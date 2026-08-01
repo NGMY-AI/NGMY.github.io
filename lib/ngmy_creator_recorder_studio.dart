@@ -45,9 +45,33 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   NgmyLiveCaptureSession get _session => ngmyLiveCaptureSession;
 
-  double get _previewHeight {
-    final base = _session.aspect == 'tiktok' ? 280.0 : 220.0;
-    return base + 56;
+  (double, double) _previewSize(BuildContext context) {
+    final maxW = MediaQuery.sizeOf(context).width - 72;
+    switch (_session.aspect) {
+      case 'tiktok':
+        final w = maxW.clamp(200.0, 360.0);
+        return (w, w * 16 / 9);
+      case 'square':
+        final w = maxW.clamp(220.0, 340.0);
+        return (w, w);
+      case 'youtube':
+      default:
+        return (maxW, maxW * 9 / 16);
+    }
+  }
+
+  double _previewHeight(BuildContext context) => _previewSize(context).$2;
+
+  String get _aspectHint {
+    switch (_session.aspect) {
+      case 'tiktok':
+        return 'TikTok — hold your phone upright for full-screen vertical video.';
+      case 'square':
+        return 'Square — centered 1:1 video, like Instagram posts.';
+      case 'youtube':
+      default:
+        return 'YouTube — turn your phone sideways for full-screen wide video.';
+    }
   }
 
   @override
@@ -55,6 +79,10 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
     _session.videoMode = true;
+    _session.pipEnabled = false;
+    if (_session.aspect != 'tiktok' && _session.aspect != 'youtube' && _session.aspect != 'square') {
+      _session.aspect = 'tiktok';
+    }
     _session.addListener(_onSession);
     unawaited(_reload().then((_) async {
       if (!_session.recording) {
@@ -103,8 +131,10 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       if (_session.recording) {
         if (_session.noiseCancellation) {
           _session.lastStatus = 'Recording with noise cancel — background sounds are filtered.';
-        } else if (_session.pipEnabled) {
-          _session.lastStatus = 'Self-view is on — back camera on top, front camera on bottom.';
+        } else if (_session.aspect == 'youtube') {
+          _session.lastStatus = 'Recording wide video — keep your phone sideways.';
+        } else if (_session.aspect == 'tiktok') {
+          _session.lastStatus = 'Recording vertical video — keep your phone upright.';
         }
       }
     }
@@ -345,15 +375,18 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               if (_session.recording || _session.previewActive)
                 _buildCameraPreview()
               else
-                _idleHint(),
+                _idleHint(context),
               const SizedBox(height: 16),
               if (recording)
-                const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
-              else
                 const Text(
-                  'Flip camera anytime. Dual camera puts the back view on top and your front camera on the bottom.',
+                  '● LIVE',
+                  style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4),
+                )
+              else
+                Text(
+                  _aspectHint,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
+                  style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
               const SizedBox(height: 16),
               SizedBox(
@@ -451,10 +484,11 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     );
   }
 
-  Widget _idleHint() {
+  Widget _idleHint(BuildContext context) {
+    final size = _previewSize(context);
     return Container(
-      width: double.infinity,
-      height: _previewHeight,
+      width: size.$1,
+      height: size.$2,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.18),
@@ -466,60 +500,27 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   Widget _buildCameraPreview({double? height}) {
-    final previewHeight = height ?? _previewHeight;
-    final pipOn = _session.pipEnabled && _session.pipStream != null;
-    if (pipOn) {
-      final topH = previewHeight * 0.72;
-      final bottomH = previewHeight * 0.28;
-      return Stack(
-        clipBehavior: Clip.none,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: topH,
-                  width: double.infinity,
-                  child: NgmyLiveCaptureMedia.liveCameraPreview(
-                    stream: _session.previewStream,
-                    height: topH,
-                    mirror: false,
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-                Container(height: 2, color: Colors.white.withValues(alpha: 0.85)),
-                SizedBox(
-                  height: bottomH,
-                  width: double.infinity,
-                  child: NgmyLiveCaptureMedia.liveCameraPreview(
-                    stream: _session.pipStream,
-                    height: bottomH,
-                    mirror: true,
-                    borderRadius: BorderRadius.zero,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            top: 6,
-            right: 6,
-            child: _previewControlBar(),
-          ),
-        ],
-      );
-    }
+    final size = _previewSize(context);
+    final previewWidth = size.$1;
+    final previewHeight = height ?? size.$2;
     return Stack(
       clipBehavior: Clip.none,
+      alignment: Alignment.center,
       children: [
-        KeyedSubtree(
-          key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
-          child: NgmyLiveCaptureMedia.liveCameraPreview(
-            stream: _session.previewStream,
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: SizedBox(
+            width: previewWidth,
             height: previewHeight,
-            mirror: _session.facingMode == 'user',
+            child: KeyedSubtree(
+              key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
+              child: NgmyLiveCaptureMedia.liveCameraPreview(
+                stream: _session.previewStream,
+                height: previewHeight,
+                mirror: _session.facingMode == 'user',
+                objectFit: 'cover',
+              ),
+            ),
           ),
         ),
         Positioned(
@@ -553,12 +554,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               icon: Icons.cameraswitch_rounded,
               tooltip: _session.facingMode == 'user' ? 'Switch to back camera' : 'Switch to front camera',
               onTap: _cameraBusy ? null : _flipCamera,
-            ),
-            _previewControlBtn(
-              icon: _session.pipEnabled ? Icons.picture_in_picture_alt_rounded : Icons.picture_in_picture_rounded,
-              tooltip: _session.pipEnabled ? 'Hide dual camera' : 'Dual camera — back on top, you on bottom',
-              onTap: _cameraBusy ? null : _togglePip,
-              active: _session.pipEnabled,
             ),
             _previewControlBtn(
               icon: _previewFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
@@ -653,13 +648,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     if (_cameraBusy) return;
     setState(() => _cameraBusy = true);
     await _session.setNoiseCancellation(!_session.noiseCancellation);
-    if (mounted) setState(() => _cameraBusy = false);
-  }
-
-  Future<void> _togglePip() async {
-    if (_cameraBusy) return;
-    setState(() => _cameraBusy = true);
-    await _session.setPipEnabled(!_session.pipEnabled);
     if (mounted) setState(() => _cameraBusy = false);
   }
 

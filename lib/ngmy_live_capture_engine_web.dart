@@ -107,13 +107,8 @@ class NgmyLiveCaptureEngine {
         return false;
       }
       if (_pipEnabled) {
-        final ok = await _ensureSelfViewLayout(aspect);
-        if (!ok) {
-          lastError = lastError ?? 'Could not open both cameras for self-view preview.';
-          await _releaseStream();
-          _previewOnly = false;
-          return false;
-        }
+        await _releasePipStream();
+        _pipEnabled = false;
       }
       return true;
     } catch (e) {
@@ -534,6 +529,17 @@ class NgmyLiveCaptureEngine {
     }
   }
 
+  Map<String, dynamic> _videoConstraintsForAspect(String facing, String aspect) {
+    final sizes = _sizesForAspect(aspect);
+    return {
+      'facingMode': {'ideal': facing},
+      'width': {'ideal': sizes.$1},
+      'height': {'ideal': sizes.$2},
+      'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
+      'frameRate': {'ideal': 30, 'max': 30},
+    };
+  }
+
   Future<html.MediaStream> _openVideoOnlyStream({
     required String facingMode,
     required String aspect,
@@ -547,23 +553,7 @@ class NgmyLiveCaptureEngine {
     final attempts = <Map<String, dynamic>>[
       {
         'audio': false,
-        'video': {
-          'facingMode': {'ideal': facing},
-          'frameRate': {'ideal': 30, 'max': 30},
-        },
-      },
-      {
-        'audio': false,
-        'video': {'facingMode': facing},
-      },
-      {
-        'audio': false,
-        'video': {
-          'facingMode': {'ideal': facing},
-          'width': {'ideal': sizes.$1},
-          'height': {'ideal': sizes.$2},
-          'frameRate': {'ideal': 30, 'max': 30},
-        },
+        'video': _videoConstraintsForAspect(facing, aspect),
       },
       {
         'audio': false,
@@ -572,6 +562,10 @@ class NgmyLiveCaptureEngine {
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
         },
+      },
+      {
+        'audio': false,
+        'video': {'facingMode': facing},
       },
       {'audio': false, 'video': true},
     ];
@@ -666,7 +660,7 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
   }
 
-  void _drawVideoContainInRect(
+  void _drawVideoCoverInRect(
     html.CanvasRenderingContext2D ctx,
     html.VideoElement video,
     num dx,
@@ -685,11 +679,11 @@ class NgmyLiveCaptureEngine {
     num drawW;
     num drawH;
     if (videoAspect > slotAspect) {
-      drawW = dw;
-      drawH = dw / videoAspect;
-    } else {
       drawH = dh;
       drawW = dh * videoAspect;
+    } else {
+      drawW = dw;
+      drawH = dw / videoAspect;
     }
     final drawX = dx + (dw - drawW) / 2;
     final drawY = dy + (dh - drawH) / 2;
@@ -704,15 +698,7 @@ class NgmyLiveCaptureEngine {
     try {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, w, h);
-      if (_compositeShowPip && _compositePipVideo != null) {
-        final splitY = (h * 0.72).round();
-        _drawVideoContainInRect(ctx, _compositeMainVideo!, 0, 0, w, splitY);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, splitY, w, 3);
-        _drawVideoContainInRect(ctx, _compositePipVideo!, 0, splitY + 3, w, h - splitY - 3);
-      } else {
-        _drawVideoContainInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
-      }
+      _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
     } catch (_) {}
   }
 
@@ -814,20 +800,11 @@ class NgmyLiveCaptureEngine {
 
       html.MediaStream streamForRecorder = _stream!;
       if (_video) {
-        if (_pipEnabled) {
-          final dualOk = await _ensureSelfViewLayout(aspect);
-          if (!dualOk) {
-            lastError = lastError ?? 'Could not open both cameras for self-view recording.';
-            await _teardownRecorderOnly();
-            return false;
-          }
-          _activeFacing = 'environment';
-        }
         final composite = await _startCompositeStream(
           _stream!,
-          _pipStream,
+          null,
           aspect,
-          showPip: _pipEnabled && _pipStream != null,
+          showPip: false,
         );
         if (composite == null) {
           lastError = 'Could not start video recorder on this device.';
@@ -1103,23 +1080,7 @@ class NgmyLiveCaptureEngine {
     final attempts = <Map<String, dynamic>>[
       {
         'audio': audioPref,
-        'video': {
-          'facingMode': {'ideal': facing},
-          'frameRate': {'ideal': 30, 'max': 30},
-        },
-      },
-      {
-        'audio': audioPref,
-        'video': {'facingMode': facing},
-      },
-      {
-        'audio': audioPref,
-        'video': {
-          'facingMode': {'ideal': facing},
-          'width': {'ideal': sizes.$1},
-          'height': {'ideal': sizes.$2},
-          'frameRate': {'ideal': 30, 'max': 30},
-        },
+        'video': _videoConstraintsForAspect(facing, aspect),
       },
       {
         'audio': audioPref,
@@ -1127,7 +1088,7 @@ class NgmyLiveCaptureEngine {
           'facingMode': facing,
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
-          'frameRate': {'ideal': 30, 'max': 30},
+          'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
         },
       },
       {
@@ -1136,11 +1097,7 @@ class NgmyLiveCaptureEngine {
       },
       {
         'audio': true,
-        'video': {
-          'facingMode': {'ideal': facing},
-          'width': {'ideal': sizes.$1},
-          'height': {'ideal': sizes.$2},
-        },
+        'video': _videoConstraintsForAspect(facing, aspect),
       },
       {
         'audio': true,
@@ -1163,12 +1120,12 @@ class NgmyLiveCaptureEngine {
   (int, int) _sizesForAspect(String aspect) {
     switch (aspect) {
       case 'tiktok':
-        return (720, 1280);
+        return (1080, 1920);
       case 'square':
         return (1080, 1080);
       case 'youtube':
       default:
-        return (1280, 720);
+        return (1920, 1080);
     }
   }
 
