@@ -222,11 +222,7 @@ class _NgmyHomeRoboticEssentialsHubState extends State<_NgmyHomeRoboticEssential
         return list
             .map((m) => _PinRow(
                   title: m.name.trim().isEmpty ? 'Medicine' : m.name.trim(),
-                  body: [
-                    if (m.dosage.trim().isNotEmpty) m.dosage.trim(),
-                    if (m.schedule.trim().isNotEmpty) m.schedule.trim(),
-                    if (m.notes.trim().isNotEmpty) m.notes.trim(),
-                  ].join('\n'),
+                  body: ngmyMedicinePinBody(m),
                 ))
             .toList();
       case 'notes':

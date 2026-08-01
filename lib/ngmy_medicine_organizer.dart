@@ -107,7 +107,6 @@ Future<void> ngmyImportMedicines({required String userEmail, required List<NgmyM
   await _saveMedicines(userEmail, byId.values.toList());
 }
 
-/// Default reminder times from times-per-day when user has not set custom times.
 List<String> ngmyDefaultMedicineReminderTimes(int timesPerDay) {
   switch (timesPerDay.clamp(1, 6)) {
     case 1:
@@ -123,6 +122,30 @@ List<String> ngmyDefaultMedicineReminderTimes(int timesPerDay) {
     default:
       return ['07:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
   }
+}
+
+String ngmyFormatMedicineClock(String hhmm) {
+  final parts = hhmm.split(':');
+  if (parts.length < 2) return hhmm;
+  final h = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+  final ampm = h >= 12 ? 'PM' : 'AM';
+  return '$hour12:${m.toString().padLeft(2, '0')} $ampm';
+}
+
+String ngmyMedicinePinBody(NgmyMedicineEntry m) {
+  final times = m.reminderTimes.isNotEmpty ? m.reminderTimes : ngmyDefaultMedicineReminderTimes(m.timesPerDay);
+  return [
+    if (m.dosage.trim().isNotEmpty) 'Dosage: ${m.dosage.trim()}',
+    '${m.timesPerDay}x per day',
+    if (m.category.trim().isNotEmpty) 'Category: ${m.category.trim()}',
+    if (m.schedule.trim().isNotEmpty) 'Schedule: ${m.schedule.trim()}',
+    if (times.isNotEmpty) 'Times: ${times.map(ngmyFormatMedicineClock).join(' · ')}',
+    if (m.notes.trim().isNotEmpty) 'Notes: ${m.notes.trim()}',
+    m.remindersEnabled ? 'Reminders: On' : 'Reminders: Off',
+    'Time for your medicine',
+  ].join('\n');
 }
 
 Future<void> showNgmyMedicineOrganizerDialog(BuildContext context, {required String userEmail}) {
@@ -327,9 +350,12 @@ class _MedicinePlasticCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final times = medicine.reminderTimes.isNotEmpty
+        ? medicine.reminderTimes
+        : ngmyDefaultMedicineReminderTimes(medicine.timesPerDay);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 128,
+      height: 168,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -427,19 +453,44 @@ class _MedicinePlasticCard extends StatelessWidget {
                               style: TextStyle(color: const Color(0xFF9D174D).withValues(alpha: 0.85), fontWeight: FontWeight.w700, fontSize: 12),
                             ),
                             const Spacer(),
-                            Row(
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
                               children: [
                                 _MedChip(label: '${medicine.timesPerDay}x / day'),
-                                if (medicine.schedule.isNotEmpty) ...[
-                                  const SizedBox(width: 6),
-                                  Flexible(child: _MedChip(label: medicine.schedule)),
-                                ],
-                                if (medicine.remindersEnabled) ...[
-                                  const SizedBox(width: 6),
-                                  const Icon(Icons.notifications_active_rounded, size: 14, color: Color(0xFFDB2777)),
-                                ],
+                                if (medicine.schedule.isNotEmpty) _MedChip(label: medicine.schedule),
+                                if (medicine.remindersEnabled)
+                                  const _MedChip(label: 'Reminders on')
+                                else
+                                  const _MedChip(label: 'Reminders off'),
                               ],
                             ),
+                            if (times.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.access_time_filled_rounded, size: 13, color: accent.withValues(alpha: 0.85)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      times.map(ngmyFormatMedicineClock).join(' · '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(color: const Color(0xFF9D174D).withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 10.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (medicine.notes.trim().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                medicine.notes.trim(),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: const Color(0xFFBE185D).withValues(alpha: 0.75), fontWeight: FontWeight.w600, fontSize: 10),
+                              ),
+                            ],
                           ],
                         ),
                       ),

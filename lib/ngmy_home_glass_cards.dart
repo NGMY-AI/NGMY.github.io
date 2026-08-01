@@ -649,6 +649,19 @@ String _monthLong(int m) => const [
 
 String ngmyHomeDateTabLabel(DateTime date) => '${_weekdayLong(date.weekday)}, ${date.day} ${_monthLong(date.month)}';
 
+NgmyMedicineEntry? _medicineMatchingEntry(List<NgmyMedicineEntry> list, NgmySpendingEntry entry) {
+  final title = entry.description.trim().toLowerCase();
+  if (title.isEmpty) return null;
+  for (final m in list) {
+    if (m.name.trim().toLowerCase() == title) return m;
+  }
+  for (final m in list) {
+    final n = m.name.trim().toLowerCase();
+    if (n.contains(title) || title.contains(n)) return m;
+  }
+  return null;
+}
+
 // ?? Generic swipeable glass card stack ??????????????????????????????????????
 
 class NgmyGlassCardStack<T> extends StatefulWidget {
@@ -1969,7 +1982,6 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   }
 
   bool _medicineDueNow(NgmyMedicineEntry m, DateTime now) {
-    if (!m.remindersEnabled) return false;
     final times = m.reminderTimes.isNotEmpty ? m.reminderTimes : ngmyDefaultMedicineReminderTimes(m.timesPerDay);
     final hm = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     for (final t in times) {
@@ -2028,7 +2040,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       await _triggerAlarmHold(
         ackKey: key,
         title: m.name.trim().isEmpty ? 'Medicine' : m.name.trim(),
-        body: [if (m.dosage.trim().isNotEmpty) m.dosage.trim(), 'Time for your medicine'].join('\n'),
+        body: ngmyMedicinePinBody(m),
         kind: 'Medicines',
       );
       return;
@@ -2358,7 +2370,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                               : entry.isPassword
                                   ? const [Color(0xFFFBBF24), Color(0xFFEA580C)]
                                   : entry.hasPinnedEssentials && entry.amount <= 0
-                                      ? const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
+                                      ? entry.pinnedEssentialsKind.trim() == 'Medicines'
+                                          ? const [Color(0xFF831843), Color(0xFFDB2777)]
+                                          : const [Color(0xFF0B1220), Color(0xFF1E1B4B)]
                                       : entry.showsCreditFace
                                           ? ngmyMoneyCardAccent(entry)
                                           : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
@@ -2377,6 +2391,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                   child: _SpendingCardContent(
                     entry: entry,
                     totalSpent: _totalSpent,
+                    userEmail: widget.userEmail,
                     liveCivicRecord: widget.civicIdRecord,
                     profilePicturePath: widget.profilePicturePath,
                   ),
@@ -2509,12 +2524,14 @@ class _SpendingCardContent extends StatelessWidget {
   const _SpendingCardContent({
     required this.entry,
     required this.totalSpent,
+    required this.userEmail,
     this.liveCivicRecord,
     this.profilePicturePath,
   });
 
   final NgmySpendingEntry entry;
   final double totalSpent;
+  final String userEmail;
   final Map<String, dynamic>? liveCivicRecord;
   final String? profilePicturePath;
 
@@ -2537,6 +2554,9 @@ class _SpendingCardContent extends StatelessWidget {
       return _PasswordCardBody(entry: entry);
     }
     if (entry.hasPinnedEssentials && entry.amount <= 0) {
+      if (entry.pinnedEssentialsKind.trim() == 'Medicines') {
+        return _PinnedMedicineCardBody(entry: entry, userEmail: userEmail);
+      }
       return _PinnedEssentialsCardBody(entry: entry);
     }
     return _CreditCardSpendBody(entry: entry, totalSpent: totalSpent);
@@ -2817,6 +2837,279 @@ class _PasswordCardBodyState extends State<_PasswordCardBody> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PinnedMedicineCardBody extends StatefulWidget {
+  const _PinnedMedicineCardBody({required this.entry, required this.userEmail});
+
+  final NgmySpendingEntry entry;
+  final String userEmail;
+
+  @override
+  State<_PinnedMedicineCardBody> createState() => _PinnedMedicineCardBodyState();
+}
+
+class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
+  NgmyMedicineEntry? _medicine;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final list = await ngmyExportMedicines(userEmail: widget.userEmail);
+    if (!mounted) return;
+    setState(() {
+      _medicine = _medicineMatchingEntry(list, widget.entry);
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFFDB2777);
+    const ink = Color(0xFF831843);
+    const inkSoft = Color(0xFF9D174D);
+    final m = _medicine;
+    final title = widget.entry.description.trim().isEmpty ? 'Medicine' : widget.entry.description.trim();
+    final bodyLines = widget.entry.pinnedNoteText.trim().split('\n').where((l) => l.trim().isNotEmpty).toList();
+    final times = m == null
+        ? _timesFromBody(bodyLines)
+        : (m.reminderTimes.isNotEmpty ? m.reminderTimes : ngmyDefaultMedicineReminderTimes(m.timesPerDay));
+    final dosage = m?.dosage.trim().isNotEmpty == true
+        ? m!.dosage.trim()
+        : _lineAfter(bodyLines, 'Dosage:').trim();
+    final schedule = m?.schedule.trim().isNotEmpty == true
+        ? m!.schedule.trim()
+        : _lineAfter(bodyLines, 'Schedule:').trim();
+    final category = m?.category.trim().isNotEmpty == true ? m!.category.trim() : _lineAfter(bodyLines, 'Category:').trim();
+    final notes = m?.notes.trim().isNotEmpty == true ? m!.notes.trim() : _lineAfter(bodyLines, 'Notes:').trim();
+    final timesPerDay = m?.timesPerDay ?? _timesPerDayFromBody(bodyLines);
+    final remindersOn = m?.remindersEnabled ?? bodyLines.any((l) => l.toLowerCase().contains('reminders: on'));
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFFFF1F7), Color(0xFFFCE7F3), Color(0xFFFBCFE8)],
+            ),
+          ),
+        ),
+        Positioned(
+          right: -8,
+          bottom: -20,
+          child: Icon(Icons.medication_liquid_rounded, size: 120, color: accent.withValues(alpha: 0.12)),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 34,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.75)]),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4)),
+                  const Spacer(),
+                  if (category.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.6)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 42, 14, 12),
+          child: _loading
+              ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: accent)))
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.72)]),
+                            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
+                          ),
+                          child: const Icon(Icons.medication_rounded, color: Colors.white, size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 19, height: 1.15)),
+                              const SizedBox(height: 4),
+                              Text(
+                                dosage.isEmpty ? 'Dosage not set' : dosage,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: inkSoft.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _HomeMedChip(icon: Icons.repeat_rounded, label: '${timesPerDay}x / day'),
+                        if (schedule.isNotEmpty) _HomeMedChip(icon: Icons.schedule_rounded, label: schedule),
+                        _HomeMedChip(
+                          icon: remindersOn ? Icons.notifications_active_rounded : Icons.notifications_off_rounded,
+                          label: remindersOn ? 'Reminders on' : 'Reminders off',
+                        ),
+                      ],
+                    ),
+                    if (times.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: accent.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.access_time_filled_rounded, size: 16, color: accent.withValues(alpha: 0.85)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                times.map(ngmyFormatMedicineClock).join('  ·  '),
+                                style: TextStyle(color: ink.withValues(alpha: 0.92), fontWeight: FontWeight.w800, fontSize: 12, height: 1.35),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (notes.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEC4899).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.28)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.sticky_note_2_outlined, size: 15, color: inkSoft.withValues(alpha: 0.85)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(notes, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: inkSoft.withValues(alpha: 0.95), fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.35)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(Icons.favorite_rounded, size: 14, color: accent.withValues(alpha: 0.75)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            bodyLines.any((l) => l.toLowerCase().contains('time for your medicine')) ? 'Due now — take your dose' : 'Pinned from Medicines',
+                            style: TextStyle(color: inkSoft.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 11),
+                          ),
+                        ),
+                        Text(
+                          ngmyHomeDateTabLabel(widget.entry.date),
+                          style: TextStyle(color: inkSoft.withValues(alpha: 0.65), fontWeight: FontWeight.w700, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  static String _lineAfter(List<String> lines, String prefix) {
+    for (final l in lines) {
+      if (l.startsWith(prefix)) return l.substring(prefix.length).trim();
+    }
+    return '';
+  }
+
+  static List<String> _timesFromBody(List<String> lines) {
+    for (final l in lines) {
+      if (l.startsWith('Times:')) {
+        return l.substring(6).split('·').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      }
+    }
+    return const [];
+  }
+
+  static int _timesPerDayFromBody(List<String> lines) {
+    for (final l in lines) {
+      final m = RegExp(r'(\d+)x per day', caseSensitive: false).firstMatch(l);
+      if (m != null) return int.tryParse(m.group(1) ?? '') ?? 1;
+    }
+    return 1;
+  }
+}
+
+class _HomeMedChip extends StatelessWidget {
+  const _HomeMedChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEC4899).withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFEC4899).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: const Color(0xFFBE185D)),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(color: Color(0xFFBE185D), fontWeight: FontWeight.w800, fontSize: 10)),
         ],
       ),
     );
