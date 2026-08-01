@@ -100,8 +100,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     await _session.start(userEmail: widget.userEmail, video: true);
     if (mounted) {
       setState(() => _busy = false);
-      if (_session.recording && _session.pipEnabled) {
-        _session.lastStatus = 'Self-view is on — your face will appear in the saved video.';
+      if (_session.recording) {
+        if (_session.noiseCancellation) {
+          _session.lastStatus = 'Recording with noise cancel — background sounds are filtered.';
+        } else if (_session.pipEnabled) {
+          _session.lastStatus = 'Self-view is on — back camera on top, front camera on bottom.';
+        }
       }
     }
   }

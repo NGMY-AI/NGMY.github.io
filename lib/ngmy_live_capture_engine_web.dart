@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:html' as html;
+import 'dart:js_util' as js_util;
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -39,6 +41,13 @@ class NgmyLiveCaptureEngine {
   html.MediaStream? _recordStream;
   bool _pipEnabled = false;
   bool _noiseCancellation = false;
+  Object? _noiseAudioCtx;
+  html.MediaStream? _rawAudioStream;
+  html.MediaStreamTrack? _rawAudioTrack;
+  html.MediaStreamTrack? _processedAudioTrack;
+  Object? _noiseGateGain;
+  Object? _noiseAnalyser;
+  Timer? _noiseGateTimer;
   html.CanvasElement? _compositeCanvas;
   html.VideoElement? _compositeMainVideo;
   html.VideoElement? _compositePipVideo;
@@ -221,10 +230,19 @@ class NgmyLiveCaptureEngine {
   }
 
   Future<bool> setNoiseCancellation(bool enabled) async {
+    final previous = _noiseCancellation;
     _noiseCancellation = enabled;
     if (_stream == null) return true;
     final ok = await _applyNoiseCancellation(_stream!, enabled);
-    if (!ok && _previewOnly) {
+    if (ok) {
+      if (_recordStream != null) {
+        _syncRecordStreamAudio();
+      }
+      return true;
+    }
+    _noiseCancellation = previous;
+    lastError = lastError ?? 'Could not ${enabled ? 'enable' : 'disable'} noise cancellation on this device.';
+    if (_previewOnly) {
       return openPreview(
         facingMode: _activeFacing,
         aspect: _activeAspect,
@@ -232,30 +250,212 @@ class NgmyLiveCaptureEngine {
         noiseCancellation: enabled,
       );
     }
-    return ok;
+    return false;
   }
 
   Map<String, dynamic> _audioConstraints({required bool noiseCancellation}) {
+    if (noiseCancellation) {
+      return {
+        'echoCancellation': true,
+        'noiseSuppression': true,
+        'autoGainControl': true,
+        'channelCount': {'ideal': 1},
+        'sampleRate': {'ideal': 48000},
+      };
+    }
     return {
-      'echoCancellation': noiseCancellation,
-      'noiseSuppression': noiseCancellation,
-      'autoGainControl': noiseCancellation,
+      'echoCancellation': false,
+      'noiseSuppression': false,
+      'autoGainControl': false,
     };
   }
 
+  Future<void> _resumeAudioContext(Object ctx) async {
+    try {
+      if (js_util.getProperty(ctx, 'state') == 'suspended') {
+        await js_util.promiseToFuture<void>(js_util.callMethod(ctx, 'resume', const []));
+      }
+    } catch (e) {
+      debugPrint('[live_capture] AudioContext resume: $e');
+    }
+  }
+
+  Object _createAudioContext() {
+    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
+        js_util.getProperty(html.window, 'webkitAudioContext');
+    if (ctor == null) {
+      throw StateError('Web Audio is not supported in this browser');
+    }
+    return js_util.callConstructor(ctor, const []);
+  }
+
+  void _setAudioParam(Object node, String param, double value) {
+    final p = js_util.getProperty(node, param);
+    js_util.setProperty(p, 'value', value);
+  }
+
   Future<bool> _applyNoiseCancellation(html.MediaStream stream, bool enabled) async {
+    if (!enabled) {
+      await _teardownNoisePipeline(hostStream: stream);
+      final raw = _rawAudioTrack ?? _firstAudioTrack(stream);
+      if (raw != null) {
+        try {
+          await raw.applyConstraints(_audioConstraints(noiseCancellation: false));
+        } catch (e) {
+          debugPrint('[live_capture] disable noise constraints: $e');
+        }
+      }
+      return true;
+    }
+
+    final raw = _firstAudioTrack(stream) ?? _rawAudioTrack;
+    if (raw == null) return false;
+    try {
+      await raw.applyConstraints(_audioConstraints(noiseCancellation: true));
+    } catch (e) {
+      debugPrint('[live_capture] enable noise constraints: $e');
+    }
+    return _installNoisePipeline(stream, raw);
+  }
+
+  html.MediaStreamTrack? _firstAudioTrack(html.MediaStream stream) {
     final tracks = stream.getAudioTracks();
-    if (tracks.isEmpty) return false;
-    var anyOk = false;
-    for (final t in tracks) {
+    if (tracks.isEmpty) return null;
+    if (_processedAudioTrack != null && tracks.length == 1 && tracks.first.id == _processedAudioTrack!.id) {
+      return _rawAudioTrack;
+    }
+    return tracks.first;
+  }
+
+  Future<bool> _installNoisePipeline(html.MediaStream hostStream, html.MediaStreamTrack rawTrack) async {
+    await _teardownNoisePipeline(restoreHost: false);
+    _rawAudioTrack = rawTrack;
+    try {
+      _rawAudioStream = html.MediaStream()..addTrack(rawTrack);
+      _noiseAudioCtx = _createAudioContext();
+      final ctx = _noiseAudioCtx!;
+      await _resumeAudioContext(ctx);
+
+      final source = js_util.callMethod(ctx, 'createMediaStreamSource', [_rawAudioStream]);
+      final highpass = js_util.callMethod(ctx, 'createBiquadFilter', const []);
+      js_util.setProperty(highpass, 'type', 'highpass');
+      _setAudioParam(highpass, 'frequency', 140);
+      _setAudioParam(highpass, 'Q', 0.8);
+
+      final lowpass = js_util.callMethod(ctx, 'createBiquadFilter', const []);
+      js_util.setProperty(lowpass, 'type', 'lowpass');
+      _setAudioParam(lowpass, 'frequency', 9000);
+      _setAudioParam(lowpass, 'Q', 0.7);
+
+      final compressor = js_util.callMethod(ctx, 'createDynamicsCompressor', const []);
+      _setAudioParam(compressor, 'threshold', -38);
+      _setAudioParam(compressor, 'knee', 18);
+      _setAudioParam(compressor, 'ratio', 10);
+      _setAudioParam(compressor, 'attack', 0.004);
+      _setAudioParam(compressor, 'release', 0.12);
+
+      _noiseGateGain = js_util.callMethod(ctx, 'createGain', const []);
+      _setAudioParam(_noiseGateGain!, 'gain', 1.0);
+      _noiseAnalyser = js_util.callMethod(ctx, 'createAnalyser', const []);
+      js_util.setProperty(_noiseAnalyser!, 'fftSize', 512);
+      final dest = js_util.callMethod(ctx, 'createMediaStreamDestination', const []);
+
+      js_util.callMethod(source, 'connect', [highpass]);
+      js_util.callMethod(highpass, 'connect', [lowpass]);
+      js_util.callMethod(lowpass, 'connect', [compressor]);
+      js_util.callMethod(compressor, 'connect', [_noiseGateGain]);
+      js_util.callMethod(_noiseGateGain, 'connect', [_noiseAnalyser]);
+      js_util.callMethod(_noiseAnalyser, 'connect', [dest]);
+
+      _startNoiseGate(ctx);
+
+      final destStream = js_util.getProperty(dest, 'stream') as html.MediaStream;
+      final processedTracks = destStream.getAudioTracks();
+      if (processedTracks.isEmpty) {
+        lastError = 'Noise cancellation could not start on this browser.';
+        await _teardownNoisePipeline(restoreHost: false);
+        return false;
+      }
+      _processedAudioTrack = processedTracks.first;
+
+      for (final t in List<html.MediaStreamTrack>.from(hostStream.getAudioTracks())) {
+        hostStream.removeTrack(t);
+      }
+      hostStream.addTrack(_processedAudioTrack!);
+      debugPrint('[live_capture] noise pipeline active raw=${rawTrack.id} processed=${_processedAudioTrack!.id}');
+      return true;
+    } catch (e) {
+      lastError = 'Noise cancellation failed: $e';
+      debugPrint('[live_capture] installNoisePipeline: $e');
+      await _teardownNoisePipeline(hostStream: hostStream);
+      return false;
+    }
+  }
+
+  void _startNoiseGate(Object ctx) {
+    _noiseGateTimer?.cancel();
+    final analyser = _noiseAnalyser;
+    final gate = _noiseGateGain;
+    if (analyser == null || gate == null) return;
+    final fftSize = js_util.getProperty(analyser, 'fftSize') as int? ?? 512;
+    final buf = Float32List(fftSize);
+    _noiseGateTimer = Timer.periodic(const Duration(milliseconds: 35), (_) {
       try {
-        await t.applyConstraints(_audioConstraints(noiseCancellation: enabled));
-        anyOk = true;
-      } catch (e) {
-        debugPrint('[live_capture] noise cancellation applyConstraints: $e');
+        js_util.callMethod(analyser, 'getFloatTimeDomainData', [buf]);
+        var sum = 0.0;
+        for (final s in buf) {
+          sum += s * s;
+        }
+        final rms = math.sqrt(sum / buf.length);
+        final target = rms > 0.014 ? 1.05 : 0.02;
+        final gainParam = js_util.getProperty(gate, 'gain');
+        final now = js_util.getProperty(ctx, 'currentTime') as num? ?? 0;
+        js_util.callMethod(gainParam, 'setTargetAtTime', [target, now, 0.02]);
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _teardownNoisePipeline({html.MediaStream? hostStream, bool restoreHost = true}) async {
+    _noiseGateTimer?.cancel();
+    _noiseGateTimer = null;
+    _noiseAnalyser = null;
+    _noiseGateGain = null;
+
+    if (restoreHost && hostStream != null && _rawAudioTrack != null) {
+      for (final t in List<html.MediaStreamTrack>.from(hostStream.getAudioTracks())) {
+        if (_processedAudioTrack != null && t.id == _processedAudioTrack!.id) {
+          hostStream.removeTrack(t);
+          try {
+            t.stop();
+          } catch (_) {}
+        }
+      }
+      if (!hostStream.getAudioTracks().any((t) => t.id == _rawAudioTrack!.id)) {
+        hostStream.addTrack(_rawAudioTrack!);
       }
     }
-    return anyOk;
+
+    final ctx = _noiseAudioCtx;
+    if (ctx != null) {
+      try {
+        await js_util.promiseToFuture<void>(js_util.callMethod(ctx, 'close', const []));
+      } catch (_) {}
+    }
+    _noiseAudioCtx = null;
+    _rawAudioStream = null;
+    _processedAudioTrack = null;
+  }
+
+  void _syncRecordStreamAudio() {
+    final record = _recordStream;
+    final host = _stream;
+    if (record == null || host == null) return;
+    for (final t in List<html.MediaStreamTrack>.from(record.getAudioTracks())) {
+      record.removeTrack(t);
+    }
+    for (final t in host.getAudioTracks()) {
+      record.addTrack(t);
+    }
   }
 
   Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {
@@ -1205,6 +1405,11 @@ class NgmyLiveCaptureEngine {
 
   Future<void> _releaseStream() async {
     _removeMuxCanvas();
+    await _teardownNoisePipeline(restoreHost: false);
+    try {
+      _rawAudioTrack?.stop();
+    } catch (_) {}
+    _rawAudioTrack = null;
     try {
       _stream?.getTracks().forEach((t) {
         try {

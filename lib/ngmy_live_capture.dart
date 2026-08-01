@@ -224,7 +224,15 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   Future<void> setNoiseCancellation(bool enabled) async {
     noiseCancellation = enabled;
-    await _engine.setNoiseCancellation(enabled);
+    final ok = await _engine.setNoiseCancellation(enabled);
+    if (!ok) {
+      noiseCancellation = _engine.noiseCancellation;
+      lastError = _engine.lastError ?? 'Could not enable noise cancellation on this device.';
+    } else if (enabled) {
+      lastStatus = 'Noise cancel on — background sounds are filtered in your recording.';
+    } else {
+      lastStatus = 'Noise cancel off — raw microphone audio.';
+    }
     notifyListeners();
   }
 
