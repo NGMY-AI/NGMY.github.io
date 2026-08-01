@@ -69,6 +69,20 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     const volGlyph = '🔊';
     const replayGlyph = '↺';
 
+    /// Classic white play triangle — no font glyph, no gray box on mobile web.
+    html.DivElement playTriangle({required double height, double offsetLeft = 3}) {
+      final half = height / 2;
+      final width = height * 0.92;
+      return html.DivElement()
+        ..style.width = '0'
+        ..style.height = '0'
+        ..style.borderTop = '${half}px solid transparent'
+        ..style.borderBottom = '${half}px solid transparent'
+        ..style.borderLeft = '${width}px solid #FFFFFF'
+        ..style.marginLeft = '${offsetLeft}px'
+        ..style.pointerEvents = 'none';
+    }
+
     html.SpanElement glyph(String char, {double size = 20}) {
       return html.SpanElement()
         ..text = char
@@ -119,9 +133,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.pointerEvents = 'none'
       ..style.transition = 'opacity 0.2s'
       ..style.zIndex = '3';
-    final centerGlyph = glyph(playGlyph, size: 22);
-    centerGlyph.style.marginLeft = '3px';
-    centerBtn.append(centerGlyph);
+    centerBtn.children.clear();
+    centerBtn.append(playTriangle(height: 26, offsetLeft: 5));
 
     // Bottom transport bar (HTML — receives taps reliably on mobile web).
     final bar = html.DivElement()
