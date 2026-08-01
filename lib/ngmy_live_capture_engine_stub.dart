@@ -10,6 +10,12 @@ class NgmyLiveCaptureEngine {
 
   Object? get previewStream => null;
 
+  bool get previewActive => false;
+
+  Future<bool> openPreview({required String facingMode, required String aspect}) async => false;
+
+  Future<void> closePreview() async {}
+
   Future<bool> start({
     required bool video,
     String facingMode = 'user',

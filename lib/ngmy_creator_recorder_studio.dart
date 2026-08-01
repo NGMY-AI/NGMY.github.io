@@ -64,7 +64,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       _mode = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
     }
     _session.addListener(_onSession);
-    unawaited(_reload());
+    unawaited(_reload().then((_) async {
+      if (_mode == _StudioMode.video && !_session.recording) {
+        await _session.refreshVideoPreview();
+        if (mounted) setState(() {});
+      }
+    }));
   }
 
   void _onSession() {
@@ -80,6 +85,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   void dispose() {
     _session.removeListener(_onSession);
     _pulse.dispose();
+    unawaited(_session.closeVideoPreview());
     super.dispose();
   }
 
@@ -105,6 +111,15 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       _mode = mode;
       _session.videoMode = mode == _StudioMode.video;
     });
+    if (mode == _StudioMode.video) {
+      unawaited(_session.refreshVideoPreview().then((_) {
+        if (mounted) setState(() {});
+      }));
+    } else {
+      unawaited(_session.closeVideoPreview().then((_) {
+        if (mounted) setState(() {});
+      }));
+    }
   }
 
   Future<void> _startRecording() async {
@@ -297,22 +312,31 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => setState(() => _session.aspect = 'youtube')),
-                    _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => setState(() => _session.aspect = 'tiktok')),
-                    _smallChip('Square', _session.aspect == 'square', () => setState(() => _session.aspect = 'square')),
+                    _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => _setAspect('youtube')),
+                    _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => _setAspect('tiktok')),
+                    _smallChip('Square', _session.aspect == 'square', () => _setAspect('square')),
                     _flipCameraIcon(),
                   ],
                 ),
               ],
               const SizedBox(height: 16),
-              if (recording && _displayMode == _StudioMode.video)
-                KeyedSubtree(
-                  key: ValueKey('cam-${identityHashCode(_session.previewStream)}'),
-                  child: NgmyLiveCaptureMedia.liveCameraPreview(
-                    stream: _session.previewStream,
-                    height: _session.aspect == 'tiktok' ? 280 : 220,
-                    mirror: _session.facingMode == 'user',
-                  ),
+              if (_displayMode == _StudioMode.video && (_session.recording || _session.previewActive))
+                Stack(
+                  alignment: Alignment.topRight,
+                  children: [
+                    KeyedSubtree(
+                      key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
+                      child: NgmyLiveCaptureMedia.liveCameraPreview(
+                        stream: _session.previewStream,
+                        height: _session.aspect == 'tiktok' ? 280 : 220,
+                        mirror: _session.facingMode == 'user',
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: _flipCameraIcon(enabled: !_session.recording, compact: true),
+                    ),
+                  ],
                 )
               else if (recording && _displayMode == _StudioMode.voice)
                 _WaveBars(active: true, pulse: p)
@@ -464,24 +488,50 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     );
   }
 
-  Widget _flipCameraIcon() {
+  void _setAspect(String aspect) {
+    if (_session.recording) return;
+    setState(() => _session.aspect = aspect);
+    if (_displayMode == _StudioMode.video) {
+      unawaited(_session.refreshVideoPreview().then((_) {
+        if (mounted) setState(() {});
+      }));
+    }
+  }
+
+  Future<void> _flipCamera() async {
+    if (_session.recording) return;
+    setState(() => _session.facingMode = _session.facingMode == 'user' ? 'environment' : 'user');
+    if (_displayMode == _StudioMode.video) {
+      await _session.refreshVideoPreview();
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _flipCameraIcon({bool enabled = true, bool compact = false}) {
     final isFront = _session.facingMode == 'user';
+    final size = compact ? 30.0 : 34.0;
+    final iconSize = compact ? 15.0 : 17.0;
     return Tooltip(
-      message: isFront ? 'Switch to back camera' : 'Switch to front camera',
+      message: isFront ? 'Front camera — tap to switch back' : 'Back camera — tap to switch front',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => setState(() => _session.facingMode = isFront ? 'environment' : 'user'),
+          onTap: enabled ? _flipCamera : null,
           borderRadius: BorderRadius.circular(10),
-          child: Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: Colors.white.withValues(alpha: 0.08),
-              border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.45)),
+          child: AnimatedRotation(
+            turns: isFront ? 0.0 : 0.5,
+            duration: const Duration(milliseconds: 340),
+            curve: Curves.easeOutBack,
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: Colors.black.withValues(alpha: compact ? 0.45 : 0.08),
+                border: Border.all(color: NgmyRecorderStudioColors.mint.withValues(alpha: enabled ? 0.65 : 0.25)),
+              ),
+              child: Icon(Icons.cameraswitch_rounded, size: iconSize, color: Colors.white.withValues(alpha: enabled ? 0.95 : 0.45)),
             ),
-            child: Icon(Icons.cameraswitch_rounded, size: 17, color: Colors.white.withValues(alpha: 0.85)),
           ),
         ),
       ),

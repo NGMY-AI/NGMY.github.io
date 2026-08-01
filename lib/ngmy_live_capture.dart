@@ -169,9 +169,23 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   Object? get previewStream => _engine.previewStream;
 
+  bool get previewActive => _engine.previewActive;
+
   String? get activeUserEmail => _userEmail;
 
   bool get isBackgroundRecording => recording;
+
+  Future<void> refreshVideoPreview() async {
+    if (recording || !videoMode) return;
+    await _engine.openPreview(facingMode: facingMode, aspect: aspect);
+    notifyListeners();
+  }
+
+  Future<void> closeVideoPreview() async {
+    if (recording) return;
+    await _engine.closePreview();
+    notifyListeners();
+  }
 
   Future<bool> start({required String userEmail, required bool video}) async {
     lastError = null;

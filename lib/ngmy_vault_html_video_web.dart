@@ -61,6 +61,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..preload = 'auto'
       ..autoplay = false
       ..muted = false
+      ..defaultMuted = false
+      ..volume = 1.0
       ..setAttribute('playsinline', 'true')
       ..setAttribute('webkit-playsinline', 'true')
       ..style.width = '100%'
@@ -223,6 +225,34 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       if (mounted) setState(() => _error = msg);
     }
 
+    void playWithSound() {
+      if (!userMuted) {
+        v.muted = false;
+        v.defaultMuted = false;
+        v.removeAttribute('muted');
+        v.volume = 1.0;
+      }
+      v.playbackRate = 1.0;
+      v.defaultPlaybackRate = 1.0;
+      v.play().catchError((e) {
+        debugPrint('[vault html video] unmuted play failed: $e');
+        final keepMuted = userMuted;
+        v.muted = true;
+        v.play().then((_) {
+          if (!keepMuted) {
+            v.muted = false;
+            v.defaultMuted = false;
+            v.removeAttribute('muted');
+            v.volume = 1.0;
+          }
+          syncUi();
+        }).catchError((e2) {
+          debugPrint('[vault html video] muted play failed: $e2');
+          showError('Tap Play again — your browser blocked playback.');
+        });
+      });
+    }
+
     void togglePlay() {
       try {
         v.playbackRate = 1.0;
@@ -232,11 +262,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         }
         if (v.paused || v.ended) {
           if (v.ended) v.currentTime = 0;
-          ensureAudible();
-          v.play().catchError((e) {
-            debugPrint('[vault html video] play failed: $e');
-            showError('Tap Play again — your browser blocked playback.');
-          });
+          playWithSound();
         } else {
           v.pause();
         }
@@ -306,7 +332,11 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..append(bar);
 
     v.onPlay.listen((_) {
-      ensureAudible();
+      if (!userMuted) {
+        v.muted = false;
+        v.volume = 1.0;
+      }
+      v.playbackRate = 1.0;
       syncUi();
     });
     v.onLoadedMetadata.listen((_) {

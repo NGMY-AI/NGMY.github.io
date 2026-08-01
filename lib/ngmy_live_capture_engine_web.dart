@@ -32,8 +32,47 @@ class NgmyLiveCaptureEngine {
   bool _appleVoiceMux = false;
   Timer? _muxCanvasTimer;
   Timer? _flushTimer;
+  bool _previewOnly = false;
 
   Object? get previewStream => _stream;
+
+  bool get previewActive => _previewOnly && _stream != null;
+
+  /// Live camera preview before recording (video mode only).
+  Future<bool> openPreview({
+    required String facingMode,
+    required String aspect,
+  }) async {
+    if (_recorder != null && _recorder!.state == 'recording') return false;
+    lastError = null;
+    await _teardownRecorderOnly();
+    await _releaseStream();
+    _previewOnly = true;
+    _video = true;
+    try {
+      _stream = await _openStream(video: true, facingMode: facingMode, aspect: aspect);
+      _ensureTracksLive(_stream!);
+      final videoOk = await _waitForLiveTrack(_stream!, audio: false);
+      if (!videoOk) {
+        lastError = 'Camera is not ready. Allow camera access for ngmy.org.';
+        await _releaseStream();
+        _previewOnly = false;
+        return false;
+      }
+      return true;
+    } catch (e) {
+      lastError = _describeStartError(e);
+      _previewOnly = false;
+      await _releaseStream();
+      return false;
+    }
+  }
+
+  Future<void> closePreview() async {
+    if (_recorder != null && _recorder!.state == 'recording') return;
+    _previewOnly = false;
+    await _releaseStream();
+  }
 
   static bool get _isAppleWebKit {
     final ua = html.window.navigator.userAgent.toLowerCase();
@@ -53,7 +92,15 @@ class NgmyLiveCaptureEngine {
     _appleVoiceMux = false;
 
     if (video) {
-      await dispose();
+      final hasReadyStream = _stream != null &&
+          _hasLiveTrack(_stream!, audio: true) &&
+          _hasLiveTrack(_stream!, audio: false);
+      if (hasReadyStream) {
+        await _teardownRecorderOnly();
+        _previewOnly = false;
+      } else {
+        await dispose();
+      }
     } else {
       await _teardownRecorderOnly();
       if (_voiceAudioStream == null || !_audioTracksLive(_voiceAudioStream!)) {
@@ -65,7 +112,9 @@ class NgmyLiveCaptureEngine {
     try {
       if (!video && _voiceAudioStream != null && _audioTracksLive(_voiceAudioStream!)) {
         _stream = _isAppleWebKit ? _muxAppleVoiceStream(_voiceAudioStream!) : _voiceAudioStream!;
-      } else {
+      } else if (_stream == null ||
+          (video && (!_hasLiveTrack(_stream!, audio: true) || !_hasLiveTrack(_stream!, audio: false))) ||
+          (!video && !_hasLiveTrack(_stream!, audio: true))) {
         _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
       }
 
@@ -117,7 +166,7 @@ class NgmyLiveCaptureEngine {
 
       try {
         if (_video) {
-          recorder.start();
+          recorder.start(_isAppleWebKit ? 1000 : 500);
         } else {
           recorder.start(_isAppleWebKit ? 1000 : 500);
         }
@@ -588,6 +637,7 @@ class NgmyLiveCaptureEngine {
   }
 
   Future<void> dispose() async {
+    _previewOnly = false;
     await _teardownRecorderOnly();
     await _releaseStream();
   }
