@@ -13,8 +13,9 @@ bool get ngmyStudioUseDesktopFilePicker =>
         defaultTargetPlatform == TargetPlatform.linux ||
         defaultTargetPlatform == TargetPlatform.macOS);
 
-const int kNgmyStudioMaxVideoBytes = 280 * 1024 * 1024;
-const int kNgmyStudioMaxWebVideoBytes = 80 * 1024 * 1024;
+/// No app-imposed video length cap — limited only by free space on the device.
+const int kNgmyStudioMaxVideoBytes = 1024 * 1024 * 1024 * 512;
+const int kNgmyStudioMaxWebVideoBytes = 1024 * 1024 * 1024 * 512;
 const int kNgmyStudioMaxLogoBytes = 16 * 1024 * 1024;
 
 class NgmyStudioLogoPick {

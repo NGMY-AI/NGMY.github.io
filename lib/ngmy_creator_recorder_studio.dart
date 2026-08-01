@@ -69,9 +69,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
         _session.videoMode = true;
         await _session.refreshVideoPreview();
         if (mounted) setState(() {});
-      } else if (_mode == _StudioMode.voice && !_session.recording) {
-        await _session.warmVoiceMicrophone();
-        if (mounted) setState(() {});
       }
     }));
   }
@@ -121,9 +118,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       }));
     } else {
       unawaited(_session.closeVideoPreview().then((_) {
-        if (mounted) setState(() {});
-      }));
-      unawaited(_session.warmVoiceMicrophone().then((_) {
         if (mounted) setState(() {});
       }));
     }

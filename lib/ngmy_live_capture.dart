@@ -112,11 +112,7 @@ class NgmyLiveCaptureStore {
   /// Returns false if the recording could not be persisted for later — the
   /// caller should still let the user play/download it in this session.
   static Future<bool> save(String email, List<NgmyLiveCaptureItem> items) async {
-    final trimmed = items.take(24).toList();
-    final dropped = items.skip(24);
-    if (dropped.isNotEmpty) {
-      unawaited(NgmyLiveCaptureBlobStore.deleteMany(dropped.map((e) => e.id)));
-    }
+    final trimmed = items;
     var mediaOk = true;
     for (final item in trimmed) {
       if (item.dataUrl.isEmpty) {

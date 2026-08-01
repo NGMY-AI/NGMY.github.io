@@ -587,7 +587,7 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
             _addOption(ctx, emoji: '🖼️', title: 'Add photos', subtitle: 'Choose one or more from your gallery', onTap: _addPhotos),
-            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Saved on your device — 5+ min, very large files OK', onTap: _addVideo),
+            _addOption(ctx, emoji: '🎬', title: 'Add a video', subtitle: 'Saved on your device — any length, limited only by your phone storage', onTap: _addVideo),
             const SizedBox(height: 12),
           ],
         ),

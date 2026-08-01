@@ -25,7 +25,7 @@ Future<String?> pickWebVideoObjectUrl() async {
 
   input.click();
   return completer.future.timeout(
-    const Duration(minutes: 5),
+    const Duration(hours: 24),
     onTimeout: () {
       cleanup();
       return null;

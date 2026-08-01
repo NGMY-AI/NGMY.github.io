@@ -33,6 +33,7 @@ class NgmyLiveCaptureEngine {
   Timer? _muxCanvasTimer;
   Timer? _flushTimer;
   bool _previewOnly = false;
+  html.CanvasElement? _muxCanvas;
 
   Object? get previewStream => _stream;
 
@@ -81,24 +82,9 @@ class NgmyLiveCaptureEngine {
     await _releaseStream();
   }
 
-  /// Opens the mic ahead of time for voice memos (no recording yet).
+  /// Mic opens only inside [start] / [openPreview] — not here (iOS requires a tap).
   Future<bool> warmVoiceMicrophone() async {
-    if (_recorder != null && _recorder!.state == 'recording') return false;
-    lastError = null;
-    if (_voiceAudioStream != null && _audioTracksLive(_voiceAudioStream!)) return true;
-    try {
-      final stream = await _openStream(video: false, facingMode: 'user', aspect: 'youtube');
-      _ensureTracksLive(stream);
-      final ok = await _waitForLiveTrack(stream, audio: true);
-      if (!ok) {
-        lastError = 'Allow microphone access so voice memos record with sound.';
-        return false;
-      }
-      return true;
-    } catch (e) {
-      lastError = _describeStartError(e);
-      return false;
-    }
+    return _voiceAudioStream != null && _audioTracksLive(_voiceAudioStream!);
   }
 
   static bool get _isAppleWebKit {
@@ -119,37 +105,34 @@ class NgmyLiveCaptureEngine {
     _appleVoiceMux = false;
 
     if (video) {
-      final hasReadyStream = _stream != null &&
+      final hasPreviewStream = _previewOnly &&
+          _stream != null &&
           _hasLiveTrack(_stream!, audio: true) &&
           _hasLiveTrack(_stream!, audio: false);
-      if (hasReadyStream) {
+      if (hasPreviewStream) {
         await _teardownRecorderOnly(keepStream: true);
         _previewOnly = false;
       } else {
         await dispose();
       }
     } else {
-      await _teardownRecorderOnly();
-      if (_voiceAudioStream == null || !_audioTracksLive(_voiceAudioStream!)) {
-        await _releaseStream();
-        _voiceAudioStream = null;
-      }
+      await dispose();
     }
 
     try {
-      if (!video && _voiceAudioStream != null && _audioTracksLive(_voiceAudioStream!)) {
-        _stream = _isAppleWebKit ? _muxAppleVoiceStream(_voiceAudioStream!) : _voiceAudioStream!;
+      if (!video) {
+        _stream = await _openStream(video: false, facingMode: facingMode, aspect: aspect);
       } else if (_stream == null ||
-          (video && (!_hasLiveTrack(_stream!, audio: true) || !_hasLiveTrack(_stream!, audio: false))) ||
-          (!video && !_hasLiveTrack(_stream!, audio: true))) {
+          !_hasLiveTrack(_stream!, audio: true) ||
+          !_hasLiveTrack(_stream!, audio: false)) {
         _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
       }
 
       _ensureTracksLive(_stream!);
       final audioOk = await _waitForLiveTrack(_stream!, audio: true);
       if (!audioOk && !video) {
-        lastError = 'Microphone is not ready. Allow mic access for ngmy.org once — it stays on after that.';
-        await _teardownRecorderOnly();
+        lastError = 'Microphone is not ready. Tap Start Voice and tap Allow when iPhone asks.';
+        await dispose();
         return false;
       }
       if (video && !audioOk) {
@@ -161,6 +144,13 @@ class NgmyLiveCaptureEngine {
         final videoOk = await _waitForLiveTrack(_stream!, audio: false);
         if (!videoOk) {
           lastError = 'Camera track is not active. Allow camera access for ngmy.org and try again.';
+          await dispose();
+          return false;
+        }
+      } else if (_appleVoiceMux) {
+        final videoOk = await _waitForLiveTrack(_stream!, audio: false);
+        if (!videoOk) {
+          lastError = 'Recorder is not ready. Tap Start Voice again.';
           await dispose();
           return false;
         }
@@ -192,8 +182,12 @@ class NgmyLiveCaptureEngine {
       });
 
       try {
-        if (_video) {
-          recorder.start(_isAppleWebKit ? 1000 : 500);
+        if (_isAppleWebKit && _appleVoiceMux) {
+          recorder.start();
+        } else if (_isAppleWebKit && _video) {
+          recorder.start(1000);
+        } else if (_video) {
+          recorder.start(500);
         } else {
           recorder.start(_isAppleWebKit ? 1000 : 500);
         }
@@ -268,32 +262,49 @@ class NgmyLiveCaptureEngine {
     try {
       if (t.enabled != true) return false;
       final state = t.readyState;
-      return state == 'live' || state == 'new';
+      return state != 'ended';
     } catch (_) {
-      return t.enabled == true;
+      return true;
     }
   }
 
   bool _hasLiveTrack(html.MediaStream stream, {required bool audio}) {
     final tracks = audio ? stream.getAudioTracks() : stream.getVideoTracks();
-    return tracks.any(_trackUsable);
+    return tracks.isNotEmpty && tracks.any(_trackUsable);
   }
 
   Future<bool> _waitForLiveTrack(html.MediaStream stream, {required bool audio}) async {
-    for (var i = 0; i < 12; i++) {
+    final attempts = _isAppleWebKit ? 50 : 15;
+    for (var i = 0; i < attempts; i++) {
       if (_hasLiveTrack(stream, audio: audio)) return true;
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 120 : 80));
     }
     return _hasLiveTrack(stream, audio: audio);
   }
 
+  void _removeMuxCanvas() {
+    _muxCanvasTimer?.cancel();
+    _muxCanvasTimer = null;
+    try {
+      _muxCanvas?.remove();
+    } catch (_) {}
+    _muxCanvas = null;
+  }
+
   html.MediaStream _muxAppleVoiceStream(html.MediaStream audioStream) {
     _appleVoiceMux = true;
+    _removeMuxCanvas();
     final canvas = html.CanvasElement(width: 4, height: 4);
+    _muxCanvas = canvas;
+    canvas
+      ..style.display = 'none'
+      ..style.position = 'fixed'
+      ..style.left = '-9999px'
+      ..style.top = '0';
+    html.document.body?.append(canvas);
     final ctx = canvas.context2D;
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, 4, 4);
-    _muxCanvasTimer?.cancel();
     _muxCanvasTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       try {
         ctx.fillRect(0, 0, 4, 4);
@@ -429,10 +440,11 @@ class NgmyLiveCaptureEngine {
   }
 
   html.MediaRecorder? _createRecorder(html.MediaStream stream, String mime) {
+    final withVideo = _video || _appleVoiceMux;
     final options = <String, dynamic>{
       if (mime.isNotEmpty) 'mimeType': mime,
       'audioBitsPerSecond': 128000,
-      if (_video) 'videoBitsPerSecond': 2500000,
+      if (withVideo) 'videoBitsPerSecond': 2500000,
     };
     if (mime.isNotEmpty) {
       try {
@@ -444,7 +456,12 @@ class NgmyLiveCaptureEngine {
       }
     }
     try {
-      return html.MediaRecorder(stream, _video ? {'audioBitsPerSecond': 128000, 'videoBitsPerSecond': 2500000} : {'audioBitsPerSecond': 128000});
+      return html.MediaRecorder(
+        stream,
+        withVideo
+            ? {'audioBitsPerSecond': 128000, 'videoBitsPerSecond': 2500000}
+            : {'audioBitsPerSecond': 128000},
+      );
     } catch (e) {
       debugPrint('[live_capture] MediaRecorder default failed: $e');
       return null;
@@ -514,8 +531,7 @@ class NgmyLiveCaptureEngine {
 
     _flushTimer?.cancel();
     _flushTimer = null;
-    _muxCanvasTimer?.cancel();
-    _muxCanvasTimer = null;
+    _removeMuxCanvas();
 
     final stopDone = Completer<void>();
     late final StreamSubscription<html.Event> stopSub;
@@ -549,13 +565,13 @@ class NgmyLiveCaptureEngine {
       debugPrint('[live_capture] stop event timeout — using buffered chunks');
     }
 
-    for (var i = 0; i < 10 && _chunks.isEmpty; i++) {
+    for (var i = 0; i < 20 && _chunks.isEmpty; i++) {
       try {
         recorder.requestData();
       } catch (_) {}
-      await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 700 : 350));
+      await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 900 : 400));
     }
-    await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 3500 : 800));
+    await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 5000 : 900));
 
     try {
       await stopSub.cancel();
@@ -627,8 +643,7 @@ class NgmyLiveCaptureEngine {
     _flushTimer?.cancel();
     _flushTimer = null;
     if (!keepStream) {
-      _muxCanvasTimer?.cancel();
-      _muxCanvasTimer = null;
+      _removeMuxCanvas();
     }
     try {
       if (_recorder != null && _recorder!.state != 'inactive') {
@@ -656,6 +671,7 @@ class NgmyLiveCaptureEngine {
   }
 
   Future<void> _releaseStream() async {
+    _removeMuxCanvas();
     try {
       _stream?.getTracks().forEach((t) {
         try {
