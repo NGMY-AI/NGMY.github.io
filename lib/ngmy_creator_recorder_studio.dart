@@ -64,7 +64,16 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       _mode = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
     }
     _session.addListener(_onSession);
-    unawaited(_reload());
+    unawaited(_reload().then((_) async {
+      if (_mode == _StudioMode.video && !_session.recording) {
+        _session.videoMode = true;
+        await _session.refreshVideoPreview();
+        if (mounted) setState(() {});
+      } else if (_mode == _StudioMode.voice && !_session.recording) {
+        await _session.warmVoiceMicrophone();
+        if (mounted) setState(() {});
+      }
+    }));
   }
 
   void _onSession() {
@@ -112,6 +121,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       }));
     } else {
       unawaited(_session.closeVideoPreview().then((_) {
+        if (mounted) setState(() {});
+      }));
+      unawaited(_session.warmVoiceMicrophone().then((_) {
         if (mounted) setState(() {});
       }));
     }
@@ -377,7 +389,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 Text(
                   _displayMode == _StudioMode.video
                       ? 'Record video with front or back camera. Tap the flip icon on the preview to switch.'
-                      : 'Tap Start Voice — allow the mic when iPhone asks, then speak.',
+                      : 'Record voice memos — clear audio like iPhone Voice Memos.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
