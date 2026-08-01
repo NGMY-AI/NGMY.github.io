@@ -105,52 +105,30 @@ class NgmyLiveCaptureEngine {
     _appleVoiceMux = false;
 
     if (video) {
-      final hasPreviewStream = _previewOnly &&
-          _stream != null &&
-          _hasLiveTrack(_stream!, audio: true) &&
-          _hasLiveTrack(_stream!, audio: false);
-      if (hasPreviewStream) {
-        await _teardownRecorderOnly(keepStream: true);
-        _previewOnly = false;
-      } else {
-        await dispose();
-      }
+      await dispose();
     } else {
       await dispose();
     }
 
     try {
-      if (!video) {
-        _stream = await _openStream(video: false, facingMode: facingMode, aspect: aspect);
-      } else if (_stream == null ||
-          !_hasLiveTrack(_stream!, audio: true) ||
-          !_hasLiveTrack(_stream!, audio: false)) {
-        _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
-      }
+      _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
 
       _ensureTracksLive(_stream!);
+      _logTrackState('after openStream');
       final audioOk = await _waitForLiveTrack(_stream!, audio: true);
-      if (!audioOk && !video) {
-        lastError = 'Microphone is not ready. Tap Start Voice and tap Allow when iPhone asks.';
+      if (!audioOk) {
+        lastError = video
+            ? 'Allow microphone access so your video records with sound.'
+            : 'Tap Start Voice again and tap Allow when Safari asks for the microphone.';
         await dispose();
         return false;
       }
-      if (video && !audioOk) {
-        lastError = 'Allow microphone access so your video records with sound.';
-        await dispose();
-        return false;
-      }
-      if (video) {
+      if (video || _appleVoiceMux) {
         final videoOk = await _waitForLiveTrack(_stream!, audio: false);
         if (!videoOk) {
-          lastError = 'Camera track is not active. Allow camera access for ngmy.org and try again.';
-          await dispose();
-          return false;
-        }
-      } else if (_appleVoiceMux) {
-        final videoOk = await _waitForLiveTrack(_stream!, audio: false);
-        if (!videoOk) {
-          lastError = 'Recorder is not ready. Tap Start Voice again.';
+          lastError = video
+              ? 'Camera track is not active. Allow camera access for ngmy.org and try again.'
+              : 'Recorder is not ready. Tap Start Voice again.';
           await dispose();
           return false;
         }
@@ -182,14 +160,12 @@ class NgmyLiveCaptureEngine {
       });
 
       try {
-        if (_isAppleWebKit && _appleVoiceMux) {
-          recorder.start();
-        } else if (_isAppleWebKit && _video) {
+        if (_isAppleWebKit) {
           recorder.start(1000);
         } else if (_video) {
           recorder.start(500);
         } else {
-          recorder.start(_isAppleWebKit ? 1000 : 500);
+          recorder.start(500);
         }
       } catch (_) {
         try {
@@ -340,6 +316,46 @@ class NgmyLiveCaptureEngine {
     }
 
     if (!video) {
+      if (_isAppleWebKit) {
+        final appleVoiceAttempts = <Map<String, dynamic>>[
+          {
+            'audio': {
+              'echoCancellation': true,
+              'noiseSuppression': true,
+              'autoGainControl': true,
+            },
+            'video': {
+              'facingMode': 'user',
+              'width': {'ideal': 320, 'max': 480},
+              'height': {'ideal': 240, 'max': 360},
+              'frameRate': {'ideal': 15, 'max': 24},
+            },
+          },
+          {
+            'audio': true,
+            'video': {
+              'facingMode': 'user',
+              'width': {'ideal': 320},
+              'height': {'ideal': 240},
+            },
+          },
+          {'audio': true, 'video': true},
+        ];
+        Object? lastErr;
+        for (final c in appleVoiceAttempts) {
+          try {
+            final stream = await devices.getUserMedia(c);
+            _voiceAudioStream = stream;
+            _appleVoiceMux = stream.getVideoTracks().isNotEmpty;
+            return stream;
+          } catch (e) {
+            lastErr = e;
+            debugPrint('[live_capture] apple voice getUserMedia failed: $e');
+          }
+        }
+        throw lastErr ?? StateError('Could not open microphone');
+      }
+
       final audioAttempts = <Map<String, dynamic>>[
         {'audio': true, 'video': false},
         {
@@ -370,9 +386,6 @@ class NgmyLiveCaptureEngine {
         throw lastErr ?? StateError('Could not open microphone');
       }
       _voiceAudioStream = audioStream;
-      if (_isAppleWebKit) {
-        return _muxAppleVoiceStream(audioStream);
-      }
       return audioStream;
     }
 
@@ -428,6 +441,16 @@ class NgmyLiveCaptureEngine {
       case 'youtube':
       default:
         return (1280, 720);
+    }
+  }
+
+  void _logTrackState(String label) {
+    if (_stream == null) return;
+    for (final t in _stream!.getAudioTracks()) {
+      debugPrint('[live_capture] $label audio id=${t.id} state=${t.readyState} enabled=${t.enabled} muted=${t.muted}');
+    }
+    for (final t in _stream!.getVideoTracks()) {
+      debugPrint('[live_capture] $label video id=${t.id} state=${t.readyState} enabled=${t.enabled} muted=${t.muted}');
     }
   }
 
@@ -531,7 +554,6 @@ class NgmyLiveCaptureEngine {
 
     _flushTimer?.cancel();
     _flushTimer = null;
-    _removeMuxCanvas();
 
     final stopDone = Completer<void>();
     late final StreamSubscription<html.Event> stopSub;
@@ -584,6 +606,7 @@ class NgmyLiveCaptureEngine {
     final cleanMime = ngmyCleanMediaMime(blobMime);
     await _cancelSubs();
     _recorder = null;
+    _removeMuxCanvas();
 
     if (_video) {
       await _releaseStream();

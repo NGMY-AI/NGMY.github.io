@@ -64,13 +64,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       _mode = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
     }
     _session.addListener(_onSession);
-    unawaited(_reload().then((_) async {
-      if (_mode == _StudioMode.video && !_session.recording) {
-        _session.videoMode = true;
-        await _session.refreshVideoPreview();
-        if (mounted) setState(() {});
-      }
-    }));
+    unawaited(_reload());
   }
 
   void _onSession() {
@@ -998,10 +992,11 @@ class _MicSetupGuideSheetState extends State<_MicSetupGuideSheet> {
         return const [
           '1. Open ngmy.org in Safari (Add to Home Screen works too).',
           '2. Open Recorder Studio and tap Start Voice or Start Video.',
-          '3. When iPhone asks, tap Allow for the microphone (and camera for video).',
-          '4. If you don\'t see a prompt: Settings → Safari → Microphone → Allow.',
-          '5. Also check: Settings → Privacy & Security → Microphone → turn Safari ON.',
-          '6. Close Safari completely, reopen ngmy.org, and tap Start again.',
+          '3. Tap Allow when ngmy.org asks — this works with Safari set to Ask or Allow.',
+          '4. Recommended: Settings → Safari → Microphone → Ask, then Allow inside ngmy.org when recording.',
+          '5. If no prompt appears: tap the AA icon in the address bar → Website Settings → Microphone → Allow.',
+          '6. Also check: Settings → Privacy & Security → Microphone → Safari ON.',
+          '7. Close Safari completely, reopen ngmy.org, tap Start Voice, then Allow.',
         ];
       case _MicGuideDevice.android:
         return const [
