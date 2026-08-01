@@ -44,8 +44,15 @@ class NgmyLiveCaptureMedia {
     double height = 200,
     bool mirror = true,
     BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
+    String objectFit = 'contain',
   }) {
-    return _StableCameraPreview(stream: stream, height: height, mirror: mirror, borderRadius: borderRadius);
+    return _StableCameraPreview(
+      stream: stream,
+      height: height,
+      mirror: mirror,
+      borderRadius: borderRadius,
+      objectFit: objectFit,
+    );
   }
 
   static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
@@ -211,11 +218,13 @@ class _StableCameraPreview extends StatefulWidget {
     required this.height,
     this.mirror = true,
     this.borderRadius = const BorderRadius.all(Radius.circular(18)),
+    this.objectFit = 'contain',
   });
   final Object? stream;
   final double height;
   final bool mirror;
   final BorderRadius borderRadius;
+  final String objectFit;
 
   @override
   State<_StableCameraPreview> createState() => _StableCameraPreviewState();
@@ -248,7 +257,7 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
         ..setAttribute('muted', 'true')
         ..style.width = '100%'
         ..style.height = '100%'
-        ..style.objectFit = 'cover'
+        ..style.objectFit = widget.objectFit
         ..style.backgroundColor = '#000'
         ..style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
       if (widget.stream is html.MediaStream) {
@@ -271,6 +280,9 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
     }
     if (oldWidget.mirror != widget.mirror && _video != null) {
       _video!.style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
+    }
+    if (oldWidget.objectFit != widget.objectFit && _video != null) {
+      _video!.style.objectFit = widget.objectFit;
     }
   }
 

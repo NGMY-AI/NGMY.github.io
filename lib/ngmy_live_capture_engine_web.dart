@@ -549,6 +549,17 @@ class NgmyLiveCaptureEngine {
         'audio': false,
         'video': {
           'facingMode': {'ideal': facing},
+          'frameRate': {'ideal': 30, 'max': 30},
+        },
+      },
+      {
+        'audio': false,
+        'video': {'facingMode': facing},
+      },
+      {
+        'audio': false,
+        'video': {
+          'facingMode': {'ideal': facing},
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
           'frameRate': {'ideal': 30, 'max': 30},
@@ -561,10 +572,6 @@ class NgmyLiveCaptureEngine {
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
         },
-      },
-      {
-        'audio': false,
-        'video': {'facingMode': facing},
       },
       {'audio': false, 'video': true},
     ];
@@ -659,7 +666,7 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
   }
 
-  void _drawVideoCoverInRect(
+  void _drawVideoContainInRect(
     html.CanvasRenderingContext2D ctx,
     html.VideoElement video,
     num dx,
@@ -678,11 +685,11 @@ class NgmyLiveCaptureEngine {
     num drawW;
     num drawH;
     if (videoAspect > slotAspect) {
-      drawH = dh;
-      drawW = dh * videoAspect;
-    } else {
       drawW = dw;
       drawH = dw / videoAspect;
+    } else {
+      drawH = dh;
+      drawW = dh * videoAspect;
     }
     final drawX = dx + (dw - drawW) / 2;
     final drawY = dy + (dh - drawH) / 2;
@@ -699,12 +706,12 @@ class NgmyLiveCaptureEngine {
       ctx.fillRect(0, 0, w, h);
       if (_compositeShowPip && _compositePipVideo != null) {
         final splitY = (h * 0.72).round();
-        _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, splitY);
+        _drawVideoContainInRect(ctx, _compositeMainVideo!, 0, 0, w, splitY);
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, splitY, w, 3);
-        _drawVideoCoverInRect(ctx, _compositePipVideo!, 0, splitY + 3, w, h - splitY - 3);
+        _drawVideoContainInRect(ctx, _compositePipVideo!, 0, splitY + 3, w, h - splitY - 3);
       } else {
-        _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
+        _drawVideoContainInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
       }
     } catch (_) {}
   }
@@ -1094,6 +1101,17 @@ class NgmyLiveCaptureEngine {
     final sizes = _sizesForAspect(aspect);
     final audioPref = _audioMediaConstraint(requiredAudio: true);
     final attempts = <Map<String, dynamic>>[
+      {
+        'audio': audioPref,
+        'video': {
+          'facingMode': {'ideal': facing},
+          'frameRate': {'ideal': 30, 'max': 30},
+        },
+      },
+      {
+        'audio': audioPref,
+        'video': {'facingMode': facing},
+      },
       {
         'audio': audioPref,
         'video': {
