@@ -5,9 +5,10 @@ import 'package:flutter/material.dart';
 
 /// Phone mockup layout — shared across stage + face widgets.
 const _kPhoneW = 96.0;
-const _kPhoneH = 220.0;
-const _kPhoneTopIconY = 44.0;
-const _kPhoneBottomBarInset = 14.0;
+const _kPhoneH = 252.0;
+const _kPhoneTopIconY = 52.0;
+const _kPhoneBottomBarInset = 16.0;
+const _kSlideSeconds = 7;
 
 /// Animated onboarding slides teaching users to save NGMY to their iPhone home screen.
 class NgmyHomeInstallGuideCard extends StatefulWidget {
@@ -98,7 +99,7 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
     _orbit = AnimationController(vsync: this, duration: const Duration(seconds: 5))..repeat();
     _slidePop = AnimationController(vsync: this, duration: const Duration(milliseconds: 620));
     _slidePop.forward();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _advanceSlide());
+    _timer = Timer.periodic(const Duration(seconds: _kSlideSeconds), (_) => _advanceSlide());
   }
 
   void _advanceSlide() {
@@ -313,7 +314,7 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
@@ -336,7 +337,7 @@ class _HeroBadge extends StatelessWidget {
         ).createShader(bounds),
         child: const Text(
           'SAVE NGMY LIKE AN APP',
-          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.85),
+          style: TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w900, letterSpacing: 1.0),
         ),
       ),
     );
@@ -373,7 +374,7 @@ class _PhoneStage extends StatelessWidget {
             final r = 54 + math.sin(orbit * math.pi * 2 + i) * 5;
             return Positioned(
               left: 52 + math.cos(angle) * r - 3,
-              top: 110 + math.sin(angle) * r * 0.4 - 3,
+              top: 126 + math.sin(angle) * r * 0.4 - 3,
               child: Container(
                 width: 7,
                 height: 7,
@@ -502,7 +503,7 @@ class _PhoneMockup extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  top: 74,
+                  top: 82,
                   left: 0,
                   right: 0,
                   child: _IosAppIcon(
