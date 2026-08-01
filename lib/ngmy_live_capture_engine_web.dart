@@ -38,6 +38,7 @@ class NgmyLiveCaptureEngine {
   html.MediaStream? _pipStream;
   html.MediaStream? _recordStream;
   bool _pipEnabled = false;
+  bool _noiseCancellation = false;
   html.CanvasElement? _compositeCanvas;
   html.VideoElement? _compositeMainVideo;
   html.VideoElement? _compositePipVideo;
@@ -58,17 +59,21 @@ class NgmyLiveCaptureEngine {
 
   bool get pipEnabled => _pipEnabled;
 
+  bool get noiseCancellation => _noiseCancellation;
+
   /// Live camera preview before recording (video mode only).
   Future<bool> openPreview({
     required String facingMode,
     required String aspect,
     bool pipEnabled = false,
+    bool noiseCancellation = false,
   }) async {
     if (_recorder != null && _recorder!.state == 'recording') return false;
     lastError = null;
     _activeFacing = facingMode;
     _activeAspect = aspect;
     _pipEnabled = pipEnabled;
+    _noiseCancellation = noiseCancellation;
     await _teardownRecorderOnly();
     await _releaseStream();
     await _releasePipStream();
@@ -77,6 +82,9 @@ class NgmyLiveCaptureEngine {
     try {
       _stream = await _openStream(video: true, facingMode: facingMode, aspect: aspect);
       _ensureTracksLive(_stream!);
+      if (_noiseCancellation) {
+        await _applyNoiseCancellation(_stream!, true);
+      }
       final audioOk = await _waitForLiveTrack(_stream!, audio: true);
       if (!audioOk) {
         lastError = 'Allow microphone access so your videos record with sound.';
@@ -206,6 +214,44 @@ class NgmyLiveCaptureEngine {
         await _compositePipVideo!.play();
       } catch (_) {}
     }
+  }
+
+  Future<bool> setNoiseCancellation(bool enabled) async {
+    _noiseCancellation = enabled;
+    if (_stream == null) return true;
+    final ok = await _applyNoiseCancellation(_stream!, enabled);
+    if (!ok && _previewOnly) {
+      return openPreview(
+        facingMode: _activeFacing,
+        aspect: _activeAspect,
+        pipEnabled: _pipEnabled,
+        noiseCancellation: enabled,
+      );
+    }
+    return ok;
+  }
+
+  Map<String, dynamic> _audioConstraints({required bool noiseCancellation}) {
+    return {
+      'echoCancellation': noiseCancellation,
+      'noiseSuppression': noiseCancellation,
+      'autoGainControl': noiseCancellation,
+    };
+  }
+
+  Future<bool> _applyNoiseCancellation(html.MediaStream stream, bool enabled) async {
+    final tracks = stream.getAudioTracks();
+    if (tracks.isEmpty) return false;
+    var anyOk = false;
+    for (final t in tracks) {
+      try {
+        await t.applyConstraints(_audioConstraints(noiseCancellation: enabled));
+        anyOk = true;
+      } catch (e) {
+        debugPrint('[live_capture] noise cancellation applyConstraints: $e');
+      }
+    }
+    return anyOk;
   }
 
   Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {
@@ -438,6 +484,7 @@ class NgmyLiveCaptureEngine {
     String facingMode = 'user',
     String aspect = 'youtube',
     bool pipEnabled = false,
+    bool noiseCancellation = false,
   }) async {
     lastError = null;
     _video = video;
@@ -445,6 +492,7 @@ class NgmyLiveCaptureEngine {
     _activeFacing = facingMode;
     _activeAspect = aspect;
     _pipEnabled = pipEnabled && video;
+    _noiseCancellation = noiseCancellation;
 
     if (video) {
       await dispose();
@@ -456,6 +504,9 @@ class NgmyLiveCaptureEngine {
       _stream = await _openStream(video: video, facingMode: facingMode, aspect: aspect);
 
       _ensureTracksLive(_stream!);
+      if (_noiseCancellation) {
+        await _applyNoiseCancellation(_stream!, true);
+      }
       _logTrackState('after openStream');
       final audioOk = await _waitForLiveTrack(_stream!, audio: true);
       if (!audioOk) {
@@ -667,6 +718,13 @@ class NgmyLiveCaptureEngine {
     return out;
   }
 
+  dynamic _audioMediaConstraint({required bool requiredAudio}) {
+    if (requiredAudio) {
+      return _audioConstraints(noiseCancellation: _noiseCancellation);
+    }
+    return false;
+  }
+
   Future<html.MediaStream> _openStream({
     required bool video,
     required String facingMode,
@@ -753,9 +811,10 @@ class NgmyLiveCaptureEngine {
 
     final facing = facingMode == 'environment' ? 'environment' : 'user';
     final sizes = _sizesForAspect(aspect);
+    final audioPref = _audioMediaConstraint(requiredAudio: true);
     final attempts = <Map<String, dynamic>>[
       {
-        'audio': true,
+        'audio': audioPref,
         'video': {
           'facingMode': {'ideal': facing},
           'width': {'ideal': sizes.$1},
@@ -764,7 +823,7 @@ class NgmyLiveCaptureEngine {
         },
       },
       {
-        'audio': true,
+        'audio': audioPref,
         'video': {
           'facingMode': facing,
           'width': {'ideal': sizes.$1},
@@ -773,8 +832,16 @@ class NgmyLiveCaptureEngine {
         },
       },
       {
-        'audio': true,
+        'audio': audioPref,
         'video': {'facingMode': facing},
+      },
+      {
+        'audio': true,
+        'video': {
+          'facingMode': {'ideal': facing},
+          'width': {'ideal': sizes.$1},
+          'height': {'ideal': sizes.$2},
+        },
       },
       {
         'audio': true,

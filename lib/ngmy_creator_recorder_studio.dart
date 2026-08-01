@@ -316,6 +316,11 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                           _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => _setAspect('youtube')),
                           _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => _setAspect('tiktok')),
                           _smallChip('Square', _session.aspect == 'square', () => _setAspect('square')),
+                          _smallChip(
+                            'Noise cancel',
+                            _session.noiseCancellation,
+                            _cameraBusy ? () {} : _toggleNoiseCancellation,
+                          ),
                         ],
                       ),
                     )
@@ -347,7 +352,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
                 const Text(
-                  'Flip camera anytime — even while recording. Turn on self-view for a FaceTime-style mini picture.',
+                  'Flip camera anytime — even while recording. Turn on self-view or noise cancel from the preview controls.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
@@ -521,6 +526,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
           mainAxisSize: MainAxisSize.min,
           children: [
             _previewControlBtn(
+              icon: _session.noiseCancellation ? Icons.noise_aware_rounded : Icons.hearing_rounded,
+              tooltip: _session.noiseCancellation ? 'Noise cancel on' : 'Turn on noise cancel',
+              onTap: _cameraBusy ? null : _toggleNoiseCancellation,
+              active: _session.noiseCancellation,
+            ),
+            _previewControlBtn(
               icon: Icons.cameraswitch_rounded,
               tooltip: _session.facingMode == 'user' ? 'Switch to back camera' : 'Switch to front camera',
               onTap: _cameraBusy ? null : _flipCamera,
@@ -618,6 +629,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   void _toggleFullscreen() {
     setState(() => _previewFullscreen = !_previewFullscreen);
+  }
+
+  Future<void> _toggleNoiseCancellation() async {
+    if (_cameraBusy) return;
+    setState(() => _cameraBusy = true);
+    await _session.setNoiseCancellation(!_session.noiseCancellation);
+    if (mounted) setState(() => _cameraBusy = false);
   }
 
   Future<void> _togglePip() async {

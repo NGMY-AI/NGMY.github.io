@@ -161,6 +161,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   /// `youtube` = 16:9, `tiktok` = 9:16 vertical, `square` = 1:1.
   String aspect = 'youtube';
   bool pipEnabled = false;
+  bool noiseCancellation = false;
   bool recording = false;
   int elapsedSec = 0;
 
@@ -176,7 +177,12 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   Future<void> refreshVideoPreview() async {
     if (recording || !videoMode) return;
-    await _engine.openPreview(facingMode: facingMode, aspect: aspect, pipEnabled: pipEnabled);
+    await _engine.openPreview(
+      facingMode: facingMode,
+      aspect: aspect,
+      pipEnabled: pipEnabled,
+      noiseCancellation: noiseCancellation,
+    );
     notifyListeners();
   }
 
@@ -205,6 +211,12 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setNoiseCancellation(bool enabled) async {
+    noiseCancellation = enabled;
+    await _engine.setNoiseCancellation(enabled);
+    notifyListeners();
+  }
+
   Future<void> warmVoiceMicrophone() async {
     if (recording || videoMode) return;
     await _engine.warmVoiceMicrophone();
@@ -219,6 +231,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       facingMode: facingMode,
       aspect: aspect,
       pipEnabled: pipEnabled,
+      noiseCancellation: noiseCancellation,
     );
     if (!ok) {
       lastError = _engine.lastError ?? 'Could not start recording on this device.';
