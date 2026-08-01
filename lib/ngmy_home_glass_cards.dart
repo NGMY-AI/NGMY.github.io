@@ -1,3 +1,4 @@
+import 'ngmy_home_install_guide_card.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
@@ -2304,6 +2305,60 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     return email.isEmpty ? 'friend' : email;
   }
 
+  /// Default home card — visible whenever the user has not added any spending cards.
+  bool get _showInstallGuide => _spending.isEmpty;
+
+  Widget _installGuideEmptyCard({required bool isDark, required String name}) {
+    return SizedBox(
+      height: 252,
+      child: NgmyFrostedCard(
+        dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+        isFront: true,
+        showDateTab: true,
+        welcomeName: name,
+        accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+        onAdd: _openAddSheet,
+        footer: _modePill(),
+        child: NgmyHomeInstallGuideCard(isDark: isDark),
+      ),
+    );
+  }
+
+  Widget _notesOnlyEmptyCard({required bool isDark, required String name}) {
+    return SizedBox(
+      height: 252,
+      child: NgmyFrostedCard(
+        dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
+        isFront: true,
+        showDateTab: true,
+        welcomeName: name,
+        accent: [
+          (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
+          (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
+        ],
+        onAdd: _openAddSheet,
+        footer: _modePill(),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 28, top: 36),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.sticky_note_2_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
+                const SizedBox(height: 10),
+                Text(
+                  'No notes yet ? tap + to write one',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2330,35 +2385,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
               slideStyle: _slideStyle,
               pauseAutoPlay: _alarmHold,
               onFrontChanged: (id) => _setDeckPrefs(frontSpendingId: id.toString()),
-              emptyBuilder: (ctx) => NgmyFrostedCard(
-                dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
-                isFront: true,
-                showDateTab: true,
-                welcomeName: name,
-                accent: [
-                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
-                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-                ],
-                onAdd: _openAddSheet,
-                footer: _modePill(),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 28, top: 36),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.savings_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
-                        const SizedBox(height: 10),
-                        Text(
-                          'No spending yet ? tap + to add',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              emptyBuilder: (ctx) => _installGuideEmptyCard(isDark: isDark, name: name),
               cardBuilder: (ctx, entry, {required isFront, required revealDates}) {
                 final isCivic = entry.hasCivicId;
                 final card = NgmyFrostedCard(
@@ -2417,35 +2444,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
               slideStyle: _slideStyle,
               pauseAutoPlay: _alarmHold,
               onFrontChanged: (id) => _setDeckPrefs(frontNoteId: id.toString()),
-              emptyBuilder: (ctx) => NgmyFrostedCard(
-                dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
-                isFront: true,
-                showDateTab: true,
-                welcomeName: name,
-                accent: [
-                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.12),
-                  (isDark ? Colors.white : Colors.black).withValues(alpha: 0.06),
-                ],
-                onAdd: _openAddSheet,
-                footer: _modePill(),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 28, top: 36),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.sticky_note_2_rounded, size: 30, color: isDark ? Colors.white38 : Colors.black26),
-                        const SizedBox(height: 10),
-                        Text(
-                          'No notes yet ? tap + to write one',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black45),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              emptyBuilder: (ctx) => _showInstallGuide
+                  ? _installGuideEmptyCard(isDark: isDark, name: name)
+                  : _notesOnlyEmptyCard(isDark: isDark, name: name),
               cardBuilder: (ctx, note, {required isFront, required revealDates}) {
                 final card = NgmyFrostedCard(
                   dateLabel: ngmyHomeDateTabLabel(note.createdAt),
@@ -4423,13 +4424,6 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
     );
   }
 
-  Widget _logSpendingLogo(double t) {
-    return Transform.scale(
-      scale: 1.0 + t * 0.05,
-      child: const NgmyOfflineEmoji('💳', fontSize: 54),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -4474,30 +4468,20 @@ class _NgmyAddSpendingSheetState extends State<_NgmyAddSpendingSheet> with Singl
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(18, 16, 10, 8),
+                      padding: const EdgeInsets.fromLTRB(18, 16, 10, 12),
                       child: Row(
                         children: [
-                          _logSpendingLogo(t),
-                          const SizedBox(width: 12),
+                          Icon(Icons.credit_card_rounded, size: 22, color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t)),
+                          const SizedBox(width: 10),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'LOG SPENDING',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 2.2,
-                                    color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t),
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Device vault ? stays local',
-                                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.58 + t * 0.08), fontWeight: FontWeight.w600),
-                                ),
-                              ],
+                            child: Text(
+                              'LOG SPENDING',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2.0,
+                                color: Color.lerp(const Color(0xFF67E8F9), const Color(0xFFA78BFA), t),
+                              ),
                             ),
                           ),
                           IconButton(
