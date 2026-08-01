@@ -2315,11 +2315,14 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
         isFront: true,
         showDateTab: true,
-        welcomeName: name,
+        welcomeName: null,
         accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
         onAdd: _openAddSheet,
         footer: _modePill(),
-        child: NgmyHomeInstallGuideCard(isDark: isDark),
+        child: SizedBox(
+          height: 172,
+          child: NgmyHomeInstallGuideCard(isDark: isDark),
+        ),
       ),
     );
   }
