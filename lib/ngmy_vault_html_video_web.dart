@@ -63,12 +63,33 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
 
     var userMuted = false;
 
-    const playSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
-    const pauseSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-    const muteSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>';
-    const volSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>';
-    const replaySvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>';
-    const centerPlaySvg = '<svg width="44" height="44" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+    const playGlyph = '▶';
+    const pauseGlyph = '❚❚';
+    const muteGlyph = '🔇';
+    const volGlyph = '🔊';
+    const replayGlyph = '↺';
+
+    html.SpanElement glyph(String char, {double size = 20}) {
+      return html.SpanElement()
+        ..text = char
+        ..style.fontSize = '${size}px'
+        ..style.color = '#FFFFFF'
+        ..style.lineHeight = '1'
+        ..style.userSelect = 'none';
+    }
+
+    void setBtnIcon(html.ButtonElement btn, String char, {double size = 20}) {
+      btn.children.clear();
+      btn.append(glyph(char, size: size));
+    }
+
+    void ensureAudible() {
+      if (userMuted) return;
+      v.muted = false;
+      v.defaultMuted = false;
+      v.removeAttribute('muted');
+      v.volume = 1.0;
+    }
 
     // Tap layer — covers video area above transport bar.
     final tapLayer = html.DivElement()
@@ -98,7 +119,11 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.pointerEvents = 'none'
       ..style.transition = 'opacity 0.2s'
       ..style.zIndex = '3'
-      ..innerHtml = centerPlaySvg;
+      ..style.transition = 'opacity 0.2s';
+    centerBtn.children.clear();
+    final centerGlyph = glyph(playGlyph, size: 34);
+    centerGlyph.style.marginLeft = '5px';
+    centerBtn.append(centerGlyph);
 
     // Bottom transport bar (HTML — receives taps reliably on mobile web).
     final bar = html.DivElement()
@@ -125,7 +150,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.alignItems = 'center'
       ..style.gap = '4px';
 
-    html.ButtonElement iconBtn(String svg, void Function(html.Event) onClick) {
+    html.ButtonElement iconBtn(String char, void Function(html.Event) onClick, {double size = 20}) {
       final b = html.ButtonElement()
         ..type = 'button'
         ..style.background = 'transparent'
@@ -134,8 +159,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         ..style.cursor = 'pointer'
         ..style.display = 'flex'
         ..style.alignItems = 'center'
-        ..style.justifyContent = 'center'
-        ..innerHtml = svg;
+        ..style.justifyContent = 'center';
+      setBtnIcon(b, char, size: size);
       b.onClick.listen(onClick);
       return b;
     }
@@ -150,9 +175,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       final pos = v.currentTime;
       final playing = !v.paused && !v.ended;
       centerBtn.style.opacity = playing ? '0' : '1';
-      centerBtn.innerHtml = centerPlaySvg;
-      barPlayBtn.innerHtml = playing ? pauseSvg : playSvg;
-      muteBtn.innerHtml = v.muted ? muteSvg : volSvg;
+      setBtnIcon(barPlayBtn, playing ? pauseGlyph : playGlyph);
+      setBtnIcon(muteBtn, v.muted ? muteGlyph : volGlyph);
       if (dur.isFinite && dur > 0) {
         seek.value = ((pos / dur) * 1000).round().clamp(0, 1000).toString();
       }
@@ -176,19 +200,11 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       try {
         if (v.paused || v.ended) {
           if (v.ended) v.currentTime = 0;
-          final p = v.play();
-          if (p != null) {
-            p.catchError((_) {
-              v.muted = true;
-              final p2 = v.play();
-              if (p2 != null) {
-                p2.then((_) {
-                  v.muted = userMuted;
-                  syncUi();
-                });
-              }
-            });
-          }
+          ensureAudible();
+          v.play().catchError((e) {
+            debugPrint('[vault html video] play failed: $e');
+            showError('Tap Play again — your browser blocked playback.');
+          });
         } else {
           v.pause();
         }
@@ -204,20 +220,23 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       togglePlay();
     });
 
-    barPlayBtn = iconBtn(playSvg, (e) {
+    barPlayBtn = iconBtn(playGlyph, (e) {
       e.preventDefault();
       togglePlay();
     });
 
-    muteBtn = iconBtn(volSvg, (e) {
+    muteBtn = iconBtn(volGlyph, (e) {
       e.preventDefault();
-      userMuted = !v.muted;
+      userMuted = !userMuted;
       v.muted = userMuted;
-      if (!userMuted) v.volume = 1;
+      if (!userMuted) {
+        v.volume = 1.0;
+        v.muted = false;
+      }
       syncUi();
     });
 
-    replayBtn = iconBtn(replaySvg, (e) {
+    replayBtn = iconBtn(replayGlyph, (e) {
       e.preventDefault();
       v.currentTime = 0;
       togglePlay();
@@ -254,6 +273,10 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..append(centerBtn)
       ..append(bar);
 
+    v.onPlay.listen((_) {
+      ensureAudible();
+      syncUi();
+    });
     v.onLoadedMetadata.listen((_) => syncUi());
     v.onLoadedData.listen((_) => syncUi());
     v.onCanPlay.listen((_) => syncUi());

@@ -422,6 +422,9 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
     el
       ..preload = 'auto'
       ..controls = false
+      ..muted = false
+      ..defaultMuted = false
+      ..volume = 1.0
       ..setAttribute('playsinline', 'true')
       ..setAttribute('webkit-playsinline', 'true')
       ..style.pointerEvents = 'none';
@@ -433,14 +436,44 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
         ..style.display = 'block'
         ..style.backgroundColor = '#000';
     } else {
-      el.style.display = 'none';
+      el
+        ..style.position = 'absolute'
+        ..style.width = '1px'
+        ..style.height = '1px'
+        ..style.opacity = '0'
+        ..style.left = '0'
+        ..style.bottom = '0';
     }
     el.src = url;
     root.append(el);
 
-    const playSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
-    const pauseSvg = '<svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
-    const centerPlaySvg = '<svg width="44" height="44" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
+    var userMuted = false;
+    const playGlyph = '▶';
+    const pauseGlyph = '❚❚';
+    const muteGlyph = '🔇';
+    const volGlyph = '🔊';
+
+    html.SpanElement glyph(String char, {double size = 20}) {
+      return html.SpanElement()
+        ..text = char
+        ..style.fontSize = '${size}px'
+        ..style.color = '#FFFFFF'
+        ..style.lineHeight = '1'
+        ..style.userSelect = 'none';
+    }
+
+    void setBtnIcon(html.ButtonElement btn, String char, {double size = 20}) {
+      btn.children.clear();
+      btn.append(glyph(char, size: size));
+    }
+
+    void ensureAudible() {
+      if (userMuted) return;
+      el.muted = false;
+      el.defaultMuted = false;
+      el.removeAttribute('muted');
+      el.volume = 1.0;
+    }
 
     final centerBtn = html.DivElement()
       ..style.position = 'absolute'
@@ -457,8 +490,10 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.justifyContent = 'center'
       ..style.pointerEvents = 'none'
       ..style.zIndex = '3'
-      ..style.transition = 'opacity 0.2s'
-      ..innerHtml = centerPlaySvg;
+      ..style.transition = 'opacity 0.2s';
+    final centerGlyph = glyph(playGlyph, size: 34);
+    centerGlyph.style.marginLeft = '5px';
+    centerBtn.append(centerGlyph);
 
     if (!isVideo) {
       final label = html.DivElement()
@@ -508,6 +543,7 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.gap = '6px';
 
     late html.ButtonElement barPlayBtn;
+    late html.ButtonElement muteBtn;
     late html.SpanElement timeLabel;
 
     void syncUi() {
@@ -515,7 +551,8 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       final pos = el.currentTime;
       final playing = !el.paused && !el.ended;
       centerBtn.style.opacity = playing && isVideo ? '0' : '1';
-      barPlayBtn.innerHtml = playing ? pauseSvg : playSvg;
+      setBtnIcon(barPlayBtn, playing ? pauseGlyph : playGlyph);
+      setBtnIcon(muteBtn, el.muted ? muteGlyph : volGlyph);
       if (dur.isFinite && dur > 0) {
         seek.value = ((pos / dur) * 1000).round().clamp(0, 1000).toString();
       }
@@ -533,19 +570,10 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       try {
         if (el.paused || el.ended) {
           if (el.ended) el.currentTime = 0;
-          final p = el.play();
-          if (p != null) {
-            p.catchError((_) {
-              el.muted = true;
-              final p2 = el.play();
-              if (p2 != null) {
-                p2.then((_) {
-                  el.muted = false;
-                  syncUi();
-                });
-              }
-            });
-          }
+          ensureAudible();
+          el.play().catchError((e) {
+            debugPrint('[live_capture] play failed: $e');
+          });
         } else {
           el.pause();
         }
@@ -565,11 +593,29 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.border = 'none'
       ..style.padding = '6px'
       ..style.cursor = 'pointer'
-      ..innerHtml = playSvg
       ..onClick.listen((e) {
         e.preventDefault();
         togglePlay();
       });
+    setBtnIcon(barPlayBtn, playGlyph);
+
+    muteBtn = html.ButtonElement()
+      ..type = 'button'
+      ..style.background = 'transparent'
+      ..style.border = 'none'
+      ..style.padding = '6px'
+      ..style.cursor = 'pointer'
+      ..onClick.listen((e) {
+        e.preventDefault();
+        userMuted = !userMuted;
+        el.muted = userMuted;
+        if (!userMuted) {
+          el.volume = 1.0;
+          el.muted = false;
+        }
+        syncUi();
+      });
+    setBtnIcon(muteBtn, volGlyph);
 
     timeLabel = html.SpanElement()
       ..style.color = 'rgba(255,255,255,0.75)'
@@ -588,6 +634,7 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
 
     row
       ..append(barPlayBtn)
+      ..append(muteBtn)
       ..append(timeLabel);
 
     bar
@@ -600,7 +647,10 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..append(bar);
 
     el.onLoadedMetadata.listen((_) => syncUi());
-    el.onPlay.listen((_) => syncUi());
+    el.onPlay.listen((_) {
+      ensureAudible();
+      syncUi();
+    });
     el.onPause.listen((_) => syncUi());
     el.onTimeUpdate.listen((_) => syncUi());
     el.onEnded.listen((_) => syncUi());

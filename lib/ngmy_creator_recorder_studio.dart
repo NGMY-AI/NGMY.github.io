@@ -1,10 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_live_capture.dart';
@@ -12,7 +9,7 @@ import 'ngmy_live_capture_blob_store.dart';
 import 'ngmy_live_capture_export.dart';
 import 'ngmy_live_capture_media.dart';
 
-/// Cool green studio palette — photos, voice memos, and video in one place.
+/// Cool green studio palette — voice memos and video in one place.
 abstract final class NgmyRecorderStudioColors {
   static const emerald = Color(0xFF059669);
   static const teal = Color(0xFF14B8A6);
@@ -22,7 +19,7 @@ abstract final class NgmyRecorderStudioColors {
   static const panel = Color(0xFF064E3B);
 }
 
-enum _StudioMode { photo, voice, video }
+enum _StudioMode { voice, video }
 
 Future<void> showNgmyCreatorRecorderStudio(BuildContext context, {required String userEmail}) {
   return Navigator.of(context).push<void>(
@@ -90,9 +87,14 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     final items = await NgmyLiveCaptureStore.load(widget.userEmail);
     if (!mounted) return;
     setState(() {
-      _items = items;
+      _items = items.where((e) => e.kind != 'photo' && !e.mimeType.startsWith('image/')).toList();
       _loading = false;
     });
+  }
+
+  Future<void> _deleteItem(NgmyLiveCaptureItem item) async {
+    await NgmyLiveCaptureStore.deleteItem(widget.userEmail, item.id);
+    await _reload();
   }
 
   void _setMode(_StudioMode mode) {
@@ -106,7 +108,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   Future<void> _startRecording() async {
-    if (_busy || _session.recording || _mode == _StudioMode.photo) return;
+    if (_busy || _session.recording) return;
     _session.lastError = null;
     _session.lastStatus = null;
     setState(() => _busy = true);
@@ -123,82 +125,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     if (item != null) {
       await _reload();
       if (mounted) await _openItem(item);
-    }
-  }
-
-  Future<void> _capturePhoto({required ImageSource source}) async {
-    if (_busy || _session.recording) return;
-    _session.lastError = null;
-    _session.lastStatus = null;
-    setState(() => _busy = true);
-    try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 90, maxWidth: 4096);
-      if (picked == null || !mounted) return;
-      final bytes = await picked.readAsBytes();
-      if (bytes.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Photo was empty — try again.'), backgroundColor: Color(0xFFDC2626)),
-          );
-        }
-        return;
-      }
-      final id = DateTime.now().microsecondsSinceEpoch.toString();
-      final title = 'Photo · ${_photoTitleStamp(DateTime.now())}';
-      final stored = await NgmyLiveCaptureBlobStore.putBytes(id, bytes, mimeType: 'image/jpeg');
-      var playUrl = '';
-      if (stored) {
-        playUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(id) ?? '';
-      }
-      if (playUrl.isEmpty && bytes.length <= 700000) {
-        playUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      }
-      if (playUrl.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Photo captured but could not be saved on this device.'),
-              backgroundColor: Color(0xFFDC2626),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-      final item = NgmyLiveCaptureItem(
-        id: id,
-        title: title,
-        kind: 'photo',
-        createdAt: DateTime.now(),
-        dataUrl: stored ? '' : playUrl,
-        mimeType: 'image/jpeg',
-        durationSec: 0,
-      );
-      final existing = await NgmyLiveCaptureStore.load(widget.userEmail);
-      await NgmyLiveCaptureStore.save(widget.userEmail, [item, ...existing]);
-      if (stored) item.dataUrl = playUrl;
-      _session.lastError = null;
-      _session.lastStatus = 'Photo saved to your studio library.';
-      await _reload();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Photo saved to your studio library'),
-            backgroundColor: NgmyRecorderStudioColors.emerald,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        await _openItem(item);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not take photo: $e'), backgroundColor: const Color(0xFFDC2626)),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -247,7 +173,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                       const Text('Your studio library', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                       const SizedBox(height: 4),
                       const Text(
-                        'Photos, voice memos, and videos — tap any item to play or download.',
+                        'Voice memos and videos — tap to play, swipe left to delete.',
                         style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
                       ),
                       const SizedBox(height: 12),
@@ -300,7 +226,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               children: [
                 const Text('Recorder Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
                 Text(
-                  recording ? 'Recording in progress — come back here to stop & save.' : 'Photos · voice memos · video — like a pocket studio.',
+                  recording ? 'Recording in progress — come back here to stop & save.' : 'Voice memos · video — like a pocket studio.',
                   style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
                 ),
               ],
@@ -349,14 +275,11 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
             children: [
               Row(
                 children: [
-                  _modeChip('Photo', _displayMode == _StudioMode.photo, Icons.photo_camera_rounded, () => _setMode(_StudioMode.photo)),
-                  const SizedBox(width: 8),
                   _modeChip('Voice', _displayMode == _StudioMode.voice, Icons.mic_rounded, () => _setMode(_StudioMode.voice)),
                   const SizedBox(width: 8),
                   _modeChip('Video', _displayMode == _StudioMode.video, Icons.videocam_rounded, () => _setMode(_StudioMode.video)),
                   const Spacer(),
-                  if (_displayMode != _StudioMode.photo)
-                    Text(
+                  Text(
                       _session.clockLabel(),
                       style: TextStyle(
                         color: recording ? NgmyRecorderStudioColors.mint : Colors.white,
@@ -388,9 +311,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 ),
               ],
               const SizedBox(height: 16),
-              if (_displayMode == _StudioMode.photo)
-                _photoControls()
-              else if (recording && _displayMode == _StudioMode.video)
+              if (recording && _displayMode == _StudioMode.video)
                 KeyedSubtree(
                   key: ValueKey('cam-${identityHashCode(_session.previewStream)}'),
                   child: NgmyLiveCaptureMedia.liveCameraPreview(
@@ -404,9 +325,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               else
                 _idleHint(),
               const SizedBox(height: 16),
-              if (_displayMode == _StudioMode.photo)
-                const SizedBox.shrink()
-              else if (recording)
+              if (recording)
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
                 Text(
@@ -416,26 +335,24 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
-              if (_displayMode != _StudioMode.photo) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : (recording ? _stopRecording : _startRecording),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: recording ? const Color(0xFFDC2626) : NgmyRecorderStudioColors.emerald,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    icon: Icon(recording ? Icons.stop_rounded : (_displayMode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
-                    label: Text(
-                      recording ? 'Stop & Save' : 'Start ${_displayMode == _StudioMode.video ? 'Video' : 'Voice'}',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
-                    ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : (recording ? _stopRecording : _startRecording),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: recording ? const Color(0xFFDC2626) : NgmyRecorderStudioColors.emerald,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  icon: Icon(recording ? Icons.stop_rounded : (_displayMode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
+                  label: Text(
+                    recording ? 'Stop & Save' : 'Start ${_displayMode == _StudioMode.video ? 'Video' : 'Voice'}',
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                   ),
                 ),
-              ],
+              ),
             ],
           ),
         );
@@ -443,58 +360,76 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     );
   }
 
-  Widget _photoControls() {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 28),
+  Widget _emptyLibrary() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.25)),
+      ),
+      child: const Text('Nothing here yet — record your first voice memo or video.', style: TextStyle(color: Colors.white54)),
+    );
+  }
+
+  Widget _libraryTile(NgmyLiveCaptureItem item) {
+    final isVideo = item.kind == 'video';
+    final icon = isVideo ? Icons.videocam_rounded : Icons.graphic_eq_rounded;
+    final label = isVideo ? 'VIDEO · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}' : 'VOICE · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Dismissible(
+        key: ValueKey('studio-cap-${item.id}'),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 22),
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.4)),
+            color: const Color(0xFFDC2626),
+            borderRadius: BorderRadius.circular(16),
           ),
-          child: Column(
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Icon(Icons.photo_camera_rounded, size: 56, color: NgmyRecorderStudioColors.mint.withValues(alpha: 0.9)),
-              const SizedBox(height: 10),
-              const Text('Snap a photo or pick from gallery', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              Icon(Icons.delete_outline_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ],
           ),
         ),
-        const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _busy ? null : () => _capturePhoto(source: ImageSource.camera),
-                style: FilledButton.styleFrom(
-                  backgroundColor: NgmyRecorderStudioColors.emerald,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                icon: const Icon(Icons.camera_alt_rounded),
-                label: const Text('Take Photo', style: TextStyle(fontWeight: FontWeight.w900)),
+        onDismissed: (_) {
+          setState(() => _items.removeWhere((e) => e.id == item.id));
+          unawaited(_deleteItem(item));
+        },
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _openItem(item),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Icon(icon, color: NgmyRecorderStudioColors.teal),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        Text('$label · Tap to play', style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _busy ? null : () => _capturePhoto(source: ImageSource.gallery),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: NgmyRecorderStudioColors.mint,
-                  side: BorderSide(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.7)),
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                icon: const Icon(Icons.photo_library_rounded),
-                label: const Text('Gallery', style: TextStyle(fontWeight: FontWeight.w800)),
-              ),
-            ),
-          ],
+          ),
         ),
-      ],
+      ),
     );
   }
 
@@ -509,73 +444,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
         border: Border.all(color: Colors.white12),
       ),
       child: Icon(icon, size: 52, color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.85)),
-    );
-  }
-
-  Widget _emptyLibrary() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.25)),
-      ),
-      child: const Text('Nothing here yet — take a photo or record your first memo.', style: TextStyle(color: Colors.white54)),
-    );
-  }
-
-  Widget _libraryTile(NgmyLiveCaptureItem item) {
-    IconData icon;
-    String label;
-    switch (item.kind) {
-      case 'photo':
-        icon = Icons.photo_rounded;
-        label = 'PHOTO';
-        break;
-      case 'video':
-        icon = Icons.videocam_rounded;
-        label = 'VIDEO · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}';
-        break;
-      default:
-        icon = Icons.graphic_eq_rounded;
-        label = 'VOICE · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}';
-    }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _openItem(item),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                if (item.kind == 'photo' && item.dataUrl.isNotEmpty)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(width: 48, height: 48, child: _photoThumb(item.dataUrl)),
-                  )
-                else
-                  Icon(icon, color: NgmyRecorderStudioColors.teal),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                      Text('$label · Tap to open', style: const TextStyle(color: Colors.white54, fontSize: 11)),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white38),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -616,61 +484,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
         child: Text(label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w800 : FontWeight.w600, fontSize: 11)),
       ),
     );
-  }
-}
-
-String _photoTitleStamp(DateTime dt) {
-  final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-  final ampm = dt.hour >= 12 ? 'PM' : 'AM';
-  return '${dt.month}/${dt.day} · $h:${dt.minute.toString().padLeft(2, '0')} $ampm';
-}
-
-Widget _photoThumb(String src) {
-  if (src.startsWith('blob:') || src.startsWith('http')) {
-    return Image.network(src, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: Colors.white38));
-  }
-  final bytes = _decodeImageBytes(src);
-  if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
-  return const Icon(Icons.photo_rounded, color: NgmyRecorderStudioColors.teal);
-}
-
-Widget _photoPreview(String src, {double maxHeight = 320}) {
-  if (src.isEmpty) {
-    return const Text('Photo unavailable on this device.', style: TextStyle(color: Colors.white54));
-  }
-  if (src.startsWith('blob:') || src.startsWith('http')) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Image.network(src, fit: BoxFit.contain, height: maxHeight),
-    );
-  }
-  final bytes = _decodeImageBytes(src);
-  if (bytes != null) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Image.memory(bytes, fit: BoxFit.contain, height: maxHeight),
-    );
-  }
-  return const Text('Could not load photo.', style: TextStyle(color: Colors.white54));
-}
-
-Uint8List? _decodeImageBytes(String src) {
-  try {
-    if (!src.startsWith('data:')) return null;
-    final comma = src.indexOf(',');
-    if (comma < 0) return null;
-    final header = src.substring(0, comma).toLowerCase();
-    final payload = src.substring(comma + 1);
-    if (header.contains(';base64')) {
-      var cleaned = payload.replaceAll(RegExp(r'\s'), '');
-      cleaned = cleaned.replaceAll('-', '+').replaceAll('_', '/');
-      final pad = cleaned.length % 4;
-      if (pad > 0) cleaned = cleaned.padRight(cleaned.length + (4 - pad), '=');
-      return base64Decode(cleaned);
-    }
-    return Uint8List.fromList(Uri.decodeComponent(payload).codeUnits);
-  } catch (_) {
-    return null;
   }
 }
 
@@ -785,21 +598,6 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _download() async {
-    setState(() => _exporting = true);
-    final ok = await ngmyLiveCaptureDownload(widget.item);
-    if (mounted) {
-      setState(() => _exporting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok ? 'Download started — check Files or Downloads.' : 'Could not download this item.'),
-          backgroundColor: ok ? NgmyRecorderStudioColors.emerald : const Color(0xFFDC2626),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
   Future<void> _share() async {
     setState(() => _exporting = true);
     final ok = await ngmyLiveCaptureShare(widget.item);
@@ -808,7 +606,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
       if (!ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not share — try Download instead.'),
+            content: Text('Could not share this recording.'),
             backgroundColor: Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
           ),
@@ -831,7 +629,6 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
   @override
   Widget build(BuildContext context) {
     final isVideo = widget.item.kind == 'video' || widget.item.mimeType.startsWith('video/');
-    final isPhoto = widget.item.kind == 'photo';
     final maxH = MediaQuery.sizeOf(context).height * 0.88;
     return SafeArea(
       child: Align(
@@ -853,27 +650,25 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                 const SizedBox(height: 14),
                 Text(_titleC.text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                 Text(
-                  isPhoto ? 'Photo' : '${isVideo ? 'Video' : 'Voice Memo'} · ${_clock(widget.item.durationSec.toDouble())}',
+                  '${isVideo ? 'Video' : 'Voice Memo'} · ${_clock(widget.item.durationSec.toDouble())}',
                   style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
                 if (_mediaLoading)
                   SizedBox(
-                    height: isPhoto ? 120 : (isVideo ? 240 : 140),
+                    height: isVideo ? 280 : 140,
                     child: const Center(
                       child: CircularProgressIndicator(color: NgmyRecorderStudioColors.mint, strokeWidth: 2.5),
                     ),
                   )
                 else if (widget.item.dataUrl.isEmpty)
                   const Text('Media unavailable — storage was full when saved.', style: TextStyle(color: Colors.white54, fontSize: 12))
-                else if (isPhoto)
-                  _photoPreview(widget.item.dataUrl)
                 else if (isVideo || widget.item.mimeType.startsWith('video/'))
                   NgmyLiveCaptureMedia.playbackVideo(
                     key: ValueKey('media-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
-                    height: isVideo ? 280 : 200,
+                    height: 280,
                   )
                 else
                   NgmyLiveCaptureMedia.playbackAudio(
@@ -882,36 +677,19 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                     mimeType: widget.item.mimeType,
                   ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _exporting ? null : _download,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: NgmyRecorderStudioColors.forest,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        icon: const Icon(Icons.download_rounded),
-                        label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w800)),
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _exporting ? null : _share,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NgmyRecorderStudioColors.emerald,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _exporting ? null : _share,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: NgmyRecorderStudioColors.emerald,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(48),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        icon: const Icon(Icons.ios_share_rounded),
-                        label: const Text('Share', style: TextStyle(fontWeight: FontWeight.w800)),
-                      ),
-                    ),
-                  ],
+                    icon: const Icon(Icons.ios_share_rounded),
+                    label: const Text('Share', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Row(
