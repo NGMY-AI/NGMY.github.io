@@ -541,11 +541,35 @@ class NgmyLiveCaptureEngine {
     final sizes = _sizesForAspect(aspect);
     return {
       'facingMode': {'ideal': facing},
-      'width': {'ideal': sizes.$1},
-      'height': {'ideal': sizes.$2},
+      'width': {'ideal': sizes.$1, 'max': sizes.$1},
+      'height': {'ideal': sizes.$2, 'max': sizes.$2},
       'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
       'frameRate': {'ideal': 30, 'max': 30},
+      'zoom': {'ideal': 1.0},
     };
+  }
+
+  List<Map<String, dynamic>> _streamAttempts({
+    required dynamic audio,
+    required String facing,
+    required String aspect,
+  }) {
+    final sizes = _sizesForAspect(aspect);
+    return [
+      {'audio': audio, 'video': _videoConstraintsForAspect(facing, aspect)},
+      {
+        'audio': audio,
+        'video': {
+          'facingMode': {'ideal': facing},
+          'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
+          'zoom': {'ideal': 1.0},
+          'frameRate': {'ideal': 30, 'max': 30},
+        },
+      },
+      {'audio': audio, 'video': _nativeVideoConstraints(facing)},
+      {'audio': audio, 'video': {'facingMode': facing}},
+      if (audio != false) {'audio': audio, 'video': true},
+    ];
   }
 
   Future<html.MediaStream> _openVideoOnlyStream({
@@ -557,21 +581,7 @@ class NgmyLiveCaptureEngine {
       throw StateError('Secure media devices API unavailable');
     }
     final facing = facingMode == 'environment' ? 'environment' : 'user';
-    final attempts = <Map<String, dynamic>>[
-      {
-        'audio': false,
-        'video': _nativeVideoConstraints(facing),
-      },
-      {
-        'audio': false,
-        'video': {'facingMode': facing},
-      },
-      {
-        'audio': false,
-        'video': _videoConstraintsForAspect(facing, aspect),
-      },
-      {'audio': false, 'video': true},
-    ];
+    final attempts = _streamAttempts(audio: false, facing: facing, aspect: aspect);
     Object? lastErr;
     for (final c in attempts) {
       try {
@@ -590,26 +600,9 @@ class NgmyLiveCaptureEngine {
     }
   }
 
-  (int, int) _scaleDimensions(int w, int h, int maxEdge) {
-    if (w <= 0 || h <= 0) return (1280, 720);
-    final maxDim = w > h ? w : h;
-    if (maxDim <= maxEdge) return (w, h);
-    final scale = maxEdge / maxDim;
-    var ow = (w * scale).round();
-    var oh = (h * scale).round();
-    if (ow.isOdd) ow++;
-    if (oh.isOdd) oh++;
-    return (ow, oh);
-  }
+  (int, int) _canvasSizeForAspect(String aspect) => _sizesForAspect(aspect);
 
-  (int, int) _canvasSizeForVideo(html.VideoElement video, String aspect) {
-    final vw = video.videoWidth;
-    final vh = video.videoHeight;
-    if (vw > 0 && vh > 0) {
-      return _scaleDimensions(vw, vh, 1920);
-    }
-    return _sizesForAspect(aspect);
-  }
+  static const double _recordZoomOut = 1.18;
 
   Future<html.MediaStream?> _startCompositeStream(
     html.MediaStream main,
@@ -632,7 +625,7 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
     await _waitForVideoDimensions(mainV);
 
-    final sizes = _canvasSizeForVideo(mainV, aspect);
+    final sizes = _canvasSizeForAspect(aspect);
     final w = sizes.$1;
     final h = sizes.$2;
     _compositeW = w;
@@ -693,7 +686,7 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
   }
 
-  void _drawVideoContainInRect(
+  void _drawVideoCoverInRect(
     html.CanvasRenderingContext2D ctx,
     html.VideoElement video,
     num dx,
@@ -712,15 +705,34 @@ class NgmyLiveCaptureEngine {
     num drawW;
     num drawH;
     if (videoAspect > slotAspect) {
-      drawW = dw;
-      drawH = dw / videoAspect;
-    } else {
       drawH = dh;
       drawW = dh * videoAspect;
+    } else {
+      drawW = dw;
+      drawH = dw / videoAspect;
     }
     final drawX = dx + (dw - drawW) / 2;
     final drawY = dy + (dh - drawH) / 2;
     ctx.drawImageScaled(video, drawX, drawY, drawW, drawH);
+  }
+
+  void _drawVideoCoverZoomOut(
+    html.CanvasRenderingContext2D ctx,
+    html.VideoElement video,
+    num dx,
+    num dy,
+    num dw,
+    num dh, {
+    double zoomOut = _recordZoomOut,
+  }) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(dx, dy, dw, dh);
+    ctx.clip();
+    final slotW = dw * zoomOut;
+    final slotH = dh * zoomOut;
+    _drawVideoCoverInRect(ctx, video, dx + (dw - slotW) / 2, dy + (dh - slotH) / 2, slotW, slotH);
+    ctx.restore();
   }
 
   void _compositeDrawFrame() {
@@ -728,19 +740,10 @@ class NgmyLiveCaptureEngine {
     final ctx = _compositeCanvas!.context2D;
     final w = _compositeW;
     final h = _compositeH;
-    final video = _compositeMainVideo!;
     try {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, w, h);
-      final vw = video.videoWidth;
-      final vh = video.videoHeight;
-      if (vw > 0 && vh > 0 && vw == w && vh == h) {
-        ctx.drawImageScaled(video, 0, 0, w, h);
-      } else if (vw > 0 && vh > 0 && (vw / vh - w / h).abs() < 0.02) {
-        ctx.drawImageScaled(video, 0, 0, w, h);
-      } else {
-        _drawVideoContainInRect(ctx, video, 0, 0, w, h);
-      }
+      _drawVideoCoverZoomOut(ctx, _compositeMainVideo!, 0, 0, w, h);
     } catch (_) {}
   }
 
@@ -1118,28 +1121,11 @@ class NgmyLiveCaptureEngine {
 
     final facing = facingMode == 'environment' ? 'environment' : 'user';
     final audioPref = _audioMediaConstraint(requiredAudio: true);
-    final attempts = <Map<String, dynamic>>[
-      {
-        'audio': audioPref,
-        'video': _nativeVideoConstraints(facing),
-      },
-      {
-        'audio': audioPref,
-        'video': {'facingMode': facing},
-      },
-      {
-        'audio': audioPref,
-        'video': _videoConstraintsForAspect(facing, aspect),
-      },
-      {
-        'audio': true,
-        'video': _nativeVideoConstraints(facing),
-      },
-      {
-        'audio': true,
-        'video': true,
-      },
-    ];
+    final attempts = _streamAttempts(audio: audioPref, facing: facing, aspect: aspect)
+      ..addAll([
+        {'audio': true, 'video': _videoConstraintsForAspect(facing, aspect)},
+        {'audio': true, 'video': true},
+      ]);
 
     Object? lastErr;
     for (final c in attempts) {

@@ -44,7 +44,8 @@ class NgmyLiveCaptureMedia {
     double height = 200,
     bool mirror = true,
     BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
-    String objectFit = 'contain',
+    String objectFit = 'cover',
+    double zoomOut = 1.18,
   }) {
     return _StableCameraPreview(
       stream: stream,
@@ -52,6 +53,7 @@ class NgmyLiveCaptureMedia {
       mirror: mirror,
       borderRadius: borderRadius,
       objectFit: objectFit,
+      zoomOut: zoomOut,
     );
   }
 
@@ -218,13 +220,15 @@ class _StableCameraPreview extends StatefulWidget {
     required this.height,
     this.mirror = true,
     this.borderRadius = const BorderRadius.all(Radius.circular(18)),
-    this.objectFit = 'contain',
+    this.objectFit = 'cover',
+    this.zoomOut = 1.18,
   });
   final Object? stream;
   final double height;
   final bool mirror;
   final BorderRadius borderRadius;
   final String objectFit;
+  final double zoomOut;
 
   @override
   State<_StableCameraPreview> createState() => _StableCameraPreviewState();
@@ -246,6 +250,14 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
     if (_registered) return;
     _registered = true;
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
+      final root = html.DivElement()
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.overflow = 'hidden'
+        ..style.position = 'relative'
+        ..style.backgroundColor = '#000';
+      final zoomPct = (widget.zoomOut * 100).clamp(100.0, 135.0);
+      final mirror = widget.mirror ? ' scaleX(-1)' : '';
       final v = html.VideoElement()
         ..autoplay = true
         ..muted = true
@@ -255,11 +267,14 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
         ..setAttribute('webkit-playsinline', 'true')
         ..setAttribute('autoplay', 'true')
         ..setAttribute('muted', 'true')
-        ..style.width = '100%'
-        ..style.height = '100%'
+        ..style.position = 'absolute'
+        ..style.left = '50%'
+        ..style.top = '50%'
+        ..style.width = '$zoomPct%'
+        ..style.height = '$zoomPct%'
         ..style.objectFit = widget.objectFit
         ..style.backgroundColor = '#000'
-        ..style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
+        ..style.transform = 'translate(-50%, -50%)$mirror';
       if (widget.stream is html.MediaStream) {
         v.srcObject = widget.stream as html.MediaStream;
       }
@@ -267,7 +282,8 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
         debugPrint('[live_capture] preview play: $e');
       }));
       _video = v;
-      return v;
+      root.append(v);
+      return root;
     });
   }
 
@@ -279,10 +295,16 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
       unawaited(_video!.play().catchError((_) {}));
     }
     if (oldWidget.mirror != widget.mirror && _video != null) {
-      _video!.style.transform = widget.mirror ? 'scaleX(-1)' : 'none';
+      final mirror = widget.mirror ? ' scaleX(-1)' : '';
+      _video!.style.transform = 'translate(-50%, -50%)$mirror';
     }
     if (oldWidget.objectFit != widget.objectFit && _video != null) {
       _video!.style.objectFit = widget.objectFit;
+    }
+    if (oldWidget.zoomOut != widget.zoomOut && _video != null) {
+      final zoomPct = (widget.zoomOut * 100).clamp(100.0, 135.0);
+      _video!.style.width = '$zoomPct%';
+      _video!.style.height = '$zoomPct%';
     }
   }
 
