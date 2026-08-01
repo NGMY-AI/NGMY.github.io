@@ -1144,6 +1144,7 @@ class NgmyFrostedCard extends StatelessWidget {
     this.showDateTab = true,
     this.welcomeName,
     this.fillBleed = false,
+    this.expandFace = false,
   });
 
   final Widget child;
@@ -1158,6 +1159,8 @@ class NgmyFrostedCard extends StatelessWidget {
   final String? welcomeName;
   /// When true, [child] fills the whole card face (for photos).
   final bool fillBleed;
+  /// When true, stretch the glass face to the full deck card height (252px slot).
+  final bool expandFace;
 
   @override
   Widget build(BuildContext context) {
@@ -1195,7 +1198,7 @@ class NgmyFrostedCard extends StatelessWidget {
             ),
           Padding(
             padding: EdgeInsets.fromLTRB(showWelcome ? 12 : 20, showWelcome ? 48 : 28, 48, footer != null ? 44 : 16),
-            child: child,
+            child: expandFace ? SizedBox(width: double.infinity, height: double.infinity, child: child) : child,
           ),
         ],
         // Soft top shade so welcome / date stay readable on full-bleed faces.
@@ -1259,7 +1262,10 @@ class NgmyFrostedCard extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 16),
-          child: DecoratedBox(
+          child: SizedBox(
+            height: expandFace ? 236 : null,
+            width: double.infinity,
+            child: DecoratedBox(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
               boxShadow: isFront
@@ -1315,6 +1321,7 @@ class NgmyFrostedCard extends StatelessWidget {
                       ),
                     ),
                   ),
+            ),
           ),
         ),
         if (showDateTab)
@@ -2311,17 +2318,16 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   Widget _installGuideEmptyCard({required bool isDark, required String name}) {
     return SizedBox(
       height: 252,
+      width: double.infinity,
       child: NgmyFrostedCard(
         dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
         isFront: true,
         showDateTab: true,
         welcomeName: name,
+        expandFace: true,
         accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
         onAdd: _openAddSheet,
-        child: SizedBox(
-          height: 158,
-          child: NgmyHomeInstallGuideCard(isDark: isDark),
-        ),
+        child: NgmyHomeInstallGuideCard(isDark: isDark),
       ),
     );
   }
