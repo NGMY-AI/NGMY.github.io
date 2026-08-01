@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -9,7 +8,7 @@ import 'ngmy_live_capture_blob_store.dart';
 import 'ngmy_live_capture_export.dart';
 import 'ngmy_live_capture_media.dart';
 
-/// Cool green studio palette — voice memos and video in one place.
+/// Cool green studio palette — video recording in one place.
 abstract final class NgmyRecorderStudioColors {
   static const emerald = Color(0xFF059669);
   static const teal = Color(0xFF14B8A6);
@@ -18,8 +17,6 @@ abstract final class NgmyRecorderStudioColors {
   static const deep = Color(0xFF042F2E);
   static const panel = Color(0xFF064E3B);
 }
-
-enum _StudioMode { voice, video }
 
 Future<void> showNgmyCreatorRecorderStudio(BuildContext context, {required String userEmail}) {
   return Navigator.of(context).push<void>(
@@ -40,39 +37,33 @@ class NgmyCreatorRecorderStudioPage extends StatefulWidget {
 
 class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudioPage> with TickerProviderStateMixin {
   late final AnimationController _pulse;
-  _StudioMode _mode = _StudioMode.voice;
   List<NgmyLiveCaptureItem> _items = [];
   bool _loading = true;
   bool _busy = false;
 
   NgmyLiveCaptureSession get _session => ngmyLiveCaptureSession;
 
-  /// While recording, always reflect the active capture kind from the session
-  /// (survives leaving and re-entering Recorder Studio).
-  _StudioMode get _displayMode {
-    if (_session.recording) {
-      return _session.videoMode ? _StudioMode.video : _StudioMode.voice;
-    }
-    return _mode;
+  double get _previewHeight {
+    final base = _session.aspect == 'tiktok' ? 280.0 : 220.0;
+    return base + 56;
   }
 
   @override
   void initState() {
     super.initState();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
-    if (_session.recording) {
-      _mode = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
-    }
+    _session.videoMode = true;
     _session.addListener(_onSession);
-    unawaited(_reload());
+    unawaited(_reload().then((_) async {
+      if (!_session.recording) {
+        await _session.refreshVideoPreview();
+        if (mounted) setState(() {});
+      }
+    }));
   }
 
   void _onSession() {
     if (!mounted) return;
-    if (_session.recording) {
-      final synced = _session.videoMode ? _StudioMode.video : _StudioMode.voice;
-      if (_mode != synced) _mode = synced;
-    }
     setState(() {});
   }
 
@@ -88,7 +79,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     final items = await NgmyLiveCaptureStore.load(widget.userEmail);
     if (!mounted) return;
     setState(() {
-      _items = items.where((e) => e.kind != 'photo' && !e.mimeType.startsWith('image/')).toList();
+      _items = items.where((e) => e.kind == 'video' || e.mimeType.startsWith('video/')).toList();
       _loading = false;
     });
   }
@@ -98,31 +89,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     await _reload();
   }
 
-  void _setMode(_StudioMode mode) {
-    if (_session.recording) return;
-    _session.lastError = null;
-    _session.lastStatus = null;
-    setState(() {
-      _mode = mode;
-      _session.videoMode = mode == _StudioMode.video;
-    });
-    if (mode == _StudioMode.video) {
-      unawaited(_session.refreshVideoPreview().then((_) {
-        if (mounted) setState(() {});
-      }));
-    } else {
-      unawaited(_session.closeVideoPreview().then((_) {
-        if (mounted) setState(() {});
-      }));
-    }
-  }
-
   Future<void> _startRecording() async {
     if (_busy || _session.recording) return;
     _session.lastError = null;
     _session.lastStatus = null;
+    _session.videoMode = true;
     setState(() => _busy = true);
-    await _session.start(userEmail: widget.userEmail, video: _mode == _StudioMode.video);
+    await _session.start(userEmail: widget.userEmail, video: true);
     if (mounted) setState(() => _busy = false);
   }
 
@@ -183,7 +156,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                       const Text('Your studio library', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
                       const SizedBox(height: 4),
                       const Text(
-                        'Voice memos and videos — tap to play, swipe left to delete.',
+                        'Videos — tap to play, swipe left to delete.',
                         style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
                       ),
                       const SizedBox(height: 12),
@@ -236,7 +209,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               children: [
                 const Text('Recorder Studio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
                 Text(
-                  recording ? 'Recording in progress — come back here to stop & save.' : 'Voice memos · video — like a pocket studio.',
+                  recording ? 'Recording in progress — come back here to stop & save.' : 'Video studio — record with front or back camera.',
                   style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.35),
                 ),
               ],
@@ -318,37 +291,41 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
           child: Column(
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  _modeChip('Voice', _displayMode == _StudioMode.voice, Icons.mic_rounded, () => _setMode(_StudioMode.voice)),
-                  const SizedBox(width: 8),
-                  _modeChip('Video', _displayMode == _StudioMode.video, Icons.videocam_rounded, () => _setMode(_StudioMode.video)),
-                  const Spacer(),
-                  Text(
-                      _session.clockLabel(),
-                      style: TextStyle(
-                        color: recording ? NgmyRecorderStudioColors.mint : Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 26,
-                        letterSpacing: 1.1,
+                  if (!recording)
+                    Expanded(
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => _setAspect('youtube')),
+                          _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => _setAspect('tiktok')),
+                          _smallChip('Square', _session.aspect == 'square', () => _setAspect('square')),
+                        ],
+                      ),
+                    )
+                  else
+                    const Expanded(
+                      child: Text(
+                        'VIDEO',
+                        style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2),
                       ),
                     ),
+                  Text(
+                    _session.clockLabel(),
+                    style: TextStyle(
+                      color: recording ? NgmyRecorderStudioColors.mint : Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 26,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
                 ],
               ),
-              if (_displayMode == _StudioMode.video && !recording) ...[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => _setAspect('youtube')),
-                    _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => _setAspect('tiktok')),
-                    _smallChip('Square', _session.aspect == 'square', () => _setAspect('square')),
-                  ],
-                ),
-              ],
               const SizedBox(height: 16),
-              if (_displayMode == _StudioMode.video && (_session.recording || _session.previewActive))
+              if (_session.recording || _session.previewActive)
                 Stack(
                   alignment: Alignment.topRight,
                   children: [
@@ -356,7 +333,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                       key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
                       child: NgmyLiveCaptureMedia.liveCameraPreview(
                         stream: _session.previewStream,
-                        height: _session.aspect == 'tiktok' ? 280 : 220,
+                        height: _previewHeight,
                         mirror: _session.facingMode == 'user',
                       ),
                     ),
@@ -366,20 +343,16 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                     ),
                   ],
                 )
-              else if (recording && _displayMode == _StudioMode.voice)
-                _WaveBars(active: true, pulse: p)
               else
                 _idleHint(),
               const SizedBox(height: 16),
               if (recording)
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
-                Text(
-                  _displayMode == _StudioMode.video
-                      ? 'Record video with front or back camera. Tap the flip icon on the preview to switch.'
-                      : 'Record voice memos — clear audio like iPhone Voice Memos.',
+                const Text(
+                  'Record video with front or back camera. Tap the flip icon on the preview to switch.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
+                  style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
               const SizedBox(height: 16),
               SizedBox(
@@ -392,9 +365,9 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  icon: Icon(recording ? Icons.stop_rounded : (_displayMode == _StudioMode.video ? Icons.videocam_rounded : Icons.mic_rounded)),
+                  icon: Icon(recording ? Icons.stop_rounded : Icons.videocam_rounded),
                   label: Text(
-                    recording ? 'Stop & Save' : 'Start ${_displayMode == _StudioMode.video ? 'Video' : 'Voice'}',
+                    recording ? 'Stop & Save' : 'Start Video',
                     style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                   ),
                 ),
@@ -415,14 +388,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.25)),
       ),
-      child: const Text('Nothing here yet — record your first voice memo or video.', style: TextStyle(color: Colors.white54)),
+      child: const Text('Nothing here yet — record your first video.', style: TextStyle(color: Colors.white54)),
     );
   }
 
   Widget _libraryTile(NgmyLiveCaptureItem item) {
-    final isVideo = item.kind == 'video';
-    final icon = isVideo ? Icons.videocam_rounded : Icons.graphic_eq_rounded;
-    final label = isVideo ? 'VIDEO · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}' : 'VOICE · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}';
+    final label = 'VIDEO · ${NgmyLiveCaptureSession.formatClock(item.durationSec)}';
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Dismissible(
@@ -458,7 +429,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  Icon(icon, color: NgmyRecorderStudioColors.teal),
+                  Icon(Icons.videocam_rounded, color: NgmyRecorderStudioColors.teal),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -480,59 +451,32 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   Widget _idleHint() {
-    final icon = _mode == _StudioMode.video ? Icons.videocam_rounded : Icons.graphic_eq_rounded;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 32),
+      height: _previewHeight,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: Colors.white12),
       ),
-      child: Icon(icon, size: 52, color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.85)),
-    );
-  }
-
-  Widget _modeChip(String label, bool on, IconData icon, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          color: on ? NgmyRecorderStudioColors.emerald.withValues(alpha: 0.35) : Colors.transparent,
-          border: Border.all(color: on ? NgmyRecorderStudioColors.mint : Colors.white24, width: 1.5),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 22, color: on ? NgmyRecorderStudioColors.mint : Colors.white70),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 16)),
-          ],
-        ),
-      ),
+      child: Icon(Icons.videocam_rounded, size: 52, color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.85)),
     );
   }
 
   void _setAspect(String aspect) {
     if (_session.recording) return;
     setState(() => _session.aspect = aspect);
-    if (_displayMode == _StudioMode.video) {
-      unawaited(_session.refreshVideoPreview().then((_) {
-        if (mounted) setState(() {});
-      }));
-    }
+    unawaited(_session.refreshVideoPreview().then((_) {
+      if (mounted) setState(() {});
+    }));
   }
 
   Future<void> _flipCamera() async {
     if (_session.recording) return;
     setState(() => _session.facingMode = _session.facingMode == 'user' ? 'environment' : 'user');
-    if (_displayMode == _StudioMode.video) {
-      await _session.refreshVideoPreview();
-      if (mounted) setState(() {});
-    }
+    await _session.refreshVideoPreview();
+    if (mounted) setState(() {});
   }
 
   Widget _flipCameraIcon({bool enabled = true, bool compact = false}) {
@@ -578,35 +522,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
           border: Border.all(color: on ? NgmyRecorderStudioColors.teal : Colors.white24),
         ),
         child: Text(label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w800 : FontWeight.w600, fontSize: 11)),
-      ),
-    );
-  }
-}
-
-class _WaveBars extends StatelessWidget {
-  const _WaveBars({required this.active, required this.pulse});
-  final bool active;
-  final double pulse;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 64,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(28, (i) {
-          final h = 10.0 + (math.sin((i * 0.55) + pulse * math.pi * 2).abs() * (active ? 46 : 18));
-          return Container(
-            width: 5,
-            height: h,
-            margin: const EdgeInsets.symmetric(horizontal: 1.5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(99),
-              color: Color.lerp(NgmyRecorderStudioColors.teal, NgmyRecorderStudioColors.mint, pulse),
-            ),
-          );
-        }),
       ),
     );
   }
@@ -746,7 +661,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                 const SizedBox(height: 14),
                 Text(_titleC.text, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                 Text(
-                  '${isVideo ? 'Video' : 'Voice Memo'} · ${_clock(widget.item.durationSec.toDouble())}',
+                  'Video · ${_clock(widget.item.durationSec.toDouble())}',
                   style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 16),
@@ -759,18 +674,12 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                   )
                 else if (widget.item.dataUrl.isEmpty)
                   const Text('Media unavailable — storage was full when saved.', style: TextStyle(color: Colors.white54, fontSize: 12))
-                else if (isVideo || widget.item.mimeType.startsWith('video/'))
+                else
                   NgmyLiveCaptureMedia.playbackVideo(
                     key: ValueKey('media-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
                     src: widget.item.dataUrl,
                     mimeType: widget.item.mimeType,
                     height: 280,
-                  )
-                else
-                  NgmyLiveCaptureMedia.playbackAudio(
-                    key: ValueKey('aud-${widget.item.id}-${widget.item.dataUrl.hashCode}'),
-                    src: widget.item.dataUrl,
-                    mimeType: widget.item.mimeType,
                   ),
                 const SizedBox(height: 20),
                 SizedBox(
@@ -873,7 +782,7 @@ class _MicSetupGuideSheetState extends State<_MicSetupGuideSheet> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Pick your device below. Follow the steps so voice memos and videos record with sound.',
+                  'Pick your device below. Follow the steps so videos record with sound.',
                   style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.45),
                 ),
                 const SizedBox(height: 16),
@@ -897,7 +806,7 @@ class _MicSetupGuideSheetState extends State<_MicSetupGuideSheet> {
                     border: Border.all(color: NgmyRecorderStudioColors.mint.withValues(alpha: 0.35)),
                   ),
                   child: const Text(
-                    'Tip: Always tap Start Voice or Start Video first — then allow the mic when your device asks. '
+                    'Tip: Always tap Start Video first — then allow the mic when your device asks. '
                     'Recordings made before the mic is allowed will have no sound.',
                     style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.45, fontWeight: FontWeight.w600),
                   ),
@@ -991,31 +900,31 @@ class _MicSetupGuideSheetState extends State<_MicSetupGuideSheet> {
       case _MicGuideDevice.iphone:
         return const [
           '1. Open ngmy.org in Safari (Add to Home Screen works too).',
-          '2. Open Recorder Studio and tap Start Voice or Start Video.',
+          '2. Open Recorder Studio and tap Start Video.',
           '3. Tap Allow when ngmy.org asks — this works with Safari set to Ask or Allow.',
           '4. Recommended: Settings → Safari → Microphone → Ask, then Allow inside ngmy.org when recording.',
           '5. If no prompt appears: tap the AA icon in the address bar → Website Settings → Microphone → Allow.',
           '6. Also check: Settings → Privacy & Security → Microphone → Safari ON.',
-          '7. Close Safari completely, reopen ngmy.org, tap Start Voice, then Allow.',
+          '7. Close Safari completely, reopen ngmy.org, tap Start Video, then Allow.',
         ];
       case _MicGuideDevice.android:
         return const [
           '1. Open ngmy.org in Chrome (recommended).',
-          '2. Open Recorder Studio and tap Start Voice or Start Video.',
+          '2. Open Recorder Studio and tap Start Video.',
           '3. When Android asks, tap Allow while using the app.',
           '4. If blocked: tap the lock icon in the address bar → Permissions → Microphone → Allow.',
           '5. Or go to Settings → Apps → Chrome → Permissions → Microphone → Allow.',
-          '6. Refresh the page and tap Start Voice again.',
+          '6. Refresh the page and tap Start Video again.',
         ];
       case _MicGuideDevice.computer:
         return const [
           '1. Open ngmy.org in Chrome, Edge, or Safari.',
-          '2. Click Start Voice or Start Video in Recorder Studio.',
+          '2. Click Start Video in Recorder Studio.',
           '3. Click Allow in the browser microphone prompt.',
           '4. If blocked: click the lock icon in the address bar → Site settings → Microphone → Allow.',
           '5. On Mac: System Settings → Privacy & Security → Microphone → enable your browser.',
           '6. On Windows: Settings → Privacy → Microphone → allow desktop apps and your browser.',
-          '7. Refresh ngmy.org and click Start again.',
+          '7. Refresh ngmy.org and click Start Video again.',
         ];
     }
   }
