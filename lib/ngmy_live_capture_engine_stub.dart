@@ -12,9 +12,17 @@ class NgmyLiveCaptureEngine {
 
   bool get previewActive => false;
 
-  Future<bool> openPreview({required String facingMode, required String aspect}) async => false;
+  Object? get pipStream => null;
+
+  bool get pipEnabled => false;
+
+  Future<bool> openPreview({required String facingMode, required String aspect, bool pipEnabled = false}) async => false;
 
   Future<void> closePreview() async {}
+
+  Future<bool> switchVideoFacing({required String facingMode, required String aspect}) async => false;
+
+  Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {}
 
   Future<bool> warmVoiceMicrophone() async => false;
 
@@ -22,6 +30,7 @@ class NgmyLiveCaptureEngine {
     required bool video,
     String facingMode = 'user',
     String aspect = 'youtube',
+    bool pipEnabled = false,
   }) async {
     lastError = 'Live Capture needs a web browser with microphone/camera access.';
     return false;

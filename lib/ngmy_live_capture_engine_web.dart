@@ -35,19 +35,38 @@ class NgmyLiveCaptureEngine {
   bool _previewOnly = false;
   html.CanvasElement? _muxCanvas;
 
+  html.MediaStream? _pipStream;
+  html.MediaStream? _recordStream;
+  bool _pipEnabled = false;
+  html.CanvasElement? _compositeCanvas;
+  html.VideoElement? _compositeMainVideo;
+  html.VideoElement? _compositePipVideo;
+  Timer? _compositeTimer;
+  String _activeFacing = 'user';
+  String _activeAspect = 'youtube';
+
   Object? get previewStream => _stream;
 
   bool get previewActive => _previewOnly && _stream != null;
+
+  Object? get pipStream => _pipStream;
+
+  bool get pipEnabled => _pipEnabled;
 
   /// Live camera preview before recording (video mode only).
   Future<bool> openPreview({
     required String facingMode,
     required String aspect,
+    bool pipEnabled = false,
   }) async {
     if (_recorder != null && _recorder!.state == 'recording') return false;
     lastError = null;
+    _activeFacing = facingMode;
+    _activeAspect = aspect;
+    _pipEnabled = pipEnabled;
     await _teardownRecorderOnly();
     await _releaseStream();
+    await _releasePipStream();
     _previewOnly = true;
     _video = true;
     try {
@@ -67,6 +86,9 @@ class NgmyLiveCaptureEngine {
         _previewOnly = false;
         return false;
       }
+      if (_pipEnabled) {
+        await _syncPipStream(mainFacing: facingMode, aspect: aspect);
+      }
       return true;
     } catch (e) {
       lastError = _describeStartError(e);
@@ -79,7 +101,240 @@ class NgmyLiveCaptureEngine {
   Future<void> closePreview() async {
     if (_recorder != null && _recorder!.state == 'recording') return;
     _previewOnly = false;
+    _pipEnabled = false;
+    await _releasePipStream();
     await _releaseStream();
+  }
+
+  /// Flip front/back while previewing or recording (replaces the active video track).
+  Future<bool> switchVideoFacing({
+    required String facingMode,
+    required String aspect,
+  }) async {
+    lastError = null;
+    _activeFacing = facingMode;
+    _activeAspect = aspect;
+    if (_stream == null) {
+      if (_previewOnly) {
+        return openPreview(facingMode: facingMode, aspect: aspect, pipEnabled: _pipEnabled);
+      }
+      return false;
+    }
+    try {
+      final newVideoStream = await _openVideoOnlyStream(facingMode: facingMode, aspect: aspect);
+      final newTrack = newVideoStream.getVideoTracks().isNotEmpty ? newVideoStream.getVideoTracks().first : null;
+      if (newTrack == null) {
+        lastError = 'Could not switch camera.';
+        return false;
+      }
+      for (final t in List<html.MediaStreamTrack>.from(_stream!.getVideoTracks())) {
+        _stream!.removeTrack(t);
+        try {
+          t.stop();
+        } catch (_) {}
+      }
+      _stream!.addTrack(newTrack);
+      _ensureTracksLive(_stream!);
+      for (final t in newVideoStream.getAudioTracks()) {
+        try {
+          t.stop();
+        } catch (_) {}
+      }
+      if (_pipEnabled) {
+        await _syncPipStream(mainFacing: facingMode, aspect: aspect);
+        if (_compositeMainVideo != null) {
+          _compositeMainVideo!.srcObject = _stream;
+          unawaited(_compositeMainVideo!.play().catchError((_) {}));
+        }
+        if (_compositePipVideo != null && _pipStream != null) {
+          _compositePipVideo!.srcObject = _pipStream;
+          unawaited(_compositePipVideo!.play().catchError((_) {}));
+        }
+      }
+      _previewOnly = false;
+      return true;
+    } catch (e) {
+      lastError = _describeStartError(e);
+      debugPrint('[live_capture] switchVideoFacing: $e');
+      return false;
+    }
+  }
+
+  Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {
+    _pipEnabled = enabled;
+    _activeFacing = mainFacing;
+    _activeAspect = aspect;
+    if (!enabled) {
+      await _releasePipStream();
+      return;
+    }
+    await _syncPipStream(mainFacing: mainFacing, aspect: aspect);
+  }
+
+  Future<void> _syncPipStream({required String mainFacing, required String aspect}) async {
+    await _releasePipStream();
+    final pipFacing = mainFacing == 'user' ? 'environment' : 'user';
+    try {
+      _pipStream = await _openVideoOnlyStream(facingMode: pipFacing, aspect: aspect);
+    } catch (e) {
+      debugPrint('[live_capture] pip stream failed: $e');
+      _pipStream = null;
+    }
+  }
+
+  Future<html.MediaStream> _openVideoOnlyStream({
+    required String facingMode,
+    required String aspect,
+  }) async {
+    final devices = html.window.navigator.mediaDevices;
+    if (devices == null) {
+      throw StateError('Secure media devices API unavailable');
+    }
+    final facing = facingMode == 'environment' ? 'environment' : 'user';
+    final sizes = _sizesForAspect(aspect);
+    final attempts = <Map<String, dynamic>>[
+      {
+        'audio': false,
+        'video': {
+          'facingMode': {'ideal': facing},
+          'width': {'ideal': sizes.$1},
+          'height': {'ideal': sizes.$2},
+          'frameRate': {'ideal': 30, 'max': 30},
+        },
+      },
+      {
+        'audio': false,
+        'video': {
+          'facingMode': facing,
+          'width': {'ideal': sizes.$1},
+          'height': {'ideal': sizes.$2},
+        },
+      },
+      {
+        'audio': false,
+        'video': {'facingMode': facing},
+      },
+      {'audio': false, 'video': true},
+    ];
+    Object? lastErr;
+    for (final c in attempts) {
+      try {
+        return await devices.getUserMedia(c);
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    throw lastErr ?? StateError('Could not open camera');
+  }
+
+  Future<html.MediaStream?> _startCompositeStream(
+    html.MediaStream main,
+    html.MediaStream? pip,
+    String aspect,
+  ) async {
+    if (pip == null || pip.getVideoTracks().isEmpty) return null;
+    _teardownComposite();
+    final sizes = _sizesForAspect(aspect);
+    final w = sizes.$1;
+    final h = sizes.$2;
+    final canvas = html.CanvasElement(width: w, height: h);
+    canvas
+      ..style.display = 'none'
+      ..style.position = 'fixed'
+      ..style.left = '-9999px';
+    html.document.body?.append(canvas);
+    _compositeCanvas = canvas;
+
+    final mainV = html.VideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..defaultMuted = true
+      ..setAttribute('playsinline', 'true')
+      ..srcObject = main;
+    final pipV = html.VideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..defaultMuted = true
+      ..setAttribute('playsinline', 'true')
+      ..srcObject = pip;
+    _compositeMainVideo = mainV;
+    _compositePipVideo = pipV;
+    try {
+      await mainV.play();
+      await pipV.play();
+    } catch (_) {}
+
+    final ctx = canvas.context2D;
+    final pipW = (w * 0.28).round().clamp(120, 360);
+    final pipH = (pipW * 4 / 3).round();
+    final pipX = w - pipW - 16;
+    const pipY = 16;
+
+    void drawFrame() {
+      try {
+        ctx.drawImageScaled(mainV, 0, 0, w, h);
+        ctx
+          ..save()
+          ..beginPath()
+          ..rect(pipX - 2, pipY - 2, pipW + 4, pipH + 4)
+          ..fillStyle = '#FFFFFF'
+          ..fill()
+          ..restore();
+        ctx.drawImageScaled(pipV, pipX, pipY, pipW, pipH);
+      } catch (_) {}
+    }
+
+    drawFrame();
+    _compositeTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => drawFrame());
+
+    html.MediaStream? canvasStream;
+    try {
+      canvasStream = canvas.captureStream(30);
+    } catch (e) {
+      debugPrint('[live_capture] composite captureStream failed: $e');
+      _teardownComposite();
+      return null;
+    }
+
+    final out = html.MediaStream();
+    for (final t in canvasStream.getVideoTracks()) {
+      out.addTrack(t);
+    }
+    for (final t in main.getAudioTracks()) {
+      out.addTrack(t);
+    }
+    return out;
+  }
+
+  void _teardownComposite() {
+    _compositeTimer?.cancel();
+    _compositeTimer = null;
+    try {
+      _compositeMainVideo?.srcObject = null;
+      _compositeMainVideo?.remove();
+    } catch (_) {}
+    try {
+      _compositePipVideo?.srcObject = null;
+      _compositePipVideo?.remove();
+    } catch (_) {}
+    _compositeMainVideo = null;
+    _compositePipVideo = null;
+    try {
+      _compositeCanvas?.remove();
+    } catch (_) {}
+    _compositeCanvas = null;
+    _recordStream = null;
+  }
+
+  Future<void> _releasePipStream() async {
+    try {
+      _pipStream?.getTracks().forEach((t) {
+        try {
+          t.stop();
+        } catch (_) {}
+      });
+    } catch (_) {}
+    _pipStream = null;
   }
 
   /// Mic opens only inside [start] / [openPreview] — not here (iOS requires a tap).
@@ -99,10 +354,14 @@ class NgmyLiveCaptureEngine {
     required bool video,
     String facingMode = 'user',
     String aspect = 'youtube',
+    bool pipEnabled = false,
   }) async {
     lastError = null;
     _video = video;
     _appleVoiceMux = false;
+    _activeFacing = facingMode;
+    _activeAspect = aspect;
+    _pipEnabled = pipEnabled && video;
 
     if (video) {
       await dispose();
@@ -137,7 +396,17 @@ class NgmyLiveCaptureEngine {
       _mime = _pickMime(video: video || _appleVoiceMux);
       _chunks.clear();
 
-      final recorder = _createRecorder(_stream!, _mime);
+      html.MediaStream streamForRecorder = _stream!;
+      if (_video && _pipEnabled) {
+        await _syncPipStream(mainFacing: facingMode, aspect: aspect);
+        final composite = await _startCompositeStream(_stream!, _pipStream, aspect);
+        if (composite != null) {
+          _recordStream = composite;
+          streamForRecorder = composite;
+        }
+      }
+
+      final recorder = _createRecorder(streamForRecorder, _mime);
       if (recorder == null) {
         lastError = 'This browser cannot record ${_video ? 'video' : 'audio'}. Try Chrome or Safari 14.5+.';
         await _teardownRecorderOnly();
@@ -607,6 +876,7 @@ class NgmyLiveCaptureEngine {
     await _cancelSubs();
     _recorder = null;
     _removeMuxCanvas();
+    _teardownComposite();
 
     if (_video) {
       await _releaseStream();
@@ -715,7 +985,10 @@ class NgmyLiveCaptureEngine {
 
   Future<void> dispose() async {
     _previewOnly = false;
+    _pipEnabled = false;
     await _teardownRecorderOnly();
+    _teardownComposite();
+    await _releasePipStream();
     await _releaseStream();
   }
 }

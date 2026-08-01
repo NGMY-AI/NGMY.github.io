@@ -40,6 +40,8 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   List<NgmyLiveCaptureItem> _items = [];
   bool _loading = true;
   bool _busy = false;
+  bool _cameraBusy = false;
+  bool _previewFullscreen = false;
 
   NgmyLiveCaptureSession get _session => ngmyLiveCaptureSession;
 
@@ -96,7 +98,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     _session.videoMode = true;
     setState(() => _busy = true);
     await _session.start(userEmail: widget.userEmail, video: true);
-    if (mounted) setState(() => _busy = false);
+    if (mounted) {
+      setState(() => _busy = false);
+      if (_session.recording && _session.pipEnabled) {
+        _session.lastStatus = 'Self-view is on — your face will appear in the saved video.';
+      }
+    }
   }
 
   Future<void> _stopRecording() async {
@@ -135,45 +142,51 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       builder: (context, pulse, scan, orbit) {
         return Scaffold(
           backgroundColor: NgmyRecorderStudioColors.deep,
-          body: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _header(recording),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
-                    children: [
-                      _studioPanel(recording, pulse),
-                      if (_session.lastError != null) ...[
-                        const SizedBox(height: 12),
-                        Text(_session.lastError!, style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
-                      ] else if (_session.lastStatus != null) ...[
-                        const SizedBox(height: 12),
-                        Text(_session.lastStatus!, style: const TextStyle(color: NgmyRecorderStudioColors.mint, fontSize: 12)),
-                      ],
-                      const SizedBox(height: 22),
-                      const Text('Your studio library', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Videos — tap to play, swipe left to delete.',
-                        style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+          body: Stack(
+            children: [
+              SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _header(recording),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+                        children: [
+                          _studioPanel(recording, pulse),
+                          if (_session.lastError != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_session.lastError!, style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 12)),
+                          ] else if (_session.lastStatus != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_session.lastStatus!, style: const TextStyle(color: NgmyRecorderStudioColors.mint, fontSize: 12)),
+                          ],
+                          const SizedBox(height: 22),
+                          const Text('Your studio library', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Videos — tap to play, swipe left to delete.',
+                            style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4),
+                          ),
+                          const SizedBox(height: 12),
+                          if (_loading)
+                            const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Center(child: CircularProgressIndicator(color: NgmyRecorderStudioColors.teal)),
+                            )
+                          else if (_items.isEmpty)
+                            _emptyLibrary()
+                          else
+                            ..._items.map(_libraryTile),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      if (_loading)
-                        const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(child: CircularProgressIndicator(color: NgmyRecorderStudioColors.teal)),
-                        )
-                      else if (_items.isEmpty)
-                        _emptyLibrary()
-                      else
-                        ..._items.map(_libraryTile),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              if (_previewFullscreen && (_session.recording || _session.previewActive))
+                _fullscreenPreviewOverlay(recording),
+            ],
           ),
         );
       },
@@ -326,23 +339,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               ),
               const SizedBox(height: 16),
               if (_session.recording || _session.previewActive)
-                Stack(
-                  alignment: Alignment.topRight,
-                  children: [
-                    KeyedSubtree(
-                      key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
-                      child: NgmyLiveCaptureMedia.liveCameraPreview(
-                        stream: _session.previewStream,
-                        height: _previewHeight,
-                        mirror: _session.facingMode == 'user',
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(8),
-                      child: _flipCameraIcon(enabled: !_session.recording, compact: true),
-                    ),
-                  ],
-                )
+                _buildCameraPreview()
               else
                 _idleHint(),
               const SizedBox(height: 16),
@@ -350,7 +347,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
                 const Text(
-                  'Record video with front or back camera. Tap the flip icon on the preview to switch.',
+                  'Flip camera anytime — even while recording. Turn on self-view for a FaceTime-style mini picture.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
@@ -464,6 +461,172 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     );
   }
 
+  Widget _buildCameraPreview({double? height}) {
+    final previewHeight = height ?? _previewHeight;
+    final pipOn = _session.pipEnabled && _session.pipStream != null;
+    final pipMirror = _session.facingMode != 'user';
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        KeyedSubtree(
+          key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
+          child: NgmyLiveCaptureMedia.liveCameraPreview(
+            stream: _session.previewStream,
+            height: previewHeight,
+            mirror: _session.facingMode == 'user',
+          ),
+        ),
+        if (pipOn)
+          Positioned(
+            top: 10,
+            left: 10,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.5),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10)],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: KeyedSubtree(
+                  key: ValueKey('pip-${identityHashCode(_session.pipStream)}'),
+                  child: NgmyLiveCaptureMedia.liveCameraPreview(
+                    stream: _session.pipStream,
+                    height: 68,
+                    mirror: pipMirror,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: _previewControlBar(),
+        ),
+      ],
+    );
+  }
+
+  Widget _previewControlBar() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _previewControlBtn(
+              icon: Icons.cameraswitch_rounded,
+              tooltip: _session.facingMode == 'user' ? 'Switch to back camera' : 'Switch to front camera',
+              onTap: _cameraBusy ? null : _flipCamera,
+            ),
+            _previewControlBtn(
+              icon: _session.pipEnabled ? Icons.picture_in_picture_alt_rounded : Icons.picture_in_picture_rounded,
+              tooltip: _session.pipEnabled ? 'Hide self-view' : 'Self-view (FaceTime style)',
+              onTap: _cameraBusy ? null : _togglePip,
+              active: _session.pipEnabled,
+            ),
+            _previewControlBtn(
+              icon: _previewFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+              tooltip: _previewFullscreen ? 'Exit full screen' : 'Full screen preview',
+              onTap: _toggleFullscreen,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _previewControlBtn({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onTap,
+    bool active = false,
+  }) {
+    final enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(7),
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(7),
+              color: active ? NgmyRecorderStudioColors.mint.withValues(alpha: 0.28) : Colors.transparent,
+            ),
+            child: Icon(
+              icon,
+              size: 13,
+              color: Colors.white.withValues(alpha: enabled ? (active ? 1.0 : 0.92) : 0.4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _fullscreenPreviewOverlay(bool recording) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    return Material(
+      color: Colors.black.withValues(alpha: 0.96),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Row(
+                children: [
+                  Text(
+                    recording ? '● RECORDING ${_session.clockLabel()}' : 'PREVIEW',
+                    style: TextStyle(
+                      color: recording ? NgmyRecorderStudioColors.mint : Colors.white70,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => setState(() => _previewFullscreen = false),
+                    icon: const Icon(Icons.fullscreen_exit_rounded, color: Colors.white, size: 22),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                child: Center(
+                  child: _buildCameraPreview(height: screenH * 0.72),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleFullscreen() {
+    setState(() => _previewFullscreen = !_previewFullscreen);
+  }
+
+  Future<void> _togglePip() async {
+    if (_cameraBusy) return;
+    setState(() => _cameraBusy = true);
+    await _session.setPipEnabled(!_session.pipEnabled);
+    if (mounted) setState(() => _cameraBusy = false);
+  }
+
   void _setAspect(String aspect) {
     if (_session.recording) return;
     setState(() => _session.aspect = aspect);
@@ -473,41 +636,10 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   Future<void> _flipCamera() async {
-    if (_session.recording) return;
-    setState(() => _session.facingMode = _session.facingMode == 'user' ? 'environment' : 'user');
-    await _session.refreshVideoPreview();
-    if (mounted) setState(() {});
-  }
-
-  Widget _flipCameraIcon({bool enabled = true, bool compact = false}) {
-    final isFront = _session.facingMode == 'user';
-    final size = compact ? 30.0 : 34.0;
-    final iconSize = compact ? 15.0 : 17.0;
-    return Tooltip(
-      message: isFront ? 'Front camera — tap to switch back' : 'Back camera — tap to switch front',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? _flipCamera : null,
-          borderRadius: BorderRadius.circular(10),
-          child: AnimatedRotation(
-            turns: isFront ? 0.0 : 0.5,
-            duration: const Duration(milliseconds: 340),
-            curve: Curves.easeOutBack,
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                color: Colors.black.withValues(alpha: compact ? 0.45 : 0.08),
-                border: Border.all(color: NgmyRecorderStudioColors.mint.withValues(alpha: enabled ? 0.65 : 0.25)),
-              ),
-              child: Icon(Icons.cameraswitch_rounded, size: iconSize, color: Colors.white.withValues(alpha: enabled ? 0.95 : 0.45)),
-            ),
-          ),
-        ),
-      ),
-    );
+    if (_cameraBusy) return;
+    setState(() => _cameraBusy = true);
+    await _session.switchCamera();
+    if (mounted) setState(() => _cameraBusy = false);
   }
 
   Widget _smallChip(String label, bool on, VoidCallback onTap) {

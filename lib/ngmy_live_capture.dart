@@ -160,6 +160,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   String facingMode = 'user';
   /// `youtube` = 16:9, `tiktok` = 9:16 vertical, `square` = 1:1.
   String aspect = 'youtube';
+  bool pipEnabled = false;
   bool recording = false;
   int elapsedSec = 0;
 
@@ -167,19 +168,42 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   bool get previewActive => _engine.previewActive;
 
+  Object? get pipStream => _engine.pipStream;
+
   String? get activeUserEmail => _userEmail;
 
   bool get isBackgroundRecording => recording;
 
   Future<void> refreshVideoPreview() async {
     if (recording || !videoMode) return;
-    await _engine.openPreview(facingMode: facingMode, aspect: aspect);
+    await _engine.openPreview(facingMode: facingMode, aspect: aspect, pipEnabled: pipEnabled);
     notifyListeners();
   }
 
   Future<void> closeVideoPreview() async {
     if (recording) return;
+    pipEnabled = false;
     await _engine.closePreview();
+    notifyListeners();
+  }
+
+  Future<bool> switchCamera() async {
+    lastError = null;
+    facingMode = facingMode == 'user' ? 'environment' : 'user';
+    final ok = await _engine.switchVideoFacing(facingMode: facingMode, aspect: aspect);
+    if (!ok) {
+      facingMode = facingMode == 'user' ? 'environment' : 'user';
+      lastError = _engine.lastError ?? 'Could not switch camera.';
+    } else if (pipEnabled) {
+      await _engine.setPipEnabled(true, mainFacing: facingMode, aspect: aspect);
+    }
+    notifyListeners();
+    return ok;
+  }
+
+  Future<void> setPipEnabled(bool enabled) async {
+    pipEnabled = enabled;
+    await _engine.setPipEnabled(enabled, mainFacing: facingMode, aspect: aspect);
     notifyListeners();
   }
 
@@ -196,6 +220,7 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
       video: video,
       facingMode: facingMode,
       aspect: aspect,
+      pipEnabled: pipEnabled,
     );
     if (!ok) {
       lastError = _engine.lastError ?? 'Could not start recording on this device.';
