@@ -529,6 +529,14 @@ class NgmyLiveCaptureEngine {
     }
   }
 
+  Map<String, dynamic> _nativeVideoConstraints(String facing) {
+    return {
+      'facingMode': {'ideal': facing},
+      'frameRate': {'ideal': 30, 'max': 30},
+      'zoom': {'ideal': 1.0},
+    };
+  }
+
   Map<String, dynamic> _videoConstraintsForAspect(String facing, String aspect) {
     final sizes = _sizesForAspect(aspect);
     return {
@@ -549,23 +557,18 @@ class NgmyLiveCaptureEngine {
       throw StateError('Secure media devices API unavailable');
     }
     final facing = facingMode == 'environment' ? 'environment' : 'user';
-    final sizes = _sizesForAspect(aspect);
     final attempts = <Map<String, dynamic>>[
       {
         'audio': false,
-        'video': _videoConstraintsForAspect(facing, aspect),
-      },
-      {
-        'audio': false,
-        'video': {
-          'facingMode': facing,
-          'width': {'ideal': sizes.$1},
-          'height': {'ideal': sizes.$2},
-        },
+        'video': _nativeVideoConstraints(facing),
       },
       {
         'audio': false,
         'video': {'facingMode': facing},
+      },
+      {
+        'audio': false,
+        'video': _videoConstraintsForAspect(facing, aspect),
       },
       {'audio': false, 'video': true},
     ];
@@ -580,6 +583,34 @@ class NgmyLiveCaptureEngine {
     throw lastErr ?? StateError('Could not open camera');
   }
 
+  Future<void> _waitForVideoDimensions(html.VideoElement video) async {
+    for (var i = 0; i < 80; i++) {
+      if (video.videoWidth > 0 && video.videoHeight > 0) return;
+      await Future<void>.delayed(Duration(milliseconds: _isAppleWebKit ? 80 : 50));
+    }
+  }
+
+  (int, int) _scaleDimensions(int w, int h, int maxEdge) {
+    if (w <= 0 || h <= 0) return (1280, 720);
+    final maxDim = w > h ? w : h;
+    if (maxDim <= maxEdge) return (w, h);
+    final scale = maxEdge / maxDim;
+    var ow = (w * scale).round();
+    var oh = (h * scale).round();
+    if (ow.isOdd) ow++;
+    if (oh.isOdd) oh++;
+    return (ow, oh);
+  }
+
+  (int, int) _canvasSizeForVideo(html.VideoElement video, String aspect) {
+    final vw = video.videoWidth;
+    final vh = video.videoHeight;
+    if (vw > 0 && vh > 0) {
+      return _scaleDimensions(vw, vh, 1920);
+    }
+    return _sizesForAspect(aspect);
+  }
+
   Future<html.MediaStream?> _startCompositeStream(
     html.MediaStream main,
     html.MediaStream? pip,
@@ -587,20 +618,7 @@ class NgmyLiveCaptureEngine {
     bool showPip = false,
   }) async {
     _teardownComposite();
-    final sizes = _sizesForAspect(aspect);
-    final w = sizes.$1;
-    final h = sizes.$2;
-    _compositeW = w;
-    _compositeH = h;
     _compositeShowPip = showPip && pip != null && pip.getVideoTracks().isNotEmpty;
-
-    final canvas = html.CanvasElement(width: w, height: h);
-    canvas
-      ..style.display = 'none'
-      ..style.position = 'fixed'
-      ..style.left = '-9999px';
-    html.document.body?.append(canvas);
-    _compositeCanvas = canvas;
 
     final mainV = html.VideoElement()
       ..autoplay = true
@@ -612,6 +630,21 @@ class NgmyLiveCaptureEngine {
     try {
       await mainV.play();
     } catch (_) {}
+    await _waitForVideoDimensions(mainV);
+
+    final sizes = _canvasSizeForVideo(mainV, aspect);
+    final w = sizes.$1;
+    final h = sizes.$2;
+    _compositeW = w;
+    _compositeH = h;
+
+    final canvas = html.CanvasElement(width: w, height: h);
+    canvas
+      ..style.display = 'none'
+      ..style.position = 'fixed'
+      ..style.left = '-9999px';
+    html.document.body?.append(canvas);
+    _compositeCanvas = canvas;
 
     if (_compositeShowPip && pip != null) {
       await _attachPipVideo(pip);
@@ -660,7 +693,7 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
   }
 
-  void _drawVideoCoverInRect(
+  void _drawVideoContainInRect(
     html.CanvasRenderingContext2D ctx,
     html.VideoElement video,
     num dx,
@@ -679,11 +712,11 @@ class NgmyLiveCaptureEngine {
     num drawW;
     num drawH;
     if (videoAspect > slotAspect) {
-      drawH = dh;
-      drawW = dh * videoAspect;
-    } else {
       drawW = dw;
       drawH = dw / videoAspect;
+    } else {
+      drawH = dh;
+      drawW = dh * videoAspect;
     }
     final drawX = dx + (dw - drawW) / 2;
     final drawY = dy + (dh - drawH) / 2;
@@ -695,10 +728,19 @@ class NgmyLiveCaptureEngine {
     final ctx = _compositeCanvas!.context2D;
     final w = _compositeW;
     final h = _compositeH;
+    final video = _compositeMainVideo!;
     try {
       ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, w, h);
-      _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
+      final vw = video.videoWidth;
+      final vh = video.videoHeight;
+      if (vw > 0 && vh > 0 && vw == w && vh == h) {
+        ctx.drawImageScaled(video, 0, 0, w, h);
+      } else if (vw > 0 && vh > 0 && (vw / vh - w / h).abs() < 0.02) {
+        ctx.drawImageScaled(video, 0, 0, w, h);
+      } else {
+        _drawVideoContainInRect(ctx, video, 0, 0, w, h);
+      }
     } catch (_) {}
   }
 
@@ -1075,29 +1117,23 @@ class NgmyLiveCaptureEngine {
     }
 
     final facing = facingMode == 'environment' ? 'environment' : 'user';
-    final sizes = _sizesForAspect(aspect);
     final audioPref = _audioMediaConstraint(requiredAudio: true);
     final attempts = <Map<String, dynamic>>[
       {
         'audio': audioPref,
-        'video': _videoConstraintsForAspect(facing, aspect),
-      },
-      {
-        'audio': audioPref,
-        'video': {
-          'facingMode': facing,
-          'width': {'ideal': sizes.$1},
-          'height': {'ideal': sizes.$2},
-          'aspectRatio': {'ideal': sizes.$1 / sizes.$2},
-        },
+        'video': _nativeVideoConstraints(facing),
       },
       {
         'audio': audioPref,
         'video': {'facingMode': facing},
       },
       {
-        'audio': true,
+        'audio': audioPref,
         'video': _videoConstraintsForAspect(facing, aspect),
+      },
+      {
+        'audio': true,
+        'video': _nativeVideoConstraints(facing),
       },
       {
         'audio': true,

@@ -518,7 +518,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 stream: _session.previewStream,
                 height: previewHeight,
                 mirror: _session.facingMode == 'user',
-                objectFit: 'cover',
+                objectFit: 'contain',
               ),
             ),
           ),
