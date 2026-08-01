@@ -61,12 +61,16 @@ class NgmyLiveCaptureBlobStore {
     }
   }
 
-  static Future<bool> putBlob(String id, Object blob) async {
+  static Future<bool> putBlob(String id, Object blob, {String mimeType = ''}) async {
     if (blob is! html.Blob) return false;
+    var stored = blob;
+    if (stored.type.isEmpty && mimeType.trim().isNotEmpty) {
+      stored = html.Blob([stored], mimeType.trim());
+    }
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readwrite');
-      tx.objectStore(_storeName).put(blob, id);
+      tx.objectStore(_storeName).put(stored, id);
       await tx.completed;
       return true;
     } catch (_) {
@@ -120,13 +124,17 @@ class NgmyLiveCaptureBlobStore {
     return url;
   }
 
-  static Future<String?> getPlayableUrl(String id) async {
+  static Future<String?> getPlayableUrl(String id, {String? mimeType}) async {
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readonly');
       final result = await tx.objectStore(_storeName).getObject(id);
       if (result is html.Blob) {
-        return html.Url.createObjectUrlFromBlob(result);
+        var blob = result;
+        if (blob.type.isEmpty && mimeType != null && mimeType.trim().isNotEmpty) {
+          blob = html.Blob([blob], mimeType.trim());
+        }
+        return html.Url.createObjectUrlFromBlob(blob);
       }
       if (result is String && result.isNotEmpty) return result;
       return null;

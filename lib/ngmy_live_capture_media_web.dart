@@ -126,11 +126,25 @@ class NgmyLiveCaptureMedia {
   }
 
   static void downloadSync(String dataUrl, String mimeType, String title) {
+    unawaited(downloadAsync(dataUrl, mimeType, title));
+  }
+
+  static Future<void> downloadAsync(String src, String mimeType, String title) async {
     try {
       final clean = ngmyCleanMediaMime(mimeType);
-      final objectUrl = dataUrl.startsWith('blob:')
-          ? dataUrl
-          : html.Url.createObjectUrlFromBlob(dataUrlToBlob(dataUrl, clean));
+      html.Blob blob;
+      if (src.startsWith('blob:')) {
+        final req = await html.HttpRequest.request(src, responseType: 'blob');
+        final raw = req.response;
+        if (raw is! html.Blob || raw.size <= 0) {
+          debugPrint('[live_capture] download blob fetch failed');
+          return;
+        }
+        blob = raw.type.isNotEmpty ? raw : html.Blob([raw], clean);
+      } else {
+        blob = dataUrlToBlob(src, clean);
+      }
+      final objectUrl = html.Url.createObjectUrlFromBlob(blob);
       if (_isIOSSafari) {
         html.window.open(objectUrl, '_blank');
         return;
@@ -145,19 +159,17 @@ class NgmyLiveCaptureMedia {
         try {
           a.remove();
         } catch (_) {}
-        if (!dataUrl.startsWith('blob:')) {
-          try {
-            html.Url.revokeObjectUrl(objectUrl);
-          } catch (_) {}
-        }
+        try {
+          html.Url.revokeObjectUrl(objectUrl);
+        } catch (_) {}
       });
     } catch (e) {
-      debugPrint('[live_capture] downloadSync: $e');
+      debugPrint('[live_capture] downloadAsync: $e');
     }
   }
 
   static Future<void> downloadQuiet(String dataUrl, String mimeType, String title) async {
-    downloadSync(dataUrl, mimeType, title);
+    await downloadAsync(dataUrl, mimeType, title);
   }
 
   static html.Blob dataUrlToBlob(String dataUrl, String mimeType) {
@@ -428,6 +440,14 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..setAttribute('playsinline', 'true')
       ..setAttribute('webkit-playsinline', 'true')
       ..style.pointerEvents = 'none';
+    if (url.startsWith('blob:') || url.startsWith('http://') || url.startsWith('https://')) {
+      el.src = url;
+    } else {
+      el.children.clear();
+      el.append(html.SourceElement()
+        ..src = url
+        ..type = mime);
+    }
     if (isVideo) {
       (el as html.VideoElement)
         ..style.width = '100%'
@@ -444,7 +464,7 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
         ..style.left = '0'
         ..style.bottom = '0';
     }
-    el.src = url;
+    el.load();
     root.append(el);
 
     var userMuted = false;
@@ -566,11 +586,22 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
 
     void togglePlay() {
       try {
+        if (el.readyState < 1) el.load();
         if (el.paused || el.ended) {
           if (el.ended) el.currentTime = 0;
           ensureAudible();
           el.play().catchError((e) {
             debugPrint('[live_capture] play failed: $e');
+            try {
+              el.muted = true;
+              el.play().then((_) {
+                if (!userMuted) {
+                  el.muted = false;
+                  el.volume = 1.0;
+                }
+                syncUi();
+              });
+            } catch (_) {}
           });
         } else {
           el.pause();

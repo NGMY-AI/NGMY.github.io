@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_live_capture_blob_store.dart';
 import 'ngmy_live_capture_engine.dart';
 import 'ngmy_live_capture_media.dart';
+import 'ngmy_vault_web_io.dart';
 
 final NgmyLiveCaptureSession ngmyLiveCaptureSession = NgmyLiveCaptureSession._();
 
@@ -97,7 +98,7 @@ class NgmyLiveCaptureStore {
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
       for (final item in items) {
-        final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id);
+        final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: item.mimeType);
         if (url != null && url.isNotEmpty) {
           item.dataUrl = url;
         }
@@ -120,7 +121,7 @@ class NgmyLiveCaptureStore {
     for (final item in trimmed) {
       if (item.dataUrl.isEmpty) {
         // Media already in IndexedDB (photos putBytes, recordings putBlob).
-        final existing = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id);
+        final existing = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: item.mimeType);
         if (existing == null || existing.isEmpty) mediaOk = false;
         continue;
       }
@@ -215,11 +216,11 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     var mediaOk = true;
     final blob = result.captureBlob;
     if (blob != null) {
-      mediaOk = await NgmyLiveCaptureBlobStore.putBlob(id, blob);
+      mediaOk = await NgmyLiveCaptureBlobStore.putBlob(id, blob, mimeType: result.mimeType);
     } else if (result.dataUrl.isNotEmpty) {
       mediaOk = await NgmyLiveCaptureBlobStore.putMedia(id, result.dataUrl, mimeType: result.mimeType);
     }
-    final playUrl = mediaOk ? (await NgmyLiveCaptureBlobStore.getPlayableUrl(id) ?? result.dataUrl) : result.dataUrl;
+    final playUrl = mediaOk ? (await NgmyLiveCaptureBlobStore.getPlayableUrl(id, mimeType: result.mimeType) ?? result.dataUrl) : result.dataUrl;
     final item = NgmyLiveCaptureItem(
       id: id,
       title: '${videoMode ? 'Video' : 'Voice Memo'} ${NgmyLiveCaptureSession._formatClock(elapsedSec)}',
@@ -679,7 +680,7 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
       if (mounted) setState(() => _mediaLoading = false);
       return;
     }
-    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
+    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id, mimeType: widget.item.mimeType);
     if (!mounted) return;
     if (url != null && url.isNotEmpty) widget.item.dataUrl = url;
     setState(() => _mediaLoading = false);
@@ -738,11 +739,29 @@ class _VoiceMemoSheetState extends State<_VoiceMemoSheet> {
     }
   }
 
-  void _download() {
-    NgmyLiveCaptureMedia.downloadSync(widget.item.dataUrl, widget.item.mimeType, widget.item.title);
+  Future<void> _download() async {
+    var src = widget.item.dataUrl;
+    if (src.isEmpty) {
+      src = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id, mimeType: widget.item.mimeType) ?? '';
+    }
+    var ok = false;
+    if (src.isNotEmpty) {
+      await NgmyLiveCaptureMedia.downloadAsync(src, widget.item.mimeType, widget.item.title);
+      ok = true;
+    } else {
+      final bytes = await NgmyLiveCaptureBlobStore.getBytes(widget.item.id);
+      if (bytes != null && bytes.isNotEmpty) {
+        final ext = widget.item.kind == 'video' ? 'mp4' : 'm4a';
+        ok = await ngmyVaultDownloadBytes(bytes, '${widget.item.title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}.$ext', widget.item.mimeType);
+      }
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Download started'), backgroundColor: Color(0xFF334155), behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(ok ? 'Download started' : 'Could not download this recording.'),
+        backgroundColor: ok ? const Color(0xFF334155) : const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 

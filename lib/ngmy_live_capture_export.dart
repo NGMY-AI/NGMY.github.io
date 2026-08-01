@@ -54,10 +54,10 @@ Future<Uint8List?> ngmyLiveCaptureResolveBytes(NgmyLiveCaptureItem item) async {
 Future<bool> ngmyLiveCaptureDownload(NgmyLiveCaptureItem item) async {
   var src = item.dataUrl;
   if (src.isEmpty) {
-    src = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id) ?? '';
+    src = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: item.mimeType) ?? '';
   }
   if (src.isNotEmpty) {
-    NgmyLiveCaptureMedia.downloadSync(src, item.mimeType, item.title);
+    await NgmyLiveCaptureMedia.downloadAsync(src, item.mimeType, item.title);
     return true;
   }
   final bytes = await ngmyLiveCaptureResolveBytes(item);

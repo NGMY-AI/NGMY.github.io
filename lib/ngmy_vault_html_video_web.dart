@@ -4,6 +4,25 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+String _cleanVideoMime(String mime) {
+  final base = mime.split(';').first.trim().toLowerCase();
+  if (base.startsWith('video/')) return base;
+  return 'video/mp4';
+}
+
+void _attachMediaSource(html.VideoElement v, String source, String mime) {
+  v.children.clear();
+  v.removeAttribute('src');
+  if (source.startsWith('blob:') || source.startsWith('http://') || source.startsWith('https://')) {
+    v.src = source;
+  } else {
+    v.append(html.SourceElement()
+      ..src = source
+      ..type = mime);
+  }
+  v.load();
+}
+
 /// Full-screen vault player — controls live in the HTML layer so taps work on
 /// Flutter web (HtmlElementView sits above Flutter widgets and steals hits).
 class NgmyVaultHtmlVideo extends StatefulWidget {
@@ -50,13 +69,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.display = 'block'
       ..style.pointerEvents = 'none';
 
-    final mime = widget.mimeType.trim().isEmpty ? 'video/mp4' : widget.mimeType.trim();
-    v.src = widget.source;
-    try {
-      v.append(html.SourceElement()
-        ..src = widget.source
-        ..type = mime);
-    } catch (_) {}
+    final mime = widget.mimeType.trim().isEmpty ? 'video/mp4' : _cleanVideoMime(widget.mimeType);
+    _attachMediaSource(v, widget.source, mime);
 
     _video = v;
     root.append(v);
@@ -209,20 +223,39 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
 
     void togglePlay() {
       try {
+        if (v.readyState < 1) {
+          _attachMediaSource(v, widget.source, mime);
+        }
         if (v.paused || v.ended) {
           if (v.ended) v.currentTime = 0;
           ensureAudible();
-          v.play().catchError((e) {
+          v.play().then((_) {
+            syncUi();
+          }).catchError((e) {
             debugPrint('[vault html video] play failed: $e');
-            showError('Tap Play again — your browser blocked playback.');
+            // iOS often needs one muted play first, then unmute.
+            try {
+              v.muted = true;
+              v.play().then((_) {
+                if (!userMuted) {
+                  v.muted = false;
+                  v.volume = 1.0;
+                }
+                syncUi();
+              }).catchError((e2) {
+                showError('Tap Play again — your browser blocked playback.');
+              });
+            } catch (_) {
+              showError('Tap Play again — your browser blocked playback.');
+            }
           });
         } else {
           v.pause();
+          syncUi();
         }
       } catch (e) {
         showError('Tap Play again — your browser blocked playback.');
       }
-      syncUi();
     }
 
     tapLayer.onClick.listen((e) {
@@ -300,7 +333,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       showError('Could not play this video. Try re-adding an MP4 clip from your gallery.');
     });
 
-    v.load();
+    v.onCanPlayThrough.listen((_) => syncUi());
+
     syncUi();
     return root;
   }

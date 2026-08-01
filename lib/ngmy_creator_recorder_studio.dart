@@ -130,7 +130,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   Future<void> _openItem(NgmyLiveCaptureItem item) async {
     if (item.dataUrl.isEmpty) {
-      item.dataUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id) ?? '';
+      item.dataUrl = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: item.mimeType) ?? '';
     }
     await showModalBottomSheet<void>(
       context: context,
@@ -544,7 +544,7 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
       if (mounted) setState(() => _mediaLoading = false);
       return;
     }
-    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id);
+    final url = await NgmyLiveCaptureBlobStore.getPlayableUrl(widget.item.id, mimeType: widget.item.mimeType);
     if (!mounted) return;
     if (url != null && url.isNotEmpty) widget.item.dataUrl = url;
     setState(() => _mediaLoading = false);
@@ -596,6 +596,20 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
     }
     await widget.onChanged();
     if (mounted) setState(() {});
+  }
+
+  Future<void> _download() async {
+    setState(() => _exporting = true);
+    final ok = await ngmyLiveCaptureDownload(widget.item);
+    if (!mounted) return;
+    setState(() => _exporting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Download started — video includes audio.' : 'Could not download this recording.'),
+        backgroundColor: ok ? const Color(0xFF059669) : const Color(0xFFDC2626),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _share() async {
@@ -677,6 +691,21 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                     mimeType: widget.item.mimeType,
                   ),
                 const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _exporting ? null : _download,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NgmyRecorderStudioColors.teal,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.download_rounded),
+                    label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(

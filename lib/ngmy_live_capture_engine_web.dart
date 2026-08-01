@@ -76,6 +76,11 @@ class NgmyLiveCaptureEngine {
         await _teardownRecorderOnly();
         return false;
       }
+      if (video && !audioOk) {
+        lastError = 'Allow microphone access so your video records with sound.';
+        await dispose();
+        return false;
+      }
       if (video) {
         final videoOk = await _waitForLiveTrack(_stream!, audio: false);
         if (!videoOk) {
@@ -335,17 +340,22 @@ class NgmyLiveCaptureEngine {
   }
 
   html.MediaRecorder? _createRecorder(html.MediaStream stream, String mime) {
+    final options = <String, dynamic>{
+      if (mime.isNotEmpty) 'mimeType': mime,
+      'audioBitsPerSecond': 128000,
+      if (_video) 'videoBitsPerSecond': 2500000,
+    };
     if (mime.isNotEmpty) {
       try {
         if (html.MediaRecorder.isTypeSupported(mime)) {
-          return html.MediaRecorder(stream, {'mimeType': mime});
+          return html.MediaRecorder(stream, options);
         }
       } catch (e) {
         debugPrint('[live_capture] MediaRecorder mime $mime failed: $e');
       }
     }
     try {
-      return html.MediaRecorder(stream);
+      return html.MediaRecorder(stream, _video ? {'audioBitsPerSecond': 128000, 'videoBitsPerSecond': 2500000} : {'audioBitsPerSecond': 128000});
     } catch (e) {
       debugPrint('[live_capture] MediaRecorder default failed: $e');
       return null;
@@ -390,7 +400,13 @@ class NgmyLiveCaptureEngine {
                 'audio/webm',
               ])
         : (video
-            ? <String>['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp9,opus', 'video/webm', 'video/mp4']
+            ? <String>[
+                'video/webm;codecs=vp9,opus',
+                'video/webm;codecs=vp8,opus',
+                'video/webm',
+                'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                'video/mp4',
+              ]
             : <String>['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4']);
     for (final m in candidates) {
       try {
@@ -461,7 +477,6 @@ class NgmyLiveCaptureEngine {
             : (recorder.mimeType ?? ((_video || _appleVoiceMux) ? 'video/mp4' : 'audio/webm')))
         .trim();
     final cleanMime = ngmyCleanMediaMime(blobMime);
-
     await _cancelSubs();
     _recorder = null;
 
@@ -480,7 +495,7 @@ class NgmyLiveCaptureEngine {
       return null;
     }
 
-    final blob = html.Blob(List<html.Blob>.from(_chunks), blobMime);
+    final blob = html.Blob(List<html.Blob>.from(_chunks), cleanMime.isNotEmpty ? cleanMime : blobMime);
     if (blob.size <= 0) {
       lastError = 'No audio/video data was captured.';
       return null;
