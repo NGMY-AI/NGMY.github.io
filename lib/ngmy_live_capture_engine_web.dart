@@ -52,6 +52,13 @@ class NgmyLiveCaptureEngine {
     try {
       _stream = await _openStream(video: true, facingMode: facingMode, aspect: aspect);
       _ensureTracksLive(_stream!);
+      final audioOk = await _waitForLiveTrack(_stream!, audio: true);
+      if (!audioOk) {
+        lastError = 'Allow microphone access so your videos record with sound.';
+        await _releaseStream();
+        _previewOnly = false;
+        return false;
+      }
       final videoOk = await _waitForLiveTrack(_stream!, audio: false);
       if (!videoOk) {
         lastError = 'Camera is not ready. Allow camera access for ngmy.org.';
@@ -72,6 +79,26 @@ class NgmyLiveCaptureEngine {
     if (_recorder != null && _recorder!.state == 'recording') return;
     _previewOnly = false;
     await _releaseStream();
+  }
+
+  /// Opens the mic ahead of time for voice memos (no recording yet).
+  Future<bool> warmVoiceMicrophone() async {
+    if (_recorder != null && _recorder!.state == 'recording') return false;
+    lastError = null;
+    if (_voiceAudioStream != null && _audioTracksLive(_voiceAudioStream!)) return true;
+    try {
+      final stream = await _openStream(video: false, facingMode: 'user', aspect: 'youtube');
+      _ensureTracksLive(stream);
+      final ok = await _waitForLiveTrack(stream, audio: true);
+      if (!ok) {
+        lastError = 'Allow microphone access so voice memos record with sound.';
+        return false;
+      }
+      return true;
+    } catch (e) {
+      lastError = _describeStartError(e);
+      return false;
+    }
   }
 
   static bool get _isAppleWebKit {
@@ -96,7 +123,7 @@ class NgmyLiveCaptureEngine {
           _hasLiveTrack(_stream!, audio: true) &&
           _hasLiveTrack(_stream!, audio: false);
       if (hasReadyStream) {
-        await _teardownRecorderOnly();
+        await _teardownRecorderOnly(keepStream: true);
         _previewOnly = false;
       } else {
         await dispose();
@@ -195,7 +222,14 @@ class NgmyLiveCaptureEngine {
         await _teardownRecorderOnly();
         return false;
       }
-      debugPrint('[live_capture] recording started mime=$_mime video=$_video appleMux=$_appleVoiceMux tracks=${_stream!.getTracks().length}');
+      final audioTracks = _stream!.getAudioTracks().length;
+      final videoTracks = _stream!.getVideoTracks().length;
+      debugPrint('[live_capture] recording started mime=$_mime video=$_video appleMux=$_appleVoiceMux audioTracks=$audioTracks videoTracks=$videoTracks');
+      if ((_video || _appleVoiceMux) && audioTracks == 0) {
+        lastError = 'Microphone is off — allow mic access for ngmy.org and record again.';
+        await _teardownRecorderOnly();
+        return false;
+      }
       return true;
     } catch (e) {
       lastError = _describeStartError(e);
@@ -589,11 +623,13 @@ class NgmyLiveCaptureEngine {
     NgmyLiveCaptureMedia.downloadSync(dataUrl, mimeType, title);
   }
 
-  Future<void> _teardownRecorderOnly() async {
+  Future<void> _teardownRecorderOnly({bool keepStream = false}) async {
     _flushTimer?.cancel();
     _flushTimer = null;
-    _muxCanvasTimer?.cancel();
-    _muxCanvasTimer = null;
+    if (!keepStream) {
+      _muxCanvasTimer?.cancel();
+      _muxCanvasTimer = null;
+    }
     try {
       if (_recorder != null && _recorder!.state != 'inactive') {
         _recorder!.stop();
@@ -602,8 +638,10 @@ class NgmyLiveCaptureEngine {
     await _cancelSubs();
     _recorder = null;
     _chunks.clear();
-    _stopMuxVideoTracks();
-    _stream = null;
+    if (!keepStream) {
+      _stopMuxVideoTracks();
+      _stream = null;
+    }
   }
 
   Future<void> _cancelSubs() async {

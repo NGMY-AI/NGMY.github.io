@@ -537,7 +537,7 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.left = '0'
       ..style.right = '0'
       ..style.top = '0'
-      ..style.bottom = '52px'
+      ..style.bottom = '88px'
       ..style.zIndex = '2'
       ..style.cursor = 'pointer';
 
@@ -549,7 +549,9 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.padding = '6px 8px'
       ..style.borderRadius = '12px'
       ..style.backgroundColor = 'rgba(0,0,0,0.55)'
-      ..style.zIndex = '4';
+      ..style.zIndex = '10'
+      ..style.pointerEvents = 'auto'
+      ..style.touchAction = 'manipulation';
 
     final seek = html.InputElement(type: 'range')
       ..style.width = '100%'
@@ -589,30 +591,31 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
     }
 
     void playWithSound() {
-      if (!userMuted) {
+      el.playbackRate = 1.0;
+      el.defaultPlaybackRate = 1.0;
+      if (userMuted) {
+        el.muted = true;
+        el.play().catchError((e) => debugPrint('[live_capture] muted play failed: $e'));
+        syncUi();
+        return;
+      }
+      // iOS/Safari: play() must start in the tap handler; unmute in the same turn.
+      el.volume = 1.0;
+      el.muted = true;
+      el.defaultMuted = true;
+      try {
+        final pending = el.play();
         el.muted = false;
         el.defaultMuted = false;
         el.removeAttribute('muted');
         el.volume = 1.0;
-      }
-      el.playbackRate = 1.0;
-      el.defaultPlaybackRate = 1.0;
-      el.play().catchError((e) {
-        debugPrint('[live_capture] unmuted play failed: $e');
-        final keepMuted = userMuted;
-        el.muted = true;
-        el.play().then((_) {
-          if (!keepMuted) {
-            el.muted = false;
-            el.defaultMuted = false;
-            el.removeAttribute('muted');
-            el.volume = 1.0;
-          }
-          syncUi();
-        }).catchError((e2) {
-          debugPrint('[live_capture] muted play failed: $e2');
+        pending.catchError((e) {
+          debugPrint('[live_capture] play failed: $e');
         });
-      });
+      } catch (e) {
+        debugPrint('[live_capture] play threw: $e');
+      }
+      syncUi();
     }
 
     void togglePlay() {
@@ -640,10 +643,15 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..type = 'button'
       ..style.background = 'transparent'
       ..style.border = 'none'
-      ..style.padding = '6px'
+      ..style.padding = '10px'
+      ..style.minWidth = '44px'
+      ..style.minHeight = '44px'
       ..style.cursor = 'pointer'
+      ..style.opacity = '1'
+      ..style.pointerEvents = 'auto'
       ..onClick.listen((e) {
         e.preventDefault();
+        e.stopPropagation();
         togglePlay();
       });
     setBtnIcon(barPlayBtn, playGlyph);
@@ -652,15 +660,22 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..type = 'button'
       ..style.background = 'transparent'
       ..style.border = 'none'
-      ..style.padding = '6px'
+      ..style.padding = '10px'
+      ..style.minWidth = '44px'
+      ..style.minHeight = '44px'
       ..style.cursor = 'pointer'
+      ..style.opacity = '1'
+      ..style.pointerEvents = 'auto'
       ..onClick.listen((e) {
         e.preventDefault();
+        e.stopPropagation();
         userMuted = !userMuted;
         el.muted = userMuted;
         if (!userMuted) {
           el.volume = 1.0;
           el.muted = false;
+          el.defaultMuted = false;
+          el.removeAttribute('muted');
         }
         syncUi();
       });
@@ -673,7 +688,8 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.flex = '1'
       ..text = '00:00 / 00:00';
 
-    seek.onInput.listen((_) {
+    seek.onInput.listen((e) {
+      e.stopPropagation();
       final dur = el.duration;
       if (!dur.isFinite || dur <= 0) return;
       final val = int.tryParse(seek.value ?? '0') ?? 0;
@@ -792,30 +808,23 @@ class NgmyCapturePlayer {
   Future<void> play() async {
     lastError = null;
     try {
+      _media.playbackRate = 1.0;
+      _media.defaultPlaybackRate = 1.0;
       _media.volume = 1;
+      _media.muted = true;
+      _media.defaultMuted = true;
+      final pending = _media.play();
       _media.muted = false;
       _media.defaultMuted = false;
       _media.removeAttribute('muted');
-      _media.playbackRate = 1.0;
-      _media.defaultPlaybackRate = 1.0;
-      await _media.play();
+      _media.volume = 1;
+      await pending;
       _emit();
     } catch (e) {
-      debugPrint('[live_capture] unmuted play: $e');
-      try {
-        _media.muted = true;
-        await _media.play();
-        _media.muted = false;
-        _media.defaultMuted = false;
-        _media.removeAttribute('muted');
-        _media.volume = 1;
-        _emit();
-      } catch (e2) {
-        lastError = 'Tap Play again, or use the player bar above.';
-        debugPrint('[live_capture] muted play: $e2');
-        _emit();
-        rethrow;
-      }
+      lastError = 'Tap Play again, or use the player bar above.';
+      debugPrint('[live_capture] play: $e');
+      _emit();
+      rethrow;
     }
   }
 

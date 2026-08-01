@@ -164,7 +164,9 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.borderRadius = '16px'
       ..style.backgroundColor = 'rgba(0,0,0,0.62)'
       ..style.border = '1px solid rgba(255,255,255,0.12)'
-      ..style.zIndex = '4';
+      ..style.zIndex = '10'
+      ..style.pointerEvents = 'auto'
+      ..style.touchAction = 'manipulation';
 
     final seek = html.InputElement(type: 'range')
       ..style.width = '100%'
@@ -184,13 +186,20 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         ..type = 'button'
         ..style.background = 'transparent'
         ..style.border = 'none'
-        ..style.padding = '8px'
+        ..style.padding = '10px'
+        ..style.minWidth = '44px'
+        ..style.minHeight = '44px'
         ..style.cursor = 'pointer'
+        ..style.opacity = '1'
+        ..style.pointerEvents = 'auto'
         ..style.display = 'flex'
         ..style.alignItems = 'center'
         ..style.justifyContent = 'center';
       setBtnIcon(b, char, size: size);
-      b.onClick.listen(onClick);
+      b.onClick.listen((e) {
+        e.stopPropagation();
+        onClick(e);
+      });
       return b;
     }
 
@@ -226,31 +235,34 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     }
 
     void playWithSound() {
-      if (!userMuted) {
+      v.playbackRate = 1.0;
+      v.defaultPlaybackRate = 1.0;
+      if (userMuted) {
+        v.muted = true;
+        v.play().catchError((e) {
+          debugPrint('[vault html video] muted play failed: $e');
+          showError('Tap Play again — your browser blocked playback.');
+        });
+        syncUi();
+        return;
+      }
+      v.volume = 1.0;
+      v.muted = true;
+      v.defaultMuted = true;
+      try {
+        final pending = v.play();
         v.muted = false;
         v.defaultMuted = false;
         v.removeAttribute('muted');
         v.volume = 1.0;
-      }
-      v.playbackRate = 1.0;
-      v.defaultPlaybackRate = 1.0;
-      v.play().catchError((e) {
-        debugPrint('[vault html video] unmuted play failed: $e');
-        final keepMuted = userMuted;
-        v.muted = true;
-        v.play().then((_) {
-          if (!keepMuted) {
-            v.muted = false;
-            v.defaultMuted = false;
-            v.removeAttribute('muted');
-            v.volume = 1.0;
-          }
-          syncUi();
-        }).catchError((e2) {
-          debugPrint('[vault html video] muted play failed: $e2');
+        pending.catchError((e) {
+          debugPrint('[vault html video] play failed: $e');
           showError('Tap Play again — your browser blocked playback.');
         });
-      });
+      } catch (e) {
+        showError('Tap Play again — your browser blocked playback.');
+      }
+      syncUi();
     }
 
     void togglePlay() {
@@ -300,7 +312,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       togglePlay();
     });
 
-    seek.onInput.listen((_) {
+    seek.onInput.listen((e) {
+      e.stopPropagation();
       final dur = v.duration;
       if (!dur.isFinite || dur <= 0) return;
       final val = int.tryParse(seek.value ?? '0') ?? 0;

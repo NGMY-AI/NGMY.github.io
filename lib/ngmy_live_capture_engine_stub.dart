@@ -16,6 +16,8 @@ class NgmyLiveCaptureEngine {
 
   Future<void> closePreview() async {}
 
+  Future<bool> warmVoiceMicrophone() async => false;
+
   Future<bool> start({
     required bool video,
     String facingMode = 'user',

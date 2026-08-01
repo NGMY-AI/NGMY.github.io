@@ -187,6 +187,12 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> warmVoiceMicrophone() async {
+    if (recording || videoMode) return;
+    await _engine.warmVoiceMicrophone();
+    notifyListeners();
+  }
+
   Future<bool> start({required String userEmail, required bool video}) async {
     lastError = null;
     lastStatus = null;
