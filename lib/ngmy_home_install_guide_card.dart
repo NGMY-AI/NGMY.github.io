@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 
 /// Phone mockup layout — shared across stage + face widgets.
 const _kPhoneW = 96.0;
-const _kPhoneH = 252.0;
-const _kPhoneTopIconY = 52.0;
-const _kPhoneBottomBarInset = 16.0;
+/// Default phone height; actual height fills available card space via [LayoutBuilder].
+const _kPhoneHDefault = 172.0;
+const _kPhoneTopIconY = 30.0;
+const _kPhoneBottomBarInset = 12.0;
+const _kPhoneIconSize = 32.0;
 const _kSlideSeconds = 7;
 
 /// Animated onboarding slides teaching users to save NGMY to their iPhone home screen.
@@ -133,88 +135,105 @@ class _NgmyHomeInstallGuideCardState extends State<NgmyHomeInstallGuideCard> wit
         final pop = Curves.easeOutCubic.transform(_slidePop.value.clamp(0.0, 1.0));
         final breathe = 0.92 + _pulse.value * 0.08;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 54),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: _HeroBadge(shimmer: _shimmer.value, pulse: _pulse.value, slide: slide),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: Transform.translate(
-                offset: Offset(8 * (1 - pop), 0),
-                child: Opacity(
-                  opacity: 0.4 + pop * 0.6,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _PhoneStage(
-                        slide: slide,
-                        pulse: _pulse.value,
-                        orbit: _orbit.value,
-                        isDark: widget.isDark,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _LightTextFrame(
-                              isDark: widget.isDark,
-                              slide: slide,
-                              pulse: _pulse.value,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    slide.title,
-                                    style: TextStyle(
-                                      color: titleColor,
-                                      fontSize: 14.5,
-                                      fontWeight: FontWeight.w900,
-                                      height: 1.1,
-                                      shadows: widget.isDark
-                                          ? [Shadow(color: slide.accent.withValues(alpha: 0.35 * breathe), blurRadius: 10)]
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    slide.body,
-                                    style: TextStyle(color: bodyColor, fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w600),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _AccentTextFrame(
-                              isDark: widget.isDark,
-                              slide: slide,
-                              pulse: _pulse.value,
-                              child: Text(
-                                slide.detail,
-                                style: TextStyle(
-                                  color: slide.accent.withValues(alpha: widget.isDark ? 1 : 0.92),
-                                  fontSize: 10.5,
-                                  height: 1.32,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final phoneH = constraints.maxHeight.isFinite && constraints.maxHeight > 0
+                ? constraints.maxHeight
+                : _kPhoneHDefault;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Transform.translate(
+                  offset: Offset(8 * (1 - pop), 0),
+                  child: Opacity(
+                    opacity: 0.4 + pop * 0.6,
+                    child: _PhoneStage(
+                      slide: slide,
+                      pulse: _pulse.value,
+                      orbit: _orbit.value,
+                      isDark: widget.isDark,
+                      height: phoneH,
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Transform.translate(
+                    offset: Offset(8 * (1 - pop), 0),
+                    child: Opacity(
+                      opacity: 0.4 + pop * 0.6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _HeroBadge(shimmer: _shimmer.value, pulse: _pulse.value, slide: slide),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _LightTextFrame(
+                                  isDark: widget.isDark,
+                                  slide: slide,
+                                  pulse: _pulse.value,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        slide.title,
+                                        style: TextStyle(
+                                          color: titleColor,
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w900,
+                                          height: 1.1,
+                                          shadows: widget.isDark
+                                              ? [Shadow(color: slide.accent.withValues(alpha: 0.35 * breathe), blurRadius: 10)]
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        slide.body,
+                                        style: TextStyle(
+                                          color: bodyColor,
+                                          fontSize: 11.5,
+                                          height: 1.3,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                _AccentTextFrame(
+                                  isDark: widget.isDark,
+                                  slide: slide,
+                                  pulse: _pulse.value,
+                                  child: Text(
+                                    slide.detail,
+                                    style: TextStyle(
+                                      color: slide.accent.withValues(alpha: widget.isDark ? 1 : 0.92),
+                                      fontSize: 10.5,
+                                      height: 1.32,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -350,21 +369,23 @@ class _PhoneStage extends StatelessWidget {
     required this.pulse,
     required this.orbit,
     required this.isDark,
+    required this.height,
   });
 
   final _InstallSlide slide;
   final double pulse;
   final double orbit;
   final bool isDark;
+  final double height;
 
   static const _phoneW = _kPhoneW;
-  static const _phoneH = _kPhoneH;
 
   @override
   Widget build(BuildContext context) {
+    final midY = height * 0.5;
     return SizedBox(
       width: 104,
-      height: _phoneH,
+      height: height,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
@@ -374,7 +395,7 @@ class _PhoneStage extends StatelessWidget {
             final r = 54 + math.sin(orbit * math.pi * 2 + i) * 5;
             return Positioned(
               left: 52 + math.cos(angle) * r - 3,
-              top: 126 + math.sin(angle) * r * 0.4 - 3,
+              top: midY + math.sin(angle) * r * 0.4 - 3,
               child: Container(
                 width: 7,
                 height: 7,
@@ -386,7 +407,7 @@ class _PhoneStage extends StatelessWidget {
               ),
             );
           }),
-          _PhoneMockup(slide: slide, pulse: pulse, isDark: isDark, width: _phoneW, height: _phoneH),
+          _PhoneMockup(slide: slide, pulse: pulse, isDark: isDark, width: _phoneW, height: height),
         ],
       ),
     );
@@ -485,7 +506,7 @@ class _PhoneMockup extends StatelessWidget {
             ...switch (slide.phoneHint) {
               'safari' => [
                 Positioned(
-                  top: 20,
+                  top: height * 0.10,
                   left: 10,
                   right: 10,
                   child: Container(
@@ -503,7 +524,7 @@ class _PhoneMockup extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  top: 82,
+                  top: height * 0.38,
                   left: 0,
                   right: 0,
                   child: _IosAppIcon(
@@ -527,9 +548,9 @@ class _PhoneMockup extends StatelessWidget {
                     accent: slide.accent,
                     accent2: slide.accent2,
                     pulse: pulse,
-                    size: 36,
+                    size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 19),
+                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18),
                   ),
                 ),
                 Positioned(
@@ -551,9 +572,9 @@ class _PhoneMockup extends StatelessWidget {
                     accent: slide.accent,
                     accent2: slide.accent2,
                     pulse: pulse,
-                    size: 36,
+                    size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 17),
+                    child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 16),
                   ),
                 ),
                 Positioned(
@@ -575,9 +596,9 @@ class _PhoneMockup extends StatelessWidget {
                     accent: slide.accent,
                     accent2: slide.accent2,
                     pulse: pulse,
-                    size: 36,
+                    size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 19),
+                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18),
                   ),
                 ),
                 Positioned(
@@ -596,9 +617,9 @@ class _PhoneMockup extends StatelessWidget {
                     accent: slide.accent,
                     accent2: slide.accent2,
                     pulse: pulse,
-                    size: 36,
+                    size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.add_to_home_screen_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.add_to_home_screen_rounded, color: Colors.white, size: 17),
                   ),
                 ),
                 Positioned(
@@ -615,7 +636,7 @@ class _PhoneMockup extends StatelessWidget {
               ],
               'confirm' => [
                 Positioned(
-                  top: 18,
+                  top: 14,
                   left: 10,
                   right: 10,
                   bottom: _kPhoneBottomBarInset,
