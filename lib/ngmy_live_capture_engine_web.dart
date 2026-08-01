@@ -359,13 +359,15 @@ class NgmyLiveCaptureEngine {
       _noiseAnalyser = js_util.callMethod(ctx, 'createAnalyser', const []);
       js_util.setProperty(_noiseAnalyser!, 'fftSize', 512);
       final dest = js_util.callMethod(ctx, 'createMediaStreamDestination', const []);
+      final gate = _noiseGateGain!;
+      final analyser = _noiseAnalyser!;
 
       js_util.callMethod(source, 'connect', [highpass]);
       js_util.callMethod(highpass, 'connect', [lowpass]);
       js_util.callMethod(lowpass, 'connect', [compressor]);
-      js_util.callMethod(compressor, 'connect', [_noiseGateGain]);
-      js_util.callMethod(_noiseGateGain, 'connect', [_noiseAnalyser]);
-      js_util.callMethod(_noiseAnalyser, 'connect', [dest]);
+      js_util.callMethod(compressor, 'connect', [gate]);
+      js_util.callMethod(gate, 'connect', [analyser]);
+      js_util.callMethod(analyser, 'connect', [dest]);
 
       _startNoiseGate(ctx);
 

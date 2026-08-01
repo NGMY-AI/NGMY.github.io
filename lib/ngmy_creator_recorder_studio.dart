@@ -320,11 +320,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                           _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => _setAspect('youtube')),
                           _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => _setAspect('tiktok')),
                           _smallChip('Square', _session.aspect == 'square', () => _setAspect('square')),
-                          _smallChip(
-                            'Noise cancel',
-                            _session.noiseCancellation,
-                            _cameraBusy ? () {} : _toggleNoiseCancellation,
-                          ),
                         ],
                       ),
                     )
