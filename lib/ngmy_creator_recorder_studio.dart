@@ -242,17 +242,51 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white24),
-            ),
-            child: const Icon(Icons.mic_rounded, color: Colors.white, size: 22),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white24),
+                ),
+                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 6),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _showMicSetupGuide,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Tooltip(
+                    message: 'How to turn on the microphone',
+                    child: Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Icon(Icons.info_outline_rounded, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  void _showMicSetupGuide() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _MicSetupGuideSheet(),
     );
   }
 
@@ -783,5 +817,205 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
         ),
       ),
     );
+  }
+}
+
+enum _MicGuideDevice { iphone, android, computer }
+
+class _MicSetupGuideSheet extends StatefulWidget {
+  const _MicSetupGuideSheet();
+
+  @override
+  State<_MicSetupGuideSheet> createState() => _MicSetupGuideSheetState();
+}
+
+class _MicSetupGuideSheetState extends State<_MicSetupGuideSheet> {
+  _MicGuideDevice _device = _MicGuideDevice.iphone;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxH = MediaQuery.sizeOf(context).height * 0.88;
+    return SafeArea(
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: 520, maxHeight: maxH),
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 22),
+          decoration: BoxDecoration(
+            color: NgmyRecorderStudioColors.panel,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.35)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: NgmyRecorderStudioColors.mint, size: 22),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Turn on the microphone',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Pick your device below. Follow the steps so voice memos and videos record with sound.',
+                  style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.45),
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _deviceChip('iPhone', Icons.phone_iphone_rounded, _MicGuideDevice.iphone),
+                    _deviceChip('Android', Icons.android_rounded, _MicGuideDevice.android),
+                    _deviceChip('Computer', Icons.computer_rounded, _MicGuideDevice.computer),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                ..._stepsFor(_device).map(_stepTile),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: NgmyRecorderStudioColors.emerald.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: NgmyRecorderStudioColors.mint.withValues(alpha: 0.35)),
+                  ),
+                  child: const Text(
+                    'Tip: Always tap Start Voice or Start Video first — then allow the mic when your device asks. '
+                    'Recordings made before the mic is allowed will have no sound.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.45, fontWeight: FontWeight.w600),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: NgmyRecorderStudioColors.emerald,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _deviceChip(String label, IconData icon, _MicGuideDevice device) {
+    final selected = _device == device;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _device = device),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: selected ? NgmyRecorderStudioColors.emerald.withValues(alpha: 0.35) : Colors.white.withValues(alpha: 0.06),
+            border: Border.all(color: selected ? NgmyRecorderStudioColors.mint : Colors.white24),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: selected ? Colors.white : Colors.white60),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.white60,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _stepTile(String text) {
+    final dot = text.indexOf('.');
+    final n = dot > 0 ? text.substring(0, dot) : '•';
+    final body = dot > 0 ? text.substring(dot + 1).trim() : text;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+            ),
+            child: Text(n, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(body, style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.45, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _stepsFor(_MicGuideDevice device) {
+    switch (device) {
+      case _MicGuideDevice.iphone:
+        return const [
+          '1. Open ngmy.org in Safari (Add to Home Screen works too).',
+          '2. Open Recorder Studio and tap Start Voice or Start Video.',
+          '3. When iPhone asks, tap Allow for the microphone (and camera for video).',
+          '4. If you don\'t see a prompt: Settings → Safari → Microphone → Allow.',
+          '5. Also check: Settings → Privacy & Security → Microphone → turn Safari ON.',
+          '6. Close Safari completely, reopen ngmy.org, and tap Start again.',
+        ];
+      case _MicGuideDevice.android:
+        return const [
+          '1. Open ngmy.org in Chrome (recommended).',
+          '2. Open Recorder Studio and tap Start Voice or Start Video.',
+          '3. When Android asks, tap Allow while using the app.',
+          '4. If blocked: tap the lock icon in the address bar → Permissions → Microphone → Allow.',
+          '5. Or go to Settings → Apps → Chrome → Permissions → Microphone → Allow.',
+          '6. Refresh the page and tap Start Voice again.',
+        ];
+      case _MicGuideDevice.computer:
+        return const [
+          '1. Open ngmy.org in Chrome, Edge, or Safari.',
+          '2. Click Start Voice or Start Video in Recorder Studio.',
+          '3. Click Allow in the browser microphone prompt.',
+          '4. If blocked: click the lock icon in the address bar → Site settings → Microphone → Allow.',
+          '5. On Mac: System Settings → Privacy & Security → Microphone → enable your browser.',
+          '6. On Windows: Settings → Privacy → Microphone → allow desktop apps and your browser.',
+          '7. Refresh ngmy.org and click Start again.',
+        ];
+    }
   }
 }
