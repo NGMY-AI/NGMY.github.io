@@ -117,6 +117,8 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       v.defaultMuted = false;
       v.removeAttribute('muted');
       v.volume = 1.0;
+      v.playbackRate = 1.0;
+      v.defaultPlaybackRate = 1.0;
     }
 
     // Tap layer — covers video area above transport bar.
@@ -223,39 +225,25 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
 
     void togglePlay() {
       try {
+        v.playbackRate = 1.0;
+        v.defaultPlaybackRate = 1.0;
         if (v.readyState < 1) {
           _attachMediaSource(v, widget.source, mime);
         }
         if (v.paused || v.ended) {
           if (v.ended) v.currentTime = 0;
           ensureAudible();
-          v.play().then((_) {
-            syncUi();
-          }).catchError((e) {
+          v.play().catchError((e) {
             debugPrint('[vault html video] play failed: $e');
-            // iOS often needs one muted play first, then unmute.
-            try {
-              v.muted = true;
-              v.play().then((_) {
-                if (!userMuted) {
-                  v.muted = false;
-                  v.volume = 1.0;
-                }
-                syncUi();
-              }).catchError((e2) {
-                showError('Tap Play again — your browser blocked playback.');
-              });
-            } catch (_) {
-              showError('Tap Play again — your browser blocked playback.');
-            }
+            showError('Tap Play again — your browser blocked playback.');
           });
         } else {
           v.pause();
-          syncUi();
         }
       } catch (e) {
         showError('Tap Play again — your browser blocked playback.');
       }
+      syncUi();
     }
 
     tapLayer.onClick.listen((e) {
@@ -321,7 +309,11 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ensureAudible();
       syncUi();
     });
-    v.onLoadedMetadata.listen((_) => syncUi());
+    v.onLoadedMetadata.listen((_) {
+      v.playbackRate = 1.0;
+      v.defaultPlaybackRate = 1.0;
+      syncUi();
+    });
     v.onLoadedData.listen((_) => syncUi());
     v.onCanPlay.listen((_) => syncUi());
     v.onPlay.listen((_) => syncUi());

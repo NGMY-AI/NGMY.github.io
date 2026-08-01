@@ -110,6 +110,8 @@ class NgmyLiveCaptureMedia {
         el.currentTime = 0;
         el.muted = false;
         el.volume = 1;
+        el.playbackRate = 1.0;
+        el.defaultPlaybackRate = 1.0;
       } catch (e) {
         debugPrint('[live_capture] probe play: $e');
       }
@@ -493,6 +495,8 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       el.defaultMuted = false;
       el.removeAttribute('muted');
       el.volume = 1.0;
+      el.playbackRate = 1.0;
+      el.defaultPlaybackRate = 1.0;
     }
 
     final centerBtn = html.DivElement()
@@ -586,22 +590,14 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
 
     void togglePlay() {
       try {
+        el.playbackRate = 1.0;
+        el.defaultPlaybackRate = 1.0;
         if (el.readyState < 1) el.load();
         if (el.paused || el.ended) {
           if (el.ended) el.currentTime = 0;
           ensureAudible();
           el.play().catchError((e) {
             debugPrint('[live_capture] play failed: $e');
-            try {
-              el.muted = true;
-              el.play().then((_) {
-                if (!userMuted) {
-                  el.muted = false;
-                  el.volume = 1.0;
-                }
-                syncUi();
-              });
-            } catch (_) {}
           });
         } else {
           el.pause();
@@ -675,7 +671,11 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..append(centerBtn)
       ..append(bar);
 
-    el.onLoadedMetadata.listen((_) => syncUi());
+    el.onLoadedMetadata.listen((_) {
+      el.playbackRate = 1.0;
+      el.defaultPlaybackRate = 1.0;
+      syncUi();
+    });
     el.onPlay.listen((_) {
       ensureAudible();
       syncUi();

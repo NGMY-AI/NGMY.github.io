@@ -291,22 +291,16 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 ],
               ),
               if (_displayMode == _StudioMode.video && !recording) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _smallChip('Front', _session.facingMode == 'user', () => setState(() => _session.facingMode = 'user')),
-                    const SizedBox(width: 8),
-                    _smallChip('Back', _session.facingMode == 'environment', () => setState(() => _session.facingMode = 'environment')),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _smallChip('YouTube 16:9', _session.aspect == 'youtube', () => setState(() => _session.aspect = 'youtube')),
                     _smallChip('TikTok 9:16', _session.aspect == 'tiktok', () => setState(() => _session.aspect = 'tiktok')),
                     _smallChip('Square', _session.aspect == 'square', () => setState(() => _session.aspect = 'square')),
+                    _flipCameraIcon(),
                   ],
                 ),
               ],
@@ -470,6 +464,30 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     );
   }
 
+  Widget _flipCameraIcon() {
+    final isFront = _session.facingMode == 'user';
+    return Tooltip(
+      message: isFront ? 'Switch to back camera' : 'Switch to front camera',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _session.facingMode = isFront ? 'environment' : 'user'),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: Colors.white.withValues(alpha: 0.08),
+              border: Border.all(color: NgmyRecorderStudioColors.teal.withValues(alpha: 0.45)),
+            ),
+            child: Icon(Icons.cameraswitch_rounded, size: 17, color: Colors.white.withValues(alpha: 0.85)),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _smallChip(String label, bool on, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -598,20 +616,6 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _download() async {
-    setState(() => _exporting = true);
-    final ok = await ngmyLiveCaptureDownload(widget.item);
-    if (!mounted) return;
-    setState(() => _exporting = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? 'Download started — video includes audio.' : 'Could not download this recording.'),
-        backgroundColor: ok ? const Color(0xFF059669) : const Color(0xFFDC2626),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
   Future<void> _share() async {
     setState(() => _exporting = true);
     final ok = await ngmyLiveCaptureShare(widget.item);
@@ -691,21 +695,6 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
                     mimeType: widget.item.mimeType,
                   ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _exporting ? null : _download,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: NgmyRecorderStudioColors.teal,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('Download', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                ),
-                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(

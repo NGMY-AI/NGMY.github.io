@@ -116,7 +116,11 @@ class NgmyLiveCaptureEngine {
       });
 
       try {
-        recorder.start(_isAppleWebKit ? 1000 : 500);
+        if (_video) {
+          recorder.start();
+        } else {
+          recorder.start(_isAppleWebKit ? 1000 : 500);
+        }
       } catch (_) {
         try {
           recorder.start();
@@ -287,6 +291,7 @@ class NgmyLiveCaptureEngine {
           'facingMode': {'ideal': facing},
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
+          'frameRate': {'ideal': 30, 'max': 30},
         },
       },
       {
@@ -295,6 +300,7 @@ class NgmyLiveCaptureEngine {
           'facingMode': facing,
           'width': {'ideal': sizes.$1},
           'height': {'ideal': sizes.$2},
+          'frameRate': {'ideal': 30, 'max': 30},
         },
       },
       {
