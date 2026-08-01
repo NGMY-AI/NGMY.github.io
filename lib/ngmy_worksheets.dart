@@ -673,12 +673,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                       const SizedBox(height: 14),
                       _projectsBody(p),
                     ] else if (_tab == _WorksheetTab.cashier)
-                      _placeholderTab(
-                        p: p,
-                        icon: Icons.calculate_outlined,
-                        title: 'Cashier',
-                        subtitle: 'Track daily spending and receipts here.',
-                      )
+                      _cashierTab(p)
                     else
                       NgmyFamilyTreeTab(
                         key: ValueKey(_familyTreeVersion),
@@ -720,9 +715,21 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
+  WorksheetFrameStyle get _activeTabFrameStyle {
+    switch (_tab) {
+      case _WorksheetTab.projects:
+        return WorksheetFrameStyle.projects;
+      case _WorksheetTab.cashier:
+        return WorksheetFrameStyle.cashier;
+      case _WorksheetTab.familyTree:
+        return WorksheetFrameStyle.familyTree;
+    }
+  }
+
   Widget _headerCard(WorksheetPalette p) {
     return WorksheetGlowFrame(
-      glowStrength: 0.85,
+      style: WorksheetFrameStyle.header,
+      glowStrength: 1.35,
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -838,7 +845,8 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
 
   Widget _tabBar(WorksheetPalette p) {
     return WorksheetGlowFrame(
-      glowStrength: 0.65,
+      style: _activeTabFrameStyle,
+      glowStrength: 1.25,
       borderRadius: 14,
       padding: const EdgeInsets.all(4),
       child: Container(
@@ -877,12 +885,16 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
             decoration: BoxDecoration(
               color: active ? WorksheetPalette.green : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
+              border: active
+                  ? Border.all(color: Colors.white.withValues(alpha: 0.55), width: 2)
+                  : Border.all(color: Colors.transparent, width: 2),
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: WorksheetPalette.green.withValues(alpha: 0.28),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        color: WorksheetPalette.green.withValues(alpha: 0.42),
+                        blurRadius: 14,
+                        spreadRadius: 0.5,
+                        offset: const Offset(0, 4),
                       ),
                     ]
                   : null,
@@ -920,28 +932,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: p.primaryText),
         ),
         const Spacer(),
-        Material(
-          color: WorksheetPalette.green,
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            onTap: _createProject,
-            borderRadius: BorderRadius.circular(10),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.add, color: Colors.white, size: 18),
-                  SizedBox(width: 4),
-                  Text(
-                    'New Project',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        WorksheetNewProjectButton(onPressed: _createProject),
       ],
     );
   }
@@ -949,6 +940,8 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   Widget _projectsBody(WorksheetPalette p) {
     if (_projects.isEmpty) {
       return WorksheetGlowFrame(
+        style: WorksheetFrameStyle.projects,
+        glowStrength: 1.45,
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
         child: Container(
           width: double.infinity,
@@ -1027,6 +1020,8 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     }
 
     return WorksheetGlowFrame(
+      style: WorksheetFrameStyle.projects,
+      glowStrength: 1.4,
       padding: const EdgeInsets.all(10),
       child: Column(children: _projects.map((proj) => _projectTile(proj, p)).toList()),
     );
@@ -1136,14 +1131,11 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _placeholderTab({
-    required WorksheetPalette p,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-  }) {
+  Widget _cashierTab(WorksheetPalette p) {
     return WorksheetGlowFrame(
-      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+      style: WorksheetFrameStyle.cashier,
+      glowStrength: 1.45,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -1152,11 +1144,48 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
         ),
         child: Column(
           children: [
-            Icon(icon, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
-            const SizedBox(height: 16),
-            Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
-            const SizedBox(height: 8),
-            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4)),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: AspectRatio(
+                aspectRatio: 16 / 7,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const NgmyBuiltinThumbnailArt(id: 'calculator', animate: true),
+                    Positioned(
+                      left: 16,
+                      bottom: 14,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                        ),
+                        child: const Text(
+                          'Daily register preview',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
+              child: Column(
+                children: [
+                  Text('Cashier', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: p.primaryText)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Track daily spending, receipts, and quick totals — coming soon to this tab.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.45),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

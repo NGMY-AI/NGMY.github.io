@@ -162,6 +162,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
       return _emptyState(p);
     }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
@@ -184,14 +185,21 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        ..._trees.map((tree) => _treeCard(tree, p)),
+        const SizedBox(height: 14),
+        WorksheetGlowFrame(
+          style: WorksheetFrameStyle.familyTree,
+          glowStrength: 1.4,
+          padding: const EdgeInsets.all(10),
+          child: Column(children: _trees.map((tree) => _treeCard(tree, p)).toList()),
+        ),
       ],
     );
   }
 
   Widget _emptyState(WorksheetPalette p) {
     return WorksheetGlowFrame(
+      style: WorksheetFrameStyle.familyTree,
+      glowStrength: 1.45,
       padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       child: Container(
         width: double.infinity,

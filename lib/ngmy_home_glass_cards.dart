@@ -2914,28 +2914,28 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
         Positioned(
           left: 0,
           right: 0,
-          top: 0,
-          height: 34,
+          bottom: 0,
+          height: 30,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.75)]),
+              gradient: LinearGradient(colors: [accent.withValues(alpha: 0.75), accent]),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Row(
                 children: [
-                  const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 16),
+                  const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 14),
                   const SizedBox(width: 6),
-                  const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4)),
+                  const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.2)),
                   const Spacer(),
                   if (category.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.22),
                         borderRadius: BorderRadius.circular(999),
                       ),
-                      child: Text(category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.6)),
+                      child: Text(category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 8, letterSpacing: 0.5)),
                     ),
                 ],
               ),
@@ -2943,7 +2943,7 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 42, 14, 12),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 38),
           child: _loading
               ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: accent)))
               : Column(

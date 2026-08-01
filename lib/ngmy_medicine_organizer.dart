@@ -395,25 +395,27 @@ class _MedicinePlasticCard extends StatelessWidget {
                 Positioned(
                   left: 0,
                   right: 0,
-                  top: 0,
-                  height: 30,
+                  bottom: 0,
+                  height: 28,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [accent, accent.withValues(alpha: 0.7)]),
+                      gradient: LinearGradient(colors: [accent.withValues(alpha: 0.7), accent]),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       child: Row(
                         children: [
-                          const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.5)),
+                          const Icon(Icons.local_pharmacy_rounded, color: Colors.white, size: 13),
+                          const SizedBox(width: 6),
+                          const Text('MEDICATION CARD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.2)),
                           const Spacer(),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.22),
                               borderRadius: BorderRadius.circular(999),
                             ),
-                            child: Text(medicine.category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.8)),
+                            child: Text(medicine.category.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 8, letterSpacing: 0.6)),
                           ),
                         ],
                       ),
@@ -421,7 +423,7 @@ class _MedicinePlasticCard extends StatelessWidget {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 38, 10, 10),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 10, 34),
                   child: Row(
                     children: [
                       Container(
