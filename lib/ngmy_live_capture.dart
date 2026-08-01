@@ -194,8 +194,6 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     if (!ok) {
       facingMode = facingMode == 'user' ? 'environment' : 'user';
       lastError = _engine.lastError ?? 'Could not switch camera.';
-    } else if (pipEnabled) {
-      await _engine.setPipEnabled(true, mainFacing: facingMode, aspect: aspect);
     }
     notifyListeners();
     return ok;

@@ -42,6 +42,11 @@ class NgmyLiveCaptureEngine {
   html.VideoElement? _compositeMainVideo;
   html.VideoElement? _compositePipVideo;
   Timer? _compositeTimer;
+  bool _compositeShowPip = false;
+  int _compositeW = 1280;
+  int _compositeH = 720;
+  int _compositePipW = 240;
+  int _compositePipH = 180;
   String _activeFacing = 'user';
   String _activeAspect = 'youtube';
 
@@ -106,7 +111,9 @@ class NgmyLiveCaptureEngine {
     await _releaseStream();
   }
 
-  /// Flip front/back while previewing or recording (replaces the active video track).
+  /// Flip front/back while previewing or recording.
+  /// With self-view on, both cameras stay open and we swap which feed is main vs PiP.
+  /// While recording, only the canvas sources change — MediaRecorder keeps one stable track.
   Future<bool> switchVideoFacing({
     required String facingMode,
     required String aspect,
@@ -121,6 +128,18 @@ class NgmyLiveCaptureEngine {
       return false;
     }
     try {
+      if (_pipEnabled &&
+          _pipStream != null &&
+          _pipStream!.getVideoTracks().isNotEmpty &&
+          _stream!.getVideoTracks().isNotEmpty) {
+        _swapDualCameraVideoTracks();
+        _ensureTracksLive(_stream!);
+        _ensureTracksLive(_pipStream!);
+        await _refreshCompositeVideoSources();
+        _previewOnly = false;
+        return true;
+      }
+
       final newVideoStream = await _openVideoOnlyStream(facingMode: facingMode, aspect: aspect);
       final newTrack = newVideoStream.getVideoTracks().isNotEmpty ? newVideoStream.getVideoTracks().first : null;
       if (newTrack == null) {
@@ -140,15 +159,16 @@ class NgmyLiveCaptureEngine {
           t.stop();
         } catch (_) {}
       }
+      if (_compositeMainVideo != null) {
+        _compositeMainVideo!.srcObject = _stream;
+        try {
+          await _compositeMainVideo!.play();
+        } catch (_) {}
+      }
       if (_pipEnabled) {
         await _syncPipStream(mainFacing: facingMode, aspect: aspect);
-        if (_compositeMainVideo != null) {
-          _compositeMainVideo!.srcObject = _stream;
-          unawaited(_compositeMainVideo!.play().catchError((_) {}));
-        }
-        if (_compositePipVideo != null && _pipStream != null) {
-          _compositePipVideo!.srcObject = _pipStream;
-          unawaited(_compositePipVideo!.play().catchError((_) {}));
+        if (_compositeShowPip && _pipStream != null) {
+          await _attachPipVideo(_pipStream!);
         }
       }
       _previewOnly = false;
@@ -160,15 +180,52 @@ class NgmyLiveCaptureEngine {
     }
   }
 
+  void _swapDualCameraVideoTracks() {
+    if (_stream == null || _pipStream == null) return;
+    final mainTracks = _stream!.getVideoTracks();
+    final pipTracks = _pipStream!.getVideoTracks();
+    if (mainTracks.isEmpty || pipTracks.isEmpty) return;
+    final mainTrack = mainTracks.first;
+    final pipTrack = pipTracks.first;
+    _stream!.removeTrack(mainTrack);
+    _pipStream!.removeTrack(pipTrack);
+    _stream!.addTrack(pipTrack);
+    _pipStream!.addTrack(mainTrack);
+  }
+
+  Future<void> _refreshCompositeVideoSources() async {
+    if (_compositeMainVideo != null && _stream != null) {
+      _compositeMainVideo!.srcObject = _stream;
+      try {
+        await _compositeMainVideo!.play();
+      } catch (_) {}
+    }
+    if (_compositePipVideo != null && _pipStream != null) {
+      _compositePipVideo!.srcObject = _pipStream;
+      try {
+        await _compositePipVideo!.play();
+      } catch (_) {}
+    }
+  }
+
   Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {
     _pipEnabled = enabled;
     _activeFacing = mainFacing;
     _activeAspect = aspect;
+    final recording = _recorder?.state == 'recording';
     if (!enabled) {
-      await _releasePipStream();
+      _compositeShowPip = false;
+      if (!recording) {
+        await _releasePipStream();
+      }
       return;
     }
     await _syncPipStream(mainFacing: mainFacing, aspect: aspect);
+    if (_pipStream == null) return;
+    _compositeShowPip = true;
+    if (_compositeCanvas != null) {
+      await _attachPipVideo(_pipStream!);
+    }
   }
 
   Future<void> _syncPipStream({required String mainFacing, required String aspect}) async {
@@ -230,13 +287,19 @@ class NgmyLiveCaptureEngine {
   Future<html.MediaStream?> _startCompositeStream(
     html.MediaStream main,
     html.MediaStream? pip,
-    String aspect,
-  ) async {
-    if (pip == null || pip.getVideoTracks().isEmpty) return null;
+    String aspect, {
+    bool showPip = false,
+  }) async {
     _teardownComposite();
     final sizes = _sizesForAspect(aspect);
     final w = sizes.$1;
     final h = sizes.$2;
+    _compositeW = w;
+    _compositeH = h;
+    _compositePipW = (w * 0.28).round().clamp(120, 360);
+    _compositePipH = (_compositePipW * 4 / 3).round();
+    _compositeShowPip = showPip && pip != null && pip.getVideoTracks().isNotEmpty;
+
     final canvas = html.CanvasElement(width: w, height: h);
     canvas
       ..style.display = 'none'
@@ -251,41 +314,17 @@ class NgmyLiveCaptureEngine {
       ..defaultMuted = true
       ..setAttribute('playsinline', 'true')
       ..srcObject = main;
-    final pipV = html.VideoElement()
-      ..autoplay = true
-      ..muted = true
-      ..defaultMuted = true
-      ..setAttribute('playsinline', 'true')
-      ..srcObject = pip;
     _compositeMainVideo = mainV;
-    _compositePipVideo = pipV;
     try {
       await mainV.play();
-      await pipV.play();
     } catch (_) {}
 
-    final ctx = canvas.context2D;
-    final pipW = (w * 0.28).round().clamp(120, 360);
-    final pipH = (pipW * 4 / 3).round();
-    final pipX = w - pipW - 16;
-    const pipY = 16;
-
-    void drawFrame() {
-      try {
-        ctx.drawImageScaled(mainV, 0, 0, w, h);
-        ctx
-          ..save()
-          ..beginPath()
-          ..rect(pipX - 2, pipY - 2, pipW + 4, pipH + 4)
-          ..fillStyle = '#FFFFFF'
-          ..fill()
-          ..restore();
-        ctx.drawImageScaled(pipV, pipX, pipY, pipW, pipH);
-      } catch (_) {}
+    if (_compositeShowPip && pip != null) {
+      await _attachPipVideo(pip);
     }
 
-    drawFrame();
-    _compositeTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => drawFrame());
+    _compositeDrawFrame();
+    _compositeTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _compositeDrawFrame());
 
     html.MediaStream? canvasStream;
     try {
@@ -306,6 +345,49 @@ class NgmyLiveCaptureEngine {
     return out;
   }
 
+  Future<void> _attachPipVideo(html.MediaStream pip) async {
+    if (_compositeCanvas == null) return;
+    if (_compositePipVideo != null) {
+      _compositePipVideo!.srcObject = pip;
+      try {
+        await _compositePipVideo!.play();
+      } catch (_) {}
+      return;
+    }
+    final pipV = html.VideoElement()
+      ..autoplay = true
+      ..muted = true
+      ..defaultMuted = true
+      ..setAttribute('playsinline', 'true')
+      ..srcObject = pip;
+    _compositePipVideo = pipV;
+    try {
+      await pipV.play();
+    } catch (_) {}
+  }
+
+  void _compositeDrawFrame() {
+    if (_compositeCanvas == null || _compositeMainVideo == null) return;
+    final ctx = _compositeCanvas!.context2D;
+    final w = _compositeW;
+    final h = _compositeH;
+    try {
+      ctx.drawImageScaled(_compositeMainVideo!, 0, 0, w, h);
+      if (_compositeShowPip && _compositePipVideo != null) {
+        const pipX = 16;
+        const pipY = 16;
+        ctx
+          ..save()
+          ..beginPath()
+          ..rect(pipX - 2, pipY - 2, _compositePipW + 4, _compositePipH + 4)
+          ..fillStyle = '#FFFFFF'
+          ..fill()
+          ..restore();
+        ctx.drawImageScaled(_compositePipVideo!, pipX, pipY, _compositePipW, _compositePipH);
+      }
+    } catch (_) {}
+  }
+
   void _teardownComposite() {
     _compositeTimer?.cancel();
     _compositeTimer = null;
@@ -323,6 +405,7 @@ class NgmyLiveCaptureEngine {
       _compositeCanvas?.remove();
     } catch (_) {}
     _compositeCanvas = null;
+    _compositeShowPip = false;
     _recordStream = null;
   }
 
@@ -397,13 +480,23 @@ class NgmyLiveCaptureEngine {
       _chunks.clear();
 
       html.MediaStream streamForRecorder = _stream!;
-      if (_video && _pipEnabled) {
-        await _syncPipStream(mainFacing: facingMode, aspect: aspect);
-        final composite = await _startCompositeStream(_stream!, _pipStream, aspect);
-        if (composite != null) {
-          _recordStream = composite;
-          streamForRecorder = composite;
+      if (_video) {
+        if (_pipEnabled) {
+          await _syncPipStream(mainFacing: facingMode, aspect: aspect);
         }
+        final composite = await _startCompositeStream(
+          _stream!,
+          _pipStream,
+          aspect,
+          showPip: _pipEnabled && _pipStream != null,
+        );
+        if (composite == null) {
+          lastError = 'Could not start video recorder on this device.';
+          await _teardownRecorderOnly();
+          return false;
+        }
+        _recordStream = composite;
+        streamForRecorder = composite;
       }
 
       final recorder = _createRecorder(streamForRecorder, _mime);
@@ -879,6 +972,7 @@ class NgmyLiveCaptureEngine {
     _teardownComposite();
 
     if (_video) {
+      await _releasePipStream();
       await _releaseStream();
       _voiceAudioStream = null;
     } else {
