@@ -452,18 +452,18 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(999),
           color: on ? NgmyRecorderStudioColors.emerald.withValues(alpha: 0.35) : Colors.transparent,
-          border: Border.all(color: on ? NgmyRecorderStudioColors.mint : Colors.white24),
+          border: Border.all(color: on ? NgmyRecorderStudioColors.mint : Colors.white24, width: 1.5),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: on ? NgmyRecorderStudioColors.mint : Colors.white70),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 12)),
+            Icon(icon, size: 22, color: on ? NgmyRecorderStudioColors.mint : Colors.white70),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 16)),
           ],
         ),
       ),

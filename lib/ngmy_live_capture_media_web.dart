@@ -480,19 +480,17 @@ class _StableMediaPlaybackState extends State<_StableMediaPlayback> {
       ..style.left = '50%'
       ..style.top = isVideo ? '50%' : '42%'
       ..style.transform = 'translate(-50%, -50%)'
-      ..style.width = '72px'
-      ..style.height = '72px'
-      ..style.borderRadius = '50%'
-      ..style.backgroundColor = 'rgba(5, 150, 105, 0.85)'
-      ..style.border = '2px solid rgba(255,255,255,0.35)'
       ..style.display = 'flex'
       ..style.alignItems = 'center'
       ..style.justifyContent = 'center'
       ..style.pointerEvents = 'none'
       ..style.zIndex = '3'
-      ..style.transition = 'opacity 0.2s';
-    final centerGlyph = glyph(playGlyph, size: 34);
-    centerGlyph.style.marginLeft = '5px';
+      ..style.transition = 'opacity 0.2s'
+      ..style.backgroundColor = 'transparent'
+      ..style.border = 'none';
+    final centerGlyph = glyph(playGlyph, size: 52);
+    centerGlyph.style.marginLeft = '6px';
+    centerGlyph.style.textShadow = '0 2px 14px rgba(0,0,0,0.9)';
     centerBtn.append(centerGlyph);
 
     if (!isVideo) {

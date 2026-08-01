@@ -102,27 +102,23 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..style.cursor = 'pointer'
       ..style.backgroundColor = 'transparent';
 
-    // Single center play / pause affordance.
+    // Center play — icon only, no circle background.
     final centerBtn = html.DivElement()
       ..style.position = 'absolute'
       ..style.left = '50%'
       ..style.top = '50%'
       ..style.transform = 'translate(-50%, -50%)'
-      ..style.width = '72px'
-      ..style.height = '72px'
-      ..style.borderRadius = '50%'
-      ..style.backgroundColor = 'rgba(0,0,0,0.55)'
-      ..style.border = '1.5px solid rgba(255,255,255,0.24)'
       ..style.display = 'flex'
       ..style.alignItems = 'center'
       ..style.justifyContent = 'center'
       ..style.pointerEvents = 'none'
       ..style.transition = 'opacity 0.2s'
       ..style.zIndex = '3'
-      ..style.transition = 'opacity 0.2s';
-    centerBtn.children.clear();
-    final centerGlyph = glyph(playGlyph, size: 34);
-    centerGlyph.style.marginLeft = '5px';
+      ..style.backgroundColor = 'transparent'
+      ..style.border = 'none';
+    final centerGlyph = glyph(playGlyph, size: 52);
+    centerGlyph.style.marginLeft = '6px';
+    centerGlyph.style.textShadow = '0 2px 14px rgba(0,0,0,0.9)';
     centerBtn.append(centerGlyph);
 
     // Bottom transport bar (HTML — receives taps reliably on mobile web).
