@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_glow_frame.dart';
 import 'ngmy_worksheet_helpers.dart';
