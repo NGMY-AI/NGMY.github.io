@@ -729,7 +729,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   Widget _headerCard(WorksheetPalette p) {
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.header,
-      glowStrength: 1.35,
+      glowStrength: 1.0,
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
@@ -846,7 +846,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   Widget _tabBar(WorksheetPalette p) {
     return WorksheetGlowFrame(
       style: _activeTabFrameStyle,
-      glowStrength: 1.25,
+      glowStrength: 0.95,
       borderRadius: 14,
       padding: const EdgeInsets.all(4),
       child: Container(
@@ -941,7 +941,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     if (_projects.isEmpty) {
       return WorksheetGlowFrame(
         style: WorksheetFrameStyle.projects,
-        glowStrength: 1.45,
+        glowStrength: 1.05,
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
         child: Container(
           width: double.infinity,
@@ -1021,7 +1021,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
 
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.projects,
-      glowStrength: 1.4,
+      glowStrength: 1.0,
       padding: const EdgeInsets.all(10),
       child: Column(children: _projects.map((proj) => _projectTile(proj, p)).toList()),
     );
@@ -1134,7 +1134,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
   Widget _cashierTab(WorksheetPalette p) {
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.cashier,
-      glowStrength: 1.25,
+      glowStrength: 0.95,
       padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       child: Container(
         width: double.infinity,

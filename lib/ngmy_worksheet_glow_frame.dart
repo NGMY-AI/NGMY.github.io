@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'dart:ui' show PathMetric;
 
 import 'package:flutter/material.dart';
@@ -14,7 +13,7 @@ enum WorksheetFrameStyle {
   familyTree,
 }
 
-/// Animated rounded border for Worksheets — light travels along the frame edge only.
+/// Crisp animated rounded border for Worksheets — light travels along the edge only.
 class WorksheetGlowFrame extends StatefulWidget {
   const WorksheetGlowFrame({
     super.key,
@@ -68,43 +67,38 @@ class _WorksheetGlowFrameState extends State<WorksheetGlowFrame> with SingleTick
   @override
   Widget build(BuildContext context) {
     final p = WorksheetPalette.of(context);
-    return AnimatedBuilder(
-      animation: _spin,
-      builder: (context, _) {
-        final t = _spin.value;
-        final pulse = 0.5 + 0.5 * math.sin(t * math.pi * 2);
-        return CustomPaint(
-          painter: _WorksheetGlowBorderPainter(
-            t: t,
-            borderRadius: widget.borderRadius,
-            isDark: p.isDark,
-            strength: widget.glowStrength,
-            accents: _accentColors,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(3),
-            child: Container(
-              padding: widget.padding,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(widget.borderRadius - 1),
-                boxShadow: [
-                  BoxShadow(
-                    color: _accentColors[1].withValues(alpha: 0.10 + 0.12 * pulse * widget.glowStrength),
-                    blurRadius: 18 + pulse * 6,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: widget.child,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _spin,
+        builder: (context, _) {
+          return CustomPaint(
+            foregroundPainter: _WorksheetGlowBorderPainter(
+              t: _spin.value,
+              borderRadius: widget.borderRadius,
+              isDark: p.isDark,
+              strength: widget.glowStrength,
+              accents: _accentColors,
             ),
-          ),
-        );
-      },
+            child: Padding(
+              padding: const EdgeInsets.all(2.5),
+              child: RepaintBoundary(
+                child: Container(
+                  padding: widget.padding,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(widget.borderRadius - 1),
+                  ),
+                  child: widget.child,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
 
-/// Shimmer + pulse for the New Project action.
+/// Shimmer for the New Project action — no heavy blur shadows.
 class WorksheetNewProjectButton extends StatefulWidget {
   const WorksheetNewProjectButton({super.key, required this.onPressed});
 
@@ -135,7 +129,6 @@ class _WorksheetNewProjectButtonState extends State<WorksheetNewProjectButton> w
       animation: _ctrl,
       builder: (context, _) {
         final t = Curves.easeInOut.transform(_ctrl.value);
-        final pulse = 0.5 + 0.5 * math.sin(_ctrl.value * math.pi * 2);
         return Material(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
@@ -154,38 +147,16 @@ class _WorksheetNewProjectButtonState extends State<WorksheetNewProjectButton> w
                     WorksheetPalette.green,
                   ],
                 ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.35 + pulse * 0.25),
-                  width: 1.8,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: WorksheetPalette.green.withValues(alpha: 0.35 + pulse * 0.25),
-                    blurRadius: 14 + pulse * 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 1.5),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Transform.rotate(
-                      angle: math.sin(_ctrl.value * math.pi * 2) * 0.12,
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.22 + pulse * 0.12),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
-                        ),
-                        child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
+                    Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                    SizedBox(width: 8),
+                    Text(
                       'New Project',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5, letterSpacing: 0.2),
                     ),
@@ -219,37 +190,33 @@ class _WorksheetGlowBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (size.width < 8 || size.height < 8) return;
     final r = RRect.fromRectAndRadius(
-      Rect.fromLTWH(2, 2, size.width - 4, size.height - 4),
+      Rect.fromLTWH(1.5, 1.5, size.width - 3, size.height - 3),
       Radius.circular(borderRadius),
     );
     final path = Path()..addRRect(r);
 
-    // Outer soft bloom — follows rounded frame
+    // Soft outer rail — crisp stroke only (no MaskFilter blur).
     canvas.drawRRect(
       r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 12
-        ..color = accents[1].withValues(alpha: 0.10 * strength)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+        ..strokeWidth = 5
+        ..color = accents[1].withValues(alpha: 0.14 * strength),
     );
 
-    // Steady rounded rail
     canvas.drawPath(
       path,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.2
-        ..color = (isDark ? accents[0] : accents[2]).withValues(alpha: 0.50 * strength),
+        ..strokeWidth = 2.8
+        ..color = (isDark ? accents[0] : accents[2]).withValues(alpha: 0.55 * strength),
     );
 
-    // Traveling highlights trace the rounded perimeter (no corner brackets, no inner boxes)
     final metrics = path.computeMetrics();
     for (final metric in metrics) {
       final len = metric.length;
-      _drawTraceSegment(canvas, metric, len, t, 0.0, 0.22, 5.0, 0.95);
-      _drawTraceSegment(canvas, metric, len, t, 0.38, 0.14, 4.0, 0.70);
-      _drawTraceSegment(canvas, metric, len, -t * 0.85, 0.55, 0.12, 3.5, 0.55);
+      _drawTraceSegment(canvas, metric, len, t, 0.0, 0.20, 4.2, 0.92);
+      _drawTraceSegment(canvas, metric, len, -t * 0.85, 0.52, 0.11, 3.2, 0.58);
     }
   }
 
@@ -274,15 +241,15 @@ class _WorksheetGlowBorderPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = width
         ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true
         ..shader = LinearGradient(
           colors: [
             accents[0].withValues(alpha: 0.0),
             accents[0].withValues(alpha: alpha * strength),
             accents[1].withValues(alpha: alpha * strength),
-            accents[2].withValues(alpha: 0.45 * strength),
             accents[0].withValues(alpha: 0.0),
           ],
-          stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+          stops: const [0.0, 0.35, 0.65, 1.0],
         ).createShader(bounds),
     );
   }

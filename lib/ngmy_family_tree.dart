@@ -188,7 +188,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
         const SizedBox(height: 14),
         WorksheetGlowFrame(
           style: WorksheetFrameStyle.familyTree,
-          glowStrength: 1.4,
+          glowStrength: 1.0,
           padding: const EdgeInsets.all(10),
           child: Column(children: _trees.map((tree) => _treeCard(tree, p)).toList()),
         ),
@@ -199,7 +199,7 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
   Widget _emptyState(WorksheetPalette p) {
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.familyTree,
-      glowStrength: 1.45,
+      glowStrength: 1.05,
       padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
       child: Container(
         width: double.infinity,

@@ -2894,7 +2894,9 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
     final timesPerDay = m?.timesPerDay ?? _timesPerDayFromBody(bodyLines);
     final remindersOn = m?.remindersEnabled ?? bodyLines.any((l) => l.toLowerCase().contains('reminders: on'));
 
-    const topReserve = 76.0;
+    const topReserve = 68.0;
+    const bottomBar = 30.0;
+    const bottomClear = 14.0;
 
     return Stack(
       fit: StackFit.expand,
@@ -2926,14 +2928,14 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
         ),
         Positioned(
           right: -8,
-          bottom: 28,
-          child: Icon(Icons.medication_liquid_rounded, size: 96, color: accent.withValues(alpha: 0.10)),
+          bottom: bottomBar + 6,
+          child: Icon(Icons.medication_liquid_rounded, size: 88, color: accent.withValues(alpha: 0.10)),
         ),
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          height: 30,
+          height: bottomBar,
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(colors: [accent.withValues(alpha: 0.75), accent]),
@@ -2961,7 +2963,7 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, topReserve + 4, 14, 38),
+          padding: EdgeInsets.fromLTRB(14, topReserve + 2, 14, bottomBar + bottomClear),
           child: _loading
               ? const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: accent)))
               : Column(
@@ -3037,10 +3039,10 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
                       ),
                     ],
                     if (notes.isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFEC4899).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
@@ -3052,28 +3054,31 @@ class _PinnedMedicineCardBodyState extends State<_PinnedMedicineCardBody> {
                             Icon(Icons.sticky_note_2_outlined, size: 15, color: inkSoft.withValues(alpha: 0.85)),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(notes, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: inkSoft.withValues(alpha: 0.95), fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.35)),
+                              child: Text(notes, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: inkSoft.withValues(alpha: 0.95), fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.35)),
                             ),
                           ],
                         ),
                       ),
                     ],
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Icon(Icons.favorite_rounded, size: 14, color: accent.withValues(alpha: 0.75)),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            bodyLines.any((l) => l.toLowerCase().contains('time for your medicine')) ? 'Due now — take your dose' : 'Pinned from Medicines',
-                            style: TextStyle(color: inkSoft.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 11),
+                    const Spacer(flex: 1),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(
+                        children: [
+                          Icon(Icons.push_pin_rounded, size: 13, color: accent.withValues(alpha: 0.85)),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              bodyLines.any((l) => l.toLowerCase().contains('time for your medicine')) ? 'Due now — take your dose' : 'Pinned from Medicines',
+                              style: TextStyle(color: ink.withValues(alpha: 0.92), fontWeight: FontWeight.w800, fontSize: 11.5),
+                            ),
                           ),
-                        ),
-                        Text(
-                          ngmyHomeDateTabLabel(widget.entry.date),
-                          style: TextStyle(color: inkSoft.withValues(alpha: 0.65), fontWeight: FontWeight.w700, fontSize: 10),
-                        ),
-                      ],
+                          Text(
+                            ngmyHomeDateTabLabel(widget.entry.date),
+                            style: TextStyle(color: ink.withValues(alpha: 0.78), fontWeight: FontWeight.w800, fontSize: 10.5),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
