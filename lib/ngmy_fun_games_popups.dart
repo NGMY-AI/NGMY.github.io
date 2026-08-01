@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'generated/ngmy_fortune.g.dart';
 import 'ngmy_fun_games_limits.dart';
+import 'ngmy_offline_icons.dart';
 
 const _confGold = Color(0xFFF59E0B);
 const _confDeep = Color(0xFFB45309);
@@ -102,7 +103,7 @@ class _ConfidencePopupOverlayState extends State<_ConfidencePopupOverlay> with S
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text('💪', style: TextStyle(fontSize: 40)),
+                        const NgmyOfflineEmoji('💪', fontSize: 40),
                         const SizedBox(height: 8),
                         const Text(
                           'Daily Confidence Boost',
@@ -223,7 +224,7 @@ class _FortunePopupOverlayState extends State<_FortunePopupOverlay> with TickerP
                               ),
                               boxShadow: [BoxShadow(color: aura.withValues(alpha: 0.6), blurRadius: 24)],
                             ),
-                            child: const Center(child: Text('🔮', style: TextStyle(fontSize: 36))),
+                            child: const Center(child: NgmyOfflineEmoji('🔮', fontSize: 36)),
                           ),
                         ),
                         const SizedBox(height: 12),

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
 
 /// Ink / surface tokens for HUD chrome — dark mode unchanged, light mode readable.
@@ -195,6 +196,7 @@ class NgmyHudMiniOrb extends StatelessWidget {
     required this.orbit,
     this.size = 56,
     this.icon,
+    this.emoji,
   });
 
   final List<Color> colors;
@@ -202,6 +204,7 @@ class NgmyHudMiniOrb extends StatelessWidget {
   final double orbit;
   final double size;
   final IconData? icon;
+  final String? emoji;
 
   @override
   Widget build(BuildContext context) {
@@ -215,7 +218,9 @@ class NgmyHudMiniOrb extends StatelessWidget {
             size: Size.square(size),
             painter: NgmyHudMiniOrbPainter(colors: colors, pulse: pulse, orbit: orbit),
           ),
-          if (icon != null)
+          if (emoji != null && emoji!.trim().isNotEmpty)
+            NgmyOfflineEmoji(emoji!, fontSize: size * 0.42)
+          else if (icon != null)
             Icon(icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.42),
         ],
       ),
@@ -477,6 +482,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
     required this.orbit,
     this.subtitle,
     this.icon,
+    this.emoji,
     this.onClose,
     this.trailing,
     this.dense = false,
@@ -488,6 +494,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
   final double pulse;
   final double orbit;
   final IconData? icon;
+  final String? emoji;
   final VoidCallback? onClose;
   final Widget? trailing;
   final bool dense;
@@ -506,6 +513,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
             orbit: orbit,
             size: dense ? 40 : 44,
             icon: icon,
+            emoji: emoji,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -539,7 +547,15 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
           if (onClose != null)
             IconButton(
               onPressed: onClose,
-              icon: Icon(Icons.close_rounded, color: NgmyHudInk.muted(context), size: 22),
+              icon: Text(
+                '✕',
+                style: TextStyle(
+                  color: NgmyHudInk.muted(context),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
+              ),
             ),
         ],
       ),

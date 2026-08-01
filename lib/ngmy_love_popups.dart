@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_offline_icons.dart';
+
 const _lovePink = Color(0xFFEC4899);
 const _loveDeep = Color(0xFF9F1239);
 
@@ -119,7 +121,7 @@ class _LoveMatchPopupOverlayState extends State<_LoveMatchPopupOverlay> with Sin
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('💘', style: TextStyle(fontSize: 36)),
+                      const NgmyOfflineEmoji('💘', fontSize: 36),
                       const SizedBox(height: 8),
                       Text(
                         '${widget.score}%',
@@ -230,7 +232,7 @@ class _LoveIdeaPopupOverlayState extends State<_LoveIdeaPopupOverlay> with Singl
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.emoji, style: const TextStyle(fontSize: 22)),
+                        NgmyOfflineEmoji(widget.emoji, fontSize: 22),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(

@@ -12,6 +12,7 @@ import 'ngmy_fun_games_popups.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_love_content.dart';
 import 'ngmy_love_popups.dart';
+import 'ngmy_offline_icons.dart';
 
 /// Play Zone — love match, confidence, brain teasers & fortune (Creator Toolkit).
 void showNgmyFunGamesDialog(BuildContext context, {String? userEmail}) {
@@ -74,10 +75,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   final _rng = math.Random();
 
   static const _categories = [
-    _CatItem('Love', Icons.favorite_rounded, '💕', Color(0xFFEC4899)),
-    _CatItem('Confidence', Icons.bolt_rounded, '💪', Color(0xFFF59E0B)),
-    _CatItem('Brain', Icons.psychology_alt_rounded, '🧠', Color(0xFF8B5CF6)),
-    _CatItem('Fortune', Icons.auto_awesome_rounded, '🔮', Color(0xFF06B6D4)),
+    _CatItem('Love', '💕', Color(0xFFEC4899)),
+    _CatItem('Confidence', '💪', Color(0xFFF59E0B)),
+    _CatItem('Brain', '🧠', Color(0xFF8B5CF6)),
+    _CatItem('Fortune', '🔮', Color(0xFF06B6D4)),
   ];
 
   @override
@@ -227,7 +228,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   colors: colors,
                   pulse: pulse,
                   orbit: orbit,
-                  icon: Icons.interests_rounded,
+                  emoji: '🎮',
                   onClose: () => Navigator.of(context).pop(),
                 ),
                 Flexible(
@@ -289,7 +290,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
         border: Border.all(color: selected ? Colors.white38 : Colors.white12),
       ),
       child: Center(
-        child: Icon(item.icon, size: 20, color: selected ? Colors.white : item.color),
+        child: NgmyOfflineEmoji(item.emoji, fontSize: 20),
       ),
     );
   }
@@ -355,7 +356,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(item.icon, size: 20, color: item.color),
+          NgmyOfflineEmoji(item.emoji, fontSize: 20),
           const SizedBox(width: 8),
           Text(
             _category == 0 ? 'Your Love Journey' : '${item.label} Zone',
@@ -368,10 +369,10 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
 
   Widget _loveSubTabs() {
     const tabs = [
-      _SubTab('Match', '💘', Icons.favorite_rounded),
-      _SubTab('Next', '🌹', Icons.north_east_rounded),
-      _SubTab('Keep', '💞', Icons.favorite_border_rounded),
-      _SubTab('Date', '🌙', Icons.nightlight_round),
+      _SubTab('Match', '💘'),
+      _SubTab('Next', '🌹'),
+      _SubTab('Keep', '💞'),
+      _SubTab('Date', '🌙'),
     ];
     return Row(
       children: List.generate(tabs.length, (i) {
@@ -406,7 +407,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                   ),
                   child: Column(
                     children: [
-                      Icon(tab.icon, size: 20, color: selected ? Colors.white : Colors.white70),
+                      NgmyOfflineEmoji(tab.emoji, fontSize: 20),
                       Text(tab.label, style: TextStyle(color: selected ? Colors.white : Colors.white54, fontSize: 10, fontWeight: FontWeight.w800)),
                     ],
                   ),
@@ -425,7 +426,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
         return _loveMatchCalculator();
       case 1:
         return _loveIdeaPanel(
-          icon: Icons.local_florist_rounded,
+          emoji: '🌹',
           title: 'What happens next?',
           subtitle: 'You just met — here is a romantic first-step idea.',
           buttonLabel: 'Show me what\'s next',
@@ -433,7 +434,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
         );
       case 2:
         return _loveIdeaPanel(
-          icon: Icons.favorite_rounded,
+          emoji: '💞',
           title: 'Keep the connection growing',
           subtitle: 'Tap for a relationship tip — what to do after the first spark.',
           buttonLabel: 'Get relationship tip',
@@ -441,7 +442,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
         );
       case 3:
         return _loveIdeaPanel(
-          icon: Icons.nightlight_round,
+          emoji: '🌙',
           title: 'Date inspiration',
           subtitle: 'Romantic date ideas when you are ready to plan something special.',
           buttonLabel: 'Generate date idea',
@@ -453,7 +454,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   }
 
   Widget _loveIdeaPanel({
-    required IconData icon,
+    required String emoji,
     required String title,
     required String subtitle,
     required String buttonLabel,
@@ -475,7 +476,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
           ),
           child: Column(
             children: [
-              Icon(icon, size: 40, color: _pinkGlow),
+              NgmyOfflineEmoji(emoji, fontSize: 40),
               const SizedBox(height: 8),
               Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(height: 6),
@@ -518,7 +519,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
             ..setEntry(3, 2, 0.002)
             ..rotateY(math.sin(t) * 0.35)
             ..rotateX(0.4),
-          child: Icon(Icons.favorite_rounded, color: _redLove.withValues(alpha: 0.35 + math.sin(t) * 0.15), size: size),
+          child: NgmyOfflineEmoji('💘', fontSize: size * 0.85),
         );
       },
     );
@@ -546,7 +547,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('✨', style: TextStyle(fontSize: 16)),
+                    const NgmyOfflineEmoji('✨', fontSize: 16),
                     const SizedBox(width: 8),
                     Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
                   ],
@@ -575,7 +576,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       ),
       child: Column(
         children: [
-          const Text('💘', style: TextStyle(fontSize: 28)),
+          const NgmyOfflineEmoji('💘', fontSize: 28),
           const SizedBox(height: 6),
           Text(
             '$_matchScore%',
@@ -618,15 +619,15 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
           ),
           child: Column(
             children: [
-              const Icon(Icons.favorite_rounded, size: 36, color: _pinkGlow),
+              const NgmyOfflineEmoji('💘', fontSize: 36),
               const SizedBox(height: 8),
               const Text('Love Match Calculator', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
               const SizedBox(height: 6),
               Text('Enter both names — your match shows here and in a love popup', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
               const SizedBox(height: 20),
-              _nameField(controller: _yourNameC, hint: 'Your name', prefixIcon: Icons.person_rounded),
+              _nameField(controller: _yourNameC, hint: 'Your name', prefixEmoji: '👤'),
               const SizedBox(height: 12),
-              _nameField(controller: _theirNameC, hint: 'Their name', prefixIcon: Icons.favorite_rounded),
+              _nameField(controller: _theirNameC, hint: 'Their name', prefixEmoji: '💘'),
               if (_matchScore != null) ...[
                 const SizedBox(height: 18),
                 _loveMatchResultCard(),
@@ -640,7 +641,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     );
   }
 
-  Widget _nameField({required TextEditingController controller, required String hint, required IconData prefixIcon}) {
+  Widget _nameField({required TextEditingController controller, required String hint, required String prefixEmoji}) {
     return TextField(
       controller: controller,
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
@@ -648,7 +649,15 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
-        prefixIcon: Icon(prefixIcon, color: _pinkGlow, size: 22),
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 12, right: 8),
+          child: Align(
+            alignment: Alignment.center,
+            widthFactor: 1,
+            child: NgmyOfflineEmoji(prefixEmoji, fontSize: 22),
+          ),
+        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
         fillColor: const Color(0xFF0A0F1C),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -757,8 +766,8 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Positioned(top: 10, right: 14, child: _mini3DIcon(Icons.bolt_rounded, accent, 38, _orbCtrl)),
-        Positioned(bottom: 36, left: 8, child: _mini3DIcon(Icons.bolt_rounded, accent, 28, _orbCtrl)),
+        Positioned(top: 10, right: 14, child: _mini3DEmoji('💪', 38, _orbCtrl)),
+        Positioned(bottom: 36, left: 8, child: _mini3DEmoji('💪', 28, _orbCtrl)),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
@@ -795,7 +804,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                           transform: Matrix4.identity()
                             ..setEntry(3, 2, 0.003)
                             ..rotateY(math.sin(t) * 0.4),
-                          child: const Text('💪', style: TextStyle(fontSize: 44)),
+                          child: const NgmyOfflineEmoji('💪', fontSize: 44),
                         );
                       },
                     ),
@@ -845,7 +854,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Positioned(top: 8, right: 12, child: _mini3DIcon(Icons.psychology_alt_rounded, accent, 40, _brainCtrl)),
+        Positioned(top: 8, right: 12, child: _mini3DEmoji('🧠', 40, _brainCtrl)),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
@@ -929,7 +938,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Positioned(top: 6, right: 10, child: _mini3DIcon(Icons.auto_awesome_rounded, accent, 36, _orbCtrl)),
+        Positioned(top: 6, right: 10, child: _mini3DEmoji('🔮', 36, _orbCtrl)),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
@@ -959,7 +968,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                         gradient: RadialGradient(colors: [Colors.white.withOpacity(0.85), accent, accentDeep.withOpacity(0.5)]),
                         boxShadow: [BoxShadow(color: accent.withOpacity(0.5), blurRadius: 20)],
                       ),
-                      child: const Center(child: Text('🔮', style: TextStyle(fontSize: 42))),
+                      child: const Center(child: NgmyOfflineEmoji('🔮', fontSize: 42)),
                     ),
                   );
                 },
@@ -1007,7 +1016,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
     );
   }
 
-  Widget _mini3DIcon(IconData icon, Color color, double size, AnimationController ctrl) {
+  Widget _mini3DEmoji(String emoji, double size, AnimationController ctrl) {
     return AnimatedBuilder(
       animation: ctrl,
       builder: (context, _) {
@@ -1018,7 +1027,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
             ..setEntry(3, 2, 0.002)
             ..rotateY(math.sin(t) * 0.35)
             ..rotateX(0.35),
-          child: Icon(icon, color: color.withValues(alpha: 0.35 + math.sin(t) * 0.15), size: size),
+          child: NgmyOfflineEmoji(emoji, fontSize: size * 0.85),
         );
       },
     );
@@ -1051,7 +1060,7 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('✨', style: TextStyle(fontSize: 16)),
+                    const NgmyOfflineEmoji('✨', fontSize: 16),
                     const SizedBox(width: 8),
                     Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
                   ],
@@ -1067,15 +1076,13 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
 
 class _CatItem {
   final String label;
-  final IconData icon;
   final String emoji;
   final Color color;
-  const _CatItem(this.label, this.icon, this.emoji, this.color);
+  const _CatItem(this.label, this.emoji, this.color);
 }
 
 class _SubTab {
   final String label;
   final String emoji;
-  final IconData icon;
-  const _SubTab(this.label, this.emoji, this.icon);
+  const _SubTab(this.label, this.emoji);
 }
