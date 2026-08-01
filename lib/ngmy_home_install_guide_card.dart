@@ -9,7 +9,7 @@ const _kPhoneW = 96.0;
 const _kPhoneHDefault = 172.0;
 const _kPhoneTopIconY = 30.0;
 const _kPhoneBottomBarInset = 12.0;
-const _kPhoneIconSize = 32.0;
+const _kPhoneIconSize = 38.0;
 const _kSlideSeconds = 7;
 
 /// Animated onboarding slides teaching users to save NGMY to their iPhone home screen.
@@ -337,7 +337,7 @@ class _HeroBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final glow = 0.35 + pulse * 0.35;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
         gradient: LinearGradient(
@@ -367,9 +367,9 @@ class _HeroBadge extends StatelessWidget {
             softWrap: false,
             style: TextStyle(
               color: Colors.white,
-              fontSize: 10.5,
+              fontSize: 12.0,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.45,
+              letterSpacing: 0.4,
               height: 1.0,
             ),
           ),
@@ -566,7 +566,7 @@ class _PhoneMockup extends StatelessWidget {
                     pulse: pulse,
                     size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 20),
                   ),
                 ),
                 Positioned(
@@ -590,7 +590,7 @@ class _PhoneMockup extends StatelessWidget {
                     pulse: pulse,
                     size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 16),
+                    child: Icon(Icons.ios_share_rounded, color: Colors.white, size: 18),
                   ),
                 ),
                 Positioned(
@@ -614,7 +614,7 @@ class _PhoneMockup extends StatelessWidget {
                     pulse: pulse,
                     size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.more_horiz_rounded, color: Colors.white, size: 20),
                   ),
                 ),
                 Positioned(
@@ -635,7 +635,7 @@ class _PhoneMockup extends StatelessWidget {
                     pulse: pulse,
                     size: _kPhoneIconSize,
                     squircle: false,
-                    child: Icon(Icons.add_to_home_screen_rounded, color: Colors.white, size: 17),
+                    child: Icon(Icons.add_to_home_screen_rounded, color: Colors.white, size: 19),
                   ),
                 ),
                 Positioned(
