@@ -352,7 +352,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 const Text('● LIVE', style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4))
               else
                 const Text(
-                  'Flip camera anytime — even while recording. Turn on self-view or noise cancel from the preview controls.',
+                  'Flip camera anytime. Dual camera puts the back view on top and your front camera on the bottom.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white60, fontSize: 12, height: 1.45),
                 ),
@@ -469,7 +469,49 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   Widget _buildCameraPreview({double? height}) {
     final previewHeight = height ?? _previewHeight;
     final pipOn = _session.pipEnabled && _session.pipStream != null;
-    final pipMirror = _session.facingMode != 'user';
+    if (pipOn) {
+      final topH = previewHeight * 0.72;
+      final bottomH = previewHeight * 0.28;
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: topH,
+                  width: double.infinity,
+                  child: NgmyLiveCaptureMedia.liveCameraPreview(
+                    stream: _session.previewStream,
+                    height: topH,
+                    mirror: false,
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+                Container(height: 2, color: Colors.white.withValues(alpha: 0.85)),
+                SizedBox(
+                  height: bottomH,
+                  width: double.infinity,
+                  child: NgmyLiveCaptureMedia.liveCameraPreview(
+                    stream: _session.pipStream,
+                    height: bottomH,
+                    mirror: true,
+                    borderRadius: BorderRadius.zero,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: _previewControlBar(),
+          ),
+        ],
+      );
+    }
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -481,29 +523,6 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
             mirror: _session.facingMode == 'user',
           ),
         ),
-        if (pipOn)
-          Positioned(
-            top: 10,
-            left: 10,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.85), width: 1.5),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10)],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: KeyedSubtree(
-                  key: ValueKey('pip-${identityHashCode(_session.pipStream)}'),
-                  child: NgmyLiveCaptureMedia.liveCameraPreview(
-                    stream: _session.pipStream,
-                    height: 68,
-                    mirror: pipMirror,
-                  ),
-                ),
-              ),
-            ),
-          ),
         Positioned(
           top: 6,
           right: 6,
@@ -538,7 +557,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
             ),
             _previewControlBtn(
               icon: _session.pipEnabled ? Icons.picture_in_picture_alt_rounded : Icons.picture_in_picture_rounded,
-              tooltip: _session.pipEnabled ? 'Hide self-view' : 'Self-view (FaceTime style)',
+              tooltip: _session.pipEnabled ? 'Hide dual camera' : 'Dual camera — back on top, you on bottom',
               onTap: _cameraBusy ? null : _togglePip,
               active: _session.pipEnabled,
             ),

@@ -46,8 +46,6 @@ class NgmyLiveCaptureEngine {
   bool _compositeShowPip = false;
   int _compositeW = 1280;
   int _compositeH = 720;
-  int _compositePipW = 240;
-  int _compositePipH = 180;
   String _activeFacing = 'user';
   String _activeAspect = 'youtube';
 
@@ -100,7 +98,13 @@ class NgmyLiveCaptureEngine {
         return false;
       }
       if (_pipEnabled) {
-        await _syncPipStream(mainFacing: facingMode, aspect: aspect);
+        final ok = await _ensureSelfViewLayout(aspect);
+        if (!ok) {
+          lastError = lastError ?? 'Could not open both cameras for self-view preview.';
+          await _releaseStream();
+          _previewOnly = false;
+          return false;
+        }
       }
       return true;
     } catch (e) {
@@ -256,7 +260,6 @@ class NgmyLiveCaptureEngine {
 
   Future<void> setPipEnabled(bool enabled, {required String mainFacing, required String aspect}) async {
     _pipEnabled = enabled;
-    _activeFacing = mainFacing;
     _activeAspect = aspect;
     final recording = _recorder?.state == 'recording';
     if (!enabled) {
@@ -266,11 +269,55 @@ class NgmyLiveCaptureEngine {
       }
       return;
     }
-    await _syncPipStream(mainFacing: mainFacing, aspect: aspect);
-    if (_pipStream == null) return;
+    final ok = await _ensureSelfViewLayout(aspect);
+    if (!ok || _pipStream == null) {
+      _pipEnabled = false;
+      _compositeShowPip = false;
+      lastError = lastError ?? 'Could not open both cameras for self-view.';
+      return;
+    }
+    _activeFacing = 'environment';
     _compositeShowPip = true;
     if (_compositeCanvas != null) {
       await _attachPipVideo(_pipStream!);
+    } else if (_compositeMainVideo != null) {
+      await _refreshCompositeVideoSources();
+    }
+  }
+
+  /// Self-view layout: back camera on top (main), front camera on bottom (pip).
+  Future<bool> _ensureSelfViewLayout(String aspect) async {
+    if (_stream == null) return false;
+    try {
+      await _releasePipStream();
+      _pipStream = await _openVideoOnlyStream(facingMode: 'user', aspect: aspect);
+
+      final backStream = await _openVideoOnlyStream(facingMode: 'environment', aspect: aspect);
+      final backTrack = backStream.getVideoTracks().isNotEmpty ? backStream.getVideoTracks().first : null;
+      if (backTrack == null) {
+        lastError = 'Back camera is not available on this device.';
+        return false;
+      }
+      for (final t in List<html.MediaStreamTrack>.from(_stream!.getVideoTracks())) {
+        _stream!.removeTrack(t);
+        try {
+          t.stop();
+        } catch (_) {}
+      }
+      _stream!.addTrack(backTrack);
+      for (final t in backStream.getAudioTracks()) {
+        try {
+          t.stop();
+        } catch (_) {}
+      }
+      _activeFacing = 'environment';
+      _ensureTracksLive(_stream!);
+      _ensureTracksLive(_pipStream!);
+      return true;
+    } catch (e) {
+      lastError = _describeStartError(e);
+      debugPrint('[live_capture] ensureSelfViewLayout: $e');
+      return false;
     }
   }
 
@@ -342,8 +389,6 @@ class NgmyLiveCaptureEngine {
     final h = sizes.$2;
     _compositeW = w;
     _compositeH = h;
-    _compositePipW = (w * 0.28).round().clamp(120, 360);
-    _compositePipH = (_compositePipW * 4 / 3).round();
     _compositeShowPip = showPip && pip != null && pip.getVideoTracks().isNotEmpty;
 
     final canvas = html.CanvasElement(width: w, height: h);
@@ -412,24 +457,52 @@ class NgmyLiveCaptureEngine {
     } catch (_) {}
   }
 
+  void _drawVideoCoverInRect(
+    html.CanvasRenderingContext2D ctx,
+    html.VideoElement video,
+    num dx,
+    num dy,
+    num dw,
+    num dh,
+  ) {
+    var vw = video.videoWidth;
+    var vh = video.videoHeight;
+    if (vw <= 0 || vh <= 0) {
+      ctx.drawImageScaled(video, dx, dy, dw, dh);
+      return;
+    }
+    final videoAspect = vw / vh;
+    final slotAspect = dw / dh;
+    num drawW;
+    num drawH;
+    if (videoAspect > slotAspect) {
+      drawH = dh;
+      drawW = dh * videoAspect;
+    } else {
+      drawW = dw;
+      drawH = dw / videoAspect;
+    }
+    final drawX = dx + (dw - drawW) / 2;
+    final drawY = dy + (dh - drawH) / 2;
+    ctx.drawImageScaled(video, drawX, drawY, drawW, drawH);
+  }
+
   void _compositeDrawFrame() {
     if (_compositeCanvas == null || _compositeMainVideo == null) return;
     final ctx = _compositeCanvas!.context2D;
     final w = _compositeW;
     final h = _compositeH;
     try {
-      ctx.drawImageScaled(_compositeMainVideo!, 0, 0, w, h);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
       if (_compositeShowPip && _compositePipVideo != null) {
-        const pipX = 16;
-        const pipY = 16;
-        ctx
-          ..save()
-          ..beginPath()
-          ..rect(pipX - 2, pipY - 2, _compositePipW + 4, _compositePipH + 4)
-          ..fillStyle = '#FFFFFF'
-          ..fill()
-          ..restore();
-        ctx.drawImageScaled(_compositePipVideo!, pipX, pipY, _compositePipW, _compositePipH);
+        final splitY = (h * 0.72).round();
+        _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, splitY);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, splitY, w, 3);
+        _drawVideoCoverInRect(ctx, _compositePipVideo!, 0, splitY + 3, w, h - splitY - 3);
+      } else {
+        _drawVideoCoverInRect(ctx, _compositeMainVideo!, 0, 0, w, h);
       }
     } catch (_) {}
   }
@@ -533,7 +606,13 @@ class NgmyLiveCaptureEngine {
       html.MediaStream streamForRecorder = _stream!;
       if (_video) {
         if (_pipEnabled) {
-          await _syncPipStream(mainFacing: facingMode, aspect: aspect);
+          final dualOk = await _ensureSelfViewLayout(aspect);
+          if (!dualOk) {
+            lastError = lastError ?? 'Could not open both cameras for self-view recording.';
+            await _teardownRecorderOnly();
+            return false;
+          }
+          _activeFacing = 'environment';
         }
         final composite = await _startCompositeStream(
           _stream!,

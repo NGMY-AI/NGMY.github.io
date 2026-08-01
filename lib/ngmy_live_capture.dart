@@ -206,8 +206,19 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   }
 
   Future<void> setPipEnabled(bool enabled) async {
+    final prevFacing = facingMode;
     pipEnabled = enabled;
+    if (enabled) {
+      facingMode = 'environment';
+    }
     await _engine.setPipEnabled(enabled, mainFacing: facingMode, aspect: aspect);
+    if (enabled && !_engine.pipEnabled) {
+      pipEnabled = false;
+      facingMode = prevFacing;
+      lastError = _engine.lastError ?? 'Could not open both cameras on this device.';
+    } else if (enabled) {
+      facingMode = 'environment';
+    }
     notifyListeners();
   }
 

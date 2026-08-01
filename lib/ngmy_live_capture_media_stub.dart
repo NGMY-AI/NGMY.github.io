@@ -9,7 +9,12 @@ String ngmyCleanMediaMime(String mime) {
 }
 
 class NgmyLiveCaptureMedia {
-  static Widget liveCameraPreview({required Object? stream, double height = 200, bool mirror = true}) {
+  static Widget liveCameraPreview({
+    required Object? stream,
+    double height = 200,
+    bool mirror = true,
+    BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
+  }) {
     return Container(
       height: height,
       alignment: Alignment.center,

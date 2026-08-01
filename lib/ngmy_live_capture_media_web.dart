@@ -39,8 +39,13 @@ Uint8List? _decodeDataUrlBytes(String dataUrl) {
 class NgmyLiveCaptureMedia {
   static Uint8List? decodeDataUrlBytes(String dataUrl) => _decodeDataUrlBytes(dataUrl);
 
-  static Widget liveCameraPreview({required Object? stream, double height = 200, bool mirror = true}) {
-    return _StableCameraPreview(stream: stream, height: height, mirror: mirror);
+  static Widget liveCameraPreview({
+    required Object? stream,
+    double height = 200,
+    bool mirror = true,
+    BorderRadius borderRadius = const BorderRadius.all(Radius.circular(18)),
+  }) {
+    return _StableCameraPreview(stream: stream, height: height, mirror: mirror, borderRadius: borderRadius);
   }
 
   static Widget playbackVideo({required String src, required String mimeType, double height = 220, Key? key}) {
@@ -201,10 +206,16 @@ class NgmyLiveCaptureMedia {
 }
 
 class _StableCameraPreview extends StatefulWidget {
-  const _StableCameraPreview({required this.stream, required this.height, this.mirror = true});
+  const _StableCameraPreview({
+    required this.stream,
+    required this.height,
+    this.mirror = true,
+    this.borderRadius = const BorderRadius.all(Radius.circular(18)),
+  });
   final Object? stream;
   final double height;
   final bool mirror;
+  final BorderRadius borderRadius;
 
   @override
   State<_StableCameraPreview> createState() => _StableCameraPreviewState();
@@ -274,7 +285,7 @@ class _StableCameraPreviewState extends State<_StableCameraPreview> {
       );
     }
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: widget.borderRadius,
       child: SizedBox(
         height: widget.height,
         width: double.infinity,
