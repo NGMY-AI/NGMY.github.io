@@ -12954,18 +12954,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   _isSyncing = true;
 
                   try {
-                    final result = await supabase
+                    await ngmyWaitForSupabaseReady();
+                    var result = await supabase
                         .from('users')
                         .update({'passwordHash': newHash})
                         .eq('email', emailNorm)
                         .select();
 
                     if (result.isEmpty) {
-                       await supabase.from('users').insert({
-                         'email': emailNorm,
-                         'passwordHash': newHash,
-                         'username': emailNorm.split('@').first,
-                       });
+                      result = await supabase
+                          .from('users')
+                          .update({'passwordHash': newHash})
+                          .ilike('email', emailNorm)
+                          .select();
+                    }
+
+                    if (result.isEmpty) {
+                      await supabase.from('users').upsert({
+                        'email': emailNorm,
+                        'passwordHash': newHash,
+                        'username': emailNorm.split('@').first,
+                      }, onConflict: 'email');
                     }
 
                     final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
@@ -12974,7 +12983,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                         if (idx != -1) {
                           _allUsers[idx].passwordHash = newHash;
                         } else {
-                          _allUsers.add(UserData(email: emailNorm, passwordHash: newHash, username: emailNorm.split('@').first));
+                          _allUsers.add(UserData(
+                            email: emailNorm,
+                            passwordHash: newHash,
+                            username: emailNorm.split('@').first,
+                            isAppLoginAccount: true,
+                          ));
                         }
                       });
                     }
@@ -12985,6 +12999,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     _isSyncing = false;
                     return true;
                   } catch (e) {
+                    debugPrint('[ResetPW] failed: $e');
                     _isSyncing = false;
                     return false;
                   }

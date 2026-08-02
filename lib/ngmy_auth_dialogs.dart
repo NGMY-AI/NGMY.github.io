@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -144,7 +143,8 @@ class _NgmyResetAppDataDialogState extends State<_NgmyResetAppDataDialog> with S
   }
 }
 
-/// Modern forgot-password flow (email code + new password).
+/// Forgot-password flow — updates the app account password in Supabase directly
+/// (email/password accounts are stored in the users table, not Supabase Auth OTP).
 Future<void> showNgmyForgotPasswordDialog(
   BuildContext context, {
   required String initialEmail,
@@ -179,7 +179,6 @@ class _NgmyForgotPasswordDialog extends StatefulWidget {
 
 class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> with SingleTickerProviderStateMixin {
   late final TextEditingController _emailCtl;
-  late final TextEditingController _codeCtl;
   late final TextEditingController _newPwCtl;
   late final TextEditingController _confirmCtl;
   late final AnimationController _ctrl;
@@ -190,7 +189,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
   void initState() {
     super.initState();
     _emailCtl = TextEditingController(text: widget.initialEmail);
-    _codeCtl = TextEditingController();
     _newPwCtl = TextEditingController();
     _confirmCtl = TextEditingController();
     _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat(reverse: true);
@@ -199,7 +197,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
   @override
   void dispose() {
     _emailCtl.dispose();
-    _codeCtl.dispose();
     _newPwCtl.dispose();
     _confirmCtl.dispose();
     _ctrl.dispose();
@@ -223,7 +220,19 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     );
   }
 
-  Future<void> _sendCode() async {
+  Future<bool> _accountExists(String email) async {
+    final existsLocally = widget.knownEmails.any((e) => e.toLowerCase().trim() == email);
+    if (existsLocally) return true;
+    try {
+      await ngmyWaitForSupabaseReady();
+      final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
+      return row != null;
+    } catch (_) {
+      return existsLocally;
+    }
+  }
+
+  Future<void> _continueToPassword() async {
     final email = _emailCtl.text.toLowerCase().trim();
     if (email.isEmpty || !email.endsWith('@gmail.com')) {
       _toast('Enter a valid Gmail address');
@@ -231,53 +240,28 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
     setState(() => _loading = true);
     try {
-      await ngmyWaitForSupabaseReady();
-      final existsInApp = widget.knownEmails.any((e) => e.toLowerCase().trim() == email);
-      Map<String, dynamic>? row;
-      try {
-        row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
-      } catch (_) {}
-      final oauthLinked = row != null && (row['isAppLoginAccount'] == true || row['is_app_login_account'] == true);
-      var shouldCreateUser = !existsInApp && row == null;
-      if (oauthLinked || existsInApp || row != null) shouldCreateUser = false;
-      try {
-        await Supabase.instance.client.auth.signInWithOtp(email: email, shouldCreateUser: shouldCreateUser);
-      } catch (otpErr) {
-        if (!shouldCreateUser) {
-          await Supabase.instance.client.auth.signInWithOtp(email: email, shouldCreateUser: true);
-        } else {
-          rethrow;
-        }
-      }
+      final exists = await _accountExists(email);
       if (!mounted) return;
+      if (!exists) {
+        setState(() => _loading = false);
+        _toast('Account not found. Sign up first.');
+        return;
+      }
       setState(() {
         _loading = false;
         _step = 2;
       });
-      _toast('Code sent to $email. Check inbox and spam.', success: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      final err = e.toString().toLowerCase();
-      if (err.contains('rate') || err.contains('too many') || err.contains('over_email_send_rate_limit')) {
-        _toast('Too many emails. Wait about an hour and try again.');
-      } else if (err.contains('signup') && err.contains('disabled')) {
-        _toast('Email signup is disabled in Supabase settings.');
-      } else {
-        _toast(e.toString());
-      }
+      _toast(_friendlyResetError(e));
     }
   }
 
-  Future<void> _verifyAndReset() async {
+  Future<void> _updatePassword() async {
     final email = _emailCtl.text.toLowerCase().trim();
-    final code = _codeCtl.text.trim();
     final pw = _newPwCtl.text;
     final confirm = _confirmCtl.text;
-    if (code.length < 6) {
-      _toast('Enter the 6-digit code');
-      return;
-    }
     if (pw.length < 6) {
       _toast('Password must be at least 6 characters');
       return;
@@ -288,29 +272,35 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
     setState(() => _loading = true);
     try {
-      await Supabase.instance.client.auth.verifyOTP(type: OtpType.email, email: email, token: code);
-      try {
-        await Supabase.instance.client.auth.updateUser(UserAttributes(password: pw));
-      } catch (_) {}
+      await ngmyWaitForSupabaseReady();
       final ok = await widget.onResetPasswordByEmail(email, hashPassword(pw));
-      try {
-        await Supabase.instance.client.auth.signOut();
-      } catch (_) {}
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            ok ? 'Password updated! Log in with your new password.' : 'Password updated but profile not found. Sign up first.',
-          ),
+          content: Text(ok ? 'Password updated! Log in with your new password.' : 'Could not update password. Try again.'),
           backgroundColor: ok ? const Color(0xFF00B25A) : Colors.orange,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      _toast('Verification failed: $e');
+      _toast(_friendlyResetError(e));
     }
+  }
+
+  String _friendlyResetError(Object e) {
+    final err = e.toString().toLowerCase();
+    if (err.contains('authretryable') || err.contains('retryable')) {
+      return 'Could not reach the server. Try mobile data or wait a moment.';
+    }
+    if (err.contains('rate') || err.contains('too many') || err.contains('over_email_send_rate_limit')) {
+      return 'Too many tries. Wait a bit and try again.';
+    }
+    if (err.contains('timeout') || err.contains('timed out') || err.contains('socket') || err.contains('network')) {
+      return ngmyAuthReachabilityMessage(e);
+    }
+    return 'Could not reset password. Check your connection and try again.';
   }
 
   void _toast(String msg, {bool success = false}) {
@@ -351,7 +341,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                 child: Material(
                   color: const Color(0xFF12101C),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400, maxHeight: 560),
+                    constraints: const BoxConstraints(maxWidth: 400, maxHeight: 520),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -381,13 +371,15 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _step == 1 ? 'Reset password' : 'Verify & set password',
+                                      _step == 1 ? 'Reset password' : 'Choose new password',
                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      _step == 1 ? 'We email you a 6-digit code' : 'Enter code and choose a new password',
+                                      _step == 1 ? 'Enter the Gmail on your account' : 'Set a new password for ${_emailCtl.text}',
                                       style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ],
                                 ),
@@ -413,22 +405,10 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                       ),
                                     ]
                                   : [
-                                      Text(
-                                        'Code sent to ${_emailCtl.text}',
-                                        style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 12),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      TextField(
-                                        controller: _codeCtl,
-                                        keyboardType: TextInputType.number,
-                                        maxLength: 6,
-                                        style: const TextStyle(color: Colors.white, letterSpacing: 4),
-                                        decoration: _field('6-digit code'),
-                                      ),
-                                      const SizedBox(height: 12),
                                       TextField(
                                         controller: _newPwCtl,
                                         obscureText: true,
+                                        autofocus: true,
                                         style: const TextStyle(color: Colors.white),
                                         decoration: _field('New password (min 6 chars)', obscure: true),
                                       ),
@@ -438,13 +418,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                         obscureText: true,
                                         style: const TextStyle(color: Colors.white),
                                         decoration: _field('Confirm password', obscure: true),
-                                      ),
-                                      Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: TextButton(
-                                          onPressed: _loading ? null : _sendCode,
-                                          child: const Text('Resend code'),
-                                        ),
                                       ),
                                     ],
                             ),
@@ -456,21 +429,29 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                             children: [
                               Expanded(
                                 child: OutlinedButton(
-                                  onPressed: _loading ? null : () => Navigator.pop(context),
+                                  onPressed: _loading
+                                      ? null
+                                      : () {
+                                          if (_step == 2) {
+                                            setState(() => _step = 1);
+                                          } else {
+                                            Navigator.pop(context);
+                                          }
+                                        },
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: Colors.white70,
                                     side: BorderSide(color: Colors.white.withOpacity(0.18)),
                                     padding: const EdgeInsets.symmetric(vertical: 13),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                   ),
-                                  child: const Text('Cancel'),
+                                  child: Text(_step == 2 ? 'Back' : 'Cancel'),
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 flex: 2,
                                 child: ElevatedButton(
-                                  onPressed: _loading ? null : (_step == 1 ? _sendCode : _verifyAndReset),
+                                  onPressed: _loading ? null : (_step == 1 ? _continueToPassword : _updatePassword),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: accent,
                                     foregroundColor: Colors.white,
@@ -485,7 +466,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                         )
                                       : Text(
-                                          _step == 1 ? 'Send code' : 'Update password',
+                                          _step == 1 ? 'Continue' : 'Update password',
                                           style: const TextStyle(fontWeight: FontWeight.w800),
                                         ),
                                 ),
