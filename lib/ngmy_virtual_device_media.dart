@@ -89,15 +89,17 @@ class NgmyVirtualDeviceMedia {
     if (lower.contains('tiktok.com') ||
         lower.contains('instagram.com') ||
         lower.contains('facebook.com') ||
-        lower.contains('fb.watch') ||
-        lower.contains('youtube.com') ||
-        lower.contains('youtu.be')) {
+        lower.contains('fb.watch')) {
       return NgmyVirtualMediaTarget(
         originalUrl: url,
         playUrl: url,
         platform: NgmyVirtualMediaPlatform.other,
         label: 'Video',
       );
+    }
+
+    if (lower.contains('youtube.com') || lower.contains('youtu.be')) {
+      return null;
     }
 
     return null;
@@ -145,6 +147,8 @@ class NgmyVirtualDeviceMedia {
       RegExp(r'(?:youtube\.com/embed/|youtube-nocookie\.com/embed/|[?&]v=|youtu\.be/|/shorts/|/live/)([a-zA-Z0-9_-]{11})'),
       RegExp(r'youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
       RegExp(r'm\.youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
+      RegExp(r'music\.youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com/v/([a-zA-Z0-9_-]{11})'),
     ];
     for (final p in patterns) {
       final id = p.firstMatch(url)?.group(1);

@@ -12,8 +12,7 @@ class NgmyVirtualDeviceEmbed {
     return 'https://ngmy.org';
   }
 
-  /// Builds a mobile-friendly YouTube embed URL.
-  /// [useJsApi] adds origin params — only use on direct iframe src, not srcdoc.
+  /// Builds a mobile-friendly YouTube embed URL (direct iframe — no IFrame API).
   static String youtubeEmbedUrl(
     String videoId, {
     bool autoplay = true,
@@ -21,32 +20,25 @@ class NgmyVirtualDeviceEmbed {
     bool useJsApi = false,
     String? origin,
   }) {
-    final host = useJsApi ? 'https://www.youtube.com' : 'https://www.youtube.com';
-    if (!useJsApi) {
-      final params = <String>[
-        if (autoplay) 'autoplay=1',
-        'playsinline=1',
-        'rel=0',
-        'modestbranding=1',
-        'iv_load_policy=3',
-        if (muted) 'mute=1',
-      ];
-      return '$host/embed/$videoId?${params.join('&')}';
-    }
-    final hostOrigin = origin ?? embedOrigin;
+    const host = htmlBaseUrl;
     final params = <String>[
       if (autoplay) 'autoplay=1',
       'playsinline=1',
       'rel=0',
       'modestbranding=1',
-      'enablejsapi=1',
-      'origin=${Uri.encodeComponent(hostOrigin)}',
-      'widget_referrer=${Uri.encodeComponent(hostOrigin)}',
+      'controls=1',
       'iv_load_policy=3',
       if (muted) 'mute=1',
+      if (useJsApi) ...[
+        'enablejsapi=1',
+        'origin=${Uri.encodeComponent(origin ?? embedOrigin)}',
+      ],
     ];
     return '$host/embed/$videoId?${params.join('&')}';
   }
+
+  static String youtubeThumbnailUrl(String videoId) =>
+      'https://img.youtube.com/vi/$videoId/hqdefault.jpg';
 
   static String youtubeWatchUrl(String videoId) => 'https://www.youtube.com/watch?v=$videoId';
 
@@ -160,9 +152,7 @@ class NgmyVirtualDeviceEmbed {
   static String iframeHtml(String playUrl, {bool notifyOnEnd = false, bool muted = false}) {
     final ytId = extractYouTubeVideoId(playUrl);
     if (ytId != null) {
-      if (notifyOnEnd) {
-        return youtubePlayerHtml(ytId, muted: muted, notifyOnEnd: true, origin: embedOrigin);
-      }
+      // Direct iframe embed — IFrame API + origin breaks inside mobile WebView/PWA.
       return genericIframeHtml(youtubeEmbedUrl(ytId, muted: muted));
     }
     return genericIframeHtml(playUrl);

@@ -38,8 +38,14 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   var _loading = true;
   var _failed = false;
   var _userUnmuted = false;
+  var _youtubeStarted = false;
+  var _viewRegistered = false;
 
-  bool get _showUnmuteHint => widget.startMuted && !_userUnmuted && !_loading && !_failed;
+  String? get _youtubeId => NgmyVirtualDeviceEmbed.extractYouTubeVideoId(widget.playUrl);
+
+  bool get _needsYouTubeTap => _youtubeId != null && !_youtubeStarted;
+
+  bool get _showUnmuteHint => widget.startMuted && _youtubeStarted && !_userUnmuted && !_loading && !_failed;
 
   void _applySrc(html.IFrameElement frame, String url) {
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
@@ -84,10 +90,22 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _viewType = 'ngmy-vmedia-${widget.viewKey}-${DateTime.now().microsecondsSinceEpoch}';
+  void _startYouTubePlayback() {
+    if (_youtubeStarted) return;
+    setState(() {
+      _youtubeStarted = true;
+      _loading = true;
+    });
+    _ensureFrameRegistered();
+    final frame = _frame;
+    if (frame != null) {
+      _applySrc(frame, widget.playUrl);
+    }
+  }
+
+  void _ensureFrameRegistered() {
+    if (_viewRegistered) return;
+    _viewRegistered = true;
     try {
       ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
         _frame = html.IFrameElement()
@@ -100,7 +118,9 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
             'allow',
             'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen',
           );
-        _applySrc(_frame!, widget.playUrl);
+        if (!_needsYouTubeTap) {
+          _applySrc(_frame!, widget.playUrl);
+        }
         _frame!.onLoad.listen((_) {
           if (mounted) setState(() => _loading = false);
         });
@@ -112,9 +132,6 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
             });
           }
         });
-        // Fallback for embeds whose onLoad never fires (e.g. slow/blocked
-        // third-party iframes) — stop showing the spinner after a timeout
-        // instead of spinning forever over a video that may already be usable.
         Future<void>.delayed(const Duration(seconds: 6), () {
           if (mounted && _loading) setState(() => _loading = false);
         });
@@ -127,20 +144,91 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
   }
 
   @override
-  void didUpdateWidget(covariant NgmyVirtualDeviceMediaView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.playUrl != widget.playUrl && _frame != null) {
-      setState(() {
-        _loading = true;
-        _failed = false;
-        _userUnmuted = false;
-      });
-      _applySrc(_frame!, widget.playUrl);
+  void initState() {
+    super.initState();
+    _viewType = 'ngmy-vmedia-${widget.viewKey}-${DateTime.now().microsecondsSinceEpoch}';
+    if (_youtubeId == null) {
+      _ensureFrameRegistered();
+    } else {
+      _loading = false;
     }
   }
 
   @override
+  void didUpdateWidget(covariant NgmyVirtualDeviceMediaView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playUrl != widget.playUrl) {
+      _userUnmuted = false;
+      _youtubeStarted = _youtubeId == null;
+      if (_needsYouTubeTap) {
+        setState(() {
+          _loading = false;
+          _failed = false;
+        });
+        return;
+      }
+      setState(() {
+        _loading = true;
+        _failed = false;
+      });
+      if (_frame != null) {
+        _applySrc(_frame!, widget.playUrl);
+      }
+    }
+  }
+
+  Widget _buildYouTubeTapPoster() {
+    final id = _youtubeId!;
+    final thumb = NgmyVirtualDeviceEmbed.youtubeThumbnailUrl(id);
+    return Material(
+      color: Colors.black,
+      child: InkWell(
+        onTap: _startYouTubePlayback,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              thumb,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => const ColoredBox(color: Colors.black),
+            ),
+            ColoredBox(color: Colors.black.withValues(alpha: 0.35)),
+            Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: widget.compact ? 14 : 20, vertical: widget.compact ? 10 : 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED),
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 16, offset: Offset(0, 6))],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: widget.compact ? 22 : 28),
+                    SizedBox(width: widget.compact ? 4 : 8),
+                    Text(
+                      'Tap to play',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: widget.compact ? 12 : 15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_needsYouTubeTap) {
+      return _buildYouTubeTapPoster();
+    }
     if (_failed) {
       return ColoredBox(
         color: Colors.black,
