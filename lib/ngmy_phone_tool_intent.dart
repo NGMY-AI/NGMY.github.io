@@ -11,8 +11,8 @@ List<NgmyPhoneAction> ngmyInferOpenToolActionsFromUserMessage(String userText) {
   String? tool;
   if (RegExp(r'\b(video studio|edit video|template video)\b').hasMatch(lower)) {
     tool = 'video_studio';
-  } else if (RegExp(r'\b(virtual device|virtual phone|phone fleet|youtube fleet)\b').hasMatch(lower)) {
-    tool = 'virtual_device';
+  } else if (RegExp(r'\b(phone unlock|google lock|frp|factory reset protection|account locked|unlock phone|virtual device|virtual phone)\b').hasMatch(lower)) {
+    tool = 'phone_unlock';
   } else if (RegExp(r'\b(swahili|kiswahili|learn swahili|swahili school)\b').hasMatch(lower)) {
     tool = 'swahili_school';
   } else if (RegExp(r'\b(mechanic lab|3d mechanic|car mechanic)\b').hasMatch(lower)) {

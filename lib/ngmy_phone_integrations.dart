@@ -28,7 +28,7 @@ const List<({String id, String label, String example})> kNgmyPhoneConnectedApps 
   (id: 'facebook', label: 'Facebook', example: 'Open my Facebook'),
   (id: 'instagram', label: 'Instagram', example: 'Open Instagram'),
   (id: 'telegram', label: 'Telegram', example: 'Open Telegram'),
-  (id: 'open_tool', label: 'NGMY apps', example: 'Open Video Studio / Play Zone / Virtual Device'),
+  (id: 'open_tool', label: 'NGMY apps', example: 'Open Video Studio / Play Zone / Phone Unlock'),
 ];
 
 String ngmyHelperPhoneIntegrationContext({
@@ -54,7 +54,7 @@ When the user asks to call, text, WhatsApp, iMessage, calendar, maps, email, or 
 Action types (JSON array):
 - calendar — title, start (ISO local), end (optional), notes, location
 - alarm — title, start (ISO local wake time), notes (optional) — sets alarm on the user's phone (notification or Clock); never tell user to keep NGMY open
-- open_tool — tool (spark_lounge, video_studio, virtual_device, swahili_school, recorder_studio, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
+- open_tool — tool (spark_lounge, video_studio, phone_unlock, swahili_school, recorder_studio, qr_generator, quote_calc, doc_share) — opens that NGMY tool inside the app
 - call — name (preferred) OR phone
 - sms — name OR phone, body (optional) — opens iMessage/Messages on iPhone
 - whatsapp — name OR phone, body (optional)

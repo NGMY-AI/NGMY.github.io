@@ -8,7 +8,7 @@ import 'ngmy_swahili_school.dart';
 import 'ngmy_creator_recorder_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
-import 'ngmy_virtual_device_launcher.dart';
+import 'ngmy_phone_unlock.dart';
 
 void ngmyRegisterAiAppTools({
   required BuildContext Function() context,
@@ -34,9 +34,13 @@ void ngmyRegisterAiAppTools({
         showNgmyVideoStudio(ctx);
         return 'Opened Video Studio — add clips, templates, then Download.';
       },
+      'phone_unlock': (ctx) async {
+        showNgmyPhoneUnlock(ctx);
+        return 'Opened Phone Unlock — quick links for Google, Chrome, and Settings.';
+      },
       'virtual_device': (ctx) async {
-        await openNgmyVirtualDevice(context: ctx, userEmail: userEmail);
-        return 'Opened Virtual Device fleet.';
+        showNgmyPhoneUnlock(ctx);
+        return 'Opened Phone Unlock — quick links for Google, Chrome, and Settings.';
       },
       'swahili_school': (ctx) async {
         showNgmySwahiliSchool(context: ctx, userEmail: userEmail);

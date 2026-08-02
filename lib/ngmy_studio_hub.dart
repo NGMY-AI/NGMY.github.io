@@ -14,7 +14,7 @@ import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
-import 'ngmy_virtual_device_launcher.dart';
+import 'ngmy_phone_unlock.dart';
 export 'ngmy_studio_colors.dart';
 
 /// Bottom-nav icon for the Creator Toolkit tab.
@@ -156,11 +156,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         onTap: () => showNgmyVideoStudio(context),
       ),
       _CreatorTool(
-        icon: Icons.smartphone_rounded,
+        icon: Icons.phonelink_lock_rounded,
         colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1)],
-        title: 'Virtual Device',
-        subtitle: '20 unique phones — 4 per row, tap to watch YouTube',
-        onTap: () => unawaited(openNgmyVirtualDevice(context: context, userEmail: userEmail)),
+        title: 'Phone Unlock',
+        subtitle: 'Google lock · Chrome · Settings links',
+        onTap: () => showNgmyPhoneUnlock(context),
       ),
     ];
 
