@@ -115,7 +115,18 @@ Future<({bool ok, String? error})> ngmyPasswordResetVerifyResendOtp(String email
   }
   if (data is Map) {
     final err = data['error']?.toString();
-    if (err != null && err.isNotEmpty) return (ok: false, data: null, error: err);
+    if (err != null && err.isNotEmpty) {
+      final lower = err.toLowerCase();
+      if (lower.contains('apikey') && lower.contains('prompt')) {
+        return (
+          ok: false,
+          data: null,
+          error: 'Password reset is not on the server yet. In Supabase Dashboard → Edge Functions → '
+              'bright-handler → paste the latest code from supabase/functions/ngmy-ai-chat/index.ts → Deploy.',
+        );
+      }
+      return (ok: false, data: null, error: err);
+    }
   }
   return (ok: false, data: null, error: 'Could not reach the server (HTTP $status).');
 }
