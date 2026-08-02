@@ -38,6 +38,9 @@ Future<Map<String, dynamic>?> ngmyFetchUserLoginRow(
   String email, {
   Duration timeout = const Duration(seconds: 15),
 }) async {
+  final key = email.toLowerCase().trim();
+  if (key.isEmpty) return null;
+
   const fallbacks = <String>[
     NgmySupabaseColumns.userLogin,
     'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore',
@@ -49,10 +52,16 @@ Future<Map<String, dynamic>?> ngmyFetchUserLoginRow(
   Object? lastError;
   for (final columns in fallbacks) {
     try {
-      final row = await client
+      var row = await client
           .from('users')
           .select(columns)
-          .eq('email', email)
+          .eq('email', key)
+          .maybeSingle()
+          .timeout(timeout);
+      row ??= await client
+          .from('users')
+          .select(columns)
+          .ilike('email', key)
           .maybeSingle()
           .timeout(timeout);
       if (row == null) return null;

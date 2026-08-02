@@ -3718,14 +3718,18 @@ Future<bool> _deleteUserFromCloud(String email) async {
 
 Map<String, dynamic> _userSignupRowForCloud(UserData u) {
   final username = u.username.trim().isEmpty ? u.email.split('@').first : u.username.trim();
-  return {
-    'email': u.email.trim(),
+  final row = <String, dynamic>{
+    'email': ngmyNormalizeEmail(u.email),
     'username': username,
     'phone': u.phone.trim(),
-    'passwordHash': u.passwordHash,
     'status': u.status.trim().isEmpty ? 'active' : u.status,
     'isAdmin': u.isAdmin,
   };
+  // Never overwrite an existing cloud password with an empty hash (OAuth / partial sync).
+  if (u.passwordHash.trim().isNotEmpty) {
+    row['passwordHash'] = u.passwordHash;
+  }
+  return row;
 }
 
 /// Saves a new or returning account to Supabase so admin can see app signups.
@@ -4485,13 +4489,19 @@ void _mergeCloudProfileIdentityFields(UserData local, UserData remote) {
 }
 
 Future<UserData?> _fetchCloudUserRow(String email) async {
-  final raw = email.trim();
-  if (raw.isEmpty || !await ngmyCanReachCloud()) return null;
+  final key = ngmyNormalizeEmail(email);
+  if (key.isEmpty || !await ngmyCanReachCloud()) return null;
   try {
-    final row = await Supabase.instance.client
+    var row = await Supabase.instance.client
         .from('users')
         .select()
-        .eq('email', raw)
+        .eq('email', key)
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
+    row ??= await Supabase.instance.client
+        .from('users')
+        .select()
+        .ilike('email', key)
         .maybeSingle()
         .timeout(kNgmyCloudLoadTimeout);
     if (row == null) return null;
@@ -4499,7 +4509,7 @@ Future<UserData?> _fetchCloudUserRow(String email) async {
   } catch (e) {
     debugPrint('[user] full row fetch: $e');
     try {
-      final row = await ngmyFetchUserLoginRow(Supabase.instance.client, raw);
+      final row = await ngmyFetchUserLoginRow(Supabase.instance.client, key);
       if (row == null) return null;
       return UserData.fromJson(row);
     } catch (e2) {
@@ -7835,6 +7845,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _realtimePaused = false;
   bool _backgroundSyncPaused = false;
   bool _userExplicitlyLoggedOut = false;
+  bool _sessionBootstrapComplete = false;
   String _appShellSig = '';
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
@@ -8089,6 +8100,27 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _clearLoggedOutFlag() async {
     _userExplicitlyLoggedOut = false;
     await ngmyWriteUserLoggedOutFlag(false);
+  }
+
+  Future<void> _performForceLogoutFromCloud(String email) async {
+    _userExplicitlyLoggedOut = true;
+    _resetWalletLedgerSyncState();
+    _pauseBackgroundSync(disableRealtimeLoop: true);
+    await ngmyWriteUserLoggedOutFlag(true);
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove('current_user');
+      await p.remove('ngmy_last_session_email');
+    } catch (_) {}
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      debugPrint('[logout] force supabase signOut: $e');
+    }
+    if (!mounted) return;
+    _cloudUserRowEnsuredForEmail = null;
+    _cloudUserRowResyncTimer?.cancel();
+    setState(() => _currentUser = null);
   }
 
   Future<void> _performLogout() async {
@@ -8433,6 +8465,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     NgmyIncomeSound.bindSession(key);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
+    if (_currentUser!.passwordHash.trim().isEmpty) {
+      try {
+        final cloud = await _fetchCloudUserRow(key);
+        if (cloud != null && cloud.passwordHash.trim().isNotEmpty) {
+          _currentUser!.passwordHash = cloud.passwordHash;
+          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+          if (idx >= 0) _allUsers[idx].passwordHash = cloud.passwordHash;
+        }
+      } catch (e) {
+        debugPrint('[oauth] preserve cloud password hash: $e');
+      }
+    }
     if (!mounted) return;
     setState(() {});
     try {
@@ -8835,14 +8879,45 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _notificationsReady = false;
   int _nextNotificationId = 1;
 
-  Future<void> _initLoggedOutGuard() async {
-    _userExplicitlyLoggedOut = await ngmyReadUserLoggedOutFlag();
-    if (!_userExplicitlyLoggedOut) return;
+  Future<void> _completeSessionBootstrap() async {
     try {
-      if (supabase.auth.currentSession != null) await supabase.auth.signOut();
-    } catch (_) {}
-    if (!mounted) return;
-    if (_currentUser != null) setState(() => _currentUser = null);
+      final prefs = await SharedPreferences.getInstance();
+      _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
+      if (_userExplicitlyLoggedOut) {
+        try {
+          if (supabase.auth.currentSession != null) await supabase.auth.signOut();
+        } catch (_) {}
+        if (mounted && _currentUser != null) {
+          setState(() => _currentUser = null);
+        }
+      } else {
+        await _restoreSessionFromLocalCache(prefs: prefs);
+        if (_currentUser == null) {
+          await _tryRestoreSessionFromSupabaseAuth();
+        }
+        if (_currentUser != null) {
+          await _clearLoggedOutFlag();
+        }
+      }
+    } catch (e) {
+      debugPrint('[session] bootstrap: $e');
+    } finally {
+      if (mounted) setState(() => _sessionBootstrapComplete = true);
+    }
+  }
+
+  Future<void> _initLoggedOutGuard() async {
+    await _completeSessionBootstrap();
+  }
+
+  Future<void> _restoreSessionOnAppVisible() async {
+    if (_userExplicitlyLoggedOut || !_sessionBootstrapComplete) return;
+    if (_currentUser != null) return;
+    await _restoreSessionFromLocalCache();
+    if (_currentUser == null) {
+      await _tryRestoreSessionFromSupabaseAuth();
+    }
+    if (_currentUser != null && mounted) setState(() {});
   }
 
   void _hydrateFromLaunchBootstrap(NgmyLaunchBootstrap b) {
@@ -8923,7 +8998,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _userTxnSyncTimer = null;
     };
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
-    unawaited(_initLoggedOutGuard());
+    unawaited(_completeSessionBootstrap());
+    if (kIsWeb) {
+      ngmyRegisterPageVisibleHandler(_restoreSessionOnAppVisible);
+    }
     _initLocalNotifications();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_startBackgroundServicesWhenReady());
@@ -9030,7 +9108,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _pauseBackgroundSync();
     }
     if (state == AppLifecycleState.resumed) {
-      unawaited(_restoreSessionFromLocalCache());
+      unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();
       if (_currentUser != null) {
@@ -9136,6 +9214,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   @override void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (kIsWeb) {
+      ngmyUnregisterPageVisibleHandler(_restoreSessionOnAppVisible);
+    }
     ngmyOnGameWinNotify = null;
     ngmyInAppNotify = null;
     ngmyOnStoreOrdersChanged = null;
@@ -10889,6 +10970,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     });
     NgmyIncomeSound.bindSession(emailNorm);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
+    if (_currentUser != null && _currentUser!.passwordHash.trim().isEmpty) {
+      try {
+        final cloud = await _fetchCloudUserRow(emailNorm);
+        if (cloud != null && cloud.passwordHash.trim().isNotEmpty) {
+          _currentUser!.passwordHash = cloud.passwordHash;
+          final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
+          if (uIdx >= 0) _allUsers[uIdx].passwordHash = cloud.passwordHash;
+        }
+      } catch (e) {
+        debugPrint('[oauth] preserve cloud password hash: $e');
+      }
+    }
     await _saveData();
     await _persistSessionImmediately();
     if (_currentUser != null) {
@@ -11518,8 +11611,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
             if (uIdx >= 0) _allUsers[uIdx].forceLogout = false;
             unawaited(_pushUserToCloudFast(updatedUser));
-            _currentUser = null;
-            unawaited(_persistSessionImmediately());
+            unawaited(_performForceLogoutFromCloud(email));
           } else {
             final localCurrent = _currentUser!;
             _preserveLocalSessionState(localCurrent, updatedUser);
@@ -11661,6 +11753,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _preserveLocalSessionState(UserData local, UserData remote) {
+    if (local.passwordHash.trim().isNotEmpty && remote.passwordHash.trim().isEmpty) {
+      remote.passwordHash = local.passwordHash;
+    }
     if (local.lastClockInEarningsDate != null) {
       final remoteDate = remote.lastClockInEarningsDate;
       if (remoteDate == null || local.lastClockInEarningsDate!.isAfter(remoteDate)) {
@@ -12842,7 +12937,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               );
           return ngmyCrispAppWrapper(context, body);
         },
-        home: _currentUser == null
+        home: !_sessionBootstrapComplete
+            ? Scaffold(
+                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                body: const Center(child: CircularProgressIndicator()),
+              )
+            : _currentUser == null
             ? AuthScreen(
                 allUsers: _allUsers,
                 config: _config,
@@ -12904,21 +13004,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     passwordHash: passwordHash,
                     isAppLoginAccount: true,
                   );
-                  setState(() {
-                    _currentUser = user;
-                    _allUsers.add(user);
-                  });
                   ngmyMarkUserAsAppLoginAccount(user);
                   NgmyIncomeSound.bindSession(email);
                   unawaited(NgmyIncomeSound.unlockForWebUserGesture());
-                  await _applyPendingReferralLink(user);
-                  await _persistLocalOnly();
+
                   var synced = false;
                   for (var attempt = 0; attempt < 15; attempt++) {
-                    synced = await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
+                    synced = await _pushSignupUserToCloudReliable(user, includeFreeTrial: true);
                     if (synced) break;
                     await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
                   }
+
+                  if (!mounted) return;
+                  setState(() {
+                    _currentUser = user;
+                    final idx = _allUsers.indexWhere((x) => x.email.toLowerCase().trim() == email);
+                    if (idx >= 0) {
+                      _allUsers[idx] = user;
+                    } else {
+                      _allUsers.add(user);
+                    }
+                  });
+                  await _applyPendingReferralLink(user);
+                  await _persistLocalOnly();
                   if (!synced && mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -12926,6 +13034,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                         duration: Duration(seconds: 6),
                       ),
                     );
+                    unawaited(_pushSignupUserToCloudReliable(user, includeFreeTrial: true));
                   }
                   unawaited(_startBackgroundServicesWhenReady());
                 },
@@ -13318,7 +13427,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
         final row = fresh;
         final dbHash = (row['passwordHash'] ?? row['password_hash'] ?? '').toString();
-        if (dbHash.isNotEmpty && dbHash == enteredHash) {
+        if (dbHash.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No password saved for this account. Use Forgot password or sign in with Google.'),
+            ),
+          );
+          return;
+        }
+        if (dbHash == enteredHash) {
           await widget.onAuthComplete(email, '', '', enteredHash, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -13365,6 +13482,24 @@ class _AuthScreenState extends State<AuthScreen> {
       if (existsPhone) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number already registered')));
         return;
+      }
+
+      setState(() => _authBusy = true);
+      try {
+        await ngmyWaitForSupabaseReady();
+        final existingCloud = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
+        if (!mounted) return;
+        if (existingCloud != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('This email is already registered. Please log in instead.')),
+          );
+          setState(() => _isLogin = true);
+          return;
+        }
+      } catch (e) {
+        debugPrint('[signup] cloud duplicate check: $e');
+      } finally {
+        if (mounted) setState(() => _authBusy = false);
       }
 
       widget.onAuthComplete(email, phone, username, _hashPassword(password), false);
