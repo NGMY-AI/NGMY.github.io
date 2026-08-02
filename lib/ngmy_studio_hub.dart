@@ -143,7 +143,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
         icon: Icons.mic_rounded,
         colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
         title: 'Recorder Studio',
-        subtitle: 'Photos · voice memos · video',
+        subtitle: 'Video · record · play',
         onTap: () {
           showNgmyCreatorRecorderStudio(context, userEmail: userEmail);
         },
