@@ -13427,19 +13427,11 @@ class _AuthScreenState extends State<AuthScreen> {
 
         final row = fresh;
         final dbHash = (row['passwordHash'] ?? row['password_hash'] ?? '').toString();
-        if (dbHash.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No password saved for this account. Use Forgot password or sign in with Google.'),
-            ),
-          );
-          return;
-        }
-        if (dbHash == enteredHash) {
+        if (dbHash.isNotEmpty && dbHash == enteredHash) {
           await widget.onAuthComplete(email, '', '', enteredHash, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Incorrect password')),
+            const SnackBar(content: Text('Wrong password')),
           );
         }
       } catch (err) {
