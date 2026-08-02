@@ -3,6 +3,7 @@
 // Or link project in Supabase Dashboard → Edge Functions.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -267,6 +268,157 @@ const NGMY_ADMIN_EMAILS = new Set([
   "appbusiness84@gmail.com",
 ]);
 
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function adminClient() {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function userAccountExists(admin: ReturnType<typeof createClient>, email: string): Promise<boolean> {
+  const { data } = await admin.from("users").select("email").ilike("email", email).maybeSingle();
+  return data != null;
+}
+
+async function passwordResetSendResendCode(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<Response> {
+  const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? "").trim();
+  const from = String(Deno.env.get("RESEND_FROM_EMAIL") ?? "NGMY <noreply@ngmy.org>").trim();
+  if (!resendKey) {
+    return new Response(JSON.stringify({ error: "Email service not configured. Try again later." }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+  const codeHash = await sha256Hex(`${code}:${email}:${pepper}`);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  const { error: upsertErr } = await admin.from("ngmy_password_reset_otp").upsert(
+    { email, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
+    { onConflict: "email" },
+  );
+  if (upsertErr) {
+    return new Response(JSON.stringify({ error: "Could not store verification code." }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const html =
+    `<p>Your NGMY password reset code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p>` +
+    `<p>This code expires in 15 minutes. If you did not request this, ignore this email.</p>`;
+  await resendSendEmail(resendKey, from, email, "Your NGMY password reset code", html);
+
+  return new Response(JSON.stringify({ ok: true, method: "resend" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handlePasswordResetSendOtp(email: string): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  if (!(await userAccountExists(admin, email))) {
+    return new Response(JSON.stringify({ error: "Account not found" }), {
+      status: 404,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { error } = await admin.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true },
+  });
+  if (error) {
+    try {
+      return await passwordResetSendResendCode(admin, email);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: String(e) }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  return new Response(JSON.stringify({ ok: true, method: "supabase" }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handlePasswordResetVerifyOtp(email: string, code: string): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const { data: row, error } = await admin
+    .from("ngmy_password_reset_otp")
+    .select("code_hash,expires_at,attempts")
+    .eq("email", email)
+    .maybeSingle();
+  if (error || !row) {
+    return new Response(JSON.stringify({ error: "Incorrect or expired code." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const attempts = Number(row.attempts ?? 0);
+  if (attempts >= 8) {
+    return new Response(JSON.stringify({ error: "Too many attempts. Request a new code." }), {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const expiresAt = new Date(String(row.expires_at ?? 0)).getTime();
+  if (!expiresAt || Date.now() > expiresAt) {
+    await admin.from("ngmy_password_reset_otp").delete().eq("email", email);
+    return new Response(JSON.stringify({ error: "Code expired. Request a new one." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+  const codeHash = await sha256Hex(`${code.trim()}:${email}:${pepper}`);
+  if (codeHash !== row.code_hash) {
+    await admin.from("ngmy_password_reset_otp").update({ attempts: attempts + 1 }).eq("email", email);
+    return new Response(JSON.stringify({ error: "Incorrect code." }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  await admin.from("ngmy_password_reset_otp").delete().eq("email", email);
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -282,6 +434,29 @@ serve(async (req) => {
     const body = await req.json();
     const action = String(body?.action ?? "chat").trim();
     const apiKey = String(body?.apiKey ?? "").trim();
+
+    if (action === "passwordResetSendOtp") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      if (!email || !email.includes("@")) {
+        return new Response(JSON.stringify({ error: "Invalid email" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handlePasswordResetSendOtp(email);
+    }
+
+    if (action === "passwordResetVerifyOtp") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      const code = String(body?.code ?? "").trim();
+      if (!email || code.length < 6) {
+        return new Response(JSON.stringify({ error: "Email and 6-digit code required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handlePasswordResetVerifyOtp(email, code);
+    }
 
     if (action === "elevenlabsTts") {
       const text = String(body?.text ?? "").trim();
