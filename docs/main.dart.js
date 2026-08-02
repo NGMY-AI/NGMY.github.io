@@ -108909,7 +108909,7 @@ $S:11}
 A.dqB.prototype={
 $1(a){var s=A.jB().b
 s=s==null?null:s.canvasKitBaseUrl
-return(s==null?"https://www.gstatic.com/flutter-canvaskit/4c525dac5ebe5971c5708ef73558ed8edcf4a362/":s)+a},
+return(s==null?"canvaskit/":s)+a},
 $S:16}
 A.azO.prototype={
 gJ(a){var s=this.a
