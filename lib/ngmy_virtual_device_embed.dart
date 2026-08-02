@@ -1,7 +1,8 @@
 /// Shared YouTube / embed HTML helpers for virtual device players.
 class NgmyVirtualDeviceEmbed {
   static const String videoEndedMessage = 'ngmy-vd-ended';
-  static const String htmlBaseUrl = 'https://www.youtube-nocookie.com';
+  /// Standard YouTube embed host — matches working background player.
+  static const String htmlBaseUrl = 'https://www.youtube.com';
 
   /// Parent page origin for YouTube embed API — must match the live PWA host.
   static String get embedOrigin {
@@ -21,6 +22,7 @@ class NgmyVirtualDeviceEmbed {
     String? origin,
   }) {
     const host = htmlBaseUrl;
+    final pageOrigin = origin ?? embedOrigin;
     final params = <String>[
       if (autoplay) 'autoplay=1',
       'playsinline=1',
@@ -28,11 +30,10 @@ class NgmyVirtualDeviceEmbed {
       'modestbranding=1',
       'controls=1',
       'iv_load_policy=3',
+      'origin=${Uri.encodeComponent(pageOrigin)}',
+      'widget_referrer=${Uri.encodeComponent(pageOrigin)}',
       if (muted) 'mute=1',
-      if (useJsApi) ...[
-        'enablejsapi=1',
-        'origin=${Uri.encodeComponent(origin ?? embedOrigin)}',
-      ],
+      if (useJsApi) 'enablejsapi=1',
     ];
     return '$host/embed/$videoId?${params.join('&')}';
   }
@@ -73,7 +74,6 @@ class NgmyVirtualDeviceEmbed {
   <iframe
     src="$escaped"
     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-    referrerpolicy="strict-origin-when-cross-origin"
     allowfullscreen>
   </iframe>
 </body>

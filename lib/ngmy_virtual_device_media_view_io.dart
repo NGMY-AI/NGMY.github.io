@@ -155,11 +155,8 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
     final ytId = NgmyVirtualDeviceEmbed.extractYouTubeVideoId(url);
     if (ytId != null) {
       final muted = (widget.startMuted && !_userUnmuted) || _isMutedUrl(url);
-      _controller.loadHtmlString(
-        NgmyVirtualDeviceEmbed.genericIframeHtml(
-          NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted),
-        ),
-        baseUrl: '${NgmyVirtualDeviceEmbed.htmlBaseUrl}/',
+      _controller.loadRequest(
+        Uri.parse(NgmyVirtualDeviceEmbed.youtubeEmbedUrl(ytId, muted: muted)),
       );
       return;
     }
@@ -170,7 +167,7 @@ class _NgmyVirtualDeviceMediaViewState extends State<NgmyVirtualDeviceMediaView>
           url,
           muted: _isMutedUrl(url),
         ),
-        baseUrl: '${NgmyVirtualDeviceEmbed.htmlBaseUrl}/',
+        baseUrl: '${NgmyVirtualDeviceEmbed.embedOrigin}/',
       );
     } else {
       _controller.loadRequest(Uri.parse(url));

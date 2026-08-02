@@ -51,7 +51,7 @@ class NgmyVirtualDevicePlayback {
 
 class NgmyVirtualDeviceMedia {
   static NgmyVirtualMediaTarget? parse(String raw) {
-    final trimmed = raw.trim();
+    final trimmed = raw.trim().replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '');
     if (trimmed.isEmpty) return null;
     final url = trimmed.startsWith('http') ? trimmed : 'https://$trimmed';
     final lower = url.toLowerCase();
@@ -149,6 +149,7 @@ class NgmyVirtualDeviceMedia {
       RegExp(r'm\.youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
       RegExp(r'music\.youtube\.com/watch.*?[?&]v=([a-zA-Z0-9_-]{11})'),
       RegExp(r'youtube\.com/v/([a-zA-Z0-9_-]{11})'),
+      RegExp(r'youtube\.com/shorts/([a-zA-Z0-9_-]{11})'),
     ];
     for (final p in patterns) {
       final id = p.firstMatch(url)?.group(1);
