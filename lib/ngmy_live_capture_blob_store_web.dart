@@ -4,6 +4,8 @@ import 'dart:html' as html;
 import 'dart:indexed_db' as idb;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 /// Stores large Live Capture media payloads (data URLs) in IndexedDB instead
 /// of SharedPreferences/localStorage, which has a hard ~5-10MB per-origin
 /// quota that a single video recording can blow past on its own.
@@ -157,10 +159,13 @@ class NgmyLiveCaptureBlobStore {
   static Future<Uint8List?> fetchBlobUrlBytes(String blobUrl) async {
     if (!blobUrl.startsWith('blob:')) return null;
     try {
-      final req = await html.HttpRequest.request(blobUrl, responseType: 'blob');
+      final req = await html.HttpRequest.request(blobUrl, responseType: 'blob')
+          .timeout(const Duration(seconds: 120));
       final blob = req.response;
       if (blob is html.Blob) return _blobToBytes(blob);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[live_capture blob] fetchBlobUrlBytes: $e');
+    }
     return null;
   }
 
@@ -206,7 +211,13 @@ class NgmyLiveCaptureBlobStore {
       if (!done.isCompleted) done.complete(null);
     });
     reader.readAsArrayBuffer(blob);
-    return done.future;
+    return done.future.timeout(
+      const Duration(seconds: 90),
+      onTimeout: () {
+        if (!done.isCompleted) done.complete(null);
+        return null;
+      },
+    );
   }
 
   static Future<void> delete(String id) async {

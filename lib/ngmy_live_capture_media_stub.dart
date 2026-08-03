@@ -53,6 +53,8 @@ class NgmyLiveCaptureMedia {
 
   static void downloadSync(String dataUrl, String mimeType, String title) {}
 
+  static Future<bool> downloadAsync(String src, String mimeType, String title) async => false;
+
   static Future<void> downloadQuiet(String dataUrl, String mimeType, String title) async {}
 }
 

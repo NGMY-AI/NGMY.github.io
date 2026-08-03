@@ -21,7 +21,7 @@ Future<String> shareNgmyBytes(
 }) async {
   try {
     await Share.shareXFiles(
-      [XFile.fromData(bytes, mimeType: mimeType, name: filename)],
+      [XFile.fromData(bytes, mimeType: mimeType.split(';').first.trim(), name: filename)],
       subject: title,
       text: text,
     );
@@ -30,4 +30,14 @@ Future<String> shareNgmyBytes(
     if (mimeType == 'image/png') return download.saveNgmyQrPngBytes(bytes, filename);
     return 'Could not share $filename';
   }
+}
+
+Future<String> shareNgmyCaptureUrl(
+  String url,
+  String filename, {
+  required String mimeType,
+  String? title,
+  String? text,
+}) async {
+  return 'Could not share $filename';
 }

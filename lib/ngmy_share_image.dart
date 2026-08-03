@@ -20,3 +20,13 @@ Future<String> shareNgmyBytes(
 }) {
   return impl.shareNgmyBytes(bytes, filename, mimeType: mimeType, title: title, text: text);
 }
+
+Future<String> shareNgmyCaptureUrl(
+  String url,
+  String filename, {
+  required String mimeType,
+  String? title,
+  String? text,
+}) {
+  return impl.shareNgmyCaptureUrl(url, filename, mimeType: mimeType, title: title, text: text);
+}

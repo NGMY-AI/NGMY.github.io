@@ -145,16 +145,17 @@ class NgmyLiveCaptureMedia {
     unawaited(downloadAsync(dataUrl, mimeType, title));
   }
 
-  static Future<void> downloadAsync(String src, String mimeType, String title) async {
+  static Future<bool> downloadAsync(String src, String mimeType, String title) async {
     try {
       final clean = ngmyCleanMediaMime(mimeType);
       html.Blob blob;
       if (src.startsWith('blob:')) {
-        final req = await html.HttpRequest.request(src, responseType: 'blob');
+        final req = await html.HttpRequest.request(src, responseType: 'blob')
+            .timeout(const Duration(seconds: 120));
         final raw = req.response;
         if (raw is! html.Blob || raw.size <= 0) {
           debugPrint('[live_capture] download blob fetch failed');
-          return;
+          return false;
         }
         blob = raw.type.isNotEmpty ? raw : html.Blob([raw], clean);
       } else {
@@ -163,7 +164,7 @@ class NgmyLiveCaptureMedia {
       final objectUrl = html.Url.createObjectUrlFromBlob(blob);
       if (_isIOSSafari) {
         html.window.open(objectUrl, '_blank');
-        return;
+        return true;
       }
       final name = '${title.replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_')}.${_extFor(clean)}';
       final a = html.AnchorElement(href: objectUrl)
@@ -179,8 +180,10 @@ class NgmyLiveCaptureMedia {
           html.Url.revokeObjectUrl(objectUrl);
         } catch (_) {}
       });
+      return true;
     } catch (e) {
       debugPrint('[live_capture] downloadAsync: $e');
+      return false;
     }
   }
 

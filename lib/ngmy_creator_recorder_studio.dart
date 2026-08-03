@@ -910,13 +910,22 @@ class _StudioCaptureSheetState extends State<_StudioCaptureSheet> {
 
   Future<void> _share() async {
     setState(() => _exporting = true);
+    await _ensureMediaUrl();
     final ok = await ngmyLiveCaptureShare(widget.item);
     if (mounted) {
       setState(() => _exporting = false);
-      if (!ok) {
+      if (ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not share this recording.'),
+            content: Text('Video ready — use the share sheet or save from your gallery.'),
+            backgroundColor: NgmyRecorderStudioColors.emerald,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not share this recording. Try again after the video finishes loading.'),
             backgroundColor: Color(0xFFDC2626),
             behavior: SnackBarBehavior.floating,
           ),

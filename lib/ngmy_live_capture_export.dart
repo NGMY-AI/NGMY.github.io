@@ -1,11 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import 'ngmy_live_capture.dart';
 import 'ngmy_live_capture_blob_store.dart';
 import 'ngmy_live_capture_media.dart';
-import 'ngmy_share_image_io.dart';
+import 'ngmy_share_image.dart';
 import 'ngmy_vault_web_io.dart';
 
 String ngmyLiveCaptureFilename(NgmyLiveCaptureItem item) {
@@ -29,13 +27,46 @@ String ngmyLiveCaptureFileExt(String mimeType, {required String kind}) {
   return 'bin';
 }
 
-/// Loads capture bytes from memory URL or IndexedDB blob store.
+String _cleanMime(String mimeType) {
+  final base = mimeType.split(';').first.trim().toLowerCase();
+  if (base.startsWith('video/') || base.startsWith('audio/')) return base;
+  if (base.isEmpty && mimeType.toLowerCase().contains('video')) return 'video/mp4';
+  return base.isEmpty ? 'application/octet-stream' : base;
+}
+
+String _shareLabel(NgmyLiveCaptureItem item) {
+  if (item.kind == 'photo') return 'NGMY photo';
+  if (item.kind == 'video') return 'NGMY video';
+  return 'NGMY voice memo';
+}
+
+bool _shareMsgFailed(String msg) => msg.toLowerCase().contains('could not');
+
+/// Ensures a blob: or data: URL the player (and share) can use.
+Future<String> ngmyLiveCaptureEnsurePlayableUrl(NgmyLiveCaptureItem item) async {
+  var src = item.dataUrl.trim();
+  if (src.isNotEmpty) return src;
+  final mime = _cleanMime(item.mimeType);
+  src = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: mime) ?? '';
+  if (src.isNotEmpty) item.dataUrl = src;
+  return src;
+}
+
+/// Loads capture bytes from IndexedDB, blob URL, or data URL.
 Future<Uint8List?> ngmyLiveCaptureResolveBytes(NgmyLiveCaptureItem item) async {
+  final mime = _cleanMime(item.mimeType);
   final fromStore = await NgmyLiveCaptureBlobStore.getBytes(item.id);
   if (fromStore != null && fromStore.isNotEmpty) return fromStore;
 
-  final src = item.dataUrl.trim();
-  if (src.isEmpty) return null;
+  var src = item.dataUrl.trim();
+  if (src.isEmpty) {
+    src = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: mime) ?? '';
+  }
+
+  if (kIsWeb && src.startsWith('blob:')) {
+    final fromBlob = await NgmyLiveCaptureBlobStore.fetchBlobUrlBytes(src);
+    if (fromBlob != null && fromBlob.isNotEmpty) return fromBlob;
+  }
 
   if (src.startsWith('data:')) {
     try {
@@ -45,41 +76,54 @@ Future<Uint8List?> ngmyLiveCaptureResolveBytes(NgmyLiveCaptureItem item) async {
     }
   }
 
-  if (kIsWeb && src.startsWith('blob:')) {
-    return NgmyLiveCaptureBlobStore.fetchBlobUrlBytes(src);
-  }
   return null;
 }
 
 Future<bool> ngmyLiveCaptureDownload(NgmyLiveCaptureItem item) async {
-  var src = item.dataUrl;
-  if (src.isEmpty) {
-    src = await NgmyLiveCaptureBlobStore.getPlayableUrl(item.id, mimeType: item.mimeType) ?? '';
-  }
+  final mime = _cleanMime(item.mimeType);
+  final src = await ngmyLiveCaptureEnsurePlayableUrl(item);
   if (src.isNotEmpty) {
-    await NgmyLiveCaptureMedia.downloadAsync(src, item.mimeType, item.title);
-    return true;
+    return NgmyLiveCaptureMedia.downloadAsync(src, mime, item.title);
   }
   final bytes = await ngmyLiveCaptureResolveBytes(item);
   if (bytes == null || bytes.isEmpty) return false;
-  return ngmyVaultDownloadBytes(bytes, ngmyLiveCaptureFilename(item), item.mimeType);
+  return ngmyVaultDownloadBytes(bytes, ngmyLiveCaptureFilename(item), mime);
 }
 
 Future<bool> ngmyLiveCaptureShare(NgmyLiveCaptureItem item) async {
-  final bytes = await ngmyLiveCaptureResolveBytes(item);
-  if (bytes == null || bytes.isEmpty) {
-    if (item.dataUrl.isNotEmpty) {
-      await ngmyLiveCaptureDownload(item);
-      return true;
-    }
-    return false;
-  }
+  final mime = _cleanMime(item.mimeType);
   final name = ngmyLiveCaptureFilename(item);
-  final label = item.kind == 'photo'
-      ? 'NGMY photo'
-      : item.kind == 'video'
-          ? 'NGMY video'
-          : 'NGMY voice memo';
-  final result = await shareNgmyBytes(bytes, name, mimeType: item.mimeType, title: label, text: item.title);
-  return !result.toLowerCase().contains('could not');
+  final label = _shareLabel(item);
+
+  final src = await ngmyLiveCaptureEnsurePlayableUrl(item);
+
+  // Web: share straight from blob URL — avoids loading huge videos into RAM.
+  if (kIsWeb && src.isNotEmpty) {
+    final urlResult = await shareNgmyCaptureUrl(
+      src,
+      name,
+      mimeType: mime,
+      title: label,
+      text: item.title,
+    );
+    if (!_shareMsgFailed(urlResult)) return true;
+  }
+
+  final bytes = await ngmyLiveCaptureResolveBytes(item);
+  if (bytes != null && bytes.isNotEmpty) {
+    final result = await shareNgmyBytes(bytes, name, mimeType: mime, title: label, text: item.title);
+    if (!_shareMsgFailed(result)) return true;
+  }
+
+  // Always fall back to saving the file — user can share from Photos/Files.
+  if (src.isNotEmpty) {
+    final saved = await NgmyLiveCaptureMedia.downloadAsync(src, mime, item.title);
+    if (saved) return true;
+  }
+
+  if (bytes != null && bytes.isNotEmpty) {
+    return ngmyVaultDownloadBytes(bytes, name, mime);
+  }
+
+  return false;
 }
