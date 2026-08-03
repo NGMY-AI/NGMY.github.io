@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_live_capture.dart';
@@ -16,6 +17,42 @@ abstract final class NgmyRecorderStudioColors {
   static const forest = Color(0xFF065F46);
   static const deep = Color(0xFF042F2E);
   static const panel = Color(0xFF064E3B);
+}
+
+/// How the preview animates when switching front/back camera.
+enum NgmyCameraFlipStyle {
+  instant,
+  slideHorizontal,
+  slideVertical,
+  fade,
+}
+
+const _kCameraFlipStylePrefs = 'ngmy_recorder_camera_flip_style_v1';
+
+String _cameraFlipStyleLabel(NgmyCameraFlipStyle style) {
+  switch (style) {
+    case NgmyCameraFlipStyle.instant:
+      return 'Instant';
+    case NgmyCameraFlipStyle.slideHorizontal:
+      return 'Slide left/right';
+    case NgmyCameraFlipStyle.slideVertical:
+      return 'Slide up/down';
+    case NgmyCameraFlipStyle.fade:
+      return 'Fade';
+  }
+}
+
+IconData _cameraFlipStyleIcon(NgmyCameraFlipStyle style) {
+  switch (style) {
+    case NgmyCameraFlipStyle.instant:
+      return Icons.flash_on_rounded;
+    case NgmyCameraFlipStyle.slideHorizontal:
+      return Icons.swap_horiz_rounded;
+    case NgmyCameraFlipStyle.slideVertical:
+      return Icons.swap_vert_rounded;
+    case NgmyCameraFlipStyle.fade:
+      return Icons.blur_on_rounded;
+  }
 }
 
 Future<void> showNgmyCreatorRecorderStudio(BuildContext context, {required String userEmail}) {
@@ -42,6 +79,8 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   bool _busy = false;
   bool _cameraBusy = false;
   bool _previewFullscreen = false;
+  NgmyCameraFlipStyle _cameraFlipStyle = NgmyCameraFlipStyle.slideHorizontal;
+  int _cameraFlipSlideSign = 1;
 
   NgmyLiveCaptureSession get _session => ngmyLiveCaptureSession;
 
@@ -84,12 +123,49 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
       _session.aspect = 'tiktok';
     }
     _session.addListener(_onSession);
+    unawaited(_loadCameraFlipStyle());
     unawaited(_reload().then((_) async {
       if (!_session.recording) {
         await _session.refreshVideoPreview();
         if (mounted) setState(() {});
       }
     }));
+  }
+
+  Future<void> _loadCameraFlipStyle() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kCameraFlipStylePrefs);
+      if (raw == null || !mounted) return;
+      final style = NgmyCameraFlipStyle.values.firstWhere(
+        (s) => s.name == raw,
+        orElse: () => NgmyCameraFlipStyle.slideHorizontal,
+      );
+      setState(() => _cameraFlipStyle = style);
+    } catch (_) {}
+  }
+
+  Future<void> _persistCameraFlipStyle(NgmyCameraFlipStyle style) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kCameraFlipStylePrefs, style.name);
+    } catch (_) {}
+  }
+
+  void _cycleCameraFlipStyle() {
+    final values = NgmyCameraFlipStyle.values;
+    final next = values[(values.indexOf(_cameraFlipStyle) + 1) % values.length];
+    setState(() => _cameraFlipStyle = next);
+    unawaited(_persistCameraFlipStyle(next));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Camera switch: ${_cameraFlipStyleLabel(next)}'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: NgmyRecorderStudioColors.forest,
+      ),
+    );
   }
 
   void _onSession() {
@@ -503,6 +579,61 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
     final size = _previewSize(context);
     final previewWidth = size.$1;
     final previewHeight = height ?? size.$2;
+    final previewBody = NgmyLiveCaptureMedia.liveCameraPreview(
+      stream: _session.previewStream,
+      height: previewHeight,
+      mirror: _session.facingMode == 'user',
+      objectFit: 'cover',
+      zoomOut: 1.0,
+    );
+
+    Widget previewChild;
+    if (_cameraFlipStyle == NgmyCameraFlipStyle.instant) {
+      previewChild = KeyedSubtree(
+        key: ValueKey('cam-${_session.facingMode}-${_session.aspect}'),
+        child: previewBody,
+      );
+    } else {
+      final duration = switch (_cameraFlipStyle) {
+        NgmyCameraFlipStyle.fade => const Duration(milliseconds: 320),
+        NgmyCameraFlipStyle.slideVertical => const Duration(milliseconds: 380),
+        _ => const Duration(milliseconds: 360),
+      };
+      previewChild = AnimatedSwitcher(
+        duration: duration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          switch (_cameraFlipStyle) {
+            case NgmyCameraFlipStyle.fade:
+              return FadeTransition(opacity: animation, child: child);
+            case NgmyCameraFlipStyle.slideVertical:
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: Offset(0, _cameraFlipSlideSign * 0.35),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            case NgmyCameraFlipStyle.slideHorizontal:
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: Offset(_cameraFlipSlideSign * 0.45, 0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              );
+            case NgmyCameraFlipStyle.instant:
+              return child;
+          }
+        },
+        child: KeyedSubtree(
+          key: ValueKey('cam-${_session.facingMode}-${_session.aspect}'),
+          child: previewBody,
+        ),
+      );
+    }
+
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
@@ -512,16 +643,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
           child: SizedBox(
             width: previewWidth,
             height: previewHeight,
-            child: KeyedSubtree(
-              key: ValueKey('cam-${_session.facingMode}-${_session.aspect}-${identityHashCode(_session.previewStream)}'),
-              child: NgmyLiveCaptureMedia.liveCameraPreview(
-                stream: _session.previewStream,
-                height: previewHeight,
-                mirror: _session.facingMode == 'user',
-                objectFit: 'cover',
-                zoomOut: 1.0,
-              ),
-            ),
+            child: previewChild,
           ),
         ),
         Positioned(
@@ -550,6 +672,12 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               tooltip: _session.noiseCancellation ? 'Noise cancel on' : 'Turn on noise cancel',
               onTap: _cameraBusy ? null : _toggleNoiseCancellation,
               active: _session.noiseCancellation,
+            ),
+            _previewControlBtn(
+              icon: _cameraFlipStyleIcon(_cameraFlipStyle),
+              tooltip: 'Camera switch style: ${_cameraFlipStyleLabel(_cameraFlipStyle)} (tap to change)',
+              onTap: _cycleCameraFlipStyle,
+              active: _cameraFlipStyle != NgmyCameraFlipStyle.instant,
             ),
             _previewControlBtn(
               icon: Icons.cameraswitch_rounded,
@@ -648,8 +776,21 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   Future<void> _toggleNoiseCancellation() async {
     if (_cameraBusy) return;
     setState(() => _cameraBusy = true);
-    await _session.setNoiseCancellation(!_session.noiseCancellation);
-    if (mounted) setState(() => _cameraBusy = false);
+    final turningOn = !_session.noiseCancellation;
+    await _session.setNoiseCancellation(turningOn);
+    if (mounted) {
+      setState(() => _cameraBusy = false);
+      if (_session.recording && _session.lastError == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(turningOn ? 'Noise cancel on — still recording.' : 'Noise cancel off — still recording.'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: NgmyRecorderStudioColors.forest,
+          ),
+        );
+      }
+    }
   }
 
   void _setAspect(String aspect) {
@@ -662,6 +803,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   Future<void> _flipCamera() async {
     if (_cameraBusy) return;
+    _cameraFlipSlideSign = _session.facingMode == 'user' ? 1 : -1;
     setState(() => _cameraBusy = true);
     await _session.switchCamera();
     if (mounted) setState(() => _cameraBusy = false);

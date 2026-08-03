@@ -229,6 +229,12 @@ class NgmyLiveCaptureEngine {
     final previous = _noiseCancellation;
     _noiseCancellation = enabled;
     if (_stream == null) return true;
+
+    final recording = _recorder?.state == 'recording';
+    if (recording) {
+      return _setNoiseCancellationWhileRecording(enabled, previous);
+    }
+
     final ok = await _applyNoiseCancellation(_stream!, enabled);
     if (ok) {
       if (_recordStream != null) {
@@ -247,6 +253,50 @@ class NgmyLiveCaptureEngine {
       );
     }
     return false;
+  }
+
+  Future<bool> _setNoiseCancellationWhileRecording(bool enabled, bool previous) async {
+    final stream = _stream;
+    if (stream == null) return true;
+
+    if (_processedAudioTrack != null && _noiseAudioCtx != null) {
+      final raw = _rawAudioTrack;
+      if (raw != null) {
+        try {
+          await raw.applyConstraints(_audioConstraints(noiseCancellation: enabled));
+        } catch (e) {
+          debugPrint('[live_capture] recording noise constraints: $e');
+        }
+      }
+      if (enabled) {
+        if (_noiseAnalyser != null && _noiseGateGain != null) {
+          _startNoiseGate(_noiseAudioCtx!);
+        }
+      } else {
+        _noiseGateTimer?.cancel();
+        _noiseGateTimer = null;
+        if (_noiseGateGain != null) {
+          _setAudioParam(_noiseGateGain!, 'gain', 1.0);
+        }
+      }
+      return true;
+    }
+
+    final raw = _rawAudioTrack ?? _firstAudioTrack(stream);
+    if (raw == null) {
+      _noiseCancellation = previous;
+      lastError = 'Microphone track is not available.';
+      return false;
+    }
+    try {
+      await raw.applyConstraints(_audioConstraints(noiseCancellation: enabled));
+      return true;
+    } catch (e) {
+      debugPrint('[live_capture] recording noise constraints only: $e');
+      _noiseCancellation = previous;
+      lastError = 'Could not ${enabled ? 'enable' : 'disable'} noise cancellation while recording.';
+      return false;
+    }
   }
 
   Map<String, dynamic> _audioConstraints({required bool noiseCancellation}) {
