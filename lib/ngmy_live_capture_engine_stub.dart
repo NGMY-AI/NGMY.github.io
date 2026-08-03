@@ -48,6 +48,12 @@ class NgmyLiveCaptureEngine {
 
   Future<NgmyLiveCaptureResult?> stop() async => null;
 
+  Future<bool> pauseRecording() async => false;
+
+  Future<bool> resumeRecording() async => false;
+
+  bool get isRecordingPaused => false;
+
   Future<void> downloadLast() async {}
 
   Future<void> dispose() async {}

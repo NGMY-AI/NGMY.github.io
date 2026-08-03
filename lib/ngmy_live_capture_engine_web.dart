@@ -53,6 +53,7 @@ class NgmyLiveCaptureEngine {
   html.VideoElement? _compositePipVideo;
   Timer? _compositeTimer;
   bool _compositeShowPip = false;
+  bool _recordingPaused = false;
   int _compositeW = 1280;
   int _compositeH = 720;
   String _activeFacing = 'user';
@@ -995,11 +996,84 @@ class NgmyLiveCaptureEngine {
         await _teardownRecorderOnly();
         return false;
       }
+      _recordingPaused = false;
       return true;
     } catch (e) {
       lastError = _describeStartError(e);
       debugPrint('[live_capture] start: $e');
       await _teardownRecorderOnly();
+      return false;
+    }
+  }
+
+  bool get isRecordingPaused => _recordingPaused;
+
+  Future<bool> pauseRecording() async {
+    lastError = null;
+    final recorder = _recorder;
+    if (recorder == null) {
+      lastError = 'Recording is not active.';
+      return false;
+    }
+    try {
+      final state = recorder.state;
+      if (state == 'paused') {
+        _recordingPaused = true;
+        return true;
+      }
+      if (state != 'recording') {
+        lastError = 'Cannot pause right now (recorder state: $state).';
+        return false;
+      }
+      recorder.pause();
+      _recordingPaused = true;
+      _compositeTimer?.cancel();
+      _compositeTimer = null;
+      _flushTimer?.cancel();
+      _flushTimer = null;
+      return true;
+    } catch (e) {
+      lastError = 'Pause is not supported on this browser.';
+      debugPrint('[live_capture] pause: $e');
+      return false;
+    }
+  }
+
+  Future<bool> resumeRecording() async {
+    lastError = null;
+    final recorder = _recorder;
+    if (recorder == null) {
+      lastError = 'Recording is not active.';
+      return false;
+    }
+    try {
+      final state = recorder.state;
+      if (state == 'recording') {
+        _recordingPaused = false;
+        return true;
+      }
+      if (state != 'paused') {
+        lastError = 'Cannot resume right now (recorder state: $state).';
+        return false;
+      }
+      recorder.resume();
+      _recordingPaused = false;
+      if (_compositeCanvas != null && _compositeTimer == null) {
+        _compositeDrawFrame();
+        _compositeTimer = Timer.periodic(const Duration(milliseconds: 33), (_) => _compositeDrawFrame());
+      }
+      _flushTimer?.cancel();
+      _flushTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+        try {
+          if (_recorder?.state == 'recording') {
+            _recorder!.requestData();
+          }
+        } catch (_) {}
+      });
+      return true;
+    } catch (e) {
+      lastError = 'Could not resume recording.';
+      debugPrint('[live_capture] resume: $e');
       return false;
     }
   }
@@ -1333,6 +1407,7 @@ class NgmyLiveCaptureEngine {
 
     _flushTimer?.cancel();
     _flushTimer = null;
+    _recordingPaused = false;
 
     final stopDone = Completer<void>();
     late final StreamSubscription<html.Event> stopSub;

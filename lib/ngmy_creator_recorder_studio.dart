@@ -454,9 +454,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
                 _idleHint(context),
               const SizedBox(height: 16),
               if (recording)
-                const Text(
-                  '● LIVE',
-                  style: TextStyle(color: NgmyRecorderStudioColors.mint, fontWeight: FontWeight.w900, letterSpacing: 1.4),
+                Text(
+                  _session.recordingPaused ? '⏸ PAUSED' : '● LIVE',
+                  style: TextStyle(
+                    color: _session.recordingPaused ? Colors.amber.shade200 : NgmyRecorderStudioColors.mint,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.4,
+                  ),
                 )
               else
                 Text(
@@ -673,6 +677,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               onTap: _cameraBusy ? null : _toggleNoiseCancellation,
               active: _session.noiseCancellation,
             ),
+            if (_session.recording)
+              _previewControlBtn(
+                icon: _session.recordingPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                tooltip: _session.recordingPaused ? 'Resume recording' : 'Pause recording',
+                onTap: _cameraBusy ? null : _toggleRecordingPause,
+                active: _session.recordingPaused,
+              ),
             _previewControlBtn(
               icon: _cameraFlipStyleIcon(_cameraFlipStyle),
               tooltip: 'Camera switch style: ${_cameraFlipStyleLabel(_cameraFlipStyle)} (tap to change)',
@@ -739,9 +750,13 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
               child: Row(
                 children: [
                   Text(
-                    recording ? '● RECORDING ${_session.clockLabel()}' : 'PREVIEW',
+                    recording
+                        ? (_session.recordingPaused ? '⏸ PAUSED ${_session.clockLabel()}' : '● RECORDING ${_session.clockLabel()}')
+                        : 'PREVIEW',
                     style: TextStyle(
-                      color: recording ? NgmyRecorderStudioColors.mint : Colors.white70,
+                      color: recording
+                          ? (_session.recordingPaused ? Colors.amber.shade200 : NgmyRecorderStudioColors.mint)
+                          : Colors.white70,
                       fontWeight: FontWeight.w900,
                       fontSize: 12,
                       letterSpacing: 1.1,
@@ -771,6 +786,34 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
 
   void _toggleFullscreen() {
     setState(() => _previewFullscreen = !_previewFullscreen);
+  }
+
+  Future<void> _toggleRecordingPause() async {
+    if (_cameraBusy || !_session.recording) return;
+    setState(() => _cameraBusy = true);
+    await _session.toggleRecordingPause();
+    if (mounted) {
+      setState(() => _cameraBusy = false);
+      if (_session.lastError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_session.lastError!),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF7F1D1D),
+          ),
+        );
+      } else if (_session.recordingPaused) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Recording paused — tap Resume when you are ready to continue.'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: NgmyRecorderStudioColors.forest,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _toggleNoiseCancellation() async {

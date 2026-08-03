@@ -163,7 +163,10 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   bool pipEnabled = false;
   bool noiseCancellation = false;
   bool recording = false;
+  bool recordingPaused = false;
   int elapsedSec = 0;
+  Duration _pausedTotal = Duration.zero;
+  DateTime? _pauseStartedAt;
 
   Object? get previewStream => _engine.previewStream;
 
@@ -174,6 +177,58 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
   String? get activeUserEmail => _userEmail;
 
   bool get isBackgroundRecording => recording;
+
+  int _effectiveElapsedSec() {
+    if (_startedAt == null) return elapsedSec;
+    var ms = DateTime.now().difference(_startedAt!).inMilliseconds - _pausedTotal.inMilliseconds;
+    if (recordingPaused && _pauseStartedAt != null) {
+      ms -= DateTime.now().difference(_pauseStartedAt!).inMilliseconds;
+    }
+    return (ms / 1000).floor().clamp(0, 99999);
+  }
+
+  Future<void> toggleRecordingPause() async {
+    if (!recording) return;
+    if (recordingPaused) {
+      await resumeRecording();
+    } else {
+      await pauseRecording();
+    }
+  }
+
+  Future<void> pauseRecording() async {
+    if (!recording || recordingPaused) return;
+    lastError = null;
+    final ok = await _engine.pauseRecording();
+    if (!ok) {
+      lastError = _engine.lastError ?? 'Pause is not supported on this browser.';
+      notifyListeners();
+      return;
+    }
+    recordingPaused = true;
+    _pauseStartedAt = DateTime.now();
+    lastStatus = 'Recording paused — tap Resume when ready to continue.';
+    notifyListeners();
+  }
+
+  Future<void> resumeRecording() async {
+    if (!recording || !recordingPaused) return;
+    lastError = null;
+    final ok = await _engine.resumeRecording();
+    if (!ok) {
+      lastError = _engine.lastError ?? 'Could not resume recording.';
+      notifyListeners();
+      return;
+    }
+    if (_pauseStartedAt != null) {
+      _pausedTotal += DateTime.now().difference(_pauseStartedAt!);
+      _pauseStartedAt = null;
+    }
+    recordingPaused = false;
+    elapsedSec = _effectiveElapsedSec();
+    lastStatus = 'Recording — tap Stop & Save when finished.';
+    notifyListeners();
+  }
 
   Future<void> refreshVideoPreview() async {
     if (recording || !videoMode) return;
@@ -260,12 +315,15 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
     _userEmail = userEmail;
     videoMode = video;
     recording = true;
+    recordingPaused = false;
+    _pausedTotal = Duration.zero;
+    _pauseStartedAt = null;
     elapsedSec = 0;
     _startedAt = DateTime.now();
     _tick?.cancel();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!recording || _startedAt == null) return;
-      elapsedSec = DateTime.now().difference(_startedAt!).inSeconds;
+      if (!recording || _startedAt == null || recordingPaused) return;
+      elapsedSec = _effectiveElapsedSec();
       notifyListeners();
     });
     lastStatus = 'Recording — tap Stop & Save when finished.';
@@ -275,8 +333,13 @@ class NgmyLiveCaptureSession extends ChangeNotifier {
 
   Future<NgmyLiveCaptureItem?> stopAndSave() async {
     _tick?.cancel();
+    final savedElapsed = _effectiveElapsedSec();
+    recordingPaused = false;
+    _pauseStartedAt = null;
+    _pausedTotal = Duration.zero;
     final result = await _engine.stop();
     recording = false;
+    elapsedSec = savedElapsed;
     if (result == null) {
       lastError = _engine.lastError ?? 'Nothing was captured.';
       notifyListeners();
