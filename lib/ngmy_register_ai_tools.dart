@@ -9,6 +9,7 @@ import 'ngmy_creator_recorder_studio.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_phone_unlock.dart';
+import 'ngmy_stripe_payments.dart';
 
 void ngmyRegisterAiAppTools({
   required BuildContext Function() context,
@@ -35,11 +36,19 @@ void ngmyRegisterAiAppTools({
         return 'Opened Video Studio — add clips, templates, then Download.';
       },
       'phone_unlock': (ctx) async {
-        showNgmyPhoneUnlock(ctx);
+        await showNgmyPhoneUnlock(
+          ctx,
+          userEmail: userEmail,
+          isAdmin: NgmyStripePayments.isAdmin(user),
+        );
         return 'Opened Phone Unlock — quick links for Google, Chrome, and Settings.';
       },
       'virtual_device': (ctx) async {
-        showNgmyPhoneUnlock(ctx);
+        await showNgmyPhoneUnlock(
+          ctx,
+          userEmail: userEmail,
+          isAdmin: NgmyStripePayments.isAdmin(user),
+        );
         return 'Opened Phone Unlock — quick links for Google, Chrome, and Settings.';
       },
       'swahili_school': (ctx) async {

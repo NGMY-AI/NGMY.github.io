@@ -14,6 +14,7 @@ enum NgmyStripeProduct {
   messageTranslator,
   documentScanner,
   marriageDocument,
+  phoneUnlock,
 }
 
 class NgmyStripePayments {
@@ -24,11 +25,13 @@ class NgmyStripePayments {
   static const String messageTranslatorUrl = 'https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04';
   static const String documentScannerUrl = 'https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03';
   static const String marriageDocumentUrl = 'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
+  static const String phoneUnlockUrl = 'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
 
   static const int invoiceFreeTrialDays = 3;
   static const int advisorFreeMinutes = 30;
   static const int dayTrialHours = 24;
   static const int marriageSessionHours = 4;
+  static const int phoneUnlockAccessDays = 10;
   static const int monthlyAccessDays = 30;
 
   static const _accessPrefix = 'ngmy_stripe_until_';
@@ -65,6 +68,8 @@ class NgmyStripePayments {
         return 'scanner';
       case NgmyStripeProduct.marriageDocument:
         return 'marriage';
+      case NgmyStripeProduct.phoneUnlock:
+        return 'phone_unlock';
     }
   }
 
@@ -84,6 +89,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.documentScanner;
       case 'marriage':
         return NgmyStripeProduct.marriageDocument;
+      case 'phone_unlock':
+        return NgmyStripeProduct.phoneUnlock;
       default:
         return null;
     }
@@ -105,6 +112,8 @@ class NgmyStripePayments {
         return documentScannerUrl;
       case NgmyStripeProduct.marriageDocument:
         return marriageDocumentUrl;
+      case NgmyStripeProduct.phoneUnlock:
+        return phoneUnlockUrl;
     }
   }
 
@@ -124,6 +133,8 @@ class NgmyStripePayments {
         return 'Document Scanner';
       case NgmyStripeProduct.marriageDocument:
         return 'Marriage Documents';
+      case NgmyStripeProduct.phoneUnlock:
+        return 'Phone Unlock';
     }
   }
 
@@ -143,11 +154,15 @@ class NgmyStripePayments {
         return 'Unlimited document scans for 30 days.';
       case NgmyStripeProduct.marriageDocument:
         return 'Edit marriage documents for 4 hours after payment.';
+      case NgmyStripeProduct.phoneUnlock:
+        return 'Instant access to Phone Unlock for 10 days after payment.';
     }
   }
 
-  static bool isSubscribeProduct(NgmyStripeProduct product) =>
-      product != NgmyStripeProduct.marriageDocument;
+  static bool isOneTimePayProduct(NgmyStripeProduct product) =>
+      product == NgmyStripeProduct.marriageDocument || product == NgmyStripeProduct.phoneUnlock;
+
+  static bool isSubscribeProduct(NgmyStripeProduct product) => !isOneTimePayProduct(product);
 
   static String actionLabel(NgmyStripeProduct product) =>
       isSubscribeProduct(product) ? 'Subscribe' : 'Pay';
@@ -190,11 +205,22 @@ class NgmyStripePayments {
     );
   }
 
+  static Future<void> grantPhoneUnlockAccess(String email) async {
+    await _setAccessUntil(
+      email,
+      NgmyStripeProduct.phoneUnlock,
+      DateTime.now().add(const Duration(days: phoneUnlockAccessDays)),
+    );
+  }
+
   static Future<void> _grantForProduct(String email, NgmyStripeProduct product) async {
-    if (product == NgmyStripeProduct.marriageDocument) {
-      await grantMarriageSession(email);
-    } else {
-      await grantMonthlyAccess(email, product);
+    switch (product) {
+      case NgmyStripeProduct.marriageDocument:
+        await grantMarriageSession(email);
+      case NgmyStripeProduct.phoneUnlock:
+        await grantPhoneUnlockAccess(email);
+      default:
+        await grantMonthlyAccess(email, product);
     }
   }
 
@@ -258,6 +284,9 @@ class NgmyStripePayments {
 
   static Future<bool> hasMarriageSession(String email) =>
       hasActiveAccess(email, NgmyStripeProduct.marriageDocument);
+
+  static Future<bool> hasPhoneUnlockAccess(String email) =>
+      hasActiveAccess(email, NgmyStripeProduct.phoneUnlock);
 
   static bool marriageDocDeckKind(String? deckKind) {
     if (deckKind == null) return false;
@@ -429,7 +458,9 @@ class _NgmyPaymentDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     const accent = Color(0xFF2563EB);
     const accent2 = Color(0xFF7C3AED);
+    final isOneTimePay = NgmyStripePayments.isOneTimePayProduct(product);
     final isMarriage = product == NgmyStripeProduct.marriageDocument;
+    final isPhoneUnlock = product == NgmyStripeProduct.phoneUnlock;
     final action = NgmyStripePayments.actionLabel(product);
 
     return Dialog(
@@ -457,7 +488,7 @@ class _NgmyPaymentDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        isMarriage ? 'ONE-TIME ACCESS' : 'SUBSCRIPTION',
+                        isOneTimePay ? 'ONE-TIME ACCESS' : 'SUBSCRIPTION',
                         style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2),
                       ),
                     ),
@@ -492,6 +523,22 @@ class _NgmyPaymentDialog extends StatelessWidget {
                         ),
                         child: const Text(
                           'Complete payment first, then you can edit for 4 hours. A timer shows at the top while you work.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    if (isPhoneUnlock)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.45)),
+                        ),
+                        child: const Text(
+                          'Pay once for instant access — no waiting period. Phone Unlock stays open for 10 days, then you can pay again.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4, fontWeight: FontWeight.w600),
                         ),

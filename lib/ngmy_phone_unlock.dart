@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_hud_tech_shell.dart';
+import 'ngmy_stripe_payments.dart';
 
 abstract final class NgmyPhoneUnlockColors {
   static const sky = Color(0xFF0EA5E9);
@@ -14,8 +15,31 @@ abstract final class NgmyPhoneUnlockColors {
   static const panel = Color(0xFF111827);
 }
 
-Future<void> showNgmyPhoneUnlock(BuildContext context) {
-  return Navigator.of(context).push<void>(
+Future<void> showNgmyPhoneUnlock(
+  BuildContext context, {
+  required String userEmail,
+  bool isAdmin = false,
+}) async {
+  final email = userEmail.trim();
+  if (email.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sign in to use Phone Unlock.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
+
+  final paid = await NgmyStripePayments.ensurePaid(
+    context: context,
+    product: NgmyStripeProduct.phoneUnlock,
+    email: email,
+    isAdmin: isAdmin,
+  );
+  if (!paid || !context.mounted) return;
+
+  await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(builder: (_) => const NgmyPhoneUnlockPage()),
   );
 }

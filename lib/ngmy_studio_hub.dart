@@ -15,6 +15,7 @@ import 'ngmy_price_product_scanner.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_video_studio.dart';
 import 'ngmy_phone_unlock.dart';
+import 'ngmy_stripe_payments.dart';
 export 'ngmy_studio_colors.dart';
 
 /// Bottom-nav icon for the Creator Toolkit tab.
@@ -160,7 +161,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF0EA5E9), Color(0xFF6366F1)],
         title: 'Phone Unlock',
         subtitle: 'Google lock · Chrome · Settings links',
-        onTap: () => showNgmyPhoneUnlock(context),
+        onTap: () => showNgmyPhoneUnlock(
+          context,
+          userEmail: userEmail,
+          isAdmin: NgmyStripePayments.isAdmin(user),
+        ),
       ),
     ];
 
