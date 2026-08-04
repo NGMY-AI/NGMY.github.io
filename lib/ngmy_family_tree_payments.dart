@@ -86,7 +86,7 @@ class NgmyFamilyTreePayments {
       title: title,
       message: message.isNotEmpty
           ? message
-          : 'Subscribe with Stripe for Family Tree access — create trees and upload photos (30 days).',
+          : 'Subscribe for Family Tree access — create trees and upload photos (30 days).',
     );
   }
 }

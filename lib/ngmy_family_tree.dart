@@ -1674,7 +1674,7 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
         config: widget.config,
         amount: 0,
         title: 'Family Tree Photos',
-        message: 'Subscribe with Stripe to upload family photos (30 days).',
+        message: 'Subscribe to upload family photos (30 days).',
         onCharge: widget.onChargeWallet,
       );
       if (!paid || !mounted) return;

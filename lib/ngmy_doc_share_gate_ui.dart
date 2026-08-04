@@ -439,7 +439,7 @@ class _DocShareGatePageState extends State<_DocShareGatePage> {
                 colors: const [Color(0xFF2563EB), Color(0xFF7C3AED)],
                 title: 'Organization Owner',
                 subtitle:
-                    'Subscribe with Stripe for your team · create member logins',
+                    'Subscribe for your team · create member logins',
                 onTap: _openOrgOwner,
               ),
             ],

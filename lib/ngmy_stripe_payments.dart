@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-/// Stripe Payment Links — replaces NGMY wallet for these products.
-/// Admin users never pay. After Stripe checkout, user taps "I've completed payment"
-/// to activate access on this device (configure Stripe success URLs when ready for webhooks).
+import 'ngmy_stripe_checkout_launch_stub.dart'
+    if (dart.library.html) 'ngmy_stripe_checkout_launch_web.dart';
+
 enum NgmyStripeProduct {
   docShareOrg,
   invoice,
@@ -35,6 +34,8 @@ class NgmyStripePayments {
   static const _accessPrefix = 'ngmy_stripe_until_';
   static const _invoiceTrialPrefix = 'ngmy_invoice_trial_start_';
   static const _dayTrialPrefix = 'ngmy_stripe_day_trial_';
+  static const _pendingProductKey = 'ngmy_pay_pending_product';
+  static const _pendingEmailKey = 'ngmy_pay_pending_email';
 
   static bool isAdmin(dynamic user) {
     try {
@@ -47,6 +48,46 @@ class NgmyStripePayments {
   static String _emailKey(String email) => email.toLowerCase().trim();
 
   static String _productKey(NgmyStripeProduct product) => product.name;
+
+  static String productSlug(NgmyStripeProduct product) {
+    switch (product) {
+      case NgmyStripeProduct.docShareOrg:
+        return 'doc_share_org';
+      case NgmyStripeProduct.invoice:
+        return 'invoice';
+      case NgmyStripeProduct.advisors:
+        return 'advisors';
+      case NgmyStripeProduct.familyTree:
+        return 'family_tree';
+      case NgmyStripeProduct.messageTranslator:
+        return 'translator';
+      case NgmyStripeProduct.documentScanner:
+        return 'scanner';
+      case NgmyStripeProduct.marriageDocument:
+        return 'marriage';
+    }
+  }
+
+  static NgmyStripeProduct? productFromSlug(String slug) {
+    switch (slug.trim().toLowerCase()) {
+      case 'doc_share_org':
+        return NgmyStripeProduct.docShareOrg;
+      case 'invoice':
+        return NgmyStripeProduct.invoice;
+      case 'advisors':
+        return NgmyStripeProduct.advisors;
+      case 'family_tree':
+        return NgmyStripeProduct.familyTree;
+      case 'translator':
+        return NgmyStripeProduct.messageTranslator;
+      case 'scanner':
+        return NgmyStripeProduct.documentScanner;
+      case 'marriage':
+        return NgmyStripeProduct.marriageDocument;
+      default:
+        return null;
+    }
+  }
 
   static String checkoutUrl(NgmyStripeProduct product) {
     switch (product) {
@@ -89,21 +130,27 @@ class NgmyStripePayments {
   static String productSubtitle(NgmyStripeProduct product) {
     switch (product) {
       case NgmyStripeProduct.docShareOrg:
-        return 'Monthly organization license — team access codes & member logins.';
+        return 'Organization license — team access codes and member logins.';
       case NgmyStripeProduct.invoice:
-        return 'Monthly access to Premium & Luxury invoice templates.';
+        return 'Monthly access to Premium and Luxury invoice templates.';
       case NgmyStripeProduct.advisors:
-        return 'Monthly unlimited advisor chat.';
+        return 'Unlimited advisor chat for 30 days.';
       case NgmyStripeProduct.familyTree:
-        return 'Monthly access — create trees and upload family photos.';
+        return 'Create family trees and upload photos for 30 days.';
       case NgmyStripeProduct.messageTranslator:
-        return 'Monthly unlimited message translations.';
+        return 'Unlimited message translations for 30 days.';
       case NgmyStripeProduct.documentScanner:
-        return 'Monthly unlimited document scans.';
+        return 'Unlimited document scans for 30 days.';
       case NgmyStripeProduct.marriageDocument:
-        return 'One-time payment — edit marriage documents for 4 hours.';
+        return 'Edit marriage documents for 4 hours after payment.';
     }
   }
+
+  static bool isSubscribeProduct(NgmyStripeProduct product) =>
+      product != NgmyStripeProduct.marriageDocument;
+
+  static String actionLabel(NgmyStripeProduct product) =>
+      isSubscribeProduct(product) ? 'Subscribe' : 'Pay';
 
   static Future<DateTime?> _accessUntil(String email, NgmyStripeProduct product) async {
     final key = _emailKey(email);
@@ -130,8 +177,6 @@ class NgmyStripePayments {
   }
 
   static Future<void> grantMonthlyAccess(String email, NgmyStripeProduct product, {int days = monthlyAccessDays}) async {
-    final key = _emailKey(email);
-    if (key.isEmpty) return;
     final existing = await _accessUntil(email, product);
     final base = (existing != null && existing.isAfter(DateTime.now())) ? existing : DateTime.now();
     await _setAccessUntil(email, product, base.add(Duration(days: days)));
@@ -143,6 +188,58 @@ class NgmyStripePayments {
       NgmyStripeProduct.marriageDocument,
       DateTime.now().add(const Duration(hours: marriageSessionHours)),
     );
+  }
+
+  static Future<void> _grantForProduct(String email, NgmyStripeProduct product) async {
+    if (product == NgmyStripeProduct.marriageDocument) {
+      await grantMarriageSession(email);
+    } else {
+      await grantMonthlyAccess(email, product);
+    }
+  }
+
+  static Future<void> _setPendingCheckout(String email, NgmyStripeProduct product) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingProductKey, _productKey(product));
+    await prefs.setString(_pendingEmailKey, _emailKey(email));
+  }
+
+  static Future<void> _clearPendingCheckout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingProductKey);
+    await prefs.remove(_pendingEmailKey);
+  }
+
+  /// Call on app start — unlocks access when checkout redirects back to ngmy.org.
+  static Future<bool> processPaymentReturnFromUrl([Uri? uri]) async {
+    final u = uri ?? Uri.base;
+    if (u.queryParameters['ngmy_pay_ok'] != '1') return false;
+
+    final slug = u.queryParameters['ngmy_pay'];
+    var product = productFromSlug(slug ?? '');
+    final prefs = await SharedPreferences.getInstance();
+    if (product == null) {
+      final pending = prefs.getString(_pendingProductKey);
+      if (pending != null && pending.isNotEmpty) {
+        for (final p in NgmyStripeProduct.values) {
+          if (p.name == pending) {
+            product = p;
+            break;
+          }
+        }
+      }
+    }
+    if (product == null) return false;
+
+    final email = _emailKey(
+      prefs.getString(_pendingEmailKey) ?? u.queryParameters['ngmy_pay_email'] ?? '',
+    );
+    if (email.isEmpty) return false;
+
+    await _grantForProduct(email, product);
+    await _clearPendingCheckout();
+    ngmyClearPaymentQueryFromUrl();
+    return true;
   }
 
   static Future<DateTime?> accessUntil(String email, NgmyStripeProduct product) =>
@@ -170,8 +267,6 @@ class NgmyStripePayments {
         deckKind == 'hati_malipo_awamu';
   }
 
-  // ── Invoice 3-day free trial ──
-
   static Future<DateTime?> _invoiceTrialStart(String email) async {
     final key = _emailKey(email);
     if (key.isEmpty) return null;
@@ -191,7 +286,7 @@ class NgmyStripePayments {
 
   static Future<bool> hasInvoiceTrialAccess(String email) async {
     final started = await _invoiceTrialStart(email);
-    if (started == null) return true; // not started yet — first use is free
+    if (started == null) return true;
     return DateTime.now().difference(started).inDays < invoiceFreeTrialDays;
   }
 
@@ -201,8 +296,6 @@ class NgmyStripePayments {
     final used = DateTime.now().difference(started).inDays;
     return (invoiceFreeTrialDays - used).clamp(0, invoiceFreeTrialDays);
   }
-
-  // ── 1-day free trial (translator + scanner) ──
 
   static Future<DateTime?> _dayTrialStart(String email, NgmyStripeProduct product) async {
     final key = _emailKey(email);
@@ -230,7 +323,7 @@ class NgmyStripePayments {
     return DateTime.now().difference(started).inHours < dayTrialHours;
   }
 
-  static Future<bool> needsStripePayment({
+  static Future<bool> needsPayment({
     required String email,
     required NgmyStripeProduct product,
     bool isAdmin = false,
@@ -249,12 +342,12 @@ class NgmyStripePayments {
     return true;
   }
 
-  static Future<void> openCheckout(NgmyStripeProduct product) async {
-    final uri = Uri.parse(checkoutUrl(product));
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  static Future<void> startCheckout(String email, NgmyStripeProduct product) async {
+    await _setPendingCheckout(email, product);
+    ngmyLaunchPaymentCheckout(checkoutUrl(product));
   }
 
-  /// Paywall: opens Stripe, user confirms payment, access is granted locally.
+  /// Shows pay/subscribe dialog only when access is expired. Never grants without a checkout return.
   static Future<bool> ensurePaid({
     required BuildContext context,
     required NgmyStripeProduct product,
@@ -266,7 +359,9 @@ class NgmyStripePayments {
     String? message,
   }) async {
     if (isAdmin) return true;
-    if (!await needsStripePayment(
+    await processPaymentReturnFromUrl();
+
+    if (!await needsPayment(
       email: email,
       product: product,
       isAdmin: isAdmin,
@@ -276,34 +371,40 @@ class NgmyStripePayments {
       return true;
     }
 
-    final confirmed = await showNgmyStripeCheckoutDialog(
+    if (!context.mounted) return false;
+    final opened = await showNgmyPaymentDialog(
       context: context,
       product: product,
+      email: email,
       title: title,
       message: message,
     );
-    if (!confirmed) return false;
+    if (opened != true) return false;
 
-    if (product == NgmyStripeProduct.marriageDocument) {
-      await grantMarriageSession(email);
-    } else {
-      await grantMonthlyAccess(email, product);
-    }
-    return true;
+    await processPaymentReturnFromUrl();
+    return !await needsPayment(
+      email: email,
+      product: product,
+      isAdmin: isAdmin,
+      checkDayTrial: checkDayTrial,
+      checkInvoiceTrial: checkInvoiceTrial,
+    );
   }
 
-  static Future<bool> showNgmyStripeCheckoutDialog({
+  static Future<bool> showNgmyPaymentDialog({
     required BuildContext context,
     required NgmyStripeProduct product,
+    required String email,
     String? title,
     String? message,
   }) {
     return showDialog<bool>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.78),
-      builder: (ctx) => _NgmyStripeCheckoutDialog(
+      builder: (ctx) => _NgmyPaymentDialog(
         product: product,
+        email: email,
         title: title ?? productTitle(product),
         message: message ?? productSubtitle(product),
       ),
@@ -311,33 +412,25 @@ class NgmyStripePayments {
   }
 }
 
-class _NgmyStripeCheckoutDialog extends StatefulWidget {
-  const _NgmyStripeCheckoutDialog({
+class _NgmyPaymentDialog extends StatelessWidget {
+  const _NgmyPaymentDialog({
     required this.product,
+    required this.email,
     required this.title,
     required this.message,
   });
 
   final NgmyStripeProduct product;
+  final String email;
   final String title;
   final String message;
 
   @override
-  State<_NgmyStripeCheckoutDialog> createState() => _NgmyStripeCheckoutDialogState();
-}
-
-class _NgmyStripeCheckoutDialogState extends State<_NgmyStripeCheckoutDialog> {
-  bool _opened = false;
-
-  Future<void> _pay() async {
-    setState(() => _opened = true);
-    await NgmyStripePayments.openCheckout(widget.product);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    const stripePurple = Color(0xFF635BFF);
-    final isMarriage = widget.product == NgmyStripeProduct.marriageDocument;
+    const accent = Color(0xFF2563EB);
+    const accent2 = Color(0xFF7C3AED);
+    final isMarriage = product == NgmyStripeProduct.marriageDocument;
+    final action = NgmyStripePayments.actionLabel(product);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -353,9 +446,7 @@ class _NgmyStripeCheckoutDialogState extends State<_NgmyStripeCheckoutDialog> {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF1A1F71), stripePurple, Color(0xFF7A73FF)],
-                  ),
+                  gradient: LinearGradient(colors: [Color(0xFF1E3A8A), accent, accent2]),
                 ),
                 child: Column(
                   children: [
@@ -365,20 +456,20 @@ class _NgmyStripeCheckoutDialogState extends State<_NgmyStripeCheckoutDialog> {
                         color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
-                        'PAY WITH STRIPE',
-                        style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2),
+                      child: Text(
+                        isMarriage ? 'ONE-TIME ACCESS' : 'SUBSCRIPTION',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 2),
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      widget.title,
+                      title,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      widget.message,
+                      message,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 13, height: 1.45),
                     ),
@@ -400,38 +491,25 @@ class _NgmyStripeCheckoutDialogState extends State<_NgmyStripeCheckoutDialog> {
                           border: Border.all(color: const Color(0xFFB8860B).withValues(alpha: 0.45)),
                         ),
                         child: const Text(
-                          'Pay first, then edit. Your session lasts 4 hours — a timer shows at the top while you work.',
+                          'Complete payment first, then you can edit for 4 hours. A timer shows at the top while you work.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4, fontWeight: FontWeight.w600),
                         ),
                       ),
                     SizedBox(
                       width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _pay,
+                      child: FilledButton(
+                        onPressed: () async {
+                          await NgmyStripePayments.startCheckout(email, product);
+                          if (context.mounted) Navigator.pop(context, true);
+                        },
                         style: FilledButton.styleFrom(
-                          backgroundColor: stripePurple,
+                          backgroundColor: accent,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: Text(_opened ? 'Open Stripe again' : 'Pay with Stripe'),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        icon: const Icon(Icons.check_circle_outline_rounded),
-                        label: const Text("I've completed payment", style: TextStyle(fontWeight: FontWeight.w800)),
+                        child: Text(action, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -450,7 +528,6 @@ class _NgmyStripeCheckoutDialogState extends State<_NgmyStripeCheckoutDialog> {
   }
 }
 
-/// Countdown banner for marriage document editing sessions.
 class NgmyMarriageSessionTimerBar extends StatefulWidget {
   const NgmyMarriageSessionTimerBar({
     super.key,

@@ -105,7 +105,7 @@ class NgmyTranslatePayments {
   static Future<bool> needsPayment(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return false;
     await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.messageTranslator);
-    return NgmyStripePayments.needsStripePayment(
+    return NgmyStripePayments.needsPayment(
       email: email,
       product: NgmyStripeProduct.messageTranslator,
       isAdmin: isAdmin,
@@ -134,7 +134,7 @@ class NgmyTranslatePayments {
       isAdmin: isAdmin,
       checkDayTrial: true,
       message:
-          'Your 1-day free trial has ended. Subscribe with Stripe for unlimited translations (30 days).',
+          'Your 1-day free trial has ended. Subscribe for unlimited translations (30 days).',
     );
   }
 }

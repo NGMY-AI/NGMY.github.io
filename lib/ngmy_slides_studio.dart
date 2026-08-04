@@ -327,7 +327,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       builder: (ctx) => AlertDialog(
         title: const Text('Session ended'),
         content: const Text(
-          'Your 4-hour marriage document session has ended. Pay again with Stripe to keep editing.',
+          'Your 4-hour marriage document session has ended. Pay again to keep editing.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),

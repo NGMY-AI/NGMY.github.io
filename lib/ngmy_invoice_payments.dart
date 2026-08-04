@@ -249,8 +249,8 @@ class NgmyInvoicePayments {
       email: email,
       title: 'NGMY Invoice — $tierLabel',
       message: daysLeft <= 0
-          ? 'Your 3-day free invoice trial has ended. Subscribe with Stripe for Premium & Luxury templates (30 days).'
-          : 'Subscribe with Stripe for Premium & Luxury invoice templates (30 days).',
+          ? 'Your 3-day free invoice trial has ended. Subscribe for Premium & Luxury templates (30 days).'
+          : 'Subscribe for Premium & Luxury invoice templates (30 days).',
     );
     if (!paid) return false;
 
@@ -263,7 +263,7 @@ class NgmyInvoicePayments {
         context: context,
         theme: _themeFor(tier),
         headline: 'Invoice access unlocked',
-        subtitle: 'Active for 30 days via Stripe',
+        subtitle: 'Active for 30 days',
       );
     }
     return true;

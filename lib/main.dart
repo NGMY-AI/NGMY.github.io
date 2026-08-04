@@ -8968,6 +8968,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   @override void initState() {
     super.initState();
+    unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {

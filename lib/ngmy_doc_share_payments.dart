@@ -210,7 +210,7 @@ class NgmyDocSharePayments {
       email: email,
       isAdmin: isAdmin,
       title: 'Doc Share for Organizations',
-      message: 'Subscribe with Stripe for your organization license — create team access codes (30 days).',
+      message: 'Subscribe for your organization license — create team access codes (30 days).',
     );
     if (!paid) return false;
     grantSchoolLicense(config, email, days: NgmyStripePayments.monthlyAccessDays);

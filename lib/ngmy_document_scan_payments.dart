@@ -97,7 +97,7 @@ class NgmyDocumentScanPayments {
   static Future<bool> needsPayment(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return false;
     await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.documentScanner);
-    return NgmyStripePayments.needsStripePayment(
+    return NgmyStripePayments.needsPayment(
       email: email,
       product: NgmyStripeProduct.documentScanner,
       isAdmin: isAdmin,
@@ -125,7 +125,7 @@ class NgmyDocumentScanPayments {
       isAdmin: isAdmin,
       checkDayTrial: true,
       message:
-          'Your 1-day free trial has ended. Subscribe with Stripe for unlimited document scans (30 days).',
+          'Your 1-day free trial has ended. Subscribe for unlimited document scans (30 days).',
     );
   }
 }

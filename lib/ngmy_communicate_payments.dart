@@ -159,7 +159,7 @@ class NgmyCommunicatePayments {
       title: label,
       message:
           'You used your ${minutesPerPaymentFromConfig(config)} free minutes. '
-          'Subscribe with Stripe for unlimited advisor chat (30 days).',
+          'Subscribe for unlimited advisor chat (30 days).',
     );
     if (!paid || email.isEmpty) return paid;
 
