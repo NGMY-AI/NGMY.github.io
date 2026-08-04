@@ -91140,7 +91140,7 @@ case 3:return"https://buy.stripe.com/14A5kDfs57JL0RJ3q5b7y05"
 case 4:return"https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04"
 case 5:return"https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03"
 case 6:return"https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09"
-case 7:return"https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a"}},
+case 7:return"https://buy.stripe.com/test_cNibJ11Bf1ln0RJaSxb7y03"}},
 eqD(a){switch(a.a){case 0:return"Doc Share \u2014 Organization"
 case 1:return"NGMY Invoice"
 case 2:return"NGMY Advisors"
