@@ -7,6 +7,7 @@ import 'ngmy_stripe_checkout_launch_stub.dart'
     if (dart.library.html) 'ngmy_stripe_checkout_launch_web.dart';
 import 'ngmy_stripe_return_capture_stub.dart'
     if (dart.library.html) 'ngmy_stripe_return_capture_web.dart';
+import 'ngmy_stripe_cloud.dart';
 
 enum NgmyStripeProduct {
   docShareOrg,
@@ -205,9 +206,27 @@ class NgmyStripePayments {
     );
   }
 
+  /// Local cache write (also used when syncing from Supabase webhook records).
+  static Future<void> cacheAccessUntil(String email, NgmyStripeProduct product, DateTime until) =>
+      _setAccessUntil(email, product, until);
+
   static Future<bool> hasActiveAccess(String email, NgmyStripeProduct product) async {
+    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(email, productSlug(product));
+    if (cloudUntil != null) {
+      await _setAccessUntil(email, product, cloudUntil);
+    }
     final until = await _accessUntil(email, product);
     return until != null && until.isAfter(DateTime.now());
+  }
+
+  /// Pull all paid-feature access for a signed-in user from Supabase.
+  static Future<void> syncAllAccessFromCloud(String email) async {
+    final active = await NgmyStripeCloud.fetchAllActiveAccess(email);
+    for (final entry in active.entries) {
+      final product = productFromSlug(entry.key);
+      if (product == null) continue;
+      await _setAccessUntil(email, product, entry.value);
+    }
   }
 
   static Future<void> grantMonthlyAccess(String email, NgmyStripeProduct product, {int days = monthlyAccessDays}) async {
@@ -430,7 +449,7 @@ class NgmyStripePayments {
     ngmyLaunchPaymentCheckout(checkoutUrlFor(email, product));
   }
 
-  /// Shows pay/subscribe dialog only when access is expired. Never grants without a checkout return.
+  /// Shows pay/subscribe dialog only when access is expired.
   static Future<bool> ensurePaid({
     required BuildContext context,
     required NgmyStripeProduct product,
@@ -443,6 +462,10 @@ class NgmyStripePayments {
   }) async {
     if (isAdmin) return true;
     await processPaymentReturnFromUrl();
+    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(email, productSlug(product));
+    if (cloudUntil != null) {
+      await _setAccessUntil(email, product, cloudUntil);
+    }
 
     if (!await needsPayment(
       email: email,
@@ -465,6 +488,14 @@ class NgmyStripePayments {
     if (opened != true) return false;
 
     await processPaymentReturnFromUrl();
+    final waited = await NgmyStripeCloud.waitForCloudAccess(
+      email: email,
+      productSlug: productSlug(product),
+    );
+    if (waited != null) {
+      await _setAccessUntil(email, product, waited);
+    }
+
     return !await needsPayment(
       email: email,
       product: product,

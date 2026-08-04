@@ -8969,6 +8969,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
+    if (_currentUser != null) {
+      final stripeEmail = ((_currentUser as dynamic).email as String?) ?? '';
+      if (stripeEmail.trim().isNotEmpty) {
+        unawaited(NgmyStripePayments.syncAllAccessFromCloud(stripeEmail));
+      }
+    }
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {
@@ -9111,6 +9117,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
+      if (_currentUser != null) {
+        final stripeEmail = ((_currentUser as dynamic).email as String?) ?? '';
+        if (stripeEmail.trim().isNotEmpty) {
+          unawaited(NgmyStripePayments.syncAllAccessFromCloud(stripeEmail));
+        }
+      }
       unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();

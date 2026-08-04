@@ -1,0 +1,119 @@
+NGMY STRIPE INTEGRATION — SETUP CHECKLIST
+=========================================
+
+The app now uses Supabase + Stripe webhooks so NGMY KNOWS when someone paid.
+Payment links alone are not enough — you must complete ALL steps below.
+
+PROJECT: gvufllqqxjnpicmkxzcg
+WEB APP: https://ngmy.org/
+
+────────────────────────────────────────────────────────────
+STEP 1 — Create database table (Supabase SQL Editor)
+────────────────────────────────────────────────────────────
+
+Open: https://supabase.com/dashboard/project/gvufllqqxjnpicmkxzcg/sql/new
+
+Paste and run the full contents of:
+  supabase/ngmy_stripe_access_table.sql
+
+────────────────────────────────────────────────────────────
+STEP 2 — Deploy webhook Edge Function
+────────────────────────────────────────────────────────────
+
+From project folder (needs Supabase CLI logged in):
+
+  supabase functions deploy ngmy-stripe-webhook --project-ref gvufllqqxjnpicmkxzcg --no-verify-jwt
+
+Or upload supabase/functions/ngmy-stripe-webhook/index.ts in:
+  Supabase Dashboard → Edge Functions → Create function → ngmy-stripe-webhook
+
+IMPORTANT: Webhook must be deployed WITHOUT JWT verification
+(Stripe does not send Supabase auth tokens).
+
+────────────────────────────────────────────────────────────
+STEP 3 — Add Supabase secrets
+────────────────────────────────────────────────────────────
+
+Supabase Dashboard → Project Settings → Edge Functions → Secrets
+
+Add:
+  STRIPE_SECRET_KEY     = sk_live_...   (Stripe → Developers → API keys → Secret key)
+  STRIPE_WEBHOOK_SECRET = whsec_...     (from Step 4 after creating webhook)
+
+SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected for Edge Functions.
+
+────────────────────────────────────────────────────────────
+STEP 4 — Create Stripe webhook
+────────────────────────────────────────────────────────────
+
+Stripe Dashboard → Developers → Webhooks → Add endpoint
+
+Endpoint URL:
+  https://gvufllqqxjnpicmkxzcg.supabase.co/functions/v1/ngmy-stripe-webhook
+
+Events to send:
+  checkout.session.completed
+
+Copy the Signing secret (whsec_...) → paste into Supabase secret STRIPE_WEBHOOK_SECRET
+
+────────────────────────────────────────────────────────────
+STEP 5 — Payment Links (one per feature)
+────────────────────────────────────────────────────────────
+
+Stripe Dashboard → Payment Links → Create or edit each link.
+
+For EACH link:
+  • Set price (one-time or recurring as you want)
+  • After payment → Redirect to URL (recommended):
+      https://ngmy.org/?ngmy_pay_ok=1
+    (The app remembers which feature they were paying for.)
+
+Send me each live buy.stripe.com URL to put in the app code, OR update
+lib/ngmy_stripe_payments.dart yourself.
+
+Product slugs (used automatically in checkout links):
+  doc_share_org | invoice | advisors | family_tree | translator
+  scanner | marriage | phone_unlock
+
+Access durations (set by webhook):
+  Marriage docs  → 4 hours
+  Phone Unlock   → 10 days
+  Other features → 30 days
+
+────────────────────────────────────────────────────────────
+STEP 6 — Test
+────────────────────────────────────────────────────────────
+
+1. Use Stripe TEST mode first (sk_test_ + test Payment Links + test webhook).
+2. Sign in to ngmy.org with your email.
+3. Open a paid feature → Pay → complete checkout with test card 4242 4242 4242 4242.
+4. Return to NGMY — feature should unlock within a few seconds.
+5. Check Supabase Table Editor → ngmy_stripe_access — your email should appear.
+6. Switch Stripe to LIVE mode and repeat with real links.
+
+────────────────────────────────────────────────────────────
+HOW IT WORKS
+────────────────────────────────────────────────────────────
+
+User pays → Stripe sends webhook → Supabase saves access
+         → App checks Supabase by email → unlocks feature
+
+This works on phone, desktop, and any device — not just redirect URLs.
+
+────────────────────────────────────────────────────────────
+TROUBLESHOOTING
+────────────────────────────────────────────────────────────
+
+• Paid but still locked?
+  - Check ngmy_stripe_access table for your email
+  - Check Stripe webhook logs for failed deliveries
+  - Edge Function logs in Supabase Dashboard
+
+• Webhook 400 signature invalid?
+  - STRIPE_WEBHOOK_SECRET must match the endpoint signing secret
+
+• Webhook 422 unknown product?
+  - Payment link checkout must pass client_reference_id (app does this automatically)
+
+• Table missing error in app?
+  - Run ngmy_stripe_access_table.sql in SQL Editor
