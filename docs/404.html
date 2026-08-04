@@ -8,6 +8,22 @@
 
   <script>
     (function () {
+      try {
+        var p = new URLSearchParams(location.search);
+        if (p.get('ngmy_pay_ok') === '1') {
+          localStorage.setItem('ngmy_pay_return_v1', JSON.stringify({
+            ok: true,
+            pay: p.get('ngmy_pay') || '',
+            email: p.get('ngmy_pay_email') || '',
+            at: Date.now()
+          }));
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <script>
+    (function () {
       function ngmyBasePath() {
         var host = (location.hostname || '').toLowerCase();
         if (host === 'ngmy.org' || host === 'www.ngmy.org') return '/';
@@ -24,7 +40,7 @@
 
   <script>
     (function () {
-      var embedded = '20260804193022';
+      var embedded = '20260804200311';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -677,7 +693,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260804193022";
+      var CURRENT = "20260804200311";
 
       function showError(msg) {
 
@@ -729,7 +745,7 @@
 
   <script>
     (function () {
-      var deployId = '20260804193022';
+      var deployId = '20260804200311';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
