@@ -9110,6 +9110,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _pauseBackgroundSync();
     }
     if (state == AppLifecycleState.resumed) {
+      unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
       unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();

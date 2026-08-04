@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_stripe_checkout_launch_stub.dart'
     if (dart.library.html) 'ngmy_stripe_checkout_launch_web.dart';
+import 'ngmy_stripe_return_capture_stub.dart'
+    if (dart.library.html) 'ngmy_stripe_return_capture_web.dart';
 
 enum NgmyStripeProduct {
   docShareOrg,
@@ -39,6 +41,7 @@ class NgmyStripePayments {
   static const _dayTrialPrefix = 'ngmy_stripe_day_trial_';
   static const _pendingProductKey = 'ngmy_pay_pending_product';
   static const _pendingEmailKey = 'ngmy_pay_pending_email';
+  static const _pendingStartedKey = 'ngmy_pay_pending_started';
 
   static bool isAdmin(dynamic user) {
     try {
@@ -116,6 +119,22 @@ class NgmyStripePayments {
         return phoneUnlockUrl;
     }
   }
+
+  /// Stripe Payment Link with prefilled email + product slug for return handling.
+  static String checkoutUrlFor(String email, NgmyStripeProduct product) {
+    final base = checkoutUrl(product);
+    final uri = Uri.parse(base);
+    final params = Map<String, String>.from(uri.queryParameters);
+    final normalized = _emailKey(email);
+    if (normalized.isNotEmpty) {
+      params['prefilled_email'] = normalized;
+    }
+    params['client_reference_id'] = productSlug(product);
+    return uri.replace(queryParameters: params).toString();
+  }
+
+  static String paymentSuccessUrl(NgmyStripeProduct product) =>
+      'https://ngmy.org/?ngmy_pay_ok=1&ngmy_pay=${productSlug(product)}';
 
   static String productTitle(NgmyStripeProduct product) {
     switch (product) {
@@ -228,37 +247,36 @@ class NgmyStripePayments {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingProductKey, _productKey(product));
     await prefs.setString(_pendingEmailKey, _emailKey(email));
+    await prefs.setString(_pendingStartedKey, DateTime.now().toUtc().toIso8601String());
   }
 
   static Future<void> _clearPendingCheckout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_pendingProductKey);
     await prefs.remove(_pendingEmailKey);
+    await prefs.remove(_pendingStartedKey);
   }
 
-  /// Call on app start — unlocks access when checkout redirects back to ngmy.org.
-  static Future<bool> processPaymentReturnFromUrl([Uri? uri]) async {
-    final u = uri ?? Uri.base;
-    if (u.queryParameters['ngmy_pay_ok'] != '1') return false;
-
-    final slug = u.queryParameters['ngmy_pay'];
-    var product = productFromSlug(slug ?? '');
-    final prefs = await SharedPreferences.getInstance();
-    if (product == null) {
-      final pending = prefs.getString(_pendingProductKey);
-      if (pending != null && pending.isNotEmpty) {
-        for (final p in NgmyStripeProduct.values) {
-          if (p.name == pending) {
-            product = p;
-            break;
-          }
-        }
-      }
+  static Future<NgmyStripeProduct?> _productFromPending(SharedPreferences prefs) async {
+    final pending = prefs.getString(_pendingProductKey);
+    if (pending == null || pending.isEmpty) return null;
+    for (final p in NgmyStripeProduct.values) {
+      if (p.name == pending) return p;
     }
+    return null;
+  }
+
+  static Future<bool> _grantFromReturnData({
+    required String slug,
+    required String emailFromUrl,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    var product = productFromSlug(slug);
+    product ??= await _productFromPending(prefs);
     if (product == null) return false;
 
     final email = _emailKey(
-      prefs.getString(_pendingEmailKey) ?? u.queryParameters['ngmy_pay_email'] ?? '',
+      emailFromUrl.isNotEmpty ? emailFromUrl : (prefs.getString(_pendingEmailKey) ?? ''),
     );
     if (email.isEmpty) return false;
 
@@ -266,6 +284,42 @@ class NgmyStripePayments {
     await _clearPendingCheckout();
     ngmyClearPaymentQueryFromUrl();
     return true;
+  }
+
+  static Future<bool> _processPaymentReturnUri(Uri u) async {
+    if (u.queryParameters['ngmy_pay_ok'] != '1') return false;
+    return _grantFromReturnData(
+      slug: u.queryParameters['ngmy_pay'] ?? '',
+      emailFromUrl: u.queryParameters['ngmy_pay_email'] ?? '',
+    );
+  }
+
+  /// Call on app start / resume — unlocks access when checkout redirects back to ngmy.org.
+  static Future<bool> processPaymentReturnFromUrl([Uri? uri]) async {
+    ngmyCapturePaymentReturnInPage();
+
+    final candidates = <Uri>{uri ?? Uri.base};
+    final webUri = ngmyPaymentReturnUri();
+    if (webUri != null) candidates.add(webUri);
+
+    for (final u in candidates) {
+      if (await _processPaymentReturnUri(u)) return true;
+    }
+
+    final stored = ngmyConsumeStoredPaymentReturn();
+    if (stored != null && stored['ok'] == true) {
+      final at = stored['at'];
+      if (at is num) {
+        final age = DateTime.now().millisecondsSinceEpoch - at.toInt();
+        if (age > const Duration(hours: 6).inMilliseconds) return false;
+      }
+      return _grantFromReturnData(
+        slug: stored['pay']?.toString() ?? '',
+        emailFromUrl: stored['email']?.toString() ?? '',
+      );
+    }
+
+    return false;
   }
 
   static Future<DateTime?> accessUntil(String email, NgmyStripeProduct product) =>
@@ -373,7 +427,7 @@ class NgmyStripePayments {
 
   static Future<void> startCheckout(String email, NgmyStripeProduct product) async {
     await _setPendingCheckout(email, product);
-    ngmyLaunchPaymentCheckout(checkoutUrl(product));
+    ngmyLaunchPaymentCheckout(checkoutUrlFor(email, product));
   }
 
   /// Shows pay/subscribe dialog only when access is expired. Never grants without a checkout return.
@@ -538,7 +592,7 @@ class _NgmyPaymentDialog extends StatelessWidget {
                           border: Border.all(color: const Color(0xFF0EA5E9).withValues(alpha: 0.45)),
                         ),
                         child: const Text(
-                          'Pay once for instant access — no waiting period. Phone Unlock stays open for 10 days, then you can pay again.',
+                          'Pay once for instant access — no waiting period. Phone Unlock stays open for 10 days, then you can pay again. After paying, return to NGMY — access unlocks automatically.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.4, fontWeight: FontWeight.w600),
                         ),

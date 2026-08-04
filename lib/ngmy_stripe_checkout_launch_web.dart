@@ -1,7 +1,10 @@
 import 'dart:html' as html;
 
+import 'ngmy_stripe_return_capture_web.dart';
+
 /// Web: same-tab checkout so the post-payment redirect lands back on ngmy.org.
 void ngmyLaunchPaymentCheckout(String url) {
+  ngmyCapturePaymentReturnInPage();
   html.window.location.assign(url);
 }
 
