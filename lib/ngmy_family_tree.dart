@@ -13,6 +13,7 @@ import 'ngmy_worksheet_dialogs.dart';
 import 'ngmy_worksheet_glow_frame.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheets_storage.dart';
+import 'ngmy_stripe_payments.dart';
 
 class NgmyFamilyTreeTab extends StatefulWidget {
   final String userEmail;
@@ -1664,16 +1665,16 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
   }
 
   Future<void> _pickPhoto() async {
-    if (!NgmyFamilyTreePayments.hasActivePhotoAccess(widget.config, widget.userEmail)) {
-      final fee = NgmyFamilyTreePayments.photoMonthlyFeeFromConfig(widget.config);
+    final hasPhoto = NgmyFamilyTreePayments.hasActivePhotoAccess(widget.config, widget.userEmail);
+    final hasStripe = await NgmyStripePayments.hasActiveAccess(widget.userEmail, NgmyStripeProduct.familyTree);
+    if (!hasPhoto && !hasStripe && !(widget.user as dynamic).isAdmin) {
       final paid = await NgmyFamilyTreePayments.confirmAndCharge(
         context: context,
         user: widget.user,
         config: widget.config,
-        amount: fee,
+        amount: 0,
         title: 'Family Tree Photos',
-        message:
-            'Upload photos on family members for \$${fee.toStringAsFixed(2)} per month (30 days from payment).',
+        message: 'Subscribe with Stripe to upload family photos (30 days).',
         onCharge: widget.onChargeWallet,
       );
       if (!paid || !mounted) return;

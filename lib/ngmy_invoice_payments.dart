@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_templates.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_wallet_payment_ui.dart';
 
 enum NgmyInvoicePaymentTier { premium, luxury }
@@ -94,9 +95,26 @@ class NgmyInvoicePayments {
     if (key.isEmpty) return false;
     if (_lifetime(config, tier).contains(key)) return true;
     final untilRaw = _accessMap(config, tier)[key];
-    if (untilRaw == null || untilRaw.isEmpty) return false;
-    final until = DateTime.tryParse(untilRaw);
-    return until != null && until.isAfter(DateTime.now());
+    if (untilRaw != null && untilRaw.isNotEmpty) {
+      final until = DateTime.tryParse(untilRaw);
+      if (until != null && until.isAfter(DateTime.now())) return true;
+    }
+    return false;
+  }
+
+  static Future<bool> isContentLocked(
+    dynamic config,
+    String email,
+    String templateId, {
+    bool isAdmin = false,
+  }) async {
+    if (isAdmin) return false;
+    if (!requiresPayment(templateId, config)) return false;
+    if (hasAccess(config, email, templateId)) return false;
+    await NgmyStripePayments.ensureInvoiceTrialStarted(email);
+    if (await NgmyStripePayments.hasInvoiceTrialAccess(email)) return false;
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return false;
+    return true;
   }
 
   static void grantLifetime(dynamic config, String email, NgmyInvoicePaymentTier tier) {
@@ -211,44 +229,41 @@ class NgmyInvoicePayments {
   }) async {
     if ((user as dynamic).isAdmin == true) return true;
     if (!requiresPayment(templateId, config)) return true;
-    if (hasAccess(config, (user as dynamic).email as String, templateId)) return true;
+    final email = (user as dynamic).email as String;
+    if (hasAccess(config, email, templateId)) return true;
+
+    await NgmyStripePayments.ensureInvoiceTrialStarted(email);
+    if (await NgmyStripePayments.hasInvoiceTrialAccess(email)) {
+      onGranted?.call();
+      return true;
+    }
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return true;
 
     final tier = tierForTemplate(templateId)!;
-    final plan = await pickPlan(context, config, tier);
-    if (plan == null) return false;
-    if (!context.mounted) return false;
-
-    final amount = plan == NgmyInvoicePaymentPlan.oneTime ? oneTimeFee(config, tier) : monthlyFee(config, tier);
     final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
-    final planLabel = plan == NgmyInvoicePaymentPlan.oneTime ? 'one-time unlock' : '30-day access';
+    final daysLeft = await NgmyStripePayments.invoiceTrialDaysLeft(email);
 
-    final paid = await NgmyFamilyTreePayments.confirmAndCharge(
+    final paid = await NgmyStripePayments.ensurePaid(
       context: context,
-      user: user,
-      config: config,
-      amount: amount,
-      title: 'Invoice $tierLabel Templates',
-      message: 'Unlock $tierLabel invoice templates ($planLabel) from your NGMY wallet.',
-      theme: _themeFor(tier),
-      onCharge: onCharge,
+      product: NgmyStripeProduct.invoice,
+      email: email,
+      title: 'NGMY Invoice — $tierLabel',
+      message: daysLeft <= 0
+          ? 'Your 3-day free invoice trial has ended. Subscribe with Stripe for Premium & Luxury templates (30 days).'
+          : 'Subscribe with Stripe for Premium & Luxury invoice templates (30 days).',
     );
     if (!paid) return false;
 
-    if (plan == NgmyInvoicePaymentPlan.oneTime) {
-      grantLifetime(config, (user as dynamic).email as String, tier);
-    } else {
-      grantMonthly(config, (user as dynamic).email as String, tier);
-    }
+    grantMonthly(config, email, NgmyInvoicePaymentTier.premium);
+    grantMonthly(config, email, NgmyInvoicePaymentTier.luxury);
     onGranted?.call();
 
     if (context.mounted) {
-      final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
-      final planSubtitle = plan == NgmyInvoicePaymentPlan.oneTime ? 'Unlocked forever' : 'Active for 30 days';
       await showNgmyUnlockCelebration(
         context: context,
         theme: _themeFor(tier),
-        headline: '$tierLabel Unlocked',
-        subtitle: planSubtitle,
+        headline: 'Invoice access unlocked',
+        subtitle: 'Active for 30 days via Stripe',
       );
     }
     return true;

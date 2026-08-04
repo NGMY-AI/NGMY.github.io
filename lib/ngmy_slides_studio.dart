@@ -20,6 +20,7 @@ import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// PowerPoint-style presentation studio for students — slides, text, shapes,
@@ -28,10 +29,12 @@ class NgmySlidesStudioScreen extends StatefulWidget {
   const NgmySlidesStudioScreen({
     super.key,
     required this.userEmail,
+    this.isAdmin = false,
     this.bottomScrollPadding = 96,
   });
 
   final String userEmail;
+  final bool isAdmin;
   final double bottomScrollPadding;
 
   @override
@@ -243,6 +246,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       NgmySlidesTemplates.themeById(_activeDeck?.themeId ?? 'office_blue');
 
   void _openDeck(NgmySlideDeck deck) {
+    if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
+      unawaited(_openMarriageDraftAsync(deck));
+      return;
+    }
     setState(() {
       _activeDeck = deck.copy();
       _slideIndex = 0;
@@ -279,6 +286,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   static const _kMarriageHintSeenKey = 'ngmy_marriage_hint_seen';
 
   void _openMarriageDraft(NgmySlideDeck deck) {
+    unawaited(_openMarriageDraftAsync(deck));
+  }
+
+  Future<void> _openMarriageDraftAsync(NgmySlideDeck deck) async {
+    if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
+      final ok = await _ensureMarriageDocPaid();
+      if (!ok || !mounted) return;
+    }
     setState(() {
       _activeDeck = deck.copy();
       _slideIndex = 0;
@@ -291,6 +306,36 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _ribbonTab = 'Home';
     });
     unawaited(_maybeShowMarriageHint());
+  }
+
+  Future<bool> _ensureMarriageDocPaid() async {
+    if (widget.isAdmin) return true;
+    if (await NgmyStripePayments.hasMarriageSession(widget.userEmail)) return true;
+    return NgmyStripePayments.ensurePaid(
+      context: context,
+      product: NgmyStripeProduct.marriageDocument,
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
+  }
+
+  Future<void> _onMarriageSessionExpired() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Session ended'),
+        content: const Text(
+          'Your 4-hour marriage document session has ended. Pay again with Stripe to keep editing.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    _closeEditor();
   }
 
   // Was showing every single time a locked-template document (Marriage
@@ -2488,6 +2533,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             Column(
               children: [
+                if (!editing && _activeDeck != null && NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
+                  NgmyMarriageSessionTimerBar(
+                    email: widget.userEmail,
+                    isAdmin: widget.isAdmin,
+                    onExpired: _onMarriageSessionExpired,
+                  ),
                 if (!editing) _editorTopBar(deck, isDark, compact: compact),
                 if (!hideChrome) _modernRibbon(isDark, compact: compact),
                 if (compact && _selectedElement() != null && !hideChrome)

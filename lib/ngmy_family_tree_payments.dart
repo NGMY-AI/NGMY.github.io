@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_local_growth_income.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_wallet_payment_ui.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -37,8 +38,16 @@ class NgmyFamilyTreePayments {
 
   static bool hasActivePhotoAccess(dynamic config, String email) {
     final until = photoAccessUntil(config, email);
-    if (until == null) return false;
-    return until.isAfter(DateTime.now());
+    if (until != null && until.isAfter(DateTime.now())) return true;
+    return false;
+  }
+
+  static Future<bool> hasStripeFamilyTreeAccess(String email) =>
+      NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.familyTree);
+
+  static Future<bool> hasAnyFamilyTreeAccess(dynamic config, String email) async {
+    if (hasActivePhotoAccess(config, email)) return true;
+    return NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.familyTree);
   }
 
   static void grantPhotoAccess(dynamic config, String email, {int days = 30}) {
@@ -66,30 +75,18 @@ class NgmyFamilyTreePayments {
     required Future<bool> Function(double amount, String description) onCharge,
     NgmyWalletPaymentTheme theme = NgmyWalletPaymentTheme.standard,
   }) async {
-    if (amount <= 0) return true;
-    await NgmyLocalGrowthIncomeStore.reconcileIntoLiveUser(user);
-    final balance = ((user as dynamic).accountBalance as num).toDouble();
-    if (balance + 0.001 < amount) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Insufficient NGMY balance (\$${balance.toStringAsFixed(2)}). Need \$${amount.toStringAsFixed(2)}.',
-            ),
-          ),
-        );
-      }
-      return false;
-    }
-    final ok = await showNgmyWalletPaymentConfirm(
+    if ((user as dynamic).isAdmin == true) return true;
+    final email = ((user as dynamic).email as String?) ?? '';
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.familyTree)) return true;
+
+    return NgmyStripePayments.ensurePaid(
       context: context,
+      product: NgmyStripeProduct.familyTree,
+      email: email,
       title: title,
-      message: message,
-      amount: amount,
-      balance: balance,
-      theme: theme,
+      message: message.isNotEmpty
+          ? message
+          : 'Subscribe with Stripe for Family Tree access — create trees and upload photos (30 days).',
     );
-    if (!ok) return false;
-    return onCharge(amount, title);
   }
 }

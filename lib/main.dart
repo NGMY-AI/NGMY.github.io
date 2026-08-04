@@ -160,6 +160,7 @@ import 'ngmy_referral_link.dart';
 import 'ngmy_referral.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
@@ -15600,6 +15601,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       ),
       2: () => NgmySlidesStudioScreen(
         userEmail: widget.user.email,
+        isAdmin: widget.user.isAdmin,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
       ),
       3: () => NgmyHubScreen(
@@ -27488,6 +27490,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   double _discount = 0;
   String _invoiceTemplate = 'modern';
   bool _invoicePaid = false;
+  bool _invoiceDialogLocked = false;
+  bool _invoiceDialogLockInitialized = false;
   Uint8List? _invoiceProviderPhotoBytes;
   final List<Offset?> _providerSignaturePoints = [];
   final List<Offset?> _clientSignaturePoints = [];
@@ -28388,6 +28392,13 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, _invoiceTemplate, isAdmin: widget.user.isAdmin);
   }
 
+  Future<bool> _invoiceContentLockedAsync() => NgmyInvoicePayments.isContentLocked(
+        widget.config,
+        widget.user.email,
+        _invoiceTemplate,
+        isAdmin: widget.user.isAdmin,
+      );
+
   Future<bool> _ensureInvoiceTemplatePaid(BuildContext ctx, VoidCallback refresh) {
     return NgmyInvoicePayments.requestAccess(
       context: ctx,
@@ -28425,6 +28436,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _providerSignaturePoints.clear();
     _clientSignaturePoints.clear();
     _invoicePaid = false;
+    await NgmyStripePayments.ensureInvoiceTrialStarted(widget.user.email);
+    _invoiceDialogLockInitialized = false;
+    _invoiceDialogLocked = false;
     await _cleanupExpiredPaidInvoices();
     var savedCount = await savedInvoiceCount();
     final GlobalKey localPreviewKey = GlobalKey();
@@ -28439,6 +28453,17 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
             final subtotal = _invoiceSubtotal();
             final screen = MediaQuery.of(ctx).size;
+
+            Future<void> refreshInvoiceLock() async {
+              final locked = await _invoiceContentLockedAsync();
+              if (ctx.mounted) setDialog(() => _invoiceDialogLocked = locked);
+            }
+
+            if (!_invoiceDialogLockInitialized) {
+              _invoiceDialogLockInitialized = true;
+              unawaited(refreshInvoiceLock());
+            }
+            final invoiceLocked = _invoiceDialogLocked;
 
             Future<void> openFullscreenSignature({
               required String title,
@@ -28462,7 +28487,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
               setDialog(() {});
             }
 
-            final invoiceLocked = _invoiceContentLocked();
             void refreshAll() => setDialog(() {});
 
             return Dialog(
@@ -28501,7 +28525,10 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                     ngmyInvoiceTemplatePicker(
                       context: ctx,
                       selectedId: _invoiceTemplate,
-                      onSelect: (id) => setDialog(() => _invoiceTemplate = id),
+                      onSelect: (id) {
+                        setDialog(() => _invoiceTemplate = id);
+                        unawaited(refreshInvoiceLock());
+                      },
                     ),
                     if (ngmyIsEssentialLuxuryTemplate(_invoiceTemplate)) ...[
                       const SizedBox(height: 10),

@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_communicate_payments.dart';
+import 'ngmy_stripe_payments.dart';
 
-/// Weekly free message translations + wallet unlock for the rest of the week.
+/// Message translator — 1-day free trial, then Stripe for monthly access.
 class NgmyTranslatePayments {
-  static const int defaultWeeklyFreeLimit = 5;
-  static const double defaultWeeklyUnlockFee = 1.99;
+  static const int defaultWeeklyFreeLimit = 0;
+  static const double defaultWeeklyUnlockFee = 0;
   static const _usagePrefsPrefix = 'ngmy_translate_week_usage_';
 
   static int weeklyFreeLimitFromConfig(dynamic config) {
@@ -93,24 +93,27 @@ class NgmyTranslatePayments {
 
   static Future<int> remainingFree(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return unlimitedRemaining;
-    final limit = weeklyFreeLimitFromConfig(config);
-    if (limit <= 0) return unlimitedRemaining;
-    if (hasWeekPass(config, email)) return unlimitedRemaining;
-    final used = await weeklyUsageCount(email);
-    return (limit - used).clamp(0, limit);
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.messageTranslator)) {
+      return unlimitedRemaining;
+    }
+    if (await NgmyStripePayments.hasDayTrialAccess(email, NgmyStripeProduct.messageTranslator)) {
+      return unlimitedRemaining;
+    }
+    return 0;
   }
 
   static Future<bool> needsPayment(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return false;
-    final limit = weeklyFreeLimitFromConfig(config);
-    if (limit <= 0) return false;
-    if (hasWeekPass(config, email)) return false;
-    if (weeklyUnlockFeeFromConfig(config) <= 0) return false;
-    final used = await weeklyUsageCount(email);
-    return used >= limit;
+    await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.messageTranslator);
+    return NgmyStripePayments.needsStripePayment(
+      email: email,
+      product: NgmyStripeProduct.messageTranslator,
+      isAdmin: isAdmin,
+      checkDayTrial: true,
+    );
   }
 
-  /// Returns true if user may translate (paid or within free limit).
+  /// Returns true if user may translate (trial, paid, or admin).
   static Future<bool> ensureAccess({
     required BuildContext context,
     required dynamic user,
@@ -121,24 +124,17 @@ class NgmyTranslatePayments {
   }) async {
     final email = ((user as dynamic).email as String?) ?? '';
     final isAdmin = (user as dynamic).isAdmin == true;
+    await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.messageTranslator);
     if (!await needsPayment(config, email, isAdmin: isAdmin)) return true;
 
-    final fee = weeklyUnlockFeeFromConfig(config);
-    final limit = weeklyFreeLimitFromConfig(config);
-    final ok = await NgmyFamilyTreeStyleCharge.confirmAndCharge(
+    return NgmyStripePayments.ensurePaid(
       context: context,
-      user: user,
-      amount: fee,
-      title: 'Message translator — this week',
+      product: NgmyStripeProduct.messageTranslator,
+      email: email,
+      isAdmin: isAdmin,
+      checkDayTrial: true,
       message:
-          'You used your $limit free translations this week. '
-          'Pay \$${fee.toStringAsFixed(2)} for unlimited message translations until the week resets.',
-      onCharge: onCharge,
+          'Your 1-day free trial has ended. Subscribe with Stripe for unlimited translations (30 days).',
     );
-    if (!ok) return false;
-    grantWeekPass(config, email);
-    onDataChanged();
-    await onPersistConfig();
-    return true;
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_communicate_payments.dart';
 import 'ngmy_doc_share_school.dart';
+import 'ngmy_stripe_payments.dart';
 
 /// Doc Share — free creations for individuals; wallet unlock; organizations use org license.
 class NgmyDocSharePayments {
@@ -197,27 +197,23 @@ class NgmyDocSharePayments {
     final isAdmin = (user as dynamic).isAdmin == true;
     if (isAdmin) return true;
     if (hasSchoolLicense(config, email)) return true;
-
-    final fee = schoolLicenseFeeFromConfig(config);
-    if (fee <= 0) {
-      grantSchoolLicense(config, email);
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.docShareOrg)) {
+      grantSchoolLicense(config, email, days: NgmyStripePayments.monthlyAccessDays);
       onDataChanged();
       await onPersistConfig();
       return true;
     }
 
-    final ok = await NgmyFamilyTreeStyleCharge.confirmAndCharge(
+    final paid = await NgmyStripePayments.ensurePaid(
       context: context,
-      user: user,
-      amount: fee,
+      product: NgmyStripeProduct.docShareOrg,
+      email: email,
+      isAdmin: isAdmin,
       title: 'Doc Share for Organizations',
-      message:
-          'Pay \$${fee.toStringAsFixed(2)} for a 1-year organization license. '
-          'Create an access code and password for your team members.',
-      onCharge: onCharge,
+      message: 'Subscribe with Stripe for your organization license — create team access codes (30 days).',
     );
-    if (!ok) return false;
-    grantSchoolLicense(config, email);
+    if (!paid) return false;
+    grantSchoolLicense(config, email, days: NgmyStripePayments.monthlyAccessDays);
     onDataChanged();
     await onPersistConfig();
     return true;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_local_growth_income.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_wallet_payment_ui.dart';
 
 enum NgmyCommunicatePassTier { twoWeek, monthly, yearly }
@@ -23,7 +24,7 @@ class NgmyCommunicatePassOption {
 
 class NgmyCommunicatePayments {
   static const double defaultFeeAmount = 1.0;
-  static const int defaultMinutesPerPayment = 20;
+  static const int defaultMinutesPerPayment = 30;
 
   static double feeAmountFromConfig(dynamic config) {
     final v = (config as dynamic).communicateFeeAmount;
@@ -105,6 +106,11 @@ class NgmyCommunicatePayments {
     return until != null && until.isAfter(DateTime.now());
   }
 
+  static Future<bool> hasStripeOrLegacyPass(String email, dynamic config) async {
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.advisors)) return true;
+    return hasActivePass(config, email);
+  }
+
   static DateTime? passExpiresAt(dynamic config, String email) {
     final key = _emailKey(email);
     if (key.isEmpty) return null;
@@ -123,24 +129,12 @@ class NgmyCommunicatePayments {
     _setAccessMap(config, map);
   }
 
-  static Future<bool> needsPayment(String email, dynamic config) async {
+  static Future<bool> needsPayment(String email, dynamic config, {bool isAdmin = false}) async {
+    if (isAdmin) return false;
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.advisors)) return false;
     if (hasActivePass(config, email)) return false;
-    final options = enabledPassOptions(config);
-    if (options.isEmpty) return false;
     final used = await NgmyCommunicateTimeTracker.getUsedSeconds(email);
     return used >= thresholdSeconds(config);
-  }
-
-  static Future<NgmyCommunicatePassOption?> _pickPassOption(
-    BuildContext context,
-    List<NgmyCommunicatePassOption> options, {
-    required double balance,
-  }) {
-    return showDialog<NgmyCommunicatePassOption>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.72),
-      builder: (ctx) => _NgmyAdvisorPassSwipeDialog(options: options, balance: balance),
-    );
   }
 
   static Future<bool> confirmPassPayment({
@@ -153,37 +147,28 @@ class NgmyCommunicatePayments {
     String productName = 'NGMY Advisors',
   }) async {
     final email = ((user as dynamic).email as String?) ?? '';
-    final options = enabledPassOptions(config);
-    if (options.isEmpty) return true;
-
-    // Pull in any Growth Income balance earned before this screen was
-    // opened this session — otherwise a user with money in Growth Income
-    // can see a stale $0 here.
-    await NgmyLocalGrowthIncomeStore.reconcileIntoLiveUser(user);
-    final balance = ((user as dynamic).accountBalance as num).toDouble();
-    final picked = await _pickPassOption(context, options, balance: balance);
-    if (picked == null) return false;
-
-    if (balance + 0.001 < picked.fee) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Insufficient balance (\$${balance.toStringAsFixed(2)}). Need \$${picked.fee.toStringAsFixed(2)}.')),
-        );
-      }
-      return false;
-    }
+    if ((user as dynamic).isAdmin == true) return true;
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.advisors)) return true;
+    if (hasActivePass(config, email)) return true;
 
     final label = productName.trim().isEmpty ? 'NGMY Advisors' : productName.trim();
-    final chargeTitle = '$label — ${picked.label}';
-    final charged = await onCharge(picked.fee, chargeTitle);
-    if (!charged || email.isEmpty) return charged;
+    final paid = await NgmyStripePayments.ensurePaid(
+      context: context,
+      product: NgmyStripeProduct.advisors,
+      email: email,
+      title: label,
+      message:
+          'You used your ${minutesPerPaymentFromConfig(config)} free minutes. '
+          'Subscribe with Stripe for unlimited advisor chat (30 days).',
+    );
+    if (!paid || email.isEmpty) return paid;
 
-    grantPass(config, email, days: picked.days);
     await NgmyCommunicateTimeTracker.resetAfterPayment(email);
     if (!((user as dynamic).isAdmin == true)) {
+      final until = await NgmyStripePayments.accessUntil(email, NgmyStripeProduct.advisors);
       await NgmyCommunicateBackupCodes.ensureActiveCode(
         email,
-        passUntil: passExpiresAt(config, email),
+        passUntil: until,
       );
     }
     onDataChanged?.call();

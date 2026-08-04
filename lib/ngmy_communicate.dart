@@ -17,6 +17,7 @@ import 'ngmy_ai_memory.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync.dart';
 import 'ngmy_communicate_sync_ui.dart';
@@ -4003,16 +4004,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<bool> _ensurePaid() async {
     if (_isAdmin) return true;
+    if (await NgmyStripePayments.hasActiveAccess(_email, NgmyStripeProduct.advisors)) return true;
     if (NgmyCommunicatePayments.hasActivePass(widget.config, _email)) return true;
     await _flushSessionTime();
     _usedSeconds = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
-    if (!await NgmyCommunicatePayments.needsPayment(_email, widget.config)) return true;
-    if (widget.onChargeWallet == null) return false;
+    if (!await NgmyCommunicatePayments.needsPayment(_email, widget.config, isAdmin: _isAdmin)) return true;
     return NgmyCommunicatePayments.confirmPassPayment(
       context: context,
       user: widget.user,
       config: widget.config,
-      onCharge: widget.onChargeWallet!,
+      onCharge: widget.onChargeWallet ?? (_, __) async => true,
       onDataChanged: widget.onDataChanged,
       onPersistConfig: widget.onPersistConfig,
       productName: kNgmyAdvisorsHubTitle,

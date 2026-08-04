@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_communicate_payments.dart';
+import 'ngmy_stripe_payments.dart';
 
-/// Document Scanner — free scans then wallet unlock for unlimited scans.
+/// Document Scanner — 1-day free trial, then Stripe for monthly access.
 class NgmyDocumentScanPayments {
-  static const int defaultFreeScanLimit = 5;
-  static const double defaultUnlockFee = 2.99;
+  static const int defaultFreeScanLimit = 0;
+  static const double defaultUnlockFee = 0;
   /// Every this many follow-up questions counts as one document scan.
   static const int questionsPerScan = 2;
   static const _usagePrefsPrefix = 'ngmy_document_scan_usage_';
@@ -85,21 +85,24 @@ class NgmyDocumentScanPayments {
 
   static Future<int> remainingFree(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return unlimitedRemaining;
-    final limit = freeScanLimitFromConfig(config);
-    if (limit <= 0) return unlimitedRemaining;
-    if (hasActiveAccess(config, email)) return unlimitedRemaining;
-    final used = await lifetimeScanCount(email);
-    return (limit - used).clamp(0, limit);
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.documentScanner)) {
+      return unlimitedRemaining;
+    }
+    if (await NgmyStripePayments.hasDayTrialAccess(email, NgmyStripeProduct.documentScanner)) {
+      return unlimitedRemaining;
+    }
+    return 0;
   }
 
   static Future<bool> needsPayment(dynamic config, String email, {bool isAdmin = false}) async {
     if (isAdmin) return false;
-    final limit = freeScanLimitFromConfig(config);
-    if (limit <= 0) return false;
-    if (hasActiveAccess(config, email)) return false;
-    if (unlockFeeFromConfig(config) <= 0) return false;
-    final used = await lifetimeScanCount(email);
-    return used >= limit;
+    await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.documentScanner);
+    return NgmyStripePayments.needsStripePayment(
+      email: email,
+      product: NgmyStripeProduct.documentScanner,
+      isAdmin: isAdmin,
+      checkDayTrial: true,
+    );
   }
 
   static Future<bool> ensureAccess({
@@ -112,24 +115,17 @@ class NgmyDocumentScanPayments {
   }) async {
     final email = ((user as dynamic).email as String?) ?? '';
     final isAdmin = (user as dynamic).isAdmin == true;
+    await NgmyStripePayments.ensureDayTrialStarted(email, NgmyStripeProduct.documentScanner);
     if (!await needsPayment(config, email, isAdmin: isAdmin)) return true;
 
-    final fee = unlockFeeFromConfig(config);
-    final limit = freeScanLimitFromConfig(config);
-    final ok = await NgmyFamilyTreeStyleCharge.confirmAndCharge(
+    return NgmyStripePayments.ensurePaid(
       context: context,
-      user: user,
-      amount: fee,
-      title: 'Document Scanner',
+      product: NgmyStripeProduct.documentScanner,
+      email: email,
+      isAdmin: isAdmin,
+      checkDayTrial: true,
       message:
-          'You used your $limit free document scans. '
-          'Pay \$${fee.toStringAsFixed(2)} for unlimited scans for 30 days.',
-      onCharge: onCharge,
+          'Your 1-day free trial has ended. Subscribe with Stripe for unlimited document scans (30 days).',
     );
-    if (!ok) return false;
-    grantAccess(config, email);
-    onDataChanged();
-    await onPersistConfig();
-    return true;
   }
 }
