@@ -47,3 +47,8 @@ app.*.map.json
 # Prebuilt web output — CI syncs build/web to docs/ on deploy (see deploy-pages.yml)
 /build/
 _site/
+
+# Local API credentials — never commit
+.ngmy_secrets.local
+*.secrets.local
+.ngmy_phone_unlock_link.txt

@@ -28,7 +28,7 @@ class NgmyStripePayments {
   static const String messageTranslatorUrl = 'https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04';
   static const String documentScannerUrl = 'https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03';
   static const String marriageDocumentUrl = 'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
-  static const String phoneUnlockUrl = 'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
+  static const String phoneUnlockUrl = 'https://buy.stripe.com/test_cNibJ11Bf1ln0RJaSxb7y03';
 
   static const int invoiceFreeTrialDays = 3;
   static const int advisorFreeMinutes = 30;
