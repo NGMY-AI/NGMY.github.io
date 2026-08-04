@@ -15,9 +15,9 @@ const _metaTimeout = Duration(seconds: 18);
 /// Up to 10 minutes — full-length template export.
 const _maxRecordSeconds = 600.0;
 const _exportCanvasFps = 30;
-const _exportCanvasFpsMobile = 24;
+const _exportCanvasFpsMobile = 30;
 const _exportVideoBitsPerSecond = 18000000;
-const _exportVideoBitsPerSecondMobile = 6000000;
+const _exportVideoBitsPerSecondMobile = 9000000;
 const _exportAudioBitsPerSecond = 256000;
 const _recorderTimesliceMs = 500;
 /// Hard stop for one export attempt on desktop.
@@ -625,6 +625,51 @@ bool _webCodecsFastExportSupported() {
   }
 }
 
+Future<void> _waitSeekSettled(html.VideoElement v) async {
+  if (!v.seeking && v.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
+    await _waitVideoFrameReady(v);
+    return;
+  }
+  final done = Completer<void>();
+  void onSeeked(html.Event _) {
+    v.removeEventListener('seeked', onSeeked);
+    if (!done.isCompleted) done.complete();
+  }
+  v.addEventListener('seeked', onSeeked);
+  try {
+    await done.future.timeout(const Duration(milliseconds: 400));
+  } catch (_) {
+    v.removeEventListener('seeked', onSeeked);
+  }
+  await _waitVideoFrameReady(v);
+}
+
+/// Seek every slot to the same timestamp and wait until decoded frames are ready.
+/// Without this, fast export repeats stale frames and the output looks like it
+/// keeps pausing / stuttering.
+Future<void> _seekAllVideosForExport(
+  List<html.VideoElement> videos,
+  html.VideoElement? primary,
+  double seconds,
+) async {
+  if (videos.isEmpty) return;
+  final needsSeek = <html.VideoElement>[];
+  for (final v in videos) {
+    final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.02) : seconds;
+    final t = seconds.clamp(0.0, maxT);
+    if ((v.currentTime - t).abs() > 0.008) {
+      v.currentTime = t;
+      needsSeek.add(v);
+    }
+  }
+  if (needsSeek.isNotEmpty) {
+    await Future.wait(needsSeek.map(_waitSeekSettled));
+  } else {
+    final lead = primary ?? videos.first;
+    await _waitVideoFrameReady(lead);
+  }
+}
+
 Future<void> _seekAllVideosFast(
   List<html.VideoElement> videos,
   html.VideoElement? primary,
@@ -653,13 +698,15 @@ Future<html.Blob?> _tryFastWebCodecsExport({
   void Function(double progress, String status)? onProgress,
 }) async {
   if (!_webCodecsFastExportSupported()) return null;
+  // Short clips on phones: real-time export keeps motion and audio smooth.
+  if (_ngmyIsMobileBrowser() && durationSec <= 120) return null;
   final exportFn = js_util.getProperty(html.window, 'ngmyStudioFastExport');
   if (exportFn == null) return null;
 
   await _flushProgress(onProgress, 0.1, 'Fast export — baking template…');
 
   final seekPaintAsync = js_util.allowInterop((num t) async {
-    await _seekAllVideosFast(videoList, primaryVideo, t.toDouble());
+    await _seekAllVideosForExport(videoList, primaryVideo, t.toDouble());
     paintFrame();
   });
 
@@ -1313,11 +1360,7 @@ Future<List<html.Blob>> _recordCanvasExport({
         await _playVideoForRecord(v);
       }
     }
-    if (tick % 4 == 0) {
-      await _waitNextVideoFrame(primary);
-    } else {
-      await Future<void>.delayed(const Duration(milliseconds: 2));
-    }
+    await _waitNextVideoFrame(primary);
     paintFrame();
     tick++;
     if (tick % 3 == 0) {
@@ -1328,13 +1371,13 @@ Future<List<html.Blob>> _recordCanvasExport({
         js_util.callMethod(recorder, 'requestData', const []);
       } catch (_) {}
     }
-    if (useDedicatedAudio && tick % 12 == 0) {
+    if (useDedicatedAudio && tick % 4 == 0) {
       await _syncExportAudioPlayback(primary, playing: true);
     }
     if (tick % 2 == 0) {
       final wallSecNow = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
       await _syncExportVideosToWallClock(videoList, primary, wallSecNow, durationSec);
-      if (primary != null && (wallSecNow - primary.currentTime) > 0.07) {
+      if (primary != null && (wallSecNow - primary.currentTime) > 0.22) {
         await _seekAllVideosParallel(
           videoList,
           primary,
@@ -1812,6 +1855,12 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       }
     }
     primaryVideo ??= _pickPrimaryVideo(videoList);
+    if (primaryVideo != null) {
+      final pd = primaryVideo.duration;
+      if (pd.isFinite && pd > 0) {
+        durationSec = pd.toDouble().clamp(0.5, _ngmyIsMobileBrowser() ? _mobileMaxRecordSeconds : _maxRecordSeconds);
+      }
+    }
 
     await _flushProgress(onProgress, 0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
 
@@ -1949,7 +1998,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       if (msg != null) return msg;
     }
 
-    await _flushProgress(onProgress, 0.075, 'Recording template (fallback)…');
+    await _flushProgress(onProgress, 0.075, 'Recording template at normal speed…');
     await _warmVideosBeforeExport(videos.values.toList());
 
     for (final v in videos.values) {

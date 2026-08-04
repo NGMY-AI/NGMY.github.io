@@ -1,7 +1,6 @@
 /**
  * NGMY Video Studio — fast template export via WebCodecs + mp4-muxer.
- * Encodes canvas frames as fast as the CPU allows (much faster than real-time
- * MediaRecorder playback for long clips).
+ * Used for long clips on desktop; phones under 2 min use smooth real-time export.
  */
 import { Muxer, ArrayBufferTarget } from 'https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/+esm';
 
@@ -25,7 +24,7 @@ async function pickVideoCodec(width, height, fps) {
         codec,
         width,
         height,
-        bitrate: 8_000_000,
+        bitrate: 10_000_000,
         framerate: fps,
       });
       if (result.supported) return codec;
@@ -61,14 +60,18 @@ async function decodeAudioBuffer(src) {
   }
 }
 
-async function encodeAudioTrack(muxer, audioBuffer, durationSec, onProgress) {
+async function encodeAudioTrack(muxer, audioBuffer, videoDurationSec, onProgress) {
   if (!audioBuffer) return false;
   const targetRate = 48000;
   const channels = Math.min(2, audioBuffer.numberOfChannels || 1);
+  const audioDurationSec = Math.min(
+    audioBuffer.duration > 0 ? audioBuffer.duration : videoDurationSec,
+    videoDurationSec > 0 ? videoDurationSec : audioBuffer.duration,
+  );
   let pcmBuffer = audioBuffer;
   if (audioBuffer.sampleRate !== targetRate) {
     try {
-      const frames = Math.ceil(audioBuffer.duration * targetRate);
+      const frames = Math.ceil(audioDurationSec * targetRate);
       const offline = new OfflineAudioContext(channels, frames, targetRate);
       const srcNode = offline.createBufferSource();
       srcNode.buffer = audioBuffer;
@@ -94,14 +97,14 @@ async function encodeAudioTrack(muxer, audioBuffer, durationSec, onProgress) {
       codec: 'mp4a.40.2',
       sampleRate: targetRate,
       numberOfChannels: channels,
-      bitrate: 128_000,
+      bitrate: 256_000,
     });
     if (!cfg.supported) return false;
     audioEncoder.configure({
       codec: 'mp4a.40.2',
       sampleRate: targetRate,
       numberOfChannels: channels,
-      bitrate: 128_000,
+      bitrate: 256_000,
     });
     audioConfigured = true;
   } catch (e) {
@@ -111,9 +114,9 @@ async function encodeAudioTrack(muxer, audioBuffer, durationSec, onProgress) {
 
   const maxSamples = Math.min(
     pcmBuffer.length,
-    Math.ceil(Math.max(0.1, durationSec) * targetRate),
+    Math.ceil(Math.max(0.1, audioDurationSec) * targetRate),
   );
-  const chunkSize = 1024;
+  const chunkSize = 2048;
   for (let offset = 0; offset < maxSamples; offset += chunkSize) {
     const count = Math.min(chunkSize, maxSamples - offset);
     const interleaved = new Float32Array(count * channels);
@@ -139,7 +142,7 @@ async function encodeAudioTrack(muxer, audioBuffer, durationSec, onProgress) {
       console.warn('[ngmy fast export] audio frame', e);
       break;
     }
-    if (onProgress && offset % (chunkSize * 32) === 0) {
+    if (onProgress && offset % (chunkSize * 16) === 0) {
       onProgress(0.88 + (offset / maxSamples) * 0.08);
     }
   }
@@ -150,18 +153,6 @@ async function encodeAudioTrack(muxer, audioBuffer, durationSec, onProgress) {
   return true;
 }
 
-/**
- * @param {object} opts
- * @param {HTMLCanvasElement} opts.canvas
- * @param {number} opts.width
- * @param {number} opts.height
- * @param {number} opts.durationSec
- * @param {number} opts.fps
- * @param {string} [opts.videoSrc]
- * @param {(t:number)=>Promise<void>} opts.seekPaintAsync
- * @param {(p:number)=>void} [opts.onProgress]
- * @returns {Promise<Blob>}
- */
 export async function ngmyStudioFastExport(opts) {
   if (!supported()) throw new Error('WebCodecs unavailable');
 
@@ -169,7 +160,7 @@ export async function ngmyStudioFastExport(opts) {
   const width = opts.width | 0;
   const height = opts.height | 0;
   const durationSec = Math.max(0.4, Number(opts.durationSec) || 3);
-  const fps = Math.max(20, Math.min(30, Number(opts.fps) || 24));
+  const fps = Math.max(24, Math.min(30, Number(opts.fps) || 30));
   const seekPaintAsync = opts.seekPaintAsync;
   if (!canvas || !seekPaintAsync) throw new Error('invalid fast export args');
 
@@ -204,24 +195,24 @@ export async function ngmyStudioFastExport(opts) {
     codec,
     width,
     height,
-    bitrate: 8_000_000,
+    bitrate: 10_000_000,
     framerate: fps,
   });
   muxReady = true;
 
-  const frameCount = Math.max(1, Math.ceil(durationSec * fps));
+  const frameCount = Math.max(1, Math.round(durationSec * fps));
   const frameDurUs = Math.round(1_000_000 / fps);
 
   for (let i = 0; i < frameCount; i++) {
-    const t = Math.min(i / fps, durationSec - 0.001);
+    const t = Math.min(i / fps, durationSec);
     await seekPaintAsync(t);
     const frame = new VideoFrame(canvas, {
-      timestamp: i * frameDurUs,
+      timestamp: Math.round(i * frameDurUs),
       duration: frameDurUs,
     });
     videoEncoder.encode(frame, { keyFrame: i % (fps * 2) === 0 });
     frame.close();
-    if (opts.onProgress && (i === 0 || i % 6 === 0 || i === frameCount - 1)) {
+    if (opts.onProgress && (i === 0 || i % 8 === 0 || i === frameCount - 1)) {
       opts.onProgress(Math.min(0.87, i / frameCount));
     }
   }
