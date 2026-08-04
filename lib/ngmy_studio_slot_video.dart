@@ -9,8 +9,9 @@ import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot
 /// Local video preview for a studio frame — play, pause, replay before download.
 class NgmyStudioSlotVideo extends StatefulWidget {
   final String? source;
+  final bool trySoundOnLoad;
 
-  const NgmyStudioSlotVideo({super.key, required this.source});
+  const NgmyStudioSlotVideo({super.key, required this.source, this.trySoundOnLoad = false});
 
   @override
   State<NgmyStudioSlotVideo> createState() => _NgmyStudioSlotVideoState();
@@ -74,8 +75,17 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
         return;
       }
       await c.setLooping(true);
+      c.setVolume(1.0);
       c.addListener(_onTick);
       _controller = c;
+      if (widget.trySoundOnLoad) {
+        try {
+          await c.play();
+          if (mounted) setState(() => _playing = true);
+        } catch (e) {
+          debugPrint('[studio slot video] autoplay with sound: $e');
+        }
+      }
       if (mounted) setState(() {});
     } catch (e) {
       if (c != null) {

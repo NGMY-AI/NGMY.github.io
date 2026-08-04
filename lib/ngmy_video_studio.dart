@@ -139,6 +139,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   final Map<String, bool> _logoVisible = {};
   final Map<String, NgmyLogoFrameStyle> _logoFrameStyles = {};
   String? _preparingSlotId;
+  String? _trySoundSlotId;
   bool _uiReady = false;
 
   final _headlineC = TextEditingController();
@@ -342,11 +343,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       media.controller = null;
       _slotMedia[slotId] = media;
       if (!mounted) return;
-      setState(() => _activeSlotId = slotId);
+      setState(() {
+        _activeSlotId = slotId;
+        _trySoundSlotId = slotId;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Video added — stays on your device until you download.'),
+            content: Text('Video added — preview plays with sound. Tap Download when ready.'),
           ),
         );
       }
@@ -1164,8 +1168,16 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     Widget child;
     if (src != null && src.isNotEmpty) {
       child = kIsWeb
-          ? studio_html_video.NgmyStudioHtmlVideo(key: ValueKey('${slot.id}|$src'), source: src)
-          : NgmyStudioSlotVideo(key: ValueKey('${slot.id}|$src'), source: src);
+          ? studio_html_video.NgmyStudioHtmlVideo(
+              key: ValueKey('${slot.id}|$src'),
+              source: src,
+              trySoundOnLoad: _trySoundSlotId == slot.id,
+            )
+          : NgmyStudioSlotVideo(
+              key: ValueKey('${slot.id}|$src'),
+              source: src,
+              trySoundOnLoad: _trySoundSlotId == slot.id,
+            );
     } else {
       child = Container(
         color: Colors.black87,

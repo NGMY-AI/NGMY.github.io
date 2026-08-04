@@ -8,8 +8,9 @@ import 'package:flutter/material.dart';
 /// Inline blob preview on web — no native controls (iOS Safari fullscreen safe).
 class NgmyStudioHtmlVideo extends StatefulWidget {
   final String source;
+  final bool trySoundOnLoad;
 
-  const NgmyStudioHtmlVideo({super.key, required this.source});
+  const NgmyStudioHtmlVideo({super.key, required this.source, this.trySoundOnLoad = false});
 
   @override
   State<NgmyStudioHtmlVideo> createState() => _NgmyStudioHtmlVideoState();
@@ -52,6 +53,14 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
         setState(() => _ready = true);
         _startPlayWatchdog();
         try {
+          if (widget.trySoundOnLoad) {
+            _video!
+              ..muted = false
+              ..defaultMuted = false
+              ..volume = 1.0;
+            _video!.removeAttribute('muted');
+            if (mounted) setState(() => _muted = false);
+          }
           await _video!.play();
           if (mounted) setState(() => _playing = true);
         } catch (e) {

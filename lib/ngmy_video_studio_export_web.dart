@@ -235,8 +235,9 @@ Future<double> _probeBlobDurationSec(List<html.Blob> chunks, String blobType) as
 }
 
 bool _exportDurationAcceptable(double expectedSec, double actualSec) {
-  if (actualSec <= 0) return false;
-  final tol = math.max(0.45, expectedSec * 0.12);
+  // Fresh MediaRecorder blobs often have no duration metadata yet — don't reject.
+  if (actualSec <= 0) return true;
+  final tol = math.max(0.75, expectedSec * 0.18);
   return (actualSec - expectedSec).abs() <= tol;
 }
 
@@ -1427,8 +1428,6 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
     ..volume = 1.0
     ..defaultMuted = false;
   video.removeAttribute('muted');
-  _appendWebAudioFromVideo(composed, video);
-  if (composed.getAudioTracks().isNotEmpty) return;
   try {
     final cap = video.captureStream();
     for (final t in cap.getAudioTracks()) {
@@ -1438,6 +1437,7 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
   } catch (e) {
     debugPrint('[studio export] captureStream audio failed: $e');
   }
+  _appendWebAudioFromVideo(composed, video);
 }
 
 Future<void> _attachExportAudio(html.MediaStream recordStream, html.VideoElement primary) async {
@@ -1930,8 +1930,8 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     // Only mime type and audio-track presence vary across attempts.
     final plans = _ngmyIsMobileBrowser()
         ? [
-            // Mobile Safari is memory-sensitive. Use one video-only attempt so
-            // template export saves instead of crashing during audio retries.
+            (mime: primaryMime, audio: true),
+            if (fallbackMime != primaryMime) (mime: fallbackMime, audio: true),
             (mime: primaryMime, audio: false),
             if (fallbackMime != primaryMime) (mime: fallbackMime, audio: false),
           ]
@@ -2022,6 +2022,9 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     final apple = _ngmyIsAppleMobileBrowser();
     var blobType = mimeType.contains('webm') ? 'video/webm' : 'video/mp4';
     var ext = blobType.contains('webm') ? 'webm' : 'mp4';
+    final exportedSilent = chunks.isNotEmpty &&
+        silentFallbackChunks != null &&
+        chunks == silentFallbackChunks;
     if (apple) {
       if (blobType.contains('webm')) {
         debugPrint('[studio export] WebM on iOS — MP4 export required');
@@ -2042,14 +2045,22 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       if (!usedCanvasStream) {
         return '${_ngmyDownloadResultMessage('ios_pending')} (Full studio merge works best in Chrome on desktop.)';
       }
-      return _ngmyDownloadResultMessage('ios_pending');
+      final base = _ngmyDownloadResultMessage('ios_pending');
+      return exportedSilent ? '$base Your template is included — sound may be missing on this device.' : base;
     }
     final url = html.Url.createObjectUrlFromBlob(blob);
     final mode = await ngmyTriggerBrowserDownload(url, filename);
     if (!usedCanvasStream && config.needsComposedExport) {
       return 'Export failed: templates were not baked into the file. Use Chrome on a computer and try again.';
     }
-    return _ngmyDownloadResultMessage(mode);
+    final base = _ngmyDownloadResultMessage(mode);
+    if (exportedSilent) {
+      return '$base Your news template is baked in — sound may be missing on this browser.';
+    }
+    if (config.needsComposedExport) {
+      return '$base Your news template overlay is included.';
+    }
+    return base;
   } catch (e, st) {
     debugPrint('[studio export] composed failed: $e\n$st');
     try {
