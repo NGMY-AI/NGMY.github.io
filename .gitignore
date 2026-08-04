@@ -52,3 +52,4 @@ _site/
 .ngmy_secrets.local
 *.secrets.local
 .ngmy_phone_unlock_link.txt
+.ngmy_payment_links.txt

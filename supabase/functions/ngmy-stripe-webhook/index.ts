@@ -132,8 +132,13 @@ function productFromSession(session: any): string {
 /// Fallback for checkouts opened straight from a Payment Link URL, where the
 /// app never got to attach client_reference_id. Payment Link metadata does not
 /// copy onto the session, so it has to be fetched.
-async function productFromPaymentLink(paymentLinkId: string): Promise<string> {
-  const secretKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+async function productFromPaymentLink(
+  paymentLinkId: string,
+  liveMode: boolean,
+): Promise<string> {
+  const secretKey = liveMode
+    ? (Deno.env.get("STRIPE_SECRET_KEY") ?? "")
+    : (Deno.env.get("STRIPE_SECRET_KEY_TEST") ?? Deno.env.get("STRIPE_SECRET_KEY") ?? "");
   if (!secretKey || !paymentLinkId) return "";
 
   try {
@@ -164,11 +169,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
+  // Both secrets are accepted so the live and test endpoints can coexist.
+  const secretCandidates = [
+    Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "",
+    Deno.env.get("STRIPE_WEBHOOK_SECRET_TEST") ?? "",
+  ].filter((s) => s.length > 0);
+
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-  if (!webhookSecret || !supabaseUrl || !serviceKey) {
+  if (secretCandidates.length === 0 || !supabaseUrl || !serviceKey) {
     console.error("[ngmy-stripe-webhook] missing env configuration");
     return json({ error: "Server misconfigured" }, 500);
   }
@@ -177,7 +187,15 @@ serve(async (req) => {
   if (!signature) return json({ error: "Missing stripe-signature" }, 400);
 
   const body = await req.text();
-  const verified = await verifyStripeSignature(body, signature, webhookSecret);
+
+  let verified = { ok: false, reason: "no secret matched" } as {
+    ok: boolean;
+    reason?: string;
+  };
+  for (const secret of secretCandidates) {
+    verified = await verifyStripeSignature(body, signature, secret);
+    if (verified.ok) break;
+  }
   if (!verified.ok) {
     console.error("[ngmy-stripe-webhook] signature rejected:", verified.reason);
     return json({ error: `Webhook signature invalid: ${verified.reason}` }, 400);
@@ -206,7 +224,7 @@ serve(async (req) => {
     const linkId = typeof session.payment_link === "string"
       ? session.payment_link
       : session.payment_link?.id ?? "";
-    product = await productFromPaymentLink(linkId);
+    product = await productFromPaymentLink(linkId, event?.livemode === true);
   }
 
   if (!email.includes("@")) {

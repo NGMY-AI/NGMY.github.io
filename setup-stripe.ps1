@@ -137,59 +137,84 @@ if (-not $whSecret) { throw "Stripe did not return a webhook signing secret" }
 Write-Ok "Webhook created: $($wh.id)"
 
 # ------------------------------------------------------- 4. supabase secrets
+# Live and test secrets are kept under separate names so both endpoints work.
 Write-Step 4 "Setting Supabase Edge Function secrets ..."
+if ($isLive) {
+    $keyName = "STRIPE_SECRET_KEY"
+    $secretName = "STRIPE_WEBHOOK_SECRET"
+} else {
+    $keyName = "STRIPE_SECRET_KEY_TEST"
+    $secretName = "STRIPE_WEBHOOK_SECRET_TEST"
+}
 $secretsBody = ConvertTo-Json @(
-    @{ name = "STRIPE_SECRET_KEY"; value = $stripeKey },
-    @{ name = "STRIPE_WEBHOOK_SECRET"; value = $whSecret }
+    @{ name = $keyName; value = $stripeKey },
+    @{ name = $secretName; value = $whSecret }
 ) -Compress
 $null = Invoke-RestMethod -Method Post `
     -Uri "https://api.supabase.com/v1/projects/$ProjectRef/secrets" `
     -Headers $sbHeaders -ContentType "application/json" -Body $secretsBody
-Write-Ok "STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET stored"
+Write-Ok "$keyName and $secretName stored"
 
-# -------------------------------------------------- 5. phone unlock pay link
-Write-Step 5 "Creating Phone Unlock product and payment link ..."
+# ------------------------------------------------------ 5. wire payment links
+# Tags every existing NGMY payment link with its product slug and points its
+# post-payment redirect back at the app, so checkout always identifies itself.
+Write-Step 5 "Wiring payment links for all paid features ..."
 
-$amountText = [math]::Round($PhoneUnlockAmount / 100, 2)
-$returnUrl = $SiteUrl + "?ngmy_pay_ok=1" + [char]38 + "ngmy_pay=phone_unlock"
-
-# Reuse an existing active link at the same price so repeat runs don't pile up
-# duplicate products in the Stripe dashboard.
-$link = $null
-$existingLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"
-foreach ($pl in $existingLinks.data) {
-    if ($pl.active -and $pl.metadata.ngmy_product -eq "phone_unlock") {
-        $items = Invoke-Stripe -Method GET -Path "payment_links/$($pl.id)/line_items?limit=1"
-        if ($items.data.Count -gt 0 -and $items.data[0].amount_total -eq $PhoneUnlockAmount) {
-            $link = $pl
-            Write-Ok "Reusing existing payment link $($pl.id)"
-            break
-        }
-    }
+$productLinks = [ordered]@{
+    "doc_share_org" = "https://buy.stripe.com/eVq9AT5Rvggh8kb3q5b7y08"
+    "invoice"       = "https://buy.stripe.com/dRm6oHeo16FHeIzaSxb7y07"
+    "advisors"      = "https://buy.stripe.com/cNi28reo19RTgQH8Kpb7y06"
+    "family_tree"   = "https://buy.stripe.com/14A5kDfs57JL0RJ3q5b7y05"
+    "translator"    = "https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04"
+    "scanner"       = "https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03"
+    "marriage"      = "https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09"
+    "phone_unlock"  = "https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a"
 }
 
-if (-not $link) {
-    $product = Invoke-Stripe -Method POST -Path "products" -Fields @(
-        "name=NGMY Phone Unlock (10 days)",
-        "description=Instant access to NGMY Phone Unlock tools for 10 days."
-    )
-    Write-Ok "Product $($product.id)"
+$allLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"
+$byUrl = @{}
+foreach ($pl in $allLinks.data) { $byUrl[$pl.url] = $pl }
 
-    $price = Invoke-Stripe -Method POST -Path "prices" -Fields @(
-        "product=$($product.id)",
-        "unit_amount=$PhoneUnlockAmount",
-        "currency=$Currency"
-    )
-    Write-Ok "Price $($price.id) = $amountText $($Currency.ToUpper())"
+$wired = [ordered]@{}
+$missing = @()
 
-    $link = Invoke-Stripe -Method POST -Path "payment_links" -Fields @(
-        "line_items[0][price]=$($price.id)",
-        "line_items[0][quantity]=1",
+foreach ($slug in $productLinks.Keys) {
+    $wantUrl = $productLinks[$slug]
+    $pl = $null
+
+    if ($isLive) {
+        if ($byUrl.ContainsKey($wantUrl)) { $pl = $byUrl[$wantUrl] }
+    } else {
+        # Test mode links have different URLs; match on metadata instead.
+        foreach ($cand in $allLinks.data) {
+            if ($cand.active -and $cand.metadata.ngmy_product -eq $slug) { $pl = $cand; break }
+        }
+    }
+
+    if (-not $pl) { $missing += $slug; continue }
+
+    $redirect = $SiteUrl + "?ngmy_pay_ok=1" + [char]38 + "ngmy_pay=" + $slug
+    $null = Invoke-Stripe -Method POST -Path "payment_links/$($pl.id)" -Fields @(
         "after_completion[type]=redirect",
-        "after_completion[redirect][url]=$returnUrl",
-        "metadata[ngmy_product]=phone_unlock"
+        "after_completion[redirect][url]=$redirect",
+        "metadata[ngmy_product]=$slug"
     )
-    Write-Ok "Payment link created"
+
+    $items = Invoke-Stripe -Method GET -Path "payment_links/$($pl.id)/line_items?limit=1"
+    $amt = if ($items.data.Count -gt 0) { $items.data[0].amount_total } else { 0 }
+    $amtText = [math]::Round($amt / 100, 2)
+
+    $wired[$slug] = $pl.url
+    Write-Ok ("{0,-14} {1,8} {2}" -f $slug, $amtText, $pl.url)
+}
+
+if ($missing.Count -gt 0) {
+    Write-Warn2 "No payment link found for: $($missing -join ', ')"
+}
+
+$link = $null
+if ($wired.Contains("phone_unlock")) {
+    $link = @{ url = $wired["phone_unlock"] }
 }
 
 # ------------------------------------------------------------ 6. verification
@@ -274,12 +299,16 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host " SETUP COMPLETE ($modeLabel)" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Phone Unlock payment link:" -ForegroundColor Yellow
-Write-Host "  $($link.url)" -ForegroundColor White
+Write-Host "Wired payment links:" -ForegroundColor Yellow
+foreach ($slug in $wired.Keys) {
+    Write-Host ("  {0,-14} {1}" -f $slug, $wired[$slug]) -ForegroundColor White
+}
 Write-Host ""
 Write-Host "Webhook endpoint:" -ForegroundColor Yellow
 Write-Host "  $WebhookUrl" -ForegroundColor White
 Write-Host ""
 
-$link.url | Set-Content -Path (Join-Path $PSScriptRoot ".ngmy_phone_unlock_link.txt") -Encoding ASCII
-Write-Host "Link saved to .ngmy_phone_unlock_link.txt" -ForegroundColor DarkGray
+$lines = @()
+foreach ($slug in $wired.Keys) { $lines += "$slug=$($wired[$slug])" }
+$lines | Set-Content -Path (Join-Path $PSScriptRoot ".ngmy_payment_links.txt") -Encoding ASCII
+Write-Host "Links saved to .ngmy_payment_links.txt" -ForegroundColor DarkGray
