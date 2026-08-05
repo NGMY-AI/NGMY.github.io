@@ -3561,6 +3561,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   int _romanticNudgeGen = 0;
   int _sendGen = 0;
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
+  static const Duration _tickInterval = Duration(seconds: 5);
+  static const int _maxBillableSeconds = 10;
 
   Future<void> _saveDebateSession() async {
     if (!_isDebater) return;
@@ -3681,16 +3683,40 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     _tickTimer();
   }
 
+  /// Free advisor minutes are only spent while this chat is genuinely in front of
+  /// the user: app in the foreground and no other screen pushed over the chat.
+  bool get _shouldCountTime {
+    if (!mounted) return false;
+    if (_lifecycle != AppLifecycleState.resumed) return false;
+    return ModalRoute.of(context)?.isCurrent ?? true;
+  }
+
+  /// Starts or stops the clock to match whether the chat is actually in use.
+  Future<void> _syncTimeCounting() async {
+    final should = _shouldCountTime;
+    if (should && _sessionStart == null) {
+      _sessionStart = DateTime.now();
+    } else if (!should && _sessionStart != null) {
+      await _flushSessionTime();
+      _sessionStart = null;
+    }
+  }
+
   void _tickTimer() {
     Future.doWhile(() async {
-      await Future<void>.delayed(const Duration(seconds: 8));
+      await Future<void>.delayed(_tickInterval);
       if (!mounted) return false;
-      _flushSessionTime();
+      await _syncTimeCounting();
+      await _flushSessionTime();
       final used = await NgmyCommunicateTimeTracker.getUsedSeconds(_email);
       if (mounted) {
         setState(() {
           _usedSeconds = used;
-          _sessionSeconds = DateTime.now().difference(_sessionStart ?? DateTime.now()).inSeconds;
+          // Only the sliver since the last flush — the rest is already inside
+          // `used`, and the banner adds the two together.
+          final start = _sessionStart;
+          _sessionSeconds =
+              start == null ? 0 : DateTime.now().difference(start).inSeconds;
         });
       }
       return mounted;
@@ -3809,22 +3835,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
 
   Future<void> _flushSessionTime() async {
-    if (_sessionStart == null || _email.isEmpty) return;
-    final elapsed = DateTime.now().difference(_sessionStart!).inSeconds;
-    if (elapsed > 0) {
-      await NgmyCommunicateTimeTracker.addSeconds(_email, elapsed);
-      _sessionStart = DateTime.now();
-    }
+    final start = _sessionStart;
+    if (start == null || _email.isEmpty) return;
+    final elapsed = DateTime.now().difference(start).inSeconds;
+    if (elapsed <= 0) return;
+    // A backgrounded tab can be frozen for minutes and report the whole gap on
+    // its next tick. Never bill more than one tick's worth at a time, so time
+    // the user did not actually spend chatting cannot be charged to them.
+    final billable = elapsed > _maxBillableSeconds ? _maxBillableSeconds : elapsed;
+    await NgmyCommunicateTimeTracker.addSeconds(_email, billable);
+    _sessionStart = DateTime.now();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _lifecycle = state;
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _flushSessionTime();
-    } else if (state == AppLifecycleState.resumed) {
-      _sessionStart = DateTime.now();
-    }
+    unawaited(_syncTimeCounting());
   }
 
   @override
