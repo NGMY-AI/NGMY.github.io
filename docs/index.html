@@ -17,6 +17,17 @@
             email: p.get('ngmy_pay_email') || '',
             at: Date.now()
           }));
+          // Checkout opens in its own tab. After Stripe redirects here we only
+          // need to drop the receipt in localStorage for the original app tab —
+          // there is no reason to boot Flutter in this tab, and doing so would
+          // leave the user staring at a second copy of the app.
+          window.__NGMY_PAY_RETURN_ONLY__ = true;
+          try {
+            if (window.opener && !window.opener.closed) {
+              try { window.opener.focus(); } catch (e2) {}
+            }
+          } catch (e3) {}
+          try { window.close(); } catch (e4) {}
         }
       } catch (e) {}
     })();
@@ -40,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260805103550';
+      var embedded = '20260805110333';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -720,7 +731,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260805103550";
+      var CURRENT = "20260805110333";
 
       function showError(msg) {
 
@@ -827,7 +838,7 @@
 
   <script>
     (function () {
-      var deployId = '20260805103550';
+      var deployId = '20260805110333';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -1118,7 +1129,24 @@
           });
       }
 
+      function showPayReturnDone() {
+        var splash = document.getElementById('ngmy-splash');
+        if (splash) {
+          splash.innerHTML =
+            '<div style="max-width:280px;text-align:center;padding:24px">' +
+            '<div style="font-size:18px;font-weight:800;margin-bottom:8px">Payment received</div>' +
+            '<div style="opacity:0.8;line-height:1.45;font-weight:500">You can close this tab and go back to NGMY. Your access updates there automatically.</div>' +
+            '</div>';
+          splash.style.display = 'flex';
+        }
+      }
+
       function startApp() {
+        if (window.__NGMY_PAY_RETURN_ONLY__) {
+          showPayReturnDone();
+          return;
+        }
+
         var bootTimer = setTimeout(function () {
           showBootstrapError('NGMY is still loading. If you are on school or library Wi-Fi, try home internet or mobile data, then tap Reload.');
         }, 180000);
