@@ -40,7 +40,7 @@
 
   <script>
     (function () {
-      var embedded = '20260805012242';
+      var embedded = '20260805013103';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -440,10 +440,6 @@
 
       height: 100%;
 
-      /* Dynamic viewport height tracks the browser chrome collapsing, which the
-         static 100% above does not. Ignored by browsers that lack dvh. */
-      height: 100dvh;
-
       overflow: hidden;
 
       background-color: #121212;
@@ -472,17 +468,39 @@
 
     }
 
-    flutter-view, flt-glass-pane {
+    /* The host box has to be the layout viewport itself, never a measured copy
+       of it. Anything that tracks the *visual* viewport - 100dvh, or a pixel
+       height read from visualViewport - is a snapshot, and it goes stale while
+       the browser chrome animates. Coming back from an external page such as
+       checkout re-expands that chrome, so a stale, too-short box leaves the
+       page background showing as a black band along the bottom of the screen.
+       An inset-0 box cannot drift out of sync: it is the viewport. This is also
+       the engine's own default geometry, so nothing here fights it. */
+    flutter-view {
 
-      background-color: #121212;
+      position: absolute;
 
-      display: block;
+      inset: 0;
+
+      width: auto;
+
+      height: auto;
+
+    }
+
+    flt-glass-pane {
 
       width: 100%;
 
       height: 100%;
 
-      height: 100dvh;
+    }
+
+    flutter-view, flt-glass-pane {
+
+      background-color: #121212;
+
+      display: block;
 
       touch-action: manipulation;
 
@@ -703,7 +721,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260805012242";
+      var CURRENT = "20260805013103";
 
       function showError(msg) {
 
@@ -754,88 +772,47 @@
   </script>
 
   <script>
-    // Keeps the Flutter host box exactly the size of the visible viewport.
+    // Makes Flutter re-measure after the page is restored from an external site.
     //
-    // Coming back from an external page (Stripe checkout, OAuth) the browser
-    // hands the document back at a different height than it had at boot - the
-    // URL bar collapses, or iOS restores a standalone PWA at a new size. Flutter
-    // does not always re-measure on those transitions, so its canvas stays at the
-    // old height and the page background shows underneath it as a black band
-    // along the bottom of the screen. Pinning the host height here, and nudging
-    // Flutter to re-measure whenever the viewport really changed, removes it.
+    // The CSS above guarantees the host box is always the right size, but Flutter
+    // only re-reads its size when a ResizeObserver fires. Returning from checkout
+    // can hand the document back at the same box size it was suspended at, so no
+    // observer fires and the engine keeps rendering at whatever size it last
+    // measured - which is how the canvas ends up shorter than the window. A
+    // one-frame 1px nudge forces a real size change, so the engine re-measures.
+    //
+    // This must never leave a height behind: a pinned pixel height is exactly
+    // what used to go stale and open the black band in the first place.
     (function () {
-      var lastH = 0;
-      var lastW = 0;
-      var pending = 0;
-
-      function viewportHeight() {
-        var vv = window.visualViewport;
-        // Ignore the shrink caused by the on-screen keyboard: that one is meant
-        // to be handled by Flutter's own inset handling, not by resizing the host.
-        if (vv && vv.height && window.innerHeight && vv.height / window.innerHeight > 0.7) {
-          return Math.round(vv.height);
-        }
-        return Math.round(window.innerHeight || (vv && vv.height) || 0);
+      function nudge() {
+        var views = document.querySelectorAll('flutter-view');
+        if (!views.length) return;
+        for (var i = 0; i < views.length; i++) views[i].style.bottom = '1px';
+        var restore = function () {
+          for (var j = 0; j < views.length; j++) views[j].style.bottom = '';
+        };
+        if (window.requestAnimationFrame) requestAnimationFrame(restore);
+        else setTimeout(restore, 16);
       }
 
-      function apply() {
-        pending = 0;
-        var h = viewportHeight();
-        var w = Math.round(window.innerWidth || 0);
-        if (!h || !w) return;
-        if (h === lastH && w === lastW) return;
-        lastH = h;
-        lastW = w;
-
-        var root = document.documentElement;
-        root.style.setProperty('--ngmy-vh', h + 'px');
-        if (document.body) document.body.style.height = h + 'px';
-
-        var hosts = document.querySelectorAll('flutter-view, flt-glass-pane');
-        for (var i = 0; i < hosts.length; i++) {
-          hosts[i].style.height = h + 'px';
-        }
-
-        // Flutter reads window metrics on resize; the explicit height above can
-        // land without one when the change came from a page restore.
-        try { window.dispatchEvent(new Event('resize')); } catch (e) {}
+      // Browser chrome animates in and out on restore, so re-check for a moment
+      // rather than trusting the size at the instant the page came back.
+      function nudgeSettling() {
+        nudge();
+        [120, 400, 900].forEach(function (ms) { setTimeout(nudge, ms); });
       }
 
-      function schedule() {
-        if (pending) return;
-        pending = window.requestAnimationFrame ? requestAnimationFrame(apply) : setTimeout(apply, 16);
-      }
-
-      // Browser chrome animates in and out, so re-check for a moment afterwards
-      // rather than trusting a single measurement.
-      function scheduleSettling() {
-        schedule();
-        [60, 180, 400, 800, 1400].forEach(function (ms) { setTimeout(schedule, ms); });
-      }
-
-      window.__ngmySyncViewport = scheduleSettling;
-
-      window.addEventListener('resize', schedule);
-      window.addEventListener('orientationchange', scheduleSettling);
-      window.addEventListener('pageshow', scheduleSettling);
-      window.addEventListener('focus', schedule);
-      window.addEventListener('load', scheduleSettling);
+      window.addEventListener('pageshow', nudgeSettling);
+      window.addEventListener('orientationchange', nudgeSettling);
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') scheduleSettling();
+        if (document.visibilityState === 'visible') nudgeSettling();
       });
-      if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', schedule);
-        window.visualViewport.addEventListener('scroll', schedule);
-      }
-      window.addEventListener('flutter-first-frame', scheduleSettling, { once: true });
-
-      scheduleSettling();
     })();
   </script>
 
   <script>
     (function () {
-      var deployId = '20260805012242';
+      var deployId = '20260805013103';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
