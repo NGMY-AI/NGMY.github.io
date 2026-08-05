@@ -37,7 +37,10 @@ void main() {
           );
 
           await tester.tap(find.text('open'));
-          await tester.pumpAndSettle();
+          // The dialog runs a looping ambient animation, so pumpAndSettle would
+          // never return. Advance past the entrance animation instead.
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 900));
 
           expect(tester.takeException(), isNull);
           expect(find.text(NgmyStripePayments.priceLabel(product)), findsOneWidget);

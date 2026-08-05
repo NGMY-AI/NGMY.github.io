@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -193,26 +194,60 @@ class NgmyStripePayments {
     }
   }
 
-  /// Each feature gets its own accent pair so the dialog feels made for it.
+  /// Each feature gets its own precious-metal pair — [mid, deep] — so the
+  /// payment dialog reads as made for that feature rather than generic.
   static List<Color> productAccent(NgmyStripeProduct product) {
     switch (product) {
       case NgmyStripeProduct.docShareOrg:
-        return const [Color(0xFF38BDF8), Color(0xFF6366F1)];
+        return const [Color(0xFF8FB8F0), Color(0xFF3B5FC0)]; // sapphire
       case NgmyStripeProduct.invoice:
-        return const [Color(0xFF34D399), Color(0xFF06B6D4)];
+        return const [Color(0xFFF0C24B), Color(0xFFB07E12)]; // gold
       case NgmyStripeProduct.advisors:
-        return const [Color(0xFFFBBF24), Color(0xFFF97316)];
+        return const [Color(0xFFF5A742), Color(0xFFC2611A)]; // amber
       case NgmyStripeProduct.familyTree:
-        return const [Color(0xFF4ADE80), Color(0xFF14B8A6)];
+        return const [Color(0xFF5FD6A4), Color(0xFF14876A)]; // emerald
       case NgmyStripeProduct.messageTranslator:
-        return const [Color(0xFF22D3EE), Color(0xFF3B82F6)];
+        return const [Color(0xFF6FE3F5), Color(0xFF1E88A8)]; // crystal
       case NgmyStripeProduct.documentScanner:
-        return const [Color(0xFFA78BFA), Color(0xFF6366F1)];
+        return const [Color(0xFFB58CF5), Color(0xFF6D3FC4)]; // amethyst
       case NgmyStripeProduct.marriageDocument:
-        return const [Color(0xFFFB7185), Color(0xFFEC4899)];
+        return const [Color(0xFFF4A98F), Color(0xFFD1476B)]; // rose gold
       case NgmyStripeProduct.phoneUnlock:
-        return const [Color(0xFF818CF8), Color(0xFFA855F7)];
+        return const [Color(0xFFB3C9E6), Color(0xFF4F6E9E)]; // polished silver
     }
+  }
+
+  /// The near-white highlight that sweeps across metal as it catches the light.
+  static Color productShine(NgmyStripeProduct product) {
+    switch (product) {
+      case NgmyStripeProduct.docShareOrg:
+        return const Color(0xFFE8F1FF);
+      case NgmyStripeProduct.invoice:
+        return const Color(0xFFFFF4CB);
+      case NgmyStripeProduct.advisors:
+        return const Color(0xFFFFEACA);
+      case NgmyStripeProduct.familyTree:
+        return const Color(0xFFDCFFEF);
+      case NgmyStripeProduct.messageTranslator:
+        return const Color(0xFFE4FCFF);
+      case NgmyStripeProduct.documentScanner:
+        return const Color(0xFFF1E4FF);
+      case NgmyStripeProduct.marriageDocument:
+        return const Color(0xFFFFE6DA);
+      case NgmyStripeProduct.phoneUnlock:
+        return const Color(0xFFF5FAFF);
+    }
+  }
+
+  /// Short, single-line benefits — long sentences ruin the centred layout.
+  static List<String> productPerks(NgmyStripeProduct product) {
+    return [
+      product == NgmyStripeProduct.marriageDocument
+          ? 'Opens instantly, with a live timer'
+          : 'Unlocks the moment you pay',
+      'Works on all your devices',
+      'Private, encrypted checkout',
+    ];
   }
 
   static String paymentSuccessUrl(NgmyStripeProduct product) =>
@@ -644,7 +679,7 @@ class NgmyStripePayments {
   }
 }
 
-class _NgmyPaymentDialog extends StatelessWidget {
+class _NgmyPaymentDialog extends StatefulWidget {
   const _NgmyPaymentDialog({
     required this.product,
     required this.email,
@@ -657,36 +692,91 @@ class _NgmyPaymentDialog extends StatelessWidget {
   final String title;
   final String message;
 
-  static const _card = Color(0xFF0D1017);
+  @override
+  State<_NgmyPaymentDialog> createState() => _NgmyPaymentDialogState();
+}
+
+class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
+    with TickerProviderStateMixin {
+  static const _card = Color(0xFF0B0E14);
   static const _muted = Color(0xFF7C8499);
 
-  Widget _perk(Color accent, IconData icon, String text) {
+  late final AnimationController _entry;
+  late final AnimationController _ambient;
+
+  @override
+  void initState() {
+    super.initState();
+    _entry = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 720),
+    )..forward();
+    _ambient = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 9),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    _ambient.dispose();
+    super.dispose();
+  }
+
+  /// Rows rise into place one after another instead of all appearing at once.
+  Widget _stagger(int index, Widget child) {
+    final start = (0.14 + index * 0.07).clamp(0.0, 0.66);
+    final anim = CurvedAnimation(
+      parent: _entry,
+      curve: Interval(
+        start,
+        (start + 0.44).clamp(0.0, 1.0),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (context, inner) => Opacity(
+        opacity: anim.value.clamp(0.0, 1.0),
+        child: Transform.translate(
+          offset: Offset(0, 16 * (1 - anim.value)),
+          child: inner,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _perk(Color mid, Color shine, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 24,
-            height: 24,
+            width: 19,
+            height: 19,
             decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(8),
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [shine, mid],
+              ),
             ),
-            child: Icon(icon, size: 14, color: accent),
+            child: const Icon(Icons.check_rounded, size: 12, color: _card),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: Color(0xFFB6BDCC),
-                  fontSize: 12.5,
-                  height: 1.35,
-                  fontWeight: FontWeight.w500,
-                ),
+          const SizedBox(width: 9),
+          Flexible(
+            child: Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFFB9C0CF),
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -695,287 +785,400 @@ class _NgmyPaymentDialog extends StatelessWidget {
     );
   }
 
+  Widget _ornament(Color mid) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.transparent, mid.withValues(alpha: 0.38)],
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11),
+          child: Transform.rotate(
+            angle: math.pi / 4,
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: mid.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [mid.withValues(alpha: 0.38), Colors.transparent],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colors = NgmyStripePayments.productAccent(product);
-    final accent = colors.first;
-    final accent2 = colors.last;
-    final isOneTimePay = NgmyStripePayments.isOneTimePayProduct(product);
-    final action = NgmyStripePayments.actionLabel(product);
-    final price = NgmyStripePayments.priceLabel(product);
-    final duration = NgmyStripePayments.durationLabel(product);
-    final isMarriage = product == NgmyStripeProduct.marriageDocument;
+    final palette = NgmyStripePayments.productAccent(widget.product);
+    final mid = palette.first;
+    final deep = palette.last;
+    final shine = NgmyStripePayments.productShine(widget.product);
+    final metalText = Color.lerp(mid, Colors.white, 0.55)!;
+
+    final isOneTimePay = NgmyStripePayments.isOneTimePayProduct(widget.product);
+    final action = NgmyStripePayments.actionLabel(widget.product);
+    final price = NgmyStripePayments.priceLabel(widget.product);
+    final duration = NgmyStripePayments.durationLabel(widget.product);
+    final perks = NgmyStripePayments.productPerks(widget.product);
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 396),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: accent.withValues(alpha: 0.26),
-                blurRadius: 56,
-                spreadRadius: -8,
-                offset: const Offset(0, 20),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.6),
-                blurRadius: 30,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: Container(
-              decoration: BoxDecoration(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 26),
+      child: AnimatedBuilder(
+        animation: _entry,
+        builder: (context, child) {
+          final pop = Curves.easeOutBack.transform(_entry.value.clamp(0.0, 1.0));
+          final fade = ((_entry.value) / 0.45).clamp(0.0, 1.0);
+          return Opacity(
+            opacity: fade,
+            child: Transform.scale(scale: 0.9 + 0.1 * pop, child: child),
+          );
+        },
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 392),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: mid.withValues(alpha: 0.3),
+                  blurRadius: 60,
+                  spreadRadius: -10,
+                  offset: const Offset(0, 22),
+                ),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.66),
+                  blurRadius: 34,
+                  offset: const Offset(0, 14),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Container(
                 color: _card,
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Stack(
-                children: [
-                  // Colour wash bleeding down from the top of the card.
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: 210,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            accent.withValues(alpha: 0.22),
-                            accent2.withValues(alpha: 0.07),
-                            Colors.transparent,
-                          ],
+                child: Stack(
+                  children: [
+                    // Colour wash bleeding down from the top of the card.
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 240,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              mid.withValues(alpha: 0.20),
+                              deep.withValues(alpha: 0.09),
+                              Colors.transparent,
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  Positioned(
-                    top: -70,
-                    right: -50,
-                    child: Container(
-                      width: 190,
-                      height: 190,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: RadialGradient(
-                          colors: [accent2.withValues(alpha: 0.3), Colors.transparent],
+                    Positioned(
+                      top: -80,
+                      right: -60,
+                      child: Container(
+                        width: 210,
+                        height: 210,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              shine.withValues(alpha: 0.16),
+                              Colors.transparent,
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  SingleChildScrollView(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(26, 26, 26, 20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 54,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [accent, accent2],
-                                  ),
-                                  borderRadius: BorderRadius.circular(18),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: accent.withValues(alpha: 0.45),
-                                      blurRadius: 18,
-                                      offset: const Offset(0, 8),
+                    // Drifting highlights across the upper half.
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _ambient,
+                          builder: (context, _) => CustomPaint(
+                            painter: _SparklePainter(
+                              t: _ambient.value,
+                              color: shine,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 30, 24, 20),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            _stagger(
+                              0,
+                              SizedBox(
+                                width: 112,
+                                height: 112,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    AnimatedBuilder(
+                                      animation: _ambient,
+                                      builder: (context, _) => CustomPaint(
+                                        size: const Size(112, 112),
+                                        painter: _HaloPainter(
+                                          t: _ambient.value,
+                                          mid: mid,
+                                          shine: shine,
+                                        ),
+                                      ),
+                                    ),
+                                    Container(
+                                      width: 66,
+                                      height: 66,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [shine, mid, deep],
+                                        ),
+                                        borderRadius: BorderRadius.circular(22),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: mid.withValues(alpha: 0.5),
+                                            blurRadius: 22,
+                                            offset: const Offset(0, 9),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        NgmyStripePayments.productIcon(widget.product),
+                                        color: Colors.white,
+                                        size: 31,
+                                      ),
                                     ),
                                   ],
                                 ),
-                                child: Icon(
-                                  NgmyStripePayments.productIcon(product),
-                                  color: Colors.white,
-                                  size: 27,
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+                            _stagger(
+                              1,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: mid.withValues(alpha: 0.10),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: mid.withValues(alpha: 0.30),
+                                  ),
+                                ),
+                                child: Text(
+                                  isOneTimePay
+                                      ? 'ONE-TIME ACCESS'
+                                      : 'MONTHLY ACCESS',
+                                  style: TextStyle(
+                                    color: metalText,
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.7,
+                                  ),
                                 ),
                               ),
-                              const Spacer(),
+                            ),
+                            const SizedBox(height: 15),
+                            _stagger(
+                              2,
+                              Text(
+                                widget.title,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 23,
+                                  height: 1.18,
+                                  letterSpacing: -0.4,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 9),
+                            _stagger(
+                              3,
+                              Text(
+                                widget.message,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF98A0B2),
+                                  fontSize: 12.8,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            _stagger(
+                              4,
+                              AnimatedBuilder(
+                                animation: _ambient,
+                                builder: (context, _) {
+                                  final t = _ambient.value;
+                                  return ShaderMask(
+                                    blendMode: BlendMode.srcIn,
+                                    shaderCallback: (bounds) => LinearGradient(
+                                      begin: Alignment(-1.9 + 4.2 * t, -0.5),
+                                      end: Alignment(-1.0 + 4.2 * t, 0.5),
+                                      colors: [metalText, shine, metalText],
+                                    ).createShader(bounds),
+                                    child: Text(
+                                      price,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 46,
+                                        height: 1,
+                                        letterSpacing: -1.8,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 11),
+                            _stagger(
+                              5,
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                   vertical: 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.07),
+                                  color: mid.withValues(alpha: 0.13),
                                   borderRadius: BorderRadius.circular(30),
                                   border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.12),
+                                    color: mid.withValues(alpha: 0.30),
                                   ),
                                 ),
                                 child: Text(
-                                  isOneTimePay ? 'ONE-TIME' : 'MONTHLY',
+                                  '$duration of access',
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.82),
-                                    fontSize: 9.5,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 22),
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 23,
-                              height: 1.15,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 9),
-                          Text(
-                            message,
-                            style: const TextStyle(
-                              color: Color(0xFF9BA3B5),
-                              fontSize: 13,
-                              height: 1.45,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          // Wrap so the chip drops below the price on narrow phones
-                          // instead of colliding with it.
-                          Wrap(
-                            spacing: 11,
-                            runSpacing: 10,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              ShaderMask(
-                                shaderCallback: (bounds) => LinearGradient(
-                                  colors: [Colors.white, accent],
-                                ).createShader(bounds),
-                                child: Text(
-                                  price,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 42,
-                                    height: 1,
-                                    letterSpacing: -1.5,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 11,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: accent.withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(30),
-                                  border: Border.all(
-                                    color: accent.withValues(alpha: 0.32),
-                                  ),
-                                ),
-                                child: Text(
-                                  '$duration access',
-                                  style: TextStyle(
-                                    color: accent,
+                                    color: metalText,
                                     fontSize: 11.5,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 22),
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(15, 15, 15, 4),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.035),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.06),
+                            ),
+                            const SizedBox(height: 20),
+                            _stagger(6, _ornament(mid)),
+                            const SizedBox(height: 16),
+                            _stagger(
+                              7,
+                              Column(
+                                children: [
+                                  for (final perk in perks) _perk(mid, shine, perk),
+                                ],
                               ),
                             ),
-                            child: Column(
-                              children: [
-                                _perk(
-                                  accent,
-                                  Icons.bolt_rounded,
-                                  isMarriage
-                                      ? 'Opens the moment you pay, with a timer while you work'
-                                      : 'Opens the moment you pay — no waiting',
-                                ),
-                                _perk(
-                                  accent,
-                                  Icons.devices_rounded,
-                                  'Sign in on any phone or computer and it is still unlocked',
-                                ),
-                                _perk(
-                                  accent,
-                                  Icons.verified_user_rounded,
-                                  'Encrypted checkout — your card details stay private',
-                                ),
-                              ],
+                            const SizedBox(height: 22),
+                            _stagger(
+                              8,
+                              _GradientPayButton(
+                                label: '$action $price',
+                                colors: [mid, deep],
+                                shine: shine,
+                                onPressed: () async {
+                                  await NgmyStripePayments.startCheckout(
+                                    widget.email,
+                                    widget.product,
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.pop(context, true);
+                                  }
+                                },
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 22),
-                          _GradientPayButton(
-                            label: '$action $price',
-                            colors: [accent, accent2],
-                            onPressed: () async {
-                              await NgmyStripePayments.startCheckout(email, product);
-                              if (context.mounted) Navigator.pop(context, true);
-                            },
-                          ),
-                          if (email.trim().isNotEmpty) ...[
-                            const SizedBox(height: 13),
-                            Center(
-                              child: Text(
-                                'Unlocks on $email',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Color(0xFF5E6577),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
+                            if (widget.email.trim().isNotEmpty) ...[
+                              const SizedBox(height: 13),
+                              _stagger(
+                                9,
+                                Text(
+                                  'Unlocks on ${widget.email}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Color(0xFF5E6577),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            _stagger(
+                              10,
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _muted,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 8,
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Maybe later',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ),
                           ],
-                          const SizedBox(height: 4),
-                          Center(
-                            child: TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              style: TextButton.styleFrom(
-                                foregroundColor: _muted,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 18,
-                                  vertical: 8,
-                                ),
-                              ),
-                              child: const Text(
-                                'Maybe later',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                    // Metal frame sits above the content so it reads as a border.
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: _ambient,
+                          builder: (context, _) => CustomPaint(
+                            painter: _MetalFramePainter(
+                              t: _ambient.value,
+                              mid: mid,
+                              deep: deep,
+                              shine: shine,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -985,25 +1188,202 @@ class _NgmyPaymentDialog extends StatelessWidget {
   }
 }
 
+/// Rotating brushed-metal border, plus a fainter inner hairline.
+class _MetalFramePainter extends CustomPainter {
+  _MetalFramePainter({
+    required this.t,
+    required this.mid,
+    required this.deep,
+    required this.shine,
+  });
+
+  final double t;
+  final Color mid;
+  final Color deep;
+  final Color shine;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+
+    final shader = SweepGradient(
+      transform: GradientRotation(t * 2 * math.pi),
+      colors: [
+        deep.withValues(alpha: 0.30),
+        mid.withValues(alpha: 0.70),
+        shine,
+        mid.withValues(alpha: 0.70),
+        deep.withValues(alpha: 0.30),
+        deep.withValues(alpha: 0.30),
+      ],
+      stops: const [0.0, 0.17, 0.26, 0.35, 0.62, 1.0],
+    ).createShader(rect);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(1.1), const Radius.circular(29)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..shader = shader,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect.deflate(7.5), const Radius.circular(23)),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = mid.withValues(alpha: 0.13),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MetalFramePainter old) =>
+      old.t != t || old.mid != mid || old.shine != shine;
+}
+
+/// Two counter-rotating rings with dots riding the outer one.
+class _HaloPainter extends CustomPainter {
+  _HaloPainter({required this.t, required this.mid, required this.shine});
+
+  final double t;
+  final Color mid;
+  final Color shine;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final centre = rect.center;
+    final outer = size.width / 2 - 2;
+
+    canvas.drawCircle(
+      centre,
+      outer,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..shader = SweepGradient(
+          transform: GradientRotation(t * 2 * math.pi),
+          colors: [
+            mid.withValues(alpha: 0.0),
+            mid.withValues(alpha: 0.55),
+            shine,
+            mid.withValues(alpha: 0.55),
+            mid.withValues(alpha: 0.0),
+            mid.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.2, 0.3, 0.4, 0.7, 1.0],
+        ).createShader(rect),
+    );
+
+    final innerR = outer - 9;
+    canvas.drawCircle(
+      centre,
+      innerR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..shader = SweepGradient(
+          transform: GradientRotation(-t * 2 * math.pi),
+          colors: [
+            shine.withValues(alpha: 0.0),
+            shine.withValues(alpha: 0.42),
+            shine.withValues(alpha: 0.0),
+            shine.withValues(alpha: 0.0),
+          ],
+          stops: const [0.0, 0.12, 0.3, 1.0],
+        ).createShader(rect),
+    );
+
+    for (var i = 0; i < 3; i++) {
+      final angle = t * 2 * math.pi + i * (2 * math.pi / 3);
+      final p = Offset(
+        centre.dx + outer * math.cos(angle),
+        centre.dy + outer * math.sin(angle),
+      );
+      canvas.drawCircle(p, 2.1, Paint()..color = shine.withValues(alpha: 0.9));
+      canvas.drawCircle(p, 4.4, Paint()..color = shine.withValues(alpha: 0.16));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HaloPainter old) =>
+      old.t != t || old.mid != mid || old.shine != shine;
+}
+
+/// Slow twinkle across the top of the card.
+class _SparklePainter extends CustomPainter {
+  _SparklePainter({required this.t, required this.color});
+
+  final double t;
+  final Color color;
+
+  static const _spots = <Offset>[
+    Offset(0.13, 0.10),
+    Offset(0.86, 0.08),
+    Offset(0.93, 0.26),
+    Offset(0.07, 0.29),
+    Offset(0.74, 0.045),
+    Offset(0.26, 0.05),
+    Offset(0.50, 0.015),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var i = 0; i < _spots.length; i++) {
+      final phase = (t + i / _spots.length) % 1.0;
+      final a = (math.sin(phase * 2 * math.pi) + 1) / 2;
+      if (a <= 0.03) continue;
+      final at = Offset(_spots[i].dx * size.width, _spots[i].dy * size.height);
+      canvas.drawCircle(
+        at,
+        1.0 + 1.6 * a,
+        Paint()..color = color.withValues(alpha: 0.08 + 0.40 * a),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklePainter old) => old.t != t;
+}
+
 /// Gradient CTA with a press response — FilledButton cannot carry a gradient.
 class _GradientPayButton extends StatefulWidget {
   const _GradientPayButton({
     required this.label,
     required this.colors,
+    required this.shine,
     required this.onPressed,
   });
 
   final String label;
   final List<Color> colors;
+  final Color shine;
   final Future<void> Function() onPressed;
 
   @override
   State<_GradientPayButton> createState() => _GradientPayButtonState();
 }
 
-class _GradientPayButtonState extends State<_GradientPayButton> {
+class _GradientPayButtonState extends State<_GradientPayButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _sweep;
   bool _down = false;
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sweep = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _sweep.dispose();
+    super.dispose();
+  }
 
   Future<void> _fire() async {
     if (_busy) return;
@@ -1037,31 +1417,62 @@ class _GradientPayButtonState extends State<_GradientPayButton> {
             borderRadius: BorderRadius.circular(17),
             boxShadow: [
               BoxShadow(
-                color: widget.colors.first.withValues(alpha: 0.42),
-                blurRadius: 22,
-                offset: const Offset(0, 9),
+                color: widget.colors.first.withValues(alpha: 0.45),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),
-          child: Center(
-            child: _busy
-                ? const SizedBox(
-                    width: 19,
-                    height: 19,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.2,
-                      valueColor: AlwaysStoppedAnimation(Colors.white),
-                    ),
-                  )
-                : Text(
-                    widget.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      letterSpacing: 0.2,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: Stack(
+              children: [
+                // Light travelling across the button face.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _sweep,
+                      builder: (context, _) {
+                        final t = _sweep.value;
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment(-2.2 + 4.4 * t, -1),
+                              end: Alignment(-1.5 + 4.4 * t, 1),
+                              colors: [
+                                Colors.transparent,
+                                widget.shine.withValues(alpha: 0.42),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
+                ),
+                Center(
+                  child: _busy
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          widget.label,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
