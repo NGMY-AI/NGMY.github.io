@@ -468,14 +468,13 @@
 
     }
 
-    /* The host box has to be the layout viewport itself, never a measured copy
-       of it. Anything that tracks the *visual* viewport - 100dvh, or a pixel
-       height read from visualViewport - is a snapshot, and it goes stale while
-       the browser chrome animates. Coming back from an external page such as
-       checkout re-expands that chrome, so a stale, too-short box leaves the
-       page background showing as a black band along the bottom of the screen.
-       An inset-0 box cannot drift out of sync: it is the viewport. This is also
-       the engine's own default geometry, so nothing here fights it. */
+    /* Full-page mode never measures this element - the engine sizes its canvas
+       from the viewport, not from here - so all this box has to do is cover the
+       viewport with the app's background and never come up short. An inset-0
+       box is the viewport by definition, and it is the engine's own default
+       geometry, so nothing here fights it. Do not give it a pixel height: a
+       measured copy of the viewport goes stale, which is what used to open the
+       black band along the bottom of the screen. */
     flutter-view {
 
       position: absolute;
@@ -761,52 +760,68 @@
   </script>
 
   <script>
+    // Puts the engine's idea of the window back in step with the screen after
+    // the app has been left for an external page such as checkout.
+    //
+    // In full-page mode the engine measures visualViewport - and on iOS
+    // documentElement.clientHeight - and it only re-reads either one when a
+    // "resize" event fires on visualViewport. That is the single event it
+    // listens to. Coming back from an external page re-lays out the browser's
+    // toolbars, but the document is handed back without that event firing, so
+    // the engine keeps drawing at the height it measured before it left. The
+    // leftover strip below the short canvas is the page background, and that is
+    // the black band along the bottom, with the app's own bottom bar sitting up
+    // above it.
+    //
+    // So re-fire the exact event the engine is already waiting for. Nothing
+    // here sets a size - the CSS owns that - so there is no pinned height left
+    // behind that can go stale later, which is what broke earlier attempts.
     (function () {
-      function scrollTopOnce() {
+      // The window fallback below re-enters this through our own window
+      // listener, so hold the door while a dispatch is in flight. dispatchEvent
+      // is synchronous, so this is all the guard it needs.
+      var firing = false;
+
+      function remeasure() {
+        if (firing) return;
+        firing = true;
+        try {
+          var vv = window.visualViewport;
+          if (vv) vv.dispatchEvent(new Event('resize'));
+          else window.dispatchEvent(new Event('resize'));
+        } catch (e) {}
+        firing = false;
+      }
+
+      function resettle() {
+        // iOS can also hand the page back scrolled down by the height of the
+        // toolbar it just hid, which exposes the same strip.
         window.scrollTo(0, 0);
         document.documentElement.scrollTop = 0;
         if (document.body) document.body.scrollTop = 0;
-      }
-      window.addEventListener('pageshow', scrollTopOnce);
-    })();
-  </script>
-
-  <script>
-    // Makes Flutter re-measure after the page is restored from an external site.
-    //
-    // The CSS above guarantees the host box is always the right size, but Flutter
-    // only re-reads its size when a ResizeObserver fires. Returning from checkout
-    // can hand the document back at the same box size it was suspended at, so no
-    // observer fires and the engine keeps rendering at whatever size it last
-    // measured - which is how the canvas ends up shorter than the window. A
-    // one-frame 1px nudge forces a real size change, so the engine re-measures.
-    //
-    // This must never leave a height behind: a pinned pixel height is exactly
-    // what used to go stale and open the black band in the first place.
-    (function () {
-      function nudge() {
-        var views = document.querySelectorAll('flutter-view');
-        if (!views.length) return;
-        for (var i = 0; i < views.length; i++) views[i].style.bottom = '1px';
-        var restore = function () {
-          for (var j = 0; j < views.length; j++) views[j].style.bottom = '';
-        };
-        if (window.requestAnimationFrame) requestAnimationFrame(restore);
-        else setTimeout(restore, 16);
+        remeasure();
       }
 
-      // Browser chrome animates in and out on restore, so re-check for a moment
-      // rather than trusting the size at the instant the page came back.
-      function nudgeSettling() {
-        nudge();
-        [120, 400, 900].forEach(function (ms) { setTimeout(nudge, ms); });
+      // Toolbars animate for a moment after the page comes back, so keep asking
+      // until the size settles instead of trusting the first frame.
+      function resettleUntilSteady() {
+        resettle();
+        [50, 150, 350, 700, 1200].forEach(function (ms) { setTimeout(resettle, ms); });
       }
 
-      window.addEventListener('pageshow', nudgeSettling);
-      window.addEventListener('orientationchange', nudgeSettling);
+      window.addEventListener('pageshow', resettleUntilSteady);
+      window.addEventListener('focus', resettleUntilSteady);
+      window.addEventListener('orientationchange', resettleUntilSteady);
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState === 'visible') nudgeSettling();
+        if (document.visibilityState === 'visible') resettleUntilSteady();
       });
+
+      // Closes a gap the engine has on iOS: it measures the layout viewport but
+      // subscribes to the visual one. The two do not always move together - the
+      // layout viewport can change while the visual viewport does not - and when
+      // that happens the engine is never told, so it keeps its old height for
+      // good. The window hears about it, so pass the news along.
+      window.addEventListener('resize', remeasure);
     })();
   </script>
 
