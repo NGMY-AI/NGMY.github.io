@@ -39,6 +39,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
   late final String _viewType;
   html.VideoElement? _video;
   String? _error;
+  Timer? _stallWatch;
 
   @override
   void initState() {
@@ -237,32 +238,45 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     void playWithSound() {
       v.playbackRate = 1.0;
       v.defaultPlaybackRate = 1.0;
-      if (userMuted) {
-        v.muted = true;
-        v.play().catchError((e) {
-          debugPrint('[vault html video] muted play failed: $e');
-          showError('Tap Play again — your browser blocked playback.');
-        });
-        syncUi();
-        return;
-      }
-      v.volume = 1.0;
-      v.muted = true;
-      v.defaultMuted = true;
-      try {
-        final pending = v.play();
-        v.muted = false;
-        v.defaultMuted = false;
+      v.muted = userMuted;
+      v.defaultMuted = userMuted;
+      if (!userMuted) {
         v.removeAttribute('muted');
         v.volume = 1.0;
-        pending.catchError((e) {
+      }
+      try {
+        // Play is always called straight from a tap, so sound is allowed. If a
+        // browser still refuses, fall back to muted rather than tearing the
+        // player down — a silent clip beats a dead play button.
+        v.play().catchError((Object e) {
           debugPrint('[vault html video] play failed: $e');
-          showError('Tap Play again — your browser blocked playback.');
+          if (v.muted) return;
+          v.muted = true;
+          v.defaultMuted = true;
+          v.play().catchError((Object e2) {
+            debugPrint('[vault html video] muted retry failed: $e2');
+          });
+          syncUi();
         });
       } catch (e) {
-        showError('Tap Play again — your browser blocked playback.');
+        debugPrint('[vault html video] play threw: $e');
       }
       syncUi();
+    }
+
+    /// A clip whose data never arrives leaves `play()` pending forever, so the
+    /// button looks dead. Re-attach the source once, then say what went wrong.
+    void watchForStall() {
+      _stallWatch?.cancel();
+      _stallWatch = Timer(const Duration(seconds: 5), () {
+        if (!mounted || v.readyState > 0 || !v.paused) return;
+        _attachMediaSource(v, widget.source, mime);
+        v.play().catchError((Object _) {});
+        _stallWatch = Timer(const Duration(seconds: 8), () {
+          if (!mounted || v.readyState > 0 || !v.paused) return;
+          showError('This clip will not load on this browser. Re-add it as an MP4 from your gallery.');
+        });
+      });
     }
 
     void togglePlay() {
@@ -271,6 +285,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
         v.defaultPlaybackRate = 1.0;
         if (v.readyState < 1) {
           _attachMediaSource(v, widget.source, mime);
+          watchForStall();
         }
         if (v.paused || v.ended) {
           if (v.ended) v.currentTime = 0;
@@ -279,7 +294,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
           v.pause();
         }
       } catch (e) {
-        showError('Tap Play again — your browser blocked playback.');
+        debugPrint('[vault html video] toggle failed: $e');
       }
       syncUi();
     }
@@ -345,6 +360,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       ..append(bar);
 
     v.onPlay.listen((_) {
+      _stallWatch?.cancel();
       if (!userMuted) {
         v.muted = false;
         v.volume = 1.0;
@@ -352,6 +368,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
       v.playbackRate = 1.0;
       syncUi();
     });
+    v.onLoadedData.listen((_) => _stallWatch?.cancel());
     v.onLoadedMetadata.listen((_) {
       v.playbackRate = 1.0;
       v.defaultPlaybackRate = 1.0;
@@ -364,6 +381,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
     v.onEnded.listen((_) => syncUi());
     v.onTimeUpdate.listen((_) => syncUi());
     v.onError.listen((_) {
+      _stallWatch?.cancel();
       debugPrint('[vault html video] error code=${v.error?.code} src=${widget.source}');
       showError('Could not play this video. Try re-adding an MP4 clip from your gallery.');
     });
@@ -376,6 +394,7 @@ class _NgmyVaultHtmlVideoState extends State<NgmyVaultHtmlVideo> {
 
   @override
   void dispose() {
+    _stallWatch?.cancel();
     try {
       _video?.pause();
       _video?.removeAttribute('src');

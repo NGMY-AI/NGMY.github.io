@@ -28190,6 +28190,9 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                                   onAddTransaction: widget.onAddTransaction,
                                                 ),
                                                 onGranted: widget.onDataChanged,
+                                                invoiceRef: NgmyInvoicePayments.invoiceRefFromEntry(
+                                                  Map<String, dynamic>.from(inv),
+                                                ),
                                               );
                                               if (!ok) return;
                                             }
@@ -28409,11 +28412,21 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, _invoiceTemplate, isAdmin: widget.user.isAdmin);
   }
 
+  String _invoiceRef() => NgmyInvoicePayments.invoiceRef(
+        templateId: _invoiceTemplate,
+        invoiceNo: _invoiceNoC.text,
+        business: _bizNameC.text,
+        clientName: _clientNameC.text,
+        item: _itemNameC.text,
+        itemPrice: _itemPriceC.text,
+      );
+
   Future<bool> _invoiceContentLockedAsync() => NgmyInvoicePayments.isContentLocked(
         widget.config,
         widget.user.email,
         _invoiceTemplate,
         isAdmin: widget.user.isAdmin,
+        invoiceRef: _invoiceRef(),
       );
 
   Future<bool> _ensureInvoiceTemplatePaid(BuildContext ctx, VoidCallback refresh) {
@@ -28430,6 +28443,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
         onAddTransaction: widget.onAddTransaction,
       ),
       onGranted: widget.onDataChanged,
+      invoiceRef: _invoiceRef(),
     ).then((ok) {
       if (ok) refresh();
       return ok;
@@ -28453,7 +28467,6 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     _providerSignaturePoints.clear();
     _clientSignaturePoints.clear();
     _invoicePaid = false;
-    await NgmyStripePayments.ensureInvoiceTrialStarted(widget.user.email);
     _invoiceDialogLockInitialized = false;
     _invoiceDialogLocked = false;
     await _cleanupExpiredPaidInvoices();

@@ -243,6 +243,15 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
         !NgmyInvoicePayments.hasAccess(widget.config, _email, _templateId, isAdmin: _isAdmin);
   }
 
+  String _invoiceRef() => NgmyInvoicePayments.invoiceRef(
+        templateId: _templateId,
+        invoiceNo: _invoiceNoC.text,
+        business: _bizNameC.text,
+        clientName: _clientNameC.text,
+        item: _itemNameC.text,
+        itemPrice: _itemPriceC.text,
+      );
+
   Future<bool> _ensureTemplatePaid(BuildContext ctx) async {
     if (_isAdmin) return true;
     if (widget.config == null || widget.onCharge == null) return !_contentLocked();
@@ -253,6 +262,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
       templateId: _templateId,
       onCharge: widget.onCharge!,
       onGranted: widget.onDataChanged,
+      invoiceRef: _invoiceRef(),
     );
     if (ok && mounted) setState(() {});
     return ok;
@@ -716,6 +726,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                                               templateId: tpl,
                                               onCharge: widget.onCharge ?? (_, __) async => false,
                                               onGranted: widget.onDataChanged,
+                                              invoiceRef: NgmyInvoicePayments.invoiceRefFromEntry(
+                                                Map<String, dynamic>.from(inv),
+                                              ),
                                             );
                                             if (!ok) return;
                                           }

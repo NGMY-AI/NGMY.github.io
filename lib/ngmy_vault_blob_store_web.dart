@@ -81,6 +81,15 @@ class NgmyVaultBlobStore {
     return null;
   }
 
+  /// Re-labels a blob with the MIME the `<video>` element needs. Clips picked
+  /// on an iPhone arrive as `video/quicktime`, which Chrome refuses to decode
+  /// even though the H.264 inside plays fine once it is called `video/mp4`.
+  /// Wrapping is a data reference, not a copy, so multi-GB clips stay cheap.
+  static html.Blob _retagged(html.Blob blob, String type) {
+    if (blob.type.trim().toLowerCase() == type) return blob;
+    return html.Blob([blob], type);
+  }
+
   /// Persist bytes. Videos should pass a real [mime] so playback works later.
   static Future<bool> put(String id, Uint8List bytes, {String mime = 'application/octet-stream'}) async {
     if (id.trim().isEmpty || bytes.isEmpty) return false;
@@ -115,15 +124,7 @@ class NgmyVaultBlobStore {
     try {
       final db = await _open();
       final tx = db.transaction(_storeName, 'readwrite');
-      html.Blob toStore;
-      if (htmlBlob is html.File) {
-        toStore = htmlBlob.type.trim().isEmpty ? html.File([htmlBlob], htmlBlob.name, {'type': type}) : htmlBlob;
-      } else if (htmlBlob.type.trim().isEmpty || !htmlBlob.type.startsWith('video/')) {
-        toStore = html.Blob([htmlBlob], type);
-      } else {
-        toStore = htmlBlob;
-      }
-      tx.objectStore(_storeName).put(toStore, id);
+      tx.objectStore(_storeName).put(_retagged(htmlBlob, type), id);
       await tx.completed;
       return true;
     } catch (e) {
@@ -160,10 +161,7 @@ class NgmyVaultBlobStore {
       final result = await tx.objectStore(_storeName).getObject(id);
       final type = ngmyVaultPlaybackMime(mime);
       if (result is html.Blob && result.size > 0) {
-        final blob = (result.type.trim().isEmpty || !result.type.startsWith('video/'))
-            ? html.Blob([result], type)
-            : result;
-        return html.Url.createObjectUrlFromBlob(blob);
+        return html.Url.createObjectUrlFromBlob(_retagged(result, type));
       }
       if (result is html.Blob && result.size == 0) {
         debugPrint('[ngmy_vault_blob] getObjectUrl: empty blob for $id');

@@ -32,7 +32,9 @@ class NgmyStripePayments {
   static const String marriageDocumentUrl = 'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
   static const String phoneUnlockUrl = 'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
 
-  static const int invoiceFreeTrialDays = 3;
+  /// Invoices a free user may create before the paywall. Counted per invoice,
+  /// not per day, so someone who only invoices occasionally still gets all three.
+  static const int invoiceFreeCount = 3;
   static const int advisorFreeMinutes = 30;
   static const int dayTrialHours = 24;
   static const int marriageSessionHours = 4;
@@ -46,7 +48,7 @@ class NgmyStripePayments {
 
   static const _accessPrefix = 'ngmy_stripe_until_';
   static const _provisionalPrefix = 'ngmy_stripe_prov_';
-  static const _invoiceTrialPrefix = 'ngmy_invoice_trial_start_';
+  static const _invoiceFreeRefsPrefix = 'ngmy_invoice_free_refs_';
   static const _dayTrialPrefix = 'ngmy_stripe_day_trial_';
   static const _pendingProductKey = 'ngmy_pay_pending_product';
   static const _pendingEmailKey = 'ngmy_pay_pending_email';
@@ -522,34 +524,47 @@ class NgmyStripePayments {
         deckKind == 'hati_malipo_awamu';
   }
 
-  static Future<DateTime?> _invoiceTrialStart(String email) async {
+  /// Invoices already counted against the free allowance, held as content
+  /// references rather than a plain tally. Saving an invoice and then
+  /// downloading the same one has to spend one of the three, not two, and
+  /// re-opening one made earlier must not spend another.
+  static Future<List<String>> _invoiceFreeRefs(String email) async {
     final key = _emailKey(email);
-    if (key.isEmpty) return null;
+    if (key.isEmpty) return const [];
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('$_invoiceTrialPrefix$key');
-    if (raw == null || raw.isEmpty) return null;
-    return DateTime.tryParse(raw);
+    return prefs.getStringList('$_invoiceFreeRefsPrefix$key') ?? const [];
   }
 
-  static Future<void> ensureInvoiceTrialStarted(String email) async {
+  static Future<int> invoiceFreeUsed(String email) async => (await _invoiceFreeRefs(email)).length;
+
+  static Future<int> invoiceFreeLeft(String email) async {
+    final used = await invoiceFreeUsed(email);
+    return (invoiceFreeCount - used).clamp(0, invoiceFreeCount);
+  }
+
+  /// Whether this invoice is still covered by the free allowance, without
+  /// spending anything. Safe to call while building the locked-preview UI.
+  static Future<bool> hasInvoiceFreeLeft(String email, String invoiceRef) async {
+    final refs = await _invoiceFreeRefs(email);
+    if (refs.contains(invoiceRef.trim())) return true;
+    return refs.length < invoiceFreeCount;
+  }
+
+  /// Claims one of the free invoices for [invoiceRef]. Returns false once all
+  /// three are spent on other invoices, which is what sends the user to pay.
+  static Future<bool> claimInvoiceFree(String email, String invoiceRef) async {
     final key = _emailKey(email);
-    if (key.isEmpty) return;
-    if (await _invoiceTrialStart(email) != null) return;
+    final ref = invoiceRef.trim();
+    if (key.isEmpty || ref.isEmpty) return false;
+
+    final refs = List<String>.from(await _invoiceFreeRefs(email));
+    if (refs.contains(ref)) return true;
+    if (refs.length >= invoiceFreeCount) return false;
+
+    refs.add(ref);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('$_invoiceTrialPrefix$key', DateTime.now().toUtc().toIso8601String());
-  }
-
-  static Future<bool> hasInvoiceTrialAccess(String email) async {
-    final started = await _invoiceTrialStart(email);
-    if (started == null) return true;
-    return DateTime.now().difference(started).inDays < invoiceFreeTrialDays;
-  }
-
-  static Future<int> invoiceTrialDaysLeft(String email) async {
-    final started = await _invoiceTrialStart(email);
-    if (started == null) return invoiceFreeTrialDays;
-    final used = DateTime.now().difference(started).inDays;
-    return (invoiceFreeTrialDays - used).clamp(0, invoiceFreeTrialDays);
+    await prefs.setStringList('$_invoiceFreeRefsPrefix$key', refs);
+    return true;
   }
 
   static Future<DateTime?> _dayTrialStart(String email, NgmyStripeProduct product) async {
@@ -583,13 +598,9 @@ class NgmyStripePayments {
     required NgmyStripeProduct product,
     bool isAdmin = false,
     bool checkDayTrial = false,
-    bool checkInvoiceTrial = false,
   }) async {
     if (isAdmin) return false;
     if (await hasActiveAccess(email, product)) return false;
-    if (checkInvoiceTrial && product == NgmyStripeProduct.invoice) {
-      return !await hasInvoiceTrialAccess(email);
-    }
     if (checkDayTrial &&
         (product == NgmyStripeProduct.messageTranslator || product == NgmyStripeProduct.documentScanner)) {
       return !await hasDayTrialAccess(email, product);
@@ -609,7 +620,6 @@ class NgmyStripePayments {
     required String email,
     bool isAdmin = false,
     bool checkDayTrial = false,
-    bool checkInvoiceTrial = false,
     String? title,
     String? message,
   }) async {
@@ -625,7 +635,6 @@ class NgmyStripePayments {
       product: product,
       isAdmin: isAdmin,
       checkDayTrial: checkDayTrial,
-      checkInvoiceTrial: checkInvoiceTrial,
     )) {
       return true;
     }
@@ -654,7 +663,6 @@ class NgmyStripePayments {
       product: product,
       isAdmin: isAdmin,
       checkDayTrial: checkDayTrial,
-      checkInvoiceTrial: checkInvoiceTrial,
     );
   }
 

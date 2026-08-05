@@ -847,19 +847,14 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
   }
 
   Widget _photoTile(NgmyVaultItem item) {
-    return FutureBuilder<Uint8List?>(
-      future: NgmyVaultBlobStore.getBytes(item.id),
-      builder: (context, snap) {
-        final bytes = snap.data;
-        if (bytes == null) {
-          return Container(
-            color: Colors.white.withValues(alpha: 0.04),
-            alignment: Alignment.center,
-            child: const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.white24)),
-          );
-        }
-        return Image.memory(bytes, fit: BoxFit.cover);
-      },
+    return _VaultPhotoBytes(
+      itemId: item.id,
+      placeholder: Container(
+        color: Colors.white.withValues(alpha: 0.04),
+        alignment: Alignment.center,
+        child: const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.8, color: Colors.white24)),
+      ),
+      builder: (_, bytes) => Image.memory(bytes, fit: BoxFit.cover, gaplessPlayback: true),
     );
   }
 
@@ -911,6 +906,55 @@ class _VaultGalleryScreenState extends State<_VaultGalleryScreen> {
   }
 }
 
+/// Reads a vault photo out of IndexedDB once and holds on to it. A
+/// `FutureBuilder` with the read started inside `build` restarts on every
+/// gallery rebuild, which drops back to the spinner for a frame each time —
+/// that is what made the grid blink.
+class _VaultPhotoBytes extends StatefulWidget {
+  const _VaultPhotoBytes({required this.itemId, required this.builder, required this.placeholder});
+
+  final String itemId;
+  final Widget Function(BuildContext context, Uint8List bytes) builder;
+  final Widget placeholder;
+
+  @override
+  State<_VaultPhotoBytes> createState() => _VaultPhotoBytesState();
+}
+
+class _VaultPhotoBytesState extends State<_VaultPhotoBytes> {
+  Uint8List? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(_VaultPhotoBytes oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Grid tiles carry no keys, so a delete can hand this element a new item.
+    if (oldWidget.itemId != widget.itemId) {
+      _bytes = null;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final id = widget.itemId;
+    final bytes = await NgmyVaultBlobStore.getBytes(id);
+    if (!mounted || id != widget.itemId) return;
+    setState(() => _bytes = bytes);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    if (bytes == null) return widget.placeholder;
+    return widget.builder(context, bytes);
+  }
+}
+
 class _VaultVideoThumbTile extends StatefulWidget {
   const _VaultVideoThumbTile({required this.itemId, required this.mime});
   final String itemId;
@@ -930,7 +974,19 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(_VaultVideoThumbTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Grid tiles carry no keys, so a delete can hand this element a new item.
+    if (oldWidget.itemId != widget.itemId) {
+      _jpegThumb = null;
+      _loading = true;
+      _load();
+    }
+  }
+
   Future<void> _load() async {
+    final itemId = widget.itemId;
     final key = NgmyVaultBlobStore.thumbKey(widget.itemId);
     var bytes = await NgmyVaultBlobStore.getBytes(key);
     if (bytes == null || bytes.isEmpty) {
@@ -943,7 +999,7 @@ class _VaultVideoThumbTileState extends State<_VaultVideoThumbTile> {
         }
       }
     }
-    if (!mounted) return;
+    if (!mounted || itemId != widget.itemId) return;
     setState(() {
       _jpegThumb = bytes;
       _loading = false;
@@ -1142,17 +1198,14 @@ class _VaultViewerScreenState extends State<_VaultViewerScreen> {
 
   Widget _page(NgmyVaultItem item) {
     if (item.kind == NgmyVaultKind.video) return _VaultVideoPage(itemId: item.id, mime: item.mime);
-    return FutureBuilder<Uint8List?>(
-      future: NgmyVaultBlobStore.getBytes(item.id),
-      builder: (context, snap) {
-        final bytes = snap.data;
-        if (bytes == null) return const Center(child: CircularProgressIndicator(color: Colors.white54));
-        return InteractiveViewer(
-          minScale: 1,
-          maxScale: 4,
-          child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
-        );
-      },
+    return _VaultPhotoBytes(
+      itemId: item.id,
+      placeholder: const Center(child: CircularProgressIndicator(color: Colors.white54)),
+      builder: (_, bytes) => InteractiveViewer(
+        minScale: 1,
+        maxScale: 4,
+        child: Center(child: Image.memory(bytes, fit: BoxFit.contain, gaplessPlayback: true)),
+      ),
     );
   }
 

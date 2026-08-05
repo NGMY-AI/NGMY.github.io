@@ -102,17 +102,43 @@ class NgmyInvoicePayments {
     return false;
   }
 
+  /// Identifies one invoice by what is on it. The free allowance is spent per
+  /// invoice, so saving one and then downloading it must not count twice, and
+  /// re-opening an invoice made earlier must not count again either.
+  static String invoiceRef({
+    required String templateId,
+    required String invoiceNo,
+    required String business,
+    required String clientName,
+    required String item,
+    required String itemPrice,
+  }) =>
+      [templateId, invoiceNo, business, clientName, item, itemPrice]
+          .map((s) => s.trim().toLowerCase())
+          .join('|');
+
+  static String invoiceRefFromEntry(Map<String, dynamic> entry) => invoiceRef(
+        templateId: (entry['template'] ?? '').toString(),
+        invoiceNo: (entry['invoiceNo'] ?? '').toString(),
+        business: (entry['business'] ?? entry['businessName'] ?? '').toString(),
+        clientName: (entry['clientName'] ?? '').toString(),
+        item: (entry['item'] ?? entry['itemName'] ?? '').toString(),
+        itemPrice: (entry['itemPrice'] ?? '').toString(),
+      );
+
   static Future<bool> isContentLocked(
     dynamic config,
     String email,
     String templateId, {
     bool isAdmin = false,
+    String invoiceRef = '',
   }) async {
     if (isAdmin) return false;
     if (!requiresPayment(templateId, config)) return false;
     if (hasAccess(config, email, templateId)) return false;
-    await NgmyStripePayments.ensureInvoiceTrialStarted(email);
-    if (await NgmyStripePayments.hasInvoiceTrialAccess(email)) return false;
+    // Peek only — deciding whether to blur the preview must never spend one of
+    // the three, or simply typing would use them up.
+    if (await NgmyStripePayments.hasInvoiceFreeLeft(email, invoiceRef)) return false;
     if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return false;
     return true;
   }
@@ -226,31 +252,30 @@ class NgmyInvoicePayments {
     required String templateId,
     required Future<bool> Function(double amount, String description) onCharge,
     VoidCallback? onGranted,
+    String invoiceRef = '',
   }) async {
     if ((user as dynamic).isAdmin == true) return true;
     if (!requiresPayment(templateId, config)) return true;
     final email = (user as dynamic).email as String;
     if (hasAccess(config, email, templateId)) return true;
 
-    await NgmyStripePayments.ensureInvoiceTrialStarted(email);
-    if (await NgmyStripePayments.hasInvoiceTrialAccess(email)) {
+    // Subscribers first, so an active plan never spends a free invoice.
+    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return true;
+    if (await NgmyStripePayments.claimInvoiceFree(email, invoiceRef)) {
       onGranted?.call();
       return true;
     }
-    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return true;
 
     final tier = tierForTemplate(templateId)!;
     final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
-    final daysLeft = await NgmyStripePayments.invoiceTrialDaysLeft(email);
 
     final paid = await NgmyStripePayments.ensurePaid(
       context: context,
       product: NgmyStripeProduct.invoice,
       email: email,
       title: 'NGMY Invoice — $tierLabel',
-      message: daysLeft <= 0
-          ? 'Your 3-day free invoice trial has ended. Subscribe for Premium & Luxury templates (30 days).'
-          : 'Subscribe for Premium & Luxury invoice templates (30 days).',
+      message: 'You have used your ${NgmyStripePayments.invoiceFreeCount} free invoices. '
+          'Subscribe for unlimited Premium & Luxury templates (30 days).',
     );
     if (!paid) return false;
 

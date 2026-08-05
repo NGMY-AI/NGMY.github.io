@@ -391,33 +391,64 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
+  /// Keeps a bottom-bar label on one line. The type is a step down from the
+  /// button default so "Preview" fits beside its icon on a 320px phone instead
+  /// of wrapping a letter at a time; the scale-down is only a last resort.
+  static Widget _barLabel(String text) => FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          maxLines: 1,
+          softWrap: false,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+        ),
+      );
+
   Widget _bottomBar(NgmyHubTheme t) {
+    // Publish gives up width to Preview so all three labels fit side by side.
+    const compact = EdgeInsets.symmetric(horizontal: 6);
+    const barSize = Size(0, 44);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
       decoration: BoxDecoration(color: t.scaffold, border: Border(top: BorderSide(color: t.border))),
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton(onPressed: _save, child: const Text('Save')),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _openFullPreview,
-              icon: const Icon(Icons.visibility_outlined, size: 18),
-              label: const Text('Preview'),
-              style: OutlinedButton.styleFrom(foregroundColor: _kBioAccent, side: const BorderSide(color: _kBioAccent)),
+            flex: 3,
+            child: OutlinedButton(
+              onPressed: _save,
+              style: OutlinedButton.styleFrom(padding: compact, minimumSize: barSize),
+              child: _barLabel('Save'),
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
-            flex: 2,
+            flex: 5,
+            child: OutlinedButton.icon(
+              onPressed: _openFullPreview,
+              icon: const Icon(Icons.visibility_outlined, size: 16),
+              label: _barLabel('Preview'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _kBioAccent,
+                side: const BorderSide(color: _kBioAccent),
+                padding: compact,
+                minimumSize: barSize,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 4,
             child: FilledButton(
               onPressed: _publishing ? null : _publish,
-              style: FilledButton.styleFrom(backgroundColor: _kBioAccent),
+              style: FilledButton.styleFrom(
+                backgroundColor: _kBioAccent,
+                padding: compact,
+                minimumSize: barSize,
+              ),
               child: _publishing
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Publish'),
+                  : _barLabel('Publish'),
             ),
           ),
         ],
