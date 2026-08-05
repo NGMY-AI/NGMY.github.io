@@ -7785,6 +7785,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   List<AppTransaction> _allTransactions = [];
   List<UserData> _allUsers = [];
   String? _cloudUserRowEnsuredForEmail;
+  String? _stripeAccessSyncedForEmail;
   Timer? _cloudUserRowResyncTimer;
   AppConfig _config = AppConfig();
   List<InvestmentPlan> _globalPlans = _investmentPlansFromMaps(kNgmyInvestmentPlansMaps);
@@ -8154,10 +8155,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await _pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true);
   }
 
+  /// Restores paid Stripe features from Supabase for whoever is signed in, so
+  /// buying on one device unlocks the feature everywhere that account logs in.
+  Future<void> _syncStripeAccessForCurrentUser({bool force = false}) async {
+    final email = ngmyNormalizeEmail(_currentUser?.email ?? '');
+    if (email.isEmpty) return;
+    if (!force && _stripeAccessSyncedForEmail == email) return;
+    _stripeAccessSyncedForEmail = email;
+    await NgmyStripePayments.syncAllAccessFromCloud(email);
+  }
+
   void _startCloudUserRowResyncLoop() {
     _cloudUserRowResyncTimer?.cancel();
     if (_currentUser == null) return;
     unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
+    unawaited(_syncStripeAccessForCurrentUser(force: true));
     _cloudUserRowResyncTimer = Timer.periodic(const Duration(minutes: 5), (_) async {
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
       // Pull-merge before push — otherwise a device whose local copy missed a
@@ -8168,6 +8180,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _refreshCurrentUserFromCloud();
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
       unawaited(_pushSignupUserToCloudReliable(_currentUser!, includeFreeTrial: true));
+      unawaited(_syncStripeAccessForCurrentUser(force: true));
     });
   }
 
@@ -8969,12 +8982,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   @override void initState() {
     super.initState();
     unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
-    if (_currentUser != null) {
-      final stripeEmail = ((_currentUser as dynamic).email as String?) ?? '';
-      if (stripeEmail.trim().isNotEmpty) {
-        unawaited(NgmyStripePayments.syncAllAccessFromCloud(stripeEmail));
-      }
-    }
+    unawaited(_syncStripeAccessForCurrentUser(force: true));
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {
@@ -9117,12 +9125,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
-      if (_currentUser != null) {
-        final stripeEmail = ((_currentUser as dynamic).email as String?) ?? '';
-        if (stripeEmail.trim().isNotEmpty) {
-          unawaited(NgmyStripePayments.syncAllAccessFromCloud(stripeEmail));
-        }
-      }
+      unawaited(_syncStripeAccessForCurrentUser(force: true));
       unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();

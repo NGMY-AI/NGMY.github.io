@@ -21,14 +21,19 @@ create index if not exists ngmy_stripe_access_product_idx
 
 alter table public.ngmy_stripe_access enable row level security;
 
+-- NGMY accounts are not Supabase Auth accounts (the app only signs into Supabase
+-- anonymously, for storage), so a JWT-email policy can never match and paid access
+-- would never restore on a second device. Reads are therefore open, matching every
+-- other NGMY table.
 drop policy if exists "ngmy_stripe_access_select_own" on public.ngmy_stripe_access;
-create policy "ngmy_stripe_access_select_own"
+drop policy if exists "ngmy_stripe_access_read" on public.ngmy_stripe_access;
+create policy "ngmy_stripe_access_read"
   on public.ngmy_stripe_access
   for select
-  to authenticated
-  using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+  using (true);
 
--- Webhook (service role) inserts/updates; users only read their own rows.
+-- Deliberately no insert/update/delete policies. The Stripe webhook writes with the
+-- service role key, which bypasses RLS, so no client can ever grant itself access.
 
 create or replace function public.ngmy_stripe_touch_updated_at()
 returns trigger

@@ -117,10 +117,31 @@ function accessUntilForProduct(product: string, existingUntil: Date | null): str
   return new Date(base.getTime() + ACCESS_DAYS_DEFAULT * 86_400_000).toISOString();
 }
 
+/// client_reference_id carries "<slug>" or "<slug>--<base64url account email>".
+/// Stripe only permits [A-Za-z0-9_-] there, hence the encoding.
+function parseClientReference(raw: unknown): { slug: string; email: string } {
+  const value = String(raw ?? "").trim();
+  if (!value) return { slug: "", email: "" };
+
+  const sep = value.indexOf("--");
+  if (sep < 0) return { slug: normalize(value), email: "" };
+
+  const slug = normalize(value.slice(0, sep));
+  const encoded = value.slice(sep + 2);
+  let email = "";
+  try {
+    const padded = encoded.replaceAll("-", "+").replaceAll("_", "/");
+    email = normalize(atob(padded + "=".repeat((4 - padded.length % 4) % 4)));
+  } catch {
+    email = "";
+  }
+  return { slug, email };
+}
+
 // deno-lint-ignore no-explicit-any
 function productFromSession(session: any): string {
-  const ref = normalize(session?.client_reference_id);
-  if (PRODUCT_SLUGS.has(ref)) return ref;
+  const { slug } = parseClientReference(session?.client_reference_id);
+  if (PRODUCT_SLUGS.has(slug)) return slug;
 
   const meta = session?.metadata ?? {};
   const fromMeta = normalize(meta.ngmy_product ?? meta.product);
@@ -155,8 +176,14 @@ async function productFromPaymentLink(
   }
 }
 
+/// The NGMY account email wins over the Stripe checkout email: access has to land
+/// on the account the buyer is signed into, even if they typed a different address
+/// on Stripe's page.
 // deno-lint-ignore no-explicit-any
 function emailFromSession(session: any): string {
+  const { email: fromRef } = parseClientReference(session?.client_reference_id);
+  if (fromRef.includes("@")) return fromRef;
+
   return normalize(
     session?.customer_details?.email ??
       session?.customer_email ??
