@@ -107,7 +107,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       NgmyStudioHomeFilter.biosOnly => 'bio',
       NgmyStudioHomeFilter.all => 'menus',
     };
-    _reload();
+    _reload(syncCloud: true);
   }
 
   @override
@@ -129,20 +129,37 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     super.dispose();
   }
 
-  Future<void> _reload() async {
-    final results = await Future.wait([
-      widget._isLocal
-          ? loadNgmyLocalMenus(userEmail: widget.userEmail)
-          : loadNgmyMenus(userEmail: widget.userEmail),
-      widget._isLocal
-          ? loadNgmyLocalBios(userEmail: widget.userEmail)
-          : loadNgmyBios(userEmail: widget.userEmail),
-    ]);
+  /// Set [syncCloud] when opening the studio, so a device that has never seen
+  /// this account's library pulls it down. Saves and deletes leave it off:
+  /// those already reconciled with the cloud on their way through storage.
+  Future<void> _reload({bool syncCloud = false}) async {
+    final menusFuture = widget._isLocal
+        ? loadNgmyLocalMenus(userEmail: widget.userEmail)
+        : loadNgmyMenus(userEmail: widget.userEmail);
+    final biosFuture = widget._isLocal
+        ? loadNgmyLocalBios(userEmail: widget.userEmail)
+        : loadNgmyBios(userEmail: widget.userEmail);
+    final menus = await menusFuture;
+    final bios = await biosFuture;
     if (!mounted) return;
     setState(() {
-      _menus = results[0] as List<NgmyMenuDocument>;
-      _bios = results[1] as List<NgmyBioDocument>;
+      _menus = menus;
+      _bios = bios;
       _loading = false;
+    });
+
+    if (!syncCloud || widget._isLocal) return;
+
+    // The cloud round trip must never hold up the list this device already has,
+    // so it lands as a second, later update.
+    final syncedMenusFuture = syncNgmyMenusWithCloud(userEmail: widget.userEmail);
+    final syncedBiosFuture = syncNgmyBiosWithCloud(userEmail: widget.userEmail);
+    final syncedMenus = await syncedMenusFuture;
+    final syncedBios = await syncedBiosFuture;
+    if (!mounted) return;
+    setState(() {
+      _menus = syncedMenus;
+      _bios = syncedBios;
     });
   }
 

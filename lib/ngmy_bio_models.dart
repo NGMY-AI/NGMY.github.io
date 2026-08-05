@@ -4,6 +4,16 @@ import 'ngmy_menu_models.dart';
 
 String ngmyBioNewId() => 'bio_${DateTime.now().microsecondsSinceEpoch}';
 
+/// Bio ids embed the moment they were made (`bio_<microseconds>`), so documents
+/// written before [NgmyBioDocument.createdAt] existed can still be put in age
+/// order. Null when the id carries no timestamp to read.
+DateTime? ngmyBioCreatedAtFromId(String id) {
+  final digits = RegExp(r'(\d{10,})$').firstMatch(id.trim())?.group(1);
+  final micros = int.tryParse(digits ?? '');
+  if (micros == null) return null;
+  return DateTime.fromMicrosecondsSinceEpoch(micros);
+}
+
 /// One tappable link card on a Bio page.
 class NgmyBioLink {
   NgmyBioLink({
@@ -57,8 +67,10 @@ class NgmyBioDocument {
     this.publicUrl = '',
     this.status = 'draft',
     this.qrStyle = const NgmyMenuQrStyle(),
+    DateTime? createdAt,
     DateTime? updatedAt,
-  }) : updatedAt = updatedAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? ngmyBioCreatedAtFromId(id) ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   final String id;
   String displayName;
@@ -75,6 +87,9 @@ class NgmyBioDocument {
   String publicUrl;
   String status;
   NgmyMenuQrStyle qrStyle;
+  /// Fixed at creation. Ordering by this is what decides which Bio is the one
+  /// backed up to the account, so editing must never move it.
+  final DateTime createdAt;
   DateTime updatedAt;
 
   bool get isPublished => status == 'published' && slug.isNotEmpty;
@@ -97,27 +112,35 @@ class NgmyBioDocument {
         'publicUrl': publicUrl,
         'status': status,
         'qrStyle': qrStyle.toJson(),
+        'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
       };
 
-  factory NgmyBioDocument.fromJson(Map<String, dynamic> json) => NgmyBioDocument(
-        id: (json['id'] ?? ngmyBioNewId()).toString(),
-        displayName: (json['displayName'] ?? '').toString(),
-        tagline: (json['tagline'] ?? '').toString(),
-        templateId: (json['templateId'] ?? 'gold_curved').toString(),
-        ringStyleId: (json['ringStyleId'] ?? 'gold').toString(),
-        profileScale: ((json['profileScale'] as num?)?.toDouble() ?? 1.0).clamp(0.65, 1.6),
-        headerImageBase64: (json['headerImageBase64'] ?? '').toString(),
-        avatarImageBase64: (json['avatarImageBase64'] ?? '').toString(),
-        backgroundImageBase64: (json['backgroundImageBase64'] ?? '').toString(),
-        links: (json['links'] as List?)?.whereType<Map>().map((e) => NgmyBioLink.fromJson(Map<String, dynamic>.from(e))).toList() ?? [],
-        socialLinks: NgmyMenuSocialLinks.fromJson(json['socialLinks'] is Map ? Map<String, dynamic>.from(json['socialLinks'] as Map) : null),
-        slug: (json['slug'] ?? '').toString(),
-        publicUrl: (json['publicUrl'] ?? '').toString(),
-        status: (json['status'] ?? 'draft').toString(),
-        qrStyle: NgmyMenuQrStyle.fromJson(json['qrStyle'] is Map ? Map<String, dynamic>.from(json['qrStyle'] as Map) : null),
-        updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
-      );
+  factory NgmyBioDocument.fromJson(Map<String, dynamic> json) {
+    final id = (json['id'] ?? ngmyBioNewId()).toString();
+    final updatedAt = DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now();
+    return NgmyBioDocument(
+      id: id,
+      displayName: (json['displayName'] ?? '').toString(),
+      tagline: (json['tagline'] ?? '').toString(),
+      templateId: (json['templateId'] ?? 'gold_curved').toString(),
+      ringStyleId: (json['ringStyleId'] ?? 'gold').toString(),
+      profileScale: ((json['profileScale'] as num?)?.toDouble() ?? 1.0).clamp(0.65, 1.6),
+      headerImageBase64: (json['headerImageBase64'] ?? '').toString(),
+      avatarImageBase64: (json['avatarImageBase64'] ?? '').toString(),
+      backgroundImageBase64: (json['backgroundImageBase64'] ?? '').toString(),
+      links: (json['links'] as List?)?.whereType<Map>().map((e) => NgmyBioLink.fromJson(Map<String, dynamic>.from(e))).toList() ?? [],
+      socialLinks: NgmyMenuSocialLinks.fromJson(json['socialLinks'] is Map ? Map<String, dynamic>.from(json['socialLinks'] as Map) : null),
+      slug: (json['slug'] ?? '').toString(),
+      publicUrl: (json['publicUrl'] ?? '').toString(),
+      status: (json['status'] ?? 'draft').toString(),
+      qrStyle: NgmyMenuQrStyle.fromJson(json['qrStyle'] is Map ? Map<String, dynamic>.from(json['qrStyle'] as Map) : null),
+      // Bios written before this field existed fall back to the timestamp in
+      // their id, so their age order is preserved rather than reset to now.
+      createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? ngmyBioCreatedAtFromId(id) ?? updatedAt,
+      updatedAt: updatedAt,
+    );
+  }
 
   NgmyBioDocument copy() => NgmyBioDocument.fromJson(toJson());
 

@@ -49,6 +49,32 @@ Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaRest(
   }
 }
 
+/// Read that tells "there is no such row" apart from "the server could not be
+/// reached". A sync that cannot tell those apart reads a network blip as an
+/// empty cloud, and then overwrites good data with whatever this device holds.
+Future<({bool reachable, Map<String, dynamic>? value})> ngmyFetchSettingsRowStatus(
+  String key, {
+  Duration timeout = const Duration(seconds: 8),
+}) async {
+  try {
+    final resp = await http.get(ngmySettingsRestRowUri(key), headers: _ngmySettingsRestHeaders).timeout(timeout);
+    if (resp.statusCode != 200) {
+      debugPrint('[ngmy_settings] rest status GET $key: ${resp.statusCode}');
+      return (reachable: false, value: null);
+    }
+    final decoded = jsonDecode(resp.body);
+    if (decoded is! List || decoded.isEmpty) return (reachable: true, value: null);
+    final row = decoded.first;
+    if (row is! Map) return (reachable: true, value: null);
+    final value = row['value'];
+    if (value is! Map) return (reachable: true, value: null);
+    return (reachable: true, value: Map<String, dynamic>.from(value));
+  } catch (e) {
+    debugPrint('[ngmy_settings] rest status GET $key: $e');
+    return (reachable: false, value: null);
+  }
+}
+
 Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaClient(
   String key, {
   Duration timeout = const Duration(seconds: 8),
