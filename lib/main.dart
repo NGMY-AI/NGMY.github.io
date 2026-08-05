@@ -8983,6 +8983,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     super.initState();
     unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
     unawaited(_syncStripeAccessForCurrentUser(force: true));
+    NgmyStripePayments.listenForCrossTabPaymentReturn(() {
+      unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
+      unawaited(_syncStripeAccessForCurrentUser(force: true));
+      NgmyStripePayments.forceWebViewportResettle();
+    });
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
     ngmyOnGameWinNotify = (gameTitle, body) async {
@@ -9126,6 +9131,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
       unawaited(_syncStripeAccessForCurrentUser(force: true));
+      NgmyStripePayments.forceWebViewportResettle();
       unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();
@@ -15006,6 +15012,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      NgmyStripePayments.forceWebViewportResettle();
       if (ngmyShouldAllowGlobalInterrupt()) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();

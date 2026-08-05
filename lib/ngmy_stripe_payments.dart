@@ -491,6 +491,13 @@ class NgmyStripePayments {
     return false;
   }
 
+  /// Web: another tab wrote the Stripe success receipt into localStorage.
+  static void listenForCrossTabPaymentReturn(void Function() onMaybePaid) =>
+      ngmyListenForCrossTabPaymentReturn(onMaybePaid);
+
+  /// Web: force the engine to re-measure after leaving an external page.
+  static void forceWebViewportResettle() => ngmyForceWebViewportResettle();
+
   static Future<DateTime?> accessUntil(String email, NgmyStripeProduct product) async {
     final confirmed = await _accessUntil(email, product);
     final provisional = await _provisionalUntil(email, product);
@@ -1512,6 +1519,7 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
   @override
   void initState() {
     super.initState();
+    if (widget.isAdmin) return;
     unawaited(_refresh());
     _tick = Timer.periodic(const Duration(seconds: 1), (_) => unawaited(_refresh()));
   }
@@ -1548,6 +1556,9 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
 
   @override
   Widget build(BuildContext context) {
+    // Admins do not have a timed session — hide the bar entirely for them.
+    if (widget.isAdmin) return const SizedBox.shrink();
+
     final urgent = _remaining.inMinutes < 30 && _remaining.inHours < 999;
     final color = urgent ? const Color(0xFFEF4444) : const Color(0xFFB8860B);
     return Container(
