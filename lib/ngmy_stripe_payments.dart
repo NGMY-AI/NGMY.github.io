@@ -185,11 +185,33 @@ class NgmyStripePayments {
   static String durationLabel(NgmyStripeProduct product) {
     switch (product) {
       case NgmyStripeProduct.marriageDocument:
-        return 'for 4 hours';
+        return '4 hours';
       case NgmyStripeProduct.phoneUnlock:
-        return 'for 10 days';
+        return '10 days';
       default:
-        return 'for 30 days';
+        return '30 days';
+    }
+  }
+
+  /// Each feature gets its own accent pair so the dialog feels made for it.
+  static List<Color> productAccent(NgmyStripeProduct product) {
+    switch (product) {
+      case NgmyStripeProduct.docShareOrg:
+        return const [Color(0xFF38BDF8), Color(0xFF6366F1)];
+      case NgmyStripeProduct.invoice:
+        return const [Color(0xFF34D399), Color(0xFF06B6D4)];
+      case NgmyStripeProduct.advisors:
+        return const [Color(0xFFFBBF24), Color(0xFFF97316)];
+      case NgmyStripeProduct.familyTree:
+        return const [Color(0xFF4ADE80), Color(0xFF14B8A6)];
+      case NgmyStripeProduct.messageTranslator:
+        return const [Color(0xFF22D3EE), Color(0xFF3B82F6)];
+      case NgmyStripeProduct.documentScanner:
+        return const [Color(0xFFA78BFA), Color(0xFF6366F1)];
+      case NgmyStripeProduct.marriageDocument:
+        return const [Color(0xFFFB7185), Color(0xFFEC4899)];
+      case NgmyStripeProduct.phoneUnlock:
+        return const [Color(0xFF818CF8), Color(0xFFA855F7)];
     }
   }
 
@@ -635,26 +657,36 @@ class _NgmyPaymentDialog extends StatelessWidget {
   final String title;
   final String message;
 
-  static const _card = Color(0xFF11141C);
-  static const _accent = Color(0xFF6366F1);
-  static const _muted = Color(0xFF8B93A7);
+  static const _card = Color(0xFF0D1017);
+  static const _muted = Color(0xFF7C8499);
 
-  Widget _perk(IconData icon, String text) {
+  Widget _perk(Color accent, IconData icon, String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 17, color: _accent),
-          const SizedBox(width: 10),
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 14, color: accent),
+          ),
+          const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                color: Color(0xFFC9CEDB),
-                fontSize: 12.5,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: Color(0xFFB6BDCC),
+                  fontSize: 12.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ),
@@ -665,6 +697,9 @@ class _NgmyPaymentDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = NgmyStripePayments.productAccent(product);
+    final accent = colors.first;
+    final accent2 = colors.last;
     final isOneTimePay = NgmyStripePayments.isOneTimePayProduct(product);
     final action = NgmyStripePayments.actionLabel(product);
     final price = NgmyStripePayments.priceLabel(product);
@@ -673,179 +708,360 @@ class _NgmyPaymentDialog extends StatelessWidget {
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Container(
+        constraints: const BoxConstraints(maxWidth: 396),
+        child: DecoratedBox(
           decoration: BoxDecoration(
-            color: _card,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+            borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 40,
-                offset: const Offset(0, 18),
+                color: accent.withValues(alpha: 0.26),
+                blurRadius: 56,
+                spreadRadius: -8,
+                offset: const Offset(0, 20),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.6),
+                blurRadius: 30,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: Container(
+              decoration: BoxDecoration(
+                color: _card,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Stack(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: _accent.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Icon(
-                          NgmyStripePayments.productIcon(product),
-                          color: _accent,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 17,
-                                height: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              isOneTimePay ? 'One-time payment' : 'Renews monthly',
-                              style: const TextStyle(
-                                color: _muted,
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                  // Colour wash bleeding down from the top of the card.
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 210,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            accent.withValues(alpha: 0.22),
+                            accent2.withValues(alpha: 0.07),
+                            Colors.transparent,
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        price,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 34,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        duration,
-                        style: const TextStyle(
-                          color: _muted,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    message,
-                    style: const TextStyle(
-                      color: Color(0xFFAEB5C6),
-                      fontSize: 13,
-                      height: 1.45,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  Container(height: 1, color: Colors.white.withValues(alpha: 0.06)),
-                  const SizedBox(height: 16),
-                  _perk(
-                    Icons.bolt_rounded,
-                    isMarriage
-                        ? 'Unlocks right after payment, with a timer while you work'
-                        : 'Unlocks instantly after payment — no waiting',
-                  ),
-                  _perk(
-                    Icons.devices_rounded,
-                    'Saved to your account — sign in on any device and it is still there',
-                  ),
-                  _perk(
-                    Icons.lock_rounded,
-                    'Card handled securely by Stripe. NGMY never sees your card details',
-                  ),
-                  const SizedBox(height: 6),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () async {
-                        await NgmyStripePayments.startCheckout(email, product);
-                        if (context.mounted) Navigator.pop(context, true);
-                      },
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _accent,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: Text(
-                        '$action $price',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15.5,
+                  Positioned(
+                    top: -70,
+                    right: -50,
+                    child: Container(
+                      width: 190,
+                      height: 190,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [accent2.withValues(alpha: 0.3), Colors.transparent],
                         ),
                       ),
                     ),
                   ),
-                  if (email.trim().isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Text(
-                        'Access will be added to $email',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7286),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 2),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text(
-                        'Maybe later',
-                        style: TextStyle(
-                          color: _muted,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
+                  SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(26, 26, 26, 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 54,
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [accent, accent2],
+                                  ),
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: accent.withValues(alpha: 0.45),
+                                      blurRadius: 18,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  NgmyStripePayments.productIcon(product),
+                                  color: Colors.white,
+                                  size: 27,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.12),
+                                  ),
+                                ),
+                                child: Text(
+                                  isOneTimePay ? 'ONE-TIME' : 'MONTHLY',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.82),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 22),
+                          Text(
+                            title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 23,
+                              height: 1.15,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 9),
+                          Text(
+                            message,
+                            style: const TextStyle(
+                              color: Color(0xFF9BA3B5),
+                              fontSize: 13,
+                              height: 1.45,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          // Wrap so the chip drops below the price on narrow phones
+                          // instead of colliding with it.
+                          Wrap(
+                            spacing: 11,
+                            runSpacing: 10,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              ShaderMask(
+                                shaderCallback: (bounds) => LinearGradient(
+                                  colors: [Colors.white, accent],
+                                ).createShader(bounds),
+                                child: Text(
+                                  price,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 42,
+                                    height: 1,
+                                    letterSpacing: -1.5,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 11,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: accent.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: accent.withValues(alpha: 0.32),
+                                  ),
+                                ),
+                                child: Text(
+                                  '$duration access',
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 22),
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(15, 15, 15, 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.035),
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.06),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                _perk(
+                                  accent,
+                                  Icons.bolt_rounded,
+                                  isMarriage
+                                      ? 'Opens the moment you pay, with a timer while you work'
+                                      : 'Opens the moment you pay — no waiting',
+                                ),
+                                _perk(
+                                  accent,
+                                  Icons.devices_rounded,
+                                  'Sign in on any phone or computer and it is still unlocked',
+                                ),
+                                _perk(
+                                  accent,
+                                  Icons.verified_user_rounded,
+                                  'Encrypted checkout — your card details stay private',
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 22),
+                          _GradientPayButton(
+                            label: '$action $price',
+                            colors: [accent, accent2],
+                            onPressed: () async {
+                              await NgmyStripePayments.startCheckout(email, product);
+                              if (context.mounted) Navigator.pop(context, true);
+                            },
+                          ),
+                          if (email.trim().isNotEmpty) ...[
+                            const SizedBox(height: 13),
+                            Center(
+                              child: Text(
+                                'Unlocks on $email',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFF5E6577),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Center(
+                            child: TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              style: TextButton.styleFrom(
+                                foregroundColor: _muted,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 8,
+                                ),
+                              ),
+                              child: const Text(
+                                'Maybe later',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gradient CTA with a press response — FilledButton cannot carry a gradient.
+class _GradientPayButton extends StatefulWidget {
+  const _GradientPayButton({
+    required this.label,
+    required this.colors,
+    required this.onPressed,
+  });
+
+  final String label;
+  final List<Color> colors;
+  final Future<void> Function() onPressed;
+
+  @override
+  State<_GradientPayButton> createState() => _GradientPayButtonState();
+}
+
+class _GradientPayButtonState extends State<_GradientPayButton> {
+  bool _down = false;
+  bool _busy = false;
+
+  Future<void> _fire() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.onPressed();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _down = true),
+      onTapUp: (_) => setState(() => _down = false),
+      onTapCancel: () => setState(() => _down = false),
+      onTap: _fire,
+      child: AnimatedScale(
+        scale: _down ? 0.975 : 1,
+        duration: const Duration(milliseconds: 110),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 17),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: widget.colors,
+            ),
+            borderRadius: BorderRadius.circular(17),
+            boxShadow: [
+              BoxShadow(
+                color: widget.colors.first.withValues(alpha: 0.42),
+                blurRadius: 22,
+                offset: const Offset(0, 9),
+              ),
+            ],
+          ),
+          child: Center(
+            child: _busy
+                ? const SizedBox(
+                    width: 19,
+                    height: 19,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  )
+                : Text(
+                    widget.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
           ),
         ),
       ),
