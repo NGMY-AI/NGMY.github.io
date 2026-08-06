@@ -86,6 +86,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   void _bind() {
+    // Older blank Bios stored the sample name as real text. Treat that legacy
+    // value as the same placeholder new Bios use, so tapping starts fresh.
+    if (_doc.displayName.trim() == kNgmyBioDefaultDisplayName) {
+      _doc.displayName = '';
+    }
     _nameC.text = _doc.displayName;
     _taglineC.text = _doc.tagline;
     _slugC.text = _doc.slug;
@@ -126,13 +131,17 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     }
     widget.onSaved();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bio saved')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Bio saved')));
   }
 
   Future<void> _publish() async {
     _sync();
     if (_doc.displayName.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add your name first')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Add your name first')));
       return;
     }
     if (!widget._isLocal) {
@@ -158,14 +167,27 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     }
     final String? err;
     if (widget._isLocal) {
-      err = await NgmyLocalBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson());
+      err = await NgmyLocalBioPublishRegistry.publish(
+        slug: _doc.slug,
+        data: _doc.toJson(),
+      );
     } else {
-      err = await NgmyBioPublishRegistry.publish(slug: _doc.slug, data: _doc.toJson(), createdByEmail: widget.userEmail);
+      err = await NgmyBioPublishRegistry.publish(
+        slug: _doc.slug,
+        data: _doc.toJson(),
+        createdByEmail: widget.userEmail,
+      );
     }
     if (err == null) {
-      final base = widget._isLocal ? ngmyLocalBioPublicUrlForSlug(_doc.slug) : ngmyBioPublicUrlForSlug(_doc.slug);
+      final base = widget._isLocal
+          ? ngmyLocalBioPublicUrlForSlug(_doc.slug)
+          : ngmyBioPublicUrlForSlug(_doc.slug);
       _doc.publicUrl = widget._isLocal
-          ? NgmyLocalBioPublishRegistry.publicUrlFor(_doc.slug, _doc.toJson(), baseUrl: base)
+          ? NgmyLocalBioPublishRegistry.publicUrlFor(
+              _doc.slug,
+              _doc.toJson(),
+              baseUrl: base,
+            )
           : base;
       _doc.status = 'published';
     }
@@ -188,11 +210,15 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     if (url.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-        widget._isLocal ? 'Published! Anyone can open this link.' : 'Published! Link copied: $url',
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          widget._isLocal
+              ? 'Published! Anyone can open this link.'
+              : 'Published! Link copied: $url',
+        ),
       ),
-    ));
+    );
   }
 
   void _openFullPreview() {
@@ -207,10 +233,18 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             SafeArea(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420, maxHeight: 780),
+                  constraints: const BoxConstraints(
+                    maxWidth: 420,
+                    maxHeight: 780,
+                  ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: NgmyBioPreview(document: _doc, compact: false, interactive: false, fullBleed: true),
+                    child: NgmyBioPreview(
+                      document: _doc,
+                      compact: false,
+                      interactive: false,
+                      fullBleed: true,
+                    ),
                   ),
                 ),
               ),
@@ -234,7 +268,13 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               child: Center(
                 child: FilledButton.icon(
                   onPressed: () => Navigator.pop(ctx),
-                  style: FilledButton.styleFrom(backgroundColor: _kBioAccent, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kBioAccent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 14,
+                    ),
+                  ),
                   icon: const Icon(Icons.edit_rounded),
                   label: const Text('Back to editing'),
                 ),
@@ -246,14 +286,24 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
-  Future<void> _pickImage(void Function(String b64) setter, {int maxSize = 1200}) async {
+  Future<void> _pickImage(
+    void Function(String b64) setter, {
+    int maxSize = 1200,
+  }) async {
     try {
-      final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: maxSize.toDouble(), imageQuality: 88);
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: maxSize.toDouble(),
+        imageQuality: 88,
+      );
       if (file == null) return;
       final bytes = await file.readAsBytes();
       setState(() => setter('data:image/jpeg;base64,${base64Encode(bytes)}'));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
     }
   }
 
@@ -265,7 +315,8 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         imageQuality: 88,
       );
       if (file == null || !mounted) return;
-      final encoded = 'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
+      final encoded =
+          'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
       if (!mounted) return;
 
       if (!widget._isLocal) {
@@ -282,9 +333,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       setState(() => _doc.avatarImageBase64 = encoded);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not pick image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
       }
     }
   }
@@ -306,8 +357,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     final qrUrl = _doc.publicUrl.isNotEmpty
         ? _doc.publicUrl
         : (widget._isLocal
-            ? ngmyLocalBioPublicUrlForSlug(_doc.slug.isEmpty ? 'preview' : _doc.slug)
-            : ngmyBioPublicUrlForSlug(_doc.slug.isEmpty ? 'preview' : _doc.slug));
+              ? ngmyLocalBioPublicUrlForSlug(
+                  _doc.slug.isEmpty ? 'preview' : _doc.slug,
+                )
+              : ngmyBioPublicUrlForSlug(
+                  _doc.slug.isEmpty ? 'preview' : _doc.slug,
+                ));
     final wide = MediaQuery.sizeOf(context).width > 720;
 
     return Material(
@@ -342,7 +397,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   children: [
                     Icon(Icons.visibility_rounded, size: 16, color: t.muted),
                     const SizedBox(width: 6),
-                    Text('Live preview', style: TextStyle(color: t.subtitle, fontWeight: FontWeight.w700, fontSize: 12)),
+                    Text(
+                      'Live preview',
+                      style: TextStyle(
+                        color: t.subtitle,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -352,11 +414,20 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: t.border),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16)],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                      ),
+                    ],
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: RepaintBoundary(
-                    child: NgmyBioPreview(document: _doc, compact: false, fullBleed: true),
+                    child: NgmyBioPreview(
+                      document: _doc,
+                      compact: false,
+                      fullBleed: true,
+                    ),
                   ),
                 ),
               ),
@@ -381,18 +452,30 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               Material(
                 color: t.listItemBg,
                 child: InkWell(
-                  onTap: () => setState(() => _previewExpanded = !_previewExpanded),
+                  onTap: () =>
+                      setState(() => _previewExpanded = !_previewExpanded),
                   child: Container(
                     height: collapsedH,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: t.border)),
+                    ),
                     child: Row(
                       children: [
-                        Icon(_previewExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: _kBioAccent),
+                        Icon(
+                          _previewExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
+                          color: _kBioAccent,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           _previewExpanded ? 'Hide preview' : 'Show preview',
-                          style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13),
+                          style: TextStyle(
+                            color: t.title,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -402,7 +485,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               if (_previewExpanded)
                 Expanded(
                   child: Container(
-                    decoration: BoxDecoration(border: Border(bottom: BorderSide(color: t.border))),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: t.border)),
+                    ),
                     clipBehavior: Clip.antiAlias,
                     child: RepaintBoundary(
                       child: NgmyBioPreview(document: _doc, compact: true),
@@ -422,12 +507,32 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
       child: Row(
         children: [
-          IconButton(onPressed: widget.onBack, icon: Icon(Icons.arrow_back_ios_new_rounded, color: t.iconButtonIcon, size: 18)),
+          IconButton(
+            onPressed: widget.onBack,
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: t.iconButtonIcon,
+              size: 18,
+            ),
+          ),
           Expanded(
-            child: Text(_doc.displayName.trim().isEmpty ? 'New Bio' : _doc.displayName.trim(), style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 16), overflow: TextOverflow.ellipsis),
+            child: Text(
+              _doc.displayName.trim().isEmpty
+                  ? 'New Bio'
+                  : _doc.displayName.trim(),
+              style: TextStyle(
+                color: t.title,
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           if (_doc.publicUrl.isNotEmpty)
-            IconButton(onPressed: () => _copyLink(_doc.publicUrl), icon: const Icon(Icons.copy_rounded, color: _kBioAccent)),
+            IconButton(
+              onPressed: () => _copyLink(_doc.publicUrl),
+              icon: const Icon(Icons.copy_rounded, color: _kBioAccent),
+            ),
         ],
       ),
     );
@@ -438,12 +543,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: _kBioAccent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: _kBioAccent.withValues(alpha: 0.3))),
+        decoration: BoxDecoration(
+          color: _kBioAccent.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _kBioAccent.withValues(alpha: 0.3)),
+        ),
         child: Row(
           children: [
             const Icon(Icons.link_rounded, color: _kBioAccent, size: 16),
             const SizedBox(width: 8),
-            Expanded(child: Text(url, style: TextStyle(color: t.title, fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+            Expanded(
+              child: Text(
+                url,
+                style: TextStyle(
+                  color: t.title,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -454,14 +573,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   /// button default so "Preview" fits beside its icon on a 320px phone instead
   /// of wrapping a letter at a time; the scale-down is only a last resort.
   static Widget _barLabel(String text) => FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(
-          text,
-          maxLines: 1,
-          softWrap: false,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-        ),
-      );
+    fit: BoxFit.scaleDown,
+    child: Text(
+      text,
+      maxLines: 1,
+      softWrap: false,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+    ),
+  );
 
   Widget _bottomBar(NgmyHubTheme t) {
     // Publish gives up width to Preview so all three labels fit side by side.
@@ -469,14 +588,20 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     const barSize = Size(0, 44);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-      decoration: BoxDecoration(color: t.scaffold, border: Border(top: BorderSide(color: t.border))),
+      decoration: BoxDecoration(
+        color: t.scaffold,
+        border: Border(top: BorderSide(color: t.border)),
+      ),
       child: Row(
         children: [
           Expanded(
             flex: 3,
             child: OutlinedButton(
               onPressed: _save,
-              style: OutlinedButton.styleFrom(padding: compact, minimumSize: barSize),
+              style: OutlinedButton.styleFrom(
+                padding: compact,
+                minimumSize: barSize,
+              ),
               child: _barLabel('Save'),
             ),
           ),
@@ -506,7 +631,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                 minimumSize: barSize,
               ),
               child: _publishing
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : _barLabel('Publish'),
             ),
           ),
@@ -551,7 +683,13 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         color: t.listItemBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: t.border),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: List.generate(_tabMeta.length, (i) {
@@ -567,7 +705,15 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                 decoration: BoxDecoration(
                   color: sel ? _kBioAccent : Colors.transparent,
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: sel ? [BoxShadow(color: _kBioAccent.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))] : null,
+                  boxShadow: sel
+                      ? [
+                          BoxShadow(
+                            color: _kBioAccent.withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -592,7 +738,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
-  Widget _sectionCard(NgmyHubTheme t, {required String title, String? subtitle, required Widget child}) {
+  Widget _sectionCard(
+    NgmyHubTheme t, {
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -604,7 +755,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
+          Text(
+            title,
+            style: TextStyle(
+              color: t.title,
+              fontWeight: FontWeight.w900,
+              fontSize: 14,
+            ),
+          ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(subtitle, style: TextStyle(color: t.subtitle, fontSize: 12)),
@@ -626,11 +784,29 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           subtitle: 'Name and tagline shown on your bio page.',
           child: Column(
             children: [
-              NgmyModernField(controller: _nameC, label: 'Display name', hint: kNgmyBioDefaultDisplayName, icon: Icons.person_outline_rounded, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _nameC,
+                label: 'Display name',
+                hint: kNgmyBioDefaultDisplayName,
+                icon: Icons.person_outline_rounded,
+                accent: _kBioAccent,
+              ),
               const SizedBox(height: 12),
-              NgmyModernField(controller: _taglineC, label: 'Bio line', hint: 'MAKE MONEY ONLINE', icon: Icons.short_text_rounded, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _taglineC,
+                label: 'Bio line',
+                hint: 'MAKE MONEY ONLINE',
+                icon: Icons.short_text_rounded,
+                accent: _kBioAccent,
+              ),
               const SizedBox(height: 12),
-              NgmyModernField(controller: _slugC, label: 'Custom link slug', hint: 'my-bio', icon: Icons.link_rounded, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _slugC,
+                label: 'Custom link slug',
+                hint: 'my-bio',
+                icon: Icons.link_rounded,
+                accent: _kBioAccent,
+              ),
             ],
           ),
         ),
@@ -643,7 +819,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.photo_size_select_large_rounded, size: 18, color: t.muted),
+                  Icon(
+                    Icons.photo_size_select_large_rounded,
+                    size: 18,
+                    color: t.muted,
+                  ),
                   Expanded(
                     child: Slider(
                       value: _doc.profileScale,
@@ -655,7 +835,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                       onChanged: (v) => setState(() => _doc.profileScale = v),
                     ),
                   ),
-                  Text('${(_doc.profileScale * 100).round()}%', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
+                  Text(
+                    '${(_doc.profileScale * 100).round()}%',
+                    style: TextStyle(
+                      color: t.title,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -667,14 +854,35 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           subtitle: 'Profile, header banner, and full-page background.',
           child: Column(
             children: [
-              _photoTile(t, label: 'Profile photo', hint: 'First photo + 2 changes free', hasImage: _doc.avatarImageBase64.isNotEmpty, onPick: _pickAvatarImage, onClear: _clearAvatarImage),
+              _photoTile(
+                t,
+                label: 'Profile photo',
+                hint: 'First photo + 2 changes free',
+                hasImage: _doc.avatarImageBase64.isNotEmpty,
+                onPick: _pickAvatarImage,
+                onClear: _clearAvatarImage,
+              ),
               const SizedBox(height: 10),
-              _photoTile(t, label: 'Header banner', hint: 'Wide banner — crop to fit', hasImage: _doc.headerImageBase64.isNotEmpty, onPick: () async {
-                final url = await ngmyBioPickBannerImage(context);
-                if (url != null) setState(() => _doc.headerImageBase64 = url);
-              }, onClear: () => setState(() => _doc.headerImageBase64 = '')),
+              _photoTile(
+                t,
+                label: 'Header banner',
+                hint: 'Wide banner — crop to fit',
+                hasImage: _doc.headerImageBase64.isNotEmpty,
+                onPick: () async {
+                  final url = await ngmyBioPickBannerImage(context);
+                  if (url != null) setState(() => _doc.headerImageBase64 = url);
+                },
+                onClear: () => setState(() => _doc.headerImageBase64 = ''),
+              ),
               const SizedBox(height: 10),
-              _photoTile(t, label: 'Page background', hint: 'Optional full-page backdrop', hasImage: _doc.backgroundImageBase64.isNotEmpty, onPick: () => _pickImage((b) => _doc.backgroundImageBase64 = b), onClear: () => setState(() => _doc.backgroundImageBase64 = '')),
+              _photoTile(
+                t,
+                label: 'Page background',
+                hint: 'Optional full-page backdrop',
+                hasImage: _doc.backgroundImageBase64.isNotEmpty,
+                onPick: () => _pickImage((b) => _doc.backgroundImageBase64 = b),
+                onClear: () => setState(() => _doc.backgroundImageBase64 = ''),
+              ),
             ],
           ),
         ),
@@ -682,7 +890,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
-  Widget _photoTile(NgmyHubTheme t, {required String label, required String hint, required bool hasImage, required VoidCallback onPick, required VoidCallback onClear}) {
+  Widget _photoTile(
+    NgmyHubTheme t, {
+    required String label,
+    required String hint,
+    required bool hasImage,
+    required VoidCallback onPick,
+    required VoidCallback onClear,
+  }) {
     return Material(
       color: t.fieldFill,
       borderRadius: BorderRadius.circular(12),
@@ -691,22 +906,43 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: t.border)),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: t.border),
+          ),
           child: Row(
             children: [
               Container(
                 width: 44,
                 height: 44,
-                decoration: BoxDecoration(color: _kBioAccent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
-                child: Icon(hasImage ? Icons.check_circle_rounded : Icons.add_photo_alternate_outlined, color: hasImage ? const Color(0xFF059669) : _kBioAccent),
+                decoration: BoxDecoration(
+                  color: _kBioAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  hasImage
+                      ? Icons.check_circle_rounded
+                      : Icons.add_photo_alternate_outlined,
+                  color: hasImage ? const Color(0xFF059669) : _kBioAccent,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13)),
-                    Text(hint, style: TextStyle(color: t.subtitle, fontSize: 11)),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: t.title,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      hint,
+                      style: TextStyle(color: t.subtitle, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
@@ -715,7 +951,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   onPressed: onClear,
                   icon: Icon(Icons.close_rounded, size: 18, color: t.muted),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
               Icon(Icons.chevron_right_rounded, color: t.muted, size: 20),
             ],
@@ -732,23 +971,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         _sectionCard(
           t,
           title: 'Link cards',
-          subtitle: 'Photo, name, and URL — tap a card to edit. Guests tap these on your bio page.',
+          subtitle:
+              'Photo, name, and URL — tap a card to edit. Guests tap these on your bio page.',
           child: Column(
             children: [
               if (_doc.links.isEmpty)
                 Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 22,
+                  ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     gradient: LinearGradient(
-                      colors: [
-                        _kBioAccent.withValues(alpha: 0.10),
-                        t.scaffold,
-                      ],
+                      colors: [_kBioAccent.withValues(alpha: 0.10), t.scaffold],
                     ),
-                    border: Border.all(color: _kBioAccent.withValues(alpha: 0.28)),
+                    border: Border.all(
+                      color: _kBioAccent.withValues(alpha: 0.28),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -758,25 +1000,41 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: _kBioAccent.withValues(alpha: 0.15),
-                          border: Border.all(color: _kBioAccent.withValues(alpha: 0.4)),
+                          border: Border.all(
+                            color: _kBioAccent.withValues(alpha: 0.4),
+                          ),
                         ),
-                        child: const Icon(Icons.add_link_rounded, color: _kBioAccent, size: 26),
+                        child: const Icon(
+                          Icons.add_link_rounded,
+                          color: _kBioAccent,
+                          size: 26,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       Text(
                         'No links yet',
-                        style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 15),
+                        style: TextStyle(
+                          color: t.title,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Add your store, socials, booking page, or anything guests should open.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: t.subtitle, fontSize: 12, height: 1.35),
+                        style: TextStyle(
+                          color: t.subtitle,
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ..._doc.links.asMap().entries.map((e) => _linkEditor(t, e.key, e.value)),
+              ..._doc.links.asMap().entries.map(
+                (e) => _linkEditor(t, e.key, e.value),
+              ),
               const SizedBox(height: 6),
               SizedBox(
                 width: double.infinity,
@@ -798,15 +1056,34 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () => setState(() => _doc.links.add(NgmyBioLink(id: ngmyBioNewId(), title: 'New link', url: ''))),
+                      onTap: () => setState(
+                        () => _doc.links.add(
+                          NgmyBioLink(
+                            id: ngmyBioNewId(),
+                            title: 'New link',
+                            url: '',
+                          ),
+                        ),
+                      ),
                       child: const Padding(
                         padding: EdgeInsets.symmetric(vertical: 14),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_rounded, color: Colors.white, size: 20),
+                            Icon(
+                              Icons.add_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                             SizedBox(width: 8),
-                            Text('Add link card', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14)),
+                            Text(
+                              'Add link card',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -835,7 +1112,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               ? [const Color(0xFF1A1F2E), const Color(0xFF12161F)]
               : [Colors.white, const Color(0xFFFFFBF0)],
         ),
-        border: Border.all(color: hasUrl ? _kBioAccent.withValues(alpha: 0.45) : t.border, width: 1.2),
+        border: Border.all(
+          color: hasUrl ? _kBioAccent.withValues(alpha: 0.45) : t.border,
+          width: 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: t.isDark ? 0.28 : 0.06),
@@ -852,14 +1132,22 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _kBioAccent.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     'LINK ${index + 1}',
-                    style: const TextStyle(color: _kBioAccent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.8),
+                    style: const TextStyle(
+                      color: _kBioAccent,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 10,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
                 const Spacer(),
@@ -877,7 +1165,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: () => _pickImage((b) => setState(() => link.imageBase64 = b), maxSize: 400),
+                  onTap: () => _pickImage(
+                    (b) => setState(() => link.imageBase64 = b),
+                    maxSize: 400,
+                  ),
                   child: Stack(
                     children: [
                       Container(
@@ -891,17 +1182,34 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                               _kBioAccent.withValues(alpha: 0.05),
                             ],
                           ),
-                          border: Border.all(color: _kBioAccent.withValues(alpha: 0.4), width: 1.3),
+                          border: Border.all(
+                            color: _kBioAccent.withValues(alpha: 0.4),
+                            width: 1.3,
+                          ),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: hasImage
-                            ? Image.memory(base64Decode(link.imageBase64.split(',').last), fit: BoxFit.cover)
+                            ? Image.memory(
+                                base64Decode(link.imageBase64.split(',').last),
+                                fit: BoxFit.cover,
+                              )
                             : Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.add_photo_alternate_outlined, color: _kBioAccent.withValues(alpha: 0.85), size: 24),
+                                  Icon(
+                                    Icons.add_photo_alternate_outlined,
+                                    color: _kBioAccent.withValues(alpha: 0.85),
+                                    size: 24,
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text('Photo', style: TextStyle(color: t.muted, fontSize: 9, fontWeight: FontWeight.w700)),
+                                  Text(
+                                    'Photo',
+                                    style: TextStyle(
+                                      color: t.muted,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ],
                               ),
                       ),
@@ -914,7 +1222,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                             color: Colors.black.withValues(alpha: 0.55),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.edit_rounded, color: Colors.white, size: 12),
+                          child: const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.white,
+                            size: 12,
+                          ),
                         ),
                       ),
                     ],
@@ -926,17 +1238,37 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     children: [
                       TextFormField(
                         initialValue: link.title,
-                        style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 15),
+                        style: TextStyle(
+                          color: t.title,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                         decoration: InputDecoration(
                           labelText: 'Link name',
                           hintText: 'My store',
                           isDense: true,
                           filled: true,
                           fillColor: t.fieldFill,
-                          prefixIcon: const Icon(Icons.label_outline_rounded, size: 18, color: _kBioAccent),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBioAccent, width: 1.4)),
+                          prefixIcon: const Icon(
+                            Icons.label_outline_rounded,
+                            size: 18,
+                            color: _kBioAccent,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: t.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: t.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: _kBioAccent,
+                              width: 1.4,
+                            ),
+                          ),
                         ),
                         onChanged: (v) {
                           link.title = v;
@@ -958,9 +1290,21 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                             size: 18,
                             color: hasUrl ? _kBioAccent : t.muted,
                           ),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: _kBioAccent, width: 1.4)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: t.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: t.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: _kBioAccent,
+                              width: 1.4,
+                            ),
+                          ),
                         ),
                         onChanged: (v) {
                           link.url = v;
@@ -979,7 +1323,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
-                color: t.isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFFFF8E7),
+                color: t.isDark
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : const Color(0xFFFFF8E7),
                 border: Border.all(color: _kBioAccent.withValues(alpha: 0.22)),
               ),
               child: Row(
@@ -988,16 +1334,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      link.title.trim().isEmpty ? 'Untitled link' : link.title.trim(),
+                      link.title.trim().isEmpty
+                          ? 'Untitled link'
+                          : link.title.trim(),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 13),
+                      style: TextStyle(
+                        color: t.title,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   if (hasUrl)
                     Text(
                       'Live preview',
-                      style: TextStyle(color: _kBioAccent.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 10),
+                      style: TextStyle(
+                        color: _kBioAccent.withValues(alpha: 0.9),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10,
+                      ),
                     ),
                 ],
               ),
@@ -1038,7 +1394,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        NgmyBioTemplateThumb(template: tpl, selected: sel, size: cellW),
+                        NgmyBioTemplateThumb(
+                          template: tpl,
+                          selected: sel,
+                          size: cellW,
+                        ),
                         const SizedBox(height: 3),
                         Text(
                           tpl.name,
@@ -1078,7 +1438,8 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   childAspectRatio: cellW / 72,
                 ),
                 itemCount: kNgmyBioRingStyles.length,
-                itemBuilder: (context, i) => _ringChip(t, kNgmyBioRingStyles[i]),
+                itemBuilder: (context, i) =>
+                    _ringChip(t, kNgmyBioRingStyles[i]),
               );
             },
           ),
@@ -1098,20 +1459,43 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             height: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: sel ? _kBioAccent : Colors.transparent, width: 2.5),
-              boxShadow: sel ? [BoxShadow(color: _kBioAccent.withValues(alpha: 0.2), blurRadius: 8)] : null,
+              border: Border.all(
+                color: sel ? _kBioAccent : Colors.transparent,
+                width: 2.5,
+              ),
+              boxShadow: sel
+                  ? [
+                      BoxShadow(
+                        color: _kBioAccent.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : null,
             ),
             child: NgmyBioRingFrame(
               ringId: ring.id,
               size: 36,
               accent: ring.auraColor ?? _kBioAccent,
-              child: const CircleAvatar(radius: 18, backgroundColor: Color(0xFFE5E7EB), child: Icon(Icons.person, size: 14)),
+              child: const CircleAvatar(
+                radius: 18,
+                backgroundColor: Color(0xFFE5E7EB),
+                child: Icon(Icons.person, size: 14),
+              ),
             ),
           ),
           const SizedBox(height: 4),
           SizedBox(
             width: 56,
-            child: Text(ring.label, style: TextStyle(fontSize: 9, fontWeight: sel ? FontWeight.w900 : FontWeight.w500, color: sel ? _kBioAccent : t.subtitle), textAlign: TextAlign.center, maxLines: 2),
+            child: Text(
+              ring.label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: sel ? FontWeight.w900 : FontWeight.w500,
+                color: sel ? _kBioAccent : t.subtitle,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+            ),
           ),
         ],
       ),
@@ -1128,13 +1512,37 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           subtitle: 'Optional — small circles at the bottom of your bio page.',
           child: Column(
             children: [
-              NgmyModernField(controller: _socialInstagramC, label: 'Instagram', hint: 'https://instagram.com/you', icon: Icons.camera_alt_outlined, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _socialInstagramC,
+                label: 'Instagram',
+                hint: 'https://instagram.com/you',
+                icon: Icons.camera_alt_outlined,
+                accent: _kBioAccent,
+              ),
               const SizedBox(height: 10),
-              NgmyModernField(controller: _socialFacebookC, label: 'Facebook', hint: 'https://facebook.com/you', icon: Icons.facebook_outlined, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _socialFacebookC,
+                label: 'Facebook',
+                hint: 'https://facebook.com/you',
+                icon: Icons.facebook_outlined,
+                accent: _kBioAccent,
+              ),
               const SizedBox(height: 10),
-              NgmyModernField(controller: _socialYoutubeC, label: 'YouTube', hint: 'https://youtube.com/@you', icon: Icons.play_circle_outline_rounded, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _socialYoutubeC,
+                label: 'YouTube',
+                hint: 'https://youtube.com/@you',
+                icon: Icons.play_circle_outline_rounded,
+                accent: _kBioAccent,
+              ),
               const SizedBox(height: 10),
-              NgmyModernField(controller: _socialWebsiteC, label: 'Website', hint: 'https://yoursite.com', icon: Icons.language_rounded, accent: _kBioAccent),
+              NgmyModernField(
+                controller: _socialWebsiteC,
+                label: 'Website',
+                hint: 'https://yoursite.com',
+                icon: Icons.language_rounded,
+                accent: _kBioAccent,
+              ),
             ],
           ),
         ),
@@ -1160,9 +1568,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: () async {
-                    final bytes = await NgmyMenuQrWidget.capturePng(_qrCaptureKey);
+                    final bytes = await NgmyMenuQrWidget.capturePng(
+                      _qrCaptureKey,
+                    );
                     if (bytes == null) return;
-                    await downloadNgmyQrImage(bytes, '${_doc.slug.isEmpty ? 'bio' : _doc.slug}_qr.png');
+                    await downloadNgmyQrImage(
+                      bytes,
+                      '${_doc.slug.isEmpty ? 'bio' : _doc.slug}_qr.png',
+                    );
                   },
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Download QR'),

@@ -22,19 +22,32 @@ enum NgmyStripeProduct {
   phoneUnlock,
   menuStudio,
   bioStudio,
+  businessCard,
 }
 
 class NgmyStripePayments {
-  static const String docShareOrgUrl = 'https://buy.stripe.com/eVq9AT5Rvggh8kb3q5b7y08';
-  static const String invoiceUrl = 'https://buy.stripe.com/dRm6oHeo16FHeIzaSxb7y07';
-  static const String advisorsUrl = 'https://buy.stripe.com/cNi28reo19RTgQH8Kpb7y06';
-  static const String familyTreeUrl = 'https://buy.stripe.com/14A5kDfs57JL0RJ3q5b7y05';
-  static const String messageTranslatorUrl = 'https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04';
-  static const String documentScannerUrl = 'https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03';
-  static const String marriageDocumentUrl = 'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
-  static const String phoneUnlockUrl = 'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
-  static const String menuStudioUrl = 'https://buy.stripe.com/8x2bJ1cfTe892ZR3q5b7y0b';
-  static const String bioStudioUrl = 'https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c';
+  static const String docShareOrgUrl =
+      'https://buy.stripe.com/eVq9AT5Rvggh8kb3q5b7y08';
+  static const String invoiceUrl =
+      'https://buy.stripe.com/dRm6oHeo16FHeIzaSxb7y07';
+  static const String advisorsUrl =
+      'https://buy.stripe.com/cNi28reo19RTgQH8Kpb7y06';
+  static const String familyTreeUrl =
+      'https://buy.stripe.com/14A5kDfs57JL0RJ3q5b7y05';
+  static const String messageTranslatorUrl =
+      'https://buy.stripe.com/00wfZhbbP3tvgQH6Chb7y04';
+  static const String documentScannerUrl =
+      'https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03';
+  static const String marriageDocumentUrl =
+      'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
+  static const String phoneUnlockUrl =
+      'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
+  static const String menuStudioUrl =
+      'https://buy.stripe.com/8x2bJ1cfTe892ZR3q5b7y0b';
+  static const String bioStudioUrl =
+      'https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c';
+  static const String businessCardUrl =
+      'https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -57,6 +70,9 @@ class NgmyStripePayments {
   static const _pendingProductKey = 'ngmy_pay_pending_product';
   static const _pendingEmailKey = 'ngmy_pay_pending_email';
   static const _pendingStartedKey = 'ngmy_pay_pending_started';
+  static const _pendingScopeKey = 'ngmy_pay_pending_scope';
+  static const _scopedAccessPrefix = 'ngmy_stripe_scoped_until_';
+  static const _scopedProvisionalPrefix = 'ngmy_stripe_scoped_prov_';
 
   static bool isAdmin(dynamic user) {
     try {
@@ -92,6 +108,8 @@ class NgmyStripePayments {
         return 'menu_studio';
       case NgmyStripeProduct.bioStudio:
         return 'bio_studio';
+      case NgmyStripeProduct.businessCard:
+        return 'business_card';
     }
   }
 
@@ -117,6 +135,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.menuStudio;
       case 'bio_studio':
         return NgmyStripeProduct.bioStudio;
+      case 'business_card':
+        return NgmyStripeProduct.businessCard;
       default:
         return null;
     }
@@ -144,23 +164,40 @@ class NgmyStripePayments {
         return menuStudioUrl;
       case NgmyStripeProduct.bioStudio:
         return bioStudioUrl;
+      case NgmyStripeProduct.businessCard:
+        return businessCardUrl;
     }
   }
 
   /// Stripe only allows [A-Za-z0-9_-] in client_reference_id, so the account email
   /// rides along base64url-encoded and the webhook decodes it.
-  static String checkoutReference(String email, NgmyStripeProduct product) {
+  static String checkoutReference(
+    String email,
+    NgmyStripeProduct product, {
+    String scope = '',
+  }) {
     final slug = productSlug(product);
     final normalized = _emailKey(email);
     if (normalized.isEmpty) return slug;
-    final encoded = base64Url.encode(utf8.encode(normalized)).replaceAll('=', '');
-    return '$slug--$encoded';
+    final encoded = base64Url
+        .encode(utf8.encode(normalized))
+        .replaceAll('=', '');
+    final cleanScope = scope.trim();
+    if (cleanScope.isEmpty) return '$slug--$encoded';
+    final encodedScope = base64Url
+        .encode(utf8.encode(cleanScope))
+        .replaceAll('=', '');
+    return '$slug--$encoded--$encodedScope';
   }
 
   /// Stripe Payment Link carrying the product and the NGMY account that must be
   /// credited, so access lands on the right account no matter what email the buyer
   /// types on Stripe's page.
-  static String checkoutUrlFor(String email, NgmyStripeProduct product) {
+  static String checkoutUrlFor(
+    String email,
+    NgmyStripeProduct product, {
+    String scope = '',
+  }) {
     final base = checkoutUrl(product);
     final uri = Uri.parse(base);
     final params = Map<String, String>.from(uri.queryParameters);
@@ -168,7 +205,11 @@ class NgmyStripePayments {
     if (normalized.isNotEmpty) {
       params['prefilled_email'] = normalized;
     }
-    params['client_reference_id'] = checkoutReference(email, product);
+    params['client_reference_id'] = checkoutReference(
+      email,
+      product,
+      scope: scope,
+    );
     return uri.replace(queryParameters: params).toString();
   }
 
@@ -195,6 +236,8 @@ class NgmyStripePayments {
         return 1599;
       case NgmyStripeProduct.bioStudio:
         return 399;
+      case NgmyStripeProduct.businessCard:
+        return 399;
     }
   }
 
@@ -202,7 +245,9 @@ class NgmyStripePayments {
     final cents = priceCents(product);
     final dollars = cents ~/ 100;
     final rem = cents % 100;
-    return rem == 0 ? '\$$dollars' : '\$$dollars.${rem.toString().padLeft(2, '0')}';
+    return rem == 0
+        ? '\$$dollars'
+        : '\$$dollars.${rem.toString().padLeft(2, '0')}';
   }
 
   static String durationLabel(NgmyStripeProduct product) {
@@ -211,6 +256,8 @@ class NgmyStripePayments {
         return '4 hours';
       case NgmyStripeProduct.phoneUnlock:
         return '10 days';
+      case NgmyStripeProduct.businessCard:
+        return '2 days';
       default:
         return '30 days';
     }
@@ -240,6 +287,8 @@ class NgmyStripePayments {
         return const [Color(0xFFF0C24B), Color(0xFF8A6110)]; // menu gold
       case NgmyStripeProduct.bioStudio:
         return const [Color(0xFF78B7FF), Color(0xFF285BB8)]; // bio crystal blue
+      case NgmyStripeProduct.businessCard:
+        return const [Color(0xFF6EE7B7), Color(0xFF087F5B)]; // polished emerald
     }
   }
 
@@ -266,6 +315,8 @@ class NgmyStripePayments {
         return const Color(0xFFFFF4CB);
       case NgmyStripeProduct.bioStudio:
         return const Color(0xFFE9F5FF);
+      case NgmyStripeProduct.businessCard:
+        return const Color(0xFFE8FFF6);
     }
   }
 
@@ -305,6 +356,8 @@ class NgmyStripePayments {
         return 'Menu Studio';
       case NgmyStripeProduct.bioStudio:
         return 'Bio Studio';
+      case NgmyStripeProduct.businessCard:
+        return 'Business Card';
     }
   }
 
@@ -330,6 +383,8 @@ class NgmyStripePayments {
         return Icons.restaurant_menu_rounded;
       case NgmyStripeProduct.bioStudio:
         return Icons.badge_rounded;
+      case NgmyStripeProduct.businessCard:
+        return Icons.contact_page_rounded;
     }
   }
 
@@ -355,18 +410,26 @@ class NgmyStripePayments {
         return 'Create and publish unlimited menus for 30 days.';
       case NgmyStripeProduct.bioStudio:
         return 'Publish premium Bios and make unlimited photo changes for 30 days.';
+      case NgmyStripeProduct.businessCard:
+        return 'Edit and download this card design for 2 days.';
     }
   }
 
   static bool isOneTimePayProduct(NgmyStripeProduct product) =>
-      product == NgmyStripeProduct.marriageDocument || product == NgmyStripeProduct.phoneUnlock;
+      product == NgmyStripeProduct.marriageDocument ||
+      product == NgmyStripeProduct.phoneUnlock ||
+      product == NgmyStripeProduct.businessCard;
 
-  static bool isSubscribeProduct(NgmyStripeProduct product) => !isOneTimePayProduct(product);
+  static bool isSubscribeProduct(NgmyStripeProduct product) =>
+      !isOneTimePayProduct(product);
 
   static String actionLabel(NgmyStripeProduct product) =>
       isSubscribeProduct(product) ? 'Subscribe' : 'Pay';
 
-  static Future<DateTime?> _accessUntil(String email, NgmyStripeProduct product) async {
+  static Future<DateTime?> _accessUntil(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
@@ -375,7 +438,11 @@ class NgmyStripePayments {
     return DateTime.tryParse(raw);
   }
 
-  static Future<void> _setAccessUntil(String email, NgmyStripeProduct product, DateTime until) async {
+  static Future<void> _setAccessUntil(
+    String email,
+    NgmyStripeProduct product,
+    DateTime until,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
@@ -386,19 +453,30 @@ class NgmyStripePayments {
   }
 
   /// Local cache write (also used when syncing from Supabase webhook records).
-  static Future<void> cacheAccessUntil(String email, NgmyStripeProduct product, DateTime until) =>
-      _setAccessUntil(email, product, until);
+  static Future<void> cacheAccessUntil(
+    String email,
+    NgmyStripeProduct product,
+    DateTime until,
+  ) => _setAccessUntil(email, product, until);
 
-  static Future<DateTime?> _provisionalUntil(String email, NgmyStripeProduct product) async {
+  static Future<DateTime?> _provisionalUntil(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('$_provisionalPrefix${_productKey(product)}_$key');
+    final raw = prefs.getString(
+      '$_provisionalPrefix${_productKey(product)}_$key',
+    );
     if (raw == null || raw.isEmpty) return null;
     return DateTime.tryParse(raw);
   }
 
-  static Future<void> _setProvisional(String email, NgmyStripeProduct product) async {
+  static Future<void> _setProvisional(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
@@ -408,18 +486,129 @@ class NgmyStripePayments {
     );
   }
 
-  static Future<void> _clearProvisional(String email, NgmyStripeProduct product) async {
+  static Future<void> _clearProvisional(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('$_provisionalPrefix${_productKey(product)}_$key');
   }
 
+  static String scopedProductSlug(NgmyStripeProduct product, String scope) =>
+      '${productSlug(product)}:${scope.trim()}';
+
+  static String _scopedStorageKey(
+    String prefix,
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+  ) {
+    final encodedScope = base64Url
+        .encode(utf8.encode(scope.trim()))
+        .replaceAll('=', '');
+    return '$prefix${_productKey(product)}_${_emailKey(email)}_$encodedScope';
+  }
+
+  static Future<DateTime?> _localScopedUntil(
+    String prefix,
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+  ) async {
+    if (_emailKey(email).isEmpty || scope.trim().isEmpty) return null;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(
+      _scopedStorageKey(prefix, email, product, scope),
+    );
+    return raw == null ? null : DateTime.tryParse(raw);
+  }
+
+  static Future<void> _setLocalScopedUntil(
+    String prefix,
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+    DateTime until,
+  ) async {
+    if (_emailKey(email).isEmpty || scope.trim().isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _scopedStorageKey(prefix, email, product, scope),
+      until.toUtc().toIso8601String(),
+    );
+  }
+
+  static Future<void> _setScopedProvisional(
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+  ) => _setLocalScopedUntil(
+    _scopedProvisionalPrefix,
+    email,
+    product,
+    scope,
+    DateTime.now().toUtc().add(provisionalAccessWindow),
+  );
+
+  /// Paid-through date for one scoped purchase (for example card + template).
+  /// Expired dates are deliberately returned so callers can distinguish a new,
+  /// freely editable draft from a previously purchased card whose edit window
+  /// has ended.
+  static Future<DateTime?> scopedAccessUntil(
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+  ) async {
+    if (scope.trim().isEmpty) return null;
+    final cloud = await NgmyStripeCloud.fetchAccessUntil(
+      email,
+      scopedProductSlug(product, scope),
+    );
+    if (cloud != null) {
+      await _setLocalScopedUntil(
+        _scopedAccessPrefix,
+        email,
+        product,
+        scope,
+        cloud,
+      );
+    }
+    final cached =
+        cloud ??
+        await _localScopedUntil(_scopedAccessPrefix, email, product, scope);
+    final provisional = await _localScopedUntil(
+      _scopedProvisionalPrefix,
+      email,
+      product,
+      scope,
+    );
+    if (cached == null) return provisional;
+    if (provisional == null) return cached;
+    return cached.isAfter(provisional) ? cached : provisional;
+  }
+
+  static Future<bool> hasActiveScopedAccess(
+    String email,
+    NgmyStripeProduct product,
+    String scope,
+  ) async {
+    final until = await scopedAccessUntil(email, product, scope);
+    return until != null && until.isAfter(DateTime.now());
+  }
+
   /// Supabase is the source of truth, so paid access follows the account onto any
   /// device. The local copy is only an offline cache of what the cloud last said,
   /// plus a short provisional window right after checkout.
-  static Future<bool> hasActiveAccess(String email, NgmyStripeProduct product) async {
-    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(email, productSlug(product));
+  static Future<bool> hasActiveAccess(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
+    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(
+      email,
+      productSlug(product),
+    );
     if (cloudUntil != null) {
       await _setAccessUntil(email, product, cloudUntil);
       await _clearProvisional(email, product);
@@ -449,14 +638,31 @@ class NgmyStripePayments {
   /// Returning from checkout only opens a short provisional window. The real
   /// duration always comes from Supabase once Stripe's webhook confirms the
   /// payment, so the success URL alone can never buy lasting access.
-  static Future<void> _grantForProduct(String email, NgmyStripeProduct product) =>
-      _setProvisional(email, product);
+  static Future<void> _grantForProduct(
+    String email,
+    NgmyStripeProduct product, {
+    String scope = '',
+  }) => scope.trim().isEmpty
+      ? _setProvisional(email, product)
+      : _setScopedProvisional(email, product, scope);
 
-  static Future<void> _setPendingCheckout(String email, NgmyStripeProduct product) async {
+  static Future<void> _setPendingCheckout(
+    String email,
+    NgmyStripeProduct product, {
+    String scope = '',
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingProductKey, _productKey(product));
     await prefs.setString(_pendingEmailKey, _emailKey(email));
-    await prefs.setString(_pendingStartedKey, DateTime.now().toUtc().toIso8601String());
+    await prefs.setString(
+      _pendingStartedKey,
+      DateTime.now().toUtc().toIso8601String(),
+    );
+    if (scope.trim().isEmpty) {
+      await prefs.remove(_pendingScopeKey);
+    } else {
+      await prefs.setString(_pendingScopeKey, scope.trim());
+    }
   }
 
   static Future<void> _clearPendingCheckout() async {
@@ -464,9 +670,12 @@ class NgmyStripePayments {
     await prefs.remove(_pendingProductKey);
     await prefs.remove(_pendingEmailKey);
     await prefs.remove(_pendingStartedKey);
+    await prefs.remove(_pendingScopeKey);
   }
 
-  static Future<NgmyStripeProduct?> _productFromPending(SharedPreferences prefs) async {
+  static Future<NgmyStripeProduct?> _productFromPending(
+    SharedPreferences prefs,
+  ) async {
     final pending = prefs.getString(_pendingProductKey);
     if (pending == null || pending.isEmpty) return null;
     for (final p in NgmyStripeProduct.values) {
@@ -485,11 +694,19 @@ class NgmyStripePayments {
     if (product == null) return false;
 
     final email = _emailKey(
-      emailFromUrl.isNotEmpty ? emailFromUrl : (prefs.getString(_pendingEmailKey) ?? ''),
+      emailFromUrl.isNotEmpty
+          ? emailFromUrl
+          : (prefs.getString(_pendingEmailKey) ?? ''),
     );
     if (email.isEmpty) return false;
 
-    await _grantForProduct(email, product);
+    final scope = prefs.getString(_pendingScopeKey) ?? '';
+    // A short provisional unlock is not safe for downloadable products: it
+    // would be enough time to export without a confirmed charge. Business
+    // cards therefore wait for the signed Stripe webhook record in Supabase.
+    if (product != NgmyStripeProduct.businessCard) {
+      await _grantForProduct(email, product, scope: scope);
+    }
     await _clearPendingCheckout();
     ngmyClearPaymentQueryFromUrl();
     return true;
@@ -538,7 +755,10 @@ class NgmyStripePayments {
   /// Web: force the engine to re-measure after leaving an external page.
   static void forceWebViewportResettle() => ngmyForceWebViewportResettle();
 
-  static Future<DateTime?> accessUntil(String email, NgmyStripeProduct product) async {
+  static Future<DateTime?> accessUntil(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final confirmed = await _accessUntil(email, product);
     final provisional = await _provisionalUntil(email, product);
     if (confirmed == null) return provisional;
@@ -582,7 +802,8 @@ class NgmyStripePayments {
     return prefs.getStringList('$_invoiceFreeRefsPrefix$key') ?? const [];
   }
 
-  static Future<int> invoiceFreeUsed(String email) async => (await _invoiceFreeRefs(email)).length;
+  static Future<int> invoiceFreeUsed(String email) async =>
+      (await _invoiceFreeRefs(email)).length;
 
   static Future<int> invoiceFreeLeft(String email) async {
     final used = await invoiceFreeUsed(email);
@@ -591,7 +812,10 @@ class NgmyStripePayments {
 
   /// Whether this invoice is still covered by the free allowance, without
   /// spending anything. Safe to call while building the locked-preview UI.
-  static Future<bool> hasInvoiceFreeLeft(String email, String invoiceRef) async {
+  static Future<bool> hasInvoiceFreeLeft(
+    String email,
+    String invoiceRef,
+  ) async {
     final refs = await _invoiceFreeRefs(email);
     if (refs.contains(invoiceRef.trim())) return true;
     return refs.length < invoiceFreeCount;
@@ -614,7 +838,10 @@ class NgmyStripePayments {
     return true;
   }
 
-  static Future<DateTime?> _dayTrialStart(String email, NgmyStripeProduct product) async {
+  static Future<DateTime?> _dayTrialStart(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
@@ -623,7 +850,10 @@ class NgmyStripePayments {
     return DateTime.tryParse(raw);
   }
 
-  static Future<void> ensureDayTrialStarted(String email, NgmyStripeProduct product) async {
+  static Future<void> ensureDayTrialStarted(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     if (await _dayTrialStart(email, product) != null) return;
@@ -634,7 +864,10 @@ class NgmyStripePayments {
     );
   }
 
-  static Future<bool> hasDayTrialAccess(String email, NgmyStripeProduct product) async {
+  static Future<bool> hasDayTrialAccess(
+    String email,
+    NgmyStripeProduct product,
+  ) async {
     final started = await _dayTrialStart(email, product);
     if (started == null) return true;
     return DateTime.now().difference(started).inHours < dayTrialHours;
@@ -649,15 +882,20 @@ class NgmyStripePayments {
     if (isAdmin) return false;
     if (await hasActiveAccess(email, product)) return false;
     if (checkDayTrial &&
-        (product == NgmyStripeProduct.messageTranslator || product == NgmyStripeProduct.documentScanner)) {
+        (product == NgmyStripeProduct.messageTranslator ||
+            product == NgmyStripeProduct.documentScanner)) {
       return !await hasDayTrialAccess(email, product);
     }
     return true;
   }
 
-  static Future<void> startCheckout(String email, NgmyStripeProduct product) async {
-    await _setPendingCheckout(email, product);
-    ngmyLaunchPaymentCheckout(checkoutUrlFor(email, product));
+  static Future<void> startCheckout(
+    String email,
+    NgmyStripeProduct product, {
+    String scope = '',
+  }) async {
+    await _setPendingCheckout(email, product, scope: scope);
+    ngmyLaunchPaymentCheckout(checkoutUrlFor(email, product, scope: scope));
   }
 
   /// Shows pay/subscribe dialog only when access is expired.
@@ -672,7 +910,10 @@ class NgmyStripePayments {
   }) async {
     if (isAdmin) return true;
     await processPaymentReturnFromUrl();
-    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(email, productSlug(product));
+    final cloudUntil = await NgmyStripeCloud.syncAccessFromCloud(
+      email,
+      productSlug(product),
+    );
     if (cloudUntil != null) {
       await _setAccessUntil(email, product, cloudUntil);
     }
@@ -713,10 +954,55 @@ class NgmyStripePayments {
     );
   }
 
+  /// One payment tied to a specific object/design rather than the whole product.
+  static Future<bool> ensureScopedPaid({
+    required BuildContext context,
+    required NgmyStripeProduct product,
+    required String email,
+    required String scope,
+    bool isAdmin = false,
+    String? title,
+    String? message,
+  }) async {
+    if (isAdmin) return true;
+    final cleanScope = scope.trim();
+    if (cleanScope.isEmpty) return false;
+    await processPaymentReturnFromUrl();
+    if (await hasActiveScopedAccess(email, product, cleanScope)) return true;
+
+    if (!context.mounted) return false;
+    final opened = await showNgmyPaymentDialog(
+      context: context,
+      product: product,
+      email: email,
+      checkoutScope: cleanScope,
+      title: title,
+      message: message,
+    );
+    if (!opened) return false;
+
+    await processPaymentReturnFromUrl();
+    final waited = await NgmyStripeCloud.waitForCloudAccess(
+      email: email,
+      productSlug: scopedProductSlug(product, cleanScope),
+    );
+    if (waited != null) {
+      await _setLocalScopedUntil(
+        _scopedAccessPrefix,
+        email,
+        product,
+        cleanScope,
+        waited,
+      );
+    }
+    return hasActiveScopedAccess(email, product, cleanScope);
+  }
+
   static Future<bool> showNgmyPaymentDialog({
     required BuildContext context,
     required NgmyStripeProduct product,
     required String email,
+    String checkoutScope = '',
     String? title,
     String? message,
   }) {
@@ -727,6 +1013,7 @@ class NgmyStripePayments {
       builder: (ctx) => _NgmyPaymentDialog(
         product: product,
         email: email,
+        checkoutScope: checkoutScope,
         title: title ?? productTitle(product),
         message: message ?? productSubtitle(product),
       ),
@@ -738,12 +1025,14 @@ class _NgmyPaymentDialog extends StatefulWidget {
   const _NgmyPaymentDialog({
     required this.product,
     required this.email,
+    this.checkoutScope = '',
     required this.title,
     required this.message,
   });
 
   final NgmyStripeProduct product;
   final String email;
+  final String checkoutScope;
   final String title;
   final String message;
 
@@ -901,7 +1190,9 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
       child: AnimatedBuilder(
         animation: _entry,
         builder: (context, child) {
-          final pop = Curves.easeOutBack.transform(_entry.value.clamp(0.0, 1.0));
+          final pop = Curves.easeOutBack.transform(
+            _entry.value.clamp(0.0, 1.0),
+          );
           final fade = ((_entry.value) / 0.45).clamp(0.0, 1.0);
           return Opacity(
             opacity: fade,
@@ -1029,7 +1320,9 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                                         ],
                                       ),
                                       child: Icon(
-                                        NgmyStripePayments.productIcon(widget.product),
+                                        NgmyStripePayments.productIcon(
+                                          widget.product,
+                                        ),
                                         color: Colors.white,
                                         size: 31,
                                       ),
@@ -1154,7 +1447,8 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                               7,
                               Column(
                                 children: [
-                                  for (final perk in perks) _perk(mid, shine, perk),
+                                  for (final perk in perks)
+                                    _perk(mid, shine, perk),
                                 ],
                               ),
                             ),
@@ -1169,6 +1463,7 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                                   await NgmyStripePayments.startCheckout(
                                     widget.email,
                                     widget.product,
+                                    scope: widget.checkoutScope,
                                   );
                                   if (context.mounted) {
                                     Navigator.pop(context, true);
@@ -1548,10 +1843,12 @@ class NgmyMarriageSessionTimerBar extends StatefulWidget {
   final VoidCallback? onExpired;
 
   @override
-  State<NgmyMarriageSessionTimerBar> createState() => _NgmyMarriageSessionTimerBarState();
+  State<NgmyMarriageSessionTimerBar> createState() =>
+      _NgmyMarriageSessionTimerBarState();
 }
 
-class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBar> {
+class _NgmyMarriageSessionTimerBarState
+    extends State<NgmyMarriageSessionTimerBar> {
   Timer? _tick;
   Duration _remaining = Duration.zero;
   bool _firedExpired = false;
@@ -1561,7 +1858,10 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
     super.initState();
     if (widget.isAdmin) return;
     unawaited(_refresh());
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) => unawaited(_refresh()));
+    _tick = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(_refresh()),
+    );
   }
 
   @override
@@ -1575,7 +1875,9 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
       if (mounted) setState(() => _remaining = const Duration(hours: 999));
       return;
     }
-    final left = await NgmyStripePayments.marriageSessionRemaining(widget.email);
+    final left = await NgmyStripePayments.marriageSessionRemaining(
+      widget.email,
+    );
     if (!mounted) return;
     final rem = left ?? Duration.zero;
     setState(() => _remaining = rem);
@@ -1590,7 +1892,8 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
-    if (h > 0) return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s left';
+    if (h > 0)
+      return '${h}h ${m.toString().padLeft(2, '0')}m ${s.toString().padLeft(2, '0')}s left';
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')} left';
   }
 
@@ -1617,7 +1920,11 @@ class _NgmyMarriageSessionTimerBarState extends State<NgmyMarriageSessionTimerBa
           Expanded(
             child: Text(
               'Marriage document session · ${_format(_remaining)}',
-              style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13),
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

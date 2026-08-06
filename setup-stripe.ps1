@@ -129,6 +129,7 @@ foreach ($ep in $existing.data) {
 $wh = Invoke-Stripe -Method POST -Path "webhook_endpoints" -Fields @(
     "url=$WebhookUrl",
     "enabled_events[]=checkout.session.completed",
+    "enabled_events[]=invoice.paid",
     "description=NGMY paid feature unlock"
 )
 
@@ -169,6 +170,9 @@ $productLinks = [ordered]@{
     "scanner"       = "https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03"
     "marriage"      = "https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09"
     "phone_unlock"  = "https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a"
+    "menu_studio"   = "https://buy.stripe.com/8x2bJ1cfTe892ZR3q5b7y0b"
+    "bio_studio"    = "https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c"
+    "business_card" = "https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d"
 }
 
 $allLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"

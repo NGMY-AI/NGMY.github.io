@@ -73,13 +73,24 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   title: 'Business Card Creator',
                   subtitle: '',
                   thumbHeight: thumbH,
-                  colors: const [Color(0xFF22C55E), Color(0xFF065F46), Color(0xFF134E4A)],
+                  colors: const [
+                    Color(0xFF22C55E),
+                    Color(0xFF065F46),
+                    Color(0xFF134E4A),
+                  ],
                   pulse: pulse,
                   scan: scan,
                   orbit: orbit,
                   phase: 0,
-                  preview: _BusinessCardThumbPreview(accent: const Color(0xFF22C55E), isDark: t.isDark),
-                  onTap: () => showNgmyBusinessCardStudioDialog(context, userEmail: widget.userEmail),
+                  preview: _BusinessCardThumbPreview(
+                    accent: const Color(0xFF22C55E),
+                    isDark: t.isDark,
+                  ),
+                  onTap: () => showNgmyBusinessCardStudioDialog(
+                    context,
+                    userEmail: widget.userEmail,
+                    isAdmin: widget.isAdmin,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 _hudFrame(
@@ -87,13 +98,20 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   title: 'Menu Studio',
                   subtitle: '',
                   thumbHeight: thumbH,
-                  colors: const [Color(0xFFB8860B), Color(0xFFD4AF37), Color(0xFF3D2E1F)],
+                  colors: const [
+                    Color(0xFFB8860B),
+                    Color(0xFFD4AF37),
+                    Color(0xFF3D2E1F),
+                  ],
                   pulse: pulse,
                   scan: scan,
                   orbit: orbit,
                   phase: 0.22,
                   badge: _menuCount > 0 ? '$_menuCount saved' : null,
-                  preview: _MenuStudioThumbPreview(accent: const Color(0xFFB8860B), isDark: t.isDark),
+                  preview: _MenuStudioThumbPreview(
+                    accent: const Color(0xFFB8860B),
+                    isDark: t.isDark,
+                  ),
                   onTap: () async {
                     await showNgmyMenuStudioDialog(
                       context,
@@ -109,15 +127,24 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   title: 'Business Essentials',
                   subtitle: '',
                   thumbHeight: thumbH,
-                  colors: const [Color(0xFF38BDF8), Color(0xFF1E3A8A), Color(0xFF0E7490)],
+                  colors: const [
+                    Color(0xFF38BDF8),
+                    Color(0xFF1E3A8A),
+                    Color(0xFF0E7490),
+                  ],
                   pulse: pulse,
                   scan: scan,
                   orbit: orbit,
                   phase: 0.44,
-                  badge: _essentialsCount > 0 ? '$_essentialsCount saved' : null,
+                  badge: _essentialsCount > 0
+                      ? '$_essentialsCount saved'
+                      : null,
                   preview: _EssentialsThumbPreview(isDark: t.isDark),
                   onTap: () async {
-                    await showNgmyBusinessEssentialsHub(context, userEmail: widget.userEmail);
+                    await showNgmyBusinessEssentialsHub(
+                      context,
+                      userEmail: widget.userEmail,
+                    );
                     await _refreshBadges();
                   },
                 ),
@@ -172,12 +199,16 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.72)],
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.72),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                if (frameCenterLabel != null && frameCenterLabel.trim().isNotEmpty)
+                if (frameCenterLabel != null &&
+                    frameCenterLabel.trim().isNotEmpty)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -216,11 +247,16 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(999),
                         color: Colors.black.withValues(alpha: 0.45),
-                        border: Border.all(color: colors.first.withValues(alpha: 0.7)),
+                        border: Border.all(
+                          color: colors.first.withValues(alpha: 0.7),
+                        ),
                       ),
                       child: Text(
                         badge,
@@ -283,20 +319,46 @@ class _BusinessCardThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
-              colors: isDark ? const [Color(0xFF0A0A0A), Color(0xFF171717)] : const [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+              colors: isDark
+                  ? const [Color(0xFF0A0A0A), Color(0xFF171717)]
+                  : const [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
             ),
-            border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.6)),
-            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 24, offset: const Offset(0, 12))],
+            border: Border.all(
+              color: const Color(0xFFD4AF37).withValues(alpha: 0.6),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.25),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('KB PABLO QR', style: TextStyle(color: const Color(0xFFD4AF37), fontWeight: FontWeight.w300, fontSize: 11, letterSpacing: 2)),
+              Text(
+                'KB PABLO QR',
+                style: TextStyle(
+                  color: const Color(0xFFD4AF37),
+                  fontWeight: FontWeight.w300,
+                  fontSize: 11,
+                  letterSpacing: 2,
+                ),
+              ),
               const Spacer(),
               Container(height: 2, width: 40, color: const Color(0xFFD4AF37)),
               const SizedBox(height: 6),
-              Text('Business Card Studio', style: TextStyle(color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF64748B), fontSize: 9)),
+              Text(
+                'Business Card Studio',
+                style: TextStyle(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.5)
+                      : const Color(0xFF64748B),
+                  fontSize: 9,
+                ),
+              ),
             ],
           ),
         ),
@@ -323,10 +385,18 @@ class _MenuStudioThumbPreview extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
-              colors: isDark ? const [Color(0xFF1A1410), Color(0xFF0A0A0A)] : const [Color(0xFFFFF8E7), Color(0xFFFEF3C7)],
+              colors: isDark
+                  ? const [Color(0xFF1A1410), Color(0xFF0A0A0A)]
+                  : const [Color(0xFFFFF8E7), Color(0xFFFEF3C7)],
             ),
             border: Border.all(color: accent.withValues(alpha: 0.65)),
-            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12))],
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.3),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -334,9 +404,23 @@ class _MenuStudioThumbPreview extends StatelessWidget {
             children: [
               Icon(Icons.restaurant_menu_rounded, color: accent, size: 22),
               const SizedBox(height: 8),
-              Text('YOUR MENU', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2)),
+              Text(
+                'YOUR MENU',
+                style: TextStyle(
+                  color: accent,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                ),
+              ),
               const Spacer(),
-              Text('Burgers · Drinks · QR', style: TextStyle(color: isDark ? Colors.white54 : const Color(0xFF64748B), fontSize: 9)),
+              Text(
+                'Burgers · Drinks · QR',
+                style: TextStyle(
+                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
+                  fontSize: 9,
+                ),
+              ),
             ],
           ),
         ),
@@ -366,11 +450,28 @@ class _EssentialsThumbPreview extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: isDark
-                  ? const [Color(0xFF0B1220), Color(0xFF0E7490), Color(0xFF1E3A8A)]
-                  : const [Color(0xFFF0F9FF), Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
+                  ? const [
+                      Color(0xFF0B1220),
+                      Color(0xFF0E7490),
+                      Color(0xFF1E3A8A),
+                    ]
+                  : const [
+                      Color(0xFFF0F9FF),
+                      Color(0xFFE0F2FE),
+                      Color(0xFFBAE6FD),
+                    ],
             ),
-            border: Border.all(color: accent.withValues(alpha: 0.65), width: 1.3),
-            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.3), blurRadius: 24, offset: const Offset(0, 12))],
+            border: Border.all(
+              color: accent.withValues(alpha: 0.65),
+              width: 1.3,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.3),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           padding: const EdgeInsets.all(14),
           child: Column(
@@ -383,9 +484,15 @@ class _EssentialsThumbPreview extends StatelessWidget {
                     height: 28,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      gradient: const LinearGradient(colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)]),
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF38BDF8), Color(0xFF0EA5E9)],
+                      ),
                     ),
-                    child: const Icon(Icons.business_center_rounded, color: Colors.white, size: 16),
+                    child: const Icon(
+                      Icons.business_center_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                   const Spacer(),
                   _miniDot(const Color(0xFF38BDF8)),
@@ -428,7 +535,9 @@ class _EssentialsThumbPreview extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color.withValues(alpha: 0.85),
-        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 4),
+        ],
       ),
     );
   }

@@ -33,11 +33,13 @@ const PRODUCT_SLUGS = new Set([
   "phone_unlock",
   "menu_studio",
   "bio_studio",
+  "business_card",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;
 const ACCESS_DAYS_PHONE_UNLOCK = 10;
 const ACCESS_HOURS_MARRIAGE = 4;
+const ACCESS_DAYS_BUSINESS_CARD = 2;
 const SIGNATURE_TOLERANCE_SEC = 300;
 
 function json(body: unknown, status = 200): Response {
@@ -115,29 +117,42 @@ function accessUntilForProduct(product: string, existingUntil: Date | null): str
   if (product === "phone_unlock") {
     return new Date(now.getTime() + ACCESS_DAYS_PHONE_UNLOCK * 86_400_000).toISOString();
   }
+  if (product.startsWith("business_card:")) {
+    return new Date(now.getTime() + ACCESS_DAYS_BUSINESS_CARD * 86_400_000).toISOString();
+  }
   const base = existingUntil && existingUntil.getTime() > now.getTime() ? existingUntil : now;
   return new Date(base.getTime() + ACCESS_DAYS_DEFAULT * 86_400_000).toISOString();
 }
 
-/// client_reference_id carries "<slug>" or "<slug>--<base64url account email>".
+/// client_reference_id carries "<slug>--<base64url email>[--<base64url scope>]".
 /// Stripe only permits [A-Za-z0-9_-] there, hence the encoding.
-function parseClientReference(raw: unknown): { slug: string; email: string } {
+function parseClientReference(raw: unknown): { slug: string; email: string; scope: string } {
   const value = String(raw ?? "").trim();
-  if (!value) return { slug: "", email: "" };
+  if (!value) return { slug: "", email: "", scope: "" };
 
   const sep = value.indexOf("--");
-  if (sep < 0) return { slug: normalize(value), email: "" };
+  if (sep < 0) return { slug: normalize(value), email: "", scope: "" };
 
   const slug = normalize(value.slice(0, sep));
-  const encoded = value.slice(sep + 2);
-  let email = "";
-  try {
+  const parts = value.slice(sep + 2).split("--");
+  const decodePart = (encoded: string): string => {
+    if (!encoded) return "";
     const padded = encoded.replaceAll("-", "+").replaceAll("_", "/");
-    email = normalize(atob(padded + "=".repeat((4 - padded.length % 4) % 4)));
+    return atob(padded + "=".repeat((4 - padded.length % 4) % 4));
+  };
+  let email = "";
+  let scope = "";
+  try {
+    email = normalize(decodePart(parts[0] ?? ""));
   } catch {
     email = "";
   }
-  return { slug, email };
+  try {
+    scope = String(decodePart(parts[1] ?? "")).trim();
+  } catch {
+    scope = "";
+  }
+  return { slug, email, scope };
 }
 
 // deno-lint-ignore no-explicit-any
@@ -315,6 +330,14 @@ serve(async (req) => {
       session?.client_reference_id,
     );
     return json({ error: "Unknown product" }, 422);
+  }
+  const { scope } = parseClientReference(session?.client_reference_id);
+  if (product === "business_card") {
+    if (!scope || !/^[A-Za-z0-9_]+$/.test(scope)) {
+      console.error("[ngmy-stripe-webhook] missing/invalid business card scope", session?.id);
+      return json({ error: "Missing business card scope" }, 422);
+    }
+    product = `business_card:${scope}`;
   }
 
   const { data: existing } = await admin

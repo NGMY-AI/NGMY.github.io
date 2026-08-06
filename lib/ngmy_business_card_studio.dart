@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -8,13 +8,18 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_business_card_models.dart';
+import 'ngmy_business_card_payments.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 
-const _kBizCardHudColors = [Color(0xFF22C55E), Color(0xFF065F46), Color(0xFF134E4A)];
+const _kBizCardHudColors = [
+  Color(0xFF22C55E),
+  Color(0xFF065F46),
+  Color(0xFF134E4A),
+];
 
 /// Inline or full-screen business card designer.
 class NgmyBusinessCardStudio extends StatefulWidget {
@@ -25,6 +30,7 @@ class NgmyBusinessCardStudio extends StatefulWidget {
     this.showExpandButton = true,
     this.initialDocument,
     this.onDocumentChanged,
+    this.isAdmin = false,
   });
 
   final String userEmail;
@@ -32,6 +38,7 @@ class NgmyBusinessCardStudio extends StatefulWidget {
   final bool showExpandButton;
   final NgmyBusinessCardDocument? initialDocument;
   final ValueChanged<NgmyBusinessCardDocument>? onDocumentChanged;
+  final bool isAdmin;
 
   @override
   State<NgmyBusinessCardStudio> createState() => NgmyBusinessCardStudioState();
@@ -45,32 +52,82 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   TextEditingController? _activeField;
   String? _selectedElementId;
   int _galleryReload = 0;
+  NgmyBusinessCardAccess _access = NgmyBusinessCardAccess.neverPurchased;
 
   static const _businessEmojis = [
-    '💼', '📇', '✨', '🏢', '💡', '🎯', '⭐', '🔥', '💎', '🚀',
-    '📞', '✉️', '🌐', '📍', '💰', '🤝', '🎨', '📊', '🏆', '👔',
-    '💻', '📝', '🔔', '✅', '🌟', '🏠', '📱', '💳', '🎓', '⚡',
+    '💼',
+    '📇',
+    '✨',
+    '🏢',
+    '💡',
+    '🎯',
+    '⭐',
+    '🔥',
+    '💎',
+    '🚀',
+    '📞',
+    '✉️',
+    '🌐',
+    '📍',
+    '💰',
+    '🤝',
+    '🎨',
+    '📊',
+    '🏆',
+    '👔',
+    '💻',
+    '📝',
+    '🔔',
+    '✅',
+    '🌟',
+    '🏠',
+    '📱',
+    '💳',
+    '🎓',
+    '⚡',
   ];
 
   static const _accentColors = [
-    Color(0xFF2563EB), Color(0xFF059669), Color(0xFFDB2777), Color(0xFFD4AF37),
-    Color(0xFF0F172A), Color(0xFF22D3EE), Color(0xFF7C3AED), Color(0xFFEF4444),
-    Color(0xFFF97316), Color(0xFF14B8A6),
+    Color(0xFF2563EB),
+    Color(0xFF059669),
+    Color(0xFFDB2777),
+    Color(0xFFD4AF37),
+    Color(0xFF0F172A),
+    Color(0xFF22D3EE),
+    Color(0xFF7C3AED),
+    Color(0xFFEF4444),
+    Color(0xFFF97316),
+    Color(0xFF14B8A6),
   ];
 
   static const _bgColors = [
-    Color(0xFFFFFFFF), Color(0xFFF8FAFC), Color(0xFF0F172A), Color(0xFF111827),
-    Color(0xFF1E1B4B), Color(0xFF0A0A0A), Color(0xFFFAF9F7), Color(0xFFECFEFF),
+    Color(0xFFFFFFFF),
+    Color(0xFFF8FAFC),
+    Color(0xFF0F172A),
+    Color(0xFF111827),
+    Color(0xFF1E1B4B),
+    Color(0xFF0A0A0A),
+    Color(0xFFFAF9F7),
+    Color(0xFFECFEFF),
   ];
 
   static const _textColors = [
-    Color(0xFF0F172A), Color(0xFFFFFFFF), Color(0xFF18181B), Color(0xFF1E293B),
-    Color(0xFF3FB950), Color(0xFFD4AF37), Color(0xFFDB2777),
+    Color(0xFF0F172A),
+    Color(0xFFFFFFFF),
+    Color(0xFF18181B),
+    Color(0xFF1E293B),
+    Color(0xFF3FB950),
+    Color(0xFFD4AF37),
+    Color(0xFFDB2777),
   ];
 
   static const _borderColors = [
-    Color(0xFFD4AF37), Color(0xFF2563EB), Color(0xFF22C55E), Color(0xFF7C3AED),
-    Color(0xFFEF4444), Color(0xFF0F172A),
+    Color(0xFFD4AF37),
+    Color(0xFF2563EB),
+    Color(0xFF22C55E),
+    Color(0xFF7C3AED),
+    Color(0xFFEF4444),
+    Color(0xFF0F172A),
   ];
 
   final _nameC = TextEditingController();
@@ -87,14 +144,17 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     super.initState();
     _doc = widget.initialDocument?.copy() ?? NgmyBusinessCardDocument();
     _syncControllersFromDoc();
+    _refreshAccess();
   }
 
   @override
   void didUpdateWidget(covariant NgmyBusinessCardStudio oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialDocument != null && widget.initialDocument!.id != _doc.id) {
+    if (widget.initialDocument != null &&
+        widget.initialDocument!.id != _doc.id) {
       _doc = widget.initialDocument!.copy();
       _syncControllersFromDoc();
+      _refreshAccess();
     }
   }
 
@@ -104,6 +164,31 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       _syncControllersFromDoc();
     });
     widget.onDocumentChanged?.call(_doc);
+    _refreshAccess();
+  }
+
+  bool get _editLocked =>
+      !widget.isAdmin && _access == NgmyBusinessCardAccess.expired;
+
+  Future<void> _refreshAccess() async {
+    final cardId = _doc.id;
+    final access = await NgmyBusinessCardPayments.accessFor(
+      email: widget.userEmail,
+      document: _doc,
+      isAdmin: widget.isAdmin,
+    );
+    if (mounted && _doc.id == cardId) setState(() => _access = access);
+  }
+
+  Future<bool> _requestCardAccess() async {
+    final allowed = await NgmyBusinessCardPayments.ensureDownloadAccess(
+      context: context,
+      email: widget.userEmail,
+      document: _doc,
+      isAdmin: widget.isAdmin,
+    );
+    await _refreshAccess();
+    return allowed;
   }
 
   void _syncControllersFromDoc() {
@@ -156,7 +241,11 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       final bytes = await file.readAsBytes();
       if (bytes.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not read that image. Try another file.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not read that image. Try another file.'),
+            ),
+          );
         }
         return;
       }
@@ -169,7 +258,9 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       widget.onDocumentChanged?.call(_doc);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logo error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Logo error: $e')));
       }
     }
   }
@@ -180,33 +271,68 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     if (!mounted) return;
     setState(() => _galleryReload++);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Business card saved on this device.'), backgroundColor: Color(0xFF16A34A)),
+      const SnackBar(
+        content: Text('Business card saved on this device.'),
+        backgroundColor: Color(0xFF16A34A),
+      ),
     );
   }
 
   Future<void> _downloadCard() async {
     _applyControllersToDoc();
+    if (!await _requestCardAccess()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Payment must be confirmed before this card can download.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await Future.delayed(const Duration(milliseconds: 120));
       await WidgetsBinding.instance.endOfFrame;
-      final boundary = _captureKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _captureKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) throw Exception('Preview not ready.');
       final image = await boundary.toImage(pixelRatio: 4.0);
-      final bytes = (await image.toByteData(format: ui.ImageByteFormat.png))?.buffer.asUint8List();
+      final bytes = (await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      ))?.buffer.asUint8List();
       if (bytes == null) throw Exception('Could not render card.');
-      final slug = _doc.fullName.replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_').toLowerCase();
-      final msg = await downloadNgmyQrImage(bytes, 'business_card_${slug}_${DateTime.now().millisecondsSinceEpoch}');
+      final slug = _doc.fullName
+          .replaceAll(RegExp(r'[^a-zA-Z0-9]+'), '_')
+          .toLowerCase();
+      final msg = await downloadNgmyQrImage(
+        bytes,
+        'business_card_${slug}_${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: const Color(0xFF16A34A)));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: const Color(0xFF16A34A),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Download failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Download failed: $e')));
       }
     }
   }
 
   void _selectTemplate(NgmyBusinessCardTemplate tpl) {
+    if (_editLocked) {
+      _requestCardAccess();
+      return;
+    }
     setState(() {
       _doc.templateId = tpl.id;
       _doc.accentColor = null;
@@ -284,7 +410,9 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     _chip('All', 'all'),
-                    ...kNgmyBusinessCardCategories.map((c) => _chip(c.$2, c.$1)),
+                    ...kNgmyBusinessCardCategories.map(
+                      (c) => _chip(c.$2, c.$1),
+                    ),
                   ],
                 ),
               ),
@@ -313,14 +441,21 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: selected ? const Color(0xFF22C55E) : t.chipOffBorder,
+                            color: selected
+                                ? const Color(0xFF22C55E)
+                                : t.chipOffBorder,
                             width: selected ? 2 : 1,
                           ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Expanded(child: ngmyBusinessCardTemplateThumb(tpl, width: 120)),
+                            Expanded(
+                              child: ngmyBusinessCardTemplateThumb(
+                                tpl,
+                                width: 120,
+                              ),
+                            ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(4, 3, 4, 5),
                               child: Text(
@@ -328,7 +463,11 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: t.chipOffLabel, fontWeight: FontWeight.w800, fontSize: 8),
+                                style: TextStyle(
+                                  color: t.chipOffLabel,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 8,
+                                ),
                               ),
                             ),
                           ],
@@ -340,61 +479,75 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               ),
             ),
             const SizedBox(height: 12),
-            Center(
-              child: RepaintBoundary(
-                key: _captureKey,
-                child: NgmyBusinessCardPreview(
-                  document: _doc,
-                  interactive: _editMode,
-                  width: widget.compact ? 320 : 360,
-                  selectedElementId: _selectedElementId,
-                  onElementSelect: _selectElement,
-                  onElementDrag: (id, delta) {
-                    setState(() {
-                      _selectedElementId = id;
-                      ngmyCardSetElementOffset(_doc, id, delta);
-                    });
-                    widget.onDocumentChanged?.call(_doc);
-                  },
-                ),
-              ),
-            ),
-            if (_editMode && _selectedElementId != null) _selectedElementSizeBar(),
-            const SizedBox(height: 10),
-            NgmyToolkitAliveSection(
-              colors: _kBizCardHudColors,
-              pulse: pulse,
-              scan: scan,
-              orbit: orbit,
-              phase: 0.22,
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _editMode = !_editMode),
-                      icon: Icon(_editMode ? Icons.touch_app_rounded : Icons.visibility_rounded, size: 18),
-                      label: Text(_editMode ? 'Drag Mode On' : 'Preview Mode'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Reset layout',
-                    onPressed: () {
+            if (_editLocked) _expiredAccessNotice(),
+            if (_editLocked) const SizedBox(height: 10),
+            _editGate(
+              Center(
+                child: RepaintBoundary(
+                  key: _captureKey,
+                  child: NgmyBusinessCardPreview(
+                    document: _doc,
+                    interactive: _editMode && !_editLocked,
+                    width: widget.compact ? 320 : 360,
+                    selectedElementId: _selectedElementId,
+                    onElementSelect: _selectElement,
+                    onElementDrag: (id, delta) {
                       setState(() {
-                        ngmyCardResetLayout(_doc);
-                        _selectedElementId = null;
+                        _selectedElementId = id;
+                        ngmyCardSetElementOffset(_doc, id, delta);
                       });
                       widget.onDocumentChanged?.call(_doc);
                     },
-                    icon: const Icon(Icons.restart_alt_rounded),
                   ),
-                  IconButton(
-                    tooltip: 'Add logo',
-                    onPressed: _pickLogo,
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                  ),
-                ],
+                ),
+              ),
+            ),
+            if (_editMode && _selectedElementId != null)
+              _selectedElementSizeBar(),
+            const SizedBox(height: 10),
+            _editGate(
+              NgmyToolkitAliveSection(
+                colors: _kBizCardHudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                phase: 0.22,
+                padding: const EdgeInsets.all(8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => setState(() => _editMode = !_editMode),
+                        icon: Icon(
+                          _editMode
+                              ? Icons.touch_app_rounded
+                              : Icons.visibility_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          _editMode ? 'Drag Mode On' : 'Preview Mode',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Reset layout',
+                      onPressed: () {
+                        setState(() {
+                          ngmyCardResetLayout(_doc);
+                          _selectedElementId = null;
+                        });
+                        widget.onDocumentChanged?.call(_doc);
+                      },
+                      icon: const Icon(Icons.restart_alt_rounded),
+                    ),
+                    IconButton(
+                      tooltip: 'Add logo',
+                      onPressed: _pickLogo,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -405,7 +558,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               orbit: orbit,
               phase: 0.3,
               padding: EdgeInsets.zero,
-              child: _toolsPanel(),
+              child: _editGate(_toolsPanel()),
             ),
             const SizedBox(height: 10),
             NgmyToolkitAliveSection(
@@ -419,7 +572,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _saveCard,
+                      onPressed: _editLocked ? _requestCardAccess : _saveCard,
                       icon: const Icon(Icons.save_outlined),
                       label: const Text('Save Card'),
                     ),
@@ -428,7 +581,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: _downloadCard,
-                      style: FilledButton.styleFrom(backgroundColor: const Color(0xFF22C55E), foregroundColor: Colors.black),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: Colors.black,
+                      ),
                       icon: const Icon(Icons.download_rounded),
                       label: const Text('Download'),
                     ),
@@ -445,7 +601,14 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               ),
             ],
             const SizedBox(height: 16),
-            Text('Saved cards', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 14)),
+            Text(
+              'Saved cards',
+              style: TextStyle(
+                color: t.title,
+                fontWeight: FontWeight.w900,
+                fontSize: 14,
+              ),
+            ),
             const SizedBox(height: 8),
             NgmyBusinessCardGallery(
               key: ValueKey('biz-gallery-$_galleryReload'),
@@ -458,13 +621,72 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     );
   }
 
+  Widget _editGate(Widget child) {
+    if (!_editLocked) return child;
+    return Stack(
+      children: [
+        AbsorbPointer(child: Opacity(opacity: 0.72, child: child)),
+        Positioned.fill(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: _requestCardAccess,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _expiredAccessNotice() {
+    final t = NgmyHubTheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF22C55E).withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_clock_rounded, color: Color(0xFF22C55E)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'The 2-day edit window ended. This card is view-only until you pay again.',
+              style: TextStyle(
+                color: t.title,
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: _requestCardAccess,
+            child: const Text('Unlock'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _chip(String label, String id) {
     final t = NgmyHubTheme.of(context);
     final on = _category == id;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: FilterChip(
-        label: Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: on ? Colors.black : t.chipOffLabel)),
+        label: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+            color: on ? Colors.black : t.chipOffLabel,
+          ),
+        ),
         selected: on,
         onSelected: (_) => setState(() => _category = id),
         selectedColor: const Color(0xFF22C55E),
@@ -484,7 +706,11 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       decoration: BoxDecoration(
         color: t.panel,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: t.isDark ? 0.2 : 0.35)),
+        border: Border.all(
+          color: const Color(
+            0xFF22C55E,
+          ).withValues(alpha: t.isDark ? 0.2 : 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -493,12 +719,26 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             children: [
               Container(
                 padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: const Color(0xFF22C55E).withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.palette_rounded, color: Color(0xFF22C55E), size: 18),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.palette_rounded,
+                  color: Color(0xFF22C55E),
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Design Studio', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 15)),
+                child: Text(
+                  'Design Studio',
+                  style: TextStyle(
+                    color: t.title,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                  ),
+                ),
               ),
             ],
           ),
@@ -507,10 +747,22 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
           const SizedBox(height: 8),
           _iconStrip(),
           const SizedBox(height: 12),
-          _fieldRow(_field('Full name', _nameC, 'name'), _field('Job title', _titleC, 'title')),
-          _fieldRow(_field('Company', _companyC, 'company'), _field('Phone', _phoneC, 'phone')),
-          _fieldRow(_field('Email', _emailC, 'email'), _field('Website', _websiteC, 'website')),
-          _fieldRow(_field('Address', _addressC, 'address'), _field('Tagline', _taglineC, 'tagline')),
+          _fieldRow(
+            _field('Full name', _nameC, 'name'),
+            _field('Job title', _titleC, 'title'),
+          ),
+          _fieldRow(
+            _field('Company', _companyC, 'company'),
+            _field('Phone', _phoneC, 'phone'),
+          ),
+          _fieldRow(
+            _field('Email', _emailC, 'email'),
+            _field('Website', _websiteC, 'website'),
+          ),
+          _fieldRow(
+            _field('Address', _addressC, 'address'),
+            _field('Tagline', _taglineC, 'tagline'),
+          ),
           const SizedBox(height: 10),
           _styleSection('Accent', _accentColors, _doc.accentColor, (c) {
             setState(() => _doc.accentColor = c);
@@ -542,7 +794,14 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Text size', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Text size',
+                      style: TextStyle(
+                        color: t.subtitle,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                     Slider(
                       value: _doc.fontScale.clamp(0.85, 1.3),
                       min: 0.85,
@@ -562,7 +821,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               ),
               const SizedBox(width: 8),
               FilterChip(
-                label: const Text('Bold', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                label: const Text(
+                  'Bold',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+                ),
                 selected: _doc.boldText,
                 onSelected: (v) {
                   setState(() {
@@ -573,12 +835,21 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 },
                 selectedColor: const Color(0xFF22C55E),
                 checkmarkColor: Colors.black,
-                backgroundColor: t.isDark ? Colors.black26 : const Color(0xFFE2E8F0),
+                backgroundColor: t.isDark
+                    ? Colors.black26
+                    : const Color(0xFFE2E8F0),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text('Logo rings', style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            'Logo rings',
+            style: TextStyle(
+              color: t.subtitle,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -593,7 +864,13 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 ('soft', 'Soft'),
               ])
                 FilterChip(
-                  label: Text(opt.$2, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                  label: Text(
+                    opt.$2,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                    ),
+                  ),
                   selected: _doc.logoRingStyle == opt.$1,
                   onSelected: (_) {
                     setState(() {
@@ -604,7 +881,9 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   },
                   selectedColor: const Color(0xFF22C55E),
                   checkmarkColor: Colors.black,
-                  backgroundColor: t.isDark ? Colors.black26 : const Color(0xFFE2E8F0),
+                  backgroundColor: t.isDark
+                      ? Colors.black26
+                      : const Color(0xFFE2E8F0),
                 ),
             ],
           ),
@@ -637,30 +916,55 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       decoration: BoxDecoration(
         color: t.panel,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.35)),
+        border: Border.all(
+          color: const Color(0xFF22C55E).withValues(alpha: 0.35),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.open_with_rounded, size: 16, color: const Color(0xFF22C55E).withValues(alpha: 0.85)),
+          Icon(
+            Icons.open_with_rounded,
+            size: 16,
+            color: const Color(0xFF22C55E).withValues(alpha: 0.85),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Selected: ${ngmyCardElementLabel(id)}',
-              style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12),
+              style: TextStyle(
+                color: t.title,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
             ),
           ),
           IconButton(
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
             onPressed: scale <= 0.55 ? null : () => _nudgeSelectedScale(-0.08),
-            icon: const Icon(Icons.remove_circle_outline, color: Color(0xFF22C55E), size: 22),
+            icon: const Icon(
+              Icons.remove_circle_outline,
+              color: Color(0xFF22C55E),
+              size: 22,
+            ),
           ),
-          Text('$pct%', style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 13)),
+          Text(
+            '$pct%',
+            style: TextStyle(
+              color: t.title,
+              fontWeight: FontWeight.w900,
+              fontSize: 13,
+            ),
+          ),
           IconButton(
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             padding: EdgeInsets.zero,
             onPressed: scale >= 2.45 ? null : () => _nudgeSelectedScale(0.08),
-            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF22C55E), size: 22),
+            icon: const Icon(
+              Icons.add_circle_outline,
+              color: Color(0xFF22C55E),
+              size: 22,
+            ),
           ),
         ],
       ),
@@ -672,7 +976,14 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Business emojis', style: TextStyle(color: t.subtitle, fontSize: 10, fontWeight: FontWeight.w700)),
+        Text(
+          'Business emojis',
+          style: TextStyle(
+            color: t.subtitle,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 6),
         SizedBox(
           height: 38,
@@ -691,10 +1002,23 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
-                      color: noneSelected ? const Color(0xFF22C55E).withValues(alpha: 0.2) : t.fieldFill,
-                      border: Border.all(color: noneSelected ? const Color(0xFF22C55E) : t.border),
+                      color: noneSelected
+                          ? const Color(0xFF22C55E).withValues(alpha: 0.2)
+                          : t.fieldFill,
+                      border: Border.all(
+                        color: noneSelected
+                            ? const Color(0xFF22C55E)
+                            : t.border,
+                      ),
                     ),
-                    child: Text('None', style: TextStyle(color: noneSelected ? const Color(0xFF22C55E) : t.muted, fontWeight: FontWeight.w800, fontSize: 8)),
+                    child: Text(
+                      'None',
+                      style: TextStyle(
+                        color: noneSelected ? const Color(0xFF22C55E) : t.muted,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 8,
+                      ),
+                    ),
                   ),
                 );
               }
@@ -711,8 +1035,12 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    color: selected ? const Color(0xFF22C55E).withValues(alpha: 0.2) : t.fieldFill,
-                    border: Border.all(color: selected ? const Color(0xFF22C55E) : t.border),
+                    color: selected
+                        ? const Color(0xFF22C55E).withValues(alpha: 0.2)
+                        : t.fieldFill,
+                    border: Border.all(
+                      color: selected ? const Color(0xFF22C55E) : t.border,
+                    ),
                   ),
                   child: Text(e, style: const TextStyle(fontSize: 18)),
                 ),
@@ -720,7 +1048,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             },
           ),
         ),
-        Text('None clears emoji · tap to place · drag to move · use +/- to resize', style: TextStyle(color: t.muted, fontSize: 9)),
+        Text(
+          'None clears emoji · tap to place · drag to move · use +/- to resize',
+          style: TextStyle(color: t.muted, fontSize: 9),
+        ),
       ],
     );
   }
@@ -757,20 +1088,44 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     );
   }
 
-  Widget _styleSection(String label, List<Color> colors, Color? selected, ValueChanged<Color?> onPick, {required String defaultLabel}) {
+  Widget _styleSection(
+    String label,
+    List<Color> colors,
+    Color? selected,
+    ValueChanged<Color?> onPick, {
+    required String defaultLabel,
+  }) {
     final t = NgmyHubTheme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: t.subtitle, fontSize: 11, fontWeight: FontWeight.w700)),
+        Text(
+          label,
+          style: TextStyle(
+            color: t.subtitle,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         const SizedBox(height: 6),
         SizedBox(
           height: 32,
           child: ListView(
             scrollDirection: Axis.horizontal,
             children: [
-              _colorDot(null, label: defaultLabel, selected: selected == null, onTap: () => onPick(null)),
-              ...colors.map((c) => _colorDot(c, selected: selected == c, onTap: () => onPick(c))),
+              _colorDot(
+                null,
+                label: defaultLabel,
+                selected: selected == null,
+                onTap: () => onPick(null),
+              ),
+              ...colors.map(
+                (c) => _colorDot(
+                  c,
+                  selected: selected == c,
+                  onTap: () => onPick(c),
+                ),
+              ),
             ],
           ),
         ),
@@ -778,7 +1133,12 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     );
   }
 
-  Widget _colorDot(Color? color, {String? label, required bool selected, required VoidCallback onTap}) {
+  Widget _colorDot(
+    Color? color, {
+    String? label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
     final t = NgmyHubTheme.of(context);
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -787,16 +1147,30 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
         child: Container(
           width: label != null ? null : 28,
           height: 28,
-          padding: label != null ? const EdgeInsets.symmetric(horizontal: 10) : null,
+          padding: label != null
+              ? const EdgeInsets.symmetric(horizontal: 10)
+              : null,
           decoration: BoxDecoration(
             shape: label == null ? BoxShape.circle : BoxShape.rectangle,
             borderRadius: label != null ? BorderRadius.circular(14) : null,
-            color: color ?? (t.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
-            border: Border.all(color: selected ? const Color(0xFF22C55E) : t.chipOffBorder, width: selected ? 2.5 : 1),
+            color:
+                color ??
+                (t.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+            border: Border.all(
+              color: selected ? const Color(0xFF22C55E) : t.chipOffBorder,
+              width: selected ? 2.5 : 1,
+            ),
           ),
           alignment: Alignment.center,
           child: label != null
-              ? Text(label, style: TextStyle(color: t.chipOffLabel, fontSize: 9, fontWeight: FontWeight.w700))
+              ? Text(
+                  label,
+                  style: TextStyle(
+                    color: t.chipOffLabel,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
               : null,
         ),
       ),
@@ -818,7 +1192,11 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             });
             widget.onDocumentChanged?.call(_doc);
           },
-          icon: Icon(visible ? Icons.visibility_rounded : Icons.visibility_off_rounded, size: 16, color: t.muted),
+          icon: Icon(
+            visible ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+            size: 16,
+            color: t.muted,
+          ),
         ),
         Expanded(
           child: TextField(
@@ -828,15 +1206,24 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
               _applyControllersToDoc();
               setState(() {});
             },
-            style: TextStyle(color: t.title, fontWeight: FontWeight.w600, fontSize: 12),
+            style: TextStyle(
+              color: t.title,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
             decoration: InputDecoration(
               labelText: label,
               labelStyle: TextStyle(color: t.muted, fontSize: 11),
               isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
               filled: true,
               fillColor: t.fieldFill,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: BorderSide(color: t.inputBorder),
@@ -888,6 +1275,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                         padding: const EdgeInsets.all(12),
                         child: NgmyBusinessCardStudio(
                           userEmail: widget.userEmail,
+                          isAdmin: widget.isAdmin,
                           initialDocument: _doc,
                           showExpandButton: false,
                           onDocumentChanged: (d) => loadDocument(d),
@@ -905,7 +1293,12 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   }
 }
 
-void showNgmyBusinessCardStudioDialog(BuildContext context, {required String userEmail, NgmyBusinessCardDocument? doc}) {
+void showNgmyBusinessCardStudioDialog(
+  BuildContext context, {
+  required String userEmail,
+  NgmyBusinessCardDocument? doc,
+  bool isAdmin = false,
+}) {
   final barrier = NgmyHubTheme.of(context).barrier;
   showGeneralDialog<void>(
     context: context,
@@ -919,46 +1312,57 @@ void showNgmyBusinessCardStudioDialog(BuildContext context, {required String use
       return PopScope(
         canPop: false,
         child: Dialog(
-        insetPadding: const EdgeInsets.all(12),
-        backgroundColor: Colors.transparent,
-        child: NgmyHudMotion(
-          builder: (context, pulse, scan, orbit) {
-            return NgmyToolkitAlivePanel(
-              colors: _kBizCardHudColors,
-              pulse: pulse,
-              scan: scan,
-              orbit: orbit,
-              width: dialogW,
-              maxHeight: MediaQuery.of(context).size.height * 0.92,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  NgmyToolkitAliveHeader(
-                    title: 'Business Card Studio',
-                    colors: _kBizCardHudColors,
-                    pulse: pulse,
-                    orbit: orbit,
-                    icon: Icons.badge_rounded,
-                    onClose: () => Navigator.pop(context),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(12),
-                      child: NgmyBusinessCardStudio(userEmail: userEmail, initialDocument: doc, showExpandButton: false),
+          insetPadding: const EdgeInsets.all(12),
+          backgroundColor: Colors.transparent,
+          child: NgmyHudMotion(
+            builder: (context, pulse, scan, orbit) {
+              return NgmyToolkitAlivePanel(
+                colors: _kBizCardHudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                width: dialogW,
+                maxHeight: MediaQuery.of(context).size.height * 0.92,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    NgmyToolkitAliveHeader(
+                      title: 'Business Card Studio',
+                      colors: _kBizCardHudColors,
+                      pulse: pulse,
+                      orbit: orbit,
+                      icon: Icons.badge_rounded,
+                      onClose: () => Navigator.pop(context),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    Flexible(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(12),
+                        child: NgmyBusinessCardStudio(
+                          userEmail: userEmail,
+                          initialDocument: doc,
+                          showExpandButton: false,
+                          isAdmin: isAdmin,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
-      ),
       );
     },
     transitionBuilder: (ctx, anim, _, child) {
       return FadeTransition(
         opacity: anim,
-        child: ScaleTransition(scale: Tween<double>(begin: 0.96, end: 1).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)), child: child),
+        child: ScaleTransition(
+          scale: Tween<double>(
+            begin: 0.96,
+            end: 1,
+          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          child: child,
+        ),
       );
     },
   );
@@ -976,7 +1380,8 @@ class NgmyBusinessCardGallery extends StatefulWidget {
   final ValueChanged<NgmyBusinessCardDocument> onOpen;
 
   @override
-  State<NgmyBusinessCardGallery> createState() => _NgmyBusinessCardGalleryState();
+  State<NgmyBusinessCardGallery> createState() =>
+      _NgmyBusinessCardGalleryState();
 }
 
 class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
@@ -997,7 +1402,9 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
   }
 
   void _reload() {
-    setState(() => _future = loadNgmyBusinessCards(userEmail: widget.userEmail));
+    setState(
+      () => _future = loadNgmyBusinessCards(userEmail: widget.userEmail),
+    );
   }
 
   Future<void> _deleteCard(String id) async {
@@ -1020,12 +1427,21 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
       builder: (context, snap) {
         final raw = snap.data ?? [];
         if (snap.connectionState == ConnectionState.waiting && raw.isEmpty) {
-          return const SizedBox(height: 80, child: Center(child: CircularProgressIndicator(color: Color(0xFF22C55E))));
+          return const SizedBox(
+            height: 80,
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFF22C55E)),
+            ),
+          );
         }
         if (raw.isEmpty) {
           return Text(
             'No saved cards yet. Design one above and tap Save Card.',
-            style: TextStyle(color: t.subtitle, fontWeight: FontWeight.w600, fontSize: 12),
+            style: TextStyle(
+              color: t.subtitle,
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+            ),
           );
         }
         return Column(
@@ -1045,20 +1461,39 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
                     children: [
                       SizedBox(
                         width: 96,
-                        child: NgmyBusinessCardPreview(document: doc, width: 96, interactive: false),
+                        child: NgmyBusinessCardPreview(
+                          document: doc,
+                          width: 96,
+                          interactive: false,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(doc.fullName, style: TextStyle(color: t.title, fontWeight: FontWeight.w800)),
-                            Text(doc.company, style: TextStyle(color: t.subtitle, fontSize: 11)),
-                            Text(doc.template.name, style: TextStyle(color: t.muted, fontSize: 10)),
+                            Text(
+                              doc.fullName,
+                              style: TextStyle(
+                                color: t.title,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              doc.company,
+                              style: TextStyle(color: t.subtitle, fontSize: 11),
+                            ),
+                            Text(
+                              doc.template.name,
+                              style: TextStyle(color: t.muted, fontSize: 10),
+                            ),
                           ],
                         ),
                       ),
-                      TextButton(onPressed: () => widget.onOpen(doc), child: const Text('Open')),
+                      TextButton(
+                        onPressed: () => widget.onOpen(doc),
+                        child: const Text('Open'),
+                      ),
                     ],
                   ),
                 ),
@@ -1069,9 +1504,16 @@ class _NgmyBusinessCardGalleryState extends State<NgmyBusinessCardGallery> {
                     tooltip: 'Delete card',
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+                    constraints: const BoxConstraints(
+                      minWidth: 30,
+                      minHeight: 30,
+                    ),
                     onPressed: () => _deleteCard(doc.id),
-                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: t.muted),
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: t.muted,
+                    ),
                   ),
                 ),
               ],
