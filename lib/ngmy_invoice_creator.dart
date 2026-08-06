@@ -268,6 +268,23 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
     return ok;
   }
 
+  /// Save / download: Standard uses 3 free invoices; paid templates always paywall.
+  Future<bool> _ensureCanSaveOrDownload(BuildContext ctx) async {
+    if (_isAdmin) return true;
+    if (widget.config == null || widget.onCharge == null) return !_contentLocked();
+    final ok = await NgmyInvoicePayments.ensureSaveOrDownloadAllowed(
+      context: ctx,
+      user: _effectiveUser,
+      config: widget.config,
+      templateId: _templateId,
+      onCharge: widget.onCharge!,
+      onGranted: widget.onDataChanged,
+      invoiceRef: _invoiceRef(),
+    );
+    if (ok && mounted) setState(() {});
+    return ok;
+  }
+
   InputDecoration _fieldDec(String label, {bool locked = false}) => InputDecoration(
         labelText: label,
         suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18) : null,
@@ -350,6 +367,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
   }
 
   Future<void> _pickProviderPhoto() async {
+    if (_contentLocked()) {
+      if (!await _ensureTemplatePaid(context)) return;
+    }
     try {
       final picker = ImagePicker();
       final file = await picker.pickImage(
@@ -710,16 +730,9 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                                       child: OutlinedButton.icon(
                                         onPressed: () async {
                                           final tpl = ngmyNormalizeInvoiceTemplateId((inv['template'] ?? 'modern').toString());
-                                          if (widget.config != null &&
-                                              NgmyInvoicePayments.requiresPayment(tpl, widget.config) &&
-                                              !NgmyInvoicePayments.hasAccess(
-                                                widget.config,
-                                                _email,
-                                                tpl,
-                                                isAdmin: _isAdmin,
-                                              )) {
+                                          if (widget.config != null) {
                                             if (!ctx.mounted) return;
-                                            final ok = await NgmyInvoicePayments.requestAccess(
+                                            final ok = await NgmyInvoicePayments.ensureSaveOrDownloadAllowed(
                                               context: ctx,
                                               user: _effectiveUser,
                                               config: widget.config,
@@ -731,6 +744,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                                               ),
                                             );
                                             if (!ok) return;
+                                            if (mounted) setState(() {});
                                           }
                                           _applyEntry(inv);
                                           await Future.delayed(const Duration(milliseconds: 250));
@@ -967,7 +981,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Premium/Luxury preview — pay to fill business details, save, or download. Photo upload is still allowed.',
+                          'Premium/Luxury locked — pay to edit, add your photo, save, or download. You can unlock anytime.',
                           style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87, height: 1.35),
                         ),
                       ),
@@ -1182,7 +1196,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () async {
-                        if (!await _ensureTemplatePaid(context)) return;
+                        if (!await _ensureCanSaveOrDownload(context)) return;
                         final count = await _saveInvoice(context, subtotal);
                         setState(() => _savedCount = count);
                       },
@@ -1194,7 +1208,7 @@ class _NgmyInvoiceCreatorDialogState extends State<NgmyInvoiceCreatorDialog> {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () async {
-                        if (!await _ensureTemplatePaid(context)) return;
+                        if (!await _ensureCanSaveOrDownload(context)) return;
                         await _showDownloadOrPrintOptions(context);
                       },
                       icon: const Icon(Icons.download_rounded),

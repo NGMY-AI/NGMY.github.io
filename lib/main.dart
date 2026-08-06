@@ -27602,6 +27602,25 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
   }
 
   Future<void> _pickInvoiceProviderPhoto(VoidCallback refresh) async {
+    if (_invoiceContentLocked()) {
+      final ok = await NgmyInvoicePayments.requestAccess(
+        context: context,
+        user: widget.user,
+        config: widget.config,
+        templateId: _invoiceTemplate,
+        onCharge: (amount, description) async => ngmyChargeUserWallet(
+          user: widget.user,
+          allUsers: widget.allUsers,
+          amount: amount,
+          description: description,
+          onAddTransaction: widget.onAddTransaction,
+        ),
+        onGranted: widget.onDataChanged,
+        invoiceRef: _invoiceRef(),
+      );
+      if (!ok) return;
+      refresh();
+    }
     try {
       final picker = ImagePicker();
       final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800, imageQuality: 85);
@@ -28182,27 +28201,24 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                                         child: OutlinedButton.icon(
                                           onPressed: () async {
                                             final tpl = ngmyNormalizeInvoiceTemplateId((inv['template'] ?? 'modern').toString());
-                                            if (NgmyInvoicePayments.requiresPayment(tpl, widget.config) &&
-                                                !NgmyInvoicePayments.hasAccess(widget.config, widget.user.email, tpl, isAdmin: widget.user.isAdmin)) {
-                                              final ok = await NgmyInvoicePayments.requestAccess(
-                                                context: context,
+                                            final ok = await NgmyInvoicePayments.ensureSaveOrDownloadAllowed(
+                                              context: context,
+                                              user: widget.user,
+                                              config: widget.config,
+                                              templateId: tpl,
+                                              onCharge: (amount, description) async => ngmyChargeUserWallet(
                                                 user: widget.user,
-                                                config: widget.config,
-                                                templateId: tpl,
-                                                onCharge: (amount, description) async => ngmyChargeUserWallet(
-                                                  user: widget.user,
-                                                  allUsers: widget.allUsers,
-                                                  amount: amount,
-                                                  description: description,
-                                                  onAddTransaction: widget.onAddTransaction,
-                                                ),
-                                                onGranted: widget.onDataChanged,
-                                                invoiceRef: NgmyInvoicePayments.invoiceRefFromEntry(
-                                                  Map<String, dynamic>.from(inv),
-                                                ),
-                                              );
-                                              if (!ok) return;
-                                            }
+                                                allUsers: widget.allUsers,
+                                                amount: amount,
+                                                description: description,
+                                                onAddTransaction: widget.onAddTransaction,
+                                              ),
+                                              onGranted: widget.onDataChanged,
+                                              invoiceRef: NgmyInvoicePayments.invoiceRefFromEntry(
+                                                Map<String, dynamic>.from(inv),
+                                              ),
+                                            );
+                                            if (!ok) return;
                                             _applyInvoiceEntryToForm(inv, refreshParent);
                                             await Future.delayed(const Duration(milliseconds: 250));
                                             if (context.mounted) {
@@ -28457,6 +28473,27 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
     });
   }
 
+  Future<bool> _ensureInvoiceSaveOrDownload(BuildContext ctx, VoidCallback refresh, {String? templateId, String? invoiceRef}) {
+    return NgmyInvoicePayments.ensureSaveOrDownloadAllowed(
+      context: ctx,
+      user: widget.user,
+      config: widget.config,
+      templateId: templateId ?? _invoiceTemplate,
+      onCharge: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
+      onGranted: widget.onDataChanged,
+      invoiceRef: invoiceRef ?? _invoiceRef(),
+    ).then((ok) {
+      if (ok) refresh();
+      return ok;
+    });
+  }
+
   InputDecoration _invoiceFieldDec(String label, {bool locked = false}) => InputDecoration(
         labelText: label,
         suffixIcon: locked ? const Icon(Icons.lock_outline_rounded, size: 18) : null,
@@ -28637,7 +28674,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Premium/Luxury preview — pay to fill business details, save, or download. Photo upload is still allowed.',
+                                'Premium/Luxury locked — pay to edit, add your photo, save, or download. You can unlock anytime.',
                                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white70 : Colors.black87, height: 1.35),
                               ),
                             ),
@@ -28840,7 +28877,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: () async {
-                              if (!await _ensureInvoiceTemplatePaid(ctx, refreshAll)) return;
+                              if (!await _ensureInvoiceSaveOrDownload(ctx, refreshAll)) return;
                               final count = await _saveInvoiceLocally(ctx, subtotal);
                               setDialog(() => savedCount = count);
                             },
@@ -28852,7 +28889,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         Expanded(
                           child: FilledButton.icon(
                             onPressed: () async {
-                              if (!await _ensureInvoiceTemplatePaid(ctx, refreshAll)) return;
+                              if (!await _ensureInvoiceSaveOrDownload(ctx, refreshAll)) return;
                               await _downloadInvoiceImage(ctx, localPreviewKey);
                             },
                             icon: const Icon(Icons.download_rounded),

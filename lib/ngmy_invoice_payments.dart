@@ -9,7 +9,12 @@ enum NgmyInvoicePaymentTier { premium, luxury }
 
 enum NgmyInvoicePaymentPlan { oneTime, monthly }
 
-/// Invoice template wallet pricing (Premium + Luxury / Essential Luxury).
+/// Invoice template access.
+///
+/// - Standard templates are free to edit. Save / download is free for the first
+///   three invoices, then Stripe unlocks unlimited export.
+/// - Premium / Luxury / Essential Luxury are always paywalled for editing,
+///   photo, unlock, save, and download — the free-invoice count never applies.
 class NgmyInvoicePayments {
   static const double defaultPremiumOneTime = 9.99;
   static const double defaultPremiumMonthly = 12.99;
@@ -34,6 +39,8 @@ class NgmyInvoicePayments {
     if (tier == null) return false;
     return tierMonetizationEnabled(config, tier);
   }
+
+  static bool isStandardTemplate(String templateId) => tierForTemplate(templateId) == null;
 
   static bool tierMonetizationEnabled(dynamic config, NgmyInvoicePaymentTier tier) {
     return _allowOneTime(config, tier) || _allowMonthly(config, tier);
@@ -87,6 +94,7 @@ class NgmyInvoicePayments {
     return raw.map((k, v) => MapEntry(k.toString().toLowerCase().trim(), v.toString()));
   }
 
+  /// Local wallet / lifetime unlock for a paid template (sync).
   static bool hasAccess(dynamic config, String email, String templateId, {bool isAdmin = false}) {
     if (isAdmin) return true;
     if (!requiresPayment(templateId, config)) return true;
@@ -102,9 +110,13 @@ class NgmyInvoicePayments {
     return false;
   }
 
+  /// Stripe invoice subscription unlocks every tier.
+  static Future<bool> hasStripeInvoiceAccess(String email) =>
+      NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice);
+
   /// Identifies one invoice by what is on it. The free allowance is spent per
-  /// invoice, so saving one and then downloading it must not count twice, and
-  /// re-opening an invoice made earlier must not count again either.
+  /// Standard invoice on save/download, so saving then downloading the same one
+  /// must not count twice.
   static String invoiceRef({
     required String templateId,
     required String invoiceNo,
@@ -126,6 +138,9 @@ class NgmyInvoicePayments {
         itemPrice: (entry['itemPrice'] ?? '').toString(),
       );
 
+  /// Whether Premium / Luxury content should stay locked in the editor.
+  /// Standard templates are never content-locked — only their export is limited.
+  /// The three free invoices never unlock a paid template.
   static Future<bool> isContentLocked(
     dynamic config,
     String email,
@@ -136,10 +151,7 @@ class NgmyInvoicePayments {
     if (isAdmin) return false;
     if (!requiresPayment(templateId, config)) return false;
     if (hasAccess(config, email, templateId)) return false;
-    // Peek only — deciding whether to blur the preview must never spend one of
-    // the three, or simply typing would use them up.
-    if (await NgmyStripePayments.hasInvoiceFreeLeft(email, invoiceRef)) return false;
-    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return false;
+    if (await hasStripeInvoiceAccess(email)) return false;
     return true;
   }
 
@@ -175,6 +187,11 @@ class NgmyInvoicePayments {
     } else {
       (config as dynamic).invoiceLuxuryAccessUntilByEmail = map;
     }
+  }
+
+  static void _grantAllPaidTiers(dynamic config, String email) {
+    grantMonthly(config, email, NgmyInvoicePaymentTier.premium);
+    grantMonthly(config, email, NgmyInvoicePaymentTier.luxury);
   }
 
   static Future<NgmyInvoicePaymentPlan?> pickPlan(
@@ -245,6 +262,41 @@ class NgmyInvoicePayments {
     );
   }
 
+  static Future<bool> _runStripeCheckout({
+    required BuildContext context,
+    required String email,
+    required dynamic config,
+    required String title,
+    required String message,
+    required NgmyInvoicePaymentTier celebrateTier,
+    VoidCallback? onGranted,
+  }) async {
+    final paid = await NgmyStripePayments.ensurePaid(
+      context: context,
+      product: NgmyStripeProduct.invoice,
+      email: email,
+      title: title,
+      message: message,
+    );
+    if (!paid) return false;
+
+    _grantAllPaidTiers(config, email);
+    onGranted?.call();
+
+    if (context.mounted) {
+      await showNgmyUnlockCelebration(
+        context: context,
+        theme: _themeFor(celebrateTier),
+        headline: 'Invoice access unlocked',
+        subtitle: 'Active for 30 days',
+      );
+    }
+    return true;
+  }
+
+  /// Unlock Premium / Luxury / Essential Luxury for editing, photo, unlock,
+  /// save, or download. The free-invoice allowance is never spent here — users
+  /// can pay for paid templates at any time, even with free Standard exports left.
   static Future<bool> requestAccess({
     required BuildContext context,
     required dynamic user,
@@ -255,13 +307,15 @@ class NgmyInvoicePayments {
     String invoiceRef = '',
   }) async {
     if ((user as dynamic).isAdmin == true) return true;
-    if (!requiresPayment(templateId, config)) return true;
     final email = (user as dynamic).email as String;
-    if (hasAccess(config, email, templateId)) return true;
 
-    // Subscribers first, so an active plan never spends a free invoice.
-    if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.invoice)) return true;
-    if (await NgmyStripePayments.claimInvoiceFree(email, invoiceRef)) {
+    // Standard templates are not gated by this method — export uses
+    // [ensureSaveOrDownloadAllowed] instead.
+    if (!requiresPayment(templateId, config)) return true;
+
+    if (hasAccess(config, email, templateId)) return true;
+    if (await hasStripeInvoiceAccess(email)) {
+      _grantAllPaidTiers(config, email);
       onGranted?.call();
       return true;
     }
@@ -269,28 +323,67 @@ class NgmyInvoicePayments {
     final tier = tierForTemplate(templateId)!;
     final tierLabel = tier == NgmyInvoicePaymentTier.premium ? 'Premium' : 'Luxury';
 
-    final paid = await NgmyStripePayments.ensurePaid(
+    return _runStripeCheckout(
       context: context,
-      product: NgmyStripeProduct.invoice,
       email: email,
+      config: config,
       title: 'NGMY Invoice — $tierLabel',
-      message: 'You have used your ${NgmyStripePayments.invoiceFreeCount} free invoices. '
-          'Subscribe for unlimited Premium & Luxury templates (30 days).',
+      message: 'Unlock $tierLabel invoice templates to edit, add your photo, save, and download.',
+      celebrateTier: tier,
+      onGranted: onGranted,
     );
-    if (!paid) return false;
+  }
 
-    grantMonthly(config, email, NgmyInvoicePaymentTier.premium);
-    grantMonthly(config, email, NgmyInvoicePaymentTier.luxury);
-    onGranted?.call();
+  /// Save / download gate for every template.
+  ///
+  /// Paid templates go through [requestAccess]. Standard templates use the
+  /// three free invoices; the fourth and later require Stripe.
+  static Future<bool> ensureSaveOrDownloadAllowed({
+    required BuildContext context,
+    required dynamic user,
+    required dynamic config,
+    required String templateId,
+    required Future<bool> Function(double amount, String description) onCharge,
+    VoidCallback? onGranted,
+    String invoiceRef = '',
+  }) async {
+    if ((user as dynamic).isAdmin == true) return true;
+    final email = (user as dynamic).email as String;
 
-    if (context.mounted) {
-      await showNgmyUnlockCelebration(
+    if (await hasStripeInvoiceAccess(email)) {
+      if (requiresPayment(templateId, config)) {
+        _grantAllPaidTiers(config, email);
+      }
+      onGranted?.call();
+      return true;
+    }
+
+    if (requiresPayment(templateId, config)) {
+      return requestAccess(
         context: context,
-        theme: _themeFor(tier),
-        headline: 'Invoice access unlocked',
-        subtitle: 'Active for 30 days',
+        user: user,
+        config: config,
+        templateId: templateId,
+        onCharge: onCharge,
+        onGranted: onGranted,
+        invoiceRef: invoiceRef,
       );
     }
-    return true;
+
+    // Standard — three free unique invoices, then pay.
+    if (await NgmyStripePayments.claimInvoiceFree(email, invoiceRef)) {
+      return true;
+    }
+
+    return _runStripeCheckout(
+      context: context,
+      email: email,
+      config: config,
+      title: 'NGMY Invoice',
+      message: 'You have used your ${NgmyStripePayments.invoiceFreeCount} free Standard invoices. '
+          'Subscribe for unlimited invoices, including Premium & Luxury templates (30 days).',
+      celebrateTier: NgmyInvoicePaymentTier.premium,
+      onGranted: onGranted,
+    );
   }
 }
