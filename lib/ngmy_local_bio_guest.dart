@@ -10,6 +10,7 @@ import 'ngmy_bio_templates.dart';
 import 'ngmy_guest_link_missing.dart';
 import 'ngmy_local_bio_launch_stub.dart' if (dart.library.html) 'ngmy_local_bio_launch_web.dart';
 import 'ngmy_local_bio_publish_registry.dart';
+import 'ngmy_platform_graphics.dart';
 
 const _kBioGold = Color(0xFF0EA5E9);
 
@@ -30,6 +31,7 @@ class NgmyGuestLocalPublishedBio extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Local Bio',
+      builder: ngmyCrispMaterialAppBuilder,
       theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: Colors.white),
       home: NgmyGuestLocalBioHostScreen(slug: slug),
     );

@@ -1390,29 +1390,21 @@ class _NgmyPaymentDialogState extends State<_NgmyPaymentDialog>
                             const SizedBox(height: 20),
                             _stagger(
                               4,
-                              AnimatedBuilder(
-                                animation: _ambient,
-                                builder: (context, _) {
-                                  final t = _ambient.value;
-                                  return ShaderMask(
-                                    blendMode: BlendMode.srcIn,
-                                    shaderCallback: (bounds) => LinearGradient(
-                                      begin: Alignment(-1.9 + 4.2 * t, -0.5),
-                                      end: Alignment(-1.0 + 4.2 * t, 0.5),
-                                      colors: [metalText, shine, metalText],
-                                    ).createShader(bounds),
-                                    child: Text(
-                                      price,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 46,
-                                        height: 1,
-                                        letterSpacing: -1.8,
-                                      ),
+                              Text(
+                                price,
+                                style: TextStyle(
+                                  color: shine,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 46,
+                                  height: 1,
+                                  letterSpacing: -1.8,
+                                  shadows: [
+                                    Shadow(
+                                      color: metalText.withValues(alpha: 0.32),
+                                      blurRadius: 8,
                                     ),
-                                  );
-                                },
+                                  ],
+                                ),
                               ),
                             ),
                             const SizedBox(height: 11),

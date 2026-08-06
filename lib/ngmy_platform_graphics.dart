@@ -41,6 +41,15 @@ Widget ngmyCrispAppWrapper(BuildContext context, Widget child) {
   );
 }
 
+/// Drop-in [MaterialApp.builder] so standalone guest links receive the same
+/// sharp text metrics as the signed-in app.
+Widget ngmyCrispMaterialAppBuilder(BuildContext context, Widget? child) {
+  return ngmyCrispAppWrapper(
+    context,
+    child ?? const SizedBox.shrink(),
+  );
+}
+
 /// Frosted clip without GPU backdrop blur when [ngmyPreferLightGraphics] is true.
 Widget ngmyClipBackdrop({
   required BorderRadius borderRadius,

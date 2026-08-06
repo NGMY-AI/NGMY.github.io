@@ -12,6 +12,7 @@ import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_builder_urls.dart';
 import 'ngmy_app_studio_published_registry.dart';
+import 'ngmy_platform_graphics.dart';
 
 const _kGuestAppCachePrefix = 'ngmy_guest_app_cache_';
 
@@ -108,6 +109,7 @@ class NgmyGuestPublishedApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'App',
+      builder: ngmyCrispMaterialAppBuilder,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6366F1)),
         useMaterial3: true,

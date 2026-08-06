@@ -1420,7 +1420,9 @@ class _SwahiliUnderstandButtonState extends State<_SwahiliUnderstandButton> with
           t,
         )!;
         return Transform.scale(
-          scale: _pressed ? 0.97 : (1.0 + t * 0.012),
+          // Animate color/glow while idle, but leave all lesson text at an
+          // exact 1:1 scale so CanvasKit does not resample its glyphs.
+          scale: _pressed ? 0.97 : 1.0,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),

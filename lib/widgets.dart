@@ -5,19 +5,32 @@ import 'utils.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 
+int? _ngmyLogoCacheWidth(double? width, double? height) {
+  final logical = width ?? height;
+  if (logical == null || logical <= 0) return null;
+  final views = WidgetsBinding.instance.platformDispatcher.views;
+  final dpr = views.isEmpty ? 1.0 : views.first.devicePixelRatio;
+  return (logical * dpr).ceil();
+}
+
 Widget ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
   final primary = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
+  final cacheWidth = _ngmyLogoCacheWidth(width, height);
   return Image.network(
     primary,
     width: width,
     height: height,
     fit: fit,
     gaplessPlayback: true,
+    cacheWidth: cacheWidth,
+    filterQuality: FilterQuality.high,
     errorBuilder: (_, __, ___) => Image.network(
       kNgmyDefaultLogoUrl,
       width: width,
       height: height,
       fit: fit,
+      cacheWidth: cacheWidth,
+      filterQuality: FilterQuality.high,
       errorBuilder: (_, __, ___) => Container(
         width: width,
         height: height,

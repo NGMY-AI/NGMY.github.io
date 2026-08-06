@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_app_builder_invoice_templates.dart';
 import 'ngmy_invoice_launch_stub.dart' if (dart.library.html) 'ngmy_invoice_launch_web.dart';
 import 'ngmy_invoice_publish_registry.dart';
+import 'ngmy_platform_graphics.dart';
 
 String? ngmyPublishedInvoiceSlugFromLaunch() => ngmyReadInvoiceSlugFromLaunchUrl();
 
@@ -22,6 +23,7 @@ class NgmyGuestPublishedInvoice extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Invoice',
+      builder: ngmyCrispMaterialAppBuilder,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2563EB), brightness: Brightness.dark),
         useMaterial3: true,

@@ -65,6 +65,7 @@ class NgmyGuestCivicEnrollApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'NGMY Self Enrollment',
+      builder: ngmyCrispMaterialAppBuilder,
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         useMaterial3: true,

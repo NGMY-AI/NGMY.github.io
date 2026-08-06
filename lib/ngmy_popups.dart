@@ -13,19 +13,17 @@ import 'package:video_player/video_player.dart';
 import 'ngmy_platform_graphics.dart';
 
 Widget _ngmyPopupTitleText(String title, double size, {int maxLines = 1}) {
-  return FittedBox(
-    fit: BoxFit.scaleDown,
-    child: Text(
-      title,
-      textAlign: TextAlign.center,
-      maxLines: maxLines,
-      softWrap: false,
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: size * 0.088,
-        fontWeight: FontWeight.w900,
-        letterSpacing: 0.3,
-      ),
+  return Text(
+    title,
+    textAlign: TextAlign.center,
+    maxLines: maxLines,
+    softWrap: maxLines > 1,
+    overflow: TextOverflow.ellipsis,
+    style: TextStyle(
+      color: Colors.white,
+      fontSize: math.max(14, (size * 0.088).floorToDouble()),
+      fontWeight: FontWeight.w900,
+      letterSpacing: 0.3,
     ),
   );
 }

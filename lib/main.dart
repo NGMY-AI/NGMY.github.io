@@ -6796,21 +6796,19 @@ Widget _ngmyLogoTextCircle(double size) {
     height: size,
     decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF00B25A)),
     alignment: Alignment.center,
-    child: FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: size * 0.1),
-        child: Text(
-          'NGMY',
-          maxLines: 1,
-          softWrap: false,
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w900,
-            fontSize: size * 0.36,
-            height: 1,
-            letterSpacing: -0.2,
-          ),
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: size * 0.1),
+      child: Text(
+        'NGMY',
+        maxLines: 1,
+        softWrap: false,
+        overflow: TextOverflow.clip,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: (size * 0.32).floorToDouble(),
+          height: 1,
+          letterSpacing: -0.2,
         ),
       ),
     ),
@@ -6820,6 +6818,9 @@ Widget _ngmyLogoTextCircle(double size) {
 Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fit = BoxFit.cover}) {
   final primary = (logoUrl ?? '').trim().isNotEmpty ? logoUrl!.trim() : kNgmyDefaultLogoUrl;
   final size = width ?? height ?? 48;
+  final views = WidgetsBinding.instance.platformDispatcher.views;
+  final dpr = views.isEmpty ? 1.0 : views.first.devicePixelRatio;
+  final cacheWidth = (size * dpr).ceil();
   Widget fallback() => _ngmyLogoTextCircle(size);
   if (primary.startsWith('data:image')) {
     try {
@@ -6829,6 +6830,8 @@ Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fi
         height: height,
         fit: fit,
         gaplessPlayback: true,
+        cacheWidth: cacheWidth,
+        filterQuality: FilterQuality.high,
         errorBuilder: (_, __, ___) => fallback(),
       );
     } catch (_) {
@@ -6846,6 +6849,8 @@ Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fi
           height: height,
           fit: fit,
           gaplessPlayback: true,
+          cacheWidth: cacheWidth,
+          filterQuality: FilterQuality.high,
           errorBuilder: (_, __, ___) => fallback(),
         );
       },
@@ -6857,6 +6862,8 @@ Widget _ngmyLogoImage(String? logoUrl, {double? width, double? height, BoxFit fi
     height: height,
     fit: fit,
     gaplessPlayback: true,
+    cacheWidth: cacheWidth,
+    filterQuality: FilterQuality.high,
     errorBuilder: (_, __, ___) => fallback(),
   );
 }

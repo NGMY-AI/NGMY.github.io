@@ -792,6 +792,7 @@
       // listener, so hold the door while a dispatch is in flight. dispatchEvent
       // is synchronous, so this is all the guard it needs.
       var firing = false;
+      var lastDevicePixelRatio = window.devicePixelRatio || 1;
 
       function remeasure() {
         if (firing) return;
@@ -799,7 +800,11 @@
         try {
           var vv = window.visualViewport;
           if (vv) vv.dispatchEvent(new Event('resize'));
-          else window.dispatchEvent(new Event('resize'));
+          // The window event also makes CanvasKit rebuild its physical-pixel
+          // backing store. Without it, browser zoom, monitor changes, or a PWA
+          // resume can leave a correctly sized canvas stretched from an older
+          // devicePixelRatio, softening every glyph and icon.
+          window.dispatchEvent(new Event('resize'));
         } catch (e) {}
         firing = false;
       }
@@ -826,6 +831,17 @@
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') resettleUntilSteady();
       });
+
+      function resettleForPixelRatioChange() {
+        var current = window.devicePixelRatio || 1;
+        if (Math.abs(current - lastDevicePixelRatio) < 0.001) return;
+        lastDevicePixelRatio = current;
+        resettleUntilSteady();
+      }
+      // Some browsers do not emit a dependable resize when display scale or
+      // browser zoom changes. A lightweight check prevents permanent bitmap
+      // stretching while doing no work when the ratio is stable.
+      setInterval(resettleForPixelRatioChange, 1000);
 
       // Closes a gap the engine has on iOS: it measures the layout viewport but
       // subscribes to the visual one. The two do not always move together - the

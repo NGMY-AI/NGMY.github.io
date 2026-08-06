@@ -986,11 +986,14 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
                 left: 0,
                 right: 0,
                 height: widget.height,
-                child: Transform.scale(
-                  scale: i == 1
-                      ? (1 - 0.03) + combinedReveal * 0.03
-                      : 1 - i * 0.03,
-                  alignment: Alignment.topCenter,
+                child: Padding(
+                  // Create depth by relayout, not by raster-scaling a finished
+                  // card. Text on idle cards therefore stays at native scale.
+                  padding: EdgeInsets.symmetric(
+                    horizontal: i == 1
+                        ? 6 * (1 - combinedReveal)
+                        : i * 6,
+                  ),
                   child: Opacity(
                     opacity: i == 1
                         ? (0.55 + combinedReveal * 0.45).clamp(0.55, 1.0)
@@ -1281,7 +1284,9 @@ class NgmyFrostedCard extends StatelessWidget {
             child: fillBleed
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(28),
-                    clipBehavior: Clip.antiAliasWithSaveLayer,
+                    // No group opacity is applied here, so a saveLayer only
+                    // adds an unnecessary raster pass over text and photos.
+                    clipBehavior: Clip.antiAlias,
                     child: ColoredBox(color: accent[0], child: face),
                   )
                 : ClipRRect(
@@ -1488,7 +1493,10 @@ class _NgmyHomeBrandBadgeState extends State<NgmyHomeBrandBadge> with TickerProv
         final pulse = Curves.easeInOut.transform(_pulse.value);
         final shimmer = _shimmer.value;
         final glow = 0.18 + pulse * 0.22;
-        final scale = 1.0 + pulse * 0.035;
+        // Keep the badge's letters at their native raster size. The glow and
+        // shimmer still animate; continuously scaling the whole subtree made
+        // its text alternate between sharp and soft frames on web.
+        const scale = 1.0;
         return Transform.scale(
           scale: scale,
           child: Material(
@@ -2569,16 +2577,18 @@ class _BusinessCardBody extends StatelessWidget {
         final w = c.maxWidth;
         final cardH = w / kNgmyBusinessCardAspect;
         final scale = math.max(1.0, c.maxHeight / cardH);
+        final renderedWidth = w * scale;
         return ColoredBox(
           color: const Color(0xFF0B1220),
           child: ClipRect(
             child: OverflowBox(
-              maxWidth: w * scale,
+              maxWidth: renderedWidth,
               maxHeight: cardH * scale,
               alignment: Alignment.center,
-              child: Transform.scale(
-                scale: scale,
-                child: NgmyBusinessCardPreview(document: doc!, width: w, interactive: false),
+              child: NgmyBusinessCardPreview(
+                document: doc!,
+                width: renderedWidth,
+                interactive: false,
               ),
             ),
           ),
@@ -2631,28 +2641,25 @@ class _CivicIdCardBody extends StatelessWidget {
       builder: (context, c) {
         const designW = 360.0;
         final designH = designW / 1.586;
+        final renderScale = math.max(
+          c.maxWidth / designW,
+          c.maxHeight / designH,
+        );
         // Cover the whole card face so left/right (and top/bottom) gutters disappear.
         return ColoredBox(
           color: const Color(0xFF0B1220),
           child: ClipRect(
-            child: SizedBox(
-              width: c.maxWidth,
-              height: c.maxHeight,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: designW,
-                  height: designH,
-                  child: NgmyCivicRegistryIdCard(
-                    record: record!,
-                    photoPath: photo.isEmpty ? null : photo,
-                    scale: 1,
-                    onQrTap: () => showNgmyEnlargedCivicQrDialog(
-                      context,
-                      (record!['registryId'] ?? '').toString().trim(),
-                    ),
-                  ),
+            child: OverflowBox(
+              maxWidth: designW * renderScale,
+              maxHeight: designH * renderScale,
+              alignment: Alignment.center,
+              child: NgmyCivicRegistryIdCard(
+                record: record!,
+                photoPath: photo.isEmpty ? null : photo,
+                scale: renderScale,
+                onQrTap: () => showNgmyEnlargedCivicQrDialog(
+                  context,
+                  (record!['registryId'] ?? '').toString().trim(),
                 ),
               ),
             ),

@@ -6,6 +6,7 @@ import 'ngmy_local_menu_publish_registry.dart';
 import 'ngmy_menu_footer.dart';
 import 'ngmy_menu_models.dart';
 import 'ngmy_menu_renderer.dart';
+import 'ngmy_platform_graphics.dart';
 
 String? ngmyPublishedLocalMenuSlugFromLaunch() => ngmyReadLocalMenuSlugFromLaunchUrl();
 
@@ -25,6 +26,7 @@ class NgmyGuestLocalPublishedMenu extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Local Menu',
+      builder: ngmyCrispMaterialAppBuilder,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0EA5E9)), useMaterial3: true),
       home: NgmyGuestLocalMenuHostScreen(slug: slug),
     );

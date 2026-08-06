@@ -118,23 +118,41 @@ class _NgmyLoginLogoHeroState extends State<NgmyLoginLogoHero> with TickerProvid
   }
 
   Widget _profileLogo() {
+    final cacheSize = (_kAvatarSize * MediaQuery.devicePixelRatioOf(context)).ceil();
     Widget image = Image.asset(
       _kNgmyLogoAsset,
       fit: BoxFit.cover,
       alignment: Alignment.center,
+      cacheWidth: cacheSize,
+      filterQuality: FilterQuality.high,
       errorBuilder: (_, __, ___) {
         final network = (widget.logoUrl ?? '').trim();
         if (network.isNotEmpty) {
-          return Image.network(network, fit: BoxFit.cover, alignment: Alignment.center, gaplessPlayback: true, errorBuilder: (_, __, ___) => _fallbackLogo());
+          return Image.network(
+            network,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            gaplessPlayback: true,
+            cacheWidth: cacheSize,
+            filterQuality: FilterQuality.high,
+            errorBuilder: (_, __, ___) => _fallbackLogo(),
+          );
         }
-        return Image.network(_kNgmyDefaultLogoUrl, fit: BoxFit.cover, alignment: Alignment.center, errorBuilder: (_, __, ___) => _fallbackLogo());
+        return Image.network(
+          _kNgmyDefaultLogoUrl,
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          cacheWidth: cacheSize,
+          filterQuality: FilterQuality.high,
+          errorBuilder: (_, __, ___) => _fallbackLogo(),
+        );
       },
     );
     return ClipOval(
       child: SizedBox(
         width: _kAvatarSize,
         height: _kAvatarSize,
-        child: Transform.scale(scale: 1.18, child: image),
+        child: image,
       ),
     );
   }

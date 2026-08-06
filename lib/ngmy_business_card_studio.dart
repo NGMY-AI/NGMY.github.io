@@ -625,10 +625,12 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     if (!_editLocked) return child;
     return Stack(
       children: [
-        AbsorbPointer(child: Opacity(opacity: 0.72, child: child)),
+        AbsorbPointer(child: child),
         Positioned.fill(
           child: Material(
-            color: Colors.transparent,
+            // Dim with a separate overlay. Opacity around the editor forced
+            // card text into an offscreen layer and made it look soft.
+            color: Colors.black.withValues(alpha: 0.14),
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: _requestCardAccess,

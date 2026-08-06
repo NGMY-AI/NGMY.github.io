@@ -6,6 +6,7 @@ import 'ngmy_menu_launch_stub.dart' if (dart.library.html) 'ngmy_menu_launch_web
 import 'ngmy_guest_link_missing.dart';
 import 'ngmy_menu_publish_registry.dart';
 import 'ngmy_menu_renderer.dart';
+import 'ngmy_platform_graphics.dart';
 
 String? ngmyPublishedMenuSlugFromLaunch() => ngmyReadMenuSlugFromLaunchUrl();
 
@@ -25,6 +26,7 @@ class NgmyGuestPublishedMenu extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Menu',
+      builder: ngmyCrispMaterialAppBuilder,
       theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFB8860B)), useMaterial3: true),
       home: NgmyGuestMenuHostScreen(slug: slug),
     );

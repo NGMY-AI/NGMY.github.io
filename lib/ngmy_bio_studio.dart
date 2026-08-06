@@ -569,17 +569,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
-  /// Keeps a bottom-bar label on one line. The type is a step down from the
-  /// button default so "Preview" fits beside its icon on a 320px phone instead
-  /// of wrapping a letter at a time; the scale-down is only a last resort.
-  static Widget _barLabel(String text) => FittedBox(
-    fit: BoxFit.scaleDown,
-    child: Text(
-      text,
-      maxLines: 1,
-      softWrap: false,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
-    ),
+  /// Keep labels sharp by laying text out at its final size. FittedBox applies
+  /// a fractional raster scale on narrow phones, which softens letter edges.
+  static Widget _barLabel(String text) => Text(
+    text,
+    maxLines: 1,
+    softWrap: false,
+    overflow: TextOverflow.ellipsis,
+    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
   );
 
   Widget _bottomBar(NgmyHubTheme t) {

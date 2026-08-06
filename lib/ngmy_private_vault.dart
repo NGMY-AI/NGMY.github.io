@@ -285,7 +285,10 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
               builder: (context, child) {
                 final t = _shakeCtrl.value;
                 final dx = math.sin(t * math.pi * 5) * 10 * (1 - t);
-                return Transform.translate(offset: Offset(dx, 0), child: child);
+                return Transform.translate(
+                  offset: Offset(dx.roundToDouble(), 0),
+                  child: child,
+                );
               },
               child: Column(
                 children: [
@@ -296,10 +299,11 @@ class _DialerScreenState extends State<_DialerScreen> with SingleTickerProviderS
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 64,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
+                    child: Center(
                       child: Text(
                         _digits.isEmpty ? ' ' : _digits,
+                        maxLines: 1,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w400),
                       ),
                     ),
