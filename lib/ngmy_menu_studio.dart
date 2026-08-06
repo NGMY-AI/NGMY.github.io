@@ -25,6 +25,7 @@ import 'ngmy_menu_templates.dart';
 import 'ngmy_menu_urls.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_studio_backend.dart';
+import 'ngmy_studio_payments.dart';
 
 const _kMenuAccent = Color(0xFFD4AF37);
 const _kMenuHudColors = [_kMenuAccent, Color(0xFFB8860B)];
@@ -33,6 +34,7 @@ const _kBioHudColors = [Color(0xFF2563EB), Color(0xFF1D4ED8)];
 Future<void> showNgmyMenuStudioDialog(
   BuildContext context, {
   required String userEmail,
+  bool isAdmin = false,
   NgmyStudioPublishBackend backend = NgmyStudioPublishBackend.cloud,
   NgmyStudioHomeFilter homeFilter = NgmyStudioHomeFilter.all,
 }) {
@@ -46,6 +48,7 @@ Future<void> showNgmyMenuStudioDialog(
       canPop: false,
       child: _NgmyMenuStudio(
         userEmail: userEmail,
+        isAdmin: isAdmin,
         backend: backend,
         homeFilter: homeFilter,
       ),
@@ -60,11 +63,13 @@ Future<void> showNgmyMenuStudioDialog(
 class _NgmyMenuStudio extends StatefulWidget {
   const _NgmyMenuStudio({
     required this.userEmail,
+    this.isAdmin = false,
     this.backend = NgmyStudioPublishBackend.cloud,
     this.homeFilter = NgmyStudioHomeFilter.all,
   });
 
   final String userEmail;
+  final bool isAdmin;
   final NgmyStudioPublishBackend backend;
   final NgmyStudioHomeFilter homeFilter;
 
@@ -171,8 +176,18 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     setState(() => _editingBio = doc.copy());
   }
 
-  void _newMenu() {
+  Future<void> _newMenu() async {
     final doc = ngmyMenuBlankDocument();
+    if (!widget._isLocal) {
+      final allowed = await NgmyStudioPayments.ensureCanCreateMenu(
+        context: context,
+        email: widget.userEmail,
+        existingIdsNewestFirst: _menus.map((m) => m.id).toList(),
+        newMenuId: doc.id,
+        isAdmin: widget.isAdmin,
+      );
+      if (!allowed || !mounted) return;
+    }
     setState(() {
       _editing = doc;
       _tab = 0;
@@ -349,6 +364,16 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     final doc = _editing;
     if (doc == null) return;
     _syncFromEditors();
+    if (!widget._isLocal) {
+      final allowed = await NgmyStudioPayments.ensureCanPublishMenu(
+        context: context,
+        email: widget.userEmail,
+        existingIdsNewestFirst: _menus.map((m) => m.id).toList(),
+        menuId: doc.id,
+        isAdmin: widget.isAdmin,
+      );
+      if (!allowed || !mounted) return;
+    }
     if (doc.restaurantName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add a restaurant name first')));
       return;
@@ -455,6 +480,8 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     if (_editingBio != null) {
       return NgmyBioStudioEditor(
         userEmail: widget.userEmail,
+        isAdmin: widget.isAdmin,
+        existingBioIds: _bios.map((b) => b.id).toList(),
         document: _editingBio!,
         backend: widget.backend,
         onBack: () => setState(() => _editingBio = null),

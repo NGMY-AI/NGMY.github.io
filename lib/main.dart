@@ -15622,6 +15622,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       1: () => NgmyMarketHubScreen(
                 userEmail: widget.user.email,
         username: widget.user.username,
+        isAdmin: widget.user.isAdmin,
       ),
       2: () => NgmySlidesStudioScreen(
         userEmail: widget.user.email,

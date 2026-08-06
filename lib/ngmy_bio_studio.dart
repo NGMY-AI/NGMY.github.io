@@ -17,6 +17,7 @@ import 'ngmy_bio_templates.dart';
 import 'ngmy_bio_urls.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_studio_backend.dart';
+import 'ngmy_studio_payments.dart';
 import 'ngmy_bio_qr.dart';
 import 'ngmy_menu_qr.dart' show NgmyMenuQrWidget;
 import 'ngmy_qr_download.dart';
@@ -28,6 +29,8 @@ class NgmyBioStudioEditor extends StatefulWidget {
   const NgmyBioStudioEditor({
     super.key,
     required this.userEmail,
+    this.isAdmin = false,
+    this.existingBioIds = const [],
     required this.document,
     this.backend = NgmyStudioPublishBackend.cloud,
     required this.onBack,
@@ -35,6 +38,8 @@ class NgmyBioStudioEditor extends StatefulWidget {
   });
 
   final String userEmail;
+  final bool isAdmin;
+  final List<String> existingBioIds;
   final NgmyBioDocument document;
   final NgmyStudioPublishBackend backend;
   final VoidCallback onBack;
@@ -129,6 +134,17 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     if (_doc.displayName.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Add your name first')));
       return;
+    }
+    if (!widget._isLocal) {
+      final allowed = await NgmyStudioPayments.ensureCanPublishBio(
+        context: context,
+        email: widget.userEmail,
+        bioId: _doc.id,
+        templateId: _doc.templateId,
+        existingIdsOldestFirst: widget.existingBioIds,
+        isAdmin: widget.isAdmin,
+      );
+      if (!allowed || !mounted) return;
     }
     setState(() => _publishing = true);
     final slugs = widget._isLocal
@@ -239,6 +255,49 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
     }
+  }
+
+  Future<void> _pickAvatarImage() async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        imageQuality: 88,
+      );
+      if (file == null || !mounted) return;
+      final encoded = 'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
+      if (!mounted) return;
+
+      if (!widget._isLocal) {
+        final allowed = await NgmyStudioPayments.ensureCanSelectBioAvatar(
+          context: context,
+          email: widget.userEmail,
+          bioId: _doc.id,
+          existingIdsOldestFirst: widget.existingBioIds,
+          isReplacement: _doc.avatarImageBase64.isNotEmpty,
+          isAdmin: widget.isAdmin,
+        );
+        if (!allowed || !mounted) return;
+      }
+      setState(() => _doc.avatarImageBase64 = encoded);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not pick image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearAvatarImage() async {
+    if (_doc.avatarImageBase64.isEmpty) return;
+    if (!widget._isLocal && !widget.isAdmin) {
+      await NgmyStudioPayments.recordBioAvatarBaseline(
+        email: widget.userEmail,
+        bioId: _doc.id,
+      );
+    }
+    if (mounted) setState(() => _doc.avatarImageBase64 = '');
   }
 
   @override
@@ -608,7 +667,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           subtitle: 'Profile, header banner, and full-page background.',
           child: Column(
             children: [
-              _photoTile(t, label: 'Profile photo', hint: 'Square photo — shown in the ring', hasImage: _doc.avatarImageBase64.isNotEmpty, onPick: () => _pickImage((b) => _doc.avatarImageBase64 = b, maxSize: 800), onClear: () => setState(() => _doc.avatarImageBase64 = '')),
+              _photoTile(t, label: 'Profile photo', hint: 'First photo + 2 changes free', hasImage: _doc.avatarImageBase64.isNotEmpty, onPick: _pickAvatarImage, onClear: _clearAvatarImage),
               const SizedBox(height: 10),
               _photoTile(t, label: 'Header banner', hint: 'Wide banner — crop to fit', hasImage: _doc.headerImageBase64.isNotEmpty, onPick: () async {
                 final url = await ngmyBioPickBannerImage(context);

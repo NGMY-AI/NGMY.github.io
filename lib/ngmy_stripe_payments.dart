@@ -20,6 +20,8 @@ enum NgmyStripeProduct {
   documentScanner,
   marriageDocument,
   phoneUnlock,
+  menuStudio,
+  bioStudio,
 }
 
 class NgmyStripePayments {
@@ -31,6 +33,8 @@ class NgmyStripePayments {
   static const String documentScannerUrl = 'https://buy.stripe.com/cNibJ11Bf1ln0RJaSxb7y03';
   static const String marriageDocumentUrl = 'https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09';
   static const String phoneUnlockUrl = 'https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a';
+  static const String menuStudioUrl = 'https://buy.stripe.com/8x2bJ1cfTe892ZR3q5b7y0b';
+  static const String bioStudioUrl = 'https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -84,6 +88,10 @@ class NgmyStripePayments {
         return 'marriage';
       case NgmyStripeProduct.phoneUnlock:
         return 'phone_unlock';
+      case NgmyStripeProduct.menuStudio:
+        return 'menu_studio';
+      case NgmyStripeProduct.bioStudio:
+        return 'bio_studio';
     }
   }
 
@@ -105,6 +113,10 @@ class NgmyStripePayments {
         return NgmyStripeProduct.marriageDocument;
       case 'phone_unlock':
         return NgmyStripeProduct.phoneUnlock;
+      case 'menu_studio':
+        return NgmyStripeProduct.menuStudio;
+      case 'bio_studio':
+        return NgmyStripeProduct.bioStudio;
       default:
         return null;
     }
@@ -128,6 +140,10 @@ class NgmyStripePayments {
         return marriageDocumentUrl;
       case NgmyStripeProduct.phoneUnlock:
         return phoneUnlockUrl;
+      case NgmyStripeProduct.menuStudio:
+        return menuStudioUrl;
+      case NgmyStripeProduct.bioStudio:
+        return bioStudioUrl;
     }
   }
 
@@ -175,6 +191,10 @@ class NgmyStripePayments {
         return 2599;
       case NgmyStripeProduct.phoneUnlock:
         return 100;
+      case NgmyStripeProduct.menuStudio:
+        return 1599;
+      case NgmyStripeProduct.bioStudio:
+        return 399;
     }
   }
 
@@ -216,6 +236,10 @@ class NgmyStripePayments {
         return const [Color(0xFFF4A98F), Color(0xFFD1476B)]; // rose gold
       case NgmyStripeProduct.phoneUnlock:
         return const [Color(0xFFB3C9E6), Color(0xFF4F6E9E)]; // polished silver
+      case NgmyStripeProduct.menuStudio:
+        return const [Color(0xFFF0C24B), Color(0xFF8A6110)]; // menu gold
+      case NgmyStripeProduct.bioStudio:
+        return const [Color(0xFF78B7FF), Color(0xFF285BB8)]; // bio crystal blue
     }
   }
 
@@ -238,6 +262,10 @@ class NgmyStripePayments {
         return const Color(0xFFFFE6DA);
       case NgmyStripeProduct.phoneUnlock:
         return const Color(0xFFF5FAFF);
+      case NgmyStripeProduct.menuStudio:
+        return const Color(0xFFFFF4CB);
+      case NgmyStripeProduct.bioStudio:
+        return const Color(0xFFE9F5FF);
     }
   }
 
@@ -273,6 +301,10 @@ class NgmyStripePayments {
         return 'Marriage Documents';
       case NgmyStripeProduct.phoneUnlock:
         return 'Phone Unlock';
+      case NgmyStripeProduct.menuStudio:
+        return 'Menu Studio';
+      case NgmyStripeProduct.bioStudio:
+        return 'Bio Studio';
     }
   }
 
@@ -294,6 +326,10 @@ class NgmyStripePayments {
         return Icons.favorite_rounded;
       case NgmyStripeProduct.phoneUnlock:
         return Icons.lock_open_rounded;
+      case NgmyStripeProduct.menuStudio:
+        return Icons.restaurant_menu_rounded;
+      case NgmyStripeProduct.bioStudio:
+        return Icons.badge_rounded;
     }
   }
 
@@ -315,6 +351,10 @@ class NgmyStripePayments {
         return 'Edit marriage documents for 4 hours after payment.';
       case NgmyStripeProduct.phoneUnlock:
         return 'Instant access to Phone Unlock for 10 days after payment.';
+      case NgmyStripeProduct.menuStudio:
+        return 'Create and publish unlimited menus for 30 days.';
+      case NgmyStripeProduct.bioStudio:
+        return 'Publish premium Bios and make unlimited photo changes for 30 days.';
     }
   }
 

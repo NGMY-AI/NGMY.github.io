@@ -18,10 +18,12 @@ class NgmyMarketHubScreen extends StatefulWidget {
     super.key,
     required this.userEmail,
     this.username = '',
+    this.isAdmin = false,
   });
 
   final String userEmail;
   final String username;
+  final bool isAdmin;
 
   @override
   State<NgmyMarketHubScreen> createState() => _NgmyMarketHubScreenState();
@@ -93,7 +95,11 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                   badge: _menuCount > 0 ? '$_menuCount saved' : null,
                   preview: _MenuStudioThumbPreview(accent: const Color(0xFFB8860B), isDark: t.isDark),
                   onTap: () async {
-                    await showNgmyMenuStudioDialog(context, userEmail: widget.userEmail);
+                    await showNgmyMenuStudioDialog(
+                      context,
+                      userEmail: widget.userEmail,
+                      isAdmin: widget.isAdmin,
+                    );
                     await _refreshBadges();
                   },
                 ),

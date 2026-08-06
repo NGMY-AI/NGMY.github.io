@@ -31,6 +31,8 @@ const PRODUCT_SLUGS = new Set([
   "scanner",
   "marriage",
   "phone_unlock",
+  "menu_studio",
+  "bio_studio",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;
@@ -236,6 +238,54 @@ serve(async (req) => {
     return json({ error: "Invalid JSON payload" }, 400);
   }
 
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // A real monthly Stripe subscription emits invoice.paid on every renewal.
+  // Set access to that invoice's paid-through date rather than blindly adding
+  // 30 days, which also makes the initial invoice idempotent if it arrives
+  // before or after checkout.session.completed.
+  if (event?.type === "invoice.paid") {
+    const invoice = event?.data?.object;
+    const subscriptionId = typeof invoice?.subscription === "string"
+      ? invoice.subscription
+      : invoice?.subscription?.id ?? "";
+    if (!subscriptionId) return json({ received: true, skipped: "no_subscription" });
+
+    const periods = Array.isArray(invoice?.lines?.data)
+      ? invoice.lines.data
+          .map((line: { period?: { end?: number } }) => Number(line?.period?.end ?? 0))
+          .filter((end: number) => Number.isFinite(end) && end > 0)
+      : [];
+    const periodEnd = periods.length > 0 ? Math.max(...periods) : 0;
+    if (periodEnd <= 0) return json({ received: true, skipped: "no_period_end" });
+
+    const { data: access, error: lookupError } = await admin
+      .from("ngmy_stripe_access")
+      .select("email, product, access_until")
+      .eq("stripe_subscription_id", subscriptionId)
+      .maybeSingle();
+    if (lookupError) return json({ error: lookupError.message }, 500);
+    // The first invoice can precede checkout.session.completed. That later
+    // event creates the row, so there is nothing to repair here.
+    if (!access) return json({ received: true, skipped: "checkout_pending" });
+
+    const current = new Date(String(access.access_until)).getTime();
+    const paidThrough = periodEnd * 1000;
+    const accessUntil = new Date(Math.max(current, paidThrough)).toISOString();
+    const { error: renewalError } = await admin
+      .from("ngmy_stripe_access")
+      .update({
+        access_until: accessUntil,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("stripe_subscription_id", subscriptionId);
+    if (renewalError) return json({ error: renewalError.message }, 500);
+    console.log(`[ngmy-stripe-webhook] renewed ${access.product} for ${access.email} until ${accessUntil}`);
+    return json({ received: true, renewed: true, access_until: accessUntil });
+  }
+
   if (event?.type !== "checkout.session.completed") {
     return json({ received: true, ignored: event?.type ?? "unknown" });
   }
@@ -267,10 +317,6 @@ serve(async (req) => {
     return json({ error: "Unknown product" }, 422);
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
   const { data: existing } = await admin
     .from("ngmy_stripe_access")
     .select("access_until")
@@ -286,6 +332,12 @@ serve(async (req) => {
   const paymentIntent = typeof session.payment_intent === "string"
     ? session.payment_intent
     : session.payment_intent?.id ?? null;
+  const subscriptionId = typeof session.subscription === "string"
+    ? session.subscription
+    : session.subscription?.id ?? null;
+  const customerId = typeof session.customer === "string"
+    ? session.customer
+    : session.customer?.id ?? null;
 
   const { error } = await admin.from("ngmy_stripe_access").upsert({
     email,
@@ -293,6 +345,8 @@ serve(async (req) => {
     access_until: accessUntil,
     stripe_session_id: session.id,
     stripe_payment_intent: paymentIntent,
+    stripe_subscription_id: subscriptionId,
+    stripe_customer_id: customerId,
     updated_at: new Date().toISOString(),
   }, { onConflict: "email,product" });
 

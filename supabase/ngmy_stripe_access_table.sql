@@ -8,10 +8,20 @@ create table if not exists public.ngmy_stripe_access (
   access_until timestamptz not null,
   stripe_session_id text unique,
   stripe_payment_intent text,
+  stripe_subscription_id text,
+  stripe_customer_id text,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
   constraint ngmy_stripe_access_email_product unique (email, product)
 );
+
+alter table public.ngmy_stripe_access
+  add column if not exists stripe_subscription_id text;
+alter table public.ngmy_stripe_access
+  add column if not exists stripe_customer_id text;
+
+create index if not exists ngmy_stripe_access_subscription_idx
+  on public.ngmy_stripe_access (stripe_subscription_id);
 
 create index if not exists ngmy_stripe_access_email_idx
   on public.ngmy_stripe_access (lower(email));
