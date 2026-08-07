@@ -19,7 +19,14 @@ Future<String?> pickWebVideoObjectUrl() async {
       return;
     }
     if (!completer.isCompleted) {
-      completer.complete(html.Url.createObjectUrl(file));
+      // Chrome rejects the video/quicktime label even for an H.264 clip it can
+      // decode. Retagging matches Quick Dial's proven playback path without
+      // changing the bytes; genuinely unsupported codecs still report an error.
+      final type = file.type.toLowerCase().split(';').first.trim();
+      final playable = type == 'video/quicktime'
+          ? html.Blob([file], 'video/mp4')
+          : file;
+      completer.complete(html.Url.createObjectUrl(playable));
     }
   });
 

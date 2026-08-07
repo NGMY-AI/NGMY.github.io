@@ -49,24 +49,26 @@ class NgmyStudioNavIcon extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        gradient: dimmed
-            ? null
-            : const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
-              ),
+        gradient:
+            dimmed
+                ? null
+                : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+                ),
         color: dimmed ? Colors.transparent : null,
         border: dimmed ? Border.all(color: Colors.grey.shade400, width: 1.4) : null,
-        boxShadow: dimmed
-            ? null
-            : [
-                BoxShadow(
-                  color: kNgmyStudioNavAccent.withValues(alpha: 0.38),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+        boxShadow:
+            dimmed
+                ? null
+                : [
+                  BoxShadow(
+                    color: kNgmyStudioNavAccent.withValues(alpha: 0.38),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -78,10 +80,7 @@ class NgmyStudioNavIcon extends StatelessWidget {
             child: Container(
               width: size * 0.34,
               height: size * 0.34,
-              decoration: BoxDecoration(
-                color: dimmed ? Colors.grey.shade500 : Colors.white,
-                shape: BoxShape.circle,
-              ),
+              decoration: BoxDecoration(color: dimmed ? Colors.grey.shade500 : Colors.white, shape: BoxShape.circle),
               child: Icon(
                 Icons.play_arrow_rounded,
                 size: size * 0.28,
@@ -191,22 +190,23 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _panel,
-        title: const Text('Cancel export?', style: TextStyle(color: Colors.white)),
-        content: const Text(
-          'Template recording is in progress. Cancel and go back?',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep recording')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Cancel export'),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: _panel,
+            title: const Text('Cancel export?', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              'Template recording is in progress. Cancel and go back?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep recording')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Cancel export'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
     return result == true;
   }
@@ -219,9 +219,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         _exportStatus = '';
         _exportProgress = 0;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Export cancelled.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Export cancelled.')));
     }
   }
 
@@ -294,9 +292,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       final picked = await pickNgmyStudioVideo();
       if (picked == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No video selected. Try an MP4 or MOV file.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('No video selected. Try an MP4 or MOV file.')));
         }
         return;
       }
@@ -349,18 +347,16 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Video added — preview plays with sound. Tap Download when ready.'),
-          ),
+          const SnackBar(content: Text('Video added — preview plays with sound. Tap Download when ready.')),
         );
       }
     } catch (e) {
       await _slotMedia[slotId]?.dispose();
       _slotMedia.remove(slotId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload failed: $e'), backgroundColor: Colors.red.shade700));
       }
     } finally {
       if (mounted) {
@@ -407,9 +403,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         _activeSlotId = slotId;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logo added — it will animate like a news pop-up.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Logo added — it will animate like a news pop-up.')));
       }
     } catch (e) {
       if (mounted) {
@@ -471,64 +467,63 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   Future<void> _showIosSaveVideoDialog(String hint) async {
     if (!mounted) return;
     final name = ngmyStagedIosStudioVideoName ?? 'your video';
-    final displayName = name.toLowerCase().endsWith('.webm')
-        ? '${name.substring(0, name.length - 5)}.mp4'
-        : name;
+    final displayName = name.toLowerCase().endsWith('.webm') ? '${name.substring(0, name.length - 5)}.mp4' : name;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A2E),
-        title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        content: Text(
-          'Tap Save below. Your video is exported as MP4 so it can go into Photos.\n\n'
-          '• In the menu, tap Save Video (or Add to Photos).\n'
-          '• Do not pick "Save to Files" only — choose Save Video for your gallery.\n\n'
-          'File: $displayName',
-          style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              ngmyClearStagedIosStudioVideo();
-              Navigator.pop(ctx);
-            },
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
-            onPressed: () async {
-              // Share/download must run on the button tap (iOS requires user gesture).
-              final saved = await ngmySaveStagedStudioVideo();
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (!mounted) return;
-              final wasWebm = name.toLowerCase().endsWith('.webm');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    saved
-                        ? 'In the menu, tap Save Video or Add to Photos.'
-                        : wasWebm
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A2E),
+            title: const Text('Save your video', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+            content: Text(
+              'Tap Save below. Your video is exported as MP4 so it can go into Photos.\n\n'
+              '• In the menu, tap Save Video (or Add to Photos).\n'
+              '• Do not pick "Save to Files" only — choose Save Video for your gallery.\n\n'
+              'File: $displayName',
+              style: const TextStyle(color: Colors.white70, height: 1.35, fontSize: 13),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ngmyClearStagedIosStudioVideo();
+                  Navigator.pop(ctx);
+                },
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF00B25A)),
+                onPressed: () async {
+                  // Share/download must run on the button tap (iOS requires user gesture).
+                  final saved = await ngmySaveStagedStudioVideo();
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (!mounted) return;
+                  final wasWebm = name.toLowerCase().endsWith('.webm');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        saved
+                            ? 'In the menu, tap Save Video or Add to Photos.'
+                            : wasWebm
                             ? 'This file was WebM (not supported in Photos). Tap Download again — the app now exports MP4 for iPhone.'
                             : 'Video opened — tap Share ↗ at the bottom, then Save Video or Add to Photos.',
-                  ),
-                  duration: const Duration(seconds: 9),
-                ),
-              );
-            },
-            child: const Text('Save to Photos / Files'),
+                      ),
+                      duration: const Duration(seconds: 9),
+                    ),
+                  );
+                },
+                child: const Text('Save to Photos / Files'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   Future<void> _export() async {
     final hasVideo = _slotMedia.values.any((m) => m.source != null && m.source!.isNotEmpty);
     if (!hasVideo) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Upload a video into at least one screen frame.')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Upload a video into at least one screen frame.')));
       return;
     }
     final cfg = _exportConfig();
@@ -540,15 +535,15 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     await Future<void>.delayed(Duration.zero);
     try {
       final msg = await exportNgmyVideoStudioComposed(
-              config: cfg,
-              onProgress: (p, status) {
-                if (!mounted) return;
-                setState(() {
-                  _exportProgress = p;
-                  _exportStatus = status;
-                });
-              },
-            );
+        config: cfg,
+        onProgress: (p, status) {
+          if (!mounted) return;
+          setState(() {
+            _exportProgress = p;
+            _exportStatus = status;
+          });
+        },
+      );
       if (mounted) {
         final lower = msg.toLowerCase();
         if (lower.contains('export cancelled')) {
@@ -556,23 +551,21 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         }
         if (ngmyHasStagedIosStudioVideo || lower.contains('tap open & save')) {
           await _showIosSaveVideoDialog(msg);
-        } else if (lower.startsWith('export failed') ||
-            lower.contains('not added') ||
-            lower.contains('unsupported')) {
+        } else if (lower.startsWith('export failed') || lower.contains('not added') || lower.contains('unsupported')) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), backgroundColor: Colors.red.shade700, duration: const Duration(seconds: 9)),
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 6)),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 6)));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red.shade700),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red.shade700));
       }
     } finally {
       if (mounted) {
@@ -593,9 +586,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         if (_picking) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Loading video…')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Loading video…')));
           return;
         }
         if (_exporting) {
@@ -606,120 +597,124 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       child: Stack(
         children: [
           Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        foregroundColor: Colors.white,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF130B26), Color(0xFF062018)],
-            ),
-            border: Border(bottom: BorderSide(color: Color(0x33FFFFFF), width: 1)),
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: _closeStudio,
-        ),
-        title: NgmyHudMotion(
-          builder: (context, pulse, scan, orbit) {
-            return Row(
-              children: [
-                NgmyHudMiniOrb(
-                  colors: const [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
-                  pulse: pulse,
-                  orbit: orbit,
-                  size: 34,
-                  icon: Icons.live_tv_rounded,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'NGMY Studio',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 17,
-                    shadows: [
-                      Shadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.45 + pulse * 0.25), blurRadius: 10),
-                    ],
+            backgroundColor: _bg,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              foregroundColor: Colors.white,
+              flexibleSpace: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF130B26), Color(0xFF062018)],
                   ),
+                  border: Border(bottom: BorderSide(color: Color(0x33FFFFFF), width: 1)),
                 ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                gradient: _exporting
-                    ? null
-                    : const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00D4A0)]),
-                color: _exporting ? const Color(0xFF00B25A).withValues(alpha: 0.45) : null,
-                boxShadow: _exporting
-                    ? null
-                    : [BoxShadow(color: const Color(0xFF00B25A).withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 3))],
               ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: _exporting ? null : _export,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _exporting
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.download_rounded, size: 18, color: Colors.white),
-                        const SizedBox(width: 6),
-                        Text(
-                          _exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+              leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: _closeStudio),
+              title: NgmyHudMotion(
+                builder: (context, pulse, scan, orbit) {
+                  return Row(
+                    children: [
+                      NgmyHudMiniOrb(
+                        colors: const [kNgmyStudioNavAccent, kNgmyStudioNavAccent2],
+                        pulse: pulse,
+                        orbit: orbit,
+                        size: 34,
+                        icon: Icons.live_tv_rounded,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'NGMY Studio',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          shadows: [
+                            Shadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.45 + pulse * 0.25), blurRadius: 10),
+                          ],
                         ),
-                      ],
+                      ),
+                    ],
+                  );
+                },
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient:
+                          _exporting ? null : const LinearGradient(colors: [Color(0xFF00B25A), Color(0xFF00D4A0)]),
+                      color: _exporting ? const Color(0xFF00B25A).withValues(alpha: 0.45) : null,
+                      boxShadow:
+                          _exporting
+                              ? null
+                              : [
+                                BoxShadow(
+                                  color: const Color(0xFF00B25A).withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: _exporting ? null : _export,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _exporting
+                                  ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                  : const Icon(Icons.download_rounded, size: 18, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Text(
+                                _exporting ? (_exportStatus.isNotEmpty ? _exportStatus : 'Saving…') : 'Download',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
+                IconButton(icon: const Icon(Icons.close_rounded), onPressed: _closeStudio),
+              ],
             ),
+            body:
+                !_uiReady
+                    ? const Center(child: CircularProgressIndicator(color: _accent))
+                    : wide
+                    ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 5, child: _previewScroll()),
+                        Expanded(flex: 4, child: _controlsScroll()),
+                      ],
+                    )
+                    : ListView(
+                      padding: const EdgeInsets.all(12),
+                      children: [
+                        _formatBar(),
+                        const SizedBox(height: 10),
+                        _previewCard(),
+                        const SizedBox(height: 12),
+                        _templatePicker(),
+                        const SizedBox(height: 12),
+                        ..._controlSections(),
+                      ],
+                    ),
           ),
-          IconButton(icon: const Icon(Icons.close_rounded), onPressed: _closeStudio),
-        ],
-      ),
-      body: !_uiReady
-          ? const Center(child: CircularProgressIndicator(color: _accent))
-          : wide
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: _previewScroll()),
-                Expanded(flex: 4, child: _controlsScroll()),
-              ],
-            )
-          : ListView(
-              padding: const EdgeInsets.all(12),
-              children: [
-                _formatBar(),
-                const SizedBox(height: 10),
-                _previewCard(),
-                const SizedBox(height: 12),
-                _templatePicker(),
-                const SizedBox(height: 12),
-                ..._controlSections(),
-              ],
-            ),
-      ),
           if (_exporting) _exportOverlay(),
         ],
       ),
@@ -777,19 +772,13 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     );
   }
 
-  Widget _previewScroll() => ListView(
-        padding: const EdgeInsets.all(14),
-        children: [_formatBar(), const SizedBox(height: 10), _previewCard()],
-      );
+  Widget _previewScroll() =>
+      ListView(padding: const EdgeInsets.all(14), children: [_formatBar(), const SizedBox(height: 10), _previewCard()]);
 
   Widget _controlsScroll() => ListView(
-        padding: const EdgeInsets.all(14),
-        children: [
-          _templatePicker(),
-          const SizedBox(height: 14),
-          ..._controlSections(),
-        ],
-      );
+    padding: const EdgeInsets.all(14),
+    children: [_templatePicker(), const SizedBox(height: 14), ..._controlSections()],
+  );
 
   Widget _formatBar() {
     return Container(
@@ -800,46 +789,66 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         border: Border.all(color: Colors.white12),
       ),
       child: Row(
-        children: kNgmyStudioFormatOrder.map((f) {
-          final sel = f == _format;
-          return Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(3),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  gradient: sel ? const LinearGradient(colors: [kNgmyStudioNavAccent, _accent]) : null,
-                  boxShadow: sel
-                      ? [BoxShadow(color: kNgmyStudioNavAccent.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))]
-                      : null,
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _setFormat(f),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Column(
-                      children: [
-                        Icon(
-                          f == NgmyVideoFormat.youtube ? Icons.smart_display_outlined : Icons.phone_android_outlined,
-                          color: sel ? Colors.white : Colors.white60,
-                          size: 22,
+        children:
+            kNgmyStudioFormatOrder.map((f) {
+              final sel = f == _format;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(3),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      gradient: sel ? const LinearGradient(colors: [kNgmyStudioNavAccent, _accent]) : null,
+                      boxShadow:
+                          sel
+                              ? [
+                                BoxShadow(
+                                  color: kNgmyStudioNavAccent.withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                              : null,
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => _setFormat(f),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Column(
+                            children: [
+                              Icon(
+                                f == NgmyVideoFormat.youtube
+                                    ? Icons.smart_display_outlined
+                                    : Icons.phone_android_outlined,
+                                color: sel ? Colors.white : Colors.white60,
+                                size: 22,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                f.label,
+                                style: TextStyle(
+                                  color: sel ? Colors.white : Colors.white60,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                f.sizeLabel,
+                                style: TextStyle(color: sel ? Colors.white70 : Colors.white38, fontSize: 9),
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(f.label, style: TextStyle(color: sel ? Colors.white : Colors.white60, fontWeight: FontWeight.w900, fontSize: 12)),
-                        Text(f.sizeLabel, style: TextStyle(color: sel ? Colors.white70 : Colors.white38, fontSize: 9)),
-                      ],
+                      ),
                     ),
                   ),
-                  ),
                 ),
-              ),
-            ),
-          );
-        }).toList(),
+              );
+            }).toList(),
       ),
     );
   }
@@ -924,43 +933,44 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                             Expanded(
                               child: ClipRRect(
                                 borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                                child: t.usesPhotoBackdrop
-                                    ? Image.asset(t.assetPath!, fit: BoxFit.cover)
-                                    : Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          CustomPaint(
-                                            painter: NgmyVideoTemplatePainter(
-                                              templateId: t.id,
-                                              format: t.forFormat,
-                                              slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
-                                              slotShapes: {for (final s in t.slots) s.id: s.shape},
-                                              headline: t.defaultHeadline,
-                                              title: t.defaultTitle,
-                                              subtitle: t.defaultSubtitle,
-                                              liveLabel: t.defaultLive,
-                                              headlineFontScale: 0.7,
-                                              titleFontScale: 0.65,
-                                              layer: NgmyTemplatePaintLayer.background,
+                                child:
+                                    t.usesPhotoBackdrop
+                                        ? Image.asset(t.assetPath!, fit: BoxFit.cover)
+                                        : Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            CustomPaint(
+                                              painter: NgmyVideoTemplatePainter(
+                                                templateId: t.id,
+                                                format: t.forFormat,
+                                                slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
+                                                slotShapes: {for (final s in t.slots) s.id: s.shape},
+                                                headline: t.defaultHeadline,
+                                                title: t.defaultTitle,
+                                                subtitle: t.defaultSubtitle,
+                                                liveLabel: t.defaultLive,
+                                                headlineFontScale: 0.7,
+                                                titleFontScale: 0.65,
+                                                layer: NgmyTemplatePaintLayer.background,
+                                              ),
                                             ),
-                                          ),
-                                          CustomPaint(
-                                            painter: NgmyVideoTemplatePainter(
-                                              templateId: t.id,
-                                              format: t.forFormat,
-                                              slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
-                                              slotShapes: {for (final s in t.slots) s.id: s.shape},
-                                              headline: t.defaultHeadline,
-                                              title: t.defaultTitle,
-                                              subtitle: t.defaultSubtitle,
-                                              liveLabel: t.defaultLive,
-                                              headlineFontScale: 0.7,
-                                              titleFontScale: 0.65,
-                                              layer: NgmyTemplatePaintLayer.foreground,
+                                            CustomPaint(
+                                              painter: NgmyVideoTemplatePainter(
+                                                templateId: t.id,
+                                                format: t.forFormat,
+                                                slotRects: {for (final s in t.slots) s.id: s.defaultRect(t.forFormat)},
+                                                slotShapes: {for (final s in t.slots) s.id: s.shape},
+                                                headline: t.defaultHeadline,
+                                                title: t.defaultTitle,
+                                                subtitle: t.defaultSubtitle,
+                                                liveLabel: t.defaultLive,
+                                                headlineFontScale: 0.7,
+                                                titleFontScale: 0.65,
+                                                layer: NgmyTemplatePaintLayer.foreground,
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
+                                          ],
+                                        ),
                               ),
                             ),
                             Padding(
@@ -968,8 +978,20 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: sel ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 10)),
-                                  Text('${t.slots.length} slot${t.slots.length > 1 ? "s" : ""} · ${t.category}', style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 8)),
+                                  Text(
+                                    t.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: sel ? Colors.white : Colors.white70,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${t.slots.length} slot${t.slots.length > 1 ? "s" : ""} · ${t.category}',
+                                    style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 8),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1002,10 +1024,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
           const SizedBox(height: 8),
           AspectRatio(
             aspectRatio: _format.aspectRatio,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: RepaintBoundary(child: _buildStage()),
-            ),
+            child: ClipRRect(borderRadius: BorderRadius.circular(10), child: RepaintBoundary(child: _buildStage())),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1025,9 +1044,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
         if (_def.usesPhotoBackdrop) {
           children.add(
-            Positioned.fill(
-              child: Image.asset(_def.assetPath!, fit: BoxFit.cover, alignment: Alignment.center),
-            ),
+            Positioned.fill(child: Image.asset(_def.assetPath!, fit: BoxFit.cover, alignment: Alignment.center)),
           );
         } else {
           children.add(
@@ -1140,7 +1157,8 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     );
   }
 
-  Rect _px(Rect n, Size size) => Rect.fromLTWH(n.left * size.width, n.top * size.height, n.width * size.width, n.height * size.height);
+  Rect _px(Rect n, Size size) =>
+      Rect.fromLTWH(n.left * size.width, n.top * size.height, n.width * size.width, n.height * size.height);
 
   Widget _slotLayer(NgmyVideoSlotDef slot, Size size) {
     final rect = _slotRects[slot.id];
@@ -1167,17 +1185,20 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     final src = media?.source;
     Widget child;
     if (src != null && src.isNotEmpty) {
-      child = kIsWeb
-          ? studio_html_video.NgmyStudioHtmlVideo(
-              key: ValueKey('${slot.id}|$src'),
-              source: src,
-              trySoundOnLoad: _trySoundSlotId == slot.id,
-            )
-          : NgmyStudioSlotVideo(
-              key: ValueKey('${slot.id}|$src'),
-              source: src,
-              trySoundOnLoad: _trySoundSlotId == slot.id,
-            );
+      child =
+          kIsWeb
+              ? studio_html_video.NgmyStudioHtmlVideo(
+                key: ValueKey('${slot.id}|$src'),
+                source: src,
+                trySoundOnLoad: _trySoundSlotId == slot.id,
+                playbackEnabled: !_exporting,
+              )
+              : NgmyStudioSlotVideo(
+                key: ValueKey('${slot.id}|$src'),
+                source: src,
+                trySoundOnLoad: _trySoundSlotId == slot.id,
+                playbackEnabled: !_exporting,
+              );
     } else {
       child = Container(
         color: Colors.black87,
@@ -1201,10 +1222,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
 
     return Positioned.fromRect(
       rect: px,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-        child: child,
-      ),
+      child: ConstrainedBox(constraints: const BoxConstraints(minWidth: 24, minHeight: 24), child: child),
     );
   }
 
@@ -1213,8 +1231,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     if (rect == null) return const SizedBox.shrink();
     final px = _px(rect, size);
     final active = _activeSlotId == slot.id;
-    final hasVideo = slot.kind == NgmySlotKind.video &&
-        (_slotMedia[slot.id]?.source?.isNotEmpty ?? false);
+    final hasVideo = slot.kind == NgmySlotKind.video && (_slotMedia[slot.id]?.source?.isNotEmpty ?? false);
 
     void onDrag(DragUpdateDetails d) {
       setState(() {
@@ -1235,9 +1252,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               Positioned.fill(
                 child: IgnorePointer(
                   child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFFF3B8A), width: 2),
-                    ),
+                    decoration: BoxDecoration(border: Border.all(color: const Color(0xFFFF3B8A), width: 2)),
                   ),
                 ),
               ),
@@ -1250,10 +1265,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   child: Container(
                     width: 28,
                     height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
                     child: const Icon(Icons.open_with, color: Colors.white, size: 16),
                   ),
                 ),
@@ -1304,10 +1316,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 child: Container(
                   width: 28,
                   height: 28,
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                  decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
                   child: const Icon(Icons.open_with, color: Colors.white, size: 16),
                 ),
               ),
@@ -1331,7 +1340,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
     return [
       Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+        decoration: BoxDecoration(
+          color: _panel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white12),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1359,9 +1372,10 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                   ),
                   value: visible,
                   activeThumbColor: _accent,
-                  onChanged: _picking
-                      ? null
-                      : (v) => setState(() {
+                  onChanged:
+                      _picking
+                          ? null
+                          : (v) => setState(() {
                             _logoVisible[logoSlot.id] = v;
                             _activeSlotId = logoSlot.id;
                           }),
@@ -1371,22 +1385,24 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
             const SizedBox(height: 8),
             ..._def.slots.map((s) {
               final isLogo = s.kind == NgmySlotKind.logoAnim;
-              final has = isLogo
-                  ? (_logoBytes.containsKey(s.id) || _logoPaths.containsKey(s.id))
-                  : (_slotMedia[s.id]?.source != null);
+              final has =
+                  isLogo
+                      ? (_logoBytes.containsKey(s.id) || _logoPaths.containsKey(s.id))
+                      : (_slotMedia[s.id]?.source != null);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: OutlinedButton.icon(
-                  onPressed: _picking
-                      ? null
-                      : () {
-                          setState(() => _activeSlotId = s.id);
-                          if (isLogo) {
-                            _pickLogoForSlot(s.id);
-                          } else {
-                            _pickVideoForSlot(s.id);
-                          }
-                        },
+                  onPressed:
+                      _picking
+                          ? null
+                          : () {
+                            setState(() => _activeSlotId = s.id);
+                            if (isLogo) {
+                              _pickLogoForSlot(s.id);
+                            } else {
+                              _pickVideoForSlot(s.id);
+                            }
+                          },
                   icon: Icon(
                     isLogo ? Icons.animation : Icons.upload_file_rounded,
                     size: 18,
@@ -1416,11 +1432,18 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+                  decoration: BoxDecoration(
+                    color: _panel,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _panelTitle(isLogo ? Icons.workspace_premium_rounded : Icons.aspect_ratio_rounded, isLogo ? 'Brand logo' : 'Resize: ${slotDef.label}'),
+                      _panelTitle(
+                        isLogo ? Icons.workspace_premium_rounded : Icons.aspect_ratio_rounded,
+                        isLogo ? 'Brand logo' : 'Resize: ${slotDef.label}',
+                      ),
                       if (isLogo) ...[
                         const SizedBox(height: 6),
                         SwitchListTile(
@@ -1446,17 +1469,21 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
-                          children: NgmyLogoFrameStyle.values.map((f) {
-                            final sel = (_logoFrameStyles[sid] ?? NgmyLogoFrameStyle.goldRing) == f;
-                            return ChoiceChip(
-                              label: Text(f.label, style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70)),
-                              selected: sel,
-                              selectedColor: _accent.withOpacity(0.35),
-                              backgroundColor: Colors.white.withOpacity(0.06),
-                              side: BorderSide(color: sel ? _accent : Colors.white24),
-                              onSelected: (_) => setState(() => _logoFrameStyles[sid] = f),
-                            );
-                          }).toList(),
+                          children:
+                              NgmyLogoFrameStyle.values.map((f) {
+                                final sel = (_logoFrameStyles[sid] ?? NgmyLogoFrameStyle.goldRing) == f;
+                                return ChoiceChip(
+                                  label: Text(
+                                    f.label,
+                                    style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70),
+                                  ),
+                                  selected: sel,
+                                  selectedColor: _accent.withOpacity(0.35),
+                                  backgroundColor: Colors.white.withOpacity(0.06),
+                                  side: BorderSide(color: sel ? _accent : Colors.white24),
+                                  onSelected: (_) => setState(() => _logoFrameStyles[sid] = f),
+                                );
+                              }).toList(),
                         ),
                         const SizedBox(height: 8),
                       ],
@@ -1484,7 +1511,11 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+          decoration: BoxDecoration(
+            color: _panel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white12),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1505,17 +1536,18 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: NgmyBannerTextStyle.values.map((s) {
-                  final sel = _bannerTextStyle == s;
-                  return ChoiceChip(
-                    label: Text(s.label, style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70)),
-                    selected: sel,
-                    selectedColor: _accent.withOpacity(0.35),
-                    backgroundColor: Colors.white.withOpacity(0.06),
-                    side: BorderSide(color: sel ? _accent : Colors.white24),
-                    onSelected: (_) => setState(() => _bannerTextStyle = s),
-                  );
-                }).toList(),
+                children:
+                    NgmyBannerTextStyle.values.map((s) {
+                      final sel = _bannerTextStyle == s;
+                      return ChoiceChip(
+                        label: Text(s.label, style: TextStyle(fontSize: 9, color: sel ? Colors.white : Colors.white70)),
+                        selected: sel,
+                        selectedColor: _accent.withOpacity(0.35),
+                        backgroundColor: Colors.white.withOpacity(0.06),
+                        side: BorderSide(color: sel ? _accent : Colors.white24),
+                        onSelected: (_) => setState(() => _bannerTextStyle = s),
+                      );
+                    }).toList(),
               ),
               _slider('Overlay scale', _headlineScale, 0.6, 1.8, (v) => setState(() => _headlineScale = v)),
             ],
@@ -1531,8 +1563,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
       child: Row(
         children: [
           ShaderMask(
-            shaderCallback: (bounds) =>
-                const LinearGradient(colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2]).createShader(bounds),
+            shaderCallback:
+                (bounds) =>
+                    const LinearGradient(colors: [kNgmyStudioNavAccent, kNgmyStudioNavAccent2]).createShader(bounds),
             child: Icon(icon, color: Colors.white, size: 16),
           ),
           const SizedBox(width: 8),
@@ -1578,7 +1611,14 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
               children: [
                 Icon(icon, color: sel ? _accent : Colors.white54, size: 20),
                 const SizedBox(height: 2),
-                Text(label, style: TextStyle(color: sel ? Colors.white : Colors.white60, fontSize: 9, fontWeight: FontWeight.w700)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: sel ? Colors.white : Colors.white60,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),

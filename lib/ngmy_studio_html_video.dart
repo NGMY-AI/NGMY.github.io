@@ -9,8 +9,14 @@ import 'package:flutter/material.dart';
 class NgmyStudioHtmlVideo extends StatefulWidget {
   final String source;
   final bool trySoundOnLoad;
+  final bool playbackEnabled;
 
-  const NgmyStudioHtmlVideo({super.key, required this.source, this.trySoundOnLoad = false});
+  const NgmyStudioHtmlVideo({
+    super.key,
+    required this.source,
+    this.trySoundOnLoad = false,
+    this.playbackEnabled = true,
+  });
 
   @override
   State<NgmyStudioHtmlVideo> createState() => _NgmyStudioHtmlVideoState();
@@ -31,27 +37,32 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
     super.initState();
     _viewType = 'ngmy-studio-vid-${widget.source.hashCode}-${DateTime.now().microsecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(_viewType, (int _) {
-      _video = html.VideoElement()
-        ..src = widget.source
-        ..controls = false
-        ..preload = 'auto'
-        ..loop = true
-        ..muted = true
-        ..defaultMuted = true
-        ..autoplay = true
-        ..setAttribute('playsinline', 'true')
-        ..setAttribute('webkit-playsinline', 'true')
-        ..setAttribute('muted', 'true')
-        ..setAttribute('x-webkit-airplay', 'deny')
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.objectFit = 'cover'
-        ..style.backgroundColor = '#000'
-        ..style.pointerEvents = 'none';
+      _video =
+          html.VideoElement()
+            ..src = widget.source
+            ..controls = false
+            ..preload = 'auto'
+            ..loop = true
+            ..muted = true
+            ..defaultMuted = true
+            ..autoplay = true
+            ..setAttribute('playsinline', 'true')
+            ..setAttribute('webkit-playsinline', 'true')
+            ..setAttribute('muted', 'true')
+            ..setAttribute('x-webkit-airplay', 'deny')
+            ..style.width = '100%'
+            ..style.height = '100%'
+            ..style.objectFit = 'cover'
+            ..style.backgroundColor = '#000'
+            ..style.pointerEvents = 'none';
       _video!.onLoadedData.listen((_) async {
         if (!mounted) return;
         setState(() => _ready = true);
         _startPlayWatchdog();
+        if (!widget.playbackEnabled) {
+          _video!.pause();
+          return;
+        }
         try {
           if (widget.trySoundOnLoad) {
             _video!
@@ -92,7 +103,7 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
 
   Future<void> _ensurePlaying() async {
     final v = _video;
-    if (v == null || !mounted || !_ready || _userPaused) return;
+    if (v == null || !mounted || !_ready || _userPaused || !widget.playbackEnabled) return;
     if (v.ended) {
       try {
         v.currentTime = 0;
@@ -110,8 +121,31 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
   }
 
   @override
+  void didUpdateWidget(covariant NgmyStudioHtmlVideo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playbackEnabled == widget.playbackEnabled) return;
+    final v = _video;
+    if (v == null) return;
+    if (!widget.playbackEnabled) {
+      v.pause();
+    } else if (!_userPaused) {
+      unawaited(_ensurePlaying());
+    }
+  }
+
+  @override
   void dispose() {
     _playWatchdog?.cancel();
+    final v = _video;
+    _video = null;
+    if (v != null) {
+      try {
+        v.pause();
+        v.removeAttribute('src');
+        v.load();
+        v.remove();
+      } catch (_) {}
+    }
     super.dispose();
   }
 
@@ -180,7 +214,11 @@ class _NgmyStudioHtmlVideoState extends State<NgmyStudioHtmlVideo> {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.all(8),
-            child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 10),
+            ),
           ),
         ),
       );

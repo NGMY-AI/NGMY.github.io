@@ -12,6 +12,7 @@ import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
 const _metaTimeout = Duration(seconds: 18);
+
 /// Up to 10 minutes — full-length template export.
 const _maxRecordSeconds = 600.0;
 const _exportCanvasFps = 30;
@@ -20,12 +21,16 @@ const _exportVideoBitsPerSecond = 18000000;
 const _exportVideoBitsPerSecondMobile = 9000000;
 const _exportAudioBitsPerSecond = 256000;
 const _recorderTimesliceMs = 100;
+
 /// Hard stop for one export attempt on desktop.
 const _exportWallCapSec = 300.0;
+
 /// Mobile composed export — enough for typical clips without multi-hour hangs.
 const _mobileMaxRecordSeconds = 180.0;
+
 /// Mobile composed export — allow full clip length + template bake.
 const _mobileComposedExportTimeoutSec = 420;
+
 /// Mobile export — 1280 keeps encode fast while templates stay sharp.
 const _mobileExportMaxEdgePx = 1280;
 
@@ -56,9 +61,17 @@ String _formatDurationLabel(double seconds) {
   if (s == 0) return '$m min clip';
   return '$m min ${s}s clip';
 }
+
 const _minRecordMs = 400;
 
-void _ngmyClipLogoShape(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape) {
+void _ngmyClipLogoShape(
+  html.CanvasRenderingContext2D ctx,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+  NgmyVideoSlotShape shape,
+) {
   ctx.beginPath();
   if (shape == NgmyVideoSlotShape.circle) {
     ctx.arc(dx + dw / 2, dy + dh / 2, math.min(dw, dh) / 2, 0, math.pi * 2);
@@ -78,7 +91,16 @@ void _ngmyClipLogoShape(html.CanvasRenderingContext2D ctx, double dx, double dy,
   ctx.clip();
 }
 
-void _ngmyDrawLogoFrame(html.CanvasRenderingContext2D ctx, double dx, double dy, double dw, double dh, NgmyVideoSlotShape shape, NgmyLogoFrameStyle frame, double t) {
+void _ngmyDrawLogoFrame(
+  html.CanvasRenderingContext2D ctx,
+  double dx,
+  double dy,
+  double dw,
+  double dh,
+  NgmyVideoSlotShape shape,
+  NgmyLogoFrameStyle frame,
+  double t,
+) {
   if (frame == NgmyLogoFrameStyle.none) return;
   ctx.save();
   ctx.lineWidth = 2.4;
@@ -187,6 +209,7 @@ Future<void> _seekVideoTo(html.VideoElement v, double seconds, {bool fast = fals
     v.removeEventListener('seeked', onSeeked);
     if (!done.isCompleted) done.complete();
   }
+
   v.addEventListener('seeked', onSeeked);
   v.currentTime = target;
   try {
@@ -198,11 +221,7 @@ Future<void> _seekVideoTo(html.VideoElement v, double seconds, {bool fast = fals
 }
 
 /// Seek every export video to the same timeline position in parallel.
-Future<void> _seekAllVideosParallel(
-  List<html.VideoElement> videos,
-  html.VideoElement? primary,
-  double seconds,
-) async {
+Future<void> _seekAllVideosParallel(List<html.VideoElement> videos, html.VideoElement? primary, double seconds) async {
   if (videos.isEmpty) return;
   final target = seconds;
   for (final v in videos) {
@@ -223,7 +242,10 @@ Future<double> _probeBlobDurationSec(List<html.Blob> chunks, String blobType) as
   if (chunks.isEmpty) return 0;
   final blob = html.Blob(chunks, blobType);
   final url = html.Url.createObjectUrlFromBlob(blob);
-  final probe = html.VideoElement()..preload = 'metadata'..src = url;
+  final probe =
+      html.VideoElement()
+        ..preload = 'metadata'
+        ..src = url;
   try {
     await probe.onLoadedMetadata.first.timeout(const Duration(seconds: 8));
     final d = probe.duration;
@@ -284,10 +306,7 @@ Future<void> _flushProgress(
 
 Future<void> _resumeExportAudioContext() async {
   try {
-    await Future.any<void>([
-      _resumeExportAudioContextImpl(),
-      Future<void>.delayed(const Duration(seconds: 2)),
-    ]);
+    await Future.any<void>([_resumeExportAudioContextImpl(), Future<void>.delayed(const Duration(seconds: 2))]);
   } catch (e) {
     debugPrint('[studio export] AudioContext resume: $e');
   }
@@ -295,8 +314,8 @@ Future<void> _resumeExportAudioContext() async {
 
 Future<void> _resumeExportAudioContextImpl() async {
   try {
-    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
-        js_util.getProperty(html.window, 'webkitAudioContext');
+    final ctor =
+        js_util.getProperty(html.window, 'AudioContext') ?? js_util.getProperty(html.window, 'webkitAudioContext');
     if (ctor == null) return;
     final ctxObj = (_ngmyExportAudioContext ?? js_util.callConstructor(ctor, const [])) as Object;
     _ngmyExportAudioContext = ctxObj;
@@ -329,29 +348,22 @@ Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
   await _waitVideoFrameReady(video);
 }
 
-void _stageHiddenVideoElement(html.VideoElement v, {int? preferW, int? preferH}) {
-  // Keep videos technically visible — opacity 0 / off-screen hidden videos get
-  // throttled on mobile Safari and freeze during canvas capture.
-  var w = v.videoWidth > 0 ? v.videoWidth : (preferW ?? 720);
-  var h = v.videoHeight > 0 ? v.videoHeight : (preferH ?? 1280);
-  final maxEdge = _ngmyIsMobileBrowser() ? _mobileExportMaxEdgePx : 3840;
-  final edge = math.max(w, h);
-  if (edge > maxEdge) {
-    final scale = maxEdge / edge;
-    w = (w * scale).round();
-    h = (h * scale).round();
-  }
+void _stageHiddenVideoElement(html.VideoElement v) {
+  // Keep videos technically painted — fully transparent or off-screen videos
+  // get throttled on mobile Safari and freeze during canvas capture.
   v
     ..style.position = 'fixed'
-    ..style.left = '-10000px'
+    ..style.left = '0'
     ..style.top = '0'
-    ..style.width = '${w}px'
-    ..style.height = '${h}px'
+    // Keep a tiny painted surface in the viewport. Browsers throttle video
+    // elements positioned far off-screen, which froze template recording.
+    ..style.width = '2px'
+    ..style.height = '2px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '1'
+    ..style.opacity = '0.01'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '1'
+    ..style.zIndex = '0'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
   v.style.removeProperty('clip');
@@ -367,6 +379,15 @@ void _cleanupExportElements() {
     _exportAudioElement?.pause();
     _exportAudioElement?.remove();
   } catch (_) {}
+  final audioContext = _ngmyExportAudioContext;
+  if (audioContext != null) {
+    try {
+      final state = js_util.getProperty(audioContext, 'state');
+      if (state != 'closed') {
+        js_util.callMethod(audioContext, 'close', const []);
+      }
+    } catch (_) {}
+  }
   _exportAudioElement = null;
   _ngmyWebAudioSourceVideo = null;
   _ngmyExportAudioContext = null;
@@ -425,26 +446,10 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
 }
 
 /// Export size — always target full HD template dimensions; upscale smaller clips.
-(int, int) _resolveExportCanvasSize(NgmyVideoStudioExportConfig config, html.VideoElement? primary) {
+(int, int) _resolveExportCanvasSize(NgmyVideoStudioExportConfig config) {
   final target = _exportDimensions(config);
   var w = target.$1;
   var h = target.$2;
-
-  if (primary != null) {
-    var vw = primary.videoWidth;
-    var vh = primary.videoHeight;
-    if (vw > 0 && vh > 0) {
-      final targetAspect = w / h;
-      final videoAspect = vw / vh;
-      if ((videoAspect - targetAspect).abs() > 0.02) {
-        if (videoAspect > targetAspect) {
-          h = (w / videoAspect).round();
-        } else {
-          w = (h * videoAspect).round();
-        }
-      }
-    }
-  }
 
   if (w.isOdd) w++;
   if (h.isOdd) h++;
@@ -460,40 +465,6 @@ Future<void> _syncExportAudioPlayback(html.VideoElement? primary, {required bool
     }
   }
   return (w, h);
-}
-
-bool _isFullFrameSlot(Rect r) =>
-    r.left <= 0.001 && r.top <= 0.001 && r.width >= 0.99 && r.height >= 0.99;
-
-/// Fit entire frame inside slot — no cropping (letterbox only when slot ≠ video aspect).
-void _drawVideoContainInRect(
-  html.CanvasRenderingContext2D ctx,
-  html.VideoElement video,
-  double dx,
-  double dy,
-  double dw,
-  double dh,
-) {
-  var vw = video.videoWidth;
-  var vh = video.videoHeight;
-  if (vw <= 0 || vh <= 0) {
-    ctx.drawImageScaled(video, dx, dy, dw, dh);
-    return;
-  }
-  final videoAspect = vw / vh;
-  final slotAspect = dw / dh;
-  double drawW;
-  double drawH;
-  if (videoAspect > slotAspect) {
-    drawW = dw;
-    drawH = dw / videoAspect;
-  } else {
-    drawH = dh;
-    drawW = dh * videoAspect;
-  }
-  final drawX = dx + (dw - drawW) / 2;
-  final drawY = dy + (dh - drawH) / 2;
-  ctx.drawImageScaled(video, drawX, drawY, drawW, drawH);
 }
 
 /// Fill slot — crop to cover like preview `object-fit: cover`.
@@ -530,19 +501,14 @@ void _drawVideoCoverInRect(
 void _drawVideoInSlot(
   html.CanvasRenderingContext2D ctx,
   html.VideoElement video,
-  Rect slot,
   double dx,
   double dy,
   double dw,
   double dh,
-  int canvasW,
-  int canvasH,
 ) {
-  if (_isFullFrameSlot(slot)) {
-    _drawVideoCoverInRect(ctx, video, 0, 0, canvasW.toDouble(), canvasH.toDouble());
-    return;
-  }
-  _drawVideoContainInRect(ctx, video, dx, dy, dw, dh);
+  // The live template preview uses object-fit: cover for every screen. Export
+  // must use the same crop or the downloaded result visibly changes layout.
+  _drawVideoCoverInRect(ctx, video, dx, dy, dw, dh);
 }
 
 double _resolveRecordingDuration(Iterable<html.VideoElement> videos) {
@@ -635,6 +601,7 @@ Future<void> _waitSeekSettled(html.VideoElement v) async {
     v.removeEventListener('seeked', onSeeked);
     if (!done.isCompleted) done.complete();
   }
+
   v.addEventListener('seeked', onSeeked);
   try {
     await done.future.timeout(const Duration(milliseconds: 400));
@@ -647,11 +614,7 @@ Future<void> _waitSeekSettled(html.VideoElement v) async {
 /// Seek every slot to the same timestamp and wait until decoded frames are ready.
 /// Without this, fast export repeats stale frames and the output looks like it
 /// keeps pausing / stuttering.
-Future<void> _seekAllVideosForExport(
-  List<html.VideoElement> videos,
-  html.VideoElement? primary,
-  double seconds,
-) async {
+Future<void> _seekAllVideosForExport(List<html.VideoElement> videos, html.VideoElement? primary, double seconds) async {
   if (videos.isEmpty) return;
   final needsSeek = <html.VideoElement>[];
   for (final v in videos) {
@@ -670,11 +633,7 @@ Future<void> _seekAllVideosForExport(
   }
 }
 
-Future<void> _seekAllVideosFast(
-  List<html.VideoElement> videos,
-  html.VideoElement? primary,
-  double seconds,
-) async {
+Future<void> _seekAllVideosFast(List<html.VideoElement> videos, html.VideoElement? primary, double seconds) async {
   if (videos.isEmpty) return;
   for (final v in videos) {
     final maxT = v.duration.isFinite && v.duration > 0 ? math.max(0.0, v.duration - 0.04) : seconds;
@@ -807,9 +766,7 @@ Future<void> _syncExportVideosToWallClock(
   if (lag.isNaN || lag.isInfinite) return;
 
   if (lag > 0.18) {
-    final maxT = primary.duration.isFinite && primary.duration > 0
-        ? math.max(0.0, primary.duration - 0.04)
-        : target;
+    final maxT = primary.duration.isFinite && primary.duration > 0 ? math.max(0.0, primary.duration - 0.04) : target;
     final seekT = target.clamp(0.0, maxT);
     for (final v in videos) {
       v.playbackRate = 1.0;
@@ -843,26 +800,27 @@ bool _ngmyIsMobileBrowser() {
 
 List<String> _recorderMimeCandidates() {
   final out = <String>[];
-  final candidates = _ngmyIsAppleMobileBrowser()
-      ? [
-          'video/mp4;codecs=avc1,mp4a',
-          'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
-          'video/mp4;codecs=h264,aac',
-          'video/mp4',
-        ]
-      : [
-          // Prefer MP4 when supported. Phone/gallery apps handle MP4 duration
-          // metadata much more reliably than WebM, avoiding fast/slow playback.
-          'video/mp4;codecs=avc1,mp4a',
-          'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
-          'video/mp4;codecs=h264,aac',
-          'video/mp4',
-          'video/webm;codecs=vp9,opus',
-          'video/webm;codecs=vp8,opus',
-          'video/webm;codecs=vp9',
-          'video/webm;codecs=vp8',
-          'video/webm',
-        ];
+  final candidates =
+      _ngmyIsAppleMobileBrowser()
+          ? [
+            'video/mp4;codecs=avc1,mp4a',
+            'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+            'video/mp4;codecs=h264,aac',
+            'video/mp4',
+          ]
+          : [
+            // Prefer MP4 when supported. Phone/gallery apps handle MP4 duration
+            // metadata much more reliably than WebM, avoiding fast/slow playback.
+            'video/mp4;codecs=avc1,mp4a',
+            'video/mp4;codecs="avc1.42E01E, mp4a.40.2"',
+            'video/mp4;codecs=h264,aac',
+            'video/mp4',
+            'video/webm;codecs=vp9,opus',
+            'video/webm;codecs=vp8,opus',
+            'video/webm;codecs=vp9',
+            'video/webm;codecs=vp8',
+            'video/webm',
+          ];
   for (final m in candidates) {
     if (html.MediaRecorder.isTypeSupported(m)) out.add(m);
   }
@@ -870,17 +828,17 @@ List<String> _recorderMimeCandidates() {
   return out;
 }
 
-void _styleExportCanvas(html.CanvasElement canvas, int w, int h) {
+void _styleExportCanvas(html.CanvasElement canvas) {
   canvas
     ..style.position = 'fixed'
-    ..style.left = '-10000px'
+    ..style.left = '0'
     ..style.top = '0'
-    ..style.width = '${w}px'
-    ..style.height = '${h}px'
-    ..style.opacity = '1'
+    ..style.width = '2px'
+    ..style.height = '2px'
+    ..style.opacity = '0.01'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '2'
+    ..style.zIndex = '0'
     ..style.transform = 'translateZ(0)';
   canvas.style.setProperty('will-change', 'transform');
   canvas.style.removeProperty('clip');
@@ -918,20 +876,22 @@ void _revokeExportCloneUrls(Iterable<String> urls) {
 }
 
 Future<void> _warmVideosBeforeExport(List<html.VideoElement> videos) async {
-  await Future.wait(videos.map((v) async {
-    v.muted = true;
-    v.playbackRate = 1.0;
-    v.currentTime = 0;
-    try {
-      await v.play().timeout(const Duration(milliseconds: 900));
-      await Future<void>.delayed(const Duration(milliseconds: 60));
-    } catch (e) {
-      debugPrint('[studio export] warm-up play: $e');
-    } finally {
-      v.pause();
+  await Future.wait(
+    videos.map((v) async {
+      v.muted = true;
+      v.playbackRate = 1.0;
       v.currentTime = 0;
-    }
-  }));
+      try {
+        await v.play().timeout(const Duration(milliseconds: 900));
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+      } catch (e) {
+        debugPrint('[studio export] warm-up play: $e');
+      } finally {
+        v.pause();
+        v.currentTime = 0;
+      }
+    }),
+  );
 }
 
 Future<html.Blob?> _ngmyBlobFromHref(String href) async {
@@ -1000,10 +960,11 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
         }
         return 'ios_pending';
       }
-      final anchor = html.AnchorElement()
-        ..href = href
-        ..download = safeName
-        ..style.display = 'none';
+      final anchor =
+          html.AnchorElement()
+            ..href = href
+            ..download = safeName
+            ..style.display = 'none';
       html.document.body?.append(anchor);
       anchor.click();
       await Future<void>.delayed(const Duration(milliseconds: 900));
@@ -1027,10 +988,11 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
         return 'ios_pending';
       }
 
-      final anchor = html.AnchorElement()
-        ..href = tempObjectUrl
-        ..download = safeName
-        ..style.display = 'none';
+      final anchor =
+          html.AnchorElement()
+            ..href = tempObjectUrl
+            ..download = safeName
+            ..style.display = 'none';
       html.document.body?.append(anchor);
       anchor.click();
       await Future<void>.delayed(const Duration(milliseconds: 900));
@@ -1043,12 +1005,13 @@ Future<String> ngmyTriggerBrowserDownload(String href, String filename) async {
       return 'ios_open';
     }
 
-    final anchor = html.AnchorElement()
-      ..href = href
-      ..download = safeName
-      ..target = '_blank'
-      ..rel = 'noopener'
-      ..style.display = 'none';
+    final anchor =
+        html.AnchorElement()
+          ..href = href
+          ..download = safeName
+          ..target = '_blank'
+          ..rel = 'noopener'
+          ..style.display = 'none';
     html.document.body?.append(anchor);
     anchor.click();
     await Future<void>.delayed(const Duration(milliseconds: 600));
@@ -1088,9 +1051,7 @@ String _ngmyDownloadResultMessage(String mode, {int clipCount = 1}) {
   }
 }
 
-Future<String> exportNgmyVideoStudioDirect({
-  required String videoSourceUrl,
-}) async {
+Future<String> exportNgmyVideoStudioDirect({required String videoSourceUrl}) async {
   final src = videoSourceUrl.trim();
   if (src.isEmpty) {
     return 'No video to download.';
@@ -1259,9 +1220,8 @@ Future<List<html.Blob>> _recordCanvasExport({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile
-        ? _exportVideoBitsPerSecondMobile
-        : (_ngmyIsMobileBrowser() ? 8000000 : _exportVideoBitsPerSecond),
+    'videoBitsPerSecond':
+        appleMobile ? _exportVideoBitsPerSecondMobile : (_ngmyIsMobileBrowser() ? 8000000 : _exportVideoBitsPerSecond),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1417,11 +1377,8 @@ Future<List<html.Blob>> _recordCanvasExport({
     final p = _exportProgress(durationSec, t, wallMs, durationMs);
     onProgress(p, _ngmyRecordingStatus(p));
 
-    final ended = primary != null &&
-        (primary.ended || primary.currentTime >= durationSec - 0.05);
-    if (wallMs >= durationMs ||
-        ended ||
-        (wallMs - lastProgressWallMs) > stallLimitMs) {
+    final ended = primary != null && (primary.ended || primary.currentTime >= durationSec - 0.05);
+    if (wallMs >= durationMs || ended || (wallMs - lastProgressWallMs) > stallLimitMs) {
       break;
     }
   }
@@ -1446,8 +1403,7 @@ Future<List<html.Blob>> _recordCanvasExport({
   if (_exportWasCancelled) return const [];
   final minRecorded = math.min(0.45, durationSec * 0.08);
   final recordedWallSec = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
-  if (abortedFrozen ||
-      (recordedWallSec < durationSec * 0.82 && maxRecordedSec < minRecorded)) {
+  if (abortedFrozen || (recordedWallSec < durationSec * 0.82 && maxRecordedSec < minRecorded)) {
     debugPrint(
       '[studio export] rejected realtime recording: maxTime=$maxRecordedSec wall=${recordedWallSec.toStringAsFixed(1)}s need=$minRecorded frozen=$abortedFrozen',
     );
@@ -1473,9 +1429,7 @@ Future<List<html.Blob>> _recordCanvasExportSeekSync({
   final appleMobile = _ngmyIsAppleMobileBrowser();
   final recorderOptions = <String, dynamic>{
     'mimeType': mimeType,
-    'videoBitsPerSecond': appleMobile
-        ? _exportVideoBitsPerSecondMobile
-        : (_ngmyIsMobileBrowser() ? 8000000 : 14000000),
+    'videoBitsPerSecond': appleMobile ? _exportVideoBitsPerSecondMobile : (_ngmyIsMobileBrowser() ? 8000000 : 14000000),
   };
   if (stream.getAudioTracks().isNotEmpty) {
     recorderOptions['audioBitsPerSecond'] = _exportAudioBitsPerSecond;
@@ -1583,8 +1537,8 @@ void _appendWebAudioFromVideo(html.MediaStream composed, html.VideoElement video
   if (composed.getAudioTracks().isNotEmpty) return;
   if (_ngmyWebAudioSourceVideo == video) return;
   try {
-    final ctor = js_util.getProperty(html.window, 'AudioContext') ??
-        js_util.getProperty(html.window, 'webkitAudioContext');
+    final ctor =
+        js_util.getProperty(html.window, 'AudioContext') ?? js_util.getProperty(html.window, 'webkitAudioContext');
     if (ctor == null) return;
     final ctxObj = (_ngmyExportAudioContext ?? js_util.callConstructor(ctor, const [])) as Object;
     _ngmyExportAudioContext = ctxObj;
@@ -1702,8 +1656,10 @@ Future<String> _downloadAllVideoClips(Map<String, String> sources) async {
     if (src.trim().isEmpty) continue;
     var ext = 'mp4';
     final lower = src.toLowerCase();
-    if (lower.contains('.webm')) ext = 'webm';
-    else if (lower.contains('.mov')) ext = 'mov';
+    if (lower.contains('.webm'))
+      ext = 'webm';
+    else if (lower.contains('.mov'))
+      ext = 'mov';
     final filename = 'ngmy_studio_${DateTime.now().millisecondsSinceEpoch}_$n.$ext';
     lastMode = await ngmyTriggerBrowserDownload(src, filename);
     n++;
@@ -1805,10 +1761,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
   html.ImageElement? backdrop;
   if (config.backgroundAsset != null && config.backgroundAsset!.isNotEmpty) {
     final asset = config.backgroundAsset!.trim();
-    final paths = <String>[
-      ngmyStudioAssetWebUrl(asset),
-      if (!asset.startsWith('assets/')) 'assets/$asset',
-    ];
+    final paths = <String>[ngmyStudioAssetWebUrl(asset), if (!asset.startsWith('assets/')) 'assets/$asset'];
     for (final p in paths) {
       try {
         final img = html.ImageElement()..src = p;
@@ -1831,22 +1784,12 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
     final metaOk = await Future.wait(videos.values.map((v) => _waitVideoMeta(v)));
     if (metaOk.contains(false)) {
-      return _fallbackComposedExport(
-        config,
-        sources,
-        reason: 'video metadata unavailable',
-        allowRawFallback: false,
-      );
+      return _fallbackComposedExport(config, sources, reason: 'video metadata unavailable', allowRawFallback: false);
     }
     await _flushProgress(onProgress, 0.07, 'Buffering video…');
     final playOk = await Future.wait(videos.values.map((v) => _waitVideoCanPlay(v)));
     if (playOk.contains(false)) {
-      return _fallbackComposedExport(
-        config,
-        sources,
-        reason: 'video still loading',
-        allowRawFallback: false,
-      );
+      return _fallbackComposedExport(config, sources, reason: 'video still loading', allowRawFallback: false);
     }
 
     var durationSec = await _resolveRecordingDurationAsync(videos.values);
@@ -1875,16 +1818,18 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
     await _flushProgress(onProgress, 0.08, 'Preparing overlay (${_formatDurationLabel(durationSec)})…');
 
-    final (w, h) = _resolveExportCanvasSize(config, primaryVideo);
+    final (w, h) = _resolveExportCanvasSize(config);
     for (final v in videos.values) {
       _applyExportVideoStaging(v, canvasW: w, canvasH: h);
     }
     html.ImageElement? bannerOverlay;
     if (config.newsBannerStyle != null) {
       try {
-        bannerOverlay = await _renderNewsBannerOverlay(config, w, h).timeout(
-          Duration(seconds: _ngmyIsMobileBrowser() ? 18 : 25),
-        );
+        bannerOverlay = await _renderNewsBannerOverlay(
+          config,
+          w,
+          h,
+        ).timeout(Duration(seconds: _ngmyIsMobileBrowser() ? 18 : 25));
       } catch (e) {
         debugPrint('[studio export] banner overlay failed: $e');
       }
@@ -1897,7 +1842,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     final canvas = exportCanvas!;
     final ctx = canvas.context2D;
 
-    _styleExportCanvas(canvas, w, h);
+    _styleExportCanvas(canvas);
     html.document.body?.append(canvas);
 
     final startMs = DateTime.now().millisecondsSinceEpoch;
@@ -1941,7 +1886,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         }
         try {
           if (video.readyState >= html.MediaElement.HAVE_CURRENT_DATA) {
-            _drawVideoInSlot(ctx, video, r, dx, dy, dw, dh, w, h);
+            _drawVideoInSlot(ctx, video, dx, dy, dw, dh);
           }
         } catch (e) {
           debugPrint('[studio export] drawImage failed (CORS?): $e');
@@ -2009,12 +1954,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       for (final i in logos.values) {
         i.remove();
       }
-      return _fallbackComposedExport(
-        config,
-        sources,
-        reason: 'canvas capture unavailable',
-        allowRawFallback: false,
-      );
+      return _fallbackComposedExport(config, sources, reason: 'canvas capture unavailable', allowRawFallback: false);
     }
 
     usedCanvasStream = true;
@@ -2030,10 +1970,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     final primaryMime = mimeCandidates.first;
     final fallbackMime = mimeCandidates.length > 1 ? mimeCandidates[1] : primaryMime;
 
-    Future<({List<html.Blob> chunks, bool hadAudio})> tryRecord(
-      String mime, {
-      required bool withAudio,
-    }) async {
+    Future<({List<html.Blob> chunks, bool hadAudio})> tryRecord(String mime, {required bool withAudio}) async {
       if (_exportWasCancelled) return (chunks: const <html.Blob>[], hadAudio: false);
       final recordStream = _videoOnlyStream(canvasStream);
       var hadAudio = false;
@@ -2063,15 +2000,10 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     }
 
     // Smooth real-time playback only — never seek-frame export (slideshow).
-    final plans = _ngmyIsMobileBrowser()
-        ? [
-            (mime: primaryMime, audio: true),
-            (mime: primaryMime, audio: false),
-          ]
-        : [
-            (mime: primaryMime, audio: true),
-            (mime: fallbackMime, audio: true),
-          ];
+    final plans =
+        _ngmyIsMobileBrowser()
+            ? [(mime: primaryMime, audio: true), (mime: primaryMime, audio: false)]
+            : [(mime: primaryMime, audio: true), (mime: fallbackMime, audio: true)];
 
     List<html.Blob>? silentFallbackChunks;
     String? silentFallbackMime;
@@ -2080,15 +2012,8 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       for (var i = 0; i < plans.length; i++) {
         if (_exportWasCancelled) break;
         final plan = plans[i];
-        await _flushProgress(
-          onProgress,
-          0.12 + (i * 0.02),
-          'Recording ${_formatDurationLabel(durationSec)}…',
-        );
-        final result = await tryRecord(
-          plan.mime,
-          withAudio: plan.audio,
-        );
+        await _flushProgress(onProgress, 0.12 + (i * 0.02), 'Recording ${_formatDurationLabel(durationSec)}…');
+        final result = await tryRecord(plan.mime, withAudio: plan.audio);
         if (_exportWasCancelled) break;
         if (result.chunks.isEmpty) {
           debugPrint('[studio export] retry mime=${plan.mime} audio=${plan.audio}');
@@ -2118,21 +2043,14 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
     if (chunks.isEmpty || mimeType == null) {
       debugPrint('[studio export] all recording attempts failed');
-      return _fallbackComposedExport(
-        config,
-        sources,
-        reason: 'recording produced no data',
-        allowRawFallback: false,
-      );
+      return _fallbackComposedExport(config, sources, reason: 'recording produced no data', allowRawFallback: false);
     }
 
     if (chunks.isNotEmpty && mimeType != null && silentFallbackChunks != null && chunks == silentFallbackChunks) {
       debugPrint('[studio export] warning: exported without audio track');
     }
 
-    final exportedSilent = chunks.isNotEmpty &&
-        silentFallbackChunks != null &&
-        chunks == silentFallbackChunks;
+    final exportedSilent = chunks.isNotEmpty && silentFallbackChunks != null && chunks == silentFallbackChunks;
     if (mimeType.contains('webm') && _ngmyIsAppleMobileBrowser()) {
       return 'Export failed: iPhone needs MP4 with your template baked in. Tap Download again and keep this screen open until saving finishes.';
     }

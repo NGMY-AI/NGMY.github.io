@@ -10,8 +10,14 @@ import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot
 class NgmyStudioSlotVideo extends StatefulWidget {
   final String? source;
   final bool trySoundOnLoad;
+  final bool playbackEnabled;
 
-  const NgmyStudioSlotVideo({super.key, required this.source, this.trySoundOnLoad = false});
+  const NgmyStudioSlotVideo({
+    super.key,
+    required this.source,
+    this.trySoundOnLoad = false,
+    this.playbackEnabled = true,
+  });
 
   @override
   State<NgmyStudioSlotVideo> createState() => _NgmyStudioSlotVideoState();
@@ -34,6 +40,15 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.source != widget.source) {
       unawaited(_load());
+    } else if (oldWidget.playbackEnabled != widget.playbackEnabled) {
+      final c = _controller;
+      if (c != null && c.value.isInitialized) {
+        if (widget.playbackEnabled) {
+          if (!_playing) unawaited(c.play());
+        } else {
+          unawaited(c.pause());
+        }
+      }
     }
   }
 
@@ -78,7 +93,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
       c.setVolume(1.0);
       c.addListener(_onTick);
       _controller = c;
-      if (widget.trySoundOnLoad) {
+      if (widget.trySoundOnLoad && widget.playbackEnabled) {
         try {
           await c.play();
           if (mounted) setState(() => _playing = true);
@@ -95,9 +110,10 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
         } catch (_) {}
       }
       if (gen != _generation || !mounted) return;
-      final msg = e is TimeoutException
-          ? e.message!
-          : e is StateError
+      final msg =
+          e is TimeoutException
+              ? e.message!
+              : e is StateError
               ? e.message
               : 'Could not load video preview';
       setState(() => _error = msg);
@@ -112,6 +128,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
   }
 
   Future<void> _togglePlay() async {
+    if (!widget.playbackEnabled) return;
     final c = _controller;
     if (c == null || !c.value.isInitialized) return;
     try {
@@ -207,10 +224,7 @@ class _NgmyStudioSlotVideoState extends State<NgmyStudioSlotVideo> {
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10),
           ),
-          TextButton(
-            onPressed: () => unawaited(_load()),
-            child: const Text('Retry', style: TextStyle(fontSize: 11)),
-          ),
+          TextButton(onPressed: () => unawaited(_load()), child: const Text('Retry', style: TextStyle(fontSize: 11))),
         ],
       ),
     );
