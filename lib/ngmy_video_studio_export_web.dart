@@ -1944,6 +1944,34 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     }
     paintFrame();
 
+    final fastAudioSrc =
+        primaryVideo == null
+            ? ''
+            : (primaryVideo.currentSrc.isNotEmpty ? primaryVideo.currentSrc : primaryVideo.src);
+    final fastBlob = await _tryFastWebCodecsExport(
+      canvas: canvas,
+      w: w,
+      h: h,
+      durationSec: durationSec,
+      videoList: videoList,
+      primaryVideo: primaryVideo,
+      paintFrame: paintFrame,
+      audioSrc: fastAudioSrc,
+      onProgress: onProgress,
+    );
+    if (fastBlob != null && !_exportWasCancelled) {
+      await _flushProgress(onProgress, 1.0, 'Saving your file…');
+      final fastResult = await _finalizeComposedBlob(
+        blob: fastBlob,
+        config: config,
+        w: w,
+        h: h,
+        startMs: startMs,
+        usedCanvasStream: true,
+      );
+      if (fastResult != null) return fastResult;
+    }
+
     final recordFps = _exportFps();
     final canvasStream = _safeCaptureStream(canvas, fps: recordFps);
     if (canvasStream == null || canvasStream.getVideoTracks().isEmpty) {

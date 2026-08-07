@@ -101,10 +101,17 @@ class _SlotMedia {
 
   Future<void> dispose() async {
     await controller?.dispose();
-    if (blobUrl != null) blob_util.revokeNgmyBlobUrl(blobUrl!);
+    final urlToRevoke = blobUrl;
     controller = null;
     source = null;
     blobUrl = null;
+    if (urlToRevoke != null) {
+      // Let the old HtmlElementView unmount before invalidating its source.
+      // Revoking immediately races the browser's video element teardown.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        blob_util.revokeNgmyBlobUrl(urlToRevoke);
+      });
+    }
   }
 }
 
@@ -918,7 +925,9 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
                       onTap: () {
                         setState(() {
                           _templateId = t.id;
-                          _loadTemplate(t.id, resetMedia: true);
+                          // Broadcast templates share stable slot IDs. Keep
+                          // uploaded clips/logos while only changing artwork.
+                          _loadTemplate(t.id, resetMedia: false);
                           _templatesExpanded = false;
                         });
                       },
