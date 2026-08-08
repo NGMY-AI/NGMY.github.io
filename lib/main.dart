@@ -31478,10 +31478,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     // Never use one HTML <table> across pages — Safari/Chrome fragment cell
     // borders and leave hanging vertical lines. Each PDF page is its own
-    // closed CSS-grid "table" with a complete outer frame. Row counts stay
-    // conservative so a page never overflows and gets browser-split.
-    const firstPageRows = 10;
-    const nextPageRows = 16;
+    // closed CSS-grid "table" with a complete outer frame. Pack enough rows
+    // to fill the sheet before starting the next page (single-line rows keep
+    // height predictable so the browser does not re-split mid-table).
+    const firstPageRows = 26;
+    const nextPageRows = 32;
 
     String memberRowHtml(Map<String, dynamic> m) {
       final name = (m['fullName'] ?? '').toString().trim();
@@ -31706,10 +31707,10 @@ ${body.toString()}
     border-bottom: 1px solid #888;
   }
   .c {
-    padding: 5px 6px;
-    font-size: 11px;
+    padding: 6px 7px;
+    font-size: 12px;
     font-weight: 400;
-    line-height: 1.25;
+    line-height: 1.3;
     border-right: 1px solid #bbb;
     box-sizing: border-box;
     overflow: hidden;
@@ -31717,7 +31718,7 @@ ${body.toString()}
   }
   .c:last-child { border-right: 0; }
   .r.head .c {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     white-space: nowrap;
   }
@@ -31727,18 +31728,18 @@ ${body.toString()}
   }
   .c.phone {
     white-space: nowrap;
-    font-size: 10px;
+    font-size: 11px;
     font-variant-numeric: tabular-nums;
   }
   .c.address {
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 10px;
+    font-size: 11px;
   }
   .c.family {
     text-align: center;
     white-space: nowrap;
-    font-size: 10px;
+    font-size: 11px;
   }
 </style>
 </head>
