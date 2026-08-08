@@ -31604,6 +31604,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     border-collapse: collapse;
     table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    page-break-inside: auto;
+  }
+  thead { display: table-header-group; }
+  tbody { display: table-row-group; }
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
   }
   col.name { width: 22%; }
   col.phone { width: 15%; }
@@ -31656,6 +31663,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   @media print {
     .sheet { padding: 0; }
     .masthead { margin-bottom: 10px; }
+    table, thead, tbody, tr, th, td {
+      -webkit-box-decoration-break: clone;
+      box-decoration-break: clone;
+    }
+    th, td {
+      /* Preserve a complete cell frame at every printed page boundary.
+         Collapsed table borders can otherwise disappear when Chrome
+         fragments the table between PDF pages. */
+      box-shadow: inset 0 0 0 0.35px #ccc;
+    }
   }
 </style>
 </head>
