@@ -106,8 +106,17 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
   }
 
   pw.Widget masthead() {
-    // Mirror the original HTML roster header: large underlined title, date/time
-    // stamp on the left, MEMBERS chip on the right.
+    // Match the original HTML header title design: Georgia/Times serif,
+    // bold, ~22pt, each line underlined — not Helvetica/sans-serif.
+    final titleStyle = pw.TextStyle(
+      font: pw.Font.timesBold(),
+      fontSize: 22,
+      letterSpacing: 0.7,
+      lineSpacing: 2,
+      decoration: pw.TextDecoration.underline,
+      decorationThickness: 2,
+      decorationColor: PdfColors.black,
+    );
     return pw.Container(
       width: contentWidth,
       padding: const pw.EdgeInsets.only(bottom: 12),
@@ -124,12 +133,20 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
               children: [
                 pw.Text(
                   dateStr,
-                  style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, letterSpacing: 0.2),
+                  style: pw.TextStyle(
+                    font: pw.Font.helveticaBold(),
+                    fontSize: 15,
+                    letterSpacing: 0.3,
+                  ),
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
                   timeStr,
-                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700),
+                  style: pw.TextStyle(
+                    font: pw.Font.helveticaBold(),
+                    fontSize: 13,
+                    color: PdfColors.grey700,
+                  ),
                 ),
               ],
             ),
@@ -138,29 +155,9 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
             flex: 2,
             child: pw.Column(
               children: [
-                pw.Text(
-                  titleLine1,
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(
-                    fontSize: 22,
-                    fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 0.4,
-                    decoration: pw.TextDecoration.underline,
-                    decorationThickness: 2,
-                  ),
-                ),
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  titleLine2,
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(
-                    fontSize: 22,
-                    fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 0.4,
-                    decoration: pw.TextDecoration.underline,
-                    decorationThickness: 2,
-                  ),
-                ),
+                pw.Text(titleLine1, textAlign: pw.TextAlign.center, style: titleStyle),
+                pw.SizedBox(height: 4),
+                pw.Text(titleLine2, textAlign: pw.TextAlign.center, style: titleStyle),
               ],
             ),
           ),
@@ -171,8 +168,8 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
                 pw.Text(
                   'MEMBERS',
                   style: pw.TextStyle(
+                    font: pw.Font.helveticaBold(),
                     fontSize: 10,
-                    fontWeight: pw.FontWeight.bold,
                     letterSpacing: 1.4,
                     color: PdfColors.grey700,
                   ),
@@ -180,7 +177,10 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
                 pw.SizedBox(height: 4),
                 pw.Text(
                   '${rows.length}',
-                  style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    font: pw.Font.helveticaBold(),
+                    fontSize: 22,
+                  ),
                 ),
               ],
             ),
