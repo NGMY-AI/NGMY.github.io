@@ -223,7 +223,7 @@ abstract final class NgmyStudioPayments {
         isAdmin: isAdmin,
         title: 'Bio Photo Changes',
         message:
-            'You used your 2 free profile photo changes. Pay \$1.99 for 2 more changes. This repeats every 2 changes.',
+            'You used your 2 free Bio photo changes (profile, header, or background). Pay \$1.99 for 2 more changes. This repeats every 2 changes.',
       );
       if (!paid) return false;
       packs = nextPack;
@@ -239,7 +239,8 @@ abstract final class NgmyStudioPayments {
     return true;
   }
 
-  /// Checks and records a profile-photo selection.
+  /// Checks and records a Bio photo selection (profile, header banner, or
+  /// page background — one shared counter).
   ///
   /// Free Bio (no subscription): first photo + two replacements are free; then
   /// subscribe. With an active Bio subscription: two photo changes are free,
@@ -296,7 +297,7 @@ abstract final class NgmyStudioPayments {
         email: email,
         title: 'Bio Studio',
         message:
-            'You used the first photo and two free photo changes. Subscribe for \$3.99 per month to keep publishing. After you subscribe, photo changes are 2 free, then \$1.99 for 2 more.',
+            'You used the first Bio photo and two free changes (profile, header, or background). Subscribe for \$3.99 per month to keep publishing. After you subscribe, photo changes are 2 free, then \$1.99 for 2 more.',
       );
     }
 

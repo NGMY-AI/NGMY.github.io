@@ -8993,9 +8993,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
     unawaited(_syncStripeAccessForCurrentUser(force: true));
     NgmyStripePayments.listenForCrossTabPaymentReturn(() {
-      unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
-      unawaited(_syncStripeAccessForCurrentUser(force: true));
-      NgmyStripePayments.forceWebViewportResettle();
+      unawaited(() async {
+        final paid = await NgmyStripePayments.processPaymentReturnFromUrl();
+        if (!paid) return;
+        await _syncStripeAccessForCurrentUser(force: true);
+        NgmyStripePayments.forceWebViewportResettle();
+      }());
     });
     unawaited(_refreshWalletDecisionLedger());
     WidgetsBinding.instance.addObserver(this);
@@ -9138,9 +9141,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _pauseBackgroundSync();
     }
     if (state == AppLifecycleState.resumed) {
-      unawaited(NgmyStripePayments.processPaymentReturnFromUrl());
-      unawaited(_syncStripeAccessForCurrentUser(force: true));
-      NgmyStripePayments.forceWebViewportResettle();
+      // Do not force a viewport resettle on every resume — returning from the
+      // image picker was making Menu/Bio feel like the app was refreshing/crashing.
+      unawaited(() async {
+        final paid = await NgmyStripePayments.processPaymentReturnFromUrl();
+        if (paid) {
+          await _syncStripeAccessForCurrentUser(force: true);
+          NgmyStripePayments.forceWebViewportResettle();
+        }
+      }());
       unawaited(_restoreSessionOnAppVisible());
       unawaited(_probeOfflineAtLaunch());
       _resumeBackgroundSync();
@@ -15021,7 +15030,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      NgmyStripePayments.forceWebViewportResettle();
+      // Avoid viewport resettle here — it was firing after gallery/photo pick
+      // and made Menu Studio / Bio feel like a full app refresh.
       if (ngmyShouldAllowGlobalInterrupt()) {
       _runScheduledPopups();
       _promptPushNotificationsIfNeeded();

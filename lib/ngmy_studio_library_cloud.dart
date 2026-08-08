@@ -70,10 +70,8 @@ class NgmyStudioLibraryCloud {
     return out;
   }
 
-  /// The reconciliation rule, kept separate from the network so it can be
-  /// tested directly: newest edit of each document wins, and a deleted document
-  /// stays gone unless it was edited after the deletion.
-  @visibleForTesting
+  /// The reconciliation rule: newest edit of each document wins, and a deleted
+  /// document stays gone unless it was edited after the deletion.
   static List<T> mergeById<T>({
     required List<T> local,
     required List<T> remote,

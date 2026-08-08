@@ -86,12 +86,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   void _bind() {
-    // Older blank Bios stored the sample name as real text. Treat that legacy
-    // value as the same placeholder new Bios use, so tapping starts fresh.
-    if (_doc.displayName.trim() == kNgmyBioDefaultDisplayName) {
-      _doc.displayName = '';
-    }
-    _nameC.text = _doc.displayName;
+    // Older blank Bios stored the sample name as real text. Show the field as
+    // empty (hint only) without mutating the saved document in memory — that
+    // used to make an accidental Save wipe a real name after reopen.
+    final legacyPlaceholder =
+        _doc.displayName.trim() == kNgmyBioDefaultDisplayName;
+    _nameC.text = legacyPlaceholder ? '' : _doc.displayName;
     _taglineC.text = _doc.tagline;
     _slugC.text = _doc.slug;
     _socialInstagramC.text = _doc.socialLinks.instagram;
@@ -286,9 +286,32 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
+  Future<bool> _ensureBioPhotoChangeAllowed({required bool isReplacement}) async {
+    if (widget._isLocal) return true;
+    if (!mounted) return false;
+    return NgmyStudioPayments.ensureCanSelectBioAvatar(
+      context: context,
+      email: widget.userEmail,
+      bioId: _doc.id,
+      existingIdsOldestFirst: widget.existingBioIds,
+      isReplacement: isReplacement,
+      isAdmin: widget.isAdmin,
+    );
+  }
+
+  Future<void> _recordBioPhotoBaselineIfNeeded() async {
+    if (widget._isLocal || widget.isAdmin) return;
+    await NgmyStudioPayments.recordBioAvatarBaseline(
+      email: widget.userEmail,
+      bioId: _doc.id,
+    );
+  }
+
   Future<void> _pickImage(
     void Function(String b64) setter, {
     int maxSize = 1200,
+    bool isReplacement = false,
+    bool gatePayment = false,
   }) async {
     try {
       final file = await ImagePicker().pickImage(
@@ -296,14 +319,20 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         maxWidth: maxSize.toDouble(),
         imageQuality: 88,
       );
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      setState(() => setter('data:image/jpeg;base64,${base64Encode(bytes)}'));
+      if (file == null || !mounted) return;
+      final encoded = 'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
+      if (!mounted) return;
+      if (gatePayment) {
+        final allowed = await _ensureBioPhotoChangeAllowed(isReplacement: isReplacement);
+        if (!allowed || !mounted) return;
+      }
+      setState(() => setter(encoded));
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
+      }
     }
   }
 
@@ -319,17 +348,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
       if (!mounted) return;
 
-      if (!widget._isLocal) {
-        final allowed = await NgmyStudioPayments.ensureCanSelectBioAvatar(
-          context: context,
-          email: widget.userEmail,
-          bioId: _doc.id,
-          existingIdsOldestFirst: widget.existingBioIds,
-          isReplacement: _doc.avatarImageBase64.isNotEmpty,
-          isAdmin: widget.isAdmin,
-        );
-        if (!allowed || !mounted) return;
-      }
+      final allowed = await _ensureBioPhotoChangeAllowed(
+        isReplacement: _doc.avatarImageBase64.isNotEmpty,
+      );
+      if (!allowed || !mounted) return;
       setState(() => _doc.avatarImageBase64 = encoded);
     } catch (e) {
       if (mounted) {
@@ -342,13 +364,38 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Future<void> _clearAvatarImage() async {
     if (_doc.avatarImageBase64.isEmpty) return;
-    if (!widget._isLocal && !widget.isAdmin) {
-      await NgmyStudioPayments.recordBioAvatarBaseline(
-        email: widget.userEmail,
-        bioId: _doc.id,
-      );
-    }
+    await _recordBioPhotoBaselineIfNeeded();
     if (mounted) setState(() => _doc.avatarImageBase64 = '');
+  }
+
+  Future<void> _pickHeaderBanner() async {
+    final url = await ngmyBioPickBannerImage(context);
+    if (url == null || !mounted) return;
+    final allowed = await _ensureBioPhotoChangeAllowed(
+      isReplacement: _doc.headerImageBase64.isNotEmpty,
+    );
+    if (!allowed || !mounted) return;
+    setState(() => _doc.headerImageBase64 = url);
+  }
+
+  Future<void> _clearHeaderBanner() async {
+    if (_doc.headerImageBase64.isEmpty) return;
+    await _recordBioPhotoBaselineIfNeeded();
+    if (mounted) setState(() => _doc.headerImageBase64 = '');
+  }
+
+  Future<void> _pickBackgroundImage() async {
+    await _pickImage(
+      (b) => _doc.backgroundImageBase64 = b,
+      isReplacement: _doc.backgroundImageBase64.isNotEmpty,
+      gatePayment: true,
+    );
+  }
+
+  Future<void> _clearBackgroundImage() async {
+    if (_doc.backgroundImageBase64.isEmpty) return;
+    await _recordBioPhotoBaselineIfNeeded();
+    if (mounted) setState(() => _doc.backgroundImageBase64 = '');
   }
 
   @override
@@ -854,7 +901,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               _photoTile(
                 t,
                 label: 'Profile photo',
-                hint: 'First photo + 2 changes free',
+                hint: 'Shares photo changes with banner & background',
                 hasImage: _doc.avatarImageBase64.isNotEmpty,
                 onPick: _pickAvatarImage,
                 onClear: _clearAvatarImage,
@@ -863,22 +910,19 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               _photoTile(
                 t,
                 label: 'Header banner',
-                hint: 'Wide banner — crop to fit',
+                hint: 'Wide banner — counts as a photo change',
                 hasImage: _doc.headerImageBase64.isNotEmpty,
-                onPick: () async {
-                  final url = await ngmyBioPickBannerImage(context);
-                  if (url != null) setState(() => _doc.headerImageBase64 = url);
-                },
-                onClear: () => setState(() => _doc.headerImageBase64 = ''),
+                onPick: _pickHeaderBanner,
+                onClear: _clearHeaderBanner,
               ),
               const SizedBox(height: 10),
               _photoTile(
                 t,
                 label: 'Page background',
-                hint: 'Optional full-page backdrop',
+                hint: 'Full-page backdrop — counts as a photo change',
                 hasImage: _doc.backgroundImageBase64.isNotEmpty,
-                onPick: () => _pickImage((b) => _doc.backgroundImageBase64 = b),
-                onClear: () => setState(() => _doc.backgroundImageBase64 = ''),
+                onPick: _pickBackgroundImage,
+                onClear: _clearBackgroundImage,
               ),
             ],
           ),

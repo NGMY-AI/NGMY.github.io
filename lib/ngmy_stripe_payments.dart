@@ -431,11 +431,11 @@ class NgmyStripePayments {
       case NgmyStripeProduct.menuStudio:
         return 'Create and publish unlimited menus for 30 days.';
       case NgmyStripeProduct.bioStudio:
-        return 'Publish premium Bios for 30 days. Profile photo changes: 2 free, then \$1.99 for 2 more.';
+        return 'Publish premium Bios for 30 days. Bio photos (profile, header, background): 2 free, then \$1.99 for 2 more.';
       case NgmyStripeProduct.businessCard:
         return 'Edit and download this card design for 2 days.';
       case NgmyStripeProduct.bioPhotoPack:
-        return 'Pay \$1.99 for 2 more Bio profile photo changes.';
+        return 'Pay \$1.99 for 2 more Bio photo changes (profile, header, or background).';
     }
   }
 

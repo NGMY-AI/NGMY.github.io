@@ -39,8 +39,24 @@ void ngmyCapturePaymentReturnInPage() {
   } catch (_) {}
 }
 
+bool _ngmyHasPendingPaymentReturn() {
+  try {
+    final uri = Uri.parse(html.window.location.href);
+    if (uri.queryParameters['ngmy_pay_ok'] == '1') return true;
+  } catch (_) {}
+  try {
+    final raw = html.window.localStorage[_returnKey];
+    return raw != null && raw.isNotEmpty;
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Fires when the checkout tab writes [ngmy_pay_return_v1], or when this tab
-/// becomes visible again after the user leaves Stripe without paying.
+/// becomes visible again **and** a payment return receipt is waiting.
+///
+/// Visibility alone must not trigger Stripe sync / viewport resettling — that
+/// was refreshing the app every time the user returned from the photo gallery.
 void ngmyListenForCrossTabPaymentReturn(void Function() onMaybePaid) {
   html.window.onStorage.listen((event) {
     if (event.key == _returnKey && event.newValue != null && event.newValue!.isNotEmpty) {
@@ -48,7 +64,8 @@ void ngmyListenForCrossTabPaymentReturn(void Function() onMaybePaid) {
     }
   });
   html.document.onVisibilityChange.listen((_) {
-    if (html.document.visibilityState == 'visible') onMaybePaid();
+    if (html.document.visibilityState != 'visible') return;
+    if (_ngmyHasPendingPaymentReturn()) onMaybePaid();
   });
 }
 
