@@ -36,8 +36,9 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
   final contentHeight = format.height - (margin * 2);
 
   // Measured layout budgets (points) so a page never overflows mid-row.
-  const mastheadH = 70.0;
-  const continuedH = 16.0;
+  // Masthead matches the original HTML print header size (large underlined title).
+  const mastheadH = 92.0;
+  const continuedH = 18.0;
   const tableHeaderH = 20.0;
   const rowH = 17.5;
   const safety = 8.0;
@@ -105,11 +106,14 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
   }
 
   pw.Widget masthead() {
+    // Mirror the original HTML roster header: large underlined title, date/time
+    // stamp on the left, MEMBERS chip on the right.
     return pw.Container(
       width: contentWidth,
-      padding: const pw.EdgeInsets.only(bottom: 8),
+      padding: const pw.EdgeInsets.only(bottom: 12),
+      margin: const pw.EdgeInsets.only(bottom: 10),
       decoration: const pw.BoxDecoration(
-        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 1.6)),
+        border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black, width: 2)),
       ),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -118,9 +122,15 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(dateStr, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 2),
-                pw.Text(timeStr, style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                pw.Text(
+                  dateStr,
+                  style: pw.TextStyle(fontSize: 15, fontWeight: pw.FontWeight.bold, letterSpacing: 0.2),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  timeStr,
+                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700),
+                ),
               ],
             ),
           ),
@@ -132,18 +142,23 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
                   titleLine1,
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
-                    fontSize: 15,
+                    fontSize: 22,
                     fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.4,
                     decoration: pw.TextDecoration.underline,
+                    decorationThickness: 2,
                   ),
                 ),
+                pw.SizedBox(height: 2),
                 pw.Text(
                   titleLine2,
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
-                    fontSize: 15,
+                    fontSize: 22,
                     fontWeight: pw.FontWeight.bold,
+                    letterSpacing: 0.4,
                     decoration: pw.TextDecoration.underline,
+                    decorationThickness: 2,
                   ),
                 ),
               ],
@@ -156,16 +171,16 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
                 pw.Text(
                   'MEMBERS',
                   style: pw.TextStyle(
-                    fontSize: 8,
+                    fontSize: 10,
                     fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 1.2,
+                    letterSpacing: 1.4,
                     color: PdfColors.grey700,
                   ),
                 ),
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: 4),
                 pw.Text(
                   '${rows.length}',
-                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
                 ),
               ],
             ),
@@ -193,6 +208,7 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
     final end = index + take > rows.length ? rows.length : index + take;
     final chunk = rows.sublist(index, end);
     final continued = pageNumber > 0;
+    final pageLabel = pageNumber + 1;
 
     doc.addPage(
       pw.Page(
@@ -201,15 +217,16 @@ Future<Uint8List> ngmyBuildCivicRosterPdfBytes({
         build: (_) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
-            if (!continued) masthead() else
+            if (!continued)
+              masthead()
+            else
               pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.only(bottom: 8),
                 child: pw.Text(
-                  'Continued · $state · ${rows.length} members',
-                  style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700),
+                  'Continued · Page $pageLabel',
+                  style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700),
                 ),
               ),
-            if (!continued) pw.SizedBox(height: 8),
             rosterTable(chunk),
           ],
         ),
