@@ -19,7 +19,7 @@ void main() {
             userEmail: 'creator@example.com',
             document: NgmyBioDocument(id: 'bio_1', displayName: 'Ana'),
             onBack: () {},
-            onSaved: () {},
+            onSaved: (_) {},
           ),
         ),
       );

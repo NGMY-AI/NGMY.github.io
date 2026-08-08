@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -151,6 +152,16 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       _menus = menus;
       _bios = bios;
       _loading = false;
+      // Keep the open editor's saved fields if this bio is still in the list.
+      final editingId = _editingBio?.id;
+      if (editingId != null) {
+        for (final b in bios) {
+          if (b.id == editingId) {
+            _editingBio = b.copy();
+            break;
+          }
+        }
+      }
     });
 
     if (!syncCloud || widget._isLocal) return;
@@ -165,7 +176,24 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     setState(() {
       _menus = syncedMenus;
       _bios = syncedBios;
+      final editingId = _editingBio?.id;
+      if (editingId != null) {
+        for (final b in syncedBios) {
+          if (b.id == editingId) {
+            // Only adopt cloud if it is strictly newer than the open editor copy.
+            if (b.updatedAt.isAfter(_editingBio!.updatedAt)) {
+              _editingBio = b.copy();
+            }
+            break;
+          }
+        }
+      }
     });
+  }
+
+  Future<void> _reloadAfterBioSave(NgmyBioDocument saved) async {
+    setState(() => _editingBio = saved.copy());
+    await _reload(syncCloud: false);
   }
 
   void _newBio() {
@@ -479,13 +507,17 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     final t = NgmyHubTheme.of(context);
     if (_editingBio != null) {
       return NgmyBioStudioEditor(
+        key: ValueKey('bio_editor_${_editingBio!.id}'),
         userEmail: widget.userEmail,
         isAdmin: widget.isAdmin,
         existingBioIds: _bios.map((b) => b.id).toList(),
         document: _editingBio!,
         backend: widget.backend,
         onBack: () => setState(() => _editingBio = null),
-        onSaved: _reload,
+        onSaved: (doc) {
+          setState(() => _editingBio = doc.copy());
+          unawaited(_reloadAfterBioSave(doc));
+        },
       );
     }
     if (_editing != null) return _editor(t);

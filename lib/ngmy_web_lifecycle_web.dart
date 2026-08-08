@@ -24,8 +24,13 @@ void ngmyRegisterPageVisibleHandler(void Function() onVisible) {
   if (_ngmyPageVisibleListenersInstalled) return;
   _ngmyPageVisibleListenersInstalled = true;
 
+  var lastFireMs = 0;
   void fire() {
     if (_ngmyPageVisibleHandlers.isEmpty) return;
+    // Debounce: iOS fires visible + pageshow together and can thrash Flutter.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - lastFireMs < 800) return;
+    lastFireMs = now;
     SchedulerBinding.instance.scheduleForcedFrame();
     for (final handler in List<void Function()>.from(_ngmyPageVisibleHandlers)) {
       try {

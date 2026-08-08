@@ -14901,6 +14901,7 @@ class NgmyAdminLiveRefresh {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
+  Timer? _metricsDebounce;
 
   void _goToMainTab(int i, {bool refreshLegal = false}) {
     setState(() {
@@ -15049,9 +15050,19 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeMetrics() {
-    // iOS PWA/web can leave stale viewInsets after the keyboard closes — rebuild
-    // so the pinned bottom nav and body layout stay in sync.
-    if (mounted) setState(() {});
+    // iOS Safari fires metrics constantly for the keyboard / URL bar. Rebuilding
+    // the whole MainScreen during Menu Studio / Bio made the app look like it
+    // was crashing. Skip while another route covers the shell, and debounce.
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _metricsDebounce?.cancel();
+    _metricsDebounce = Timer(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      final r = ModalRoute.of(context);
+      if (r != null && !r.isCurrent) return;
+      setState(() {});
+    });
   }
 
   Future<void> _refreshOnlineStatus() async {
@@ -15466,6 +15477,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ngmyUnregisterPageVisibleHandler(_onShellVisibleAgain);
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminTabRefreshDebounce?.cancel();
+    _metricsDebounce?.cancel();
     _t?.cancel();
     _onlineCheck?.cancel();
     ngmyStopItemReminderWatcher();

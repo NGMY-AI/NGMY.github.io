@@ -43,7 +43,7 @@ class NgmyBioStudioEditor extends StatefulWidget {
   final NgmyBioDocument document;
   final NgmyStudioPublishBackend backend;
   final VoidCallback onBack;
-  final VoidCallback onSaved;
+  final ValueChanged<NgmyBioDocument> onSaved;
 
   bool get _isLocal => backend == NgmyStudioPublishBackend.localDevice;
 
@@ -124,16 +124,57 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Future<void> _save() async {
     _sync();
-    if (widget._isLocal) {
-      await saveNgmyLocalBio(userEmail: widget.userEmail, doc: _doc);
-    } else {
-      await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+    final expectedName = _doc.displayName;
+    try {
+      if (widget._isLocal) {
+        await saveNgmyLocalBio(userEmail: widget.userEmail, doc: _doc);
+      } else {
+        await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
+      }
+      // Prove the write stuck — SharedPreferences/web quota failures used to
+      // look like a successful Save while the display name never persisted.
+      final stored = widget._isLocal
+          ? await loadNgmyLocalBios(userEmail: widget.userEmail)
+          : await loadNgmyBios(userEmail: widget.userEmail);
+      NgmyBioDocument? found;
+      for (final d in stored) {
+        if (d.id == _doc.id) {
+          found = d;
+          break;
+        }
+      }
+      if (found == null || found.displayName.trim() != expectedName.trim()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Could not save display name. Try a smaller photo, then Save again.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      _doc = found.copy();
+      _bind();
+      widget.onSaved(_doc.copy());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            expectedName.isEmpty ? 'Bio saved' : 'Bio saved — $expectedName',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Save failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    widget.onSaved();
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Bio saved')));
   }
 
   Future<void> _publish() async {
@@ -197,7 +238,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       await saveNgmyBio(userEmail: widget.userEmail, doc: _doc);
     }
     setState(() => _publishing = false);
-    widget.onSaved();
+    widget.onSaved(_doc.copy());
     if (!mounted) return;
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
