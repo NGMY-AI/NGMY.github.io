@@ -151,6 +151,8 @@ import 'ngmy_civic_contribution_report.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
+import 'ngmy_civic_roster_pdf.dart';
+import 'ngmy_invoice_print.dart';
 import 'ngmy_civic_id_scanner.dart';
 import 'ngmy_media_deep_link.dart';
 import 'ngmy_civic_enroll_link.dart';
@@ -31476,20 +31478,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    // Never use one HTML <table> across pages — Safari/Chrome fragment cell
-    // borders and leave hanging vertical lines. Each PDF page is its own
-    // closed CSS-grid "table" with a complete outer frame. Pack enough rows
-    // to fill the sheet before starting the next page (single-line rows keep
-    // height predictable so the browser does not re-split mid-table).
-    const firstPageRows = 26;
-    const nextPageRows = 32;
-
-    String memberRowHtml(Map<String, dynamic> m) {
+    // Build a real PDF (not HTML print). Safari/Chrome HTML tables fragment
+    // mid-page and leave hanging lines + nearly-empty continuation pages.
+    final rosterRows = <NgmyCivicRosterRow>[];
+    for (final m in members) {
       final name = (m['fullName'] ?? '').toString().trim();
       final phoneDigits = (m['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
       final phone = phoneDigits.isEmpty
           ? ''
-          : ngmyFormatPhoneDisplay(phoneDigits.length >= 10 ? phoneDigits.substring(phoneDigits.length - 10) : phoneDigits);
+          : ngmyFormatPhoneDisplay(
+              phoneDigits.length >= 10 ? phoneDigits.substring(phoneDigits.length - 10) : phoneDigits,
+            );
       final address = (m['homeAddress'] ?? '').toString().trim();
       final familyRaw = m['familyMembers'];
       final family = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
@@ -31498,284 +31497,52 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
       final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
       final familyLabel = (males > 0 || females > 0) ? '$family ($males M / $females F)' : '$family';
-      return '''
-    <div class="r">
-      <div class="c name">${_escapeHtml(name.isEmpty ? '—' : name)}</div>
-      <div class="c phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</div>
-      <div class="c address">${_escapeHtml(address.isEmpty ? '—' : address)}</div>
-      <div class="c family">${_escapeHtml(familyLabel)}</div>
-    </div>''';
-    }
-
-    String tableHtml(List<Map<String, dynamic>> pageMembers, {required bool continued}) {
-      final body = StringBuffer();
-      for (final m in pageMembers) {
-        body.writeln(memberRowHtml(m));
-      }
-      final continuedNote = continued
-          ? '<div class="continued">Continued · ${_escapeHtml(state)} · ${members.length} members</div>'
-          : '';
-      return '''
-$continuedNote
-<div class="grid-table">
-  <div class="r head">
-    <div class="c name">Name</div>
-    <div class="c phone">Phone</div>
-    <div class="c address">Address</div>
-    <div class="c family">Family size</div>
-  </div>
-${body.toString()}
-</div>''';
-    }
-
-    final pages = StringBuffer();
-    var index = 0;
-    var pageNumber = 0;
-    while (index < members.length) {
-      final take = pageNumber == 0 ? firstPageRows : nextPageRows;
-      final end = index + take > members.length ? members.length : index + take;
-      final chunk = members.sublist(index, end);
-      final isLast = end >= members.length;
-      pages.writeln('<div class="roster-page${isLast ? ' last' : ''}">');
-      if (pageNumber == 0) {
-        pages.writeln('__MASTHEAD__');
-      }
-      pages.writeln(tableHtml(chunk, continued: pageNumber > 0));
-      pages.writeln('</div>');
-      if (!isLast) {
-        pages.writeln('<div class="page-break"></div>');
-      }
-      index = end;
-      pageNumber++;
+      rosterRows.add(
+        NgmyCivicRosterRow(
+          name: name,
+          phone: phone,
+          address: address,
+          familyLabel: familyLabel,
+        ),
+      );
     }
 
     final now = DateTime.now().toLocal();
     final dateStr =
         '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final hour12 = now.hour % 12 == 0 ? 12 : now.hour % 12;
-    final timeStr =
-        '$hour12:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
-    final titleLine1 = "EMO'YA M'BEMBE";
-    final titleLine2 = "M'MBONDO · $state";
-    final masthead = '''
-  <div class="masthead">
-    <div class="stamp">
-      <div class="date">${_escapeHtml(dateStr)}</div>
-      <div class="time">${_escapeHtml(timeStr)}</div>
-    </div>
-    <div class="header">
-      <h1>
-        <span class="line1">${_escapeHtml(titleLine1)}</span>
-        <span class="line2">${_escapeHtml(titleLine2)}</span>
-      </h1>
-    </div>
-    <div class="members-chip">
-      <div class="label">Members</div>
-      <div class="value">${members.length}</div>
-    </div>
-  </div>''';
-    final pagesHtml = pages.toString().replaceFirst('__MASTHEAD__', masthead);
-
-    final html = '''
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>NGMY.ORG</title>
-<style>
-  @page {
-    size: letter;
-    margin: 10mm 9mm 12mm 9mm;
-  }
-  html, body {
-    font-family: Georgia, "Times New Roman", serif;
-    color: #111;
-    margin: 0;
-    padding: 0;
-    background: #fff;
-  }
-  .sheet { padding: 0; }
-  .roster-page {
-    display: block;
-    width: 100%;
-  }
-  .page-break {
-    display: block;
-    height: 0;
-    margin: 0;
-    padding: 0;
-    border: 0;
-    break-before: page;
-    page-break-before: always;
-  }
-  .continued {
-    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    font-size: 11px;
-    font-weight: 700;
-    color: #444;
-    margin: 0 0 8px;
-  }
-  .masthead {
-    display: grid;
-    grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
-    align-items: end;
-    gap: 10px;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    border-bottom: 2px solid #111;
-  }
-  .stamp {
-    justify-self: start;
-    text-align: left;
-    line-height: 1.25;
-    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  }
-  .stamp .date {
-    font-size: 15px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    color: #111;
-    white-space: nowrap;
-  }
-  .stamp .time {
-    margin-top: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #555;
-    white-space: nowrap;
-  }
-  .header {
-    justify-self: center;
-    text-align: center;
-    max-width: 420px;
-  }
-  .header h1 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: 0.03em;
-    line-height: 1.2;
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 6px;
-  }
-  .header h1 .line1,
-  .header h1 .line2 {
-    display: block;
-    white-space: nowrap;
-  }
-  .members-chip {
-    justify-self: end;
-    align-self: start;
-    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    text-align: right;
-    min-width: 88px;
-  }
-  .members-chip .label {
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #666;
-  }
-  .members-chip .value {
-    margin-top: 4px;
-    font-size: 22px;
-    font-weight: 900;
-    color: #111;
-    line-height: 1;
-  }
-  .grid-table {
-    display: block;
-    width: 100%;
-    border: 1.5px solid #888;
-    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    box-sizing: border-box;
-  }
-  .r {
-    display: grid;
-    grid-template-columns: 22% 15% 49% 14%;
-    width: 100%;
-    box-sizing: border-box;
-    border-bottom: 1px solid #bbb;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .r:last-child { border-bottom: 0; }
-  .r.head {
-    background: #f3f4f6;
-    border-bottom: 1px solid #888;
-  }
-  .c {
-    padding: 6px 7px;
-    font-size: 12px;
-    font-weight: 400;
-    line-height: 1.3;
-    border-right: 1px solid #bbb;
-    box-sizing: border-box;
-    overflow: hidden;
-    min-width: 0;
-  }
-  .c:last-child { border-right: 0; }
-  .r.head .c {
-    font-size: 12px;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-  .c.name {
-    white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-  .c.phone {
-    white-space: nowrap;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-  }
-  .c.address {
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 11px;
-  }
-  .c.family {
-    text-align: center;
-    white-space: nowrap;
-    font-size: 11px;
-  }
-</style>
-</head>
-<body>
-  <div class="sheet">
-$pagesHtml
-  </div>
-  <script>
-    try { document.title = 'NGMY.ORG'; } catch (e) {}
-    window.addEventListener('load', function () {
-      setTimeout(function () {
-        try { window.focus(); } catch (e) {}
-        window.print();
-      }, 180);
-    });
-  </script>
-</body>
-</html>''';
-
+    final timeStr = '$hour12:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
     final stamp = DateTime.now().toUtc().toIso8601String().replaceAll(':', '-').split('.').first;
-    final fileName = 'ngmy-civic-roster-${state.replaceAll(RegExp(r'\s+'), '_')}-$stamp';
-    await ngmyPrintCivicMemberReport(
-      htmlContent: html,
-      plainText: 'NGMY $state roster (${members.length} members)',
-      fileName: fileName,
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Print dialog opened for $state (${members.length} members). Turn off Headers and footers in the print dialog to hide date/time and page URL — title is set to NGMY.ORG.',
+    final fileName = 'ngmy-civic-roster-${state.replaceAll(RegExp(r'\s+'), '_')}-$stamp.pdf';
+
+    try {
+      final pdfBytes = await ngmyBuildCivicRosterPdfBytes(
+        state: state,
+        titleLine1: "EMO'YA M'BEMBE",
+        titleLine2: "M'MBONDO · $state",
+        dateStr: dateStr,
+        timeStr: timeStr,
+        rows: rosterRows,
+      );
+      final opened = await ngmyInvoicePrintPdfDirect(pdfBytes, fileName);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            opened
+                ? 'Roster PDF ready for $state (${members.length} members). Each page is a full framed table.'
+                : 'Could not open print sheet — try again.',
+          ),
+          backgroundColor: opened ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 6),
         ),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 7),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not build roster PDF: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   String _escapeHtml(String s) => s
