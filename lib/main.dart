@@ -31476,11 +31476,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final rows = StringBuffer();
-    for (final m in members) {
+    // Do NOT let the browser split one HTML table across PDF pages — Safari/Chrome
+    // leave hanging vertical lines and unframed continuation rows. Build discrete
+    // page sections ourselves: masthead only on page 1, fewer rows there, then a
+    // brand-new fully bordered table on every following page.
+    const firstPageRows = 15;
+    const nextPageRows = 22;
+
+    String memberRowHtml(Map<String, dynamic> m) {
       final name = (m['fullName'] ?? '').toString().trim();
       final phoneDigits = (m['phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-      // Prefer full 10-digit US display; fall back to whatever digits we have.
       final phone = phoneDigits.isEmpty
           ? ''
           : ngmyFormatPhoneDisplay(phoneDigits.length >= 10 ? phoneDigits.substring(phoneDigits.length - 10) : phoneDigits);
@@ -31492,13 +31497,62 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final males = malesRaw is num ? malesRaw.toInt() : int.tryParse('${malesRaw ?? ''}') ?? 0;
       final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
       final familyLabel = (males > 0 || females > 0) ? '$family ($males M / $females F)' : '$family';
-      rows.writeln('''
+      return '''
       <tr>
         <td class="name">${_escapeHtml(name.isEmpty ? '—' : name)}</td>
         <td class="phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
         <td class="address">${_escapeHtml(address.isEmpty ? '—' : address)}</td>
         <td class="family">${_escapeHtml(familyLabel)}</td>
-      </tr>''');
+      </tr>''';
+    }
+
+    String tableHtml(List<Map<String, dynamic>> pageMembers, {required bool continued}) {
+      final body = StringBuffer();
+      for (final m in pageMembers) {
+        body.writeln(memberRowHtml(m));
+      }
+      final continuedNote = continued
+          ? '<div class="continued">Continued · ${_escapeHtml(state)} · ${members.length} members</div>'
+          : '';
+      return '''
+$continuedNote
+<table>
+  <colgroup>
+    <col class="name"/>
+    <col class="phone"/>
+    <col class="address"/>
+    <col class="family"/>
+  </colgroup>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Phone</th>
+      <th>Address</th>
+      <th class="family">Family size</th>
+    </tr>
+  </thead>
+  <tbody>
+${body.toString()}
+  </tbody>
+</table>''';
+    }
+
+    final pages = StringBuffer();
+    var index = 0;
+    var pageNumber = 0;
+    while (index < members.length) {
+      final take = pageNumber == 0 ? firstPageRows : nextPageRows;
+      final end = index + take > members.length ? members.length : index + take;
+      final chunk = members.sublist(index, end);
+      final isLast = end >= members.length;
+      pages.writeln('<section class="roster-page${isLast ? ' last' : ''}">');
+      if (pageNumber == 0) {
+        pages.writeln('__MASTHEAD__');
+      }
+      pages.writeln(tableHtml(chunk, continued: pageNumber > 0));
+      pages.writeln('</section>');
+      index = end;
+      pageNumber++;
     }
 
     final now = DateTime.now().toLocal();
@@ -31509,6 +31563,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         '$hour12:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}';
     final titleLine1 = "EMO'YA M'BEMBE";
     final titleLine2 = "M'MBONDO · $state";
+    final masthead = '''
+  <div class="masthead">
+    <div class="stamp">
+      <div class="date">${_escapeHtml(dateStr)}</div>
+      <div class="time">${_escapeHtml(timeStr)}</div>
+    </div>
+    <div class="header">
+      <h1>
+        <span class="line1">${_escapeHtml(titleLine1)}</span>
+        <span class="line2">${_escapeHtml(titleLine2)}</span>
+      </h1>
+    </div>
+    <div class="members-chip">
+      <div class="label">Members</div>
+      <div class="value">${members.length}</div>
+    </div>
+  </div>''';
+    final pagesHtml = pages.toString().replaceFirst('__MASTHEAD__', masthead);
 
     final html = '''
 <!DOCTYPE html>
@@ -31529,6 +31601,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     background: #fff;
   }
   .sheet { padding: 4px 2px 8px; }
+  .roster-page {
+    break-after: page;
+    page-break-after: always;
+  }
+  .roster-page.last {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  .continued {
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #444;
+    margin: 0 0 8px;
+  }
   .masthead {
     display: grid;
     grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
@@ -31601,31 +31688,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
   table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     table-layout: fixed;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    page-break-inside: auto;
+    border: 1px solid #bbb;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   thead { display: table-header-group; }
   tbody { display: table-row-group; }
   tr {
-    page-break-inside: avoid !important;
-    break-inside: avoid-page !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   col.name { width: 22%; }
   col.phone { width: 15%; }
   col.address { width: 49%; }
   col.family { width: 14%; }
   th, td {
-    border: 1px solid #ccc;
+    border-right: 1px solid #bbb;
+    border-bottom: 1px solid #bbb;
     padding: 4px 6px;
     font-size: 11px;
     font-weight: 400;
     vertical-align: middle;
-    min-height: 22px;
-    height: auto;
     line-height: 1.25;
   }
+  th:last-child, td:last-child { border-right: 0; }
+  tr:last-child td { border-bottom: 0; }
   td.name {
     white-space: nowrap;
     overflow: hidden;
@@ -31633,7 +31724,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
   td.phone {
     white-space: nowrap;
-    overflow: visible;
+    overflow: hidden;
     text-overflow: clip;
     font-size: 10px;
     font-variant-numeric: tabular-nums;
@@ -31641,12 +31732,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
   td.address {
     white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
+    overflow: hidden;
     word-break: break-word;
     overflow-wrap: anywhere;
     font-size: 10px;
-    line-height: 1.3;
+    line-height: 1.25;
+    max-height: 2.6em;
   }
   th {
     background: #f3f4f6;
@@ -31654,65 +31745,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
+    border-bottom: 1px solid #999;
   }
   th.family, td.family { text-align: center; white-space: normal; font-size: 10px; line-height: 1.15; }
-  th.family {
-    overflow: visible;
-    text-overflow: clip;
-  }
   @media print {
     .sheet { padding: 0; }
     .masthead { margin-bottom: 10px; }
-    table, thead, tbody, tr, th, td {
-      -webkit-box-decoration-break: clone;
-      box-decoration-break: clone;
-    }
-    th, td {
-      /* Preserve a complete cell frame at every printed page boundary.
-         Collapsed table borders can otherwise disappear when Chrome
-         fragments the table between PDF pages. */
-      box-shadow: inset 0 0 0 0.35px #ccc;
-    }
   }
 </style>
 </head>
 <body>
   <div class="sheet">
-  <div class="masthead">
-    <div class="stamp">
-      <div class="date">${_escapeHtml(dateStr)}</div>
-      <div class="time">${_escapeHtml(timeStr)}</div>
-    </div>
-    <div class="header">
-      <h1>
-        <span class="line1">${_escapeHtml(titleLine1)}</span>
-        <span class="line2">${_escapeHtml(titleLine2)}</span>
-      </h1>
-    </div>
-    <div class="members-chip">
-      <div class="label">Members</div>
-      <div class="value">${members.length}</div>
-    </div>
-  </div>
-  <table>
-    <colgroup>
-      <col class="name"/>
-      <col class="phone"/>
-      <col class="address"/>
-      <col class="family"/>
-    </colgroup>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Phone</th>
-        <th>Address</th>
-        <th class="family">Family size</th>
-      </tr>
-    </thead>
-    <tbody>
-      $rows
-    </tbody>
-  </table>
+$pagesHtml
   </div>
   <script>
     try { document.title = 'NGMY.ORG'; } catch (e) {}
