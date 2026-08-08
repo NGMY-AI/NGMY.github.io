@@ -15,6 +15,10 @@ abstract final class NgmyStudioPayments {
   static const bioMonthlyCents = 399;
   static const freeBioTemplateId = 'gold_curved';
   static const freeBioAvatarSelections = 3; // First photo + two replacements.
+  /// After Bio Studio subscription: two profile changes free, then $1.99 unlocks
+  /// the next two, and that pack cycle repeats.
+  static const subscribedBioAvatarFreeChanges = 2;
+  static const bioAvatarPackChanges = 2;
 
   static String _email(String email) => email.trim().toLowerCase();
 
@@ -60,6 +64,9 @@ abstract final class NgmyStudioPayments {
 
   static bool freeBioAvatarSelectionAvailable(int selectionsUsed) =>
       selectionsUsed < freeBioAvatarSelections;
+
+  static int subscribedBioAvatarAllowance(int packsPurchased) =>
+      subscribedBioAvatarFreeChanges + (packsPurchased * bioAvatarPackChanges);
 
   static String _oldestId(List<String> ids) {
     if (ids.isEmpty) return '';
@@ -186,11 +193,58 @@ abstract final class NgmyStudioPayments {
     );
   }
 
-  /// Checks and records a profile-photo selection for the free Bio.
+  static Map<String, dynamic> _intMap(dynamic raw) {
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return <String, dynamic>{};
+  }
+
+  static Future<bool> _consumeSubscribedBioAvatarChange({
+    required BuildContext context,
+    required String email,
+    required String bioId,
+    bool isAdmin = false,
+  }) async {
+    final state = await _load(email);
+    final usedMap = _intMap(state['bioAvatarSubSelections']);
+    final packsMap = _intMap(state['bioAvatarPacks']);
+    var used = (usedMap[bioId] as num?)?.toInt() ?? 0;
+    var packs = (packsMap[bioId] as num?)?.toInt() ?? 0;
+    var allowance = subscribedBioAvatarAllowance(packs);
+
+    if (used >= allowance) {
+      if (!context.mounted) return false;
+      final nextPack = packs + 1;
+      final scope = '${bioId}_p$nextPack';
+      final paid = await NgmyStripePayments.ensureScopedPaid(
+        context: context,
+        product: NgmyStripeProduct.bioPhotoPack,
+        email: email,
+        scope: scope,
+        isAdmin: isAdmin,
+        title: 'Bio Photo Changes',
+        message:
+            'You used your 2 free profile photo changes. Pay \$1.99 for 2 more changes. This repeats every 2 changes.',
+      );
+      if (!paid) return false;
+      packs = nextPack;
+      packsMap[bioId] = packs;
+      state['bioAvatarPacks'] = packsMap;
+      allowance = subscribedBioAvatarAllowance(packs);
+    }
+
+    if (used >= allowance) return false;
+    usedMap[bioId] = used + 1;
+    state['bioAvatarSubSelections'] = usedMap;
+    await _save(email, state);
+    return true;
+  }
+
+  /// Checks and records a profile-photo selection.
   ///
-  /// [isReplacement] must be false for the first photo and true when an existing
-  /// profile photo is being replaced. The first selection plus two replacements
-  /// are free; the third replacement opens the subscription dialog.
+  /// Free Bio (no subscription): first photo + two replacements are free; then
+  /// subscribe. With an active Bio subscription: two photo changes are free,
+  /// then each additional pair of changes costs \$1.99 (separate from the
+  /// monthly subscription).
   static Future<bool> ensureCanSelectBioAvatar({
     required BuildContext context,
     required String email,
@@ -199,7 +253,17 @@ abstract final class NgmyStudioPayments {
     required bool isReplacement,
     bool isAdmin = false,
   }) async {
-    if (isAdmin || await hasBioSubscription(email)) return true;
+    if (isAdmin) return true;
+
+    if (await hasBioSubscription(email)) {
+      if (!context.mounted) return false;
+      return _consumeSubscribedBioAvatarChange(
+        context: context,
+        email: email,
+        bioId: bioId,
+        isAdmin: isAdmin,
+      );
+    }
 
     final freeId = await resolveFreeBioId(
       email: email,
@@ -218,9 +282,7 @@ abstract final class NgmyStudioPayments {
     }
 
     final state = await _load(email);
-    final counts = state['bioAvatarSelections'] is Map
-        ? Map<String, dynamic>.from(state['bioAvatarSelections'] as Map)
-        : <String, dynamic>{};
+    final counts = _intMap(state['bioAvatarSelections']);
     var used = (counts[bioId] as num?)?.toInt() ?? 0;
 
     // Backward compatibility: an existing image predating this counter counts
@@ -233,7 +295,8 @@ abstract final class NgmyStudioPayments {
         product: NgmyStripeProduct.bioStudio,
         email: email,
         title: 'Bio Studio',
-        message: 'You used the first photo and two free photo changes. Subscribe for \$3.99 per month for unlimited changes.',
+        message:
+            'You used the first photo and two free photo changes. Subscribe for \$3.99 per month to keep publishing. After you subscribe, photo changes are 2 free, then \$1.99 for 2 more.',
       );
     }
 
@@ -249,10 +312,9 @@ abstract final class NgmyStudioPayments {
     required String email,
     required String bioId,
   }) async {
+    if (await hasBioSubscription(email)) return;
     final state = await _load(email);
-    final counts = state['bioAvatarSelections'] is Map
-        ? Map<String, dynamic>.from(state['bioAvatarSelections'] as Map)
-        : <String, dynamic>{};
+    final counts = _intMap(state['bioAvatarSelections']);
     final used = (counts[bioId] as num?)?.toInt() ?? 0;
     if (used > 0) return;
     counts[bioId] = 1;

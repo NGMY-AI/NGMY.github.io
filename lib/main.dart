@@ -31476,12 +31476,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    // Do NOT let the browser split one HTML table across PDF pages — Safari/Chrome
-    // leave hanging vertical lines and unframed continuation rows. Build discrete
-    // page sections ourselves: masthead only on page 1, fewer rows there, then a
-    // brand-new fully bordered table on every following page.
-    const firstPageRows = 15;
-    const nextPageRows = 22;
+    // Never use one HTML <table> across pages — Safari/Chrome fragment cell
+    // borders and leave hanging vertical lines. Each PDF page is its own
+    // closed CSS-grid "table" with a complete outer frame. Row counts stay
+    // conservative so a page never overflows and gets browser-split.
+    const firstPageRows = 10;
+    const nextPageRows = 16;
 
     String memberRowHtml(Map<String, dynamic> m) {
       final name = (m['fullName'] ?? '').toString().trim();
@@ -31498,12 +31498,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final females = femalesRaw is num ? femalesRaw.toInt() : int.tryParse('${femalesRaw ?? ''}') ?? 0;
       final familyLabel = (males > 0 || females > 0) ? '$family ($males M / $females F)' : '$family';
       return '''
-      <tr>
-        <td class="name">${_escapeHtml(name.isEmpty ? '—' : name)}</td>
-        <td class="phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</td>
-        <td class="address">${_escapeHtml(address.isEmpty ? '—' : address)}</td>
-        <td class="family">${_escapeHtml(familyLabel)}</td>
-      </tr>''';
+    <div class="r">
+      <div class="c name">${_escapeHtml(name.isEmpty ? '—' : name)}</div>
+      <div class="c phone">${_escapeHtml(phone.isEmpty ? '—' : phone)}</div>
+      <div class="c address">${_escapeHtml(address.isEmpty ? '—' : address)}</div>
+      <div class="c family">${_escapeHtml(familyLabel)}</div>
+    </div>''';
     }
 
     String tableHtml(List<Map<String, dynamic>> pageMembers, {required bool continued}) {
@@ -31516,25 +31516,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           : '';
       return '''
 $continuedNote
-<table>
-  <colgroup>
-    <col class="name"/>
-    <col class="phone"/>
-    <col class="address"/>
-    <col class="family"/>
-  </colgroup>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Phone</th>
-      <th>Address</th>
-      <th class="family">Family size</th>
-    </tr>
-  </thead>
-  <tbody>
+<div class="grid-table">
+  <div class="r head">
+    <div class="c name">Name</div>
+    <div class="c phone">Phone</div>
+    <div class="c address">Address</div>
+    <div class="c family">Family size</div>
+  </div>
 ${body.toString()}
-  </tbody>
-</table>''';
+</div>''';
     }
 
     final pages = StringBuffer();
@@ -31545,12 +31535,15 @@ ${body.toString()}
       final end = index + take > members.length ? members.length : index + take;
       final chunk = members.sublist(index, end);
       final isLast = end >= members.length;
-      pages.writeln('<section class="roster-page${isLast ? ' last' : ''}">');
+      pages.writeln('<div class="roster-page${isLast ? ' last' : ''}">');
       if (pageNumber == 0) {
         pages.writeln('__MASTHEAD__');
       }
       pages.writeln(tableHtml(chunk, continued: pageNumber > 0));
-      pages.writeln('</section>');
+      pages.writeln('</div>');
+      if (!isLast) {
+        pages.writeln('<div class="page-break"></div>');
+      }
       index = end;
       pageNumber++;
     }
@@ -31591,7 +31584,7 @@ ${body.toString()}
 <style>
   @page {
     size: letter;
-    margin: 12mm 10mm 14mm 10mm;
+    margin: 10mm 9mm 12mm 9mm;
   }
   html, body {
     font-family: Georgia, "Times New Roman", serif;
@@ -31600,14 +31593,19 @@ ${body.toString()}
     padding: 0;
     background: #fff;
   }
-  .sheet { padding: 4px 2px 8px; }
+  .sheet { padding: 0; }
   .roster-page {
-    break-after: page;
-    page-break-after: always;
+    display: block;
+    width: 100%;
   }
-  .roster-page.last {
-    break-after: auto;
-    page-break-after: auto;
+  .page-break {
+    display: block;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    break-before: page;
+    page-break-before: always;
   }
   .continued {
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -31621,8 +31619,8 @@ ${body.toString()}
     grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 1fr);
     align-items: end;
     gap: 10px;
-    padding-bottom: 12px;
-    margin-bottom: 14px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
     border-bottom: 2px solid #111;
   }
   .stamp {
@@ -31686,71 +31684,61 @@ ${body.toString()}
     color: #111;
     line-height: 1;
   }
-  table {
+  .grid-table {
+    display: block;
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    table-layout: fixed;
+    border: 1.5px solid #888;
     font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-    border: 1px solid #bbb;
-    break-inside: avoid;
-    page-break-inside: avoid;
+    box-sizing: border-box;
   }
-  thead { display: table-header-group; }
-  tbody { display: table-row-group; }
-  tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  col.name { width: 22%; }
-  col.phone { width: 15%; }
-  col.address { width: 49%; }
-  col.family { width: 14%; }
-  th, td {
-    border-right: 1px solid #bbb;
+  .r {
+    display: grid;
+    grid-template-columns: 22% 15% 49% 14%;
+    width: 100%;
+    box-sizing: border-box;
     border-bottom: 1px solid #bbb;
-    padding: 4px 6px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .r:last-child { border-bottom: 0; }
+  .r.head {
+    background: #f3f4f6;
+    border-bottom: 1px solid #888;
+  }
+  .c {
+    padding: 5px 6px;
     font-size: 11px;
     font-weight: 400;
-    vertical-align: middle;
     line-height: 1.25;
-  }
-  th:last-child, td:last-child { border-right: 0; }
-  tr:last-child td { border-bottom: 0; }
-  td.name {
-    white-space: nowrap;
+    border-right: 1px solid #bbb;
+    box-sizing: border-box;
     overflow: hidden;
-    text-overflow: ellipsis;
+    min-width: 0;
   }
-  td.phone {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: clip;
-    font-size: 10px;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: 0;
-  }
-  td.address {
-    white-space: normal;
-    overflow: hidden;
-    word-break: break-word;
-    overflow-wrap: anywhere;
-    font-size: 10px;
-    line-height: 1.25;
-    max-height: 2.6em;
-  }
-  th {
-    background: #f3f4f6;
-    text-align: left;
+  .c:last-child { border-right: 0; }
+  .r.head .c {
     font-size: 11px;
     font-weight: 700;
     white-space: nowrap;
-    border-bottom: 1px solid #999;
   }
-  th.family, td.family { text-align: center; white-space: normal; font-size: 10px; line-height: 1.15; }
-  @media print {
-    .sheet { padding: 0; }
-    .masthead { margin-bottom: 10px; }
+  .c.name {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .c.phone {
+    white-space: nowrap;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .c.address {
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 10px;
+  }
+  .c.family {
+    text-align: center;
+    white-space: nowrap;
+    font-size: 10px;
   }
 </style>
 </head>

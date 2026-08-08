@@ -69,6 +69,23 @@ void main() {
     expect(NgmyStudioPayments.freeBioAvatarSelectionAvailable(3), isFalse);
   });
 
+  test('subscribed Bio photo packs are 2 free then \$1.99 for 2 more', () {
+    expect(NgmyStudioPayments.subscribedBioAvatarFreeChanges, 2);
+    expect(NgmyStudioPayments.bioAvatarPackChanges, 2);
+    expect(NgmyStudioPayments.subscribedBioAvatarAllowance(0), 2);
+    expect(NgmyStudioPayments.subscribedBioAvatarAllowance(1), 4);
+    expect(NgmyStudioPayments.subscribedBioAvatarAllowance(2), 6);
+    expect(
+      NgmyStripePayments.productSlug(NgmyStripeProduct.bioPhotoPack),
+      'bio_photo_pack',
+    );
+    expect(NgmyStripePayments.priceCents(NgmyStripeProduct.bioPhotoPack), 199);
+    expect(
+      NgmyStripePayments.isOneTimePayProduct(NgmyStripeProduct.bioPhotoPack),
+      isTrue,
+    );
+  });
+
   test(
     'new Bio display name starts as a placeholder, not editable sample text',
     () {

@@ -34,12 +34,14 @@ const PRODUCT_SLUGS = new Set([
   "menu_studio",
   "bio_studio",
   "business_card",
+  "bio_photo_pack",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;
 const ACCESS_DAYS_PHONE_UNLOCK = 10;
 const ACCESS_HOURS_MARRIAGE = 4;
 const ACCESS_DAYS_BUSINESS_CARD = 2;
+const ACCESS_DAYS_BIO_PHOTO_PACK = 1;
 const SIGNATURE_TOLERANCE_SEC = 300;
 
 function json(body: unknown, status = 200): Response {
@@ -119,6 +121,9 @@ function accessUntilForProduct(product: string, existingUntil: Date | null): str
   }
   if (product.startsWith("business_card:")) {
     return new Date(now.getTime() + ACCESS_DAYS_BUSINESS_CARD * 86_400_000).toISOString();
+  }
+  if (product.startsWith("bio_photo_pack:")) {
+    return new Date(now.getTime() + ACCESS_DAYS_BIO_PHOTO_PACK * 86_400_000).toISOString();
   }
   const base = existingUntil && existingUntil.getTime() > now.getTime() ? existingUntil : now;
   return new Date(base.getTime() + ACCESS_DAYS_DEFAULT * 86_400_000).toISOString();
@@ -338,6 +343,13 @@ serve(async (req) => {
       return json({ error: "Missing business card scope" }, 422);
     }
     product = `business_card:${scope}`;
+  }
+  if (product === "bio_photo_pack") {
+    if (!scope || !/^[A-Za-z0-9_]+$/.test(scope)) {
+      console.error("[ngmy-stripe-webhook] missing/invalid bio photo pack scope", session?.id);
+      return json({ error: "Missing bio photo pack scope" }, 422);
+    }
+    product = `bio_photo_pack:${scope}`;
   }
 
   const { data: existing } = await admin

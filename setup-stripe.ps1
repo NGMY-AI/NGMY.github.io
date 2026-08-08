@@ -171,8 +171,9 @@ $productLinks = [ordered]@{
     "marriage"      = "https://buy.stripe.com/28EdR993H3tvdEvf8Nb7y09"
     "phone_unlock"  = "https://buy.stripe.com/5kQeVd2Fjggh9ofd0Fb7y0a"
     "menu_studio"   = "https://buy.stripe.com/8x2bJ1cfTe892ZR3q5b7y0b"
-    "bio_studio"    = "https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c"
-    "business_card" = "https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d"
+    "bio_studio"     = "https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c"
+    "business_card"  = "https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d"
+    "bio_photo_pack" = "https://buy.stripe.com/5kQ8wP93H8NPdEv5ydb7y0e"
 }
 
 $allLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"
@@ -187,12 +188,35 @@ foreach ($slug in $productLinks.Keys) {
     $pl = $null
 
     if ($isLive) {
-        if ($byUrl.ContainsKey($wantUrl)) { $pl = $byUrl[$wantUrl] }
-    } else {
-        # Test mode links have different URLs; match on metadata instead.
+        if ($wantUrl -and $byUrl.ContainsKey($wantUrl)) { $pl = $byUrl[$wantUrl] }
+    }
+    if (-not $pl) {
+        # Match on metadata (test mode, or live links created by this script).
         foreach ($cand in $allLinks.data) {
             if ($cand.active -and $cand.metadata.ngmy_product -eq $slug) { $pl = $cand; break }
         }
+    }
+
+    # Auto-create the $1.99 Bio photo-change pack when missing.
+    if (-not $pl -and $slug -eq "bio_photo_pack") {
+        Write-Host "  Creating bio_photo_pack Payment Link (USD 1.99) ..." -ForegroundColor DarkGray
+        $product = Invoke-Stripe -Method POST -Path "products" -Fields @(
+            "name=NGMY Bio Photo Changes",
+            "description=Two Bio profile photo changes",
+            "metadata[ngmy_product]=bio_photo_pack"
+        )
+        $price = Invoke-Stripe -Method POST -Path "prices" -Fields @(
+            "currency=$Currency",
+            "unit_amount=199",
+            "product=$($product.id)"
+        )
+        $pl = Invoke-Stripe -Method POST -Path "payment_links" -Fields @(
+            "line_items[0][price]=$($price.id)",
+            "line_items[0][quantity]=1",
+            "metadata[ngmy_product]=bio_photo_pack"
+        )
+        $byUrl[$pl.url] = $pl
+        Write-Ok "Created bio_photo_pack -> $($pl.url)"
     }
 
     if (-not $pl) { $missing += $slug; continue }

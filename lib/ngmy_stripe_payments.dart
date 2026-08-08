@@ -23,6 +23,7 @@ enum NgmyStripeProduct {
   menuStudio,
   bioStudio,
   businessCard,
+  bioPhotoPack,
 }
 
 class NgmyStripePayments {
@@ -48,6 +49,8 @@ class NgmyStripePayments {
       'https://buy.stripe.com/4gM6oHgw97JLbwn1hXb7y0c';
   static const String businessCardUrl =
       'https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d';
+  static const String bioPhotoPackUrl =
+      'https://buy.stripe.com/5kQ8wP93H8NPdEv5ydb7y0e';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -57,6 +60,7 @@ class NgmyStripePayments {
   static const int marriageSessionHours = 4;
   static const int phoneUnlockAccessDays = 10;
   static const int monthlyAccessDays = 30;
+  static const int bioPhotoPackAccessDays = 1;
 
   /// How long a redirect-only unlock lasts before Supabase has to confirm it.
   /// Keeps a real buyer working while the webhook lands, without letting anyone
@@ -110,6 +114,8 @@ class NgmyStripePayments {
         return 'bio_studio';
       case NgmyStripeProduct.businessCard:
         return 'business_card';
+      case NgmyStripeProduct.bioPhotoPack:
+        return 'bio_photo_pack';
     }
   }
 
@@ -137,6 +143,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.bioStudio;
       case 'business_card':
         return NgmyStripeProduct.businessCard;
+      case 'bio_photo_pack':
+        return NgmyStripeProduct.bioPhotoPack;
       default:
         return null;
     }
@@ -166,6 +174,8 @@ class NgmyStripePayments {
         return bioStudioUrl;
       case NgmyStripeProduct.businessCard:
         return businessCardUrl;
+      case NgmyStripeProduct.bioPhotoPack:
+        return bioPhotoPackUrl;
     }
   }
 
@@ -238,6 +248,8 @@ class NgmyStripePayments {
         return 399;
       case NgmyStripeProduct.businessCard:
         return 399;
+      case NgmyStripeProduct.bioPhotoPack:
+        return 199;
     }
   }
 
@@ -258,6 +270,8 @@ class NgmyStripePayments {
         return '10 days';
       case NgmyStripeProduct.businessCard:
         return '2 days';
+      case NgmyStripeProduct.bioPhotoPack:
+        return '2 photo changes';
       default:
         return '30 days';
     }
@@ -289,6 +303,8 @@ class NgmyStripePayments {
         return const [Color(0xFF78B7FF), Color(0xFF285BB8)]; // bio crystal blue
       case NgmyStripeProduct.businessCard:
         return const [Color(0xFF6EE7B7), Color(0xFF087F5B)]; // polished emerald
+      case NgmyStripeProduct.bioPhotoPack:
+        return const [Color(0xFF9AD0FF), Color(0xFF2F6FCF)]; // photo pack blue
     }
   }
 
@@ -317,6 +333,8 @@ class NgmyStripePayments {
         return const Color(0xFFE9F5FF);
       case NgmyStripeProduct.businessCard:
         return const Color(0xFFE8FFF6);
+      case NgmyStripeProduct.bioPhotoPack:
+        return const Color(0xFFEAF4FF);
     }
   }
 
@@ -358,6 +376,8 @@ class NgmyStripePayments {
         return 'Bio Studio';
       case NgmyStripeProduct.businessCard:
         return 'Business Card';
+      case NgmyStripeProduct.bioPhotoPack:
+        return 'Bio Photo Changes';
     }
   }
 
@@ -385,6 +405,8 @@ class NgmyStripePayments {
         return Icons.badge_rounded;
       case NgmyStripeProduct.businessCard:
         return Icons.contact_page_rounded;
+      case NgmyStripeProduct.bioPhotoPack:
+        return Icons.photo_camera_rounded;
     }
   }
 
@@ -409,16 +431,19 @@ class NgmyStripePayments {
       case NgmyStripeProduct.menuStudio:
         return 'Create and publish unlimited menus for 30 days.';
       case NgmyStripeProduct.bioStudio:
-        return 'Publish premium Bios and make unlimited photo changes for 30 days.';
+        return 'Publish premium Bios for 30 days. Profile photo changes: 2 free, then \$1.99 for 2 more.';
       case NgmyStripeProduct.businessCard:
         return 'Edit and download this card design for 2 days.';
+      case NgmyStripeProduct.bioPhotoPack:
+        return 'Pay \$1.99 for 2 more Bio profile photo changes.';
     }
   }
 
   static bool isOneTimePayProduct(NgmyStripeProduct product) =>
       product == NgmyStripeProduct.marriageDocument ||
       product == NgmyStripeProduct.phoneUnlock ||
-      product == NgmyStripeProduct.businessCard;
+      product == NgmyStripeProduct.businessCard ||
+      product == NgmyStripeProduct.bioPhotoPack;
 
   static bool isSubscribeProduct(NgmyStripeProduct product) =>
       !isOneTimePayProduct(product);
@@ -704,7 +729,10 @@ class NgmyStripePayments {
     // A short provisional unlock is not safe for downloadable products: it
     // would be enough time to export without a confirmed charge. Business
     // cards therefore wait for the signed Stripe webhook record in Supabase.
-    if (product != NgmyStripeProduct.businessCard) {
+    // Consumable / downloadable products wait for the signed webhook so a
+    // hand-crafted success URL cannot invent credits or export unlocks.
+    if (product != NgmyStripeProduct.businessCard &&
+        product != NgmyStripeProduct.bioPhotoPack) {
       await _grantForProduct(email, product, scope: scope);
     }
     await _clearPendingCheckout();
