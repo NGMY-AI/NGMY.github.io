@@ -293,6 +293,17 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 14),
+                const Text(
+                  'NGMY.ORG',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _kGreen,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.6,
+                  ),
+                ),
               ],
             ),
           ),
