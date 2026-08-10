@@ -62630,12 +62630,13 @@ if(r!=null)return r
 q=o.toLowerCase()
 for(s=B.RN.geT(B.RN),s=s.gaj(s);s.C();){p=s.gV(s)
 if(p.a.toLowerCase()===q)return p.b}return n>=2?B.b.ao(o,0,2).toUpperCase():"ST"},
-eri(a){var s=B.b.i(a),r=s.toLowerCase()
-if(B.b.q(r,"passport"))return"PASSPORT"
-if(B.b.q(r,"driver"))return"DRIVER'S LICENSE"
-if(B.b.q(r,"voter"))return"VOTERS CARD"
-if(B.b.q(r,"national"))return"NATIONAL ID"
-return s.length===0?"CIVIC REGISTRY ID":s.toUpperCase()},
+eri(a){var s="IDENTIFICATION CARD",r=B.b.i(a),q=r.toLowerCase()
+if(B.b.q(q,"passport"))return"PASSPORT"
+if(B.b.q(q,"driver"))return"DRIVER'S LICENSE"
+if(B.b.q(q,"voter"))return"VOTERS CARD"
+if(B.b.q(q,"national"))return s
+if(B.b.q(q,"identification"))return s
+return r.length===0?s:r.toUpperCase()},
 erh(a){var s=B.b.i(a).toLowerCase()
 if(B.b.q(s,"passport"))return"PP"
 if(B.b.q(s,"driver"))return"DL"
