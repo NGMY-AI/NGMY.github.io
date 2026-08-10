@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Bundled in pubspec — fallback text emoji on web when no Twemoji PNG exists.
 const kNgmyEmojiFontFamily = 'Noto Color Emoji';
 
-/// Emoji [TextStyle]: prefer bundled Noto Color Emoji so glyphs stay available offline.
+/// Emoji [TextStyle]: bundled Noto Color Emoji on web; system emoji on mobile/desktop.
 TextStyle ngmyEmojiTextStyle({
   required double fontSize,
   Color? color,
@@ -15,8 +16,24 @@ TextStyle ngmyEmojiTextStyle({
     height: height ?? 1.0,
     color: color,
     fontWeight: fontWeight,
-    fontFamily: kNgmyEmojiFontFamily,
-    fontFamilyFallback: const [kNgmyEmojiFontFamily],
+    fontFamily: kIsWeb ? kNgmyEmojiFontFamily : null,
+    fontFamilyFallback: kIsWeb ? const [kNgmyEmojiFontFamily] : null,
+  );
+}
+
+/// Same emoji characters as before — system look on device, bundled Noto on web offline.
+TextStyle ngmyCashierAvatarTextStyle({
+  required double fontSize,
+  Color? color,
+}) {
+  return TextStyle(
+    fontSize: fontSize,
+    height: 1.0,
+    color: color,
+    // Keep native emoji look on iOS/Android. On web, use the bundled emoji
+    // font so male/female icons still paint with no internet.
+    fontFamily: kIsWeb ? kNgmyEmojiFontFamily : null,
+    fontFamilyFallback: kIsWeb ? const [kNgmyEmojiFontFamily] : null,
   );
 }
 
@@ -29,17 +46,10 @@ List<String> ngmyTwemojiAssetCandidates(String emoji) {
   final full = runes.map((r) => r.toRadixString(16)).join('-');
   final noVs =
       runes.where((r) => r != 0xFE0F).map((r) => r.toRadixString(16)).join('-');
-  // Some Twemoji ZWJ files keep FE0F only on the gender sign (e.g. beard+male).
-  final withTrailingVs = noVs.isEmpty ? '' : '$noVs-fe0f';
 
   final out = <String>{};
   if (full.isNotEmpty) out.add('assets/twemoji/$full.png');
   if (noVs.isNotEmpty && noVs != full) out.add('assets/twemoji/$noVs.png');
-  if (withTrailingVs.isNotEmpty &&
-      withTrailingVs != full &&
-      withTrailingVs != noVs) {
-    out.add('assets/twemoji/$withTrailingVs.png');
-  }
   return out.toList();
 }
 
@@ -62,15 +72,15 @@ class NgmyOfflineEmoji extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Prefer bundled Twemoji PNGs on every platform so emoji stay visible offline
-    // (web PWAs especially lose color emoji when network fonts are unavailable).
-    final candidates = ngmyTwemojiAssetCandidates(emoji);
-    if (candidates.isNotEmpty) {
-      return _NgmyTwemojiImage(
-        candidates: candidates,
-        size: fontSize,
-        fallback: _textEmoji(),
-      );
+    if (kIsWeb) {
+      final candidates = ngmyTwemojiAssetCandidates(emoji);
+      if (candidates.isNotEmpty) {
+        return _NgmyTwemojiImage(
+          candidates: candidates,
+          size: fontSize,
+          fallback: _textEmoji(),
+        );
+      }
     }
     return _textEmoji();
   }
@@ -80,6 +90,28 @@ class NgmyOfflineEmoji extends StatelessWidget {
       emoji,
       textAlign: textAlign,
       style: ngmyEmojiTextStyle(fontSize: fontSize, color: color, height: height),
+    );
+  }
+}
+
+/// Cashier male/female icons — keeps the original emoji look (not Twemoji art).
+class NgmyCashierAvatarEmoji extends StatelessWidget {
+  const NgmyCashierAvatarEmoji(
+    this.emoji, {
+    super.key,
+    this.fontSize = 22,
+    this.color,
+  });
+
+  final String emoji;
+  final double fontSize;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      emoji,
+      style: ngmyCashierAvatarTextStyle(fontSize: fontSize, color: color),
     );
   }
 }

@@ -127,7 +127,7 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                           ),
                         ),
                         alignment: Alignment.center,
-                        child: NgmyOfflineEmoji(
+                        child: NgmyCashierAvatarEmoji(
                           iou.displayAvatar,
                           fontSize: 30,
                         ),

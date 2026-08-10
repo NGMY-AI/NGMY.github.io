@@ -247,7 +247,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: NgmyOfflineEmoji(emoji, fontSize: 26),
+                          child: NgmyCashierAvatarEmoji(emoji, fontSize: 26),
                         ),
                       );
                     },
@@ -356,7 +356,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                                         ),
                                       ),
                                       alignment: Alignment.center,
-                                      child: NgmyOfflineEmoji(
+                                      child: NgmyCashierAvatarEmoji(
                                         gender == null
                                             ? '👤'
                                             : ngmyCashierResolveAvatar(
@@ -813,7 +813,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              NgmyOfflineEmoji(emoji, fontSize: 18),
+              NgmyCashierAvatarEmoji(emoji, fontSize: 18),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -1434,7 +1434,10 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                   alignment: Alignment.center,
                   child: Opacity(
                     opacity: iou.isPaid ? 0.55 : 1,
-                    child: NgmyOfflineEmoji(iou.displayAvatar, fontSize: 24),
+                    child: NgmyCashierAvatarEmoji(
+                      iou.displayAvatar,
+                      fontSize: 24,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
