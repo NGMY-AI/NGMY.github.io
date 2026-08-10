@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_cashier_tab.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_family_tree.dart';
 import 'ngmy_nav.dart';
@@ -617,7 +618,10 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
                       const SizedBox(height: 14),
                       _projectsBody(p),
                     ] else if (_tab == _WorksheetTab.cashier)
-                      _cashierTab(p)
+                      NgmyCashierTab(
+                        userEmail: widget.userEmail,
+                        palette: p,
+                      )
                     else
                       NgmyFamilyTreeTab(
                         key: ValueKey(_familyTreeVersion),
@@ -801,7 +805,7 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
         child: Row(
           children: [
             _tabChip(p: p, tab: _WorksheetTab.projects, icon: Icons.folder_outlined, label: 'Projects'),
-            _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.calculate_outlined, label: 'Cashier'),
+            _tabChip(p: p, tab: _WorksheetTab.cashier, icon: Icons.payments_outlined, label: 'Cashier'),
             _tabChip(p: p, tab: _WorksheetTab.familyTree, icon: Icons.account_tree_outlined, label: 'Family Tree'),
           ],
         ),
@@ -1075,31 +1079,4 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     );
   }
 
-  Widget _cashierTab(WorksheetPalette p) {
-    return WorksheetGlowFrame(
-      style: WorksheetFrameStyle.cashier,
-      glowStrength: 0.95,
-      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: p.cardBg,
-          borderRadius: BorderRadius.circular(15),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.calculate_outlined, size: 56, color: p.secondaryText.withValues(alpha: 0.45)),
-            const SizedBox(height: 16),
-            Text('Cashier', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.primaryText)),
-            const SizedBox(height: 8),
-            Text(
-              'Track daily spending and receipts here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: p.secondaryText, height: 1.4),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

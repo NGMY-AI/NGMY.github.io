@@ -9,6 +9,7 @@ import 'ngmy_platform_graphics.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_bio_effects.dart';
+import 'ngmy_bio_link_icons.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_ring_frames.dart';
 import 'ngmy_bio_social.dart';
@@ -1306,6 +1307,9 @@ class NgmyBioPreview extends StatelessWidget {
     final thumbSize = compactPad ? 36.0 : 42.0;
     final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
 
+    final linkIcon = link.hasGalleryImage
+        ? null
+        : ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
     Widget thumb = ClipOval(
       child: link.imageBase64.isNotEmpty
           ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
@@ -1313,7 +1317,11 @@ class NgmyBioPreview extends StatelessWidget {
               width: thumbSize,
               height: thumbSize,
               color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
-              child: Icon(Icons.link_rounded, color: tpl.subtitleColor, size: compactPad ? 20 : 22),
+              child: Icon(
+                linkIcon ?? Icons.link_rounded,
+                color: tpl.subtitleColor,
+                size: compactPad ? 20 : 22,
+              ),
             ),
     );
 

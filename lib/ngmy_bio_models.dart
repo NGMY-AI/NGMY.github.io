@@ -21,6 +21,7 @@ class NgmyBioLink {
     this.title = '',
     this.url = '',
     this.imageBase64 = '',
+    this.iconCodePoint = 0,
     this.enabled = true,
   });
 
@@ -28,13 +29,20 @@ class NgmyBioLink {
   String title;
   String url;
   String imageBase64;
+
+  /// Material Icons code point. `0` means no icon. Gallery photo wins over icon.
+  int iconCodePoint;
   bool enabled;
+
+  bool get hasGalleryImage => imageBase64.trim().isNotEmpty;
+  bool get hasIcon => iconCodePoint != 0;
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'url': url,
     'imageBase64': imageBase64,
+    'iconCodePoint': iconCodePoint,
     'enabled': enabled,
   };
 
@@ -43,6 +51,11 @@ class NgmyBioLink {
     title: (json['title'] ?? '').toString(),
     url: (json['url'] ?? '').toString(),
     imageBase64: (json['imageBase64'] ?? '').toString(),
+    iconCodePoint: () {
+      final raw = json['iconCodePoint'];
+      if (raw is int) return raw;
+      return int.tryParse(raw?.toString() ?? '') ?? 0;
+    }(),
     enabled: json['enabled'] != false,
   );
 

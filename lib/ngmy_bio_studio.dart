@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_bio_image_crop.dart';
+import 'ngmy_bio_link_icons.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_publish_registry.dart';
 import 'ngmy_bio_renderer.dart';
@@ -437,6 +438,211 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     if (_doc.backgroundImageBase64.isEmpty) return;
     await _recordBioPhotoBaselineIfNeeded();
     if (mounted) setState(() => _doc.backgroundImageBase64 = '');
+  }
+
+  int _linkGalleryPhotoCount({String? excludingLinkId}) {
+    var n = 0;
+    for (final link in _doc.links) {
+      if (excludingLinkId != null && link.id == excludingLinkId) continue;
+      if (link.hasGalleryImage) n++;
+    }
+    return n;
+  }
+
+  Future<void> _pickLinkGalleryImage(NgmyBioLink link) async {
+    final replacing = link.hasGalleryImage;
+    if (!replacing &&
+        _linkGalleryPhotoCount(excludingLinkId: link.id) >=
+            kNgmyBioMaxLinkGalleryPhotos) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Only 2 gallery photos allowed on link cards. Use an icon for other links.',
+          ),
+        ),
+      );
+      return;
+    }
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 400,
+        imageQuality: 88,
+      );
+      if (file == null || !mounted) return;
+      final encoded =
+          'data:image/jpeg;base64,${base64Encode(await file.readAsBytes())}';
+      if (!mounted) return;
+      final allowed = await _ensureBioPhotoChangeAllowed(
+        isReplacement: replacing,
+      );
+      if (!allowed || !mounted) return;
+      setState(() {
+        link.imageBase64 = encoded;
+        link.iconCodePoint = 0;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not pick image: $e')));
+      }
+    }
+  }
+
+  Future<void> _clearLinkGalleryImage(NgmyBioLink link) async {
+    if (!link.hasGalleryImage) return;
+    await _recordBioPhotoBaselineIfNeeded();
+    if (mounted) setState(() => link.imageBase64 = '');
+  }
+
+  Future<void> _openLinkIconPicker(NgmyBioLink link) async {
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: t.scaffold,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
+                border: Border.all(color: t.border),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: t.muted.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Choose a link icon',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 17,
+                            ),
+                          ),
+                        ),
+                        if (link.hasIcon)
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, 0),
+                            child: const Text('Clear'),
+                          ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text(
+                      'Icons are free. Gallery photos are limited to '
+                      '$kNgmyBioMaxLinkGalleryPhotos per Bio.',
+                      style: TextStyle(color: t.muted, fontSize: 12.5),
+                    ),
+                  ),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 0.88,
+                      ),
+                      itemCount: kNgmyBioLinkIcons.length,
+                      itemBuilder: (_, i) {
+                        final choice = kNgmyBioLinkIcons[i];
+                        final selected =
+                            link.iconCodePoint == choice.codePoint &&
+                                !link.hasGalleryImage;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.pop(ctx, choice.codePoint),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: selected
+                                  ? _kBioAccent.withValues(alpha: 0.16)
+                                  : t.fieldFill,
+                              border: Border.all(
+                                color: selected
+                                    ? _kBioAccent
+                                    : t.border,
+                                width: selected ? 1.6 : 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  choice.icon,
+                                  color: selected ? _kBioAccent : t.title,
+                                  size: 26,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  choice.label,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: t.muted,
+                                    height: 1.15,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    if (picked == 0) {
+      setState(() => link.iconCodePoint = 0);
+      return;
+    }
+    if (link.hasGalleryImage) {
+      await _recordBioPhotoBaselineIfNeeded();
+    }
+    if (!mounted) return;
+    setState(() {
+      link.iconCodePoint = picked;
+      link.imageBase64 = '';
+    });
   }
 
   @override
@@ -1181,8 +1387,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   Widget _linkEditor(NgmyHubTheme t, int index, NgmyBioLink link) {
-    final hasImage = link.imageBase64.isNotEmpty;
+    final hasImage = link.hasGalleryImage;
+    final iconData = ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
     final hasUrl = link.url.trim().isNotEmpty;
+    final galleryUsed = _linkGalleryPhotoCount();
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -1242,15 +1450,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
             ),
           ),
           Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+            child: Text(
+              'Gallery photos on links: $galleryUsed / $kNgmyBioMaxLinkGalleryPhotos  ·  Icons are free',
+              style: TextStyle(
+                color: t.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: () => _pickImage(
-                    (b) => setState(() => link.imageBase64 = b),
-                    maxSize: 400,
-                  ),
+                  onTap: () => _pickLinkGalleryImage(link),
+                  onLongPress: hasImage
+                      ? () => _clearLinkGalleryImage(link)
+                      : null,
                   child: Stack(
                     children: [
                       Container(
@@ -1275,25 +1494,33 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                                 base64Decode(link.imageBase64.split(',').last),
                                 fit: BoxFit.cover,
                               )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_photo_alternate_outlined,
-                                    color: _kBioAccent.withValues(alpha: 0.85),
-                                    size: 24,
+                            : iconData != null
+                                ? Icon(
+                                    iconData,
+                                    color: _kBioAccent,
+                                    size: 32,
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.add_photo_alternate_outlined,
+                                        color: _kBioAccent.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                        size: 24,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Photo',
+                                        style: TextStyle(
+                                          color: t.muted,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Photo',
-                                    style: TextStyle(
-                                      color: t.muted,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
                       ),
                       Positioned(
                         right: 4,
@@ -1313,6 +1540,51 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                       ),
                     ],
                   ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  children: [
+                    Tooltip(
+                      message: 'Choose icon',
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _openLinkIconPicker(link),
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 44,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: _kBioAccent.withValues(alpha: 0.12),
+                              border: Border.all(
+                                color: _kBioAccent.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.apps_rounded,
+                                  color: _kBioAccent,
+                                  size: 22,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Icon',
+                                  style: TextStyle(
+                                    color: _kBioAccent.withValues(alpha: 0.95),
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(width: 12),
                 Expanded(
