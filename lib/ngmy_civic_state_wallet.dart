@@ -112,6 +112,7 @@ class NgmyCivicWalletTxn {
     required this.amount,
     required this.at,
     required this.isInflow,
+    this.pendingDeleteAt,
   });
 
   final String id;
@@ -119,6 +120,10 @@ class NgmyCivicWalletTxn {
   final double amount;
   final DateTime at;
   final bool isInflow;
+  /// When set, this spending is scheduled for full removal after this time.
+  final DateTime? pendingDeleteAt;
+
+  bool get isPendingDelete => pendingDeleteAt != null;
 }
 
 class NgmyCivicWalletCategory {
@@ -140,6 +145,7 @@ class NgmyCivicWalletSpendingRow {
     required this.amount,
     required this.recordedAt,
     this.campaignId = '',
+    this.pendingDeleteAt,
   });
 
   final String id;
@@ -147,6 +153,7 @@ class NgmyCivicWalletSpendingRow {
   final double amount;
   final DateTime recordedAt;
   final String campaignId;
+  final DateTime? pendingDeleteAt;
 }
 
 class NgmyCivicWalletSnapshot {
@@ -236,6 +243,7 @@ Future<void> openNgmyCivicStateWalletFlow({
     required String description,
   }) onUpdateSpending,
   required Future<void> Function(String spendingId) onDeleteSpending,
+  Future<void> Function()? onPurgeExpired,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -260,6 +268,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       onAddSpending: onAddSpending,
       onUpdateSpending: onUpdateSpending,
       onDeleteSpending: onDeleteSpending,
+      onPurgeExpired: onPurgeExpired,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );
@@ -647,9 +656,14 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   double spent = 0;
   final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
+  final now = DateTime.now();
   for (final row in spendingRows) {
     final rowState = (row['state'] ?? '').toString().trim().toLowerCase();
     if (st.isNotEmpty && rowState.isNotEmpty && rowState != st) continue;
+    final pendingRaw = (row['pendingDeleteAt'] ?? '').toString().trim();
+    final pendingAt = pendingRaw.isEmpty ? null : DateTime.tryParse(pendingRaw)?.toLocal();
+    // Already past the 24h window — omit from wallet UI.
+    if (pendingAt != null && !pendingAt.isAfter(now)) continue;
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
     final desc = (row['description'] ?? 'Spending').toString().trim();
     spent += amount;
@@ -662,6 +676,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
         amount: amount,
         recordedAt: at,
         campaignId: (row['campaignId'] ?? '').toString(),
+        pendingDeleteAt: pendingAt,
       ),
     );
     recent.add(
@@ -671,6 +686,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
         amount: amount,
         at: at,
         isInflow: false,
+        pendingDeleteAt: pendingAt,
       ),
     );
   }

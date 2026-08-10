@@ -39,6 +39,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required this.onAddSpending,
     required this.onUpdateSpending,
     required this.onDeleteSpending,
+    this.onPurgeExpired,
   });
 
   final String state;
@@ -54,6 +55,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required String description,
   }) onUpdateSpending;
   final Future<void> Function(String spendingId) onDeleteSpending;
+  final Future<void> Function()? onPurgeExpired;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -70,19 +72,59 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   String? _editTapTxnId;
   int _editTapCount = 0;
   Timer? _editTapReset;
+  Timer? _countdownTick;
 
   @override
   void initState() {
     super.initState();
     _snap = widget.snapshotBuilder();
     _searchC.addListener(() => setState(() {}));
+    _ensureCountdownTicker();
   }
 
   @override
   void dispose() {
     _editTapReset?.cancel();
+    _countdownTick?.cancel();
     _searchC.dispose();
     super.dispose();
+  }
+
+  void _ensureCountdownTicker() {
+    final needsTick = _snap.recent.any((t) => t.pendingDeleteAt != null);
+    if (!needsTick) {
+      _countdownTick?.cancel();
+      _countdownTick = null;
+      return;
+    }
+    _countdownTick ??= Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (!mounted) return;
+      final now = DateTime.now();
+      final expired = _snap.recent.any(
+        (t) => t.pendingDeleteAt != null && !t.pendingDeleteAt!.isAfter(now),
+      );
+      if (expired) {
+        final purge = widget.onPurgeExpired;
+        if (purge != null) await purge();
+        if (!mounted) return;
+        _reload();
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  String _formatDeleteCountdown(DateTime? pendingAt) {
+    if (pendingAt == null) return '';
+    var left = pendingAt.difference(DateTime.now());
+    if (left.isNegative) left = Duration.zero;
+    final h = left.inHours;
+    final m = left.inMinutes.remainder(60);
+    final s = left.inSeconds.remainder(60);
+    final hh = h.toString().padLeft(2, '0');
+    final mm = m.toString().padLeft(2, '0');
+    final ss = s.toString().padLeft(2, '0');
+    return '$hh:$mm:$ss';
   }
 
   void _onTransactionTap(NgmyCivicWalletTxn txn) {
@@ -115,7 +157,10 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     });
   }
 
-  void _reload() => setState(() => _snap = widget.snapshotBuilder());
+  void _reload() {
+    setState(() => _snap = widget.snapshotBuilder());
+    _ensureCountdownTicker();
+  }
 
   String _money(double v) {
     final neg = v < 0;
@@ -203,6 +248,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     final noteC = TextEditingController(text: existing?.description ?? '');
     final action = await showDialog<String>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -323,6 +369,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     if (action == 'delete' && existing != null && mounted) {
       final schedule = await showDialog<bool>(
         context: context,
+        barrierDismissible: false,
         builder: (ctx) {
           return Dialog(
             backgroundColor: Colors.transparent,
@@ -342,7 +389,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   Text('Delete spending?', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
                   const SizedBox(height: 8),
                   Text(
-                    'This spending will stay visible for 24 hours, then be completely deleted.',
+                    'This spending will stay visible for 24 hours with a live countdown, then be completely deleted.',
                     style: TextStyle(color: tone.secondaryText, fontSize: 13, height: 1.35),
                   ),
                   const SizedBox(height: 18),
@@ -405,6 +452,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     // Second step — confirm amount / purpose before it is recorded.
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) {
         return Dialog(
           backgroundColor: Colors.transparent,
@@ -786,10 +834,19 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                       Container(
                                         width: 40,
                                         height: 40,
-                                        decoration: BoxDecoration(color: tone.iconWell, borderRadius: BorderRadius.circular(12)),
+                                        decoration: BoxDecoration(
+                                          color: t.isPendingDelete
+                                              ? const Color(0xFFDC2626).withValues(alpha: tone.isDark ? 0.22 : 0.12)
+                                              : tone.iconWell,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
                                         child: Icon(
-                                          t.isInflow ? Icons.south_west_rounded : Icons.north_east_rounded,
-                                          color: t.isInflow ? const Color(0xFF059669) : const Color(0xFFEA580C),
+                                          t.isPendingDelete
+                                              ? Icons.timer_outlined
+                                              : (t.isInflow ? Icons.south_west_rounded : Icons.north_east_rounded),
+                                          color: t.isPendingDelete
+                                              ? const Color(0xFFDC2626)
+                                              : (t.isInflow ? const Color(0xFF059669) : const Color(0xFFEA580C)),
                                           size: 20,
                                         ),
                                       ),
@@ -803,10 +860,21 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                               style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tone.primaryText),
                                               overflow: TextOverflow.ellipsis,
                                             ),
-                                            Text(
-                                              t.isInflow ? 'Contribution' : 'Spending',
-                                              style: TextStyle(color: tone.secondaryText, fontSize: 12),
-                                            ),
+                                            if (t.isPendingDelete)
+                                              Text(
+                                                'Deleting in ${_formatDeleteCountdown(t.pendingDeleteAt)}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFFDC2626),
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w800,
+                                                  fontFeatures: [FontFeature.tabularFigures()],
+                                                ),
+                                              )
+                                            else
+                                              Text(
+                                                t.isInflow ? 'Contribution' : 'Spending',
+                                                style: TextStyle(color: tone.secondaryText, fontSize: 12),
+                                              ),
                                           ],
                                         ),
                                       ),

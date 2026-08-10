@@ -31883,6 +31883,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         widget.onDataChanged();
         await ngmyPersistCivicHelpModeSettings(widget.config);
       },
+      onPurgeExpired: _purgeExpiredWalletSpendings,
     );
   }
 
