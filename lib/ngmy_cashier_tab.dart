@@ -882,97 +882,150 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: p.isDark
+                  ? const [Color(0xFF12352E), Color(0xFF152033)]
+                  : const [Color(0xFFECFDF5), Color(0xFFF0FDFA), Colors.white],
+            ),
+            border: Border.all(
+              color: p.isDark
+                  ? _accent.withValues(alpha: 0.35)
+                  : _accent.withValues(alpha: 0.18),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    'Cashier',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: p.primaryText,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: p.isDark ? 0.28 : 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: _accent,
+                      size: 20,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    open.isEmpty
-                        ? 'Nobody owes you'
-                        : '${open.length} open · ${ngmyFormatMoney(openTotal)}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: p.secondaryText,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Cashier',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: p.primaryText,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  Material(
+                    color: _accent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      onTap: () => _addOrEdit(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.add_rounded,
+                                color: Colors.white, size: 18),
+                            SizedBox(width: 3),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            Material(
-              color: _accent,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () => _addOrEdit(),
-                borderRadius: BorderRadius.circular(10),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 4),
-                      Text(
-                        'Add',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _statChip(
+                      label: 'Open',
+                      value: '${open.length}',
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _statChip(
+                      label: 'Owed',
+                      value: open.isEmpty
+                          ? '\$0.00'
+                          : ngmyFormatMoney(openTotal),
+                      emphasize: open.isNotEmpty,
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         if (_items.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 18),
             decoration: BoxDecoration(
               color: p.cardBg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: p.secondaryText.withValues(alpha: 0.14),
+                color: p.secondaryText.withValues(alpha: 0.12),
               ),
             ),
             child: Column(
               children: [
-                Icon(
-                  Icons.payments_outlined,
-                  size: 28,
-                  color: p.secondaryText.withValues(alpha: 0.55),
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: _accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.person_add_alt_1_rounded,
+                    color: _accent,
+                    size: 26,
+                  ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 Text(
-                  'Add someone who owes you',
+                  'Nobody owes you yet',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                     color: p.primaryText,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Name, amount, and pay-by date — saved on this device.',
+                  'Add a name, amount, and pay-by date.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     color: p.secondaryText,
                     height: 1.35,
                   ),
@@ -981,73 +1034,80 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
             ),
           )
         else ...[
-          Container(
-            decoration: BoxDecoration(
-              color: p.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: p.secondaryText.withValues(alpha: 0.14),
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (var i = 0; i < open.length; i++) ...[
-                  _row(open[i]),
-                  if (i < open.length - 1)
-                    Divider(
-                      height: 1,
-                      indent: 14,
-                      endIndent: 14,
-                      color: p.secondaryText.withValues(alpha: 0.1),
-                    ),
-                ],
-              ],
-            ),
-          ),
+          ...open.map(_personCard),
           if (paid.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            Text(
-              'Paid',
-              style: TextStyle(
-                color: p.secondaryText,
-                fontWeight: FontWeight.w700,
-                fontSize: 11,
-                letterSpacing: 0.4,
-              ),
-            ),
             const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: p.cardBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: p.secondaryText.withValues(alpha: 0.12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 4, 2, 8),
+              child: Text(
+                'Paid',
+                style: TextStyle(
+                  color: p.secondaryText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
                 ),
               ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                children: [
-                  for (var i = 0; i < paid.length; i++) ...[
-                    _row(paid[i]),
-                    if (i < paid.length - 1)
-                      Divider(
-                        height: 1,
-                        indent: 14,
-                        endIndent: 14,
-                        color: p.secondaryText.withValues(alpha: 0.1),
-                      ),
-                  ],
-                ],
-              ),
             ),
+            ...paid.map(_personCard),
           ],
         ],
       ],
     );
   }
 
-  Widget _row(NgmyCashierIou iou) {
+  Widget _statChip({
+    required String label,
+    required String value,
+    bool emphasize = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.isDark
+            ? Colors.black.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: p.secondaryText.withValues(alpha: 0.12),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: p.secondaryText,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: emphasize ? _accent : p.primaryText,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty);
+    if (parts.isEmpty) return '?';
+    final list = parts.toList();
+    if (list.length == 1) return list.first.substring(0, 1).toUpperCase();
+    return ('${list.first[0]}${list.last[0]}').toUpperCase();
+  }
+
+  Widget _personCard(NgmyCashierIou iou) {
     final missed = iou.missedDays();
     final tomorrow = iou.isDueTomorrow();
     final statusColor = iou.isPaid
@@ -1061,7 +1121,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     String meta;
     if (iou.isPaid) {
       meta = iou.paidOnTime
-          ? 'Paid on time ${_fmtDate(iou.paidAt!)}'
+          ? 'Paid on time · ${_fmtDate(iou.paidAt!)}'
           : 'Paid ${_fmtDate(iou.paidAt!)} · $missed missed';
     } else if (tomorrow) {
       meta = 'Pays tomorrow';
@@ -1071,90 +1131,132 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
       meta = 'Due ${_fmtDate(iou.dueDate)}';
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _openActions(iou),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-          child: Row(
-            children: [
-              Container(
-                width: 3,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: iou.isPaid
-                      ? (iou.paidOnTime
-                          ? _accent.withValues(alpha: 0.55)
-                          : const Color(0xFFDC2626))
-                      : iou.isOverdue
-                          ? const Color(0xFFDC2626)
-                          : tomorrow
-                              ? _accent
-                              : _accent.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(2),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: p.cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: iou.isOverdue && !iou.isPaid
+              ? const Color(0xFFDC2626).withValues(alpha: 0.35)
+              : p.secondaryText.withValues(alpha: 0.12),
+        ),
+        boxShadow: p.isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            iou.personName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              color: p.primaryText.withValues(
-                                alpha: iou.isPaid ? 0.55 : 1,
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () => _openActions(iou),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: iou.isPaid
+                          ? [
+                              p.secondaryText.withValues(alpha: 0.18),
+                              p.secondaryText.withValues(alpha: 0.08),
+                            ]
+                          : [
+                              _accent.withValues(alpha: 0.85),
+                              const Color(0xFF0D9488),
+                            ],
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _initials(iou.personName),
+                    style: TextStyle(
+                      color: iou.isPaid ? p.primaryText : Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              iou.personName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14.5,
+                                color: p.primaryText.withValues(
+                                  alpha: iou.isPaid ? 0.6 : 1,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        if (iou.hasAttachments) ...[
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.attach_file_rounded,
-                            size: 14,
-                            color: p.secondaryText.withValues(alpha: 0.7),
-                          ),
+                          if (iou.hasAttachments) ...[
+                            const SizedBox(width: 5),
+                            Icon(
+                              Icons.verified_user_outlined,
+                              size: 14,
+                              color: _accent.withValues(alpha: 0.8),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      ngmyFormatMoney(iou.amount),
+                      style: TextStyle(
+                        color: p.primaryText
+                            .withValues(alpha: iou.isPaid ? 0.55 : 1),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      meta,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: p.secondaryText.withValues(alpha: 0.5),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                ngmyFormatMoney(iou.amount),
-                style: TextStyle(
-                  color: p.primaryText.withValues(alpha: iou.isPaid ? 0.55 : 1),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13.5,
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: p.secondaryText.withValues(alpha: 0.55),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

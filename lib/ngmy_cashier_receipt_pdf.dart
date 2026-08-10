@@ -130,45 +130,102 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
       pageFormat: PdfPageFormat.letter,
       margin: const pw.EdgeInsets.all(40),
       build: (ctx) => [
-        pw.Text(
-          'NGMY CASHIER',
-          style: pw.TextStyle(
-            fontSize: 10,
-            fontWeight: pw.FontWeight.bold,
-            letterSpacing: 1.4,
-            color: PdfColors.green800,
+        pw.Center(
+          child: pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.green50,
+              borderRadius: pw.BorderRadius.circular(999),
+            ),
+            child: pw.Text(
+              'Cashier',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.green800,
+              ),
+            ),
           ),
         ),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'Payment / Debt Receipt',
-          style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+        pw.SizedBox(height: 8),
+        pw.Center(
+          child: pw.Text(
+            'Debt receipt',
+            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
+          ),
         ),
         pw.SizedBox(height: 3),
-        pw.Text(
-          'Issued ${ngmyCashierFmtDate(DateTime.now(), withTime: true)}',
-          style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey600),
+        pw.Center(
+          child: pw.Text(
+            ngmyCashierFmtDate(DateTime.now(), withTime: true),
+            style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey600),
+          ),
         ),
         pw.SizedBox(height: 16),
         pw.Container(
           width: double.infinity,
           padding: const pw.EdgeInsets.all(14),
           decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColors.grey400, width: 0.9),
-            borderRadius: pw.BorderRadius.circular(6),
+            color: PdfColors.grey100,
+            borderRadius: pw.BorderRadius.circular(12),
+          ),
+          child: pw.Column(
+            children: [
+              pw.Text(
+                iou.personName.trim().isEmpty ? '—' : iou.personName.trim(),
+                style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                'Person who owes',
+                style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey600),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.symmetric(vertical: 10),
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.white,
+                  borderRadius: pw.BorderRadius.circular(10),
+                ),
+                child: pw.Column(
+                  children: [
+                    pw.Text(
+                      'Amount owed',
+                      style: const pw.TextStyle(
+                        fontSize: 9.5,
+                        color: PdfColors.grey600,
+                      ),
+                    ),
+                    pw.SizedBox(height: 2),
+                    pw.Text(
+                      ngmyFormatMoney(iou.amount),
+                      style: pw.TextStyle(
+                        fontSize: 20,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.green800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey300, width: 0.9),
+            borderRadius: pw.BorderRadius.circular(12),
           ),
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              kv(
-                'Person who owes',
-                iou.personName.trim().isEmpty ? '—' : iou.personName.trim(),
-                bold: true,
-              ),
-              kv('Amount', ngmyFormatMoney(iou.amount), bold: true),
               kv('Original due', ngmyCashierFmtDate(iou.originalDueDate)),
               kv('Current due', ngmyCashierFmtDate(iou.dueDate)),
-              pw.SizedBox(height: 8),
+              pw.SizedBox(height: 6),
               pw.Container(
                 width: double.infinity,
                 padding: const pw.EdgeInsets.symmetric(
@@ -177,7 +234,7 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
                 ),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: statusColor, width: 1.1),
-                  borderRadius: pw.BorderRadius.circular(4),
+                  borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Center(
                   child: pw.Text(
@@ -233,7 +290,7 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
                               color: PdfColors.red700,
                               width: 0.7,
                             ),
-                            borderRadius: pw.BorderRadius.circular(3),
+                            borderRadius: pw.BorderRadius.circular(999),
                           ),
                           child: pw.Text(
                             ngmyCashierFmtDate(d),

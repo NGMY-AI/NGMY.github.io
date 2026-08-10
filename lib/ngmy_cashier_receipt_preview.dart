@@ -28,59 +28,73 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
     final statusColor = iou.isPaid
         ? (paidOnTime ? _kGreen : _kRed)
         : (iou.isOverdue ? _kRed : const Color(0xFFD97706));
+    final name =
+        iou.personName.trim().isEmpty ? '—' : iou.personName.trim();
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE8EEF5)),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
             decoration: const BoxDecoration(
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFE2E8F0)),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFECFDF5), Color(0xFFF0FDFA), Colors.white],
               ),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'NGMY CASHIER',
-                  style: TextStyle(
-                    color: _kGreen,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 11,
-                    letterSpacing: 1.4,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _kGreen.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.payments_rounded, size: 14, color: _kGreen),
+                      SizedBox(width: 6),
+                      Text(
+                        'Cashier',
+                        style: TextStyle(
+                          color: _kGreen,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 10),
                 const Text(
-                  'Payment / Debt Receipt',
+                  'Debt receipt',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _kInk,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                    height: 1.15,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    height: 1.1,
+                    letterSpacing: -0.3,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Issued ${ngmyCashierFmtDate(DateTime.now(), withTime: true)}',
+                  ngmyCashierFmtDate(DateTime.now(), withTime: true),
                   style: const TextStyle(
                     color: _kMuted,
-                    fontSize: 11,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -88,91 +102,220 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _kv('Person who owes', iou.personName.trim().isEmpty
-                    ? '—'
-                    : iou.personName.trim()),
-                _kv('Amount', ngmyFormatMoney(iou.amount), bold: true),
-                _kv('Original due', ngmyCashierFmtDate(iou.originalDueDate)),
-                _kv('Current due', ngmyCashierFmtDate(iou.dueDate)),
-                const SizedBox(height: 10),
                 Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.35),
-                    ),
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  child: Text(
-                    iou.statusLabel,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 13,
-                      letterSpacing: 0.6,
-                    ),
+                  child: Column(
+                    children: [
+                      Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: _kInk,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Person who owes',
+                        style: TextStyle(
+                          color: _kMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Amount owed',
+                              style: TextStyle(
+                                color: _kMuted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              ngmyFormatMoney(iou.amount),
+                              style: const TextStyle(
+                                color: _kGreen,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 26,
+                                height: 1.1,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _paidBlock(),
-                const SizedBox(height: 12),
-                _missedBlock(missed, paidOnTime),
-                if (iou.notes.trim().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _kv('Notes', iou.notes.trim()),
-                ],
-                if (iou.hasSignature) ...[
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Debtor signature',
-                    style: TextStyle(
-                      color: _kMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
-                  const SizedBox(height: 6),
+                  child: Column(
+                    children: [
+                      _dateRow('Original due', ngmyCashierFmtDate(iou.originalDueDate)),
+                      const SizedBox(height: 8),
+                      _dateRow('Current due', ngmyCashierFmtDate(iou.dueDate)),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          iou.statusLabel,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12.5,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _paidBlock(),
+                      const SizedBox(height: 8),
+                      _missedBlock(missed, paidOnTime),
+                    ],
+                  ),
+                ),
+                if (iou.notes.trim().isNotEmpty) ...[
+                  const SizedBox(height: 10),
                   Container(
-                    height: 72,
                     width: double.infinity,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
-                    child: CustomPaint(
-                      painter: _CashierSignaturePainter(iou.signaturePoints),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Notes',
+                          style: TextStyle(
+                            color: _kMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          iou.notes.trim(),
+                          style: const TextStyle(
+                            color: _kInk,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
+                if (iou.hasSignature) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Debtor signature',
+                          style: TextStyle(
+                            color: _kMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        SizedBox(
+                          height: 68,
+                          width: double.infinity,
+                          child: CustomPaint(
+                            painter:
+                                _CashierSignaturePainter(iou.signaturePoints),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                const Text(
+                  'NGMY.ORG · Local only',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _kMuted,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-              color: Color(0xFFF8FAFC),
-            ),
-            child: const Text(
-              'NGMY.ORG · Stored locally on your device',
-              style: TextStyle(
-                color: _kMuted,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _dateRow(String label, String value) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: _kMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            color: _kInk,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 
@@ -214,8 +357,8 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
           'Missed days (${missed.length})',
           style: const TextStyle(
             color: _kMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const SizedBox(height: 6),
@@ -229,8 +372,8 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: _kRed.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: _kRed.withValues(alpha: 0.35)),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: _kRed.withValues(alpha: 0.28)),
                   ),
                   child: Text(
                     ngmyCashierFmtDate(d),
@@ -248,71 +391,36 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
     );
   }
 
-  Widget _kv(String label, String value, {bool bold = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: _kMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: _kInk,
-                fontSize: 13,
-                fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _coloredLine({
     required String label,
     required String value,
     required Color color,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: _kMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: _kMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 13,
-                fontWeight: FontWeight.w900,
-              ),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -338,7 +446,8 @@ class _CashierSignaturePainter extends CustomPainter {
     if (!any) return;
     final srcW = (maxX - minX).clamp(1.0, 10000.0);
     final srcH = (maxY - minY).clamp(1.0, 10000.0);
-    final scale = (size.width * 0.85 / srcW).clamp(0.0, size.height * 0.7 / srcH);
+    final scale =
+        (size.width * 0.85 / srcW).clamp(0.0, size.height * 0.7 / srcH);
     final ox = (size.width - srcW * scale) / 2;
     final oy = (size.height - srcH * scale) / 2;
 
@@ -380,123 +489,156 @@ Future<void> showNgmyCashierReceiptViewer(
   final previewKey = GlobalKey();
   await showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withValues(alpha: 0.62),
+    barrierColor: Colors.black.withValues(alpha: 0.55),
     builder: (ctx) {
+      final maxH = MediaQuery.sizeOf(ctx).height * 0.9;
       return Dialog(
-        backgroundColor: const Color(0xFF0F172A),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440, maxHeight: 720),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Receipt',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    IconButton(
+          constraints: BoxConstraints(maxWidth: 380, maxHeight: maxH),
+          child: Material(
+            color: const Color(0xFF111827),
+            borderRadius: BorderRadius.circular(26),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
                       onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: RepaintBoundary(
-                    key: previewKey,
-                    child: NgmyCashierIouReceiptPreview(iou: iou),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final boundary = previewKey.currentContext
-                              ?.findRenderObject() as RenderRepaintBoundary?;
-                          if (boundary == null) return;
-                          final image = await boundary.toImage(pixelRatio: 2.5);
-                          final data = await image.toByteData(
-                            format: ui.ImageByteFormat.png,
-                          );
-                          if (data == null) return;
-                          final bytes = data.buffer.asUint8List();
-                          var name = iou.personName
-                              .trim()
-                              .replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '_');
-                          if (name.length > 32) name = name.substring(0, 32);
-                          final msg = await downloadNgmyQrImage(
-                            bytes,
-                            'ngmy_cashier_receipt_${name.isEmpty ? iou.id : name}.png',
-                          );
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text(msg)),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text(
-                          'Download',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          side: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.28),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white70,
+                        size: 22,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () async {
-                          final ok = await ngmyPrintCashierIouReceipt(iou);
-                          if (ctx.mounted) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  ok
-                                      ? 'Print dialog opened.'
-                                      : 'Could not print receipt.',
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          RepaintBoundary(
+                            key: previewKey,
+                            child: NgmyCashierIouReceiptPreview(iou: iou),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final boundary = previewKey.currentContext
+                                            ?.findRenderObject()
+                                        as RenderRepaintBoundary?;
+                                    if (boundary == null) return;
+                                    final image =
+                                        await boundary.toImage(pixelRatio: 2.5);
+                                    final data = await image.toByteData(
+                                      format: ui.ImageByteFormat.png,
+                                    );
+                                    if (data == null) return;
+                                    final bytes = data.buffer.asUint8List();
+                                    var name = iou.personName
+                                        .trim()
+                                        .replaceAll(
+                                          RegExp(r'[^a-zA-Z0-9_-]+'),
+                                          '_',
+                                        );
+                                    if (name.length > 32) {
+                                      name = name.substring(0, 32);
+                                    }
+                                    final msg = await downloadNgmyQrImage(
+                                      bytes,
+                                      'ngmy_cashier_receipt_${name.isEmpty ? iou.id : name}.png',
+                                    );
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(content: Text(msg)),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.download_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Download',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white,
+                                    side: BorderSide(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.28),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.print_rounded, size: 18),
-                        label: const Text(
-                          'Print',
-                          style: TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _kGreen,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  onPressed: () async {
+                                    final ok =
+                                        await ngmyPrintCashierIouReceipt(iou);
+                                    if (ctx.mounted) {
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            ok
+                                                ? 'Print dialog opened.'
+                                                : 'Could not print receipt.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(
+                                    Icons.print_rounded,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Print',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: _kGreen,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -530,9 +672,9 @@ Future<void> showNgmyCashierAttachmentViewer(
     context: context,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF111827),
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 28),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -561,7 +703,7 @@ Future<void> showNgmyCashierAttachmentViewer(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(14),
                   child: Image.memory(data, fit: BoxFit.contain),
                 ),
               ),
@@ -587,6 +729,9 @@ Future<void> showNgmyCashierAttachmentViewer(
                   style: FilledButton.styleFrom(
                     backgroundColor: _kGreen,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -607,8 +752,8 @@ Future<void> showNgmyCashierSignatureViewer(
     context: context,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: const Color(0xFF111827),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 12, 8, 14),
           child: Column(
@@ -635,12 +780,15 @@ Future<void> showNgmyCashierSignatureViewer(
               const SizedBox(height: 8),
               RepaintBoundary(
                 key: key,
-                child: Container(
-                  height: 160,
-                  width: double.infinity,
-                  color: Colors.white,
-                  child: CustomPaint(
-                    painter: _CashierSignaturePainter(iou.signaturePoints),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    height: 160,
+                    width: double.infinity,
+                    color: Colors.white,
+                    child: CustomPaint(
+                      painter: _CashierSignaturePainter(iou.signaturePoints),
+                    ),
                   ),
                 ),
               ),
@@ -678,6 +826,9 @@ Future<void> showNgmyCashierSignatureViewer(
                   style: FilledButton.styleFrom(
                     backgroundColor: _kGreen,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
