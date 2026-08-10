@@ -148,6 +148,7 @@ import 'ngmy_communicate_sync_download_io.dart'
 import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_contribution_report.dart';
+import 'ngmy_civic_state_wallet.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
@@ -31747,6 +31748,113 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     await showNgmyCivicContributionReportSheet(context, data: data);
   }
 
+  List<AppTransaction> _stateWalletContributionTx() {
+    final viewerState = _selectedState.trim().toLowerCase();
+    return _civicTransactionsForDisplay().where((t) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+      final meta = _decodeContributionMeta(t);
+      final targetState = _contributionReceiptState(t, meta);
+      if (viewerState.isEmpty || targetState.isEmpty) return false;
+      return targetState.toLowerCase() == viewerState;
+    }).toList();
+  }
+
+  NgmyCivicWalletSnapshot _buildCivicStateWalletSnapshot() {
+    final contribRows = _stateWalletContributionTx().map((t) {
+      final meta = _decodeContributionMeta(t);
+      return <String, dynamic>{
+        'id': t.id,
+        'amount': t.amount,
+        'title': (meta['purpose'] ?? 'Contribution').toString(),
+        'at': t.timestamp.toUtc().toIso8601String(),
+      };
+    }).toList();
+    final spendingRows = widget.config.helpCampaignSpendings
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((e) {
+          final st = (e['state'] ?? '').toString().trim().toLowerCase();
+          final want = _selectedState.trim().toLowerCase();
+          if (want.isEmpty) return true;
+          if (st.isEmpty) return true;
+          return st == want;
+        })
+        .toList();
+    return buildNgmyCivicWalletSnapshot(
+      state: _selectedState,
+      contributionRows: contribRows,
+      spendingRows: spendingRows,
+    );
+  }
+
+  Future<void> _openCivicStateWalletFlow() async {
+    await openNgmyCivicStateWalletFlow(
+      context: context,
+      state: _selectedState,
+      globalPin: widget.config.civicRegistryPin,
+      pinsByState: widget.config.civicRegistryPinsByState,
+      members: ngmyCivicMembersForState(widget.config, _selectedState),
+      snapshotBuilder: _buildCivicStateWalletSnapshot,
+      canEdit: _canManageCivicRegistry(),
+      onAddSpending: ({required double amount, required String description}) async {
+        final record = {
+          'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
+          'campaignId': _activeHelpCampaignId().trim().isEmpty
+              ? 'wallet_${_selectedState.trim().toLowerCase()}'
+              : _activeHelpCampaignId().trim(),
+          'amount': amount,
+          'description': description,
+          'recordedAt': DateTime.now().toUtc().toIso8601String(),
+          'recordedByEmail': widget.user.email.toLowerCase().trim(),
+          'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+          'state': _selectedState.trim(),
+        };
+        setState(() {
+          widget.config.helpCampaignSpendings = [
+            ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+            record,
+          ];
+        });
+        widget.onDataChanged();
+        await ngmyPersistCivicHelpModeSettings(widget.config);
+      },
+      onUpdateSpending: ({
+        required String spendingId,
+        required double amount,
+        required String description,
+      }) async {
+        final id = spendingId.trim();
+        if (id.isEmpty) return;
+        setState(() {
+          widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.map((e) {
+            final row = Map<String, dynamic>.from(e);
+            if ((row['id'] ?? '').toString().trim() != id) return row;
+            row['amount'] = amount;
+            row['description'] = description;
+            row['recordedAt'] = DateTime.now().toUtc().toIso8601String();
+            row['recordedByEmail'] = widget.user.email.toLowerCase().trim();
+            row['recordedByName'] = (widget.user.fullName ?? widget.user.username).trim();
+            row['state'] = _selectedState.trim();
+            return row;
+          }).toList();
+        });
+        widget.onDataChanged();
+        await ngmyPersistCivicHelpModeSettings(widget.config);
+      },
+      onDeleteSpending: (spendingId) async {
+        final id = spendingId.trim();
+        if (id.isEmpty) return;
+        setState(() {
+          widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings
+              .where((e) => (e['id'] ?? '').toString().trim() != id)
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        });
+        widget.onDataChanged();
+        await ngmyPersistCivicHelpModeSettings(widget.config);
+      },
+    );
+  }
+
   Future<void> _showCivicRegistryBackupSheet() async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
@@ -31845,7 +31953,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
+                                borderRadius: BorderRadius.zero,
                                 onTap: () {
                                   Navigator.pop(ctx);
                                   unawaited(_openCivicContributionReportSheet());
@@ -31867,6 +31975,43 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
                                           color: isDark ? const Color(0xFF34D399) : const Color(0xFF059669),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 16,
+                              color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                            ),
+                            Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: const BorderRadius.horizontal(right: Radius.circular(999)),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  unawaited(_openCivicStateWalletFlow());
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.account_balance_wallet_rounded,
+                                        size: 14,
+                                        color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Wallet',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                          color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
                                         ),
                                       ),
                                     ],
@@ -34142,14 +34287,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
+                        // Looks the same — opens full-screen state wallet unlock.
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(12),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              unawaited(_openCivicStateWalletFlow());
+                            },
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.shield_outlined, color: Colors.white),
+                            ),
                           ),
-                          child: const Icon(Icons.shield_outlined, color: Colors.white),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
@@ -36556,17 +36712,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
                             Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 9)),
                           if (_canManageCivicRegistry())
-                            IconButton(
-                              visualDensity: VisualDensity.compact,
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-                              tooltip: '',
-                              icon: Icon(
-                                Icons.pin_rounded,
-                                size: 15,
-                                color: (isDark ? Colors.white : Colors.black).withOpacity(0.14),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: NgmyCivicBackupPinButton(
+                                onPressed: _showCivicRegistryBackupSheet,
                               ),
-                              onPressed: _showCivicRegistryBackupSheet,
                             ),
                         ],
                       ),
