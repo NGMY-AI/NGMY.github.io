@@ -52,6 +52,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   int _type = 0;
   bool _busy = false;
   List<NgmySavedQrRecord> _saved = [];
+  List<NgmySavedQrTemplateRecord> _savedTemplates = [];
 
   final _labelC = TextEditingController();
   final _linkC = TextEditingController();
@@ -93,8 +94,64 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
 
   Future<void> _reloadSaved() async {
     final list = await loadNgmySavedQrs(userEmail: widget.userEmail);
+    final templates = await loadNgmySavedQrTemplates();
     if (!mounted) return;
-    setState(() => _saved = list);
+    setState(() {
+      _saved = list;
+      _savedTemplates = templates;
+    });
+  }
+
+  Future<void> _saveCurrentTemplate() async {
+    final payload = _buildPayload();
+    final template = _activeTemplate;
+    final label = _labelC.text.trim();
+    if (template == null || payload.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick a template first, then save it.')),
+      );
+      return;
+    }
+    if (label.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add a label so you know what this template is for.')),
+      );
+      return;
+    }
+    final record = NgmySavedQrTemplateRecord(
+      id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
+      label: label,
+      templateId: template.id,
+      templateName: template.name,
+      typeIndex: _type,
+      typeLabel: _typeLabel(),
+      payload: payload,
+      title: _templateTitleC.text.trim(),
+      body: _templateBodyC.text.trim(),
+      footer: _templateFooterC.text.trim(),
+      savedAt: DateTime.now().toUtc().toIso8601String(),
+    );
+    await addNgmySavedQrTemplate(record);
+    await _reloadSaved();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Template “$label” saved on this device.')),
+    );
+  }
+
+  Future<void> _deleteSavedTemplate(NgmySavedQrTemplateRecord record) async {
+    final ok = await showNgmyDeleteConfirm(
+      context,
+      title: 'Delete saved template?',
+      message: 'Remove “${record.label}” from this device?',
+    );
+    if (ok != true) return;
+    await deleteNgmySavedQrTemplate(record.id);
+    await _reloadSaved();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deleted template “${record.label}”.')),
+    );
   }
 
   void _onFieldsChanged() => setState(() {});
@@ -538,7 +595,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                                   child: ElevatedButton.icon(
                                     onPressed: _busy ? null : _saveCurrent,
                                     icon: const Icon(Icons.bookmark_rounded, size: 18),
-                                    label: const Text('Save'),
+                                    label: const Text('Save QR'),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _accent,
                                       foregroundColor: Colors.white,
@@ -548,6 +605,22 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                                 ),
                               ],
                             ),
+                            if (_activeTemplate != null) ...[
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _busy ? null : _saveCurrentTemplate,
+                                  icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
+                                  label: const Text('Save template'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFA78BFA),
+                                    side: const BorderSide(color: Color(0xFFA78BFA)),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             Text(
                               'Saved locally on this device only · never uploaded',
@@ -647,7 +720,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           Flexible(
             child: Text(
               _type == _savedTabIndex
-                  ? '${_saved.length} saved QR code${_saved.length == 1 ? '' : 's'}'
+                  ? '${_saved.length} QR · ${_savedTemplates.length} template${_savedTemplates.length == 1 ? '' : 's'}'
                   : 'Generate ${_typeLabel()} QR instantly',
               textAlign: TextAlign.center,
               style: const TextStyle(color: _accent, fontWeight: FontWeight.w800, fontSize: 13),
@@ -659,7 +732,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Widget _savedList() {
-    if (_saved.isEmpty) {
+    if (_saved.isEmpty && _savedTemplates.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(color: _panel, borderRadius: BorderRadius.circular(18), border: Border.all(color: _accent.withOpacity(0.2))),
@@ -670,7 +743,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             const Text('No saved QR codes yet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
             const SizedBox(height: 6),
             Text(
-              'Create a QR and tap Save, or save a restore QR\nfrom NGMY Advisors or Family Tree sync.',
+              'Create a QR and tap Save QR, or Save template\nafter picking a design.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12, height: 1.4),
             ),
@@ -679,21 +752,64 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       );
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.78,
-      ),
-      itemCount: _saved.length,
-      itemBuilder: (context, index) => _savedGridTile(_saved[index]),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_saved.isNotEmpty) ...[
+          const Text('Saved QR codes', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 13)),
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 0.78,
+            ),
+            itemCount: _saved.length,
+            itemBuilder: (context, index) => _savedGridTile(_saved[index]),
+          ),
+        ],
+        if (_savedTemplates.isNotEmpty) ...[
+          SizedBox(height: _saved.isEmpty ? 0 : 18),
+          const Text('Saved templates', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 13)),
+          const SizedBox(height: 10),
+          ..._savedTemplates.map(_savedTemplateTile),
+        ],
+      ],
     );
   }
 
-  void _openSavedQrFullscreen(NgmySavedQrRecord record) {
+  Widget _savedTemplateTile(NgmySavedQrTemplateRecord record) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: _panel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFA78BFA).withOpacity(0.35)),
+      ),
+      child: ListTile(
+        onTap: () => _openSavedTemplate(record),
+        leading: const Icon(Icons.dashboard_customize_rounded, color: Color(0xFFA78BFA)),
+        title: Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        subtitle: Text('${record.templateName} · ${record.typeLabel}', style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12)),
+        trailing: IconButton(
+          onPressed: () => _deleteSavedTemplate(record),
+          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSavedTemplate(NgmySavedQrTemplateRecord record) async {
+    final def = ngmyQrTemplateById(record.templateId);
+    if (def == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That template design is no longer available.')),
+      );
+      return;
+    }
     showDialog<void>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.94),
@@ -711,28 +827,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                       icon: const Icon(Icons.close_rounded, color: Colors.white70),
                     ),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w700)),
-                          if (record.isSyncQr && record.usesRemaining != null)
-                            Text(
-                              record.usesRemaining! >= 999
-                                  ? 'Unlimited scans (admin)'
-                                  : '${record.usesRemaining} of 2 scans remaining',
-                              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w600),
-                            ),
-                        ],
-                      ),
+                      child: Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
                     IconButton(
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              await _deleteSaved(record);
-                              if (ctx.mounted) Navigator.pop(ctx);
-                            },
+                      onPressed: () async {
+                        await _deleteSavedTemplate(record);
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
                       icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
                     ),
                   ],
@@ -741,35 +842,14 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
               Expanded(
                 child: Center(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        NgmyBrandedQrWidget(data: record.payload, large: true),
-                        const SizedBox(height: 20),
-                        Text(
-                          record.isSyncQr
-                              ? 'Restore QR — scan on another phone (${record.usesRemaining != null && record.usesRemaining! < 999 ? 'max 2 scans total' : 'admin'})'
-                              : 'Scan with any camera app',
-                          style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _busy ? null : () => _downloadQr(payload: record.payload, label: record.label),
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('Download to gallery'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _accent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.all(16),
+                    child: NgmyQrTemplateCard(
+                      template: def,
+                      title: record.title,
+                      body: record.body,
+                      footer: record.footer,
+                      fieldVars: const {},
+                      qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
                     ),
                   ),
                 ),
@@ -777,6 +857,186 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _openSavedQrFullscreen(NgmySavedQrRecord record) {
+    NgmyQrTemplateDef? activeTemplate;
+    var title = '';
+    var body = '';
+    var footer = '';
+
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.94),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          Future<void> openTemplates() async {
+            final typeIndex = record.typeIndex < 0 ? 0 : record.typeIndex;
+            await showNgmyQrTemplateGallery(
+              context: ctx,
+              categoryIndex: typeIndex,
+              categoryLabel: record.typeLabel,
+              fieldVars: {'label': record.label, 'payload': record.payload},
+              qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+              onSelected: (template, t, b, f) {
+                setLocal(() {
+                  activeTemplate = template;
+                  title = t;
+                  body = b;
+                  footer = f;
+                });
+              },
+            );
+          }
+
+          Future<void> saveTemplateFromSaved() async {
+            final template = activeTemplate;
+            if (template == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Open Templates and pick a design first.')),
+              );
+              return;
+            }
+            final saved = NgmySavedQrTemplateRecord(
+              id: 'tpl_${DateTime.now().millisecondsSinceEpoch}',
+              label: record.label,
+              templateId: template.id,
+              templateName: template.name,
+              typeIndex: record.typeIndex < 0 ? 0 : record.typeIndex,
+              typeLabel: record.typeLabel,
+              payload: record.payload,
+              title: title,
+              body: body,
+              footer: footer,
+              savedAt: DateTime.now().toUtc().toIso8601String(),
+            );
+            await addNgmySavedQrTemplate(saved);
+            await _reloadSaved();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Template “${record.label}” saved.')),
+            );
+          }
+
+          return Dialog.fullscreen(
+            backgroundColor: _bg,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(record.label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              Text(record.typeLabel, style: TextStyle(color: _accent.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w700)),
+                              if (record.isSyncQr && record.usesRemaining != null)
+                                Text(
+                                  record.usesRemaining! >= 999
+                                      ? 'Unlimited scans (admin)'
+                                      : '${record.usesRemaining} of 2 scans remaining',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 11, fontWeight: FontWeight.w600),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Templates',
+                          onPressed: openTemplates,
+                          icon: const Icon(Icons.dashboard_customize_rounded, color: Color(0xFFA78BFA)),
+                        ),
+                        IconButton(
+                          onPressed: _busy
+                              ? null
+                              : () async {
+                                  await _deleteSaved(record);
+                                  if (ctx.mounted) Navigator.pop(ctx);
+                                },
+                          icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (activeTemplate != null)
+                              NgmyQrTemplateCard(
+                                template: activeTemplate!,
+                                title: title,
+                                body: body,
+                                footer: footer,
+                                fieldVars: {'label': record.label},
+                                qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+                              )
+                            else
+                              NgmyBrandedQrWidget(data: record.payload, large: true),
+                            const SizedBox(height: 20),
+                            Text(
+                              record.isSyncQr
+                                  ? 'Restore QR — scan on another phone (${record.usesRemaining != null && record.usesRemaining! < 999 ? 'max 2 scans total' : 'admin'})'
+                                  : 'Scan with any camera app',
+                              style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Column(
+                      children: [
+                        if (activeTemplate != null) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: saveTemplateFromSaved,
+                              icon: const Icon(Icons.dashboard_customize_rounded),
+                              label: const Text('Save template'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFFA78BFA),
+                                side: const BorderSide(color: Color(0xFFA78BFA)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _busy ? null : () => _downloadQr(payload: record.payload, label: record.label),
+                            icon: const Icon(Icons.download_rounded),
+                            label: const Text('Download to gallery'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _accent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

@@ -143,3 +143,102 @@ Future<void> deleteNgmySavedQr(String id, {String? userEmail}) async {
   list.removeWhere((r) => r.id == id);
   await persistNgmySavedQrs(list);
 }
+
+const String _kSavedQrTemplatesKey = 'ngmy_saved_qr_templates_v1';
+
+/// A QR template composition saved on this device (like a saved QR).
+class NgmySavedQrTemplateRecord {
+  const NgmySavedQrTemplateRecord({
+    required this.id,
+    required this.label,
+    required this.templateId,
+    required this.templateName,
+    required this.typeIndex,
+    required this.typeLabel,
+    required this.payload,
+    required this.title,
+    required this.body,
+    required this.footer,
+    required this.savedAt,
+  });
+
+  final String id;
+  final String label;
+  final String templateId;
+  final String templateName;
+  final int typeIndex;
+  final String typeLabel;
+  final String payload;
+  final String title;
+  final String body;
+  final String footer;
+  final String savedAt;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'label': label,
+        'templateId': templateId,
+        'templateName': templateName,
+        'typeIndex': typeIndex,
+        'typeLabel': typeLabel,
+        'payload': payload,
+        'title': title,
+        'body': body,
+        'footer': footer,
+        'savedAt': savedAt,
+      };
+
+  factory NgmySavedQrTemplateRecord.fromJson(Map<String, dynamic> json) {
+    return NgmySavedQrTemplateRecord(
+      id: (json['id'] ?? '').toString(),
+      label: (json['label'] ?? 'Untitled template').toString(),
+      templateId: (json['templateId'] ?? '').toString(),
+      templateName: (json['templateName'] ?? 'Template').toString(),
+      typeIndex: json['typeIndex'] is int ? json['typeIndex'] as int : int.tryParse('${json['typeIndex']}') ?? 0,
+      typeLabel: (json['typeLabel'] ?? 'QR').toString(),
+      payload: (json['payload'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      body: (json['body'] ?? '').toString(),
+      footer: (json['footer'] ?? '').toString(),
+      savedAt: (json['savedAt'] ?? '').toString(),
+    );
+  }
+}
+
+Future<List<NgmySavedQrTemplateRecord>> loadNgmySavedQrTemplates() async {
+  final prefs = await SharedPreferences.getInstance();
+  final raw = prefs.getString(_kSavedQrTemplatesKey);
+  if (raw == null || raw.isEmpty) return [];
+  try {
+    final list = jsonDecode(raw);
+    if (list is! List) return [];
+    return list
+        .whereType<Map>()
+        .map((e) => NgmySavedQrTemplateRecord.fromJson(Map<String, dynamic>.from(e)))
+        .where((r) => r.id.isNotEmpty && r.payload.isNotEmpty && r.templateId.isNotEmpty)
+        .toList();
+  } catch (_) {
+    return [];
+  }
+}
+
+Future<void> persistNgmySavedQrTemplates(List<NgmySavedQrTemplateRecord> records) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(
+    _kSavedQrTemplatesKey,
+    jsonEncode(records.map((e) => e.toJson()).toList()),
+  );
+}
+
+Future<NgmySavedQrTemplateRecord> addNgmySavedQrTemplate(NgmySavedQrTemplateRecord record) async {
+  final list = await loadNgmySavedQrTemplates();
+  list.insert(0, record);
+  await persistNgmySavedQrTemplates(list);
+  return record;
+}
+
+Future<void> deleteNgmySavedQrTemplate(String id) async {
+  final list = await loadNgmySavedQrTemplates();
+  list.removeWhere((r) => r.id == id);
+  await persistNgmySavedQrTemplates(list);
+}
