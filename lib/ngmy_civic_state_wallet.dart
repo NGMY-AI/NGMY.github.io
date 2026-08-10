@@ -455,7 +455,7 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
                     child: LinearProgressIndicator(
                       value: progress,
                       minHeight: 6,
-                      backgroundColor: Colors.white.withValues(alpha: isDark ? 0.18 : 0.28),
+                      backgroundColor: Colors.white.withValues(alpha: 0.22),
                       color: Colors.white,
                     ),
                   ),
