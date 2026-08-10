@@ -1,10 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_cashier_iou.dart';
-import 'ngmy_cashier_receipt_pdf.dart';
+import 'ngmy_cashier_receipt_preview.dart';
 import 'ngmy_cashier_storage.dart';
 import 'ngmy_delete_confirm_dialog.dart';
+import 'ngmy_invoice_signature.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// Worksheets → Cashier: local “who owes me” tracker.
@@ -45,10 +49,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     });
   }
 
-  String _fmtDate(DateTime d) {
-    final local = d.toLocal();
-    return '${local.month}/${local.day}/${local.year}';
-  }
+  String _fmtDate(DateTime d) => ngmyCashierFmtDate(d);
 
   InputDecoration _fieldDecoration(String label, {String? prefix}) {
     return InputDecoration(
@@ -74,6 +75,89 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     );
   }
 
+  Future<String?> _pickPhoto({required bool fromCamera}) async {
+    try {
+      final file = await ImagePicker().pickImage(
+        source: fromCamera ? ImageSource.camera : ImageSource.gallery,
+        maxWidth: 900,
+        maxHeight: 900,
+        imageQuality: 72,
+      );
+      if (file == null) return null;
+      final bytes = await file.readAsBytes();
+      return 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not pick photo: $e')),
+        );
+      }
+      return null;
+    }
+  }
+
+  Widget _optionalAttachTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool hasValue,
+    required VoidCallback onAdd,
+    required VoidCallback? onClear,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: p.secondaryText.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: hasValue ? _accent : p.secondaryText),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: p.primaryText,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
+                ),
+                Text(
+                  hasValue ? 'Added · optional' : subtitle,
+                  style: TextStyle(
+                    color: hasValue ? _accent : p.secondaryText,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onAdd,
+            style: TextButton.styleFrom(
+              foregroundColor: _accent,
+              visualDensity: VisualDensity.compact,
+            ),
+            child: Text(hasValue ? 'Change' : 'Add'),
+          ),
+          if (hasValue && onClear != null)
+            IconButton(
+              onPressed: onClear,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.close_rounded, size: 18, color: p.secondaryText),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _addOrEdit([NgmyCashierIou? existing]) async {
     final nameCtrl = TextEditingController(text: existing?.personName ?? '');
     final amountCtrl = TextEditingController(
@@ -87,6 +171,9 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     var due = existing == null
         ? ngmyCashierDateOnly(DateTime.now().add(const Duration(days: 7)))
         : ngmyCashierDateOnly(existing.dueDate);
+    var idPhoto = existing?.idPhotoBase64 ?? '';
+    var selfie = existing?.selfieBase64 ?? '';
+    final signaturePoints = List<Offset?>.from(existing?.signaturePoints ?? []);
 
     final saved = await showGeneralDialog<bool>(
       context: context,
@@ -108,8 +195,11 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                 child: StatefulBuilder(
                   builder: (ctx, setLocal) {
                     return Container(
-                      width: 340,
-                      margin: const EdgeInsets.symmetric(horizontal: 22),
+                      width: 360,
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.sizeOf(ctx).height * 0.88,
+                      ),
+                      margin: const EdgeInsets.symmetric(horizontal: 18),
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                       decoration: BoxDecoration(
                         color: p.cardBg,
@@ -275,6 +365,93 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                               maxLines: 2,
                               decoration: _fieldDecoration('Note (optional)'),
                             ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Optional verification',
+                              style: TextStyle(
+                                color: p.primaryText,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            Text(
+                              'ID photo, selfie, and signature from the person who owes you — all optional.',
+                              style: TextStyle(
+                                color: p.secondaryText,
+                                fontSize: 11,
+                                height: 1.3,
+                              ),
+                            ),
+                            _optionalAttachTile(
+                              title: 'ID photo',
+                              subtitle: 'Upload from gallery',
+                              icon: Icons.badge_outlined,
+                              hasValue: idPhoto.isNotEmpty,
+                              onAdd: () async {
+                                final v = await _pickPhoto(fromCamera: false);
+                                if (v != null) setLocal(() => idPhoto = v);
+                              },
+                              onClear: () => setLocal(() => idPhoto = ''),
+                            ),
+                            _optionalAttachTile(
+                              title: 'Selfie',
+                              subtitle: 'Camera or gallery',
+                              icon: Icons.face_retouching_natural_outlined,
+                              hasValue: selfie.isNotEmpty,
+                              onAdd: () async {
+                                final choice = await showModalBottomSheet<String>(
+                                  context: ctx,
+                                  backgroundColor: p.cardBg,
+                                  builder: (sheetCtx) => SafeArea(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ListTile(
+                                          leading: const Icon(Icons.photo_camera_outlined),
+                                          title: const Text('Take photo'),
+                                          onTap: () =>
+                                              Navigator.pop(sheetCtx, 'camera'),
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.photo_library_outlined),
+                                          title: const Text('Gallery'),
+                                          onTap: () =>
+                                              Navigator.pop(sheetCtx, 'gallery'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                                if (choice == null) return;
+                                final v = await _pickPhoto(
+                                  fromCamera: choice == 'camera',
+                                );
+                                if (v != null) setLocal(() => selfie = v);
+                              },
+                              onClear: () => setLocal(() => selfie = ''),
+                            ),
+                            const SizedBox(height: 8),
+                            NgmyInvoiceSignaturePad(
+                              title: 'Signature (optional)',
+                              points: signaturePoints,
+                              onChanged: () => setLocal(() {}),
+                              onClear: () =>
+                                  setLocal(() => signaturePoints.clear()),
+                              onFullscreen: () async {
+                                await showNgmyFullscreenSignature(
+                                  ctx,
+                                  title: 'Debtor signature',
+                                  points: signaturePoints,
+                                  onSave: (savedPts, size, color, stroke) {
+                                    setLocal(() {
+                                      signaturePoints
+                                        ..clear()
+                                        ..addAll(savedPts);
+                                    });
+                                  },
+                                );
+                              },
+                            ),
                             const SizedBox(height: 14),
                             Row(
                               children: [
@@ -367,12 +544,20 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
           amount: amount,
           dueDate: due,
           notes: notes,
+          idPhotoBase64: idPhoto,
+          selfieBase64: selfie,
+          signaturePoints: signaturePoints,
         ),
       );
     } else {
       existing.personName = name;
       existing.amount = amount;
       existing.notes = notes;
+      existing.idPhotoBase64 = idPhoto;
+      existing.selfieBase64 = selfie;
+      existing.signaturePoints
+        ..clear()
+        ..addAll(signaturePoints);
       if (ngmyCashierDateOnly(due) != ngmyCashierDateOnly(existing.dueDate)) {
         existing.extendDueDate(due);
       }
@@ -433,8 +618,11 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                       Text(
                         'Missed days: ${iou.missedDays()}',
                         style: TextStyle(
-                          color: p.secondaryText,
+                          color: iou.missedDays() > 0
+                              ? const Color(0xFFDC2626)
+                              : _accent,
                           fontSize: 12,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 14),
@@ -495,27 +683,6 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     }
     await upsertNgmyCashierIou(widget.userEmail, iou);
     await _reload();
-  }
-
-  Future<void> _printReceipt(NgmyCashierIou iou) async {
-    try {
-      final ok = await ngmyPrintCashierIouReceipt(iou);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            ok
-                ? 'Receipt ready to print / download.'
-                : 'Could not open the receipt.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print failed: $e')),
-      );
-    }
   }
 
   Future<void> _delete(NgmyCashierIou iou) async {
@@ -610,6 +777,14 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                     color: p.secondaryText.withValues(alpha: 0.12),
                   ),
                   action(
+                    icon: Icons.receipt_long_outlined,
+                    label: 'View receipt',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showNgmyCashierReceiptViewer(context, iou: iou);
+                    },
+                  ),
+                  action(
                     icon: iou.isPaid
                         ? Icons.undo_rounded
                         : Icons.check_circle_outline_rounded,
@@ -627,14 +802,45 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                       _addOrEdit(iou);
                     },
                   ),
-                  action(
-                    icon: Icons.print_outlined,
-                    label: 'Print receipt',
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _printReceipt(iou);
-                    },
-                  ),
+                  if (iou.hasIdPhoto)
+                    action(
+                      icon: Icons.badge_outlined,
+                      label: 'View / download ID',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showNgmyCashierAttachmentViewer(
+                          context,
+                          title: 'ID photo · ${iou.personName}',
+                          base64Image: iou.idPhotoBase64,
+                          downloadName:
+                              'ngmy_cashier_id_${iou.id}.jpg',
+                        );
+                      },
+                    ),
+                  if (iou.hasSelfie)
+                    action(
+                      icon: Icons.face_outlined,
+                      label: 'View / download selfie',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showNgmyCashierAttachmentViewer(
+                          context,
+                          title: 'Selfie · ${iou.personName}',
+                          base64Image: iou.selfieBase64,
+                          downloadName:
+                              'ngmy_cashier_selfie_${iou.id}.jpg',
+                        );
+                      },
+                    ),
+                  if (iou.hasSignature)
+                    action(
+                      icon: Icons.draw_outlined,
+                      label: 'View / download signature',
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        showNgmyCashierSignatureViewer(context, iou: iou);
+                      },
+                    ),
                   action(
                     icon: Icons.delete_outline_rounded,
                     label: 'Delete',
@@ -845,7 +1051,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     final missed = iou.missedDays();
     final tomorrow = iou.isDueTomorrow();
     final statusColor = iou.isPaid
-        ? p.secondaryText
+        ? (iou.paidOnTime ? _accent : const Color(0xFFDC2626))
         : iou.isOverdue
             ? const Color(0xFFDC2626)
             : tomorrow
@@ -854,8 +1060,9 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
 
     String meta;
     if (iou.isPaid) {
-      meta =
-          'Paid ${_fmtDate(iou.paidAt!)}${missed > 0 ? ' · $missed missed' : ''}';
+      meta = iou.paidOnTime
+          ? 'Paid on time ${_fmtDate(iou.paidAt!)}'
+          : 'Paid ${_fmtDate(iou.paidAt!)} · $missed missed';
     } else if (tomorrow) {
       meta = 'Pays tomorrow';
     } else if (missed > 0) {
@@ -877,7 +1084,9 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                 height: 28,
                 decoration: BoxDecoration(
                   color: iou.isPaid
-                      ? p.secondaryText.withValues(alpha: 0.25)
+                      ? (iou.paidOnTime
+                          ? _accent.withValues(alpha: 0.55)
+                          : const Color(0xFFDC2626))
                       : iou.isOverdue
                           ? const Color(0xFFDC2626)
                           : tomorrow
@@ -891,17 +1100,31 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      iou.personName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: p.primaryText.withValues(
-                          alpha: iou.isPaid ? 0.55 : 1,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            iou.personName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: p.primaryText.withValues(
+                                alpha: iou.isPaid ? 0.55 : 1,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        if (iou.hasAttachments) ...[
+                          const SizedBox(width: 6),
+                          Icon(
+                            Icons.attach_file_rounded,
+                            size: 14,
+                            color: p.secondaryText.withValues(alpha: 0.7),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(

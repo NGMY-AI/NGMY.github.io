@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import 'ngmy_worksheet_helpers.dart';
 
 String ngmyCashierIouNewId() =>
@@ -10,6 +12,52 @@ int ngmyCashierDaysBetween(DateTime a, DateTime b) {
   final aa = ngmyCashierDateOnly(a);
   final bb = ngmyCashierDateOnly(b);
   return bb.difference(aa).inDays;
+}
+
+String ngmyCashierFmtDate(DateTime? d, {bool withTime = false}) {
+  if (d == null) return '';
+  final local = d.toLocal();
+  final date =
+      '${local.month}/${local.day}/${local.year}';
+  if (!withTime) return date;
+  final h = local.hour.toString().padLeft(2, '0');
+  final m = local.minute.toString().padLeft(2, '0');
+  return '$date $h:$m';
+}
+
+List<Map<String, double>> ngmyCashierSerializeSignature(List<Offset?> points) {
+  final out = <Map<String, double>>[];
+  for (final p in points) {
+    if (p == null) {
+      out.add(const {'x': -1, 'y': -1});
+    } else {
+      out.add({'x': p.dx, 'y': p.dy});
+    }
+  }
+  return out;
+}
+
+List<Offset?> ngmyCashierDeserializeSignature(dynamic raw) {
+  if (raw is! List) return [];
+  final out = <Offset?>[];
+  for (final item in raw) {
+    if (item is! Map) {
+      out.add(null);
+      continue;
+    }
+    final x = item['x'];
+    final y = item['y'];
+    if (x is num && y is num) {
+      if (x < 0 && y < 0) {
+        out.add(null);
+      } else {
+        out.add(Offset(x.toDouble(), y.toDouble()));
+      }
+    } else {
+      out.add(null);
+    }
+  }
+  return out;
 }
 
 /// Local IOU / "who owes me" ledger entry for Worksheets → Cashier.
@@ -25,8 +73,12 @@ class NgmyCashierIou {
     this.notes = '',
     DateTime? createdAt,
     this.dayBeforeReminderSeenKey = '',
+    this.idPhotoBase64 = '',
+    this.selfieBase64 = '',
+    List<Offset?>? signaturePoints,
   })  : originalDueDate = originalDueDate ?? dueDate,
-        createdAt = createdAt ?? DateTime.now();
+        createdAt = createdAt ?? DateTime.now(),
+        signaturePoints = signaturePoints ?? <Offset?>[];
 
   final String id;
   String personName;
@@ -48,7 +100,19 @@ class NgmyCashierIou {
   /// Last day-before reminder key shown (`yyyy-MM-dd` of due date).
   String dayBeforeReminderSeenKey;
 
+  /// Optional attachments from the person who owes (local only).
+  String idPhotoBase64;
+  String selfieBase64;
+  List<Offset?> signaturePoints;
+
   bool get isPaid => paidAt != null;
+
+  bool get hasIdPhoto => idPhotoBase64.trim().isNotEmpty;
+  bool get hasSelfie => selfieBase64.trim().isNotEmpty;
+  bool get hasSignature =>
+      signaturePoints.any((p) => p != null);
+
+  bool get hasAttachments => hasIdPhoto || hasSelfie || hasSignature;
 
   bool get isOverdue {
     if (isPaid) return false;
@@ -64,13 +128,32 @@ class NgmyCashierIou {
     return due.difference(today).inDays == 1;
   }
 
-  int missedDays([DateTime? now]) {
+  int missedDays([DateTime? now]) => missedCalendarDates(now).length;
+
+  bool get paidOnTime => isPaid && missedDays() == 0;
+
+  /// Calendar days after the original due date through paid day / today.
+  List<DateTime> missedCalendarDates([DateTime? now]) {
+    final start = ngmyCashierDateOnly(originalDueDate);
     final end = isPaid
         ? ngmyCashierDateOnly(paidAt!)
         : ngmyCashierDateOnly(now ?? DateTime.now());
-    final due = ngmyCashierDateOnly(dueDate);
-    final openMissed = end.isAfter(due) ? end.difference(due).inDays : 0;
-    return accruedMissedDays + openMissed;
+    if (!end.isAfter(start)) return const [];
+    final dates = <DateTime>[];
+    for (var d = start.add(const Duration(days: 1));
+        !d.isAfter(end);
+        d = d.add(const Duration(days: 1))) {
+      dates.add(d);
+    }
+    return dates;
+  }
+
+  String get statusLabel {
+    if (isPaid) {
+      return paidOnTime ? 'PAID ON TIME' : 'PAID LATE';
+    }
+    if (isOverdue) return 'UNPAID · OVERDUE';
+    return 'UNPAID';
   }
 
   /// Extend the pay date; keep counting prior missed days.
@@ -106,6 +189,9 @@ class NgmyCashierIou {
         'notes': notes,
         'createdAt': createdAt.toIso8601String(),
         'dayBeforeReminderSeenKey': dayBeforeReminderSeenKey,
+        'idPhotoBase64': idPhotoBase64,
+        'selfieBase64': selfieBase64,
+        'signature': ngmyCashierSerializeSignature(signaturePoints),
       };
 
   factory NgmyCashierIou.fromJson(Map<String, dynamic> json) {
@@ -133,6 +219,9 @@ class NgmyCashierIou {
       createdAt: parseDt(json['createdAt']),
       dayBeforeReminderSeenKey:
           (json['dayBeforeReminderSeenKey'] ?? '').toString(),
+      idPhotoBase64: (json['idPhotoBase64'] ?? '').toString(),
+      selfieBase64: (json['selfieBase64'] ?? '').toString(),
+      signaturePoints: ngmyCashierDeserializeSignature(json['signature']),
     );
   }
 
