@@ -31787,6 +31787,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _openCivicStateWalletFlow() async {
+    final isRegistrar = _canManageCivicRegistry();
     await openNgmyCivicStateWalletFlow(
       context: context,
       state: _selectedState,
@@ -31794,7 +31795,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       pinsByState: widget.config.civicRegistryPinsByState,
       members: ngmyCivicMembersForState(widget.config, _selectedState),
       snapshotBuilder: _buildCivicStateWalletSnapshot,
-      canEdit: _canManageCivicRegistry(),
+      canEdit: isRegistrar,
+      // Authorized registrars never enter wallet unlock codes.
+      skipUnlockCodes: isRegistrar,
       onAddSpending: ({required double amount, required String description}) async {
         final record = {
           'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',

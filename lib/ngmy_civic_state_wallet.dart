@@ -8,7 +8,7 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_nav.dart';
 
-/// Bright animated pin that opens Registry Backup — easy to see, framed lights.
+/// Compact Registry Backup pin — thin animated outline, no thick white plate.
 class NgmyCivicBackupPinButton extends StatefulWidget {
   const NgmyCivicBackupPinButton({super.key, required this.onPressed});
 
@@ -21,7 +21,7 @@ class NgmyCivicBackupPinButton extends StatefulWidget {
 class _NgmyCivicBackupPinButtonState extends State<NgmyCivicBackupPinButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _spin =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat();
 
   @override
   void dispose() {
@@ -31,38 +31,31 @@ class _NgmyCivicBackupPinButtonState extends State<NgmyCivicBackupPinButton>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669);
     return Tooltip(
       message: 'Registry Backup',
-      child: GestureDetector(
-        onTap: widget.onPressed,
-        child: AnimatedBuilder(
-          animation: _spin,
-          builder: (context, _) {
-            return CustomPaint(
-              painter: _BackupPinFramePainter(t: _spin.value),
-              child: Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFEEF2FF), Color(0xFFE0E7FF)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.35),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onPressed,
+          customBorder: const CircleBorder(),
+          child: AnimatedBuilder(
+            animation: _spin,
+            builder: (context, _) {
+              return CustomPaint(
+                painter: _BackupPinFramePainter(
+                  t: _spin.value,
+                  accent: iconColor,
                 ),
-                child: const Icon(Icons.pin_rounded, size: 15, color: Color(0xFF4F46E5)),
-              ),
-            );
-          },
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Icon(Icons.pin_rounded, size: 14, color: iconColor),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -70,47 +63,43 @@ class _NgmyCivicBackupPinButtonState extends State<NgmyCivicBackupPinButton>
 }
 
 class _BackupPinFramePainter extends CustomPainter {
-  _BackupPinFramePainter({required this.t});
+  _BackupPinFramePainter({required this.t, required this.accent});
   final double t;
+  final Color accent;
 
   @override
   void paint(Canvas canvas, Size size) {
+    // Hairline ring only — sits on top of the icon, not a filled white box.
     final r = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0.8, 0.8, size.width - 1.6, size.height - 1.6),
-      const Radius.circular(8),
+      Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1),
+      const Radius.circular(7),
     );
     final path = Path()..addRRect(r);
     canvas.drawRRect(
       r,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = const Color(0xFF818CF8).withValues(alpha: 0.55),
+        ..strokeWidth = 0.9
+        ..color = accent.withValues(alpha: 0.35),
     );
     for (final metric in path.computeMetrics()) {
       final len = metric.length;
       final start = (t % 1.0) * len;
-      final seg = metric.extractPath(start, start + len * 0.28);
+      final seg = metric.extractPath(start, start + len * 0.22);
       canvas.drawPath(
         seg,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
+          ..strokeWidth = 1.15
           ..strokeCap = StrokeCap.round
-          ..shader = LinearGradient(
-            colors: [
-              const Color(0xFF6366F1).withValues(alpha: 0),
-              const Color(0xFFA78BFA),
-              const Color(0xFF38BDF8),
-              const Color(0xFF6366F1).withValues(alpha: 0),
-            ],
-          ).createShader(seg.getBounds()),
+          ..color = accent.withValues(alpha: 0.95),
       );
     }
   }
 
   @override
-  bool shouldRepaint(covariant _BackupPinFramePainter oldDelegate) => oldDelegate.t != t;
+  bool shouldRepaint(covariant _BackupPinFramePainter oldDelegate) =>
+      oldDelegate.t != t || oldDelegate.accent != accent;
 }
 
 class NgmyCivicWalletTxn {
@@ -232,6 +221,8 @@ Future<void> openNgmyCivicStateWalletFlow({
   required List<Map<String, dynamic>> members,
   required NgmyCivicWalletSnapshot Function() snapshotBuilder,
   required bool canEdit,
+  /// Authorized registrars skip PIN / name / DOB / ID — open wallet directly.
+  bool skipUnlockCodes = false,
   required Future<void> Function({
     required double amount,
     required String description,
@@ -243,17 +234,20 @@ Future<void> openNgmyCivicStateWalletFlow({
   }) onUpdateSpending,
   required Future<void> Function(String spendingId) onDeleteSpending,
 }) async {
-  final unlocked = await NgmyNavigator.push<bool>(
-    context,
-    NgmyCivicStateWalletVerifyScreen(
-      state: state,
-      globalPin: globalPin,
-      pinsByState: pinsByState,
-      members: members,
-    ),
-    routeName: 'NgmyCivicStateWalletVerifyScreen',
-  );
-  if (unlocked != true || !context.mounted) return;
+  if (!skipUnlockCodes) {
+    final unlocked = await NgmyNavigator.push<bool>(
+      context,
+      NgmyCivicStateWalletVerifyScreen(
+        state: state,
+        globalPin: globalPin,
+        pinsByState: pinsByState,
+        members: members,
+      ),
+      routeName: 'NgmyCivicStateWalletVerifyScreen',
+    );
+    if (unlocked != true || !context.mounted) return;
+  }
+  if (!context.mounted) return;
   await NgmyNavigator.push<void>(
     context,
     NgmyCivicStateWalletScreen(
