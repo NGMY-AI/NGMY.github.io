@@ -115,6 +115,23 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFECFDF5),
+                          border: Border.all(
+                            color: _kGreen.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          iou.displayAvatar,
+                          style: const TextStyle(fontSize: 30, height: 1),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         name,
                         textAlign: TextAlign.center,
@@ -276,16 +293,6 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 10),
-                const Text(
-                  'NGMY.ORG · Local only',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: _kMuted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ],
             ),
           ),

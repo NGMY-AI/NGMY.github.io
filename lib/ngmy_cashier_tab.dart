@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_cashier_avatars.dart';
 import 'ngmy_cashier_iou.dart';
 import 'ngmy_cashier_receipt_preview.dart';
 import 'ngmy_cashier_storage.dart';
@@ -174,6 +175,90 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     var idPhoto = existing?.idPhotoBase64 ?? '';
     var selfie = existing?.selfieBase64 ?? '';
     final signaturePoints = List<Offset?>.from(existing?.signaturePoints ?? []);
+    var gender = existing?.genderEnum;
+    var avatarEmoji = existing?.avatarEmoji.trim() ?? '';
+    if (avatarEmoji.isEmpty && gender != null) {
+      avatarEmoji = ngmyCashierDefaultAvatar(gender);
+    }
+
+    Future<void> pickAvatar(
+      StateSetter setLocal,
+      NgmyCashierGender forGender,
+    ) async {
+      final picked = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: p.cardBg,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        builder: (sheetCtx) {
+          final icons = ngmyCashierAvatarsFor(forGender);
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Choose ${forGender.label.toLowerCase()} icon',
+                    style: TextStyle(
+                      color: p.primaryText,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Default is already set — pick another if you want.',
+                    style: TextStyle(color: p.secondaryText, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: icons.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemBuilder: (_, i) {
+                      final emoji = icons[i];
+                      final selected = emoji == avatarEmoji;
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => Navigator.pop(sheetCtx, emoji),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? _accent.withValues(alpha: 0.14)
+                                : p.isDark
+                                    ? const Color(0xFF0F172A)
+                                    : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: selected
+                                  ? _accent
+                                  : p.secondaryText.withValues(alpha: 0.16),
+                              width: selected ? 1.6 : 1,
+                            ),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (picked != null) setLocal(() => avatarEmoji = picked);
+    }
 
     final saved = await showGeneralDialog<bool>(
       context: context,
@@ -248,10 +333,106 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                               ),
-                              decoration: _fieldDecoration('Name'),
+                              decoration: _fieldDecoration('Name').copyWith(
+                                suffixIcon: Padding(
+                                  padding: const EdgeInsets.only(right: 6),
+                                  child: InkWell(
+                                    onTap: gender == null
+                                        ? null
+                                        : () => pickAvatar(setLocal, gender!),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      width: 34,
+                                      height: 34,
+                                      margin: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: p.isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFECFDF5),
+                                        border: Border.all(
+                                          color: _accent.withValues(alpha: 0.35),
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        gender == null
+                                            ? '👤'
+                                            : ngmyCashierResolveAvatar(
+                                                gender: gender,
+                                                avatarEmoji: avatarEmoji,
+                                              ),
+                                        style: const TextStyle(fontSize: 18),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               textCapitalization: TextCapitalization.words,
                               textInputAction: TextInputAction.next,
                             ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Gender (required)',
+                              style: TextStyle(
+                                color: p.secondaryText,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _genderChip(
+                                    label: 'Male',
+                                    emoji: kNgmyCashierDefaultMaleAvatar,
+                                    selected: gender == NgmyCashierGender.male,
+                                    onTap: () => setLocal(() {
+                                      gender = NgmyCashierGender.male;
+                                      avatarEmoji =
+                                          kNgmyCashierDefaultMaleAvatar;
+                                    }),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _genderChip(
+                                    label: 'Female',
+                                    emoji: kNgmyCashierDefaultFemaleAvatar,
+                                    selected:
+                                        gender == NgmyCashierGender.female,
+                                    onTap: () => setLocal(() {
+                                      gender = NgmyCashierGender.female;
+                                      avatarEmoji =
+                                          kNgmyCashierDefaultFemaleAvatar;
+                                    }),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (gender != null) ...[
+                              const SizedBox(height: 8),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () =>
+                                      pickAvatar(setLocal, gender!),
+                                  icon: const Icon(Icons.face_rounded, size: 16),
+                                  label: const Text(
+                                    'Change icon',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5,
+                                    ),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: _accent,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 10),
                             TextField(
                               controller: amountCtrl,
@@ -484,7 +665,27 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: FilledButton(
-                                    onPressed: () => Navigator.pop(ctx, true),
+                                    onPressed: () {
+                                      if (nameCtrl.text.trim().isEmpty) {
+                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Enter a name.'),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      if (gender == null) {
+                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Choose male or female.',
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      Navigator.pop(ctx, true);
+                                    },
                                     style: FilledButton.styleFrom(
                                       backgroundColor: _accent,
                                       foregroundColor: Colors.white,
@@ -534,6 +735,19 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
       );
       return;
     }
+    final selectedGender = gender;
+    if (selectedGender == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose whether this person is male or female.'),
+        ),
+      );
+      return;
+    }
+    final resolvedAvatar = ngmyCashierResolveAvatar(
+      gender: selectedGender,
+      avatarEmoji: avatarEmoji,
+    );
 
     if (existing == null) {
       await upsertNgmyCashierIou(
@@ -547,6 +761,8 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
           idPhotoBase64: idPhoto,
           selfieBase64: selfie,
           signaturePoints: signaturePoints,
+          gender: selectedGender.storageValue,
+          avatarEmoji: resolvedAvatar,
         ),
       );
     } else {
@@ -555,6 +771,8 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
       existing.notes = notes;
       existing.idPhotoBase64 = idPhoto;
       existing.selfieBase64 = selfie;
+      existing.gender = selectedGender.storageValue;
+      existing.avatarEmoji = resolvedAvatar;
       existing.signaturePoints
         ..clear()
         ..addAll(signaturePoints);
@@ -564,6 +782,51 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
       await upsertNgmyCashierIou(widget.userEmail, existing);
     }
     await _reload();
+  }
+
+  Widget _genderChip({
+    required String label,
+    required String emoji,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: selected
+          ? _accent.withValues(alpha: 0.14)
+          : (p.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC)),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected
+                  ? _accent
+                  : p.secondaryText.withValues(alpha: 0.2),
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 18)),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: selected ? _accent : p.primaryText,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _togglePaid(NgmyCashierIou iou) async {
@@ -1099,14 +1362,6 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
     );
   }
 
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty);
-    if (parts.isEmpty) return '?';
-    final list = parts.toList();
-    if (list.length == 1) return list.first.substring(0, 1).toUpperCase();
-    return ('${list.first[0]}${list.last[0]}').toUpperCase();
-  }
-
   Widget _personCard(NgmyCashierIou iou) {
     final missed = iou.missedDays();
     final tomorrow = iou.isDueTomorrow();
@@ -1161,31 +1416,29 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
             child: Row(
               children: [
                 Container(
-                  width: 44,
-                  height: 44,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: iou.isPaid
-                          ? [
-                              p.secondaryText.withValues(alpha: 0.18),
-                              p.secondaryText.withValues(alpha: 0.08),
-                            ]
-                          : [
-                              _accent.withValues(alpha: 0.85),
-                              const Color(0xFF0D9488),
-                            ],
+                    shape: BoxShape.circle,
+                    color: p.isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFECFDF5),
+                    border: Border.all(
+                      color: iou.isOverdue && !iou.isPaid
+                          ? const Color(0xFFDC2626).withValues(alpha: 0.45)
+                          : _accent.withValues(alpha: 0.28),
+                      width: 1.4,
                     ),
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    _initials(iou.personName),
+                    iou.displayAvatar,
                     style: TextStyle(
-                      color: iou.isPaid ? p.primaryText : Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
+                      fontSize: 24,
+                      height: 1,
+                      color: iou.isPaid
+                          ? p.primaryText.withValues(alpha: 0.55)
+                          : null,
                     ),
                   ),
                 ),

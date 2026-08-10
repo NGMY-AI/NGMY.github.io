@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_cashier_avatars.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 String ngmyCashierIouNewId() =>
@@ -76,6 +77,8 @@ class NgmyCashierIou {
     this.idPhotoBase64 = '',
     this.selfieBase64 = '',
     List<Offset?>? signaturePoints,
+    this.gender = '',
+    this.avatarEmoji = '',
   })  : originalDueDate = originalDueDate ?? dueDate,
         createdAt = createdAt ?? DateTime.now(),
         signaturePoints = signaturePoints ?? <Offset?>[];
@@ -83,6 +86,12 @@ class NgmyCashierIou {
   final String id;
   String personName;
   double amount;
+
+  /// `male` / `female` (required for new entries).
+  String gender;
+
+  /// Emoji avatar; auto-filled from gender, user may change.
+  String avatarEmoji;
 
   /// Current expected pay date (can be extended).
   DateTime dueDate;
@@ -113,6 +122,13 @@ class NgmyCashierIou {
       signaturePoints.any((p) => p != null);
 
   bool get hasAttachments => hasIdPhoto || hasSelfie || hasSignature;
+
+  NgmyCashierGender? get genderEnum => ngmyCashierGenderFromStorage(gender);
+
+  String get displayAvatar => ngmyCashierResolveAvatar(
+        gender: genderEnum,
+        avatarEmoji: avatarEmoji,
+      );
 
   bool get isOverdue {
     if (isPaid) return false;
@@ -192,6 +208,8 @@ class NgmyCashierIou {
         'idPhotoBase64': idPhotoBase64,
         'selfieBase64': selfieBase64,
         'signature': ngmyCashierSerializeSignature(signaturePoints),
+        'gender': gender,
+        'avatarEmoji': avatarEmoji,
       };
 
   factory NgmyCashierIou.fromJson(Map<String, dynamic> json) {
@@ -222,6 +240,8 @@ class NgmyCashierIou {
       idPhotoBase64: (json['idPhotoBase64'] ?? '').toString(),
       selfieBase64: (json['selfieBase64'] ?? '').toString(),
       signaturePoints: ngmyCashierDeserializeSignature(json['signature']),
+      gender: (json['gender'] ?? '').toString(),
+      avatarEmoji: (json['avatarEmoji'] ?? '').toString(),
     );
   }
 

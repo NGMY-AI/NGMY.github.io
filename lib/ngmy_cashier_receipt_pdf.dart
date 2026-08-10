@@ -341,13 +341,6 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
               : 'This debt is still unpaid. Missed days appear in red when the due date has passed.',
           style: const pw.TextStyle(fontSize: 9.5, color: PdfColors.grey700),
         ),
-        pw.SizedBox(height: 20),
-        pw.Divider(color: PdfColors.grey400),
-        pw.SizedBox(height: 4),
-        pw.Text(
-          'NGMY.ORG · Stored locally on your device',
-          style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.grey600),
-        ),
       ],
     ),
   );
