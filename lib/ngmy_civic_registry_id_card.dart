@@ -56,8 +56,9 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     if (t.contains('passport')) return 'PASSPORT';
     if (t.contains('driver')) return "DRIVER'S LICENSE";
     if (t.contains('voter')) return 'VOTERS CARD';
-    if (t.contains('national')) return 'NATIONAL ID';
-    return idType.trim().isEmpty ? 'CIVIC REGISTRY ID' : idType.trim().toUpperCase();
+    if (t.contains('national')) return 'IDENTIFICATION CARD';
+    if (t.contains('identification')) return 'IDENTIFICATION CARD';
+    return idType.trim().isEmpty ? 'IDENTIFICATION CARD' : idType.trim().toUpperCase();
   }
 
   static String _docBadge(String idType) {
