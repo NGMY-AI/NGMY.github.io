@@ -87,6 +87,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
 
   void _onTransactionTap(NgmyCivicWalletTxn txn) {
     if (!widget.canEdit || txn.isInflow) return;
+    // Silent taps — no counter, no splash, no UI feedback until unlock.
     if (_editTapTxnId != txn.id) {
       _editTapTxnId = txn.id;
       _editTapCount = 0;
@@ -103,19 +104,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
           break;
         }
       }
-      setState(() {});
       if (spending != null) {
         unawaited(_promptSpending(existing: spending));
       }
       return;
     }
-    setState(() {});
     _editTapReset = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _editTapCount = 0;
-        _editTapTxnId = null;
-      });
+      _editTapCount = 0;
+      _editTapTxnId = null;
     });
   }
 
@@ -205,7 +201,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
           : existing.amount.toStringAsFixed(existing.amount == existing.amount.roundToDouble() ? 0 : 2),
     );
     final noteC = TextEditingController(text: existing?.description ?? '');
-    final ok = await showDialog<bool>(
+    final action = await showDialog<String>(
       context: context,
       builder: (ctx) {
         return Dialog(
@@ -231,6 +227,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       width: 42,
@@ -255,12 +252,20 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             ),
                           ),
                           Text(
-                            'Money stays available until you record it here.',
+                            existing == null
+                                ? 'Money stays available until you record it here.'
+                                : 'Edit this spending, or use trash to schedule delete.',
                             style: TextStyle(color: tone.secondaryText, fontSize: 12),
                           ),
                         ],
                       ),
                     ),
+                    if (existing != null)
+                      IconButton(
+                        tooltip: 'Delete (takes 24 hours)',
+                        onPressed: () => Navigator.pop(ctx, 'delete'),
+                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -282,7 +287,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx, false),
+                        onPressed: () => Navigator.pop(ctx, 'cancel'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: tone.secondaryText,
                           side: BorderSide(color: tone.fieldBorder),
@@ -295,7 +300,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton(
-                        onPressed: () => Navigator.pop(ctx, true),
+                        onPressed: () => Navigator.pop(ctx, 'save'),
                         style: FilledButton.styleFrom(
                           backgroundColor: tone.accent,
                           foregroundColor: Colors.white,
@@ -313,7 +318,81 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
         );
       },
     );
-    if (ok != true || !mounted) return;
+
+    // Trash → schedule 24h delete.
+    if (action == 'delete' && existing != null && mounted) {
+      final schedule = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.all(20),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+              decoration: BoxDecoration(
+                color: tone.dialogBg,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: tone.cardBorder),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Delete spending?', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 8),
+                  Text(
+                    'This spending will stay visible for 24 hours, then be completely deleted.',
+                    style: TextStyle(color: tone.secondaryText, fontSize: 13, height: 1.35),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: tone.secondaryText,
+                            side: BorderSide(color: tone.fieldBorder),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (schedule == true && mounted) {
+        await widget.onDeleteSpending(existing.id);
+        if (!mounted) return;
+        _reload();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Delete scheduled — fully removed in 24 hours.')),
+        );
+      }
+      return;
+    }
+
+    if (action != 'save' || !mounted) return;
     final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0;
     final note = noteC.text.trim();
     if (amount <= 0 || note.isEmpty) {
@@ -697,55 +776,48 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           for (final t in recent.take(20))
                             Padding(
                               padding: const EdgeInsets.only(bottom: 12),
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => _onTransactionTap(t),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 2),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 40,
-                                          decoration: BoxDecoration(color: tone.iconWell, borderRadius: BorderRadius.circular(12)),
-                                          child: Icon(
-                                            t.isInflow ? Icons.south_west_rounded : Icons.north_east_rounded,
-                                            color: t.isInflow ? const Color(0xFF059669) : const Color(0xFFEA580C),
-                                            size: 20,
-                                          ),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => _onTransactionTap(t),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 2),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(color: tone.iconWell, borderRadius: BorderRadius.circular(12)),
+                                        child: Icon(
+                                          t.isInflow ? Icons.south_west_rounded : Icons.north_east_rounded,
+                                          color: t.isInflow ? const Color(0xFF059669) : const Color(0xFFEA580C),
+                                          size: 20,
                                         ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                t.title,
-                                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tone.primaryText),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              Text(
-                                                t.isInflow
-                                                    ? 'Contribution'
-                                                    : (_editTapTxnId == t.id && _editTapCount > 0
-                                                        ? 'Spending · $_editTapCount/10'
-                                                        : 'Spending'),
-                                                style: TextStyle(color: tone.secondaryText, fontSize: 12),
-                                              ),
-                                            ],
-                                          ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              t.title,
+                                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tone.primaryText),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            Text(
+                                              t.isInflow ? 'Contribution' : 'Spending',
+                                              style: TextStyle(color: tone.secondaryText, fontSize: 12),
+                                            ),
+                                          ],
                                         ),
-                                        Text(
-                                          '${t.isInflow ? '+' : '-'}${_money(t.amount.abs())}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: t.isInflow ? const Color(0xFF059669) : tone.primaryText,
-                                          ),
+                                      ),
+                                      Text(
+                                        '${t.isInflow ? '+' : '-'}${_money(t.amount.abs())}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          color: t.isInflow ? const Color(0xFF059669) : tone.primaryText,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),

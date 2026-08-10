@@ -31786,7 +31786,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  /// Removes wallet spendings whose 24h delete window has ended.
+  Future<void> _purgeExpiredWalletSpendings() async {
+    final now = DateTime.now().toUtc();
+    final kept = <Map<String, dynamic>>[];
+    var changed = false;
+    for (final e in widget.config.helpCampaignSpendings) {
+      final row = Map<String, dynamic>.from(e);
+      final raw = (row['pendingDeleteAt'] ?? '').toString().trim();
+      if (raw.isNotEmpty) {
+        final at = DateTime.tryParse(raw)?.toUtc();
+        if (at != null && !at.isAfter(now)) {
+          changed = true;
+          continue;
+        }
+      }
+      kept.add(row);
+    }
+    if (!changed) return;
+    setState(() => widget.config.helpCampaignSpendings = kept);
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
   Future<void> _openCivicStateWalletFlow() async {
+    await _purgeExpiredWalletSpendings();
     final isRegistrar = _canManageCivicRegistry();
     await openNgmyCivicStateWalletFlow(
       context: context,
@@ -31844,13 +31868,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await ngmyPersistCivicHelpModeSettings(widget.config);
       },
       onDeleteSpending: (spendingId) async {
+        // Schedule complete removal after 24 hours (not instant).
         final id = spendingId.trim();
         if (id.isEmpty) return;
+        final deleteAt = DateTime.now().toUtc().add(const Duration(hours: 24)).toIso8601String();
         setState(() {
-          widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings
-              .where((e) => (e['id'] ?? '').toString().trim() != id)
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
+          widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.map((e) {
+            final row = Map<String, dynamic>.from(e);
+            if ((row['id'] ?? '').toString().trim() != id) return row;
+            row['pendingDeleteAt'] = deleteAt;
+            return row;
+          }).toList();
         });
         widget.onDataChanged();
         await ngmyPersistCivicHelpModeSettings(widget.config);
