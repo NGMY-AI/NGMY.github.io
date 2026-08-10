@@ -606,6 +606,53 @@ String ngmyAdvisorShortPingFallbackReply({
   return options[ping.hashCode.abs() % options.length];
 }
 
+/// Strip repeated Hey/Hi/Hello openers once the chat is already going.
+/// Keep greetings only when the user just said hi, or it is the first exchange.
+String ngmyStripRedundantAdvisorGreeting(
+  String text, {
+  required bool userJustGreeted,
+  required bool allowGreeting,
+}) {
+  var t = text.trim();
+  if (t.isEmpty || userJustGreeted || allowGreeting) return t;
+
+  // "Hey!" / "Hi there," / "Hello Sir!" / "Hey again…" at the start
+  t = t.replaceFirst(
+    RegExp(
+      r'^(hey|hi|hello|yo|sup|hiya|howdy)'
+      r'(\s+(there|again|friend|sir|boss|man|girl|babe))?'
+      r'[\s,!.…~\-–—❤️💕😊😌😏😘🙏]*',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  // "Hey Jordan," / "Hi Maria —"
+  t = t.replaceFirst(
+    RegExp(
+      r'^(hey|hi|hello)\s+[A-Za-z][A-Za-z.\-]{1,24}[\s,!.…\-–—]*',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  // "Good to hear from you!" as a restart when they asked a real question
+  t = t.replaceFirst(
+    RegExp(
+      r'^(good to (hear|see) from you|nice to hear from you|great to hear from you)'
+      r'[\s,!.…]*',
+      caseSensitive: false,
+    ),
+    '',
+  );
+
+  t = t.trimLeft();
+  if (t.isEmpty) return text.trim();
+  // Keep natural capitalization after stripping the opener.
+  if (t.length > 1 && t[0].toLowerCase() == t[0]) {
+    t = '${t[0].toUpperCase()}${t.substring(1)}';
+  }
+  return t;
+}
+
 /// Rewrite cold/robotic hello replies into normal human texting.
 String ngmyPolishAdvisorGreetingReply(
   String text, {
@@ -1313,14 +1360,17 @@ class NgmyCommunicateProfile {
     final pacing = isEarly && ngmyCommunicateRoleCanDateUsers(role)
         ? 'EARLY CHAT — you just met. HARD TO GET on romance only — do not fold easy into dating. '
             'No instant yes, no "I like you too" right away on feelings. Standards on love. '
-            'BUT greetings: always warm, kind, and welcoming. Never cold or dismissive. '
+            'If THEY greet you (hi/hey/hello), greet back once like a real person — then talk normally. '
             'Never open with "hey you" or "hey yourself" — that sounds rude and robotic. '
-            'Say hi back like a real person — "Hi! How are you?" or "Hey! Good to hear from you." '
             'Not mean — real ${gender == 'female' ? 'woman' : 'man'} energy who is friendly first, slow on feelings.\n'
         : isEarly
-            ? 'EARLY CHAT — warm, respectful, welcoming. Never cold openers like "hey you" or "hey yourself". '
-                'Greet like a normal human — hi back, ask how they are. Match their energy kindly.\n'
-            : 'ONGOING CHAT — history matters. React based on everything below. Stay kind and welcoming on hellos.\n';
+            ? 'EARLY CHAT — warm and human. If THEY say hi/hey/hello, greet back once. '
+                'If they ask a question, answer it — do not restart every reply with Hey/Hi/Hello. '
+                'Never cold openers like "hey you" or "hey yourself". Match their energy kindly.\n'
+            : 'ONGOING CHAT — you already know each other from the history below. '
+                'Do NOT greet again with Hey/Hi/Hello/Good to hear from you unless THEY just said hi/hello. '
+                'Jump straight into answering or reacting like a normal texting conversation. '
+                'No restarting the chat every message.\n';
 
     var gapNote = '';
     if (replyGap != null && userMsgs >= 2) {
@@ -1500,9 +1550,15 @@ class NgmyCommunicateProfile {
         '${_professionalBoundaryBlock(chatterIsBoss: chatterIsBoss, datingAllowed: datingAllowed, isMyPartner: isMyPartner || datingTheBoss)}'
         '${_languageBlock()}'
         'RULES:\n'
-        '- 100% human texting — slang, typos sometimes. '
+        '- 100% human texting — slang, typos sometimes, real feelings, real opinions. '
+        'Talk like a person with a life, not a customer-service script and not like an AI. '
         'NEVER put little stars in your texts — no asterisks (*like this*), no ★ ☆ ✦, no ✨ ⭐ sparkle stars, '
         'no markdown *stars* around words or *actions*. Write normal text messages only.\n'
+        '- GREETINGS (critical): Only open with Hey/Hi/Hello when (1) they just said hi/hey/hello, '
+        'OR (2) this is basically the first message of the chat. '
+        'If the history already shows you two talking and they asked something, answer DIRECTLY — '
+        'never restart with "Hey!" / "Hi!" / "Hello!" / "Good to hear from you!" before the answer. '
+        'One greeting at the start is enough; after that just converse.\n'
         '- EMOJIS: Do NOT put emojis on every message. '
         'Normal everyday chat → usually no emoji. '
         'Funny moment → maybe a laugh/smile emoji (😂 🙂). '
@@ -4152,8 +4208,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       return 'Reply as ${widget.profile.name} only — real phone TEXTING. '
           'HARD LENGTH RULE: 1 short sentence default (2 max). Never 2 paragraphs for a casual hello. '
-          'If they wrote a short hello, reply short, warm, and welcoming — like you are glad they texted. '
-          'NEVER say "hey you" or "hey yourself" (sounds rude/robotic). Say "Hi!" / "Hey!" / "Hello!" and ask how they are. '
+          'If they wrote a short hello, reply short and warm — greet back once like a real person. '
+          'If they asked a question or already chatting, answer directly — do NOT start with Hey/Hi/Hello again. '
+          'NEVER say "hey you" or "hey yourself" (sounds rude/robotic). '
           'Do NOT pile miss-you + sleep questions + day plans into one message. '
           'EMOJIS: mostly none on normal chat; love emojis ❤️💕 on love/miss-you/romantic lines; laugh/smile only if funny. '
           'No emoji spam. No asterisks, no little stars (★ ✨ *actions*). '
@@ -4164,8 +4221,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       return 'Reply as ${widget.profile.name} — they want more detail. Give a clear fuller answer (a paragraph is fine). '
           'Emojis sparingly. No asterisks or little stars:';
     }
-    return 'Reply as ${widget.profile.name} only — natural human texting, short (1–2 sentences), '
-        'warm and respectful. Never open with "hey you". '
+    return 'Reply as ${widget.profile.name} only — natural human texting, short (1–2 sentences). '
+        'If this is an ongoing chat and they asked something, answer directly — '
+        'do NOT start with Hey/Hi/Hello again. Never open with "hey you". '
         'emojis only when they fit the moment (usually none), no asterisks or little stars, not overly eager:';
   }
 
@@ -4179,7 +4237,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             .map((m) => (m['text'] ?? '').toString())
             .cast<String>()
             .firstWhere((x) => x.trim().isNotEmpty, orElse: () => '');
-    if (ngmyUserMessageIsShortChatPing(lastUser)) {
+    final userPing = ngmyUserMessageIsShortChatPing(lastUser);
+    final priorUserCount =
+        _messages.where((m) => m['role'] == 'user').length;
+    // Allow a greeting only on a pure hello, or the very first user turn.
+    final allowGreeting = userPing || priorUserCount <= 1;
+    if (userPing) {
       cleaned = ngmyPolishAdvisorGreetingReply(
         cleaned,
         userText: lastUser,
@@ -4190,6 +4253,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       cleaned = ngmyRewriteColdHeyYouGreeting(
         cleaned,
         girl: widget.profile.gender != 'male',
+      );
+      cleaned = ngmyStripRedundantAdvisorGreeting(
+        cleaned,
+        userJustGreeted: false,
+        allowGreeting: allowGreeting,
       );
     }
     if (ngmyCommunicateAdvisorNeedsProfessionalTone(
