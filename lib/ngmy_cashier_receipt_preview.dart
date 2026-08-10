@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 
 import 'ngmy_cashier_iou.dart';
 import 'ngmy_cashier_receipt_pdf.dart';
+import 'ngmy_offline_icons.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_worksheet_helpers.dart';
 
@@ -126,9 +127,9 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                           ),
                         ),
                         alignment: Alignment.center,
-                        child: Text(
+                        child: NgmyOfflineEmoji(
                           iou.displayAvatar,
-                          style: const TextStyle(fontSize: 30, height: 1),
+                          fontSize: 30,
                         ),
                       ),
                       const SizedBox(height: 8),

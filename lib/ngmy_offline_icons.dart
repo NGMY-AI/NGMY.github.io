@@ -1,10 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Bundled in pubspec — fallback text emoji on web when no Twemoji PNG exists.
 const kNgmyEmojiFontFamily = 'Noto Color Emoji';
 
-/// Emoji [TextStyle]: bundled Noto Color Emoji on web; system emoji on mobile/desktop.
+/// Emoji [TextStyle]: prefer bundled Noto Color Emoji so glyphs stay available offline.
 TextStyle ngmyEmojiTextStyle({
   required double fontSize,
   Color? color,
@@ -16,8 +15,8 @@ TextStyle ngmyEmojiTextStyle({
     height: height ?? 1.0,
     color: color,
     fontWeight: fontWeight,
-    fontFamily: kIsWeb ? kNgmyEmojiFontFamily : null,
-    fontFamilyFallback: kIsWeb ? const [kNgmyEmojiFontFamily] : null,
+    fontFamily: kNgmyEmojiFontFamily,
+    fontFamilyFallback: const [kNgmyEmojiFontFamily],
   );
 }
 
@@ -28,11 +27,19 @@ List<String> ngmyTwemojiAssetCandidates(String emoji) {
 
   final runes = trimmed.runes.toList();
   final full = runes.map((r) => r.toRadixString(16)).join('-');
-  final noVs = runes.where((r) => r != 0xFE0F).map((r) => r.toRadixString(16)).join('-');
+  final noVs =
+      runes.where((r) => r != 0xFE0F).map((r) => r.toRadixString(16)).join('-');
+  // Some Twemoji ZWJ files keep FE0F only on the gender sign (e.g. beard+male).
+  final withTrailingVs = noVs.isEmpty ? '' : '$noVs-fe0f';
 
   final out = <String>{};
   if (full.isNotEmpty) out.add('assets/twemoji/$full.png');
   if (noVs.isNotEmpty && noVs != full) out.add('assets/twemoji/$noVs.png');
+  if (withTrailingVs.isNotEmpty &&
+      withTrailingVs != full &&
+      withTrailingVs != noVs) {
+    out.add('assets/twemoji/$withTrailingVs.png');
+  }
   return out.toList();
 }
 
@@ -55,15 +62,15 @@ class NgmyOfflineEmoji extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      final candidates = ngmyTwemojiAssetCandidates(emoji);
-      if (candidates.isNotEmpty) {
-        return _NgmyTwemojiImage(
-          candidates: candidates,
-          size: fontSize,
-          fallback: _textEmoji(),
-        );
-      }
+    // Prefer bundled Twemoji PNGs on every platform so emoji stay visible offline
+    // (web PWAs especially lose color emoji when network fonts are unavailable).
+    final candidates = ngmyTwemojiAssetCandidates(emoji);
+    if (candidates.isNotEmpty) {
+      return _NgmyTwemojiImage(
+        candidates: candidates,
+        size: fontSize,
+        fallback: _textEmoji(),
+      );
     }
     return _textEmoji();
   }

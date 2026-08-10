@@ -10,6 +10,7 @@ import 'ngmy_cashier_receipt_preview.dart';
 import 'ngmy_cashier_storage.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_invoice_signature.dart';
+import 'ngmy_offline_icons.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// Worksheets → Cashier: local “who owes me” tracker.
@@ -246,7 +247,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                             ),
                           ),
                           alignment: Alignment.center,
-                          child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                          child: NgmyOfflineEmoji(emoji, fontSize: 26),
                         ),
                       );
                     },
@@ -355,14 +356,14 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                                         ),
                                       ),
                                       alignment: Alignment.center,
-                                      child: Text(
+                                      child: NgmyOfflineEmoji(
                                         gender == null
                                             ? '👤'
                                             : ngmyCashierResolveAvatar(
                                                 gender: gender,
                                                 avatarEmoji: avatarEmoji,
                                               ),
-                                        style: const TextStyle(fontSize: 18),
+                                        fontSize: 18,
                                       ),
                                     ),
                                   ),
@@ -812,7 +813,7 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 18)),
+              NgmyOfflineEmoji(emoji, fontSize: 18),
               const SizedBox(width: 6),
               Text(
                 label,
@@ -1431,15 +1432,9 @@ class _NgmyCashierTabState extends State<NgmyCashierTab> {
                     ),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    iou.displayAvatar,
-                    style: TextStyle(
-                      fontSize: 24,
-                      height: 1,
-                      color: iou.isPaid
-                          ? p.primaryText.withValues(alpha: 0.55)
-                          : null,
-                    ),
+                  child: Opacity(
+                    opacity: iou.isPaid ? 0.55 : 1,
+                    child: NgmyOfflineEmoji(iou.displayAvatar, fontSize: 24),
                   ),
                 ),
                 const SizedBox(width: 12),
