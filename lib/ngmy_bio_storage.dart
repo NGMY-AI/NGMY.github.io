@@ -42,13 +42,40 @@ List<NgmyBioDocument> _mergePreferNewest(
   List<NgmyBioDocument> a,
   List<NgmyBioDocument> b,
 ) {
-  return NgmyStudioLibraryCloud.mergeById<NgmyBioDocument>(
+  final merged = NgmyStudioLibraryCloud.mergeById<NgmyBioDocument>(
     local: a,
     remote: b,
     idOf: (d) => d.id,
     updatedOf: (d) => d.updatedAt,
     tombstones: const {},
   );
+  // Never let a stale/empty cloud copy erase a display name that still exists
+  // on either side — that was wiping names after Save + reopen.
+  return _protectBioDisplayNames(merged, [...a, ...b]);
+}
+
+/// If the winning doc has a blank name but another copy of the same id still
+/// carries one, keep that name.
+List<NgmyBioDocument> _protectBioDisplayNames(
+  List<NgmyBioDocument> winners,
+  List<NgmyBioDocument> sources,
+) {
+  final newestWithName = <String, NgmyBioDocument>{};
+  for (final doc in sources) {
+    if (doc.displayName.trim().isEmpty) continue;
+    final prev = newestWithName[doc.id];
+    if (prev == null || !doc.updatedAt.isBefore(prev.updatedAt)) {
+      newestWithName[doc.id] = doc;
+    }
+  }
+  for (final doc in winners) {
+    if (doc.displayName.trim().isNotEmpty) continue;
+    final named = newestWithName[doc.id];
+    if (named != null) {
+      doc.displayName = named.displayName;
+    }
+  }
+  return winners;
 }
 
 /// Reconciles this device's Bios with the account's cloud copy. Only the oldest

@@ -71,7 +71,48 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   void initState() {
     super.initState();
     _doc = widget.document.copy();
+    _anchorDisplayName = _doc.displayName.trim() == kNgmyBioDefaultDisplayName
+        ? ''
+        : _doc.displayName.trim();
     _bind();
+  }
+
+  @override
+  void didUpdateWidget(covariant NgmyBioStudioEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Parent list reloads must not blank a name the user already has on screen.
+    if (oldWidget.document.id != widget.document.id) {
+      _doc = widget.document.copy();
+      _anchorDisplayName = _doc.displayName.trim() == kNgmyBioDefaultDisplayName
+          ? ''
+          : _doc.displayName.trim();
+      _bind();
+      return;
+    }
+    final incoming = widget.document;
+    if (incoming.updatedAt.isAfter(_doc.updatedAt)) {
+      final incomingName = incoming.displayName.trim();
+      final keepName = incomingName.isNotEmpty
+          ? incomingName
+          : (_anchorDisplayName.isNotEmpty
+                ? _anchorDisplayName
+                : _doc.displayName.trim());
+      _doc = incoming.copy();
+      if (keepName.isNotEmpty) {
+        _doc.displayName = keepName;
+        _anchorDisplayName = keepName;
+      }
+      // Update non-name fields from parent without resetting the name field
+      // caret if the user is mid-edit with the same text.
+      _taglineC.text = _doc.tagline;
+      _slugC.text = _doc.slug;
+      if (_nameC.text.trim() != _doc.displayName.trim() &&
+          _doc.displayName.trim().isNotEmpty &&
+          _nameC.text.trim().isEmpty) {
+        _nameC.text = _doc.displayName;
+      }
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -92,7 +133,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     // used to make an accidental Save wipe a real name after reopen.
     final legacyPlaceholder =
         _doc.displayName.trim() == kNgmyBioDefaultDisplayName;
-    _nameC.text = legacyPlaceholder ? '' : _doc.displayName;
+    final showName = legacyPlaceholder ? '' : _doc.displayName;
+    _nameC.text = showName;
+    if (!legacyPlaceholder && showName.trim().isNotEmpty) {
+      _anchorDisplayName = showName.trim();
+    }
     _taglineC.text = _doc.tagline;
     _slugC.text = _doc.slug;
     _socialInstagramC.text = _doc.socialLinks.instagram;
@@ -105,14 +150,38 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     }
   }
 
+  /// Last non-empty display name the user saved or typed — never wiped by an
+  /// empty field, reload race, or accidental Save.
+  String _anchorDisplayName = '';
+
   void _previewRefresh() {
-    _doc.displayName = _nameC.text;
+    final typed = _nameC.text;
+    if (typed.trim().isNotEmpty) {
+      _doc.displayName = typed;
+      _anchorDisplayName = typed.trim();
+    }
+    // Empty field while editing must not blank the live title / preview name.
     _doc.tagline = _taglineC.text;
     if (mounted) setState(() {});
   }
 
   void _sync() {
-    _doc.displayName = _nameC.text.trim();
+    final typed = _nameC.text.trim();
+    if (typed.isNotEmpty) {
+      _doc.displayName = typed;
+      _anchorDisplayName = typed;
+    } else if (_anchorDisplayName.isNotEmpty) {
+      // Keep the existing name unless the user typed a replacement.
+      _doc.displayName = _anchorDisplayName;
+      if (_nameC.text != _anchorDisplayName) {
+        _nameC.value = TextEditingValue(
+          text: _anchorDisplayName,
+          selection: TextSelection.collapsed(offset: _anchorDisplayName.length),
+        );
+      }
+    } else {
+      _doc.displayName = '';
+    }
     _doc.tagline = _taglineC.text.trim();
     _doc.slug = _slugC.text.trim().toLowerCase();
     _doc.socialLinks = _doc.socialLinks.copyWith(
@@ -125,7 +194,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Future<void> _save() async {
     _sync();
-    final expectedName = _doc.displayName;
+    final expectedName = _doc.displayName.trim();
     try {
       if (widget._isLocal) {
         await saveNgmyLocalBio(userEmail: widget.userEmail, doc: _doc);
@@ -144,7 +213,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           break;
         }
       }
-      if (found == null || found.displayName.trim() != expectedName.trim()) {
+      if (found == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not save Bio. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      // If storage came back blank but we just saved a name, keep ours.
+      if (found.displayName.trim().isEmpty && expectedName.isNotEmpty) {
+        found.displayName = expectedName;
+        if (widget._isLocal) {
+          await saveNgmyLocalBio(userEmail: widget.userEmail, doc: found);
+        } else {
+          await saveNgmyBio(userEmail: widget.userEmail, doc: found);
+        }
+      } else if (found.displayName.trim() != expectedName &&
+          expectedName.isNotEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -156,8 +244,26 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         );
         return;
       }
-      _doc = found.copy();
-      _bind();
+
+      // Apply saved fields in place — no full rebind (avoids title blink / wipe).
+      _doc.displayName = found.displayName.trim().isNotEmpty
+          ? found.displayName
+          : expectedName;
+      _doc.tagline = found.tagline;
+      _doc.slug = found.slug;
+      _doc.socialLinks = found.socialLinks;
+      _doc.status = found.status;
+      _doc.publicUrl = found.publicUrl;
+      _doc.updatedAt = found.updatedAt;
+      _anchorDisplayName = _doc.displayName.trim();
+      if (_nameC.text.trim() != _anchorDisplayName &&
+          _anchorDisplayName.isNotEmpty) {
+        _nameC.value = TextEditingValue(
+          text: _anchorDisplayName,
+          selection: TextSelection.collapsed(offset: _anchorDisplayName.length),
+        );
+      }
+      if (mounted) setState(() {});
       widget.onSaved(_doc.copy());
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -811,9 +917,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           ),
           Expanded(
             child: Text(
-              _doc.displayName.trim().isEmpty
-                  ? 'New Bio'
-                  : _doc.displayName.trim(),
+              () {
+                final live = _doc.displayName.trim();
+                if (live.isNotEmpty) return live;
+                if (_anchorDisplayName.isNotEmpty) return _anchorDisplayName;
+                return 'New Bio';
+              }(),
               style: TextStyle(
                 color: t.title,
                 fontWeight: FontWeight.w900,
