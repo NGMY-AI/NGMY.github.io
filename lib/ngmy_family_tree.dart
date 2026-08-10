@@ -188,11 +188,20 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
           ],
         ),
         const SizedBox(height: 14),
-        WorksheetGlowFrame(
-          style: WorksheetFrameStyle.familyTree,
-          glowStrength: 1.0,
-          padding: const EdgeInsets.all(10),
-          child: Column(children: _trees.map((tree) => _treeCard(tree, p)).toList()),
+        Column(
+          children: [
+            for (var i = 0; i < _trees.length; i++) ...[
+              if (i > 0) const SizedBox(height: 12),
+              WorksheetGlowFrame(
+                style: WorksheetFrameStyle.familyTree,
+                glowStrength: 1.0,
+                borderRadius: 14,
+                // Lights hug the tree card — no oversized outer box.
+                padding: EdgeInsets.zero,
+                child: _treeCard(_trees[i], p),
+              ),
+            ],
+          ],
         ),
       ],
     );
@@ -202,9 +211,11 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
     return WorksheetGlowFrame(
       style: WorksheetFrameStyle.familyTree,
       glowStrength: 1.05,
-      padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
+      borderRadius: 15,
+      padding: EdgeInsets.zero,
       child: Container(
         width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(24, 36, 24, 32),
         decoration: BoxDecoration(
           color: p.cardBg,
           borderRadius: BorderRadius.circular(15),
@@ -254,11 +265,11 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
 
   Widget _treeCard(FamilyTree tree, WorksheetPalette p) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      width: double.infinity,
       decoration: BoxDecoration(
         color: p.cardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: p.cardBorder),
+        border: Border.all(color: p.cardBorder.withValues(alpha: 0.55)),
         boxShadow: [BoxShadow(color: p.shadow, blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Material(

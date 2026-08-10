@@ -79,13 +79,16 @@ class _WorksheetGlowFrameState extends State<WorksheetGlowFrame> with SingleTick
               strength: widget.glowStrength,
               accents: _accentColors,
             ),
+            // Keep lights flush to the content edge (only a hair of inset for the stroke).
             child: Padding(
-              padding: const EdgeInsets.all(2.5),
+              padding: const EdgeInsets.all(1.25),
               child: RepaintBoundary(
                 child: Container(
                   padding: widget.padding,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(widget.borderRadius - 1),
+                    borderRadius: BorderRadius.circular(
+                      (widget.borderRadius - 1).clamp(0, widget.borderRadius),
+                    ),
                   ),
                   child: widget.child,
                 ),
