@@ -26,7 +26,7 @@ const List<String> _kQrTypeLabels = [
 ];
 
 /// QR Code Generator — local codes plus cloud-saved Advisors / Family Tree sync QRs.
-/// Create + save QR are free; download and templates require Stripe.
+/// 2 free QR saves; then create/edit locks until Stripe. Download & templates always need pay.
 Future<void> showNgmyQrGeneratorDialog(
   BuildContext context, {
   String? userEmail,
@@ -97,9 +97,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
 
   NgmyQrTemplateDef? _activeTemplate;
   bool _paid = false;
+  int _freeSavesUsed = 0;
 
   /// Bumped after download capture so preview layers rebuild crisp (web toImage fix).
   int _previewGeneration = 0;
+
+  bool get _createLocked =>
+      !_paid && _freeSavesUsed >= NgmyQrGeneratorPayments.freeSaveLimit;
 
   @override
   void initState() {
@@ -112,16 +116,21 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       c.addListener(_onFieldsChanged);
     }
     _reloadSaved();
-    _refreshPaid();
+    _refreshAccess();
   }
 
-  Future<void> _refreshPaid() async {
+  Future<void> _refreshAccess() async {
+    final email = widget.userEmail ?? '';
     final paid = await NgmyQrGeneratorPayments.hasAccess(
-      email: widget.userEmail ?? '',
+      email: email,
       isAdmin: widget.isAdmin,
     );
+    final used = await NgmyQrGeneratorPayments.freeSavesUsed(email);
     if (!mounted) return;
-    setState(() => _paid = paid);
+    setState(() {
+      _paid = paid;
+      _freeSavesUsed = used;
+    });
   }
 
   Future<bool> _ensurePaid() async {
@@ -132,8 +141,14 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       isAdmin: widget.isAdmin,
     );
     if (!ok) return false;
-    await _refreshPaid();
+    await _refreshAccess();
     return _paid;
+  }
+
+  /// After free saves are used up, every create/edit action needs payment first.
+  Future<bool> _ensureCanCreate() async {
+    if (!_createLocked) return true;
+    return _ensurePaid();
   }
 
   /// Template QR encodes ngmy.org until the user has paid.
@@ -468,6 +483,19 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _saveCurrent() async {
+    if (_createLocked) {
+      if (!await _ensurePaid()) return;
+      if (!mounted) return;
+    } else if (!_paid) {
+      final canFree = await NgmyQrGeneratorPayments.canSaveWithoutPaying(
+        email: widget.userEmail ?? '',
+        isAdmin: widget.isAdmin,
+      );
+      if (!canFree) {
+        if (!await _ensurePaid()) return;
+        if (!mounted) return;
+      }
+    }
     final payload = _buildPayload();
     final label = _labelC.text.trim();
     if (payload.isEmpty) {
@@ -491,8 +519,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       savedAt: DateTime.now().toUtc().toIso8601String(),
     );
     await addNgmySavedQr(record);
+    if (!_paid) {
+      await NgmyQrGeneratorPayments.recordFreeSave(widget.userEmail ?? '');
+    }
     await _reloadSaved();
+    await _refreshAccess();
     if (!mounted) return;
+    FocusScope.of(context).unfocus();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('“$label” saved on this device only.')),
     );
@@ -554,7 +587,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              onPressed: hasQr ? () => _openTemplateGallery(payload) : null,
+                              onPressed: !hasQr
+                                  ? null
+                                  : () async {
+                                      if (!await _ensureCanCreate()) return;
+                                      if (!mounted) return;
+                                      await _openTemplateGallery(payload);
+                                    },
                               tooltip: 'Templates',
                               icon: Icon(
                                 Icons.dashboard_customize_rounded,
@@ -593,95 +632,107 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                         const SizedBox(height: 14),
                         if (onSavedTab)
                           _savedList()
-                        else ...[
-                          _formFields(),
-                          if (hasQr) ...[
-                            const SizedBox(height: 14),
-                            _field(
-                              controller: _labelC,
-                              label: 'Label this QR code *',
-                              hint: 'e.g. Home Wi‑Fi, My website, Shop link',
-                              icon: Icons.label_outline_rounded,
-                            ),
-                          ],
-                          const SizedBox(height: 18),
-                          if (_activeTemplate != null && hasQr) ...[
-                            _templateEditor(),
-                            const SizedBox(height: 12),
-                            NgmyToolkitAliveSection(
-                              colors: colors,
-                              pulse: pulse,
-                              scan: scan,
-                              orbit: orbit,
-                              phase: 0.35,
-                              child: _templatePreview(payload),
-                            ),
-                          ] else
-                            NgmyToolkitAliveSection(
-                              colors: colors,
-                              pulse: pulse,
-                              scan: scan,
-                              orbit: orbit,
-                              phase: 0.35,
-                              child: _qrPreview(payload, hasQr),
-                            ),
-                          if (hasQr) ...[
-                            const SizedBox(height: 12),
-                            Row(
+                        else
+                          _lockedCreateBody(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: _busy ? null : _downloadCurrent,
-                                    icon: _busy
-                                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                                        : const Icon(Icons.download_rounded, size: 18),
-                                    label: const Text('Download'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: _accent,
-                                      side: BorderSide(color: _accent.withOpacity(0.55)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
+                                _formFields(),
+                                if (hasQr) ...[
+                                  const SizedBox(height: 14),
+                                  _field(
+                                    controller: _labelC,
+                                    label: 'Label this QR code *',
+                                    hint: 'e.g. Home Wi‑Fi, My website, Shop link',
+                                    icon: Icons.label_outline_rounded,
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _busy ? null : _saveCurrent,
-                                    icon: const Icon(Icons.bookmark_rounded, size: 18),
-                                    label: const Text('Save QR'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _accent,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
+                                ],
+                                const SizedBox(height: 18),
+                                if (_activeTemplate != null && hasQr) ...[
+                                  _templateEditor(),
+                                  const SizedBox(height: 12),
+                                  NgmyToolkitAliveSection(
+                                    colors: colors,
+                                    pulse: pulse,
+                                    scan: scan,
+                                    orbit: orbit,
+                                    phase: 0.35,
+                                    child: _templatePreview(payload),
                                   ),
-                                ),
+                                ] else
+                                  NgmyToolkitAliveSection(
+                                    colors: colors,
+                                    pulse: pulse,
+                                    scan: scan,
+                                    orbit: orbit,
+                                    phase: 0.35,
+                                    child: _qrPreview(payload, hasQr),
+                                  ),
+                                if (hasQr) ...[
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: OutlinedButton.icon(
+                                          onPressed: _busy
+                                              ? null
+                                              : () async {
+                                                  if (!await _ensureCanCreate()) return;
+                                                  if (!mounted) return;
+                                                  await _downloadCurrent();
+                                                },
+                                          icon: _busy
+                                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                                              : const Icon(Icons.download_rounded, size: 18),
+                                          label: const Text('Download'),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: _accent,
+                                            side: BorderSide(color: _accent.withOpacity(0.55)),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: _busy ? null : _saveCurrent,
+                                          icon: const Icon(Icons.bookmark_rounded, size: 18),
+                                          label: const Text('Save QR'),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: _accent,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_activeTemplate != null) ...[
+                                    const SizedBox(height: 10),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        onPressed: _busy ? null : _saveCurrentTemplate,
+                                        icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
+                                        label: const Text('Save template'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFFA78BFA),
+                                          side: const BorderSide(color: Color(0xFFA78BFA)),
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Saved locally on this device only · never uploaded',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                  ),
+                                ],
                               ],
                             ),
-                            if (_activeTemplate != null) ...[
-                              const SizedBox(height: 10),
-                              SizedBox(
-                                width: double.infinity,
-                                child: OutlinedButton.icon(
-                                  onPressed: _busy ? null : _saveCurrentTemplate,
-                                  icon: const Icon(Icons.dashboard_customize_rounded, size: 18),
-                                  label: const Text('Save template'),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFFA78BFA),
-                                    side: const BorderSide(color: Color(0xFFA78BFA)),
-                                    padding: const EdgeInsets.symmetric(vertical: 12),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 8),
-                            Text(
-                              'Saved locally on this device only · never uploaded',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
-                            ),
-                          ],
-                        ],
+                          ),
                       ],
                     ),
                   ),
@@ -691,6 +742,29 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           );
         },
       ),
+    );
+  }
+
+  /// Blocks typing and create actions after 2 free saves until Stripe unlocks.
+  Widget _lockedCreateBody({required Widget child}) {
+    if (!_createLocked) return child;
+    return Stack(
+      children: [
+        AbsorbPointer(
+          child: Opacity(opacity: 0.45, child: child),
+        ),
+        Positioned.fill(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () async {
+                await _ensurePaid();
+              },
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -714,10 +788,21 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           return Padding(
             padding: EdgeInsets.only(right: i == types.length - 1 ? 0 : 8),
             child: GestureDetector(
-              onTap: () => setState(() {
-                _type = i;
-                _clearTemplate();
-              }),
+              onTap: () async {
+                if (i == _savedTabIndex) {
+                  setState(() {
+                    _type = i;
+                    _clearTemplate();
+                  });
+                  return;
+                }
+                if (!await _ensureCanCreate()) return;
+                if (!mounted) return;
+                setState(() {
+                  _type = i;
+                  _clearTemplate();
+                });
+              },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
