@@ -6,8 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_local_tts.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_swahili_curriculum.dart';
 import 'ngmy_swahili_path_ui.dart';
+import 'ngmy_swahili_payments.dart';
 import 'ngmy_swahili_routes.dart';
 import 'ngmy_swahili_visuals.dart';
 import 'ngmy_swahili_word_enrichment.dart';
@@ -45,12 +47,19 @@ class SwahiliWordReminder {
       );
 }
 
-void showNgmySwahiliSchool({required BuildContext context, String? userEmail}) {
+void showNgmySwahiliSchool({
+  required BuildContext context,
+  String? userEmail,
+  dynamic user,
+}) {
   final bg = Theme.of(context).brightness == Brightness.dark ? kSwahiliSchoolBgDark : kSwahiliSchoolBgLight;
   Navigator.of(context).push<void>(
     ngmySwahiliInstantRoute<void>(
       context,
-      NgmySwahiliSchoolPage(userEmail: userEmail),
+      NgmySwahiliSchoolPage(
+        userEmail: userEmail,
+        isAdmin: NgmyStripePayments.isAdmin(user),
+      ),
       background: bg,
     ),
   );
@@ -192,9 +201,10 @@ Future<void> saveSwahiliProgress(String? email, NgmySwahiliProgress progress) as
 }
 
 class NgmySwahiliSchoolPage extends StatefulWidget {
-  const NgmySwahiliSchoolPage({super.key, this.userEmail});
+  const NgmySwahiliSchoolPage({super.key, this.userEmail, this.isAdmin = false});
 
   final String? userEmail;
+  final bool isAdmin;
 
   @override
   State<NgmySwahiliSchoolPage> createState() => _NgmySwahiliSchoolPageState();
@@ -248,8 +258,17 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
     return _progress.isDayDone(levelIndex, dayIndex - 1);
   }
 
-  void _openLevelPath(int levelIndex) {
+  Future<void> _openLevelPath(int levelIndex) async {
     final level = kSwahiliLevels[levelIndex];
+    final email = widget.userEmail?.trim() ?? '';
+    final paid = await NgmySwahiliPayments.ensureLevelAccess(
+      context: context,
+      email: email,
+      levelId: level.id,
+      isAdmin: widget.isAdmin,
+    );
+    if (!paid || !mounted) return;
+    if (!context.mounted) return;
     Navigator.of(context).push<void>(
       ngmySwahiliInstantRoute<void>(
         context,

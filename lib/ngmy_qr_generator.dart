@@ -26,7 +26,6 @@ const List<String> _kQrTypeLabels = [
 ];
 
 /// QR Code Generator — local codes plus cloud-saved Advisors / Family Tree sync QRs.
-/// Opens only after \$2/week wallet access (admins free).
 Future<void> showNgmyQrGeneratorDialog(
   BuildContext context, {
   String? userEmail,
@@ -36,29 +35,22 @@ Future<void> showNgmyQrGeneratorDialog(
   VoidCallback? onDataChanged,
 }) async {
   final isAdmin = user != null && (user as dynamic).isAdmin == true;
-  if (!isAdmin) {
-    if (user == null || config == null || onCharge == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign in with wallet access to use QR Generator (\$2/week).')),
-        );
-      }
-      return;
-    }
-    final ok = await NgmyQrGeneratorPayments.ensureAccess(
-      context: context,
-      user: user,
-      config: config,
-      onCharge: onCharge,
-      onDataChanged: onDataChanged,
-    );
-    if (!ok || !context.mounted) return;
+  var email = userEmail?.trim() ?? '';
+  if (email.isEmpty && user != null) {
+    try {
+      email = (((user as dynamic).email as String?) ?? '').trim();
+    } catch (_) {}
   }
-  if (!context.mounted) return;
+  final ok = await NgmyQrGeneratorPayments.ensureAccess(
+    context: context,
+    email: email,
+    isAdmin: isAdmin,
+  );
+  if (!ok || !context.mounted) return;
   await showDialog<void>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.82),
-    builder: (ctx) => _NgmyQrGeneratorDialog(userEmail: userEmail?.trim()),
+    builder: (ctx) => _NgmyQrGeneratorDialog(userEmail: email.isEmpty ? null : email),
   );
 }
 

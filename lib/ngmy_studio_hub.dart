@@ -119,15 +119,12 @@ class NgmyCreatorHubTab extends StatelessWidget {
         icon: Icons.qr_code_2_rounded,
         colors: const [Color(0xFF2563EB), Color(0xFF7C3AED)],
         title: 'QR Generator',
-        subtitle: '\$2 / week · create & save QR codes',
+        subtitle: 'Create & save QR codes',
         onTap: () {
           unawaited(showNgmyQrGeneratorDialog(
             context,
             userEmail: userEmail.isEmpty ? null : userEmail,
             user: user,
-            config: config,
-            onCharge: onCharge,
-            onDataChanged: onDataChanged,
           ));
         },
       ),
@@ -145,7 +142,11 @@ class NgmyCreatorHubTab extends StatelessWidget {
         colors: const [Color(0xFF059669), Color(0xFF14B8A6)],
         title: 'Kiswahili School',
         subtitle: 'Jifunze Kiingereza kwa picha na Mwalimu Amina',
-        onTap: () => showNgmySwahiliSchool(context: context, userEmail: userEmail),
+        onTap: () => showNgmySwahiliSchool(
+          context: context,
+          userEmail: userEmail,
+          user: user,
+        ),
       ),
       _CreatorTool(
         icon: Icons.mic_rounded,

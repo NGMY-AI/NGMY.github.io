@@ -24,6 +24,8 @@ enum NgmyStripeProduct {
   bioStudio,
   businessCard,
   bioPhotoPack,
+  qrGenerator,
+  swahiliLevel,
 }
 
 class NgmyStripePayments {
@@ -51,6 +53,10 @@ class NgmyStripePayments {
       'https://buy.stripe.com/00w8wP4Nr2pr57Z2m1b7y0d';
   static const String bioPhotoPackUrl =
       'https://buy.stripe.com/5kQ8wP93H8NPdEv5ydb7y0e';
+  static const String qrGeneratorUrl =
+      'https://buy.stripe.com/fZufZheo12prgQH5ydb7y0f';
+  static const String swahiliLevelUrl =
+      'https://buy.stripe.com/5kQ28rcfT9RTasjf8Nb7y0g';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -116,6 +122,10 @@ class NgmyStripePayments {
         return 'business_card';
       case NgmyStripeProduct.bioPhotoPack:
         return 'bio_photo_pack';
+      case NgmyStripeProduct.qrGenerator:
+        return 'qr_generator';
+      case NgmyStripeProduct.swahiliLevel:
+        return 'swahili_level';
     }
   }
 
@@ -145,6 +155,10 @@ class NgmyStripePayments {
         return NgmyStripeProduct.businessCard;
       case 'bio_photo_pack':
         return NgmyStripeProduct.bioPhotoPack;
+      case 'qr_generator':
+        return NgmyStripeProduct.qrGenerator;
+      case 'swahili_level':
+        return NgmyStripeProduct.swahiliLevel;
       default:
         return null;
     }
@@ -176,6 +190,10 @@ class NgmyStripePayments {
         return businessCardUrl;
       case NgmyStripeProduct.bioPhotoPack:
         return bioPhotoPackUrl;
+      case NgmyStripeProduct.qrGenerator:
+        return qrGeneratorUrl;
+      case NgmyStripeProduct.swahiliLevel:
+        return swahiliLevelUrl;
     }
   }
 
@@ -250,6 +268,10 @@ class NgmyStripePayments {
         return 399;
       case NgmyStripeProduct.bioPhotoPack:
         return 199;
+      case NgmyStripeProduct.qrGenerator:
+        return 225;
+      case NgmyStripeProduct.swahiliLevel:
+        return 500;
     }
   }
 
@@ -272,6 +294,10 @@ class NgmyStripePayments {
         return '2 days';
       case NgmyStripeProduct.bioPhotoPack:
         return '2 photo changes';
+      case NgmyStripeProduct.qrGenerator:
+        return '1 week';
+      case NgmyStripeProduct.swahiliLevel:
+        return 'lifetime';
       default:
         return '30 days';
     }
@@ -305,6 +331,10 @@ class NgmyStripePayments {
         return const [Color(0xFF6EE7B7), Color(0xFF087F5B)]; // polished emerald
       case NgmyStripeProduct.bioPhotoPack:
         return const [Color(0xFF9AD0FF), Color(0xFF2F6FCF)]; // photo pack blue
+      case NgmyStripeProduct.qrGenerator:
+        return const [Color(0xFF67E8F9), Color(0xFF0E7490)]; // cyan crystal
+      case NgmyStripeProduct.swahiliLevel:
+        return const [Color(0xFF34D399), Color(0xFF047857)]; // school emerald
     }
   }
 
@@ -335,6 +365,10 @@ class NgmyStripePayments {
         return const Color(0xFFE8FFF6);
       case NgmyStripeProduct.bioPhotoPack:
         return const Color(0xFFEAF4FF);
+      case NgmyStripeProduct.qrGenerator:
+        return const Color(0xFFE0FBFF);
+      case NgmyStripeProduct.swahiliLevel:
+        return const Color(0xFFD1FAE5);
     }
   }
 
@@ -378,6 +412,10 @@ class NgmyStripePayments {
         return 'Business Card';
       case NgmyStripeProduct.bioPhotoPack:
         return 'Bio Photo Changes';
+      case NgmyStripeProduct.qrGenerator:
+        return 'QR Generator';
+      case NgmyStripeProduct.swahiliLevel:
+        return 'Kiswahili School';
     }
   }
 
@@ -407,6 +445,10 @@ class NgmyStripePayments {
         return Icons.contact_page_rounded;
       case NgmyStripeProduct.bioPhotoPack:
         return Icons.photo_camera_rounded;
+      case NgmyStripeProduct.qrGenerator:
+        return Icons.qr_code_2_rounded;
+      case NgmyStripeProduct.swahiliLevel:
+        return Icons.translate_rounded;
     }
   }
 
@@ -436,6 +478,10 @@ class NgmyStripePayments {
         return 'Edit and download this card design for 2 days.';
       case NgmyStripeProduct.bioPhotoPack:
         return 'Pay \$1.99 for 2 more Bio photo changes (profile, header, or background).';
+      case NgmyStripeProduct.qrGenerator:
+        return 'Create, template, save, and download QR codes.';
+      case NgmyStripeProduct.swahiliLevel:
+        return 'Unlock this level to keep learning.';
     }
   }
 
@@ -443,7 +489,9 @@ class NgmyStripePayments {
       product == NgmyStripeProduct.marriageDocument ||
       product == NgmyStripeProduct.phoneUnlock ||
       product == NgmyStripeProduct.businessCard ||
-      product == NgmyStripeProduct.bioPhotoPack;
+      product == NgmyStripeProduct.bioPhotoPack ||
+      product == NgmyStripeProduct.qrGenerator ||
+      product == NgmyStripeProduct.swahiliLevel;
 
   static bool isSubscribeProduct(NgmyStripeProduct product) =>
       !isOneTimePayProduct(product);

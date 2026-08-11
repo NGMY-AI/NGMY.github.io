@@ -52,11 +52,11 @@ void ngmyRegisterAiAppTools({
         return 'Opened Phone Unlock — quick links for Google, Chrome, and Settings.';
       },
       'swahili_school': (ctx) async {
-        showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
+        showNgmySwahiliSchool(context: ctx, userEmail: userEmail, user: user);
         return 'Opened Kiswahili School — learn English with Mwalimu Amina.';
       },
       'mechanic_lab': (ctx) async {
-        showNgmySwahiliSchool(context: ctx, userEmail: userEmail);
+        showNgmySwahiliSchool(context: ctx, userEmail: userEmail, user: user);
         return 'Opened Kiswahili School.';
       },
       'recorder_studio': (ctx) async {
@@ -68,9 +68,6 @@ void ngmyRegisterAiAppTools({
           ctx,
           userEmail: userEmail.isEmpty ? null : userEmail,
           user: user,
-          config: config,
-          onCharge: onCharge,
-          onDataChanged: onDataChanged,
         );
         return 'Opened QR Generator.';
       },

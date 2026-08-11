@@ -35,6 +35,8 @@ const PRODUCT_SLUGS = new Set([
   "bio_studio",
   "business_card",
   "bio_photo_pack",
+  "qr_generator",
+  "swahili_level",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;
@@ -42,6 +44,8 @@ const ACCESS_DAYS_PHONE_UNLOCK = 10;
 const ACCESS_HOURS_MARRIAGE = 4;
 const ACCESS_DAYS_BUSINESS_CARD = 2;
 const ACCESS_DAYS_BIO_PHOTO_PACK = 1;
+const ACCESS_DAYS_QR_GENERATOR = 7;
+const ACCESS_DAYS_SWAHILI_LEVEL = 36500;
 const SIGNATURE_TOLERANCE_SEC = 300;
 
 function json(body: unknown, status = 200): Response {
@@ -119,11 +123,17 @@ function accessUntilForProduct(product: string, existingUntil: Date | null): str
   if (product === "phone_unlock") {
     return new Date(now.getTime() + ACCESS_DAYS_PHONE_UNLOCK * 86_400_000).toISOString();
   }
+  if (product === "qr_generator") {
+    return new Date(now.getTime() + ACCESS_DAYS_QR_GENERATOR * 86_400_000).toISOString();
+  }
   if (product.startsWith("business_card:")) {
     return new Date(now.getTime() + ACCESS_DAYS_BUSINESS_CARD * 86_400_000).toISOString();
   }
   if (product.startsWith("bio_photo_pack:")) {
     return new Date(now.getTime() + ACCESS_DAYS_BIO_PHOTO_PACK * 86_400_000).toISOString();
+  }
+  if (product.startsWith("swahili_level:")) {
+    return new Date(now.getTime() + ACCESS_DAYS_SWAHILI_LEVEL * 86_400_000).toISOString();
   }
   const base = existingUntil && existingUntil.getTime() > now.getTime() ? existingUntil : now;
   return new Date(base.getTime() + ACCESS_DAYS_DEFAULT * 86_400_000).toISOString();
@@ -350,6 +360,13 @@ serve(async (req) => {
       return json({ error: "Missing bio photo pack scope" }, 422);
     }
     product = `bio_photo_pack:${scope}`;
+  }
+  if (product === "swahili_level") {
+    if (!scope || !/^[A-Za-z0-9_]+$/.test(scope)) {
+      console.error("[ngmy-stripe-webhook] missing/invalid swahili level scope", session?.id);
+      return json({ error: "Missing swahili level scope" }, 422);
+    }
+    product = `swahili_level:${scope}`;
   }
 
   const { data: existing } = await admin
