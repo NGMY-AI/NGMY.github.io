@@ -26,6 +26,7 @@ const List<String> _kQrTypeLabels = [
 ];
 
 /// QR Code Generator — local codes plus cloud-saved Advisors / Family Tree sync QRs.
+/// Create + save QR are free; download and templates require Stripe.
 Future<void> showNgmyQrGeneratorDialog(
   BuildContext context, {
   String? userEmail,
@@ -41,23 +42,22 @@ Future<void> showNgmyQrGeneratorDialog(
       email = (((user as dynamic).email as String?) ?? '').trim();
     } catch (_) {}
   }
-  final ok = await NgmyQrGeneratorPayments.ensureAccess(
-    context: context,
-    email: email,
-    isAdmin: isAdmin,
-  );
-  if (!ok || !context.mounted) return;
+  if (!context.mounted) return;
   await showDialog<void>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.82),
-    builder: (ctx) => _NgmyQrGeneratorDialog(userEmail: email.isEmpty ? null : email),
+    builder: (ctx) => _NgmyQrGeneratorDialog(
+      userEmail: email.isEmpty ? null : email,
+      isAdmin: isAdmin,
+    ),
   );
 }
 
 class _NgmyQrGeneratorDialog extends StatefulWidget {
-  const _NgmyQrGeneratorDialog({this.userEmail});
+  const _NgmyQrGeneratorDialog({this.userEmail, this.isAdmin = false});
 
   final String? userEmail;
+  final bool isAdmin;
 
   @override
   State<_NgmyQrGeneratorDialog> createState() => _NgmyQrGeneratorDialogState();
@@ -96,6 +96,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   final _templateFooterC = TextEditingController();
 
   NgmyQrTemplateDef? _activeTemplate;
+  bool _paid = false;
 
   /// Bumped after download capture so preview layers rebuild crisp (web toImage fix).
   int _previewGeneration = 0;
@@ -111,7 +112,33 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       c.addListener(_onFieldsChanged);
     }
     _reloadSaved();
+    _refreshPaid();
   }
+
+  Future<void> _refreshPaid() async {
+    final paid = await NgmyQrGeneratorPayments.hasAccess(
+      email: widget.userEmail ?? '',
+      isAdmin: widget.isAdmin,
+    );
+    if (!mounted) return;
+    setState(() => _paid = paid);
+  }
+
+  Future<bool> _ensurePaid() async {
+    if (_paid) return true;
+    final ok = await NgmyQrGeneratorPayments.ensureAccess(
+      context: context,
+      email: widget.userEmail ?? '',
+      isAdmin: widget.isAdmin,
+    );
+    if (!ok) return false;
+    await _refreshPaid();
+    return _paid;
+  }
+
+  /// Template QR encodes ngmy.org until the user has paid.
+  String _templateQrData(String realPayload) =>
+      NgmyQrGeneratorPayments.templatePayload(realPayload, paid: _paid);
 
   Future<void> _reloadSaved() async {
     final list = await loadNgmySavedQrs(userEmail: widget.userEmail);
@@ -124,6 +151,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _saveCurrentTemplate() async {
+    if (!await _ensurePaid()) return;
+    if (!mounted) return;
     final payload = _buildPayload();
     final template = _activeTemplate;
     final label = _labelC.text.trim();
@@ -282,13 +311,14 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     final Widget captureChild;
     if (_activeTemplate != null) {
       final template = _activeTemplate!;
+      final qrData = _templateQrData(payload);
       captureChild = NgmyQrTemplateCard(
         template: template,
         title: _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim(),
         body: _templateBodyC.text.trim(),
         footer: _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim(),
         fieldVars: _templateFieldVars(),
-        qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
+        qrWidget: _compactQrForTemplate(qrData, borderColor: template.accent),
       );
     } else {
       captureChild = NgmyBrandedQrWidget(data: payload, large: true);
@@ -337,7 +367,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _downloadQr({required String payload, required String label}) async {
-    if (_busy || payload.isEmpty) return;
+    if (!await _ensurePaid()) return;
+    if (!mounted || _busy || payload.isEmpty) return;
     setState(() => _busy = true);
     try {
       final bytes = await _captureDownloadImage(payload);
@@ -403,12 +434,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
       );
       return;
     }
+    final qrData = _templateQrData(payload);
     await showNgmyQrTemplateGallery(
       context: context,
       categoryIndex: _type,
       categoryLabel: _typeLabel(),
       fieldVars: _templateFieldVars(),
-      qrWidget: NgmyBrandedQrWidget(data: payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+      qrWidget: NgmyBrandedQrWidget(data: qrData, sizeOverride: 168, tightFrame: true, showLogo: true),
       onSelected: _applyTemplate,
     );
   }
@@ -824,6 +856,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   }
 
   Future<void> _openSavedTemplate(NgmySavedQrTemplateRecord record) async {
+    if (!await _ensurePaid()) return;
+    if (!mounted) return;
     final def = ngmyQrTemplateById(record.templateId);
     if (def == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -870,7 +904,12 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                       body: record.body,
                       footer: record.footer,
                       fieldVars: const {},
-                      qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+                      qrWidget: NgmyBrandedQrWidget(
+                        data: _templateQrData(record.payload),
+                        sizeOverride: 168,
+                        tightFrame: true,
+                        showLogo: true,
+                      ),
                     ),
                   ),
                 ),
@@ -895,12 +934,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
         builder: (ctx, setLocal) {
           Future<void> openTemplates() async {
             final typeIndex = record.typeIndex < 0 ? 0 : record.typeIndex;
+            final qrData = _templateQrData(record.payload);
             await showNgmyQrTemplateGallery(
               context: ctx,
               categoryIndex: typeIndex,
               categoryLabel: record.typeLabel,
               fieldVars: {'label': record.label, 'payload': record.payload},
-              qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+              qrWidget: NgmyBrandedQrWidget(data: qrData, sizeOverride: 168, tightFrame: true, showLogo: true),
               onSelected: (template, t, b, f) {
                 setLocal(() {
                   activeTemplate = template;
@@ -913,6 +953,9 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           }
 
           Future<void> saveTemplateFromSaved() async {
+            if (!await _ensurePaid()) return;
+            if (!mounted) return;
+            setLocal(() {});
             final template = activeTemplate;
             if (template == null) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -1001,7 +1044,12 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                                 body: body,
                                 footer: footer,
                                 fieldVars: {'label': record.label},
-                                qrWidget: NgmyBrandedQrWidget(data: record.payload, sizeOverride: 168, tightFrame: true, showLogo: true),
+                                qrWidget: NgmyBrandedQrWidget(
+                                  data: _templateQrData(record.payload),
+                                  sizeOverride: 168,
+                                  tightFrame: true,
+                                  showLogo: true,
+                                ),
                               )
                             else
                               NgmyBrandedQrWidget(data: record.payload, large: true),
@@ -1304,6 +1352,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
     final template = _activeTemplate!;
     final title = _templateTitleC.text.trim().isEmpty ? template.theme.subtitleTemplate : _templateTitleC.text.trim();
     final footer = _templateFooterC.text.trim().isEmpty ? template.theme.closingTemplate : _templateFooterC.text.trim();
+    final qrData = _templateQrData(payload);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1329,15 +1378,19 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => showNgmyQrTemplateFullscreen(
-                      context: context,
-                      template: template,
-                      title: title,
-                      body: _templateBodyC.text.trim(),
-                      footer: footer,
-                      fieldVars: _templateFieldVars(),
-                      qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
-                    ),
+                    onTap: () async {
+                      if (!await _ensurePaid()) return;
+                      if (!mounted) return;
+                      await showNgmyQrTemplateFullscreen(
+                        context: context,
+                        template: template,
+                        title: title,
+                        body: _templateBodyC.text.trim(),
+                        footer: footer,
+                        fieldVars: _templateFieldVars(),
+                        qrWidget: _compactQrForTemplate(_templateQrData(payload), borderColor: template.accent),
+                      );
+                    },
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
                       padding: const EdgeInsets.all(4),
@@ -1357,13 +1410,13 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: NgmyQrTemplateCard(
-              key: ValueKey('template-preview-$_previewGeneration'),
+              key: ValueKey('template-preview-$_previewGeneration-$_paid'),
               template: template,
               title: title,
               body: _templateBodyC.text.trim(),
               footer: footer,
               fieldVars: _templateFieldVars(),
-              qrWidget: _compactQrForTemplate(payload, borderColor: template.accent),
+              qrWidget: _compactQrForTemplate(qrData, borderColor: template.accent),
             ),
           ),
           const SizedBox(height: 10),
