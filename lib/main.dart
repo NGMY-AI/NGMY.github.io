@@ -28330,7 +28330,20 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
   void _openYQrGenerator() {
     final email = ((widget.user as dynamic).email as String?) ?? '';
-    showNgmyQrGeneratorDialog(context, userEmail: email.isEmpty ? null : email);
+    unawaited(showNgmyQrGeneratorDialog(
+      context,
+      userEmail: email.isEmpty ? null : email,
+      user: widget.user,
+      config: widget.config,
+      onCharge: (amount, description) async => ngmyChargeUserWallet(
+        user: widget.user,
+        allUsers: widget.allUsers,
+        amount: amount,
+        description: description,
+        onAddTransaction: widget.onAddTransaction,
+      ),
+      onDataChanged: widget.onDataChanged,
+    ));
   }
 
   void _openDocumentScanner() async {

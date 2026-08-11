@@ -64,7 +64,14 @@ void ngmyRegisterAiAppTools({
         return 'Opened Recorder Studio — photos, voice memos, and video.';
       },
       'qr_generator': (ctx) async {
-        showNgmyQrGeneratorDialog(ctx, userEmail: userEmail.isEmpty ? null : userEmail);
+        await showNgmyQrGeneratorDialog(
+          ctx,
+          userEmail: userEmail.isEmpty ? null : userEmail,
+          user: user,
+          config: config,
+          onCharge: onCharge,
+          onDataChanged: onDataChanged,
+        );
         return 'Opened QR Generator.';
       },
       'quote_calc': (ctx) async {

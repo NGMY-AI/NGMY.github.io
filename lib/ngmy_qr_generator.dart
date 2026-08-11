@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_qr_generator_payments.dart';
 import 'ngmy_qr_storage.dart';
 import 'ngmy_qr_template_ui.dart';
 import 'ngmy_qr_templates.dart';
@@ -25,8 +26,36 @@ const List<String> _kQrTypeLabels = [
 ];
 
 /// QR Code Generator — local codes plus cloud-saved Advisors / Family Tree sync QRs.
-void showNgmyQrGeneratorDialog(BuildContext context, {String? userEmail}) {
-  showDialog<void>(
+/// Opens only after \$2/week wallet access (admins free).
+Future<void> showNgmyQrGeneratorDialog(
+  BuildContext context, {
+  String? userEmail,
+  dynamic user,
+  dynamic config,
+  Future<bool> Function(double amount, String description)? onCharge,
+  VoidCallback? onDataChanged,
+}) async {
+  final isAdmin = user != null && (user as dynamic).isAdmin == true;
+  if (!isAdmin) {
+    if (user == null || config == null || onCharge == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in with wallet access to use QR Generator (\$2/week).')),
+        );
+      }
+      return;
+    }
+    final ok = await NgmyQrGeneratorPayments.ensureAccess(
+      context: context,
+      user: user,
+      config: config,
+      onCharge: onCharge,
+      onDataChanged: onDataChanged,
+    );
+    if (!ok || !context.mounted) return;
+  }
+  if (!context.mounted) return;
+  await showDialog<void>(
     context: context,
     barrierColor: Colors.black.withOpacity(0.82),
     builder: (ctx) => _NgmyQrGeneratorDialog(userEmail: userEmail?.trim()),

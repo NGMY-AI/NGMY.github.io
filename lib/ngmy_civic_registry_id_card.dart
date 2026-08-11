@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_civic_id_scanner.dart';
@@ -783,9 +784,41 @@ Future<void> showNgmyEnlargedCivicQrDialog(BuildContext context, String registry
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white),
           ),
           const SizedBox(height: 6),
-          Text(
-            registryId.isEmpty ? 'Registry QR' : registryId,
-            style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  registryId.isEmpty ? 'Registry QR' : registryId,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (registryId.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () async {
+                      await Clipboard.setData(ClipboardData(text: registryId));
+                      if (!ctx.mounted) return;
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('ID number copied'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(Icons.copy_rounded, size: 18, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 18),
           Container(

@@ -119,9 +119,16 @@ class NgmyCreatorHubTab extends StatelessWidget {
         icon: Icons.qr_code_2_rounded,
         colors: const [Color(0xFF2563EB), Color(0xFF7C3AED)],
         title: 'QR Generator',
-        subtitle: 'Create & save QR codes',
+        subtitle: '\$2 / week · create & save QR codes',
         onTap: () {
-          showNgmyQrGeneratorDialog(context, userEmail: userEmail.isEmpty ? null : userEmail);
+          unawaited(showNgmyQrGeneratorDialog(
+            context,
+            userEmail: userEmail.isEmpty ? null : userEmail,
+            user: user,
+            config: config,
+            onCharge: onCharge,
+            onDataChanged: onDataChanged,
+          ));
         },
       ),
       _CreatorTool(
