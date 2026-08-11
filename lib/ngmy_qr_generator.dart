@@ -788,16 +788,7 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
           return Padding(
             padding: EdgeInsets.only(right: i == types.length - 1 ? 0 : 8),
             child: GestureDetector(
-              onTap: () async {
-                if (i == _savedTabIndex) {
-                  setState(() {
-                    _type = i;
-                    _clearTemplate();
-                  });
-                  return;
-                }
-                if (!await _ensureCanCreate()) return;
-                if (!mounted) return;
+              onTap: () {
                 setState(() {
                   _type = i;
                   _clearTemplate();
