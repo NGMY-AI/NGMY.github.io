@@ -31752,8 +31752,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     await showNgmyCivicContributionReportSheet(context, data: data);
   }
 
-  List<AppTransaction> _stateWalletContributionTx() {
-    final viewerState = _selectedState.trim().toLowerCase();
+  List<AppTransaction> _stateWalletContributionTx([String? forState]) {
+    final viewerState = (forState ?? _selectedState).trim().toLowerCase();
     return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
       final meta = _decodeContributionMeta(t);
@@ -31763,8 +31763,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }).toList();
   }
 
-  NgmyCivicWalletSnapshot _buildCivicStateWalletSnapshot() {
-    final contribRows = _stateWalletContributionTx().map((t) {
+  NgmyCivicWalletSnapshot _buildCivicStateWalletSnapshot([String? forState]) {
+    final state = (forState ?? _selectedState).trim();
+    final contribRows = _stateWalletContributionTx(state).map((t) {
       final meta = _decodeContributionMeta(t);
       return <String, dynamic>{
         'id': t.id,
@@ -31773,20 +31774,116 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'at': t.timestamp.toUtc().toIso8601String(),
       };
     }).toList();
+    final want = state.toLowerCase();
     final spendingRows = widget.config.helpCampaignSpendings
         .map((e) => Map<String, dynamic>.from(e))
         .where((e) {
           final st = (e['state'] ?? '').toString().trim().toLowerCase();
-          final want = _selectedState.trim().toLowerCase();
           if (want.isEmpty) return true;
           if (st.isEmpty) return true;
           return st == want;
         })
         .toList();
     return buildNgmyCivicWalletSnapshot(
-      state: _selectedState,
+      state: state,
       contributionRows: contribRows,
       spendingRows: spendingRows,
+    );
+  }
+
+  Future<void> _addCivicWalletSpending({
+    required String state,
+    required double amount,
+    required String description,
+  }) async {
+    final st = state.trim();
+    if (st.isEmpty || amount <= 0) return;
+    final record = {
+      'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
+      'campaignId': _activeHelpCampaignId().trim().isEmpty
+          ? 'wallet_${st.toLowerCase()}'
+          : _activeHelpCampaignId().trim(),
+      'amount': amount,
+      'description': description,
+      'recordedAt': DateTime.now().toUtc().toIso8601String(),
+      'recordedByEmail': widget.user.email.toLowerCase().trim(),
+      'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+      'state': st,
+    };
+    setState(() {
+      widget.config.helpCampaignSpendings = [
+        ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+        record,
+      ];
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Future<void> _openAdminCivicStateCase(String state) async {
+    final st = state.trim();
+    if (st.isEmpty || !mounted) return;
+    final isRegistrar = _canManageCivicRegistry();
+    final isAdmin = _isGlobalCivicRegistryAdmin();
+    await NgmyNavigator.push<void>(
+      context,
+      NgmyCivicStateWalletScreen(
+        state: st,
+        canEdit: isRegistrar || isAdmin,
+        snapshotBuilder: () => _buildCivicStateWalletSnapshot(st),
+        onAddSpending: ({required double amount, required String description}) =>
+            _addCivicWalletSpending(state: st, amount: amount, description: description),
+        onUpdateSpending: ({
+          required String spendingId,
+          required double amount,
+          required String description,
+        }) async {
+          final id = spendingId.trim();
+          if (id.isEmpty) return;
+          setState(() {
+            widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.map((e) {
+              final row = Map<String, dynamic>.from(e);
+              if ((row['id'] ?? '').toString().trim() != id) return row;
+              row['amount'] = amount;
+              row['description'] = description;
+              row['recordedAt'] = DateTime.now().toUtc().toIso8601String();
+              row['recordedByEmail'] = widget.user.email.toLowerCase().trim();
+              row['recordedByName'] = (widget.user.fullName ?? widget.user.username).trim();
+              row['state'] = st;
+              return row;
+            }).toList();
+          });
+          widget.onDataChanged();
+          await ngmyPersistCivicHelpModeSettings(widget.config);
+        },
+        onDeleteSpending: (spendingId) async {
+          final id = spendingId.trim();
+          if (id.isEmpty) return;
+          final deleteAt = DateTime.now().toUtc().add(const Duration(hours: 24)).toIso8601String();
+          setState(() {
+            widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.map((e) {
+              final row = Map<String, dynamic>.from(e);
+              if ((row['id'] ?? '').toString().trim() != id) return row;
+              row['pendingDeleteAt'] = deleteAt;
+              return row;
+            }).toList();
+          });
+          widget.onDataChanged();
+          await ngmyPersistCivicHelpModeSettings(widget.config);
+        },
+        onPurgeExpired: _purgeExpiredWalletSpendings,
+        canAdminBrowseStates: isAdmin,
+        allStates: _usStates,
+        snapshotForState: _buildCivicStateWalletSnapshot,
+        onOpenStateCase: _openAdminCivicStateCase,
+        onAdminRemoveAvailable: ({required String state, required double amount}) =>
+            _addCivicWalletSpending(
+              state: state,
+              amount: amount,
+              description: 'Admin available balance adjustment',
+            ),
+      ),
+      routeName: 'NgmyCivicStateWalletScreen',
     );
   }
 
@@ -31816,38 +31913,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _openCivicStateWalletFlow() async {
     await _purgeExpiredWalletSpendings();
     final isRegistrar = _canManageCivicRegistry();
+    final isAdmin = _isGlobalCivicRegistryAdmin();
     await openNgmyCivicStateWalletFlow(
       context: context,
       state: _selectedState,
       globalPin: widget.config.civicRegistryPin,
       pinsByState: widget.config.civicRegistryPinsByState,
       members: ngmyCivicMembersForState(widget.config, _selectedState),
-      snapshotBuilder: _buildCivicStateWalletSnapshot,
-      canEdit: isRegistrar,
+      snapshotBuilder: () => _buildCivicStateWalletSnapshot(),
+      canEdit: isRegistrar || isAdmin,
       // Authorized registrars never enter wallet unlock codes.
-      skipUnlockCodes: isRegistrar,
-      onAddSpending: ({required double amount, required String description}) async {
-        final record = {
-          'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
-          'campaignId': _activeHelpCampaignId().trim().isEmpty
-              ? 'wallet_${_selectedState.trim().toLowerCase()}'
-              : _activeHelpCampaignId().trim(),
-          'amount': amount,
-          'description': description,
-          'recordedAt': DateTime.now().toUtc().toIso8601String(),
-          'recordedByEmail': widget.user.email.toLowerCase().trim(),
-          'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
-          'state': _selectedState.trim(),
-        };
-        setState(() {
-          widget.config.helpCampaignSpendings = [
-            ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
-            record,
-          ];
-        });
-        widget.onDataChanged();
-        await ngmyPersistCivicHelpModeSettings(widget.config);
-      },
+      skipUnlockCodes: isRegistrar || isAdmin,
+      onAddSpending: ({required double amount, required String description}) =>
+          _addCivicWalletSpending(
+            state: _selectedState,
+            amount: amount,
+            description: description,
+          ),
       onUpdateSpending: ({
         required String spendingId,
         required double amount,
@@ -31888,6 +31970,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await ngmyPersistCivicHelpModeSettings(widget.config);
       },
       onPurgeExpired: _purgeExpiredWalletSpendings,
+      canAdminBrowseStates: isAdmin,
+      allStates: _usStates,
+      snapshotForState: _buildCivicStateWalletSnapshot,
+      onOpenStateCase: _openAdminCivicStateCase,
+      onAdminRemoveAvailable: ({required String state, required double amount}) =>
+          _addCivicWalletSpending(
+            state: state,
+            amount: amount,
+            description: 'Admin available balance adjustment',
+          ),
     );
   }
 

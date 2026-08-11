@@ -244,6 +244,14 @@ Future<void> openNgmyCivicStateWalletFlow({
   }) onUpdateSpending,
   required Future<void> Function(String spendingId) onDeleteSpending,
   Future<void> Function()? onPurgeExpired,
+  bool canAdminBrowseStates = false,
+  List<String> allStates = const [],
+  NgmyCivicWalletSnapshot Function(String state)? snapshotForState,
+  Future<void> Function(String state)? onOpenStateCase,
+  Future<void> Function({
+    required String state,
+    required double amount,
+  })? onAdminRemoveAvailable,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -269,6 +277,11 @@ Future<void> openNgmyCivicStateWalletFlow({
       onUpdateSpending: onUpdateSpending,
       onDeleteSpending: onDeleteSpending,
       onPurgeExpired: onPurgeExpired,
+      canAdminBrowseStates: canAdminBrowseStates,
+      allStates: allStates,
+      snapshotForState: snapshotForState,
+      onOpenStateCase: onOpenStateCase,
+      onAdminRemoveAvailable: onAdminRemoveAvailable,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );

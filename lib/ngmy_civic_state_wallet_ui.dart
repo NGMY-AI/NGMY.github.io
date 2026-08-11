@@ -40,6 +40,11 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required this.onUpdateSpending,
     required this.onDeleteSpending,
     this.onPurgeExpired,
+    this.canAdminBrowseStates = false,
+    this.allStates = const [],
+    this.snapshotForState,
+    this.onOpenStateCase,
+    this.onAdminRemoveAvailable,
   });
 
   final String state;
@@ -56,6 +61,16 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   }) onUpdateSpending;
   final Future<void> Function(String spendingId) onDeleteSpending;
   final Future<void> Function()? onPurgeExpired;
+
+  /// Global civic admins can open any state's case and clear available balance.
+  final bool canAdminBrowseStates;
+  final List<String> allStates;
+  final NgmyCivicWalletSnapshot Function(String state)? snapshotForState;
+  final Future<void> Function(String state)? onOpenStateCase;
+  final Future<void> Function({
+    required String state,
+    required double amount,
+  })? onAdminRemoveAvailable;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -568,6 +583,313 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     );
   }
 
+  Future<void> _openAdminStateCases() async {
+    if (!widget.canAdminBrowseStates) return;
+    final forState = widget.snapshotForState;
+    final states = widget.allStates;
+    if (forState == null || states.isEmpty) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    final q = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheet) {
+            final query = q.text.trim().toLowerCase();
+            final filtered = query.isEmpty
+                ? states
+                : states.where((s) => s.toLowerCase().contains(query)).toList(growable: false);
+
+            return SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxWidth: 560,
+                    maxHeight: MediaQuery.sizeOf(sheetCtx).height * 0.88,
+                  ),
+                  margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  decoration: BoxDecoration(
+                    color: tone.dialogBg,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: tone.cardBorder),
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: tone.secondaryText.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'State cases',
+                                style: TextStyle(
+                                  color: tone.primaryText,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(sheetCtx),
+                              icon: Icon(Icons.close_rounded, color: tone.secondaryText),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                        child: TextField(
+                          controller: q,
+                          onChanged: (_) => setSheet(() {}),
+                          style: TextStyle(color: tone.primaryText),
+                          decoration: InputDecoration(
+                            hintText: 'Search states…',
+                            hintStyle: TextStyle(color: tone.secondaryText),
+                            prefixIcon: Icon(Icons.search_rounded, color: tone.secondaryText),
+                            filled: true,
+                            fillColor: tone.fieldFill,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: tone.fieldBorder),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide(color: tone.fieldBorder),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Text('State', style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text('Available', textAlign: TextAlign.right, style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
+                            ),
+                            const SizedBox(width: 88),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) => Divider(height: 1, color: tone.cardBorder),
+                          itemBuilder: (ctx, i) {
+                            final state = filtered[i];
+                            final snap = forState(state);
+                            final available = snap.available;
+                            final isCurrent = state.trim().toLowerCase() == widget.state.trim().toLowerCase();
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          state,
+                                          style: TextStyle(
+                                            color: tone.primaryText,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        if (isCurrent)
+                                          Text('Open now', style: TextStyle(color: tone.accent, fontSize: 11, fontWeight: FontWeight.w700)),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      _money(available),
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                        color: available > 0 ? tone.accent : tone.secondaryText,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    tooltip: 'Remove available',
+                                    onPressed: available <= 0
+                                        ? null
+                                        : () async {
+                                            final removed = await _promptAdminRemoveAvailable(
+                                              state: state,
+                                              available: available,
+                                              tone: tone,
+                                            );
+                                            if (removed == true && sheetCtx.mounted) {
+                                              setSheet(() {});
+                                              if (mounted) _reload();
+                                            }
+                                          },
+                                    icon: Icon(
+                                      Icons.remove_circle_outline_rounded,
+                                      color: available > 0 ? const Color(0xFFEF4444) : tone.secondaryText,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Open state case',
+                                    onPressed: () async {
+                                      Navigator.pop(sheetCtx);
+                                      final open = widget.onOpenStateCase;
+                                      if (open != null) {
+                                        await open(state);
+                                      }
+                                      if (mounted) _reload();
+                                    },
+                                    icon: Icon(Icons.open_in_new_rounded, color: tone.headerFg),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    q.dispose();
+    if (mounted) _reload();
+  }
+
+  Future<bool?> _promptAdminRemoveAvailable({
+    required String state,
+    required double available,
+    required _WalletTone tone,
+  }) async {
+    final remove = widget.onAdminRemoveAvailable;
+    if (remove == null || available <= 0) return false;
+    final amountC = TextEditingController(
+      text: available == available.roundToDouble()
+          ? available.toStringAsFixed(0)
+          : available.toStringAsFixed(2),
+    );
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            decoration: BoxDecoration(
+              color: tone.dialogBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: tone.cardBorder),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Remove available · $state',
+                  style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Available now: ${_money(available)}',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: amountC,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(
+                    labelText: 'Amount to remove',
+                    labelStyle: TextStyle(color: tone.secondaryText),
+                    filled: true,
+                    fillColor: tone.fieldFill,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  onPressed: () {
+                    amountC.text = available == available.roundToDouble()
+                        ? available.toStringAsFixed(0)
+                        : available.toStringAsFixed(2);
+                  },
+                  child: Text('Use full available (${_money(available)})', style: TextStyle(color: tone.accent)),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Remove'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (ok != true) {
+      amountC.dispose();
+      return false;
+    }
+    final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0;
+    amountC.dispose();
+    if (amount <= 0) return false;
+    final clipped = amount > available ? available : amount;
+    await remove(state: state, amount: clipped);
+    if (!mounted) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Removed ${_money(clipped)} from $state available.')),
+    );
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
@@ -611,6 +933,21 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       ],
                     ),
                   ),
+                  if (widget.canAdminBrowseStates)
+                    IconButton(
+                      tooltip: 'All state cases',
+                      onPressed: _openAdminStateCases,
+                      icon: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: tone.iconWell,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: tone.cardBorder),
+                        ),
+                        child: Icon(Icons.table_rows_rounded, color: tone.headerFg, size: 20),
+                      ),
+                    ),
                   if (widget.canEdit)
                     IconButton(
                       tooltip: 'Record spending',
@@ -625,7 +962,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         child: Icon(Icons.add, color: tone.isDark ? Colors.black : Colors.white),
                       ),
                     )
-                  else
+                  else if (!widget.canAdminBrowseStates)
                     const SizedBox(width: 48),
                 ],
               ),
