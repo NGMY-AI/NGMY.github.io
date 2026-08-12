@@ -374,6 +374,9 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
   NgmyCivicVotingState _voting = NgmyCivicVotingState();
   bool _busy = false;
   Timer? _livePoll;
+  bool _searchOpen = false;
+  String _searchQuery = '';
+  final _searchCtrl = TextEditingController();
 
   static const _accent = Color(0xFF22C55E);
   static const _gold = Color(0xFFFBBF24);
@@ -403,6 +406,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
   @override
   void dispose() {
     _livePoll?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -410,6 +414,12 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
   Color _card(bool isDark) => isDark ? const Color(0xFF1C1C1C) : Colors.white;
   Color _ink(bool isDark) => isDark ? Colors.white : const Color(0xFF18181B);
   Color _muted(bool isDark) => isDark ? const Color(0xFFA1A1AA) : const Color(0xFF71717A);
+
+  String get _registryId => ngmyCivicVoterRegistryId(
+        config: widget.config,
+        email: widget.userEmail,
+        phone: widget.userPhone,
+      );
 
   Future<void> _castVote(NgmyCivicVotingCandidate candidate) async {
     if (_busy) return;
@@ -427,10 +437,10 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       );
       return;
     }
-    if (_voting.hasVoted(widget.userEmail)) {
+    if (_voting.hasVoted(widget.userEmail, registryId: _registryId)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You already voted.')),
+        const SnackBar(content: Text('Each member can vote only once.')),
       );
       return;
     }
@@ -445,7 +455,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           title: Text('Confirm vote', style: TextStyle(color: _ink(isDark), fontWeight: FontWeight.w900)),
           content: Text(
-            'Vote for ${candidate.name}?\nThis cannot be changed later.',
+            'Vote for ${candidate.name}?\nEach member can vote only once. This cannot be changed later.',
             style: TextStyle(color: _muted(isDark), height: 1.4),
           ),
           actions: [
@@ -464,8 +474,14 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     setState(() => _busy = true);
     try {
       final latest = await NgmyCivicVotingStore.load(forceCloud: true);
-      if (latest.hasVoted(widget.userEmail)) {
-        if (mounted) setState(() => _voting = latest);
+      final rid = _registryId;
+      if (latest.hasVoted(widget.userEmail, registryId: rid)) {
+        if (mounted) {
+          setState(() => _voting = latest);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Each member can vote only once.')),
+          );
+        }
         return;
       }
       latest.ballots.add(
@@ -473,6 +489,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
           voterEmail: widget.userEmail.toLowerCase().trim(),
           candidateId: candidate.id,
           at: DateTime.now().toUtc().toIso8601String(),
+          voterRegistryId: rid,
         ),
       );
       await NgmyCivicVotingStore.save(latest);
@@ -484,6 +501,42 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _openPhotoZoom(String photoUrl) {
+    final provider = ngmyCivicVotingPhotoProvider(photoUrl);
+    if (provider == null) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) {
+        return Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 0.8,
+                  maxScale: 5,
+                  child: Center(
+                    child: Image(image: provider, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _downloadResults() async {
@@ -547,9 +600,13 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       memberState: widget.memberState,
       voting: _voting,
     );
-    final myPick = _voting.votedCandidateId(widget.userEmail);
+    final myPick = _voting.votedCandidateId(widget.userEmail, registryId: _registryId);
+    final q = _searchQuery.trim().toLowerCase();
     final sorted = [..._voting.candidates]
       ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
+    final visible = q.isEmpty
+        ? sorted
+        : sorted.where((c) => c.name.toLowerCase().contains(q)).toList();
     final totalVotes = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
     final leadVotes = sorted.isEmpty ? 0 : _voting.votesFor(sorted.first.id);
 
@@ -609,13 +666,54 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
-                  style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
+                        style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 20),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Search candidate',
+                      onPressed: () {
+                        setState(() {
+                          _searchOpen = !_searchOpen;
+                          if (!_searchOpen) {
+                            _searchQuery = '';
+                            _searchCtrl.clear();
+                          }
+                        });
+                      },
+                      icon: Icon(
+                        _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+                        color: ink,
+                      ),
+                    ),
+                  ],
                 ),
+                if (_searchOpen) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _searchCtrl,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (v) => setState(() => _searchQuery = v),
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                    decoration: InputDecoration(
+                      hintText: 'Type candidate name…',
+                      hintStyle: TextStyle(color: muted),
+                      prefixIcon: Icon(Icons.search_rounded, color: muted),
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Text(
-                  '$totalVotes total vote${totalVotes == 1 ? '' : 's'} · updates while you are here',
+                  '$totalVotes total vote${totalVotes == 1 ? '' : 's'} · one vote per member',
                   style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 if (myPick != null) ...[
@@ -628,7 +726,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'You already voted. Thanks for participating.',
+                      'You already voted — each member can vote only once.',
                       style: TextStyle(color: ink.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
                     ),
                   ),
@@ -655,10 +753,14 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 48),
               child: Text('No candidates yet.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
+            )
+          else if (visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 32),
+              child: Text('No candidate matches that name.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
             ),
-          ...sorted.asMap().entries.map((entry) {
-            final rank = entry.key + 1;
-            final c = entry.value;
+          ...visible.map((c) {
+            final rank = sorted.indexWhere((x) => x.id == c.id) + 1;
             final votes = _voting.votesFor(c.id);
             final selected = myPick == c.id;
             final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
@@ -683,42 +785,45 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 34,
-                            backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
-                            backgroundImage: photo,
-                            child: photo == null
-                                ? Text(
-                                    c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                    style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
-                                  )
-                                : null,
-                          ),
-                          Positioned(
-                            right: 0,
-                            bottom: 0,
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: rank == 1 ? _gold : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: card, width: 2),
-                              ),
-                              child: Text(
-                                '$rank',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: rank == 1 ? const Color(0xFF18181B) : ink,
+                      GestureDetector(
+                        onTap: photo == null ? null : () => _openPhotoZoom(c.photoUrl),
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 34,
+                              backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                              backgroundImage: photo,
+                              child: photo == null
+                                  ? Text(
+                                      c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                      style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              right: 0,
+                              bottom: 0,
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: rank == 1 ? _gold : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: card, width: 2),
+                                ),
+                                child: Text(
+                                  '$rank',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900,
+                                    color: rank == 1 ? const Color(0xFF18181B) : ink,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -769,7 +874,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                         child: FilledButton(
                           onPressed: canCast ? () => _castVote(c) : null,
                           style: FilledButton.styleFrom(
-                            backgroundColor: selected ? _accent : _accent,
+                            backgroundColor: _accent,
                             disabledBackgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
                             disabledForegroundColor: muted,
                             foregroundColor: Colors.white,
@@ -831,17 +936,24 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      CircleAvatar(
-                        radius: 42,
-                        backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
-                        backgroundImage: photo,
-                        child: photo == null
-                            ? Text(
-                                c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28),
-                              )
-                            : null,
+                      GestureDetector(
+                        onTap: photo == null ? null : () => _openPhotoZoom(c.photoUrl),
+                        child: CircleAvatar(
+                          radius: 42,
+                          backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                          backgroundImage: photo,
+                          child: photo == null
+                              ? Text(
+                                  c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                  style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28),
+                                )
+                              : null,
+                        ),
                       ),
+                      if (photo != null) ...[
+                        const SizedBox(height: 6),
+                        Text('Tap photo to zoom', style: TextStyle(color: muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                      ],
                       const SizedBox(height: 12),
                       Text(c.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
                       const SizedBox(height: 4),

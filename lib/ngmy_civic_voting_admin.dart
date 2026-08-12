@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_civic_voting.dart';
 import 'ngmy_state_picker.dart';
 import 'ngmy_voice_input.dart';
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return TextEditingValue(
+      text: newValue.text.toUpperCase(),
+      selection: newValue.selection,
+    );
+  }
+}
 
 Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -330,7 +341,7 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                               FilledButton.tonalIcon(
                                 onPressed: () async {
                                   final id = 'cand_${DateTime.now().microsecondsSinceEpoch}';
-                                  voting.candidates.add(NgmyCivicVotingCandidate(id: id, name: 'New candidate'));
+                                  voting.candidates.add(NgmyCivicVotingCandidate(id: id, name: 'NEW CANDIDATE'));
                                   await persist();
                                 },
                                 icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
@@ -378,10 +389,12 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: TextFormField(
-                                          initialValue: c.name,
+                                          initialValue: c.name.toUpperCase(),
                                           style: TextStyle(color: ink, fontWeight: FontWeight.w700),
                                           decoration: deco('Name'),
-                                          onChanged: (v) => c.name = v,
+                                          textCapitalization: TextCapitalization.characters,
+                                          inputFormatters: [_UpperCaseTextFormatter()],
+                                          onChanged: (v) => c.name = v.toUpperCase(),
                                           onFieldSubmitted: (_) => persist(),
                                         ),
                                       ),

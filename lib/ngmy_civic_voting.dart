@@ -81,16 +81,21 @@ class NgmyCivicVotingBallot {
     required this.voterEmail,
     required this.candidateId,
     required this.at,
+    this.voterRegistryId = '',
   });
 
   final String voterEmail;
   final String candidateId;
   final String at;
 
+  /// Civic registry id — used so each member can vote only once.
+  final String voterRegistryId;
+
   Map<String, dynamic> toJson() => {
         'voterEmail': voterEmail,
         'candidateId': candidateId,
         'at': at,
+        'voterRegistryId': voterRegistryId,
       };
 
   factory NgmyCivicVotingBallot.fromJson(Map<String, dynamic> json) {
@@ -98,6 +103,7 @@ class NgmyCivicVotingBallot {
       voterEmail: (json['voterEmail'] ?? '').toString().toLowerCase().trim(),
       candidateId: (json['candidateId'] ?? '').toString(),
       at: (json['at'] ?? '').toString(),
+      voterRegistryId: (json['voterRegistryId'] ?? '').toString().trim(),
     );
   }
 }
@@ -162,18 +168,41 @@ class NgmyCivicVotingState {
     return userVotes + drip;
   }
 
-  bool hasVoted(String email) {
+  bool hasVoted(String email, {String registryId = ''}) {
     final key = email.toLowerCase().trim();
-    if (key.isEmpty) return false;
-    return ballots.any((b) => b.voterEmail == key);
+    final rid = registryId.trim();
+    if (key.isNotEmpty && ballots.any((b) => b.voterEmail == key)) return true;
+    if (rid.isNotEmpty && ballots.any((b) => b.voterRegistryId.trim() == rid)) return true;
+    return false;
   }
 
-  String? votedCandidateId(String email) {
+  String? votedCandidateId(String email, {String registryId = ''}) {
     final key = email.toLowerCase().trim();
+    final rid = registryId.trim();
     for (final b in ballots) {
-      if (b.voterEmail == key) return b.candidateId;
+      if (key.isNotEmpty && b.voterEmail == key) return b.candidateId;
+      if (rid.isNotEmpty && b.voterRegistryId.trim() == rid) return b.candidateId;
     }
     return null;
+  }
+
+  /// Keep the first ballot only for each email / registry id.
+  void dedupeBallots() {
+    final seenEmail = <String>{};
+    final seenReg = <String>{};
+    final next = <NgmyCivicVotingBallot>[];
+    for (final b in ballots) {
+      final e = b.voterEmail.toLowerCase().trim();
+      final r = b.voterRegistryId.trim();
+      if (e.isNotEmpty && seenEmail.contains(e)) continue;
+      if (r.isNotEmpty && seenReg.contains(r)) continue;
+      if (e.isNotEmpty) seenEmail.add(e);
+      if (r.isNotEmpty) seenReg.add(r);
+      next.add(b);
+    }
+    ballots
+      ..clear()
+      ..addAll(next);
   }
 
   static String cycleKey(DateTime d) =>
@@ -283,7 +312,20 @@ class NgmyCivicVotingState {
   NgmyCivicVotingState copy() => NgmyCivicVotingState.fromJson(toJson());
 }
 
-/// Linked / passport-granted Civic Registry members may vote.
+String ngmyCivicVoterRegistryId({
+  required dynamic config,
+  required String email,
+  String? phone,
+}) {
+  final passport = NgmyCivicRegistryMembers.passportForAppUser(
+    config,
+    email: email,
+    phone: phone ?? '',
+  );
+  return (passport?['registryId'] ?? '').toString().trim();
+}
+
+/// Linked / passport-granted Civic Registry members may vote (once each).
 bool ngmyCanCivicVote({
   required dynamic config,
   required String email,
@@ -389,6 +431,10 @@ class NgmyCivicVotingStore {
 
   /// One settings write per mutation (vote / admin edit / schedule open).
   static Future<bool> save(NgmyCivicVotingState state) async {
+    state.dedupeBallots();
+    for (final c in state.candidates) {
+      c.name = c.name.toUpperCase();
+    }
     state.updatedAt = DateTime.now().toUtc().toIso8601String();
     _cache = state;
     _loaded = true;
