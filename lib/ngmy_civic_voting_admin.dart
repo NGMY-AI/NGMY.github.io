@@ -260,27 +260,35 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Text('Category', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 15)),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
+                                const SizedBox(height: 10),
+                                DropdownButtonFormField<String>(
+                                  key: ValueKey('cat_${voting.id}_${voting.category}'),
+                                  initialValue: voting.category,
+                                  isExpanded: true,
+                                  decoration: deco('Select category'),
+                                  dropdownColor: card,
+                                  items: [
                                     for (final c in NgmyVotingCategory.all)
-                                      ChoiceChip(
-                                        label: Text(c.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
-                                        selected: voting.category == c.$1,
-                                        selectedColor: accent.withValues(alpha: 0.22),
-                                        onSelected: (_) async {
-                                          voting.category = c.$1;
-                                          voting.syncMembersOnlyFromCategory();
-                                          if (voting.title.trim().isEmpty ||
-                                              NgmyVotingCategory.all.any((x) => x.$2 == voting.title || NgmyVotingCategory.defaultTitle(x.$1) == voting.title)) {
-                                            voting.title = NgmyVotingCategory.defaultTitle(c.$1);
-                                          }
-                                          await persist();
-                                        },
+                                      DropdownMenuItem(
+                                        value: c.$1,
+                                        child: Text(
+                                          c.$2,
+                                          style: TextStyle(color: ink, fontWeight: FontWeight.w700),
+                                        ),
                                       ),
                                   ],
+                                  onChanged: (cat) async {
+                                    if (cat == null) return;
+                                    voting.category = cat;
+                                    voting.syncMembersOnlyFromCategory();
+                                    if (voting.title.trim().isEmpty ||
+                                        NgmyVotingCategory.all.any(
+                                          (x) => x.$2 == voting.title || NgmyVotingCategory.defaultTitle(x.$1) == voting.title,
+                                        )) {
+                                      voting.title = NgmyVotingCategory.defaultTitle(cat);
+                                    }
+                                    await persist();
+                                  },
                                 ),
                                 const SizedBox(height: 8),
                                 Text(

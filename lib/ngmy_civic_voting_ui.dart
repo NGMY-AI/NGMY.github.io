@@ -921,13 +921,14 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
             final hasProfile = c.bioNote.trim().isNotEmpty || c.voiceNoteUrl.trim().isNotEmpty;
             final share = leadVotes <= 0 ? 0.0 : (votes / leadVotes).clamp(0.0, 1.0);
             final canCast = canVote && myPick == null && !_busy;
-            final crownColor = rank == 1
-                ? _gold
-                : rank == 2
-                    ? _silver
-                    : rank == 3
-                        ? _bronze
-                        : null;
+            final showCrown = votes >= 5 && rank >= 1 && rank <= 3;
+            final crownColor = !showCrown
+                ? null
+                : rank == 1
+                    ? _gold
+                    : rank == 2
+                        ? _silver
+                        : _bronze;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -938,10 +939,10 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                 border: Border.all(
                   color: selected
                       ? _accent
-                      : (rank == 1
+                      : (showCrown && rank == 1
                           ? _gold.withValues(alpha: 0.55)
                           : (isDark ? Colors.white10 : const Color(0xFFE4E4E7))),
-                  width: selected || rank == 1 ? 1.6 : 1,
+                  width: selected || (showCrown && rank == 1) ? 1.6 : 1,
                 ),
               ),
               child: Column(
@@ -953,59 +954,56 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                       GestureDetector(
                         onTap: photo == null ? null : () => _openPhotoZoom(c.photoUrl),
                         child: SizedBox(
-                          width: 72,
-                          height: 78,
+                          width: 68,
+                          height: 68,
                           child: Stack(
                             clipBehavior: Clip.none,
-                            alignment: Alignment.bottomCenter,
                             children: [
-                              if (crownColor != null)
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  child: Icon(
-                                    Icons.workspace_premium_rounded,
-                                    color: crownColor,
-                                    size: rank == 1 ? 26 : 22,
-                                  ),
-                                ),
-                              Positioned(
-                                bottom: 0,
-                                child: CircleAvatar(
-                                  radius: 34,
-                                  backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
-                                  backgroundImage: photo,
-                                  child: photo == null
-                                      ? Text(
-                                          c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                          style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
-                                        )
-                                      : null,
-                                ),
+                              CircleAvatar(
+                                radius: 34,
+                                backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                                backgroundImage: photo,
+                                child: photo == null
+                                    ? Text(
+                                        c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                        style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
+                                      )
+                                    : null,
                               ),
-                              Positioned(
-                                right: 2,
-                                bottom: 0,
-                                child: Container(
-                                  width: 22,
-                                  height: 22,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: crownColor ?? (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: card, width: 2),
-                                  ),
-                                  child: Text(
-                                    '$rank',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: crownColor != null ? const Color(0xFF18181B) : ink,
+                              // Instagram-style verified badge on the photo
+                              if (showCrown && crownColor != null)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          crownColor,
+                                          Color.lerp(crownColor, Colors.black, 0.18)!,
+                                        ],
+                                      ),
+                                      border: Border.all(color: card, width: 2.2),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: crownColor.withValues(alpha: 0.45),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.workspace_premium_rounded,
+                                      size: 13,
+                                      color: Colors.white,
                                     ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
@@ -1020,11 +1018,14 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                                 Expanded(
                                   child: Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17)),
                                 ),
-                                if (crownColor != null)
-                                  Text(
-                                    rank == 1 ? '1st' : (rank == 2 ? '2nd' : '3rd'),
-                                    style: TextStyle(color: crownColor, fontWeight: FontWeight.w900, fontSize: 12),
+                                Text(
+                                  '#$rank',
+                                  style: TextStyle(
+                                    color: showCrown && crownColor != null ? crownColor : muted,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
                                   ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 4),
@@ -1039,7 +1040,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                                 value: share,
                                 minHeight: 6,
                                 backgroundColor: isDark ? Colors.white10 : const Color(0xFFE4E4E7),
-                                color: selected || rank == 1 ? _accent : _gold.withValues(alpha: 0.85),
+                                color: selected || (showCrown && rank == 1) ? _accent : _gold.withValues(alpha: 0.85),
                               ),
                             ),
                           ],
