@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_civic_voting.dart';
+import 'ngmy_civic_voting_download.dart';
 import 'ngmy_coming_soon.dart';
 import 'ngmy_nav.dart';
 
@@ -374,6 +375,9 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
   bool _busy = false;
   Timer? _livePoll;
 
+  static const _accent = Color(0xFF22C55E);
+  static const _gold = Color(0xFFFBBF24);
+
   @override
   void initState() {
     super.initState();
@@ -384,7 +388,6 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     final v = await NgmyCivicVotingStore.load(forceCloud: true);
     if (!mounted) return;
     setState(() => _voting = v);
-    // Live refresh only while this screen is open — one cloud read every few seconds.
     _livePoll = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!mounted) return;
       final next = await NgmyCivicVotingStore.refreshWhileOpen();
@@ -392,7 +395,6 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       if (next.updatedAt != _voting.updatedAt || next.ballots.length != _voting.ballots.length) {
         setState(() => _voting = next);
       } else {
-        // Drip votes advance with time even without new ballots.
         setState(() {});
       }
     });
@@ -403,6 +405,11 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     _livePoll?.cancel();
     super.dispose();
   }
+
+  Color _bg(bool isDark) => isDark ? const Color(0xFF111111) : const Color(0xFFF4F4F5);
+  Color _card(bool isDark) => isDark ? const Color(0xFF1C1C1C) : Colors.white;
+  Color _ink(bool isDark) => isDark ? Colors.white : const Color(0xFF18181B);
+  Color _muted(bool isDark) => isDark ? const Color(0xFFA1A1AA) : const Color(0xFF71717A);
 
   Future<void> _castVote(NgmyCivicVotingCandidate candidate) async {
     if (_busy) return;
@@ -427,9 +434,35 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       );
       return;
     }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: _card(isDark),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          title: Text('Confirm vote', style: TextStyle(color: _ink(isDark), fontWeight: FontWeight.w900)),
+          content: Text(
+            'Vote for ${candidate.name}?\nThis cannot be changed later.',
+            style: TextStyle(color: _muted(isDark), height: 1.4),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(backgroundColor: _accent),
+              child: const Text('Vote', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirm != true || !mounted) return;
+
     setState(() => _busy = true);
     try {
-      // Re-load once so we don't overwrite concurrent votes — one write per vote.
       final latest = await NgmyCivicVotingStore.load(forceCloud: true);
       if (latest.hasVoted(widget.userEmail)) {
         if (mounted) setState(() => _voting = latest);
@@ -445,16 +478,44 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       await NgmyCivicVotingStore.save(latest);
       if (!mounted) return;
       setState(() => _voting = latest);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Your vote for ${candidate.name} was counted.'), backgroundColor: _accent),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  Future<void> _downloadResults() async {
+    final sorted = [..._voting.candidates]
+      ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
+    final buf = StringBuffer()
+      ..writeln('Rank,Candidate,Votes')
+      ..writeln('# ${_voting.title} · ${_voting.yearLabel} · ${_voting.dateLabel}')
+      ..writeln('# Downloaded ${DateTime.now().toLocal()}');
+    for (var i = 0; i < sorted.length; i++) {
+      final c = sorted[i];
+      final name = c.name.replaceAll(',', ' ');
+      buf.writeln('${i + 1},$name,${_voting.votesFor(c.id)}');
+    }
+    final total = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
+    buf.writeln('TOTAL,,$total');
+    final year = _voting.yearLabel.trim().isEmpty ? 'voting' : _voting.yearLabel.trim();
+    final msg = await ngmyDownloadCivicVotingResults(
+      fileName: 'civic_voting_${year}_results.csv',
+      content: buf.toString(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF8FAFC);
-    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final bg = _bg(isDark);
+    final ink = _ink(isDark);
+    final muted = _muted(isDark);
+    final card = _card(isDark);
 
     if (!_voting.open) {
       return Scaffold(
@@ -462,7 +523,8 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
         appBar: AppBar(
           backgroundColor: bg,
           foregroundColor: ink,
-          title: Text(_voting.title),
+          elevation: 0,
+          title: Text(_voting.title, style: const TextStyle(fontWeight: FontWeight.w900)),
         ),
         body: Center(
           child: Padding(
@@ -488,136 +550,241 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     final myPick = _voting.votedCandidateId(widget.userEmail);
     final sorted = [..._voting.candidates]
       ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
+    final totalVotes = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
+    final leadVotes = sorted.isEmpty ? 0 : _voting.votesFor(sorted.first.id);
 
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
         backgroundColor: bg,
         foregroundColor: ink,
-        title: Text(_voting.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(_voting.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
         actions: [
-          if (_voting.yearLabel.trim().isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(right: 14),
-              child: Center(
-                child: Text(
-                  _voting.yearLabel,
-                  style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFFF59E0B)),
-                ),
-              ),
-            ),
+          IconButton(
+            tooltip: 'Download results',
+            onPressed: sorted.isEmpty ? null : _downloadResults,
+            icon: const Icon(Icons.download_rounded),
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
-          if (!canVote)
-            Container(
-              margin: const EdgeInsets.only(bottom: 14),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.35)),
-              ),
-              child: Text(
-                'Voting is for linked Civic Registry members in allowed states.',
-                style: TextStyle(color: ink.withValues(alpha: 0.8), fontWeight: FontWeight.w600),
-              ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            decoration: BoxDecoration(
+              color: card,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE4E4E7)),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _accent.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.circle, size: 8, color: _accent),
+                          SizedBox(width: 6),
+                          Text('LIVE', style: TextStyle(color: _accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_voting.yearLabel.trim().isNotEmpty)
+                      Text(
+                        _voting.yearLabel,
+                        style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 16),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
+                  style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 20),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$totalVotes total vote${totalVotes == 1 ? '' : 's'} · updates while you are here',
+                  style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                if (myPick != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'You already voted. Thanks for participating.',
+                      style: TextStyle(color: ink.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ] else if (!canVote) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _gold.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Only linked Civic Registry members in allowed states can vote.',
+                      style: TextStyle(color: ink.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           if (sorted.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(top: 40),
-              child: Text('No candidates yet.', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.55))),
+              padding: const EdgeInsets.only(top: 48),
+              child: Text('No candidates yet.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600)),
             ),
-          ...sorted.map((c) {
+          ...sorted.asMap().entries.map((entry) {
+            final rank = entry.key + 1;
+            final c = entry.value;
             final votes = _voting.votesFor(c.id);
             final selected = myPick == c.id;
             final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
             final hasProfile = c.bioNote.trim().isNotEmpty || c.voiceNoteUrl.trim().isNotEmpty;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: (!canVote || myPick != null || _busy) ? null : () => _castVote(c),
-                  child: Ink(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: isDark ? const Color(0xFF151C2C) : Colors.white,
-                      border: Border.all(
-                        color: selected ? const Color(0xFF34D399) : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-                        width: selected ? 2 : 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
+            final share = leadVotes <= 0 ? 0.0 : (votes / leadVotes).clamp(0.0, 1.0);
+            final canCast = canVote && myPick == null && !_busy;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: card,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: selected ? _accent : (isDark ? Colors.white10 : const Color(0xFFE4E4E7)),
+                  width: selected ? 1.6 : 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Stack(
                         children: [
-                          GestureDetector(
-                            onTap: hasProfile ? () => _showCandidateProfile(c) : null,
-                            child: CircleAvatar(
-                              radius: 30,
-                              backgroundColor: const Color(0xFF334155),
-                              backgroundImage: photo,
-                              child: photo == null
-                                  ? Text(
-                                      c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
-                                    )
-                                  : null,
-                            ),
+                          CircleAvatar(
+                            radius: 34,
+                            backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                            backgroundImage: photo,
+                            child: photo == null
+                                ? Text(
+                                    c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                    style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
+                                  )
+                                : null,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16)),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '$votes vote${votes == 1 ? '' : 's'}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF34D399),
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 13,
-                                  ),
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: rank == 1 ? _gold : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: card, width: 2),
+                              ),
+                              child: Text(
+                                '$rank',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: rank == 1 ? const Color(0xFF18181B) : ink,
                                 ),
-                                if (hasProfile) ...[
-                                  const SizedBox(height: 6),
-                                  GestureDetector(
-                                    onTap: () => _showCandidateProfile(c),
-                                    child: Text(
-                                      'View profile & notes',
-                                      style: TextStyle(
-                                        color: ink.withValues(alpha: 0.55),
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                        decoration: TextDecoration.underline,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                              ),
                             ),
                           ),
-                          if (selected)
-                            const Icon(Icons.check_circle_rounded, color: Color(0xFF34D399), size: 28)
-                          else if (canVote && myPick == null)
-                            Icon(Icons.how_to_vote_rounded, color: ink.withValues(alpha: 0.35)),
                         ],
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$votes vote${votes == 1 ? '' : 's'}',
+                              style: const TextStyle(color: _accent, fontWeight: FontWeight.w800, fontSize: 14),
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(99),
+                              child: LinearProgressIndicator(
+                                value: share,
+                                minHeight: 6,
+                                backgroundColor: isDark ? Colors.white10 : const Color(0xFFE4E4E7),
+                                color: selected || rank == 1 ? _accent : _gold.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _showCandidateProfile(c),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: ink,
+                            side: BorderSide(color: isDark ? Colors.white24 : const Color(0xFFD4D4D8)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: Text(
+                            hasProfile ? 'View profile' : 'Profile',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: canCast ? () => _castVote(c) : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: selected ? _accent : _accent,
+                            disabledBackgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                            disabledForegroundColor: muted,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: Text(
+                            selected ? 'Your vote' : (myPick != null ? 'Voted' : 'Vote'),
+                            style: const TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             );
           }),
@@ -628,82 +795,105 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
 
   Future<void> _showCandidateProfile(NgmyCivicVotingCandidate c) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final ink = _ink(isDark);
+    final muted = _muted(isDark);
+    final card = _card(isDark);
     final player = AudioPlayer();
     var playing = false;
+    final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
 
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setLocal) {
-            return SafeArea(
-              child: Container(
-                margin: const EdgeInsets.all(12),
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-                constraints: const BoxConstraints(maxWidth: 520),
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF0B1220) : Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 28,
-                          backgroundColor: const Color(0xFF334155),
-                          backgroundImage: ngmyCivicVotingPhotoProvider(c.photoUrl),
-                          child: ngmyCivicVotingPhotoProvider(c.photoUrl) == null
-                              ? Text(
-                                  c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
-                        ),
-                        IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: muted)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (c.bioNote.trim().isNotEmpty)
+            return Dialog(
+              backgroundColor: card,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('Candidate profile', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16)),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: Icon(Icons.close_rounded, color: muted),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      CircleAvatar(
+                        radius: 42,
+                        backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                        backgroundImage: photo,
+                        child: photo == null
+                            ? Text(
+                                c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(c.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${_voting.votesFor(c.id)} vote${_voting.votesFor(c.id) == 1 ? '' : 's'}',
+                        style: const TextStyle(color: _accent, fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 14),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          c.bioNote.trim(),
-                          style: TextStyle(color: ink.withValues(alpha: 0.88), height: 1.45, fontSize: 14.5),
+                          c.bioNote.trim().isEmpty ? 'No written notes yet.' : c.bioNote.trim(),
+                          style: TextStyle(
+                            color: c.bioNote.trim().isEmpty ? muted : ink.withValues(alpha: 0.9),
+                            height: 1.45,
+                            fontSize: 14.5,
+                          ),
                         ),
-                      )
-                    else
-                      Text('No written notes yet.', style: TextStyle(color: muted)),
-                    if (c.voiceNoteUrl.trim().isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      FilledButton.tonalIcon(
-                        onPressed: () async {
-                          if (playing) {
-                            await player.stop();
-                            setLocal(() => playing = false);
-                            return;
-                          }
-                          await player.play(UrlSource(c.voiceNoteUrl));
-                          setLocal(() => playing = true);
-                          player.onPlayerComplete.listen((_) {
-                            if (ctx.mounted) setLocal(() => playing = false);
-                          });
-                        },
-                        icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
-                        label: Text(playing ? 'Stop voice note' : 'Play voice note', style: const TextStyle(fontWeight: FontWeight.w800)),
                       ),
+                      if (c.voiceNoteUrl.trim().isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonalIcon(
+                            onPressed: () async {
+                              if (playing) {
+                                await player.stop();
+                                setLocal(() => playing = false);
+                                return;
+                              }
+                              await player.play(UrlSource(c.voiceNoteUrl));
+                              setLocal(() => playing = true);
+                              player.onPlayerComplete.listen((_) {
+                                if (ctx.mounted) setLocal(() => playing = false);
+                              });
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5),
+                              foregroundColor: ink,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                            label: Text(
+                              playing ? 'Stop voice note' : 'Play voice note',
+                              style: const TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             );
@@ -714,3 +904,4 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     await player.dispose();
   }
 }
+
