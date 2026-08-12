@@ -3110,23 +3110,35 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         return Row(
           children: [
             for (final (label, layout) in ngmySlidesSchoolLayouts)
-              _ribbonBtn(_schoolLayoutIcon(layout), label, () => _addSchoolSlide(layout), isDark),
+              _ribbonBtn(
+                _schoolLayoutIcon(layout),
+                label,
+                () => _addSchoolSlide(layout),
+                isDark,
+                isPro: NgmySlidesPayments.isPaidSchoolLayout(layout),
+              ),
             _ribbonBtn(Icons.notes_rounded, 'Notes Slide', () => _addSchoolSlide(NgmySlideLayout.titleContent), isDark),
-            _ribbonBtn(Icons.quiz_rounded, 'Quiz', () => _addSchoolSlide(NgmySlideLayout.quiz), isDark),
-            _ribbonBtn(Icons.assignment_rounded, 'Worksheet', () => _addSchoolSlide(NgmySlideLayout.worksheet), isDark),
-            _ribbonBtn(Icons.style_rounded, 'Flashcard', () => _addSchoolSlide(NgmySlideLayout.flashcard), isDark),
-            _ribbonBtn(Icons.science_rounded, 'Lab Report', () => _applyDocTool('lab_report'), isDark),
-            _ribbonBtn(Icons.fact_check_rounded, 'Rubric', () => _applyDocTool('rubric'), isDark),
-            _ribbonBtn(Icons.groups_rounded, 'Minutes', () => _applyDocTool('minutes'), isDark),
-            _ribbonBtn(Icons.menu_book_rounded, 'Syllabus', () => _applyDocTool('agenda'), isDark),
-            _ribbonBtn(Icons.timeline_rounded, 'Timeline', () => _applyDocTool('timeline'), isDark),
+            _ribbonBtn(Icons.quiz_rounded, 'Quiz', () => _addSchoolSlide(NgmySlideLayout.quiz), isDark, isPro: true),
+            _ribbonBtn(Icons.assignment_rounded, 'Worksheet', () => _addSchoolSlide(NgmySlideLayout.worksheet), isDark, isPro: true),
+            _ribbonBtn(Icons.style_rounded, 'Flashcard', () => _addSchoolSlide(NgmySlideLayout.flashcard), isDark, isPro: true),
+            _ribbonBtn(Icons.science_rounded, 'Lab Report', () => _applyDocTool('lab_report'), isDark, isPro: true),
+            _ribbonBtn(Icons.fact_check_rounded, 'Rubric', () => _applyDocTool('rubric'), isDark, isPro: true),
+            _ribbonBtn(Icons.groups_rounded, 'Minutes', () => _applyDocTool('minutes'), isDark, isPro: true),
+            _ribbonBtn(Icons.menu_book_rounded, 'Syllabus', () => _applyDocTool('agenda'), isDark, isPro: true),
+            _ribbonBtn(Icons.timeline_rounded, 'Timeline', () => _applyDocTool('timeline'), isDark, isPro: true),
           ],
         );
       case 'Tools':
         return Row(
           children: [
             for (final tool in ngmySlidesDocumentTools)
-              _ribbonBtn(tool.icon, tool.label, () => _applyDocTool(tool.id), isDark),
+              _ribbonBtn(
+                tool.icon,
+                tool.label,
+                () => _applyDocTool(tool.id),
+                isDark,
+                isPro: NgmySlidesPayments.isPaidDocTool(tool.id),
+              ),
           ],
         );
       case 'Insert':
@@ -3138,15 +3150,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
             _ribbonBtn(Icons.sticky_note_2_rounded, 'Sticky', () => _applyDocTool('sticky'), isDark),
             _ribbonBtn(Icons.horizontal_rule_rounded, 'Divider', () => _applyDocTool('divider'), isDark),
             _ribbonBtn(Icons.view_agenda_rounded, 'Header', () => _applyDocTool('header_bar'), isDark),
-            _ribbonBtn(Icons.crop_square_rounded, 'Rectangle', () => _addShape(NgmySlideShapeKind.rectangle), isDark),
-            _ribbonBtn(Icons.circle_outlined, 'Circle', () => _addShape(NgmySlideShapeKind.circle), isDark),
-            _ribbonBtn(Icons.change_history_rounded, 'Triangle', () => _addShape(NgmySlideShapeKind.triangle), isDark),
-            _ribbonBtn(Icons.arrow_forward_rounded, 'Arrow', () => _addShape(NgmySlideShapeKind.arrow), isDark),
-            _ribbonBtn(Icons.crop_landscape_rounded, 'Parallelogram', () => _addShape(NgmySlideShapeKind.parallelogram), isDark),
-            _ribbonBtn(Icons.hexagon_outlined, 'Hexagon', () => _addShape(NgmySlideShapeKind.hexagon), isDark),
-            _ribbonBtn(Icons.horizontal_rule_rounded, 'Line', () => _addShape(NgmySlideShapeKind.line), isDark),
-            _ribbonBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_addPdf()), isDark),
-            _ribbonBtn(Icons.draw_outlined, 'Signature', () => unawaited(_addSignature()), isDark),
+            _ribbonBtn(Icons.crop_square_rounded, 'Rectangle', () => _addShape(NgmySlideShapeKind.rectangle), isDark, isPro: true),
+            _ribbonBtn(Icons.circle_outlined, 'Circle', () => _addShape(NgmySlideShapeKind.circle), isDark, isPro: true),
+            _ribbonBtn(Icons.change_history_rounded, 'Triangle', () => _addShape(NgmySlideShapeKind.triangle), isDark, isPro: true),
+            _ribbonBtn(Icons.arrow_forward_rounded, 'Arrow', () => _addShape(NgmySlideShapeKind.arrow), isDark, isPro: true),
+            _ribbonBtn(Icons.crop_landscape_rounded, 'Parallelogram', () => _addShape(NgmySlideShapeKind.parallelogram), isDark, isPro: true),
+            _ribbonBtn(Icons.hexagon_outlined, 'Hexagon', () => _addShape(NgmySlideShapeKind.hexagon), isDark, isPro: true),
+            _ribbonBtn(Icons.horizontal_rule_rounded, 'Line', () => _addShape(NgmySlideShapeKind.line), isDark, isPro: true),
+            _ribbonBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_addPdf()), isDark, isPro: true),
+            _ribbonBtn(Icons.draw_outlined, 'Signature', () => unawaited(_addSignature()), isDark, isPro: true),
             _ribbonBtn(Icons.format_quote_rounded, 'Quote', () => _applyDocTool('quote'), isDark),
             _ribbonBtn(Icons.add_box_outlined, 'New Slide', () => _addSlide(), isDark),
           ],
@@ -3170,11 +3182,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 children: [
                   _colorScopeChip('This slide', !_colorApplyAllSlides, isDark, () => setState(() => _colorApplyAllSlides = false)),
                   const SizedBox(width: 6),
-                  _colorScopeChip('All slides', _colorApplyAllSlides, isDark, () async {
-                    if (!await _ensureSlidesPro()) return;
-                    if (!mounted) return;
-                    setState(() => _colorApplyAllSlides = true);
-                  }),
+                  _colorScopeChip(
+                    'All slides',
+                    _colorApplyAllSlides,
+                    isDark,
+                    () async {
+                      if (!await _ensureSlidesPro()) return;
+                      if (!mounted) return;
+                      setState(() => _colorApplyAllSlides = true);
+                    },
+                    isPro: true,
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -3257,7 +3275,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 ),
               ),
               const SizedBox(height: 8),
-              Text('SLIDE DESIGNS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1)),
+              Text(
+                'SLIDE DESIGNS · first 5 free',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isDark ? Colors.white54 : const Color(0xFF64748B), letterSpacing: 1),
+              ),
               const SizedBox(height: 4),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -3301,12 +3322,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                                     right: 2,
                                     top: 2,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.92),
-                                        borderRadius: BorderRadius.circular(4),
+                                      width: 14,
+                                      height: 14,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF1D4ED8),
+                                        shape: BoxShape.circle,
                                       ),
-                                      child: const Text('Pro', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+                                      child: const Icon(Icons.lock_rounded, size: 9, color: Colors.white),
                                     ),
                                   ),
                               ],
@@ -3393,7 +3415,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               final deck = _activeDeck;
               if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
             }, isDark),
-            _ribbonBtn(Icons.file_download_outlined, 'Export JSON', () => unawaited(_exportJson()), isDark),
+            _ribbonBtn(
+              Icons.file_download_outlined,
+              'Export JSON',
+              () => unawaited(_exportJson()),
+              isDark,
+              isPro: true,
+            ),
             _ribbonBtn(Icons.content_copy_rounded, 'Duplicate Slide', _duplicateSlide, isDark),
             _ribbonBtn(Icons.delete_outline_rounded, 'Delete Slide', _deleteSlide, isDark),
             _slideDurationStepper(isDark),
@@ -3569,7 +3597,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
-  Widget _ribbonBtn(IconData icon, String label, VoidCallback onTap, bool isDark) {
+  Widget _ribbonBtn(
+    IconData icon,
+    String label,
+    VoidCallback onTap,
+    bool isDark, {
+    bool isPro = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: Material(
@@ -3588,7 +3622,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 18, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Icon(icon, size: 18, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                      if (isPro)
+                        Positioned(
+                          right: -6,
+                          top: -4,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1D4ED8),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.lock_rounded, size: 8, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                   const SizedBox(height: 3),
                   Text(
                     label,
@@ -3971,7 +4024,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
-  Widget _colorScopeChip(String label, bool selected, bool isDark, VoidCallback onTap) {
+  Widget _colorScopeChip(
+    String label,
+    bool selected,
+    bool isDark,
+    VoidCallback onTap, {
+    bool isPro = false,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -3981,7 +4040,28 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: selected ? const Color(0xFF2563EB) : Colors.white12),
         ),
-        child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: selected ? const Color(0xFF2563EB) : (isDark ? Colors.white54 : const Color(0xFF64748B)))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: selected ? const Color(0xFF2563EB) : (isDark ? Colors.white54 : const Color(0xFF64748B)),
+              ),
+            ),
+            if (isPro) ...[
+              const SizedBox(width: 4),
+              Container(
+                width: 12,
+                height: 12,
+                decoration: const BoxDecoration(color: Color(0xFF1D4ED8), shape: BoxShape.circle),
+                child: const Icon(Icons.lock_rounded, size: 8, color: Colors.white),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

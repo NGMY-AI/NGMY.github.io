@@ -6,16 +6,16 @@ import 'ngmy_stripe_payments.dart';
 
 /// NGMY Slides freemium gate.
 ///
-/// Free: blank decks, Normal class templates, Corporate/Minimal designs,
+/// Free: blank decks, Normal class templates, first 5 slide designs,
 /// basic editing, basic transitions, Present, PDF download.
-/// Pro ($4.99/mo): Professional/Luxury/Bold templates, Luxury/Bold designs,
-/// fancy transitions, 9:16, HD/PDF/signature tools, school quiz packs, etc.
+/// Pro ($4.99/mo): remaining designs, all shapes/signature, fancy transitions,
+/// Professional/Luxury/Bold templates, HD/PDF tools, school quiz packs, etc.
 abstract final class NgmySlidesPayments {
+  /// First N entries in [ngmySlideDesignTemplates] stay free.
+  static const freeDesignCount = 5;
+
   static const freeClassCategories = {'Normal'};
   static const paidClassCategories = {'Professional', 'Luxury', 'Bold'};
-
-  static const freeDesignCategories = {'Corporate', 'Minimal', 'Modern'};
-  static const paidDesignCategories = {'Luxury', 'Bold'};
 
   static const freeThemeIds = {
     'office_blue',
@@ -83,21 +83,8 @@ abstract final class NgmySlidesPayments {
     'link_text',
     'phone',
     'email',
-    'rectangle',
-    'circle',
-    'arrow',
-    'line',
-    'triangle',
     'new_slide',
     'present',
-  };
-
-  static const freeShapes = {
-    NgmySlideShapeKind.rectangle,
-    NgmySlideShapeKind.circle,
-    NgmySlideShapeKind.triangle,
-    NgmySlideShapeKind.arrow,
-    NgmySlideShapeKind.line,
   };
 
   static const paidSchoolLayouts = {
@@ -148,8 +135,12 @@ abstract final class NgmySlidesPayments {
   static bool isPaidClassCategory(String category) =>
       paidClassCategories.contains(category.trim());
 
-  static bool isPaidDesign(NgmySlideDesignDef design) =>
-      paidDesignCategories.contains(design.category.trim());
+  /// Only the first [freeDesignCount] designs in the catalog are free.
+  static bool isPaidDesign(NgmySlideDesignDef design) {
+    final index = ngmySlideDesignTemplates.indexWhere((d) => d.id == design.id);
+    if (index < 0) return true;
+    return index >= freeDesignCount;
+  }
 
   static bool isPaidThemeId(String themeId) =>
       paidThemeIds.contains(themeId.trim());
@@ -160,7 +151,9 @@ abstract final class NgmySlidesPayments {
   static bool isPaidAspect(NgmySlideAspectRatio ratio) =>
       ratio == NgmySlideAspectRatio.portrait916;
 
-  static bool isPaidShape(NgmySlideShapeKind kind) => !freeShapes.contains(kind);
+  /// All insert shapes (rectangle, circle, triangle, arrow, parallelogram,
+  /// hexagon, line) require Pro.
+  static bool isPaidShape(NgmySlideShapeKind kind) => true;
 
   static bool isPaidSchoolLayout(NgmySlideLayout layout) =>
       paidSchoolLayouts.contains(layout);
