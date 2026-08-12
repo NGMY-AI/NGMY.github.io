@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_network_resilience.dart';
@@ -10,6 +11,9 @@ const String kNgmyHomeVoteAdSettingsKey = 'home_vote_ad_campaign';
 const String _kNgmyHomeVoteAdPrefsKey = 'ngmy_home_vote_ad_v1';
 const String kNgmyHomeVoteAdCardId = 'ngmy_home_vote_ad_default';
 const String kNgmyHomeVoteAdCategory = 'Vote Ad';
+
+/// Exact home deck card face height used by [NgmyGlassCardStack].
+const double kNgmyHomeVoteAdCardHeight = 252;
 
 /// Max campaign length: just under 5 months (~150 days).
 const int kNgmyHomeVoteAdMaxDays = 150;
@@ -26,6 +30,40 @@ const List<(int days, String label)> kNgmyHomeVoteAdDurations = [
   (149, 'Just under 5 months'),
 ];
 
+class NgmyVoteAdSlideStyle {
+  const NgmyVoteAdSlideStyle({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String id;
+  final String label;
+  final IconData icon;
+  final Color accent;
+}
+
+const List<NgmyVoteAdSlideStyle> kNgmyVoteAdSlideStyles = [
+  NgmyVoteAdSlideStyle(id: 'cinematic', label: 'Cinematic', icon: Icons.movie_filter_rounded, accent: Color(0xFFFACC15)),
+  NgmyVoteAdSlideStyle(id: 'billboard', label: 'Billboard', icon: Icons.view_agenda_rounded, accent: Color(0xFFEF4444)),
+  NgmyVoteAdSlideStyle(id: 'ticker', label: 'Ticker', icon: Icons.horizontal_rule_rounded, accent: Color(0xFF22D3EE)),
+  NgmyVoteAdSlideStyle(id: 'rally', label: 'Rally', icon: Icons.campaign_rounded, accent: Color(0xFFF97316)),
+  NgmyVoteAdSlideStyle(id: 'spotlight', label: 'Spotlight', icon: Icons.highlight_rounded, accent: Color(0xFFD4AF37)),
+  NgmyVoteAdSlideStyle(id: 'portrait', label: 'Portrait', icon: Icons.account_circle_rounded, accent: Color(0xFFA78BFA)),
+  NgmyVoteAdSlideStyle(id: 'neon', label: 'Neon', icon: Icons.bolt_rounded, accent: Color(0xFFE879F9)),
+  NgmyVoteAdSlideStyle(id: 'parade', label: 'Parade', icon: Icons.flag_rounded, accent: Color(0xFF34D399)),
+  NgmyVoteAdSlideStyle(id: 'editorial', label: 'Editorial', icon: Icons.newspaper_rounded, accent: Color(0xFFE2E8F0)),
+  NgmyVoteAdSlideStyle(id: 'stadium', label: 'Stadium', icon: Icons.stadium_rounded, accent: Color(0xFF60A5FA)),
+];
+
+NgmyVoteAdSlideStyle ngmyVoteAdSlideStyleById(String id) {
+  for (final s in kNgmyVoteAdSlideStyles) {
+    if (s.id == id) return s;
+  }
+  return kNgmyVoteAdSlideStyles.first;
+}
+
 class NgmyHomeVoteAdCampaign {
   NgmyHomeVoteAdCampaign({
     this.active = false,
@@ -33,8 +71,16 @@ class NgmyHomeVoteAdCampaign {
     this.candidateId = '',
     this.candidateName = '',
     this.photoUrl = '',
+    this.backgroundUrl = '',
     this.bioNote = '',
     this.headline = 'VOTE NOW',
+    this.supportLine = 'Your voice. Your community. Your choice.',
+    this.ctaText = 'CAST YOUR BALLOT',
+    this.marqueeText = 'VOTE · SUPPORT THIS CANDIDATE · MAKE YOUR VOICE COUNT · CIVIC REGISTRY VOTING ·',
+    this.slideStyle = 'cinematic',
+    this.showCirclePhoto = true,
+    this.showMarquee = true,
+    this.accentArgb = 0xFFFACC15,
     this.startsAt = '',
     this.endsAt = '',
     this.durationDays = 7,
@@ -43,21 +89,42 @@ class NgmyHomeVoteAdCampaign {
   });
 
   bool active;
-  /// Legacy business-card JSON (optional; new ads use photo/name/bio fields).
+  /// Legacy business-card JSON (optional).
   String businessCardJson;
   String candidateId;
   String candidateName;
+  /// Circle / portrait photo.
   String photoUrl;
+  /// Full-bleed background (separate from circle).
+  String backgroundUrl;
   String bioNote;
   String headline;
+  String supportLine;
+  String ctaText;
+  String marqueeText;
+  String slideStyle;
+  bool showCirclePhoto;
+  bool showMarquee;
+  int accentArgb;
   String startsAt;
   String endsAt;
   int durationDays;
   String publishedBy;
   String updatedAt;
 
+  Color get accent => Color(accentArgb);
+
+  String get effectiveBackground {
+    final bg = backgroundUrl.trim();
+    if (bg.isNotEmpty) return bg;
+    return photoUrl.trim();
+  }
+
   bool get hasCreative =>
-      candidateName.trim().isNotEmpty || photoUrl.trim().isNotEmpty || businessCardJson.trim().isNotEmpty;
+      candidateName.trim().isNotEmpty ||
+      photoUrl.trim().isNotEmpty ||
+      backgroundUrl.trim().isNotEmpty ||
+      businessCardJson.trim().isNotEmpty;
 
   bool get isLive {
     if (!active) return false;
@@ -70,14 +137,68 @@ class NgmyHomeVoteAdCampaign {
     return true;
   }
 
+  NgmyHomeVoteAdCampaign copyWith({
+    bool? active,
+    String? businessCardJson,
+    String? candidateId,
+    String? candidateName,
+    String? photoUrl,
+    String? backgroundUrl,
+    String? bioNote,
+    String? headline,
+    String? supportLine,
+    String? ctaText,
+    String? marqueeText,
+    String? slideStyle,
+    bool? showCirclePhoto,
+    bool? showMarquee,
+    int? accentArgb,
+    String? startsAt,
+    String? endsAt,
+    int? durationDays,
+    String? publishedBy,
+    String? updatedAt,
+  }) {
+    return NgmyHomeVoteAdCampaign(
+      active: active ?? this.active,
+      businessCardJson: businessCardJson ?? this.businessCardJson,
+      candidateId: candidateId ?? this.candidateId,
+      candidateName: candidateName ?? this.candidateName,
+      photoUrl: photoUrl ?? this.photoUrl,
+      backgroundUrl: backgroundUrl ?? this.backgroundUrl,
+      bioNote: bioNote ?? this.bioNote,
+      headline: headline ?? this.headline,
+      supportLine: supportLine ?? this.supportLine,
+      ctaText: ctaText ?? this.ctaText,
+      marqueeText: marqueeText ?? this.marqueeText,
+      slideStyle: slideStyle ?? this.slideStyle,
+      showCirclePhoto: showCirclePhoto ?? this.showCirclePhoto,
+      showMarquee: showMarquee ?? this.showMarquee,
+      accentArgb: accentArgb ?? this.accentArgb,
+      startsAt: startsAt ?? this.startsAt,
+      endsAt: endsAt ?? this.endsAt,
+      durationDays: durationDays ?? this.durationDays,
+      publishedBy: publishedBy ?? this.publishedBy,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
         'active': active,
         'businessCardJson': businessCardJson,
         'candidateId': candidateId,
         'candidateName': candidateName,
         'photoUrl': photoUrl,
+        'backgroundUrl': backgroundUrl,
         'bioNote': bioNote,
         'headline': headline,
+        'supportLine': supportLine,
+        'ctaText': ctaText,
+        'marqueeText': marqueeText,
+        'slideStyle': slideStyle,
+        'showCirclePhoto': showCirclePhoto,
+        'showMarquee': showMarquee,
+        'accentArgb': accentArgb,
         'startsAt': startsAt,
         'endsAt': endsAt,
         'durationDays': durationDays,
@@ -89,9 +210,12 @@ class NgmyHomeVoteAdCampaign {
     if (json == null) return NgmyHomeVoteAdCampaign();
     var name = (json['candidateName'] ?? '').toString();
     var photo = (json['photoUrl'] ?? '').toString();
+    var bg = (json['backgroundUrl'] ?? '').toString();
     var bio = (json['bioNote'] ?? '').toString();
     var headline = (json['headline'] ?? 'VOTE NOW').toString();
-    // Legacy: recover name from business card JSON if needed.
+    var support = (json['supportLine'] ?? '').toString();
+    var cta = (json['ctaText'] ?? '').toString();
+    var marquee = (json['marqueeText'] ?? '').toString();
     final cardJson = (json['businessCardJson'] ?? '').toString();
     if (name.trim().isEmpty && cardJson.trim().isNotEmpty) {
       try {
@@ -108,14 +232,29 @@ class NgmyHomeVoteAdCampaign {
         }
       } catch (_) {}
     }
+    if (support.trim().isEmpty) {
+      support = bio.trim().isEmpty ? 'Your voice. Your community. Your choice.' : bio.trim();
+    }
+    if (cta.trim().isEmpty) cta = 'CAST YOUR BALLOT';
+    if (marquee.trim().isEmpty) {
+      marquee = 'VOTE · SUPPORT THIS CANDIDATE · MAKE YOUR VOICE COUNT · CIVIC REGISTRY VOTING ·';
+    }
     return NgmyHomeVoteAdCampaign(
       active: json['active'] == true,
       businessCardJson: cardJson,
       candidateId: (json['candidateId'] ?? '').toString(),
       candidateName: name,
       photoUrl: photo,
+      backgroundUrl: bg,
       bioNote: bio,
       headline: headline.trim().isEmpty ? 'VOTE NOW' : headline,
+      supportLine: support,
+      ctaText: cta,
+      marqueeText: marquee,
+      slideStyle: (json['slideStyle'] ?? 'cinematic').toString(),
+      showCirclePhoto: json['showCirclePhoto'] != false,
+      showMarquee: json['showMarquee'] != false,
+      accentArgb: (json['accentArgb'] as num?)?.toInt() ?? 0xFFFACC15,
       startsAt: (json['startsAt'] ?? '').toString(),
       endsAt: (json['endsAt'] ?? '').toString(),
       durationDays: (json['durationDays'] as num?)?.toInt() ?? 7,
@@ -154,8 +293,6 @@ class NgmyHomeVoteAdStore {
     _expireIfNeeded(persistCloud: false);
 
     if (forceCloud) {
-      // Never block callers on cloud — fire and update cache when ready.
-      // Callers that need immediate UI should use local cache from above.
       // ignore: unawaited_futures
       _refreshFromCloud();
     }
@@ -217,23 +354,17 @@ class NgmyHomeVoteAdStore {
   }
 
   static Future<bool> publish({
-    required String candidateId,
-    required String candidateName,
-    required String photoUrl,
-    required String bioNote,
+    required NgmyHomeVoteAdCampaign draft,
     required int durationDays,
     required String publishedBy,
-    String headline = 'VOTE NOW',
   }) async {
     final days = durationDays.clamp(1, kNgmyHomeVoteAdMaxDays);
     final now = DateTime.now().toUtc();
-    final campaign = NgmyHomeVoteAdCampaign(
+    final campaign = draft.copyWith(
       active: true,
-      candidateId: candidateId,
-      candidateName: candidateName.trim().toUpperCase(),
-      photoUrl: photoUrl,
-      bioNote: bioNote.trim(),
-      headline: headline.trim().isEmpty ? 'VOTE NOW' : headline.trim().toUpperCase(),
+      candidateName: draft.candidateName.trim().toUpperCase(),
+      headline: draft.headline.trim().isEmpty ? 'VOTE NOW' : draft.headline.trim().toUpperCase(),
+      ctaText: draft.ctaText.trim().isEmpty ? 'CAST YOUR BALLOT' : draft.ctaText.trim().toUpperCase(),
       startsAt: now.toIso8601String(),
       endsAt: now.add(Duration(days: days)).toIso8601String(),
       durationDays: days,
