@@ -18,6 +18,7 @@ import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
+import 'ngmy_home_vote_ads.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
 import 'ngmy_offline_icons.dart';
@@ -1811,22 +1812,48 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   Future<void> _load() async {
     final s0 = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
     final s1 = await _syncBusinessCardSnapshots(s0);
-    final s = await _hydrateCivicIdCards(s1);
+    final s2 = await _hydrateCivicIdCards(s1);
+    final s = await _injectHomeVoteAd(s2);
     final deck = await NgmyHomeLocalStore.loadDeckPrefs(widget.userEmail);
     final acks = await NgmyHomeLocalStore.loadAlarmAcks(widget.userEmail);
     if (!mounted) return;
-    s.sort((a, b) => b.date.compareTo(a.date));
-    _moveIdToFront(s, (e) => e.id, deck.frontSpendingId);
+    s.sort((a, b) {
+      if (a.id == kNgmyHomeVoteAdCardId && b.id != kNgmyHomeVoteAdCardId) return -1;
+      if (b.id == kNgmyHomeVoteAdCardId && a.id != kNgmyHomeVoteAdCardId) return 1;
+      return b.date.compareTo(a.date);
+    });
+    final preferFront = s.any((e) => e.id == kNgmyHomeVoteAdCardId)
+        ? kNgmyHomeVoteAdCardId
+        : deck.frontSpendingId;
+    _moveIdToFront(s, (e) => e.id, preferFront);
     setState(() {
       _spending = s;
       _autoPlay = deck.autoPlay;
       _slideStyle = deck.style;
-      _frontSpendingId = deck.frontSpendingId ?? (s.isNotEmpty ? s.first.id : null);
+      _frontSpendingId = preferFront ?? (s.isNotEmpty ? s.first.id : null);
       _frontNoteId = deck.frontNoteId;
       _alarmAcks = acks;
       _loaded = true;
     });
     _checkDueAlarms();
+  }
+
+  Future<List<NgmySpendingEntry>> _injectHomeVoteAd(List<NgmySpendingEntry> spending) async {
+    final withoutAd = spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+    final campaign = await NgmyHomeVoteAdStore.load(forceCloud: true);
+    if (!campaign.isLive) return withoutAd;
+    final json = campaign.businessCardJson.trim();
+    if (json.isEmpty) return withoutAd;
+    final name = campaign.candidateName.trim().isEmpty ? 'Voting advertisement' : campaign.candidateName.trim();
+    final adEntry = NgmySpendingEntry(
+      id: kNgmyHomeVoteAdCardId,
+      amount: 0,
+      description: name,
+      category: 'Business Card',
+      date: DateTime.now(),
+      businessCardJson: json,
+    );
+    return [adEntry, ...withoutAd];
   }
 
   Future<void> _setDeckPrefs({bool? autoPlay, NgmyHomeCardSlideStyle? style, String? frontSpendingId, String? frontNoteId}) async {

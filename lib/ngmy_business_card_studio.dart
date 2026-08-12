@@ -11,6 +11,8 @@ import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_payments.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
+import 'ngmy_civic_voting.dart';
+import 'ngmy_home_vote_ads.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
@@ -53,6 +55,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   String? _selectedElementId;
   int _galleryReload = 0;
   NgmyBusinessCardAccess _access = NgmyBusinessCardAccess.neverPurchased;
+  List<NgmyCivicVotingCandidate> _voteCandidates = [];
+  String? _selectedCandidateId;
+  NgmyHomeVoteAdCampaign _homeAd = NgmyHomeVoteAdCampaign();
+  bool _adminBusy = false;
 
   static const _businessEmojis = [
     '💼',
@@ -145,6 +151,29 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     _doc = widget.initialDocument?.copy() ?? NgmyBusinessCardDocument();
     _syncControllersFromDoc();
     _refreshAccess();
+    if (widget.isAdmin) {
+      unawaited(_loadAdminVoteTools());
+    }
+  }
+
+  Future<void> _loadAdminVoteTools() async {
+    final voting = await NgmyCivicVotingStore.load(forceCloud: true);
+    final ad = await NgmyHomeVoteAdStore.load(forceCloud: true);
+    final candidates = <NgmyCivicVotingCandidate>[];
+    final seen = <String>{};
+    for (final poll in voting.allPolls) {
+      for (final c in poll.candidates) {
+        final id = c.id.trim();
+        if (id.isEmpty || seen.contains(id)) continue;
+        seen.add(id);
+        candidates.add(c);
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _voteCandidates = candidates;
+      _homeAd = ad;
+    });
   }
 
   @override
@@ -391,7 +420,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
-    final templates = ngmyBusinessCardTemplatesForCategory(_category);
+    final templates = ngmyBusinessCardTemplatesForCategory(
+      _category,
+      includeAdmin: widget.isAdmin,
+    );
     return NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {
         return Column(
@@ -410,13 +442,17 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     _chip('All', 'all'),
-                    ...kNgmyBusinessCardCategories.map(
+                    ...ngmyBusinessCardCategoriesVisible(isAdmin: widget.isAdmin).map(
                       (c) => _chip(c.$2, c.$1),
                     ),
                   ],
                 ),
               ),
             ),
+            if (widget.isAdmin && _category == 'admin') ...[
+              const SizedBox(height: 10),
+              _adminVoteCandidatesPanel(t),
+            ],
             const SizedBox(height: 10),
             NgmyToolkitAliveSection(
               colors: _kBizCardHudColors,
@@ -478,6 +514,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 ),
               ),
             ),
+            if (widget.isAdmin && _category == 'admin') ...[
+              const SizedBox(height: 10),
+              _adminPublishHomeAdPanel(t),
+            ],
             const SizedBox(height: 12),
             if (_editLocked) _expiredAccessNotice(),
             if (_editLocked) const SizedBox(height: 10),
@@ -671,6 +711,248 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             child: const Text('Unlock'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _adminVoteCandidatesPanel(NgmyHubTheme t) {
+    if (_voteCandidates.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: t.panel,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: t.chipOffBorder),
+        ),
+        child: Text(
+          'No voting candidates yet. Add them in Civic Voting first.',
+          style: TextStyle(color: t.chipOffLabel, fontWeight: FontWeight.w700, fontSize: 12),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Voting candidates',
+          style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 78,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _voteCandidates.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, i) {
+              final c = _voteCandidates[i];
+              final selected = _selectedCandidateId == c.id;
+              final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
+              return GestureDetector(
+                onTap: () => _applyCandidateAd(c),
+                child: Container(
+                  width: 150,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: selected ? const Color(0xFFFACC15) : t.chipOffBorder,
+                      width: selected ? 2 : 1,
+                    ),
+                    color: t.panel,
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.black26,
+                        backgroundImage: photo,
+                        child: photo == null
+                            ? Text(
+                                c.name.trim().isNotEmpty ? c.name.trim()[0] : '?',
+                                style: const TextStyle(fontWeight: FontWeight.w900),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          c.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _adminPublishHomeAdPanel(NgmyHubTheme t) {
+    final live = _homeAd.isLive;
+    final endLabel = _homeAd.endsAt.trim().length >= 10 ? _homeAd.endsAt.trim().substring(0, 10) : _homeAd.endsAt.trim();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: t.panel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: t.chipOffBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            live
+                ? 'Home default ad is live${_homeAd.candidateName.trim().isEmpty ? '' : ' · ${_homeAd.candidateName}'}'
+                : 'Publish this advertisement as the default home card for everyone',
+            style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12),
+          ),
+          if (live && endLabel.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Runs until $endLabel',
+              style: TextStyle(color: t.chipOffLabel, fontSize: 11),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _adminBusy ? null : _publishHomeAd,
+                  icon: const Icon(Icons.campaign_rounded, size: 18),
+                  label: Text(live ? 'Replace ad' : 'Put on home cards'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+              if (live) ...[
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: _adminBusy ? null : _removeHomeAd,
+                  child: const Text('Remove'),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyCandidateAd(NgmyCivicVotingCandidate candidate) {
+    final photo = candidate.photoUrl.trim();
+    var logo = '';
+    if (photo.startsWith('data:image')) {
+      final comma = photo.indexOf(',');
+      if (comma > 0) logo = photo.substring(comma + 1);
+    } else if (photo.length > 80 && !photo.startsWith('http')) {
+      logo = photo;
+    }
+    setState(() {
+      _selectedCandidateId = candidate.id;
+      _doc.fullName = candidate.name.toUpperCase();
+      _doc.jobTitle = 'VOTE';
+      _doc.company = 'Civic Registry Voting';
+      _doc.tagline = candidate.bioNote.trim().isEmpty
+          ? 'Support this candidate'
+          : candidate.bioNote.trim();
+      _doc.phone = '';
+      _doc.email = '';
+      _doc.website = 'ngmy.org';
+      _doc.address = '';
+      if (logo.isNotEmpty) {
+        _doc.logoBase64 = logo;
+        _doc.logoRingStyle = 'gold';
+      }
+      if (_doc.template.category != 'admin' && _category == 'admin') {
+        final adminTpl = ngmyBusinessCardTemplatesForCategory('admin', includeAdmin: true);
+        if (adminTpl.isNotEmpty) _doc.templateId = adminTpl.first.id;
+      }
+      _syncControllersFromDoc();
+      _doc.touch();
+    });
+    widget.onDocumentChanged?.call(_doc);
+  }
+
+  Future<void> _publishHomeAd() async {
+    final days = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(18)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text('How long should this ad run?', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                ),
+                ...kNgmyHomeVoteAdDurations.map(
+                  (d) => ListTile(
+                    title: Text(d.$2, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    onTap: () => Navigator.pop(ctx, d.$1),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (days == null || !mounted) return;
+    setState(() => _adminBusy = true);
+    _applyControllersToDoc();
+    final ok = await NgmyHomeVoteAdStore.publish(
+      document: _doc,
+      durationDays: days,
+      publishedBy: widget.userEmail,
+      candidateId: _selectedCandidateId ?? '',
+      candidateName: _doc.fullName,
+    );
+    final ad = await NgmyHomeVoteAdStore.load();
+    if (!mounted) return;
+    setState(() {
+      _homeAd = ad;
+      _adminBusy = false;
+    });
+    ngmyBumpHomeCardsRevision();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Home advertisement published for everyone.' : 'Saved on this device — will sync when online.'),
+        backgroundColor: ok ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _removeHomeAd() async {
+    setState(() => _adminBusy = true);
+    final ok = await NgmyHomeVoteAdStore.remove(publishedBy: widget.userEmail);
+    final ad = await NgmyHomeVoteAdStore.load();
+    if (!mounted) return;
+    setState(() {
+      _homeAd = ad;
+      _adminBusy = false;
+    });
+    ngmyBumpHomeCardsRevision();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Home advertisement removed.' : 'Removed on this device — will sync when online.'),
+        backgroundColor: ok ? Colors.green : Colors.orange,
       ),
     );
   }

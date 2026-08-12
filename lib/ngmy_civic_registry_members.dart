@@ -209,6 +209,9 @@ class NgmyCivicRegistryMembers {
       if ((next['registeredByToken'] ?? '').toString().trim().isEmpty) {
         next['registeredByToken'] = (keep['registeredByToken'] ?? '').toString();
       }
+      if (!next.containsKey('profileFlags') || next['profileFlags'] == null) {
+        next['profileFlags'] = keep['profileFlags'] ?? const <String, dynamic>{};
+      }
       next['updatedAt'] = now;
       members[idx] = next;
     } else {

@@ -40,7 +40,13 @@ const List<(String id, String label)> kNgmyBusinessCardCategories = [
   ('medical', 'Medical'),
   ('real_estate', 'Real Estate'),
   ('freelance', 'Freelance'),
+  ('admin', 'Admin'),
 ];
+
+List<(String id, String label)> ngmyBusinessCardCategoriesVisible({required bool isAdmin}) {
+  if (isAdmin) return kNgmyBusinessCardCategories;
+  return kNgmyBusinessCardCategories.where((c) => c.$1 != 'admin').toList(growable: false);
+}
 
 const List<NgmyBusinessCardTemplate> kNgmyBusinessCardTemplates = [
   NgmyBusinessCardTemplate(id: 'glass_frost', name: 'Glass Frost', category: 'creative', renderStyle: 'glass_frost', bgStart: Color(0xFF1E1B4B), bgEnd: Color(0xFF312E81), accent: Color(0xFF818CF8), textPrimary: Colors.white, textSecondary: Color(0xFFC7D2FE)),
@@ -80,6 +86,11 @@ const List<NgmyBusinessCardTemplate> kNgmyBusinessCardTemplates = [
   NgmyBusinessCardTemplate(id: 'shadow_kb', name: 'Shadow KB', category: 'creative', renderStyle: 'shadow_kb', bgStart: Color(0xFF0F172A), bgEnd: Color(0xFF1E293B), accent: Color(0xFF22D3EE), textPrimary: Colors.white, textSecondary: Color(0xFF94A3B8)),
   NgmyBusinessCardTemplate(id: 'watermark_gold', name: 'Gold Watermark', category: 'luxury', renderStyle: 'watermark_gold', bgStart: Color(0xFF0A0A0A), bgEnd: Color(0xFF171717), accent: Color(0xFFD4AF37), textPrimary: Color(0xFFFAFAF9), textSecondary: Color(0xFFA8A29E)),
   NgmyBusinessCardTemplate(id: 'type_halo', name: 'Type Halo', category: 'minimal', renderStyle: 'type_halo', bgStart: Color(0xFFF8FAFC), bgEnd: Color(0xFFE2E8F0), accent: Color(0xFF0F172A), textPrimary: Color(0xFF0F172A), textSecondary: Color(0xFF64748B)),
+  NgmyBusinessCardTemplate(id: 'vote_campaign', name: 'Vote Campaign', category: 'admin', renderStyle: 'hero_strip', bgStart: Color(0xFF052E16), bgEnd: Color(0xFF14532D), accent: Color(0xFFFACC15), textPrimary: Colors.white, textSecondary: Color(0xFFBBF7D0)),
+  NgmyBusinessCardTemplate(id: 'vote_spotlight', name: 'Candidate Spotlight', category: 'admin', renderStyle: 'gold_luxe', bgStart: Color(0xFF111827), bgEnd: Color(0xFF1F2937), accent: Color(0xFFF59E0B), textPrimary: Color(0xFFFAFAF9), textSecondary: Color(0xFFD1D5DB)),
+  NgmyBusinessCardTemplate(id: 'vote_billboard', name: 'Billboard Ad', category: 'admin', renderStyle: 'mega_type', bgStart: Color(0xFF7F1D1D), bgEnd: Color(0xFF991B1B), accent: Color(0xFFFEF3C7), textPrimary: Colors.white, textSecondary: Color(0xFFFECACA)),
+  NgmyBusinessCardTemplate(id: 'vote_civic', name: 'Civic Poster', category: 'admin', renderStyle: 'ribbon', bgStart: Color(0xFF0C4A6E), bgEnd: Color(0xFF0369A1), accent: Color(0xFF67E8F9), textPrimary: Colors.white, textSecondary: Color(0xFFBAE6FD)),
+  NgmyBusinessCardTemplate(id: 'vote_neon', name: 'Neon Rally', category: 'admin', renderStyle: 'neon_frame', bgStart: Color(0xFF020617), bgEnd: Color(0xFF0F172A), accent: Color(0xFF22D3EE), textPrimary: Colors.white, textSecondary: Color(0xFF94A3B8)),
 ];
 
 NgmyBusinessCardTemplate ngmyBusinessCardTemplateById(String id) {
@@ -89,9 +100,16 @@ NgmyBusinessCardTemplate ngmyBusinessCardTemplateById(String id) {
   );
 }
 
-List<NgmyBusinessCardTemplate> ngmyBusinessCardTemplatesForCategory(String category) {
-  if (category.isEmpty || category == 'all') return kNgmyBusinessCardTemplates;
-  return kNgmyBusinessCardTemplates.where((t) => t.category == category).toList();
+List<NgmyBusinessCardTemplate> ngmyBusinessCardTemplatesForCategory(
+  String category, {
+  bool includeAdmin = false,
+}) {
+  Iterable<NgmyBusinessCardTemplate> base = kNgmyBusinessCardTemplates;
+  if (!includeAdmin) {
+    base = base.where((t) => t.category != 'admin');
+  }
+  if (category.isEmpty || category == 'all') return base.toList();
+  return base.where((t) => t.category == category).toList();
 }
 
 class NgmyBusinessCardDocument {

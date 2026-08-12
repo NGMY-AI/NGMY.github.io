@@ -4,11 +4,13 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_state_wallet_ui.dart';
 import 'ngmy_nav.dart';
 
+export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity;
 export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
 
 /// Compact Registry Backup pin - thin animated outline, no thick white plate.
@@ -174,53 +176,6 @@ class NgmyCivicWalletSnapshot {
   final List<NgmyCivicWalletSpendingRow> spendings;
 
   double get available => math.max(0, collected - spent);
-}
-
-/// Normalize name / DOB / registry id for wallet unlock checks.
-class NgmyCivicWalletIdentity {
-  static String normalizeName(String raw) =>
-      raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-
-  static String normalizeDob(String raw) {
-    final t = raw.trim();
-    final m = RegExp(r'^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$').firstMatch(t);
-    if (m == null) return t.toLowerCase();
-    final mm = m.group(1)!.padLeft(2, '0');
-    final dd = m.group(2)!.padLeft(2, '0');
-    final yyyy = m.group(3)!;
-    return '$mm/$dd/$yyyy';
-  }
-
-  static String normalizeId(String raw) =>
-      raw.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
-
-  static Map<String, dynamic>? findByName({
-    required List<Map<String, dynamic>> members,
-    required String state,
-    required String fullName,
-  }) {
-    final want = normalizeName(fullName);
-    if (want.isEmpty) return null;
-    final st = state.trim().toLowerCase();
-    for (final m in members) {
-      final ms = (m['state'] ?? '').toString().trim().toLowerCase();
-      if (st.isNotEmpty && ms.isNotEmpty && ms != st) continue;
-      if (normalizeName((m['fullName'] ?? '').toString()) == want) return m;
-    }
-    return null;
-  }
-
-  static bool dobMatches(Map<String, dynamic> member, String dob) {
-    final a = normalizeDob((member['dob'] ?? '').toString());
-    final b = normalizeDob(dob);
-    return a.isNotEmpty && b.isNotEmpty && a == b;
-  }
-
-  static bool idMatches(Map<String, dynamic> member, String registryId) {
-    final a = normalizeId((member['registryId'] ?? '').toString());
-    final b = normalizeId(registryId);
-    return a.isNotEmpty && b.isNotEmpty && a == b;
-  }
 }
 
 Future<void> openNgmyCivicStateWalletFlow({

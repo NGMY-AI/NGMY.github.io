@@ -142,6 +142,7 @@ import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_id_card.dart';
+import 'ngmy_civic_profile_flags.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
@@ -29916,6 +29917,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   /// When set, Enroll tab is updating this member's registry email key.
   String? _editingMemberOriginalEmail;
   String? _editingMemberRegistryId;
+  /// Quiet registrar notes: fieldKey → {status, notedAt, notedBy}.
+  Map<String, Map<String, dynamic>> _enrollmentFlags = {};
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
@@ -30704,6 +30707,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _familyMembersC.clear();
     _familyMalesC.clear();
     _familyFemalesC.clear();
+    _enrollmentFlags = {};
     if (clearEditing) {
       _editingMemberOriginalEmail = null;
       _editingMemberRegistryId = null;
@@ -30732,6 +30736,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         (raw?['email'] ?? u.email).toString(),
       );
       _editingMemberRegistryId = registryId;
+      _enrollmentFlags = ngmyReadProfileFlags(raw);
       if (state.isNotEmpty) _selectedState = state;
       _fullNameC.text = (raw?['fullName'] ?? u.fullName ?? u.username).toString();
       _dobC.text = (raw?['dob'] ?? u.dob ?? '').toString();
@@ -30904,6 +30909,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       familyFemales: familyFemales,
       enrollmentSource: 'registrar',
     );
+    final flagsJson = ngmyProfileFlagsToJson(_enrollmentFlags);
+    if (flagsJson.isNotEmpty) member['profileFlags'] = flagsJson;
 
     setState(() {
       NgmyCivicRegistryMembers.upsert(
@@ -31085,6 +31092,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'familyMembers': familyMembers < 1 ? 1 : familyMembers,
         'familyMales': familyMales < 0 ? 0 : familyMales,
         'familyFemales': familyFemales < 0 ? 0 : familyFemales,
+        'profileFlags': ngmyProfileFlagsToJson(_enrollmentFlags),
       },
     );
     if (updated == null) {
@@ -35619,6 +35627,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         globalPin: widget.config.civicRegistryPin,
         userEmail: widget.user.email,
         initialState: _selectedState,
+        members: NgmyCivicRegistryMembers.listFrom(widget.config),
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
       );
@@ -36183,7 +36192,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ],
               const SizedBox(height: 25),
 
-              const Text('Full Name *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Full Name *', 'fullName'),
               const SizedBox(height: 8),
               TextField(
                 controller: _fullNameC,
@@ -36191,7 +36200,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Date of Birth (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Date of Birth (optional)', 'dob'),
               const SizedBox(height: 8),
               TextField(
                 controller: _dobC,
@@ -36201,7 +36210,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('ID Type', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('ID Type', 'idType'),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _idTypeC.text,
@@ -36211,9 +36220,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              _enrollField('Home Address *', _addressC, 'Street address, Apt...'),
+              _enrollField('Home Address *', _addressC, 'Street address, Apt...', fieldKey: 'homeAddress'),
 
-              const Text('Phone Number *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Phone Number *', 'phone'),
               const SizedBox(height: 8),
               TextField(
                 controller: _phoneC,
@@ -36223,7 +36232,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Email Address (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Email Address (optional)', 'email'),
               const SizedBox(height: 8),
               TextField(
                 controller: _emailC,
@@ -36232,7 +36241,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('City', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('City', 'city'),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
@@ -36244,7 +36253,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Room (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Room (optional)', 'room'),
               const SizedBox(height: 8),
               DropdownMenu<String>(
                 width: double.infinity,
@@ -36256,7 +36265,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
               const SizedBox(height: 20),
 
-              const Text('Family Size *', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              _enrollFlagLabel('Family Size *', 'familyMembers'),
               const SizedBox(height: 8),
               TextField(
                 controller: _familyMembersC,
@@ -36282,7 +36291,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Males (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        _enrollFlagLabel('Males (optional)', 'familyMales'),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _familyMalesC,
@@ -36304,7 +36313,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Females (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        _enrollFlagLabel('Females (optional)', 'familyFemales'),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _familyFemalesC,
@@ -36398,13 +36407,127 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ],
     );
   }
-  Widget _enrollField(String label, TextEditingController c, String hint) {
+  Widget _enrollField(String label, TextEditingController c, String hint, {String? fieldKey}) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (label.isNotEmpty) ...[Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 8)],
+      if (label.isNotEmpty) ...[
+        if (fieldKey != null) _enrollFlagLabel(label, fieldKey) else Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        const SizedBox(height: 8),
+      ],
       TextField(controller: c, decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none))),
       const SizedBox(height: 20),
     ]);
+  }
+
+  Widget _enrollFlagLabel(String label, String fieldKey) {
+    final flag = _enrollmentFlags[fieldKey];
+    final status = (flag?['status'] ?? '').toString().trim();
+    final hasFlag = status.isNotEmpty;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _onEnrollLabelTap(fieldKey),
+      child: Row(
+        children: [
+          Flexible(
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+          if (hasFlag) ...[
+            const SizedBox(width: 8),
+            Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(color: Color(0xFFE53935), shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              ngmyProfileFlagLabel(status),
+              style: const TextStyle(color: Color(0xFFE53935), fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  DateTime? _enrollLabelLastTap;
+  int _enrollLabelTapCount = 0;
+  String? _enrollLabelTapKey;
+
+  void _onEnrollLabelTap(String fieldKey) {
+    if (!_canManageCivicRegistry()) return;
+    final now = DateTime.now();
+    if (_enrollLabelTapKey != fieldKey ||
+        _enrollLabelLastTap == null ||
+        now.difference(_enrollLabelLastTap!) > const Duration(milliseconds: 450)) {
+      _enrollLabelTapKey = fieldKey;
+      _enrollLabelTapCount = 1;
+      _enrollLabelLastTap = now;
+      return;
+    }
+    _enrollLabelTapCount += 1;
+    _enrollLabelLastTap = now;
+    if (_enrollLabelTapCount < 3) return;
+    _enrollLabelTapCount = 0;
+    _enrollLabelTapKey = null;
+    unawaited(_showProfileFlagPicker(fieldKey));
+  }
+
+  Future<void> _showProfileFlagPicker(String fieldKey) async {
+    final current = (_enrollmentFlags[fieldKey]?['status'] ?? '').toString();
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(18)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    ngmyProfileFlagFieldLabel(fieldKey),
+                    style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                ),
+                ...kNgmyProfileFlagStatuses.map((s) {
+                  final on = current == s.$1;
+                  return ListTile(
+                    leading: Icon(on ? Icons.radio_button_checked : Icons.radio_button_off, color: const Color(0xFFE53935)),
+                    title: Text(s.$2, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    onTap: () => Navigator.pop(ctx, s.$1),
+                  );
+                }),
+                if (current.isNotEmpty)
+                  ListTile(
+                    leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+                    title: const Text('Clear note', style: TextStyle(fontWeight: FontWeight.w700)),
+                    onTap: () => Navigator.pop(ctx, ''),
+                  ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      if (picked.isEmpty) {
+        _enrollmentFlags.remove(fieldKey);
+      } else {
+        ngmySetProfileFlag(
+          _enrollmentFlags,
+          fieldKey: fieldKey,
+          status: picked,
+          notedBy: widget.user.email,
+        );
+      }
+    });
   }
 
   /// The "Clear Missed" pill above the member list had no onTap at all —
@@ -36737,74 +36860,97 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final familyLabel = (males > 0 || females > 0)
         ? '$familyCount family · $males M / $females F'
         : '$familyCount family member${familyCount == 1 ? '' : 's'}';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(u.fullName ?? u.username, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: _statusColorForMissed(u.missed), borderRadius: BorderRadius.circular(10)),
-                  child: Text(_statusLabelForMissed(u.missed), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
-              ]),
-              Text(u.registryId ?? 'PENDING ID', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
-              Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
-            ]),
-            const Spacer(),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text('${u.helps} helps', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
-              Text('${u.missed} missed', style: const TextStyle(color: Colors.red, fontSize: 10)),
-            ]),
-          ]),
-          const SizedBox(height: 15),
-          _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
-          _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
-          _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
-          _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
-          _memberInfo(
-            Icons.family_restroom_rounded,
-            familyLabel,
-            Colors.teal,
-          ),
-
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: manageActions ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+    final showFixDot = manageActions && ngmyMemberHasProfileFlags(raw);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          margin: const EdgeInsets.only(bottom: 15),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
-              if (manageActions) ...[
-                _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => unawaited(_openMoneyForMember(u))),
-                _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
-                _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
-                _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
-                  final confirm = await showNgmyLightConfirm(
-                    context,
-                    title: 'Remove this member?',
-                    message:
-                        'This will remove ${u.fullName ?? u.username} from the registry for your state. Only continue if you are sure.',
-                    cancelLabel: 'Keep',
-                    confirmLabel: 'Remove',
-                    icon: Icons.person_remove_rounded,
-                    destructive: true,
-                  );
-                  if (confirm != true) return;
-                  setState(() {});
-                  await _removeRegistryMember(u);
-                  widget.onDataChanged();
-                }),
-              ],
+              Row(children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text(u.fullName ?? u.username, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: _statusColorForMissed(u.missed), borderRadius: BorderRadius.circular(10)),
+                      child: Text(_statusLabelForMissed(u.missed), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  ]),
+                  Text(u.registryId ?? 'PENDING ID', style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('ID: ${u.registryId ?? "N/A"}', style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                ]),
+                const Spacer(),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('${u.helps} helps', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text('${u.missed} missed', style: const TextStyle(color: Colors.red, fontSize: 10)),
+                ]),
+              ]),
+              const SizedBox(height: 15),
+              _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
+              _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
+              _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
+              _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
+              _memberInfo(
+                Icons.family_restroom_rounded,
+                familyLabel,
+                Colors.teal,
+              ),
+
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: manageActions ? MainAxisAlignment.spaceBetween : MainAxisAlignment.center,
+                children: [
+                  _mBtn(Icons.visibility_outlined, 'View', Colors.indigo, () => _showMemberProfile(u)),
+                  if (manageActions) ...[
+                    _mBtn(Icons.monetization_on_outlined, 'Money', Colors.green, () => unawaited(_openMoneyForMember(u))),
+                    _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
+                    _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
+                    _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
+                      final confirm = await showNgmyLightConfirm(
+                        context,
+                        title: 'Remove this member?',
+                        message:
+                            'This will remove ${u.fullName ?? u.username} from the registry for your state. Only continue if you are sure.',
+                        cancelLabel: 'Keep',
+                        confirmLabel: 'Remove',
+                        icon: Icons.person_remove_rounded,
+                        destructive: true,
+                      );
+                      if (confirm != true) return;
+                      setState(() {});
+                      await _removeRegistryMember(u);
+                      widget.onDataChanged();
+                    }),
+                  ],
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        ),
+        if (showFixDot)
+          Positioned(
+            top: 6,
+            right: 10,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE53935),
+                shape: BoxShape.circle,
+                border: Border.all(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, width: 1.5),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFE53935).withValues(alpha: 0.45), blurRadius: 6),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
