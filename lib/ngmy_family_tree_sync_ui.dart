@@ -12,6 +12,7 @@ import 'ngmy_family_tree_sync.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_sync_qr_saved.dart';
+import 'ngmy_transfer_payments.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheets_storage.dart';
 
@@ -112,6 +113,12 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   }
 
   Future<void> _exportAll() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final msg = await NgmyFamilyTreeSyncService.exportToFile(
         email: widget.email,
@@ -124,12 +131,22 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
         _toast('No family trees to export yet.');
         return;
       }
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
+      );
       _toast(msg);
       await _refresh();
     }, busyLabel: 'Preparing download…');
   }
 
   Future<void> _exportOne(String treeId) async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final msg = await NgmyFamilyTreeSyncService.exportToFile(
         email: widget.email,
@@ -142,6 +159,10 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
         _toast('Could not export this tree.');
         return;
       }
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
+      );
       _toast(msg);
     }, busyLabel: 'Preparing file…');
   }
@@ -199,6 +220,12 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
   }
 
   Future<void> _showQr() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final qr = await NgmyFamilyTreeSyncService.createQrRestorePayload(
         email: widget.email,
@@ -221,6 +248,10 @@ class _NgmyFamilyTreeSyncPageState extends State<NgmyFamilyTreeSyncPage> {
             usesRemaining: qr.usesRemaining,
           ),
         ),
+      );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
       );
     }, busyLabel: 'Creating QR code…');
   }

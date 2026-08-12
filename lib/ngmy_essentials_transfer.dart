@@ -15,6 +15,7 @@ import 'ngmy_medicine_organizer.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_quick_support.dart';
 import 'ngmy_saved_locations.dart';
+import 'ngmy_transfer_payments.dart';
 
 const _accent = Color(0xFF38BDF8);
 const _accent2 = Color(0xFF34D399);
@@ -142,6 +143,11 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one category')));
       return;
     }
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.userEmail,
+    );
+    if (!allowed || !mounted) return;
     setState(() => _busy = true);
     try {
       final bundle = await ngmyEssentialsExportBundle(widget.userEmail, _selected);
@@ -183,6 +189,7 @@ class _NgmyEssentialsTransferPageState extends State<NgmyEssentialsTransferPage>
           ),
         ),
       );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(email: widget.userEmail);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -15,6 +15,7 @@ import 'ngmy_communicate_sync.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_sync_qr_saved.dart';
+import 'ngmy_transfer_payments.dart';
 
 Future<void> showNgmyCommunicateSyncSheet(
   BuildContext context, {
@@ -103,6 +104,12 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   }
 
   Future<void> _exportAll() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final msg = await NgmyCommunicateSyncService.exportToFile(
         email: widget.email,
@@ -114,12 +121,22 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         _toast('No saved conversations to export yet.');
         return;
       }
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
+      );
       _toast(msg);
       await _refresh();
     }, busyLabel: 'Preparing download…');
   }
 
   Future<void> _exportOne(String profileId) async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final msg = await NgmyCommunicateSyncService.exportToFile(
         email: widget.email,
@@ -132,6 +149,10 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
         _toast('Could not export this advisor.');
         return;
       }
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
+      );
       _toast(msg);
     }, busyLabel: 'Preparing file…');
   }
@@ -204,6 +225,12 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
   }
 
   Future<void> _showQr() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final qr = await NgmyCommunicateSyncService.createQrRestorePayload(
         email: widget.email,
@@ -225,6 +252,10 @@ class _NgmyCommunicateSyncPageState extends State<NgmyCommunicateSyncPage> {
             usesRemaining: qr.usesRemaining,
           ),
         ),
+      );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
       );
     }, busyLabel: 'Creating QR code…');
   }

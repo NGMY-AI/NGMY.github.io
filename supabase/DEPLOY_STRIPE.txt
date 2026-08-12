@@ -80,6 +80,7 @@ Access durations (set by webhook):
   Phone Unlock   → 10 days
   QR Generator   → 14 days (2 weeks)
   Slides Pro     → 30 days ($4.99/mo)
+  Device Transfer → 30 days ($4.99/mo, 2 free first)
   Other features → 30 days
 
 ────────────────────────────────────────────────────────────

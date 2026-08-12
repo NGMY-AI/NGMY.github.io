@@ -30,6 +30,7 @@ import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_studio_hub.dart';
+import 'ngmy_transfer_payments.dart';
 import 'ngmy_studio_slot_video_io.dart' if (dart.library.html) 'ngmy_studio_slot_video_stub.dart' as studio_video;
 
 ({Color bg, Color card, Color fg, Color muted, Color border, Color wash}) _docShareColors(BuildContext context) {
@@ -676,6 +677,12 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       _toast('Nothing selected to share.');
       return;
     }
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       if (!await _ensureCanCreate()) return;
       final created = await NgmyDocShareSync.createQrForItems(ownerEmail: widget.email, items: batch);
@@ -704,6 +711,10 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
             shortCodes: shortCodes,
           ),
         ),
+      );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
       );
       await NgmyDocShareSync.stopLanShare();
     }, label: 'Preparing QR…');
@@ -822,9 +833,19 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
       _toast('Nothing to export.');
       return;
     }
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.email,
+      isAdmin: widget.isAdmin,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final jsonText = await NgmyDocShareSync.exportBundleFile(ownerEmail: widget.email, items: batch);
       final msg = await downloadNgmyAdvisorSyncJson(jsonText, 'ngmy_doc_share_${DateTime.now().millisecondsSinceEpoch}.ngmydoc');
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+        email: widget.email,
+        isAdmin: widget.isAdmin,
+      );
       _toast(msg);
     }, label: 'Preparing file…');
   }

@@ -22,6 +22,7 @@ import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
 import 'ngmy_stripe_payments.dart';
+import 'ngmy_transfer_payments.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// PowerPoint-style presentation studio for students — slides, text, shapes,
@@ -1499,7 +1500,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _shareOutline() async {
-    if (!await _ensureSlidesPro()) return;
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
+    if (!ok || !mounted) return;
     final deck = _activeDeck;
     if (deck == null) return;
     final buf = StringBuffer('${deck.name}\n${'=' * deck.name.length}\n\n');
@@ -1513,13 +1519,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       buf.writeln();
     }
     await Share.share(buf.toString(), subject: deck.name);
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
   }
 
   Future<void> _exportJson() async {
-    if (!await _ensureSlidesPro()) return;
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
+    if (!ok || !mounted) return;
     final deck = _activeDeck;
     if (deck == null) return;
     await Share.share(jsonEncode(deck.toJson()), subject: '${deck.name}.json');
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
   }
 
   void _startSlideshow() {
@@ -2226,15 +2245,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             _header(
               title: 'NGMY SLIDES',
-              subtitle: 'Free basic decks · Pro features \$4.99/mo — Normal templates stay free',
+              subtitle: 'Free basic decks · Transfer: 2 free, then \$4.99/mo',
               icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
               onIconTap: () async {
-                if (!await _ensureSlidesPro()) return;
                 if (!mounted) return;
                 await showNgmySlidesTransferHub(
                   context,
                   ownerEmail: widget.userEmail,
+                  isAdmin: widget.isAdmin,
                   decks: _decks,
                   onImported: (imported) async {
                     setState(() {

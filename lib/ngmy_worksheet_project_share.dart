@@ -8,6 +8,7 @@ import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_transfer_payments.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_helpers.dart';
 import 'ngmy_worksheet_project_qr_stash.dart';
@@ -252,6 +253,11 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
   final Future<void> Function(WorksheetProject imported)? onImported;
 
   Future<void> _download(BuildContext context) async {
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: ownerEmail,
+    );
+    if (!ok || !context.mounted) return;
     Navigator.pop(context);
     await Future<void>.delayed(const Duration(milliseconds: 80));
     final json = await ngmyWorksheetProjectShareJson(
@@ -261,11 +267,17 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
     );
     final safeName = project.name.replaceAll(RegExp(r'[^\w\-.]+'), '_');
     final msg = await downloadNgmyAdvisorSyncJson(json, 'ngmy_project_$safeName');
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(email: ownerEmail);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  void _showQr(BuildContext context) {
+  Future<void> _showQr(BuildContext context) async {
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: ownerEmail,
+    );
+    if (!ok || !context.mounted) return;
     Navigator.pop(context);
     NgmyNavigator.push<void>(
       context,
@@ -275,6 +287,7 @@ class _NgmyWorksheetProjectShareSheet extends StatelessWidget {
       ),
       routeName: 'NgmyWorksheetProjectQr',
     );
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(email: ownerEmail);
   }
 
   Future<void> _scan(BuildContext context) async {

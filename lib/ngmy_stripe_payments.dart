@@ -27,6 +27,7 @@ enum NgmyStripeProduct {
   qrGenerator,
   swahiliLevel,
   slidesStudio,
+  deviceTransfer,
 }
 
 class NgmyStripePayments {
@@ -60,6 +61,8 @@ class NgmyStripePayments {
       'https://buy.stripe.com/5kQ28rcfT9RTasjf8Nb7y0g';
   static const String slidesStudioUrl =
       'https://buy.stripe.com/3cIaEX1Bf4xzeIzd0Fb7y0i';
+  static const String deviceTransferUrl =
+      'https://buy.stripe.com/8x2fZh2Fjc01cAr7Glb7y0j';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -131,6 +134,8 @@ class NgmyStripePayments {
         return 'swahili_level';
       case NgmyStripeProduct.slidesStudio:
         return 'slides_studio';
+      case NgmyStripeProduct.deviceTransfer:
+        return 'device_transfer';
     }
   }
 
@@ -166,6 +171,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.swahiliLevel;
       case 'slides_studio':
         return NgmyStripeProduct.slidesStudio;
+      case 'device_transfer':
+        return NgmyStripeProduct.deviceTransfer;
       default:
         return null;
     }
@@ -203,6 +210,8 @@ class NgmyStripePayments {
         return swahiliLevelUrl;
       case NgmyStripeProduct.slidesStudio:
         return slidesStudioUrl;
+      case NgmyStripeProduct.deviceTransfer:
+        return deviceTransferUrl;
     }
   }
 
@@ -283,6 +292,8 @@ class NgmyStripePayments {
         return 500;
       case NgmyStripeProduct.slidesStudio:
         return 499;
+      case NgmyStripeProduct.deviceTransfer:
+        return 499;
     }
   }
 
@@ -348,6 +359,8 @@ class NgmyStripePayments {
         return const [Color(0xFF34D399), Color(0xFF047857)]; // school emerald
       case NgmyStripeProduct.slidesStudio:
         return const [Color(0xFF60A5FA), Color(0xFF1D4ED8)]; // presentation blue
+      case NgmyStripeProduct.deviceTransfer:
+        return const [Color(0xFF38BDF8), Color(0xFF0369A1)]; // transfer sky
     }
   }
 
@@ -384,6 +397,8 @@ class NgmyStripePayments {
         return const Color(0xFFD1FAE5);
       case NgmyStripeProduct.slidesStudio:
         return const Color(0xFFDBEAFE);
+      case NgmyStripeProduct.deviceTransfer:
+        return const Color(0xFFE0F2FE);
     }
   }
 
@@ -433,6 +448,8 @@ class NgmyStripePayments {
         return 'Kiswahili School';
       case NgmyStripeProduct.slidesStudio:
         return 'NGMY Slides Pro';
+      case NgmyStripeProduct.deviceTransfer:
+        return 'NGMY Transfer';
     }
   }
 
@@ -468,6 +485,8 @@ class NgmyStripePayments {
         return Icons.translate_rounded;
       case NgmyStripeProduct.slidesStudio:
         return Icons.slideshow_rounded;
+      case NgmyStripeProduct.deviceTransfer:
+        return Icons.sync_alt_rounded;
     }
   }
 
@@ -503,6 +522,8 @@ class NgmyStripePayments {
         return 'Unlock this level to keep learning.';
       case NgmyStripeProduct.slidesStudio:
         return 'Unlock Professional, Luxury, and Bold presentation features for 30 days.';
+      case NgmyStripeProduct.deviceTransfer:
+        return 'Transfer files, decks, and backups with QR or download — 2 free, then \$4.99/mo.';
     }
   }
 

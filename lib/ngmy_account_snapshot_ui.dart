@@ -14,6 +14,7 @@ import 'ngmy_local_growth_income.dart';
 import 'ngmy_local_growth_income_stash.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_generator.dart';
+import 'ngmy_transfer_payments.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 /// Backup/restore for the Growth Income copy behind the wifi icon.
@@ -125,6 +126,11 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
   }
 
   Future<void> _exportFile() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.realEmail,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       await _refreshLocalState();
       final msg = await NgmyAccountSnapshot.exportToFile(
@@ -133,11 +139,17 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
         ownerRealEmail: widget.realEmail,
         walletStateRevision: _walletStateRevision,
       );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(email: widget.realEmail);
       _toast(msg);
     }, busyLabel: 'Preparing download…');
   }
 
   Future<void> _showQr() async {
+    final allowed = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.realEmail,
+    );
+    if (!allowed || !mounted) return;
     await _withWork(() async {
       final stashed = await _createLiveQrBackup();
       if (stashed == null) {
@@ -156,6 +168,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
           ),
         ),
       );
+      await NgmyTransferPayments.consumeFreeTransferIfNeeded(email: widget.realEmail);
     }, busyLabel: 'Creating QR code…');
   }
 

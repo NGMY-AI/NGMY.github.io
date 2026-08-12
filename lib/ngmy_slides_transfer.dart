@@ -13,6 +13,7 @@ import 'ngmy_nav.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_transfer_payments.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const String kNgmySlidesDeckBundleType = 'ngmy_slides_deck_v1';
@@ -295,6 +296,7 @@ Future<void> showNgmySlidesTransferHub(
   required String ownerEmail,
   required List<NgmySlideDeck> decks,
   required Future<void> Function(List<NgmySlideDeck> imported) onImported,
+  bool isAdmin = false,
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
@@ -303,6 +305,7 @@ Future<void> showNgmySlidesTransferHub(
         ownerEmail: ownerEmail,
         decks: decks,
         onImported: onImported,
+        isAdmin: isAdmin,
       ),
     ),
   );
@@ -314,11 +317,13 @@ class NgmySlidesTransferPage extends StatefulWidget {
     required this.ownerEmail,
     required this.decks,
     required this.onImported,
+    this.isAdmin = false,
   });
 
   final String ownerEmail;
   final List<NgmySlideDeck> decks;
   final Future<void> Function(List<NgmySlideDeck> imported) onImported;
+  final bool isAdmin;
 
   @override
   State<NgmySlidesTransferPage> createState() => _NgmySlidesTransferPageState();
@@ -328,6 +333,8 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   String _mode = 'one';
   String? _selectedDeckId;
   bool _busy = false;
+  String _transferStatus = '';
+  bool _sendNeedsPay = false;
 
   NgmySlideDeck? get _selectedDeck {
     if (_selectedDeckId == null) return null;
@@ -354,11 +361,34 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   void initState() {
     super.initState();
     if (widget.decks.isNotEmpty) _selectedDeckId = widget.decks.first.id;
+    unawaited(_refreshTransferStatus());
+  }
+
+  Future<void> _refreshTransferStatus() async {
+    final status = await NgmyTransferPayments.statusLabel(
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    final needsPay = !await NgmyTransferPayments.canTransferWithoutPaying(
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    if (!mounted) return;
+    setState(() {
+      _transferStatus = status;
+      _sendNeedsPay = needsPay;
+    });
   }
 
   Future<void> _showQr() async {
     final decks = _exportDecks;
     if (decks.isEmpty) return;
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    if (!ok || !mounted) return;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
@@ -369,6 +399,11 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
         ),
       ),
     );
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    await _refreshTransferStatus();
   }
 
   Future<void> _scan() async {
@@ -395,6 +430,12 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   Future<void> _download() async {
     final decks = _exportDecks;
     if (decks.isEmpty) return;
+    final ok = await NgmyTransferPayments.ensureCanTransfer(
+      context: context,
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    if (!ok || !mounted) return;
     final json = decks.length == 1
         ? ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: decks.first, allDecks: null)
         : ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: null, allDecks: decks);
@@ -402,6 +443,11 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
         ? decks.first.name.replaceAll(RegExp(r'[^\w\-.]+'), '_')
         : 'ngmy_slides_library';
     final msg = await downloadNgmyAdvisorSyncJson(json, 'ngmy_slides_$safe');
+    await NgmyTransferPayments.consumeFreeTransferIfNeeded(
+      email: widget.ownerEmail,
+      isAdmin: widget.isAdmin,
+    );
+    await _refreshTransferStatus();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
@@ -524,6 +570,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
                               color: const Color(0xFF38BDF8),
                               featured: true,
                               onTap: _showQr,
+                              isPro: _sendNeedsPay,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -552,6 +599,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
                               subtitle: 'Download .json',
                               color: const Color(0xFF10B981),
                               onTap: _download,
+                              isPro: _sendNeedsPay,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -664,6 +712,17 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
                       'Move presentations between devices',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.2),
                     ),
+                    if (_transferStatus.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _transferStatus,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -812,6 +871,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
     required Color color,
     required VoidCallback onTap,
     bool featured = false,
+    bool isPro = false,
   }) {
     return Opacity(
         opacity: enabled ? 1 : 0.45,
@@ -834,13 +894,32 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(icon, color: color, size: 22),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: color.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: color, size: 22),
+                        ),
+                        if (isPro)
+                          Positioned(
+                            right: -4,
+                            top: -4,
+                            child: Container(
+                              width: 14,
+                              height: 14,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF0369A1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.lock_rounded, size: 9, color: Colors.white),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF0F172A))),

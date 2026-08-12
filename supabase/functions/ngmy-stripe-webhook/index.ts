@@ -38,6 +38,7 @@ const PRODUCT_SLUGS = new Set([
   "qr_generator",
   "swahili_level",
   "slides_studio",
+  "device_transfer",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;
