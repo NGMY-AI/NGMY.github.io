@@ -94392,7 +94392,7 @@ eEh(a){switch(a.a){case 6:return"4 hours"
 case 7:return"10 days"
 case 10:return"2 days"
 case 11:return"2 photo changes"
-case 12:return"1 week"
+case 12:return"2 weeks"
 case 13:return"lifetime"
 default:return"30 days"}},
 eEj(a){switch(a.a){case 0:return B.cbC
@@ -94463,7 +94463,7 @@ case 8:return"Create and publish unlimited menus for 30 days."
 case 9:return"Publish premium Bios for 30 days. Bio photos (profile, header, background): 2 free, then $1.99 for 2 more."
 case 10:return"Edit and download this card design for 2 days."
 case 11:return"Pay $1.99 for 2 more Bio photo changes (profile, header, or background)."
-case 12:return"Create, template, save, and download QR codes."
+case 12:return"Create, template, save, and download QR codes for 2 weeks after payment."
 case 13:return"Unlock this level to keep learning."}},
 eeB(a){return a===B.tf||a===B.Ij||a===B.we||a===B.At||a===B.Au||a===B.Ii},
 aGv(a,b){var s=0,r=A.j(t.Q0),q,p,o,n,m
