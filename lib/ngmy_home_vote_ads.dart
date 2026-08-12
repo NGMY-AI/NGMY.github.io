@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ngmy_business_card_models.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
 
 const String kNgmyHomeVoteAdSettingsKey = 'home_vote_ad_campaign';
 const String _kNgmyHomeVoteAdPrefsKey = 'ngmy_home_vote_ad_v1';
 const String kNgmyHomeVoteAdCardId = 'ngmy_home_vote_ad_default';
+const String kNgmyHomeVoteAdCategory = 'Vote Ad';
 
 /// Max campaign length: just under 5 months (~150 days).
 const int kNgmyHomeVoteAdMaxDays = 150;
@@ -32,6 +32,9 @@ class NgmyHomeVoteAdCampaign {
     this.businessCardJson = '',
     this.candidateId = '',
     this.candidateName = '',
+    this.photoUrl = '',
+    this.bioNote = '',
+    this.headline = 'VOTE NOW',
     this.startsAt = '',
     this.endsAt = '',
     this.durationDays = 7,
@@ -40,18 +43,25 @@ class NgmyHomeVoteAdCampaign {
   });
 
   bool active;
+  /// Legacy business-card JSON (optional; new ads use photo/name/bio fields).
   String businessCardJson;
   String candidateId;
   String candidateName;
+  String photoUrl;
+  String bioNote;
+  String headline;
   String startsAt;
   String endsAt;
   int durationDays;
   String publishedBy;
   String updatedAt;
 
+  bool get hasCreative =>
+      candidateName.trim().isNotEmpty || photoUrl.trim().isNotEmpty || businessCardJson.trim().isNotEmpty;
+
   bool get isLive {
     if (!active) return false;
-    if (businessCardJson.trim().isEmpty) return false;
+    if (!hasCreative) return false;
     final now = DateTime.now().toUtc();
     final start = DateTime.tryParse(startsAt)?.toUtc();
     final end = DateTime.tryParse(endsAt)?.toUtc();
@@ -65,6 +75,9 @@ class NgmyHomeVoteAdCampaign {
         'businessCardJson': businessCardJson,
         'candidateId': candidateId,
         'candidateName': candidateName,
+        'photoUrl': photoUrl,
+        'bioNote': bioNote,
+        'headline': headline,
         'startsAt': startsAt,
         'endsAt': endsAt,
         'durationDays': durationDays,
@@ -74,27 +87,41 @@ class NgmyHomeVoteAdCampaign {
 
   factory NgmyHomeVoteAdCampaign.fromJson(Map<String, dynamic>? json) {
     if (json == null) return NgmyHomeVoteAdCampaign();
+    var name = (json['candidateName'] ?? '').toString();
+    var photo = (json['photoUrl'] ?? '').toString();
+    var bio = (json['bioNote'] ?? '').toString();
+    var headline = (json['headline'] ?? 'VOTE NOW').toString();
+    // Legacy: recover name from business card JSON if needed.
+    final cardJson = (json['businessCardJson'] ?? '').toString();
+    if (name.trim().isEmpty && cardJson.trim().isNotEmpty) {
+      try {
+        final map = jsonDecode(cardJson);
+        if (map is Map) {
+          if (name.trim().isEmpty) name = (map['fullName'] ?? '').toString();
+          if (bio.trim().isEmpty) bio = (map['tagline'] ?? '').toString();
+          if (photo.trim().isEmpty) {
+            final logo = (map['logoBase64'] ?? '').toString().trim();
+            if (logo.isNotEmpty) {
+              photo = logo.startsWith('data:') ? logo : 'data:image/jpeg;base64,$logo';
+            }
+          }
+        }
+      } catch (_) {}
+    }
     return NgmyHomeVoteAdCampaign(
       active: json['active'] == true,
-      businessCardJson: (json['businessCardJson'] ?? '').toString(),
+      businessCardJson: cardJson,
       candidateId: (json['candidateId'] ?? '').toString(),
-      candidateName: (json['candidateName'] ?? '').toString(),
+      candidateName: name,
+      photoUrl: photo,
+      bioNote: bio,
+      headline: headline.trim().isEmpty ? 'VOTE NOW' : headline,
       startsAt: (json['startsAt'] ?? '').toString(),
       endsAt: (json['endsAt'] ?? '').toString(),
       durationDays: (json['durationDays'] as num?)?.toInt() ?? 7,
       publishedBy: (json['publishedBy'] ?? '').toString(),
       updatedAt: (json['updatedAt'] ?? '').toString(),
     );
-  }
-
-  NgmyBusinessCardDocument? get document {
-    try {
-      final map = jsonDecode(businessCardJson);
-      if (map is! Map) return null;
-      return NgmyBusinessCardDocument.fromJson(Map<String, dynamic>.from(map));
-    } catch (_) {
-      return null;
-    }
   }
 }
 
@@ -108,7 +135,7 @@ class NgmyHomeVoteAdStore {
 
   static Future<NgmyHomeVoteAdCampaign> load({bool forceCloud = false}) async {
     if (_loaded && !forceCloud) {
-      _expireIfNeeded();
+      _expireIfNeeded(persistCloud: false);
       return _cache;
     }
     try {
@@ -123,22 +150,35 @@ class NgmyHomeVoteAdStore {
     } catch (e) {
       debugPrint('[home vote ad] local load: $e');
     }
-    if (forceCloud || await ngmyCanReachCloud()) {
-      try {
-        final row = await ngmyFetchSettingsValueViaRest(kNgmyHomeVoteAdSettingsKey);
-        if (row != null && row.isNotEmpty) {
-          final remote = NgmyHomeVoteAdCampaign.fromJson(row);
-          if (_preferRemote(remote, _cache)) {
-            _cache = remote;
-            await _saveLocal(_cache);
-          }
-        }
-      } catch (e) {
-        debugPrint('[home vote ad] cloud load: $e');
-      }
-    }
     _loaded = true;
-    _expireIfNeeded();
+    _expireIfNeeded(persistCloud: false);
+
+    if (forceCloud) {
+      // Never block callers on cloud — fire and update cache when ready.
+      // Callers that need immediate UI should use local cache from above.
+      // ignore: unawaited_futures
+      _refreshFromCloud();
+    }
+    return _cache;
+  }
+
+  static Future<NgmyHomeVoteAdCampaign> refreshFromCloud() => _refreshFromCloud();
+
+  static Future<NgmyHomeVoteAdCampaign> _refreshFromCloud() async {
+    if (!await ngmyCanReachCloud()) return _cache;
+    try {
+      final row = await ngmyFetchSettingsValueViaRest(kNgmyHomeVoteAdSettingsKey);
+      if (row != null && row.isNotEmpty) {
+        final remote = NgmyHomeVoteAdCampaign.fromJson(row);
+        if (_preferRemote(remote, _cache)) {
+          _cache = remote;
+          await _saveLocal(_cache);
+        }
+      }
+    } catch (e) {
+      debugPrint('[home vote ad] cloud load: $e');
+    }
+    _expireIfNeeded(persistCloud: true);
     return _cache;
   }
 
@@ -159,7 +199,7 @@ class NgmyHomeVoteAdStore {
     }
   }
 
-  static Future<void> _expireIfNeeded() async {
+  static Future<void> _expireIfNeeded({required bool persistCloud}) async {
     if (!_cache.active) return;
     final end = DateTime.tryParse(_cache.endsAt)?.toUtc();
     if (end == null) return;
@@ -167,7 +207,7 @@ class NgmyHomeVoteAdStore {
       _cache.active = false;
       _cache.updatedAt = DateTime.now().toUtc().toIso8601String();
       await _saveLocal(_cache);
-      // Best-effort cloud sync; don't block home load on network.
+      if (!persistCloud) return;
       try {
         if (await ngmyCanReachCloud()) {
           await ngmyUpsertSettingsRowReliable(kNgmyHomeVoteAdSettingsKey, _cache.toJson());
@@ -177,19 +217,23 @@ class NgmyHomeVoteAdStore {
   }
 
   static Future<bool> publish({
-    required NgmyBusinessCardDocument document,
+    required String candidateId,
+    required String candidateName,
+    required String photoUrl,
+    required String bioNote,
     required int durationDays,
     required String publishedBy,
-    String candidateId = '',
-    String candidateName = '',
+    String headline = 'VOTE NOW',
   }) async {
     final days = durationDays.clamp(1, kNgmyHomeVoteAdMaxDays);
     final now = DateTime.now().toUtc();
     final campaign = NgmyHomeVoteAdCampaign(
       active: true,
-      businessCardJson: jsonEncode(document.toJson()),
       candidateId: candidateId,
-      candidateName: candidateName,
+      candidateName: candidateName.trim().toUpperCase(),
+      photoUrl: photoUrl,
+      bioNote: bioNote.trim(),
+      headline: headline.trim().isEmpty ? 'VOTE NOW' : headline.trim().toUpperCase(),
       startsAt: now.toIso8601String(),
       endsAt: now.add(Duration(days: days)).toIso8601String(),
       durationDays: days,

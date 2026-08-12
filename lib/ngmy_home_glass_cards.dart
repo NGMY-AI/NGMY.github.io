@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +19,7 @@ import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
+import 'ngmy_home_vote_ad_card.dart';
 import 'ngmy_home_vote_ads.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
@@ -106,14 +108,15 @@ class NgmySpendingEntry {
   bool get isPassword => category == 'Password';
   bool get hasPinnedEssentials =>
       pinnedEssentialsKind.trim().isNotEmpty || pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
-  bool get hasBusinessCard => businessCardJson.trim().isNotEmpty;
+  bool get hasBusinessCard => businessCardJson.trim().isNotEmpty && !isVoteAd;
   bool get hasCivicId => civicIdJson.trim().isNotEmpty;
   bool get hasReceipt => receiptItems.isNotEmpty;
+  bool get isVoteAd => id == kNgmyHomeVoteAdCardId || category == kNgmyHomeVoteAdCategory;
   bool get hideModePill =>
-      hasImage || isPassword || hasBusinessCard || hasCivicId || (hasPinnedEssentials && amount <= 0);
+      hasImage || isPassword || hasBusinessCard || hasCivicId || isVoteAd || (hasPinnedEssentials && amount <= 0);
   /// Money / category face that should fill the whole frosted card like a photo.
   bool get showsCreditFace =>
-      !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !(hasPinnedEssentials && amount <= 0);
+      !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !isVoteAd && !(hasPinnedEssentials && amount <= 0);
 
   double get receiptTotal => receiptItems.fold(0.0, (a, b) => a + b.lineTotal);
 
@@ -1810,13 +1813,24 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   }
 
   Future<void> _load() async {
+    // Fast path: paint local cards immediately — never wait on cloud / hydrations.
     final s0 = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
-    final s1 = await _syncBusinessCardSnapshots(s0);
-    final s2 = await _hydrateCivicIdCards(s1);
-    final s = await _injectHomeVoteAd(s2);
     final deck = await NgmyHomeLocalStore.loadDeckPrefs(widget.userEmail);
     final acks = await NgmyHomeLocalStore.loadAlarmAcks(widget.userEmail);
+    await NgmyHomeVoteAdStore.load(forceCloud: false);
+    final fast = _mergeHomeVoteAd(s0, NgmyHomeVoteAdStore.current);
     if (!mounted) return;
+    _applyHomeDeck(fast, deck: deck, acks: acks);
+    // Background: hydrate civic IDs, sync business cards, refresh vote ad from cloud.
+    unawaited(_enrichHomeCardsInBackground());
+  }
+
+  void _applyHomeDeck(
+    List<NgmySpendingEntry> spending, {
+    required ({bool autoPlay, NgmyHomeCardSlideStyle style, String? frontSpendingId, String? frontNoteId}) deck,
+    required Set<String> acks,
+  }) {
+    final s = List<NgmySpendingEntry>.from(spending);
     s.sort((a, b) {
       if (a.id == kNgmyHomeVoteAdCardId && b.id != kNgmyHomeVoteAdCardId) return -1;
       if (b.id == kNgmyHomeVoteAdCardId && a.id != kNgmyHomeVoteAdCardId) return 1;
@@ -1838,20 +1852,38 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     _checkDueAlarms();
   }
 
-  Future<List<NgmySpendingEntry>> _injectHomeVoteAd(List<NgmySpendingEntry> spending) async {
+  Future<void> _enrichHomeCardsInBackground() async {
+    try {
+      final base = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+      final s1 = await _syncBusinessCardSnapshots(base);
+      final s2 = await _hydrateCivicIdCards(s1);
+      await NgmyHomeVoteAdStore.refreshFromCloud();
+      final merged = _mergeHomeVoteAd(s2, NgmyHomeVoteAdStore.current);
+      if (!mounted) return;
+      final deck = (
+        autoPlay: _autoPlay,
+        style: _slideStyle,
+        frontSpendingId: _frontSpendingId,
+        frontNoteId: _frontNoteId,
+      );
+      _applyHomeDeck(merged, deck: deck, acks: _alarmAcks);
+    } catch (e) {
+      debugPrint('[home cards] background enrich: $e');
+    }
+  }
+
+  List<NgmySpendingEntry> _mergeHomeVoteAd(List<NgmySpendingEntry> spending, NgmyHomeVoteAdCampaign campaign) {
     final withoutAd = spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
-    final campaign = await NgmyHomeVoteAdStore.load(forceCloud: true);
     if (!campaign.isLive) return withoutAd;
-    final json = campaign.businessCardJson.trim();
-    if (json.isEmpty) return withoutAd;
     final name = campaign.candidateName.trim().isEmpty ? 'Voting advertisement' : campaign.candidateName.trim();
     final adEntry = NgmySpendingEntry(
       id: kNgmyHomeVoteAdCardId,
       amount: 0,
       description: name,
-      category: 'Business Card',
+      category: kNgmyHomeVoteAdCategory,
       date: DateTime.now(),
-      businessCardJson: json,
+      // Keep a compact snapshot so the card can rebuild even if store cache resets.
+      businessCardJson: jsonEncode(campaign.toJson()),
     );
     return [adEntry, ...withoutAd];
   }
@@ -1879,19 +1911,26 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   double get _totalSpent => _spending.where((e) => !e.hasImage && !e.isPassword).fold(0.0, (sum, e) => sum + e.amount);
 
   Future<void> _addSpendingEntry(NgmySpendingEntry entry) async {
-    setState(() => _spending = [entry, ..._spending]);
-    await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    final base = [entry, ..._spending.where((e) => e.id != entry.id && e.id != kNgmyHomeVoteAdCardId)];
+    final next = _mergeHomeVoteAd(base, NgmyHomeVoteAdStore.current);
+    setState(() => _spending = next);
+    await NgmyHomeLocalStore.saveSpending(
+      widget.userEmail,
+      next.where((e) => e.id != kNgmyHomeVoteAdCardId).toList(),
+    );
     await _setDeckPrefs(frontSpendingId: entry.id);
   }
 
   Future<void> _deleteSpending(String id) async {
+    if (id == kNgmyHomeVoteAdCardId) return;
     final ok = await showNgmyRoboticDeleteConfirm(context, title: 'Remove this card?');
     if (!ok || !mounted) return;
     setState(() {
       _spending = _spending.where((e) => e.id != id).toList();
       _noteFaceIds.remove(id);
     });
-    await NgmyHomeLocalStore.saveSpending(widget.userEmail, _spending);
+    final persist = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+    await NgmyHomeLocalStore.saveSpending(widget.userEmail, persist);
     if (_frontSpendingId == id) {
       await _setDeckPrefs(frontSpendingId: _spending.isNotEmpty ? _spending.first.id : '');
     }
@@ -2373,12 +2412,15 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
               emptyBuilder: (ctx) => _installGuideEmptyCard(isDark: isDark, name: name),
               cardBuilder: (ctx, entry, {required isFront, required revealDates}) {
                 final isCivic = entry.hasCivicId;
+                final isVoteAd = entry.isVoteAd;
                 final showNoteFace = isFront && _noteFaceIds.contains(entry.id);
                 final card = NgmyFrostedCard(
                   dateLabel: ngmyHomeDateTabLabel(entry.date),
                   accent: showNoteFace
                       ? const [Color(0xFFF59E0B), Color(0xFFEC4899)]
-                      : entry.hasImage
+                      : isVoteAd
+                          ? const [Color(0xFF052E16), Color(0xFF7F1D1D)]
+                          : entry.hasImage
                           ? const [Color(0xFF111827), Color(0xFF1F2937)]
                           : isCivic
                               ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
@@ -2394,12 +2436,13 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                                               ? ngmyMoneyCardAccent(entry)
                                               : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
                   isFront: isFront,
-                  showDateTab: revealDates,
-                  welcomeName: isFront && !isCivic ? name : null,
-                  onDelete: isFront && !isCivic ? () => _deleteSpending(entry.id) : null,
+                  showDateTab: revealDates && !isVoteAd,
+                  welcomeName: isFront && !isCivic && !isVoteAd ? name : null,
+                  onDelete: isFront && !isCivic && !isVoteAd ? () => _deleteSpending(entry.id) : null,
                   onAdd: isFront && !isCivic ? _openAddSheet : null,
                   footer: isFront && !entry.hideModePill ? _modePillFor(entry) : null,
                   fillBleed: showNoteFace ||
+                      isVoteAd ||
                       entry.hasImage ||
                       entry.showsCreditFace ||
                       entry.hasBusinessCard ||
@@ -2505,6 +2548,22 @@ class _SpendingCardContent extends StatelessWidget {
   Widget build(BuildContext context) {
     if (entry.hasImage) {
       return _ImageCardBody(imageBase64: entry.imageBase64);
+    }
+    if (entry.isVoteAd) {
+      var campaign = NgmyHomeVoteAdStore.current;
+      try {
+        final map = jsonDecode(entry.businessCardJson);
+        if (map is Map) {
+          campaign = NgmyHomeVoteAdCampaign.fromJson(Map<String, dynamic>.from(map));
+        }
+      } catch (_) {}
+      if (campaign.candidateName.trim().isEmpty && NgmyHomeVoteAdStore.current.candidateName.trim().isNotEmpty) {
+        campaign = NgmyHomeVoteAdStore.current;
+      }
+      return NgmyHomeVoteAdCard(
+        campaign: campaign,
+        isDark: Theme.of(context).brightness == Brightness.dark,
+      );
     }
     if (entry.hasBusinessCard) {
       return _BusinessCardBody(json: entry.businessCardJson);

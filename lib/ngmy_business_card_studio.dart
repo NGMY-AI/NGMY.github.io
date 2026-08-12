@@ -12,6 +12,7 @@ import 'ngmy_business_card_payments.dart';
 import 'ngmy_business_card_renderer.dart';
 import 'ngmy_business_card_storage.dart';
 import 'ngmy_civic_voting.dart';
+import 'ngmy_home_vote_ad_card.dart';
 import 'ngmy_home_vote_ads.dart';
 import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
@@ -58,6 +59,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   List<NgmyCivicVotingCandidate> _voteCandidates = [];
   String? _selectedCandidateId;
   NgmyHomeVoteAdCampaign _homeAd = NgmyHomeVoteAdCampaign();
+  NgmyHomeVoteAdCampaign _draftVoteAd = NgmyHomeVoteAdCampaign();
   bool _adminBusy = false;
 
   static const _businessEmojis = [
@@ -173,6 +175,10 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     setState(() {
       _voteCandidates = candidates;
       _homeAd = ad;
+      if (ad.isLive) {
+        _draftVoteAd = ad;
+        _selectedCandidateId = ad.candidateId.trim().isEmpty ? null : ad.candidateId;
+      }
     });
   }
 
@@ -452,209 +458,210 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             if (widget.isAdmin && _category == 'admin') ...[
               const SizedBox(height: 10),
               _adminVoteCandidatesPanel(t),
-            ],
-            const SizedBox(height: 10),
-            NgmyToolkitAliveSection(
-              colors: _kBizCardHudColors,
-              pulse: pulse,
-              scan: scan,
-              orbit: orbit,
-              phase: 0.14,
-              padding: const EdgeInsets.all(8),
-              child: SizedBox(
-                height: 100,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: templates.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    final tpl = templates[i];
-                    final selected = tpl.id == _doc.templateId;
-                    return GestureDetector(
-                      onTap: () => _selectTemplate(tpl),
-                      child: Container(
-                        width: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: selected
-                                ? const Color(0xFF22C55E)
-                                : t.chipOffBorder,
-                            width: selected ? 2 : 1,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: ngmyBusinessCardTemplateThumb(
-                                tpl,
-                                width: 120,
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(4, 3, 4, 5),
-                              child: Text(
-                                tpl.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: t.chipOffLabel,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 8,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            if (widget.isAdmin && _category == 'admin') ...[
+              const SizedBox(height: 12),
+              _adminVoteAdPreview(t),
               const SizedBox(height: 10),
               _adminPublishHomeAdPanel(t),
-            ],
-            const SizedBox(height: 12),
-            if (_editLocked) _expiredAccessNotice(),
-            if (_editLocked) const SizedBox(height: 10),
-            _editGate(
-              Center(
-                child: RepaintBoundary(
-                  key: _captureKey,
-                  child: NgmyBusinessCardPreview(
-                    document: _doc,
-                    interactive: _editMode && !_editLocked,
-                    width: widget.compact ? 320 : 360,
-                    selectedElementId: _selectedElementId,
-                    onElementSelect: _selectElement,
-                    onElementDrag: (id, delta) {
-                      setState(() {
-                        _selectedElementId = id;
-                        ngmyCardSetElementOffset(_doc, id, delta);
-                      });
-                      widget.onDocumentChanged?.call(_doc);
-                    },
-                  ),
-                ),
-              ),
-            ),
-            if (_editMode && _selectedElementId != null)
-              _selectedElementSizeBar(),
-            const SizedBox(height: 10),
-            _editGate(
+            ] else ...[
+              const SizedBox(height: 10),
               NgmyToolkitAliveSection(
                 colors: _kBizCardHudColors,
                 pulse: pulse,
                 scan: scan,
                 orbit: orbit,
-                phase: 0.22,
+                phase: 0.14,
+                padding: const EdgeInsets.all(8),
+                child: SizedBox(
+                  height: 100,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: templates.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (_, i) {
+                      final tpl = templates[i];
+                      final selected = tpl.id == _doc.templateId;
+                      return GestureDetector(
+                        onTap: () => _selectTemplate(tpl),
+                        child: Container(
+                          width: 120,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected
+                                  ? const Color(0xFF22C55E)
+                                  : t.chipOffBorder,
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Expanded(
+                                child: ngmyBusinessCardTemplateThumb(
+                                  tpl,
+                                  width: 120,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(4, 3, 4, 5),
+                                child: Text(
+                                  tpl.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: t.chipOffLabel,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 8,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_editLocked) _expiredAccessNotice(),
+              if (_editLocked) const SizedBox(height: 10),
+              _editGate(
+                Center(
+                  child: RepaintBoundary(
+                    key: _captureKey,
+                    child: NgmyBusinessCardPreview(
+                      document: _doc,
+                      interactive: _editMode && !_editLocked,
+                      width: widget.compact ? 320 : 360,
+                      selectedElementId: _selectedElementId,
+                      onElementSelect: _selectElement,
+                      onElementDrag: (id, delta) {
+                        setState(() {
+                          _selectedElementId = id;
+                          ngmyCardSetElementOffset(_doc, id, delta);
+                        });
+                        widget.onDocumentChanged?.call(_doc);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              if (_editMode && _selectedElementId != null)
+                _selectedElementSizeBar(),
+              const SizedBox(height: 10),
+              _editGate(
+                NgmyToolkitAliveSection(
+                  colors: _kBizCardHudColors,
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.22,
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => setState(() => _editMode = !_editMode),
+                          icon: Icon(
+                            _editMode
+                                ? Icons.touch_app_rounded
+                                : Icons.visibility_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            _editMode ? 'Drag Mode On' : 'Preview Mode',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Reset layout',
+                        onPressed: () {
+                          setState(() {
+                            ngmyCardResetLayout(_doc);
+                            _selectedElementId = null;
+                          });
+                          widget.onDocumentChanged?.call(_doc);
+                        },
+                        icon: const Icon(Icons.restart_alt_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Add logo',
+                        onPressed: _pickLogo,
+                        icon: const Icon(Icons.add_photo_alternate_outlined),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              NgmyToolkitAliveSection(
+                colors: _kBizCardHudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                phase: 0.3,
+                padding: EdgeInsets.zero,
+                child: _editGate(_toolsPanel()),
+              ),
+              const SizedBox(height: 10),
+              NgmyToolkitAliveSection(
+                colors: _kBizCardHudColors,
+                pulse: pulse,
+                scan: scan,
+                orbit: orbit,
+                phase: 0.38,
                 padding: const EdgeInsets.all(8),
                 child: Row(
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => setState(() => _editMode = !_editMode),
-                        icon: Icon(
-                          _editMode
-                              ? Icons.touch_app_rounded
-                              : Icons.visibility_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          _editMode ? 'Drag Mode On' : 'Preview Mode',
-                        ),
+                        onPressed: _editLocked ? _requestCardAccess : _saveCard,
+                        icon: const Icon(Icons.save_outlined),
+                        label: const Text('Save Card'),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Reset layout',
-                      onPressed: () {
-                        setState(() {
-                          ngmyCardResetLayout(_doc);
-                          _selectedElementId = null;
-                        });
-                        widget.onDocumentChanged?.call(_doc);
-                      },
-                      icon: const Icon(Icons.restart_alt_rounded),
-                    ),
-                    IconButton(
-                      tooltip: 'Add logo',
-                      onPressed: _pickLogo,
-                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _downloadCard,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF22C55E),
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: const Icon(Icons.download_rounded),
+                        label: const Text('Download'),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            NgmyToolkitAliveSection(
-              colors: _kBizCardHudColors,
-              pulse: pulse,
-              scan: scan,
-              orbit: orbit,
-              phase: 0.3,
-              padding: EdgeInsets.zero,
-              child: _editGate(_toolsPanel()),
-            ),
-            const SizedBox(height: 10),
-            NgmyToolkitAliveSection(
-              colors: _kBizCardHudColors,
-              pulse: pulse,
-              scan: scan,
-              orbit: orbit,
-              phase: 0.38,
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _editLocked ? _requestCardAccess : _saveCard,
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('Save Card'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _downloadCard,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF22C55E),
-                        foregroundColor: Colors.black,
-                      ),
-                      icon: const Icon(Icons.download_rounded),
-                      label: const Text('Download'),
-                    ),
-                  ),
-                ],
+              if (!widget.compact && widget.showExpandButton) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () => _openFullStudio(context),
+                  icon: const Icon(Icons.open_in_full_rounded, size: 18),
+                  label: const Text('Open full-screen studio'),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                'Saved cards',
+                style: TextStyle(
+                  color: t.title,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                ),
               ),
-            ),
-            if (!widget.compact && widget.showExpandButton) ...[
               const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => _openFullStudio(context),
-                icon: const Icon(Icons.open_in_full_rounded, size: 18),
-                label: const Text('Open full-screen studio'),
+              NgmyBusinessCardGallery(
+                key: ValueKey('biz-gallery-$_galleryReload'),
+                userEmail: widget.userEmail,
+                onOpen: loadDocument,
               ),
             ],
-            const SizedBox(height: 16),
-            Text(
-              'Saved cards',
-              style: TextStyle(
-                color: t.title,
-                fontWeight: FontWeight.w900,
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 8),
-            NgmyBusinessCardGallery(
-              key: ValueKey('biz-gallery-$_galleryReload'),
-              userEmail: widget.userEmail,
-              onOpen: loadDocument,
-            ),
           ],
         );
       },
@@ -712,6 +719,39 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _adminVoteAdPreview(NgmyHubTheme t) {
+    final draft = _draftVoteAd.candidateName.trim().isNotEmpty ? _draftVoteAd : _homeAd;
+    final ready = draft.candidateName.trim().isNotEmpty || draft.photoUrl.trim().isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Home ad preview',
+          style: TextStyle(color: t.title, fontWeight: FontWeight.w900, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 168,
+          width: double.infinity,
+          child: ready
+              ? NgmyHomeVoteAdCard(campaign: draft, isDark: t.isDark, compact: true)
+              : Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.panel,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: t.chipOffBorder),
+                  ),
+                  child: Text(
+                    'Tap a candidate to preview the animated home ad',
+                    style: TextStyle(color: t.chipOffLabel, fontWeight: FontWeight.w700, fontSize: 12),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -797,6 +837,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   Widget _adminPublishHomeAdPanel(NgmyHubTheme t) {
     final live = _homeAd.isLive;
     final endLabel = _homeAd.endsAt.trim().length >= 10 ? _homeAd.endsAt.trim().substring(0, 10) : _homeAd.endsAt.trim();
+    final canPublish = _draftVoteAd.candidateName.trim().isNotEmpty || _selectedCandidateId != null;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -810,7 +851,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
           Text(
             live
                 ? 'Home default ad is live${_homeAd.candidateName.trim().isEmpty ? '' : ' · ${_homeAd.candidateName}'}'
-                : 'Publish this advertisement as the default home card for everyone',
+                : 'Publish this animated ad as the first home card for everyone',
             style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12),
           ),
           if (live && endLabel.isNotEmpty) ...[
@@ -825,7 +866,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
             children: [
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: _adminBusy ? null : _publishHomeAd,
+                  onPressed: (_adminBusy || !canPublish) ? null : _publishHomeAd,
                   icon: const Icon(Icons.campaign_rounded, size: 18),
                   label: Text(live ? 'Replace ad' : 'Put on home cards'),
                   style: FilledButton.styleFrom(
@@ -849,41 +890,32 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   }
 
   void _applyCandidateAd(NgmyCivicVotingCandidate candidate) {
-    final photo = candidate.photoUrl.trim();
-    var logo = '';
-    if (photo.startsWith('data:image')) {
-      final comma = photo.indexOf(',');
-      if (comma > 0) logo = photo.substring(comma + 1);
-    } else if (photo.length > 80 && !photo.startsWith('http')) {
-      logo = photo;
-    }
     setState(() {
       _selectedCandidateId = candidate.id;
-      _doc.fullName = candidate.name.toUpperCase();
-      _doc.jobTitle = 'VOTE';
-      _doc.company = 'Civic Registry Voting';
-      _doc.tagline = candidate.bioNote.trim().isEmpty
-          ? 'Support this candidate'
-          : candidate.bioNote.trim();
-      _doc.phone = '';
-      _doc.email = '';
-      _doc.website = 'ngmy.org';
-      _doc.address = '';
-      if (logo.isNotEmpty) {
-        _doc.logoBase64 = logo;
-        _doc.logoRingStyle = 'gold';
-      }
-      if (_doc.template.category != 'admin' && _category == 'admin') {
-        final adminTpl = ngmyBusinessCardTemplatesForCategory('admin', includeAdmin: true);
-        if (adminTpl.isNotEmpty) _doc.templateId = adminTpl.first.id;
-      }
-      _syncControllersFromDoc();
-      _doc.touch();
+      _draftVoteAd = NgmyHomeVoteAdCampaign(
+        active: true,
+        candidateId: candidate.id,
+        candidateName: candidate.name.toUpperCase(),
+        photoUrl: candidate.photoUrl,
+        bioNote: candidate.bioNote.trim().isEmpty
+            ? 'Support this candidate in Civic Registry Voting'
+            : candidate.bioNote.trim(),
+        headline: 'VOTE NOW',
+      );
     });
-    widget.onDocumentChanged?.call(_doc);
   }
 
   Future<void> _publishHomeAd() async {
+    if (_draftVoteAd.candidateName.trim().isEmpty && _selectedCandidateId != null) {
+      final match = _voteCandidates.where((c) => c.id == _selectedCandidateId).toList();
+      if (match.isNotEmpty) _applyCandidateAd(match.first);
+    }
+    if (_draftVoteAd.candidateName.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pick a voting candidate first.')),
+      );
+      return;
+    }
     final days = await showModalBottomSheet<int>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -916,18 +948,20 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
     );
     if (days == null || !mounted) return;
     setState(() => _adminBusy = true);
-    _applyControllersToDoc();
     final ok = await NgmyHomeVoteAdStore.publish(
-      document: _doc,
+      candidateId: _draftVoteAd.candidateId,
+      candidateName: _draftVoteAd.candidateName,
+      photoUrl: _draftVoteAd.photoUrl,
+      bioNote: _draftVoteAd.bioNote,
+      headline: _draftVoteAd.headline,
       durationDays: days,
       publishedBy: widget.userEmail,
-      candidateId: _selectedCandidateId ?? '',
-      candidateName: _doc.fullName,
     );
     final ad = await NgmyHomeVoteAdStore.load();
     if (!mounted) return;
     setState(() {
       _homeAd = ad;
+      _draftVoteAd = ad;
       _adminBusy = false;
     });
     ngmyBumpHomeCardsRevision();
