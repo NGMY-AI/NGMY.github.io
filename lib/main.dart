@@ -20975,6 +20975,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 animDelayMs: 40,
               ),
               _menuFrame(
+                'Civic Voting',
+                Icons.how_to_vote_rounded,
+                const Color(0xFF059669),
+                () => unawaited(_openCivicVotingAdmin(isDark)),
+                isDark,
+                animDelayMs: 60,
+              ),
+              _menuFrame(
                 'Loans',
                 Icons.attach_money_rounded,
                 const Color(0xFF00B25A),
@@ -22032,6 +22040,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
     unawaited(_refreshManagementInBackground());
   }
 
+  Future<void> _openCivicVotingAdmin(bool isDark) async {
+    await showNgmyCivicVotingAdminSheet(context);
+    if (mounted) setState(() {});
+  }
+
   void _showCivicRegistryAdmin(bool isDark) {
     final pending = NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications);
     showModalBottomSheet<void>(
@@ -22213,16 +22226,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       );
                     },
                   );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.how_to_vote_rounded, color: Color(0xFF059669)),
-                title: const Text('Civic Voting', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Open/close voting, candidates, states, drip votes'),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  unawaited(showNgmyCivicVotingAdminSheet(context));
                 },
               ),
             ],
@@ -35857,37 +35860,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
                 ],
               ),
-            const SizedBox(height: 18),
-            Builder(
-              builder: (context) {
-                final passport = NgmyCivicRegistryMembers.passportForAppUser(
-                  widget.config,
-                  email: widget.user.email,
-                  phone: widget.user.phone,
-                );
-                final memberState = (passport?['state'] ?? _selectedState).toString();
-                final isVoteAdmin = widget.user.isAdmin ||
-                    widget.user.isCivicRegistryKing ||
-                    widget.user.isCivicRegistryAdmin;
-                return NgmyCivicVotingEntryCard(
-                  config: widget.config,
-                  userEmail: widget.user.email,
-                  userPhone: widget.user.phone,
-                  memberState: memberState,
-                  isAdmin: isVoteAdmin,
-                );
-              },
-            ),
             const SizedBox(height: 30),
 
-            // Search/Action Box
+            // Search/Action Box — voting card only on Search, at the bottom.
             if (_canManageCivicRegistry()) ...[
-              if (_activeTab == 0) _searchSection(isDark),
+              if (_activeTab == 0) ...[
+                _searchSection(isDark),
+                const SizedBox(height: 20),
+                _civicVotingEntryCard(),
+              ],
               if (_activeTab == 1) _enrollSection(isDark),
               if (_activeTab == 2) _membersSection(isDark),
               if (_activeTab == 3) _rankingsSection(isDark),
             ] else ...[
-              if (_activeTab == 0) _searchSection(isDark),
+              if (_activeTab == 0) ...[
+                _searchSection(isDark),
+                const SizedBox(height: 20),
+                _civicVotingEntryCard(),
+              ],
               if (_activeTab == 1) _rankingsSection(isDark),
             ],
 
@@ -35897,6 +35887,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ),
       ),
     ),
+    );
+  }
+
+  Widget _civicVotingEntryCard() {
+    final passport = NgmyCivicRegistryMembers.passportForAppUser(
+      widget.config,
+      email: widget.user.email,
+      phone: widget.user.phone,
+    );
+    final memberState = (passport?['state'] ?? _selectedState).toString();
+    final isVoteAdmin = widget.user.isAdmin ||
+        widget.user.isCivicRegistryKing ||
+        widget.user.isCivicRegistryAdmin;
+    return NgmyCivicVotingEntryCard(
+      config: widget.config,
+      userEmail: widget.user.email,
+      userPhone: widget.user.phone,
+      memberState: memberState,
+      isAdmin: isVoteAdmin,
     );
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:image_picker/image_picker.dart';
@@ -18,6 +19,8 @@ class NgmyCivicVotingCandidate {
     required this.id,
     required this.name,
     this.photoUrl = '',
+    this.bioNote = '',
+    this.voiceNoteUrl = '',
     this.dripTotal = 0,
     this.dripDurationMinutes = 0,
     this.dripStartedAt = '',
@@ -26,6 +29,8 @@ class NgmyCivicVotingCandidate {
   final String id;
   String name;
   String photoUrl;
+  String bioNote;
+  String voiceNoteUrl;
 
   /// Admin drip votes — released gradually over [dripDurationMinutes].
   int dripTotal;
@@ -50,6 +55,8 @@ class NgmyCivicVotingCandidate {
         'id': id,
         'name': name,
         'photoUrl': photoUrl,
+        'bioNote': bioNote,
+        'voiceNoteUrl': voiceNoteUrl,
         'dripTotal': dripTotal,
         'dripDurationMinutes': dripDurationMinutes,
         'dripStartedAt': dripStartedAt,
@@ -60,6 +67,8 @@ class NgmyCivicVotingCandidate {
       id: (json['id'] ?? '').toString(),
       name: (json['name'] ?? '').toString(),
       photoUrl: (json['photoUrl'] ?? '').toString(),
+      bioNote: (json['bioNote'] ?? json['notes'] ?? '').toString(),
+      voiceNoteUrl: (json['voiceNoteUrl'] ?? '').toString(),
       dripTotal: (json['dripTotal'] as num?)?.toInt() ?? 0,
       dripDurationMinutes: (json['dripDurationMinutes'] as num?)?.toInt() ?? 0,
       dripStartedAt: (json['dripStartedAt'] ?? '').toString(),
@@ -99,6 +108,10 @@ class NgmyCivicVotingState {
     this.title = 'Civic Voting',
     this.yearLabel = '2026',
     this.dateLabel = '',
+    this.scheduleOpenDate = '',
+    this.recurrenceYears = 0,
+    this.lastAutoOpenKey = '',
+    this.manualClosedCycleKey = '',
     List<String>? allowedStates,
     List<NgmyCivicVotingCandidate>? candidates,
     List<NgmyCivicVotingBallot>? ballots,
@@ -111,6 +124,18 @@ class NgmyCivicVotingState {
   String title;
   String yearLabel;
   String dateLabel;
+
+  /// Calendar date (YYYY-MM-DD) when voting should open.
+  String scheduleOpenDate;
+
+  /// 0 = one-time; otherwise reopen every N years on the same month/day.
+  int recurrenceYears;
+
+  /// Cycle key already auto-opened (e.g. `2026-11-04`).
+  String lastAutoOpenKey;
+
+  /// If admin closed during a cycle, do not auto-reopen until the next cycle.
+  String manualClosedCycleKey;
 
   /// Empty = all states.
   List<String> allowedStates;
@@ -151,11 +176,80 @@ class NgmyCivicVotingState {
     return null;
   }
 
+  static String cycleKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  static String formatDisplayDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+
+  /// Latest scheduled cycle on or before [today] (local calendar day).
+  DateTime? currentOrPastCycleDate({DateTime? now}) {
+    final raw = scheduleOpenDate.trim();
+    if (raw.isEmpty) return null;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+    final anchor = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = now ?? DateTime.now();
+    final day = DateTime(today.year, today.month, today.day);
+    if (anchor.isAfter(day)) return null;
+    if (recurrenceYears <= 0) return anchor;
+
+    var cycle = anchor;
+    while (true) {
+      final next = DateTime(cycle.year + recurrenceYears, cycle.month, cycle.day);
+      if (next.isAfter(day)) break;
+      cycle = next;
+    }
+    return cycle;
+  }
+
+  DateTime? nextUpcomingCycleDate({DateTime? now}) {
+    final raw = scheduleOpenDate.trim();
+    if (raw.isEmpty) return null;
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return null;
+    final anchor = DateTime(parsed.year, parsed.month, parsed.day);
+    final today = now ?? DateTime.now();
+    final day = DateTime(today.year, today.month, today.day);
+    if (!anchor.isBefore(day)) return anchor;
+    if (recurrenceYears <= 0) return null;
+    var cycle = anchor;
+    while (true) {
+      final next = DateTime(cycle.year + recurrenceYears, cycle.month, cycle.day);
+      if (!next.isBefore(day)) return next;
+      cycle = next;
+    }
+  }
+
+  /// Apply calendar auto-open. Returns true if state mutated.
+  bool applySchedule({DateTime? now}) {
+    final cycle = currentOrPastCycleDate(now: now);
+    if (cycle == null) return false;
+    final key = cycleKey(cycle);
+    if (manualClosedCycleKey == key) return false;
+    if (lastAutoOpenKey == key) return false;
+
+    open = true;
+    lastAutoOpenKey = key;
+    dateLabel = formatDisplayDate(cycle);
+    yearLabel = '${cycle.year}';
+    return true;
+  }
+
   Map<String, dynamic> toJson() => {
         'open': open,
         'title': title,
         'yearLabel': yearLabel,
         'dateLabel': dateLabel,
+        'scheduleOpenDate': scheduleOpenDate,
+        'recurrenceYears': recurrenceYears,
+        'lastAutoOpenKey': lastAutoOpenKey,
+        'manualClosedCycleKey': manualClosedCycleKey,
         'allowedStates': allowedStates,
         'candidates': candidates.map((c) => c.toJson()).toList(),
         'ballots': ballots.map((b) => b.toJson()).toList(),
@@ -168,6 +262,10 @@ class NgmyCivicVotingState {
       title: (json['title'] ?? 'Civic Voting').toString(),
       yearLabel: (json['yearLabel'] ?? '2026').toString(),
       dateLabel: (json['dateLabel'] ?? '').toString(),
+      scheduleOpenDate: (json['scheduleOpenDate'] ?? '').toString(),
+      recurrenceYears: (json['recurrenceYears'] as num?)?.toInt() ?? 0,
+      lastAutoOpenKey: (json['lastAutoOpenKey'] ?? '').toString(),
+      manualClosedCycleKey: (json['manualClosedCycleKey'] ?? '').toString(),
       allowedStates: ((json['allowedStates'] as List?) ?? const [])
           .map((e) => e.toString())
           .where((s) => s.trim().isNotEmpty)
@@ -230,7 +328,10 @@ class NgmyCivicVotingStore {
   static NgmyCivicVotingState get current => _cache;
 
   static Future<NgmyCivicVotingState> load({bool forceCloud = false}) async {
-    if (_loaded && !forceCloud) return _cache;
+    if (_loaded && !forceCloud) {
+      await _syncScheduleAndMaybePersist(_cache);
+      return _cache;
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_kNgmyCivicVotingPrefsKey);
@@ -258,7 +359,15 @@ class NgmyCivicVotingStore {
       }
     }
     _loaded = true;
+    await _syncScheduleAndMaybePersist(_cache);
     return _cache;
+  }
+
+  static Future<void> _syncScheduleAndMaybePersist(NgmyCivicVotingState state) async {
+    final changed = state.applySchedule();
+    if (!changed) return;
+    // Auto-open is a real state change — one cloud write when the date arrives.
+    await save(state);
   }
 
   static bool _preferRemote(NgmyCivicVotingState remote, NgmyCivicVotingState local) {
@@ -278,7 +387,7 @@ class NgmyCivicVotingStore {
     }
   }
 
-  /// One settings write per mutation (vote / admin edit).
+  /// One settings write per mutation (vote / admin edit / schedule open).
   static Future<bool> save(NgmyCivicVotingState state) async {
     state.updatedAt = DateTime.now().toUtc().toIso8601String();
     _cache = state;
@@ -304,25 +413,65 @@ class NgmyCivicVotingStore {
     );
     if (img == null) return null;
     final bytes = await img.readAsBytes();
-    final cloud = await _uploadCandidatePhoto(candidateId, bytes);
+    final cloud = await _uploadBytes(
+      candidateId: candidateId,
+      bytes: bytes,
+      ext: 'jpg',
+      contentType: 'image/jpeg',
+      folder: 'voting_candidates',
+    );
     if (cloud != null) return cloud;
     return 'data:image/jpeg;base64,${base64Encode(bytes)}';
   }
 
-  static Future<String?> _uploadCandidatePhoto(String candidateId, Uint8List bytes) async {
+  static Future<String?> pickCandidateVoiceNote(String candidateId) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['m4a', 'mp3', 'wav', 'aac', 'ogg', 'webm'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return null;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) return null;
+    final ext = (file.extension ?? 'm4a').toLowerCase();
+    final contentType = switch (ext) {
+      'mp3' => 'audio/mpeg',
+      'wav' => 'audio/wav',
+      'aac' => 'audio/aac',
+      'ogg' => 'audio/ogg',
+      'webm' => 'audio/webm',
+      _ => 'audio/mp4',
+    };
+    return _uploadBytes(
+      candidateId: candidateId,
+      bytes: bytes,
+      ext: ext,
+      contentType: contentType,
+      folder: 'voting_voice_notes',
+    );
+  }
+
+  static Future<String?> _uploadBytes({
+    required String candidateId,
+    required Uint8List bytes,
+    required String ext,
+    required String contentType,
+    required String folder,
+  }) async {
     try {
       final safe = candidateId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
       if (safe.isEmpty) return null;
-      final path = 'voting_candidates/$safe.jpg';
+      final path = '$folder/$safe.$ext';
       final storage = Supabase.instance.client.storage.from('media');
       await storage
-          .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'))
+          .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true, contentType: contentType))
           .timeout(const Duration(seconds: 45));
       final url = storage.getPublicUrl(path);
       if (url.isEmpty) return null;
       return '$url?v=${DateTime.now().millisecondsSinceEpoch}';
     } catch (e) {
-      debugPrint('[civic voting] photo upload: $e');
+      debugPrint('[civic voting] upload: $e');
       return null;
     }
   }

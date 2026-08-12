@@ -2,13 +2,14 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_civic_voting.dart';
 import 'ngmy_coming_soon.dart';
 import 'ngmy_nav.dart';
 
-/// Animated voting entry card for Civic Registry (under Search / Rankings).
+/// Animated voting entry card for Civic Registry Search tab (home-card size).
 class NgmyCivicVotingEntryCard extends StatefulWidget {
   const NgmyCivicVotingEntryCard({
     super.key,
@@ -91,7 +92,8 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
             borderRadius: BorderRadius.circular(28),
             onTap: _open,
             child: SizedBox(
-              height: 168,
+              // Match NGMY Hub home cards (~aspect 1.6 row height).
+              height: 112,
               width: double.infinity,
               child: Stack(
                 clipBehavior: Clip.none,
@@ -159,10 +161,10 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                             child: Stack(
                               children: [
                                 // Celebration dots
-                                ...List.generate(10, (i) {
+                                ...List.generate(8, (i) {
                                   final t = (_spark.value + i * 0.09) % 1.0;
                                   final x = 18.0 + (i * 37) % 280;
-                                  final y = 12.0 + math.sin(t * math.pi * 2 + i) * 18 + t * 90;
+                                  final y = 8.0 + math.sin(t * math.pi * 2 + i) * 10 + t * 55;
                                   return Positioned(
                                     left: x,
                                     top: y,
@@ -180,15 +182,15 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                   );
                                 }),
                                 Padding(
-                                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
                                   child: Row(
                                     children: [
                                       // Year badge
                                       Transform.scale(
                                         scale: 0.96 + _pulse.value * 0.08,
                                         child: Container(
-                                          width: 78,
-                                          height: 78,
+                                          width: 64,
+                                          height: 64,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
                                             gradient: SweepGradient(
@@ -219,7 +221,7 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                               year,
                                               style: TextStyle(
                                                 fontWeight: FontWeight.w900,
-                                                fontSize: 18,
+                                                fontSize: 15,
                                                 letterSpacing: -0.5,
                                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                                               ),
@@ -227,7 +229,7 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 14),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,11 +240,11 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                               style: TextStyle(
                                                 color: const Color(0xFFF59E0B),
                                                 fontWeight: FontWeight.w900,
-                                                fontSize: 12,
-                                                letterSpacing: 2.2,
+                                                fontSize: 10,
+                                                letterSpacing: 2.0,
                                               ),
                                             ),
-                                            const SizedBox(height: 4),
+                                            const SizedBox(height: 2),
                                             Text(
                                               title,
                                               maxLines: 1,
@@ -250,24 +252,24 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                               style: TextStyle(
                                                 color: isDark ? Colors.white : const Color(0xFF0F172A),
                                                 fontWeight: FontWeight.w900,
-                                                fontSize: 22,
+                                                fontSize: 17,
                                                 height: 1.1,
                                               ),
                                             ),
-                                            const SizedBox(height: 6),
+                                            const SizedBox(height: 3),
                                             Text(
                                               open
                                                   ? (_voting.dateLabel.trim().isEmpty
-                                                      ? 'Tap to cast your vote · live results'
+                                                      ? 'Tap to vote · live results'
                                                       : _voting.dateLabel.trim())
                                                   : 'Coming soon · we\'ll be back soon',
-                                              maxLines: 2,
+                                              maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
                                                 color: isDark ? Colors.white70 : const Color(0xFF475569),
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 12.5,
-                                                height: 1.25,
+                                                fontSize: 11.5,
+                                                height: 1.2,
                                               ),
                                             ),
                                           ],
@@ -276,7 +278,7 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                       Icon(
                                         open ? Icons.how_to_vote_rounded : Icons.lock_clock_rounded,
                                         color: open ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
-                                        size: 30,
+                                        size: 26,
                                       ),
                                     ],
                                   ),
@@ -531,6 +533,8 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
           ...sorted.map((c) {
             final votes = _voting.votesFor(c.id);
             final selected = myPick == c.id;
+            final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
+            final hasProfile = c.bioNote.trim().isNotEmpty || c.voiceNoteUrl.trim().isNotEmpty;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Material(
@@ -558,16 +562,19 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: const Color(0xFF334155),
-                            backgroundImage: ngmyCivicVotingPhotoProvider(c.photoUrl),
-                            child: ngmyCivicVotingPhotoProvider(c.photoUrl) == null
-                                ? Text(
-                                    c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
-                                  )
-                                : null,
+                          GestureDetector(
+                            onTap: hasProfile ? () => _showCandidateProfile(c) : null,
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: const Color(0xFF334155),
+                              backgroundImage: photo,
+                              child: photo == null
+                                  ? Text(
+                                      c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+                                    )
+                                  : null,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -578,12 +585,27 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '$votes vote${votes == 1 ? '' : 's'}',
-                                  style: TextStyle(
-                                    color: const Color(0xFF34D399),
+                                  style: const TextStyle(
+                                    color: Color(0xFF34D399),
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                   ),
                                 ),
+                                if (hasProfile) ...[
+                                  const SizedBox(height: 6),
+                                  GestureDetector(
+                                    onTap: () => _showCandidateProfile(c),
+                                    child: Text(
+                                      'View profile & notes',
+                                      style: TextStyle(
+                                        color: ink.withValues(alpha: 0.55),
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -602,5 +624,93 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showCandidateProfile(NgmyCivicVotingCandidate c) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final player = AudioPlayer();
+    var playing = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return SafeArea(
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
+                constraints: const BoxConstraints(maxWidth: 520),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0B1220) : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: const Color(0xFF334155),
+                          backgroundImage: ngmyCivicVotingPhotoProvider(c.photoUrl),
+                          child: ngmyCivicVotingPhotoProvider(c.photoUrl) == null
+                              ? Text(
+                                  c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: muted)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (c.bioNote.trim().isNotEmpty)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          c.bioNote.trim(),
+                          style: TextStyle(color: ink.withValues(alpha: 0.88), height: 1.45, fontSize: 14.5),
+                        ),
+                      )
+                    else
+                      Text('No written notes yet.', style: TextStyle(color: muted)),
+                    if (c.voiceNoteUrl.trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          if (playing) {
+                            await player.stop();
+                            setLocal(() => playing = false);
+                            return;
+                          }
+                          await player.play(UrlSource(c.voiceNoteUrl));
+                          setLocal(() => playing = true);
+                          player.onPlayerComplete.listen((_) {
+                            if (ctx.mounted) setLocal(() => playing = false);
+                          });
+                        },
+                        icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                        label: Text(playing ? 'Stop voice note' : 'Play voice note', style: const TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    await player.dispose();
   }
 }
