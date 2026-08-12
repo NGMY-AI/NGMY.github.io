@@ -5,8 +5,11 @@ import 'dart:ui' show ImageFilter;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import 'ngmy_civic_member_report_print_stub.dart'
+    if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
 import 'ngmy_civic_voting.dart';
 import 'ngmy_civic_voting_download.dart';
+import 'ngmy_civic_voting_results_pdf.dart';
 import 'ngmy_coming_soon.dart';
 import 'ngmy_nav.dart';
 
@@ -540,23 +543,98 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
   }
 
   Future<void> _downloadResults() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: _card(isDark),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final ink = _ink(isDark);
+        final muted = _muted(isDark);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: muted.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(99)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text('Download results', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 4),
+                Text('Choose how you want the results', style: TextStyle(color: muted, fontSize: 13)),
+                const SizedBox(height: 12),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _accent.withValues(alpha: 0.15),
+                    child: const Icon(Icons.description_rounded, color: _accent),
+                  ),
+                  title: Text('Paper results', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+                  subtitle: Text('Opens a printable paper PDF you can see right away', style: TextStyle(color: muted, fontSize: 12)),
+                  onTap: () => Navigator.pop(ctx, 'paper'),
+                ),
+                ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: _gold.withValues(alpha: 0.18),
+                    child: const Icon(Icons.table_chart_rounded, color: _gold),
+                  ),
+                  title: Text('Spreadsheet (CSV)', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+                  subtitle: Text('Download the raw results file', style: TextStyle(color: muted, fontSize: 12)),
+                  onTap: () => Navigator.pop(ctx, 'csv'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (choice == null || !mounted) return;
+
     final sorted = [..._voting.candidates]
       ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
-    final buf = StringBuffer()
-      ..writeln('Rank,Candidate,Votes')
-      ..writeln('# ${_voting.title} · ${_voting.yearLabel} · ${_voting.dateLabel}')
-      ..writeln('# Downloaded ${DateTime.now().toLocal()}');
-    for (var i = 0; i < sorted.length; i++) {
-      final c = sorted[i];
-      final name = c.name.replaceAll(',', ' ');
-      buf.writeln('${i + 1},$name,${_voting.votesFor(c.id)}');
-    }
-    final total = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
-    buf.writeln('TOTAL,,$total');
     final year = _voting.yearLabel.trim().isEmpty ? 'voting' : _voting.yearLabel.trim();
-    final msg = await ngmyDownloadCivicVotingResults(
-      fileName: 'civic_voting_${year}_results.csv',
-      content: buf.toString(),
+
+    if (choice == 'csv') {
+      final buf = StringBuffer()
+        ..writeln('Rank,Candidate,Votes')
+        ..writeln('# ${_voting.title} · ${_voting.yearLabel} · ${_voting.dateLabel}')
+        ..writeln('# Downloaded ${DateTime.now().toLocal()}');
+      for (var i = 0; i < sorted.length; i++) {
+        final c = sorted[i];
+        buf.writeln('${i + 1},${c.name.replaceAll(',', ' ')},${_voting.votesFor(c.id)}');
+      }
+      final total = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
+      buf.writeln('TOTAL,,$total');
+      final msg = await ngmyDownloadCivicVotingResults(
+        fileName: 'civic_voting_${year}_results.csv',
+        content: buf.toString(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
+
+    // Paper: open printable sheet immediately + download PDF.
+    final html = ngmyCivicVotingResultsPaperHtml(voting: _voting);
+    unawaited(
+      ngmyPrintCivicMemberReport(
+        htmlContent: html,
+        plainText: '${_voting.title} results',
+        fileName: 'civic_voting_${year}_results',
+      ),
+    );
+    final pdfBytes = await ngmyBuildCivicVotingResultsPdfBytes(voting: _voting);
+    final msg = await ngmyDownloadCivicVotingPdfResults(
+      fileName: 'civic_voting_${year}_results.pdf',
+      pdfBytes: pdfBytes,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -631,10 +709,10 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
             decoration: BoxDecoration(
               color: card,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE4E4E7)),
             ),
             child: Column(
@@ -643,39 +721,53 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: _accent.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(99),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.circle, size: 8, color: _accent),
-                          SizedBox(width: 6),
-                          Text('LIVE', style: TextStyle(color: _accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1)),
-                        ],
+                      child: const Text(
+                        'LIVE',
+                        style: TextStyle(color: _accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.8),
                       ),
                     ),
-                    const Spacer(),
-                    if (_voting.yearLabel.trim().isNotEmpty)
-                      Text(
-                        _voting.yearLabel,
-                        style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 16),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
-                        style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 20),
-                      ),
+                      child: _searchOpen
+                          ? TextField(
+                              controller: _searchCtrl,
+                              autofocus: true,
+                              textCapitalization: TextCapitalization.characters,
+                              onChanged: (v) => setState(() => _searchQuery = v),
+                              style: TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 14),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                hintText: 'Search name…',
+                                hintStyle: TextStyle(color: muted, fontSize: 13),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(vertical: 6),
+                              ),
+                            )
+                          : Text(
+                              _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15),
+                            ),
                     ),
+                    if (!_searchOpen && _voting.yearLabel.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 2),
+                        child: Text(
+                          _voting.yearLabel,
+                          style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 13),
+                        ),
+                      ),
                     IconButton(
                       tooltip: 'Search candidate',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                       onPressed: () {
                         setState(() {
                           _searchOpen = !_searchOpen;
@@ -688,61 +780,29 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                       icon: Icon(
                         _searchOpen ? Icons.close_rounded : Icons.search_rounded,
                         color: ink,
+                        size: 22,
                       ),
                     ),
                   ],
                 ),
-                if (_searchOpen) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _searchCtrl,
-                    autofocus: true,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (v) => setState(() => _searchQuery = v),
-                    style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                    decoration: InputDecoration(
-                      hintText: 'Type candidate name…',
-                      hintStyle: TextStyle(color: muted),
-                      prefixIcon: Icon(Icons.search_rounded, color: muted),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 2),
+                  child: Text(
+                    '$totalVotes vote${totalVotes == 1 ? '' : 's'} · one per member',
+                    style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 11.5),
                   ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  '$totalVotes total vote${totalVotes == 1 ? '' : 's'} · one vote per member',
-                  style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 if (myPick != null) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _accent.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'You already voted — each member can vote only once.',
-                      style: TextStyle(color: ink.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'You already voted — one vote only.',
+                    style: TextStyle(color: _accent, fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                 ] else if (!canVote) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: _gold.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Only linked Civic Registry members in allowed states can vote.',
-                      style: TextStyle(color: ink.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Linked Civic Registry members in allowed states only.',
+                    style: TextStyle(color: _gold, fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                 ],
               ],

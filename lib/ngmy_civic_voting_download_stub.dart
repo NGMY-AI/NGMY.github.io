@@ -14,3 +14,20 @@ Future<String> ngmyDownloadCivicVotingResults({
     return 'Results copied to clipboard';
   }
 }
+
+Future<String> ngmyDownloadCivicVotingPdfResults({
+  required String fileName,
+  required Uint8List pdfBytes,
+}) async {
+  final safe = fileName.trim().isEmpty ? 'civic_voting_results.pdf' : fileName.trim();
+  final name = safe.toLowerCase().endsWith('.pdf') ? safe : '$safe.pdf';
+  try {
+    await Share.shareXFiles(
+      [XFile.fromData(pdfBytes, mimeType: 'application/pdf', name: name)],
+      subject: name,
+    );
+    return 'Paper results ready to share';
+  } catch (_) {
+    return 'Could not share paper results on this device.';
+  }
+}
