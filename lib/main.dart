@@ -149,6 +149,8 @@ import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_contribution_report.dart';
 import 'ngmy_civic_state_wallet.dart';
+import 'ngmy_civic_voting_ui.dart';
+import 'ngmy_civic_voting_admin.dart';
 import 'ngmy_civic_member_report.dart';
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
@@ -22213,6 +22215,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   );
                 },
               ),
+              ListTile(
+                leading: const Icon(Icons.how_to_vote_rounded, color: Color(0xFF059669)),
+                title: const Text('Civic Voting', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('Open/close voting, candidates, states, drip votes'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(showNgmyCivicVotingAdminSheet(context));
+                },
+              ),
             ],
           ),
         ),
@@ -35845,6 +35857,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
                 ],
               ),
+            const SizedBox(height: 18),
+            Builder(
+              builder: (context) {
+                final passport = NgmyCivicRegistryMembers.passportForAppUser(
+                  widget.config,
+                  email: widget.user.email,
+                  phone: widget.user.phone,
+                );
+                final memberState = (passport?['state'] ?? _selectedState).toString();
+                final isVoteAdmin = widget.user.isAdmin ||
+                    widget.user.isCivicRegistryKing ||
+                    widget.user.isCivicRegistryAdmin;
+                return NgmyCivicVotingEntryCard(
+                  config: widget.config,
+                  userEmail: widget.user.email,
+                  userPhone: widget.user.phone,
+                  memberState: memberState,
+                  isAdmin: isVoteAdmin,
+                );
+              },
+            ),
             const SizedBox(height: 30),
 
             // Search/Action Box
