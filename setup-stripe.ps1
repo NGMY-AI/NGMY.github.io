@@ -176,6 +176,7 @@ $productLinks = [ordered]@{
     "bio_photo_pack" = "https://buy.stripe.com/5kQ8wP93H8NPdEv5ydb7y0e"
     "qr_generator"   = "https://buy.stripe.com/fZufZheo12prgQH5ydb7y0f"
     "swahili_level"  = "https://buy.stripe.com/5kQ28rcfT9RTasjf8Nb7y0g"
+    "slides_studio"  = "https://buy.stripe.com/3cIaEX1Bf4xzeIzd0Fb7y0i"
 }
 
 $allLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"

@@ -26,6 +26,7 @@ enum NgmyStripeProduct {
   bioPhotoPack,
   qrGenerator,
   swahiliLevel,
+  slidesStudio,
 }
 
 class NgmyStripePayments {
@@ -57,6 +58,8 @@ class NgmyStripePayments {
       'https://buy.stripe.com/fZufZheo12prgQH5ydb7y0f';
   static const String swahiliLevelUrl =
       'https://buy.stripe.com/5kQ28rcfT9RTasjf8Nb7y0g';
+  static const String slidesStudioUrl =
+      'https://buy.stripe.com/3cIaEX1Bf4xzeIzd0Fb7y0i';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -126,6 +129,8 @@ class NgmyStripePayments {
         return 'qr_generator';
       case NgmyStripeProduct.swahiliLevel:
         return 'swahili_level';
+      case NgmyStripeProduct.slidesStudio:
+        return 'slides_studio';
     }
   }
 
@@ -159,6 +164,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.qrGenerator;
       case 'swahili_level':
         return NgmyStripeProduct.swahiliLevel;
+      case 'slides_studio':
+        return NgmyStripeProduct.slidesStudio;
       default:
         return null;
     }
@@ -194,6 +201,8 @@ class NgmyStripePayments {
         return qrGeneratorUrl;
       case NgmyStripeProduct.swahiliLevel:
         return swahiliLevelUrl;
+      case NgmyStripeProduct.slidesStudio:
+        return slidesStudioUrl;
     }
   }
 
@@ -272,6 +281,8 @@ class NgmyStripePayments {
         return 225;
       case NgmyStripeProduct.swahiliLevel:
         return 500;
+      case NgmyStripeProduct.slidesStudio:
+        return 499;
     }
   }
 
@@ -335,6 +346,8 @@ class NgmyStripePayments {
         return const [Color(0xFF67E8F9), Color(0xFF0E7490)]; // cyan crystal
       case NgmyStripeProduct.swahiliLevel:
         return const [Color(0xFF34D399), Color(0xFF047857)]; // school emerald
+      case NgmyStripeProduct.slidesStudio:
+        return const [Color(0xFF60A5FA), Color(0xFF1D4ED8)]; // presentation blue
     }
   }
 
@@ -369,6 +382,8 @@ class NgmyStripePayments {
         return const Color(0xFFE0FBFF);
       case NgmyStripeProduct.swahiliLevel:
         return const Color(0xFFD1FAE5);
+      case NgmyStripeProduct.slidesStudio:
+        return const Color(0xFFDBEAFE);
     }
   }
 
@@ -416,6 +431,8 @@ class NgmyStripePayments {
         return 'QR Generator';
       case NgmyStripeProduct.swahiliLevel:
         return 'Kiswahili School';
+      case NgmyStripeProduct.slidesStudio:
+        return 'NGMY Slides Pro';
     }
   }
 
@@ -449,6 +466,8 @@ class NgmyStripePayments {
         return Icons.qr_code_2_rounded;
       case NgmyStripeProduct.swahiliLevel:
         return Icons.translate_rounded;
+      case NgmyStripeProduct.slidesStudio:
+        return Icons.slideshow_rounded;
     }
   }
 
@@ -482,6 +501,8 @@ class NgmyStripePayments {
         return 'Create, template, save, and download QR codes for 2 weeks after payment.';
       case NgmyStripeProduct.swahiliLevel:
         return 'Unlock this level to keep learning.';
+      case NgmyStripeProduct.slidesStudio:
+        return 'Unlock Professional, Luxury, and Bold presentation features for 30 days.';
     }
   }
 

@@ -37,6 +37,7 @@ const PRODUCT_SLUGS = new Set([
   "bio_photo_pack",
   "qr_generator",
   "swahili_level",
+  "slides_studio",
 ]);
 
 const ACCESS_DAYS_DEFAULT = 30;

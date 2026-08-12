@@ -16,6 +16,7 @@ import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_marriage_agreement.dart';
+import 'ngmy_slides_payments.dart';
 import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_toolkit.dart';
@@ -319,6 +320,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  Future<bool> _ensureSlidesPro() async {
+    // Marriage / Hati decks use their own one-time paywall — never ask for Slides Pro.
+    if (NgmyStripePayments.marriageDocDeckKind(_activeDeck?.deckKind)) return true;
+    return NgmySlidesPayments.ensureProAccess(
+      context: context,
+      email: widget.userEmail,
+      isAdmin: widget.isAdmin,
+    );
+  }
+
   Future<void> _onMarriageSessionExpired() async {
     if (!mounted) return;
     await showDialog<void>(
@@ -500,7 +511,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 children: [
                   const Text('Choose a class template', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                   const SizedBox(height: 6),
-                  Text('20 professional decks · 5 slides each · Normal to luxury', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+                  Text(
+                    'Normal templates are free · Pro unlocks Professional, Luxury & Bold — \$4.99/mo',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                  ),
                 ],
               ),
             ),
@@ -512,10 +526,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 itemCount: ngmyClassPresentationTemplates.length,
                 itemBuilder: (_, i) {
                   final t = ngmyClassPresentationTemplates[i];
+                  final isPro = NgmySlidesPayments.isPaidClassCategory(t.category);
                   return Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => Navigator.pop(ctx, t.id),
+                      onTap: () async {
+                        if (isPro) {
+                          final ok = await NgmySlidesPayments.ensureProAccess(
+                            context: ctx,
+                            email: widget.userEmail,
+                            isAdmin: widget.isAdmin,
+                          );
+                          if (!ok || !ctx.mounted) return;
+                        }
+                        if (ctx.mounted) Navigator.pop(ctx, t.id);
+                      },
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: const EdgeInsets.all(12),
@@ -527,10 +552,32 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(color: t.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
-                              child: Text(t.category, style: TextStyle(color: t.accent, fontWeight: FontWeight.w800, fontSize: 9)),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(color: t.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+                                  child: Text(t.category, style: TextStyle(color: t.accent, fontWeight: FontWeight.w800, fontSize: 9)),
+                                ),
+                                if (isPro) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1D4ED8).withValues(alpha: 0.85),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.lock_rounded, size: 10, color: Colors.white),
+                                        SizedBox(width: 3),
+                                        Text('Pro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 9)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                             const Spacer(),
                             Text(t.name, style: TextStyle(color: t.titleColor, fontWeight: FontWeight.w900, fontSize: 14)),
@@ -736,7 +783,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
-  void _addShape(NgmySlideShapeKind shape) {
+  Future<void> _addShape(NgmySlideShapeKind shape) async {
+    if (NgmySlidesPayments.isPaidShape(shape) && !await _ensureSlidesPro()) return;
+    if (!mounted) return;
     _mutate(() {
       final el = NgmySlideElement(
         id: NgmySlidesTemplates.newId(),
@@ -822,7 +871,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
-  void _applyThemeColor(NgmySlidesTheme theme) {
+  Future<void> _applyThemeColor(NgmySlidesTheme theme) async {
+    final needsPro = NgmySlidesPayments.isPaidThemeId(theme.id) || _colorApplyAllSlides;
+    if (needsPro && !await _ensureSlidesPro()) return;
+    if (!mounted) return;
     final el = _selectedElement();
     if (el != null) {
       if (el.type == NgmySlideElementType.text) {
@@ -851,11 +903,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
-  void _applyTextColor(int colorValue) {
+  Future<void> _applyTextColor(int colorValue) async {
     final el = _selectedElement();
     final slide = _currentSlide;
     final deck = _activeDeck;
     if (deck == null) return;
+    if (_colorApplyAllSlides && el == null && !await _ensureSlidesPro()) return;
+    if (!mounted) return;
 
     _mutate(() {
       if (el != null && el.type == NgmySlideElementType.text) {
@@ -1445,6 +1499,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _shareOutline() async {
+    if (!await _ensureSlidesPro()) return;
     final deck = _activeDeck;
     if (deck == null) return;
     final buf = StringBuffer('${deck.name}\n${'=' * deck.name.length}\n\n');
@@ -1461,6 +1516,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _exportJson() async {
+    if (!await _ensureSlidesPro()) return;
     final deck = _activeDeck;
     if (deck == null) return;
     await Share.share(jsonEncode(deck.toJson()), subject: '${deck.name}.json');
@@ -1483,6 +1539,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addPdf() async {
+    if (!await _ensureSlidesPro()) return;
+    if (!mounted) return;
     final picked = await ngmySlidesPickPdf();
     if (picked == null || _activeDeck == null || !mounted) return;
     final pages = ngmySlidesEstimatePdfPages(picked.bytes);
@@ -1565,6 +1623,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addSignature() async {
+    if (!await _ensureSlidesPro()) return;
+    if (!mounted) return;
     final result = await ngmySlidesCaptureSignature(context);
     if (result == null || _currentSlide == null) return;
     _mutate(() {
@@ -1677,6 +1737,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addEnhancedPhoto() async {
+    if (!await _ensureSlidesPro()) return;
+    if (!mounted) return;
     final ref = await ngmySlidesPickAndEnhancePhoto();
     if (ref == null || _currentSlide == null) return;
     _mutate(() {
@@ -1696,6 +1758,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _enhanceSelectedImage() async {
+    if (!await _ensureSlidesPro()) return;
+    if (!mounted) return;
     final el = _selectedElement();
     if (el == null || el.imageRef == null) return;
     final enhanced = await ngmySlidesEnhanceImage(el.imageRef!);
@@ -1710,7 +1774,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
-  void _applyDocTool(String toolId) {
+  Future<void> _applyDocTool(String toolId) async {
+    if (NgmySlidesPayments.isPaidDocTool(toolId) && !await _ensureSlidesPro()) return;
+    if (!mounted) return;
     switch (toolId) {
       case 'upload_pdf':
         unawaited(_addPdf());
@@ -2048,27 +2114,50 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     return _showDesktopFormat;
   }
 
-  Widget _transitionChip(NgmySlideTransition tr, bool selected, Color accent, bool isDark, VoidCallback onTap) {
+  Widget _transitionChip(
+    NgmySlideTransition tr,
+    bool selected,
+    Color accent,
+    bool isDark,
+    VoidCallback onTap, {
+    bool isPro = false,
+  }) {
     final isNone = tr == NgmySlideTransition.none;
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: isNone ? 12 : 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: selected ? accent.withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: selected ? accent : Colors.white12, width: isNone && selected ? 2 : 1),
-          ),
-          child: Text(
-            ngmySlideTransitionChipLabel(tr),
-            style: TextStyle(
-              fontSize: isNone ? 12 : 18,
-              fontWeight: isNone ? FontWeight.w800 : FontWeight.normal,
-              color: isNone ? (selected ? accent : (isDark ? Colors.white70 : const Color(0xFF64748B))) : null,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: isNone ? 12 : 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? accent.withValues(alpha: 0.25) : (isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04)),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: selected ? accent : Colors.white12, width: isNone && selected ? 2 : 1),
+              ),
+              child: Text(
+                ngmySlideTransitionChipLabel(tr),
+                style: TextStyle(
+                  fontSize: isNone ? 12 : 18,
+                  fontWeight: isNone ? FontWeight.w800 : FontWeight.normal,
+                  color: isNone ? (selected ? accent : (isDark ? Colors.white70 : const Color(0xFF64748B))) : null,
+                ),
+              ),
             ),
-          ),
+            if (isPro)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: const BoxDecoration(color: Color(0xFF1D4ED8), shape: BoxShape.circle),
+                  child: const Icon(Icons.lock_rounded, size: 8, color: Colors.white),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -2084,19 +2173,27 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         const SizedBox(width: 6),
         ...NgmySlideTransition.values.map((tr) {
           final selected = el.textTransition == tr;
+          final isPro = NgmySlidesPayments.isPaidTransition(tr);
           return _transitionChip(
             tr,
             selected,
             const Color(0xFF059669),
             isDark,
-            () => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr)),
+            () async {
+              if (isPro && !await _ensureSlidesPro()) return;
+              if (!mounted) return;
+              showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr));
+            },
+            isPro: isPro,
           );
         }),
       ],
     );
   }
 
-  void _addSchoolSlide(NgmySlideLayout layout) {
+  Future<void> _addSchoolSlide(NgmySlideLayout layout) async {
+    if (NgmySlidesPayments.isPaidSchoolLayout(layout) && !await _ensureSlidesPro()) return;
+    if (!mounted) return;
     _mutate(() {
       final slide = NgmySlide(id: NgmySlidesTemplates.newId());
       NgmySlidesTemplates.applyLayout(slide, layout, _theme);
@@ -2129,22 +2226,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             _header(
               title: 'NGMY SLIDES',
-              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
+              subtitle: 'Free basic decks · Pro features \$4.99/mo — Normal templates stay free',
               icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
-              onIconTap: () => showNgmySlidesTransferHub(
-                context,
-                ownerEmail: widget.userEmail,
-                decks: _decks,
-                onImported: (imported) async {
-                  setState(() {
-                    for (final d in imported) {
-                      _decks.insert(0, d);
-                    }
-                  });
-                  await _persistDecks();
-                },
-              ),
+              onIconTap: () async {
+                if (!await _ensureSlidesPro()) return;
+                if (!mounted) return;
+                await showNgmySlidesTransferHub(
+                  context,
+                  ownerEmail: widget.userEmail,
+                  decks: _decks,
+                  onImported: (imported) async {
+                    setState(() {
+                      for (final d in imported) {
+                        _decks.insert(0, d);
+                      }
+                    });
+                    await _persistDecks();
+                  },
+                );
+              },
               onTrailingTap: _openDocumentCategoryPicker,
             ),
             const SizedBox(height: 18),
@@ -3069,7 +3170,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 children: [
                   _colorScopeChip('This slide', !_colorApplyAllSlides, isDark, () => setState(() => _colorApplyAllSlides = false)),
                   const SizedBox(width: 6),
-                  _colorScopeChip('All slides', _colorApplyAllSlides, isDark, () => setState(() => _colorApplyAllSlides = true)),
+                  _colorScopeChip('All slides', _colorApplyAllSlides, isDark, () async {
+                    if (!await _ensureSlidesPro()) return;
+                    if (!mounted) return;
+                    setState(() => _colorApplyAllSlides = true);
+                  }),
                 ],
               ),
               const SizedBox(height: 6),
@@ -3088,17 +3193,33 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     return Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: GestureDetector(
-                        onTap: () => _applyThemeColor(t),
+                        onTap: () => unawaited(_applyThemeColor(t)),
                         child: Tooltip(
-                          message: t.label,
-                          child: Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent]),
-                              border: Border.all(color: selected ? t.accent : Colors.white24, width: selected ? 2.5 : 1),
-                            ),
+                          message: NgmySlidesPayments.isPaidThemeId(t.id) ? '${t.label} (Pro)' : t.label,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 26,
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(colors: [t.slideBg, t.slideBgEnd ?? t.accent]),
+                                  border: Border.all(color: selected ? t.accent : Colors.white24, width: selected ? 2.5 : 1),
+                                ),
+                              ),
+                              if (NgmySlidesPayments.isPaidThemeId(t.id))
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: const BoxDecoration(color: Color(0xFF1D4ED8), shape: BoxShape.circle),
+                                    child: const Icon(Icons.lock_rounded, size: 8, color: Colors.white),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -3120,7 +3241,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                       Padding(
                         padding: const EdgeInsets.only(right: 6),
                         child: GestureDetector(
-                          onTap: () => _applyTextColor(c),
+                          onTap: () => unawaited(_applyTextColor(c)),
                           child: Container(
                             width: 24,
                             height: 24,
@@ -3142,37 +3263,53 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: ngmySlideDesignTemplates.map((d) {
+                    final isProDesign = NgmySlidesPayments.isPaidDesign(d);
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
-                        onTap: () {
+                        onTap: () async {
                           final slide = _currentSlide;
                           if (slide == null) return;
-                          if (slide.slideDesignId == d.id) {
-                            _mutate(() => ngmyApplySlideDesignToCurrent(slide, d.id));
-                            return;
-                          }
+                          if ((isProDesign || _colorApplyAllSlides) && !await _ensureSlidesPro()) return;
+                          if (!mounted) return;
                           _mutate(() => ngmyApplySlideDesignToCurrent(slide, d.id));
                         },
                         child: Column(
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 72,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: _currentSlide?.slideDesignId == d.id ? const Color(0xFF2563EB) : Colors.white24,
-                                    width: _currentSlide?.slideDesignId == d.id ? 2.5 : 1,
-                                  ),
+                            Stack(
+                              children: [
+                                ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: 72,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: _currentSlide?.slideDesignId == d.id ? const Color(0xFF2563EB) : Colors.white24,
+                                        width: _currentSlide?.slideDesignId == d.id ? 2.5 : 1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(7),
+                                      child: ngmyMiniSlidePreview(ngmySlideDesignPreview(d.id)),
+                                    ),
+                                  ),
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(7),
-                                  child: ngmyMiniSlidePreview(ngmySlideDesignPreview(d.id)),
-                                ),
-                              ),
+                                if (isProDesign)
+                                  Positioned(
+                                    right: 2,
+                                    top: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF1D4ED8).withValues(alpha: 0.92),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: const Text('Pro', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 3),
                             Text(d.label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
@@ -3191,12 +3328,25 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       case 'Transitions':
         final el = _selectedElement();
         final screenW = MediaQuery.sizeOf(context).width - 20;
+        Future<void> applyTransition(NgmySlideTransition tr, VoidCallback apply) async {
+          if (NgmySlidesPayments.isPaidTransition(tr) && !await _ensureSlidesPro()) return;
+          if (!mounted) return;
+          apply();
+        }
         Widget transitionRow(List<NgmySlideTransition> transitions, NgmySlideTransition? selected, void Function(NgmySlideTransition) onTap, Color accent) {
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: transitions.map((tr) {
-                return _transitionChip(tr, selected == tr, accent, isDark, () => onTap(tr));
+                final isPro = NgmySlidesPayments.isPaidTransition(tr);
+                return _transitionChip(
+                  tr,
+                  selected == tr,
+                  accent,
+                  isDark,
+                  () => onTap(tr),
+                  isPro: isPro,
+                );
               }).toList(),
             ),
           );
@@ -3213,7 +3363,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 transitionRow(
                   NgmySlideTransition.values,
                   el.textTransition,
-                  (tr) => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr)),
+                  (tr) => unawaited(applyTransition(
+                    tr,
+                    () => showNgmyTextTransitionPreview(context, transition: tr, onApply: () => _mutate(() => el.textTransition = tr)),
+                  )),
                   const Color(0xFF059669),
                 ),
                 const SizedBox(height: 8),
@@ -3223,7 +3376,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               transitionRow(
                 NgmySlideTransition.values,
                 _currentSlide?.transition,
-                (tr) => showNgmyTransitionPreview(context, transition: tr, onApply: () => _mutate(() => _currentSlide!.transition = tr)),
+                (tr) => unawaited(applyTransition(
+                  tr,
+                  () => showNgmyTransitionPreview(context, transition: tr, onApply: () => _mutate(() => _currentSlide!.transition = tr)),
+                )),
                 const Color(0xFF2563EB),
               ),
             ],
@@ -3295,12 +3451,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   Widget _aspectChip(String label, NgmySlideAspectRatio ratio, bool isDark) {
     final selected = _activeDeck?.aspectRatio == ratio;
+    final isPro = NgmySlidesPayments.isPaidAspect(ratio);
     return Padding(
       padding: const EdgeInsets.only(right: 6),
       child: ChoiceChip(
-        label: Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+            if (isPro) ...[
+              const SizedBox(width: 4),
+              const Icon(Icons.lock_rounded, size: 11),
+            ],
+          ],
+        ),
         selected: selected,
-        onSelected: (_) => _mutate(() => _activeDeck!.aspectRatio = ratio),
+        onSelected: (_) async {
+          if (isPro && !await _ensureSlidesPro()) return;
+          if (!mounted) return;
+          _mutate(() => _activeDeck!.aspectRatio = ratio);
+        },
         selectedColor: const Color(0xFF2563EB).withValues(alpha: 0.25),
       ),
     );

@@ -79,6 +79,7 @@ Access durations (set by webhook):
   Marriage docs  → 4 hours
   Phone Unlock   → 10 days
   QR Generator   → 14 days (2 weeks)
+  Slides Pro     → 30 days ($4.99/mo)
   Other features → 30 days
 
 ────────────────────────────────────────────────────────────
