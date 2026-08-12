@@ -45,6 +45,9 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     this.snapshotForState,
     this.onOpenStateCase,
     this.onAdminRemoveAvailable,
+    this.onAdminResetStateCase,
+    this.onAdminRestoreStateCase,
+    this.softResetForState,
   });
 
   final String state;
@@ -71,6 +74,14 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required String state,
     required double amount,
   })? onAdminRemoveAvailable;
+  final Future<void> Function({
+    required String state,
+    required bool hideBudget,
+    required bool hideSpendings,
+    required bool hideTransactions,
+  })? onAdminResetStateCase;
+  final Future<void> Function(String state)? onAdminRestoreStateCase;
+  final Map<String, dynamic>? Function(String state)? softResetForState;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -700,7 +711,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               flex: 2,
                               child: Text('Available', textAlign: TextAlign.right, style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
                             ),
-                            const SizedBox(width: 88),
+                            const SizedBox(width: 132),
                           ],
                         ),
                       ),
@@ -714,6 +725,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             final snap = forState(state);
                             final available = snap.available;
                             final isCurrent = state.trim().toLowerCase() == widget.state.trim().toLowerCase();
+                            final soft = widget.softResetForState?.call(state);
+                            final restorable = ngmyWalletSoftResetRestorable(soft);
                             return Padding(
                               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
                               child: Row(
@@ -733,6 +746,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                         ),
                                         if (isCurrent)
                                           Text('Open now', style: TextStyle(color: tone.accent, fontSize: 11, fontWeight: FontWeight.w700)),
+                                        if (restorable)
+                                          Text('Reset pending 24h', style: TextStyle(color: const Color(0xFFF59E0B), fontSize: 11, fontWeight: FontWeight.w700)),
                                       ],
                                     ),
                                   ),
@@ -748,9 +763,9 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
                                   IconButton(
-                                    tooltip: 'Remove available',
+                                    visualDensity: VisualDensity.compact,
                                     onPressed: available <= 0
                                         ? null
                                         : () async {
@@ -770,7 +785,30 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                     ),
                                   ),
                                   IconButton(
-                                    tooltip: 'Open state case',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: () async {
+                                      if (restorable) {
+                                        final restore = widget.onAdminRestoreStateCase;
+                                        if (restore != null) {
+                                          await restore(state);
+                                          if (sheetCtx.mounted) setSheet(() {});
+                                          if (mounted) _reload();
+                                        }
+                                        return;
+                                      }
+                                      final ok = await _promptAdminResetStateCase(state: state, tone: tone);
+                                      if (ok == true && sheetCtx.mounted) {
+                                        setSheet(() {});
+                                        if (mounted) _reload();
+                                      }
+                                    },
+                                    icon: Icon(
+                                      restorable ? Icons.undo_rounded : Icons.restart_alt_rounded,
+                                      color: restorable ? tone.accent : const Color(0xFFF59E0B),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
                                     onPressed: () async {
                                       Navigator.pop(sheetCtx);
                                       final open = widget.onOpenStateCase;
@@ -894,6 +932,202 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     if (amount <= 0) return false;
     final clipped = amount > available ? available : amount;
     await remove(state: state, amount: clipped);
+    return true;
+  }
+
+  Future<bool?> _promptAdminResetStateCase({
+    required String state,
+    required _WalletTone tone,
+  }) async {
+    final reset = widget.onAdminResetStateCase;
+    if (reset == null) return false;
+    var everything = true;
+    var hideBudget = true;
+    var hideSpendings = true;
+    var hideTransactions = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            void applyEverything(bool v) {
+              everything = v;
+              if (v) {
+                hideBudget = true;
+                hideSpendings = true;
+                hideTransactions = true;
+              }
+            }
+
+            void syncEverything() {
+              everything = hideBudget && hideSpendings && hideTransactions;
+            }
+
+            Widget check({
+              required String label,
+              required bool value,
+              required ValueChanged<bool?> onChanged,
+            }) {
+              return CheckboxListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                activeColor: tone.accent,
+                value: value,
+                onChanged: onChanged,
+                title: Text(label, style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700, fontSize: 14)),
+              );
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                decoration: BoxDecoration(
+                  color: tone.dialogBg,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: tone.cardBorder),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(state, style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Choose what to reset. Hidden for 24 hours — you can undo, then it is gone forever.',
+                      style: TextStyle(color: tone.secondaryText, fontSize: 12, height: 1.35),
+                    ),
+                    const SizedBox(height: 10),
+                    check(
+                      label: 'Everything (start like new)',
+                      value: everything,
+                      onChanged: (v) => setLocal(() => applyEverything(v == true)),
+                    ),
+                    check(
+                      label: 'Monthly budget',
+                      value: hideBudget,
+                      onChanged: (v) => setLocal(() {
+                        hideBudget = v == true;
+                        syncEverything();
+                      }),
+                    ),
+                    check(
+                      label: 'Expenses / spending',
+                      value: hideSpendings,
+                      onChanged: (v) => setLocal(() {
+                        hideSpendings = v == true;
+                        syncEverything();
+                      }),
+                    ),
+                    check(
+                      label: 'Last transactions',
+                      value: hideTransactions,
+                      onChanged: (v) => setLocal(() {
+                        hideTransactions = v == true;
+                        syncEverything();
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.black,
+                            ),
+                            onPressed: (!hideBudget && !hideSpendings && !hideTransactions)
+                                ? null
+                                : () => Navigator.pop(ctx, true),
+                            child: const Text('Reset'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (confirmed != true) return false;
+    if (!hideBudget && !hideSpendings && !hideTransactions) return false;
+    if (!mounted) return false;
+
+    final sure = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.all(20),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+            decoration: BoxDecoration(
+              color: tone.dialogBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: tone.cardBorder),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('Confirm reset?', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 8),
+                Text(
+                  'Reset $state now? You can bring it back within 24 hours. After that it is permanent.',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 13, height: 1.35),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Confirm'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (sure != true) return false;
+    await reset(
+      state: state,
+      hideBudget: hideBudget,
+      hideSpendings: hideSpendings,
+      hideTransactions: hideTransactions,
+    );
     return true;
   }
 

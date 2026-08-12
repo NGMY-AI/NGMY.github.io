@@ -31877,18 +31877,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         snapshotForState: _buildCivicStateWalletSnapshot,
         onOpenStateCase: _openAdminCivicStateCase,
         onAdminRemoveAvailable: _silentAdminRemoveAvailable,
+        onAdminResetStateCase: _adminResetStateCase,
+        onAdminRestoreStateCase: _adminRestoreStateCase,
+        softResetForState: _softResetForState,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
   }
 
-  /// Removes wallet spendings whose 24h delete window has ended.
+  /// Removes wallet spendings whose 24h delete window has ended,
+  /// and permanently applies expired admin soft-resets.
   Future<void> _purgeExpiredWalletSpendings() async {
     final now = DateTime.now().toUtc();
     final kept = <Map<String, dynamic>>[];
     var changed = false;
+    final statesToWipeSpendings = <String>{};
+    final permanentSoftResets = <Map<String, dynamic>>[];
+
     for (final e in widget.config.helpCampaignSpendings) {
       final row = Map<String, dynamic>.from(e);
+      if (ngmyIsWalletSoftResetRecord(row) && row['permanent'] != true) {
+        final purgeRaw = (row['purgeAt'] ?? '').toString().trim();
+        final purgeAt = purgeRaw.isEmpty ? null : DateTime.tryParse(purgeRaw)?.toUtc();
+        if (purgeAt != null && !purgeAt.isAfter(now)) {
+          changed = true;
+          final st = (row['state'] ?? '').toString().trim();
+          if (st.isNotEmpty && row['hideSpendings'] == true) {
+            statesToWipeSpendings.add(st.toLowerCase());
+          }
+          row['permanent'] = true;
+          row['purgeAt'] = '';
+          permanentSoftResets.add(row);
+          continue;
+        }
+      }
       final raw = (row['pendingDeleteAt'] ?? '').toString().trim();
       if (raw.isNotEmpty) {
         final at = DateTime.tryParse(raw)?.toUtc();
@@ -31899,6 +31921,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
       kept.add(row);
     }
+
+    if (statesToWipeSpendings.isNotEmpty) {
+      changed = true;
+      kept.removeWhere((row) {
+        if (ngmyIsWalletSoftResetRecord(row)) return false;
+        final st = (row['state'] ?? '').toString().trim().toLowerCase();
+        return statesToWipeSpendings.contains(st);
+      });
+    }
+    if (permanentSoftResets.isNotEmpty) {
+      kept.addAll(permanentSoftResets);
+    }
+
     if (!changed) return;
     setState(() => widget.config.helpCampaignSpendings = kept);
     widget.onDataChanged();
@@ -31970,6 +32005,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       snapshotForState: _buildCivicStateWalletSnapshot,
       onOpenStateCase: _openAdminCivicStateCase,
       onAdminRemoveAvailable: _silentAdminRemoveAvailable,
+      onAdminResetStateCase: _adminResetStateCase,
+      onAdminRestoreStateCase: _adminRestoreStateCase,
+      softResetForState: _softResetForState,
     );
   }
 
@@ -32599,6 +32637,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((e) {
           final row = Map<String, dynamic>.from(e);
           if (ngmyIsSilentAdminWalletRemoval(row)) return false;
+          if (ngmyIsWalletSoftResetRecord(row)) return false;
           return (row['campaignId'] ?? '').toString().trim() == id;
         })
         .map((e) => Map<String, dynamic>.from(e))
@@ -32640,6 +32679,73 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
         record,
       ];
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Map<String, dynamic>? _softResetForState(String state) {
+    final rows = widget.config.helpCampaignSpendings
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    return ngmyActiveWalletSoftReset(rows, state);
+  }
+
+  Future<void> _adminResetStateCase({
+    required String state,
+    required bool hideBudget,
+    required bool hideSpendings,
+    required bool hideTransactions,
+  }) async {
+    final st = state.trim();
+    if (st.isEmpty || !_isGlobalCivicRegistryAdmin()) return;
+    if (!hideBudget && !hideSpendings && !hideTransactions) return;
+    final purgeAt = DateTime.now().toUtc().add(const Duration(hours: 24)).toIso8601String();
+    final record = {
+      'id': 'wallet_soft_reset_${st.toLowerCase()}_${DateTime.now().microsecondsSinceEpoch}',
+      'campaignId': 'wallet_${st.toLowerCase()}',
+      'amount': 0,
+      'description': '',
+      'recordedAt': DateTime.now().toUtc().toIso8601String(),
+      'recordedByEmail': widget.user.email.toLowerCase().trim(),
+      'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+      'state': st,
+      'walletSoftReset': true,
+      'hideBudget': hideBudget,
+      'hideSpendings': hideSpendings,
+      'hideTransactions': hideTransactions,
+      'purgeAt': purgeAt,
+      'permanent': false,
+    };
+    setState(() {
+      // Replace any prior non-permanent soft reset for this state.
+      final kept = <Map<String, dynamic>>[];
+      for (final e in widget.config.helpCampaignSpendings) {
+        final row = Map<String, dynamic>.from(e);
+        final sameState = (row['state'] ?? '').toString().trim().toLowerCase() == st.toLowerCase();
+        if (sameState && ngmyIsWalletSoftResetRecord(row) && row['permanent'] != true) {
+          continue;
+        }
+        kept.add(row);
+      }
+      kept.add(record);
+      widget.config.helpCampaignSpendings = kept;
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Future<void> _adminRestoreStateCase(String state) async {
+    final st = state.trim().toLowerCase();
+    if (st.isEmpty || !_isGlobalCivicRegistryAdmin()) return;
+    setState(() {
+      widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.where((e) {
+        final row = Map<String, dynamic>.from(e);
+        if (!ngmyIsWalletSoftResetRecord(row)) return true;
+        if ((row['state'] ?? '').toString().trim().toLowerCase() != st) return true;
+        if (row['permanent'] == true) return true;
+        return false;
+      }).map((e) => Map<String, dynamic>.from(e)).toList();
     });
     widget.onDataChanged();
     await ngmyPersistCivicHelpModeSettings(widget.config);

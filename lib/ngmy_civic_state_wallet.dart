@@ -252,6 +252,14 @@ Future<void> openNgmyCivicStateWalletFlow({
     required String state,
     required double amount,
   })? onAdminRemoveAvailable,
+  Future<void> Function({
+    required String state,
+    required bool hideBudget,
+    required bool hideSpendings,
+    required bool hideTransactions,
+  })? onAdminResetStateCase,
+  Future<void> Function(String state)? onAdminRestoreStateCase,
+  Map<String, dynamic>? Function(String state)? softResetForState,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -282,6 +290,9 @@ Future<void> openNgmyCivicStateWalletFlow({
       snapshotForState: snapshotForState,
       onOpenStateCase: onOpenStateCase,
       onAdminRemoveAvailable: onAdminRemoveAvailable,
+      onAdminResetStateCase: onAdminResetStateCase,
+      onAdminRestoreStateCase: onAdminRestoreStateCase,
+      softResetForState: softResetForState,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );
@@ -642,6 +653,50 @@ bool ngmyIsSilentAdminWalletRemoval(Map<String, dynamic> row) {
   return desc == 'Admin available balance adjustment';
 }
 
+bool ngmyIsWalletSoftResetRecord(Map<String, dynamic> row) =>
+    row['walletSoftReset'] == true;
+
+/// Active soft-reset for [state], if any (pending 24h or permanent).
+Map<String, dynamic>? ngmyActiveWalletSoftReset(
+  List<Map<String, dynamic>> spendingRows,
+  String state, {
+  DateTime? now,
+}) {
+  final st = state.trim().toLowerCase();
+  if (st.isEmpty) return null;
+  final n = now ?? DateTime.now();
+  Map<String, dynamic>? best;
+  DateTime? bestAt;
+  for (final raw in spendingRows) {
+    final row = Map<String, dynamic>.from(raw);
+    if (!ngmyIsWalletSoftResetRecord(row)) continue;
+    final rowState = (row['state'] ?? '').toString().trim().toLowerCase();
+    if (rowState != st) continue;
+    final permanent = row['permanent'] == true;
+    final purgeRaw = (row['purgeAt'] ?? '').toString().trim();
+    final purgeAt = purgeRaw.isEmpty ? null : DateTime.tryParse(purgeRaw)?.toLocal();
+    if (!permanent && purgeAt != null && !purgeAt.isAfter(n)) {
+      // Expired pending reset — purge job should remove it; ignore for UI.
+      continue;
+    }
+    final created = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    if (best == null || created.isAfter(bestAt!)) {
+      best = row;
+      bestAt = created;
+    }
+  }
+  return best;
+}
+
+bool ngmyWalletSoftResetRestorable(Map<String, dynamic>? reset, {DateTime? now}) {
+  if (reset == null || reset['permanent'] == true) return false;
+  final purgeRaw = (reset['purgeAt'] ?? '').toString().trim();
+  final purgeAt = purgeRaw.isEmpty ? null : DateTime.tryParse(purgeRaw)?.toLocal();
+  if (purgeAt == null) return false;
+  return purgeAt.isAfter(now ?? DateTime.now());
+}
+
 /// Build a wallet snapshot from civic contribution + spending maps.
 NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   required String state,
@@ -657,41 +712,52 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     const Color(0xFF38BDF8),
     const Color(0xFF14B8A6),
   ];
+  final now = DateTime.now();
+  final soft = ngmyActiveWalletSoftReset(spendingRows, state, now: now);
+  final hideBudget = soft?['hideBudget'] == true;
+  final hideSpendings = soft?['hideSpendings'] == true;
+  final hideTransactions = soft?['hideTransactions'] == true;
 
   double collected = 0;
   final recent = <NgmyCivicWalletTxn>[];
   for (final row in contributionRows) {
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
-    collected += amount;
-    recent.add(
-      NgmyCivicWalletTxn(
-        id: (row['id'] ?? '').toString(),
-        title: (row['title'] ?? 'Contribution').toString(),
-        amount: amount,
-        at: DateTime.tryParse((row['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0),
-        isInflow: true,
-      ),
-    );
+    if (!hideBudget) {
+      collected += amount;
+    }
+    if (!hideBudget && !hideTransactions) {
+      recent.add(
+        NgmyCivicWalletTxn(
+          id: (row['id'] ?? '').toString(),
+          title: (row['title'] ?? 'Contribution').toString(),
+          amount: amount,
+          at: DateTime.tryParse((row['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0),
+          isInflow: true,
+        ),
+      );
+    }
   }
 
   double spent = 0;
   double silentCollectedCut = 0;
   final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
-  final now = DateTime.now();
   for (final row in spendingRows) {
     final rowState = (row['state'] ?? '').toString().trim().toLowerCase();
     if (st.isNotEmpty && rowState.isNotEmpty && rowState != st) continue;
+    if (ngmyIsWalletSoftResetRecord(row)) continue;
     final pendingRaw = (row['pendingDeleteAt'] ?? '').toString().trim();
     final pendingAt = pendingRaw.isEmpty ? null : DateTime.tryParse(pendingRaw)?.toLocal();
     // Already past the 24h window — omit from wallet UI.
     if (pendingAt != null && !pendingAt.isAfter(now)) continue;
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
     if (ngmyIsSilentAdminWalletRemoval(row)) {
+      if (hideBudget || hideSpendings) continue;
       // Cuts monthly budget + available with no spending / last-txn trail.
       silentCollectedCut += amount;
       continue;
     }
+    if (hideSpendings) continue;
     final desc = (row['description'] ?? 'Spending').toString().trim();
     spent += amount;
     byCat[desc.isEmpty ? 'Spending' : desc] = (byCat[desc.isEmpty ? 'Spending' : desc] ?? 0) + amount;
@@ -706,16 +772,18 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
         pendingDeleteAt: pendingAt,
       ),
     );
-    recent.add(
-      NgmyCivicWalletTxn(
-        id: (row['id'] ?? '').toString(),
-        title: desc.isEmpty ? 'Spending' : desc,
-        amount: amount,
-        at: at,
-        isInflow: false,
-        pendingDeleteAt: pendingAt,
-      ),
-    );
+    if (!hideTransactions) {
+      recent.add(
+        NgmyCivicWalletTxn(
+          id: (row['id'] ?? '').toString(),
+          title: desc.isEmpty ? 'Spending' : desc,
+          amount: amount,
+          at: at,
+          isInflow: false,
+          pendingDeleteAt: pendingAt,
+        ),
+      );
+    }
   }
   collected = math.max(0.0, collected - silentCollectedCut);
 
