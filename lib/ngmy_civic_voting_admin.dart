@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -17,7 +19,19 @@ class _UpperCaseTextFormatter extends TextInputFormatter {
 
 Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  var voting = (await NgmyCivicVotingStore.load(forceCloud: true)).copy();
+  var bundle = (await NgmyCivicVotingStore.load(forceCloud: true)).copy();
+  if (bundle.polls.isEmpty) {
+    bundle.polls = [
+      NgmyCivicVotingState(
+        id: 'poll_main',
+        category: NgmyVotingCategory.civic,
+        membersOnly: true,
+        title: 'Civic Voting',
+        yearLabel: '2026',
+      ),
+    ];
+  }
+  var selectedId = bundle.polls.first.id;
 
   if (!context.mounted) return;
   await showModalBottomSheet<void>(
@@ -33,9 +47,29 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
           final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
           final accent = const Color(0xFF059669);
 
+          NgmyCivicVotingState voting = bundle.polls.firstWhere(
+            (p) => p.id == selectedId,
+            orElse: () => bundle.polls.first,
+          );
+
           Future<void> persist() async {
-            await NgmyCivicVotingStore.save(voting);
+            voting.syncMembersOnlyFromCategory();
+            await NgmyCivicVotingStore.save(bundle);
             if (sheetCtx.mounted) setSheet(() {});
+          }
+
+          Future<void> addPoll(String category) async {
+            final id = 'poll_${DateTime.now().microsecondsSinceEpoch}';
+            final poll = NgmyCivicVotingState(
+              id: id,
+              category: category,
+              membersOnly: NgmyVotingCategory.membersOnlyFor(category),
+              title: NgmyVotingCategory.defaultTitle(category),
+              yearLabel: '${DateTime.now().year}',
+            );
+            bundle.polls.add(poll);
+            selectedId = id;
+            await persist();
           }
 
           InputDecoration deco(String label, {Widget? suffix, String? hint}) => InputDecoration(
@@ -103,8 +137,8 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Civic Voting', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
-                                Text('Schedule · candidates · drip votes', style: TextStyle(color: muted, fontSize: 12)),
+                                Text('Voting', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                                Text('Civic · music · movies · more', style: TextStyle(color: muted, fontSize: 12)),
                               ],
                             ),
                           ),
@@ -116,6 +150,65 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         children: [
+                          _sectionCard(
+                            card: card,
+                            isDark: isDark,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text('Polls', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 15)),
+                                    ),
+                                    PopupMenuButton<String>(
+                                      tooltip: 'Add poll',
+                                      onSelected: (cat) => unawaited(addPoll(cat)),
+                                      itemBuilder: (_) => [
+                                        for (final c in NgmyVotingCategory.all)
+                                          PopupMenuItem(value: c.$1, child: Text(c.$2)),
+                                      ],
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.add_rounded, color: accent, size: 18),
+                                            const SizedBox(width: 4),
+                                            Text('Add', style: TextStyle(color: accent, fontWeight: FontWeight.w800)),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final p in bundle.polls)
+                                      InputChip(
+                                        selected: p.id == voting.id,
+                                        label: Text(
+                                          p.title.trim().isEmpty ? NgmyVotingCategory.labelOf(p.category) : p.title,
+                                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                                        ),
+                                        onSelected: (_) => setSheet(() => selectedId = p.id),
+                                        onDeleted: bundle.polls.length <= 1
+                                            ? null
+                                            : () async {
+                                                bundle.polls.removeWhere((x) => x.id == p.id);
+                                                selectedId = bundle.polls.first.id;
+                                                await persist();
+                                              },
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           _sectionCard(
                             card: card,
                             isDark: isDark,
@@ -149,7 +242,51 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                                   ],
                                 ),
                                 Text(
-                                  voting.open ? 'Members can cast votes now' : 'Members see Coming soon',
+                                  voting.open
+                                      ? (voting.membersOnly
+                                          ? 'Civic members can vote now'
+                                          : 'Anyone signed in can vote now')
+                                      : 'Users see Coming soon',
+                                  style: TextStyle(color: muted, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _sectionCard(
+                            card: card,
+                            isDark: isDark,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text('Category', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 15)),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final c in NgmyVotingCategory.all)
+                                      ChoiceChip(
+                                        label: Text(c.$2, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                        selected: voting.category == c.$1,
+                                        selectedColor: accent.withValues(alpha: 0.22),
+                                        onSelected: (_) async {
+                                          voting.category = c.$1;
+                                          voting.syncMembersOnlyFromCategory();
+                                          if (voting.title.trim().isEmpty ||
+                                              NgmyVotingCategory.all.any((x) => x.$2 == voting.title || NgmyVotingCategory.defaultTitle(x.$1) == voting.title)) {
+                                            voting.title = NgmyVotingCategory.defaultTitle(c.$1);
+                                          }
+                                          await persist();
+                                        },
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  voting.membersOnly
+                                      ? 'Only linked Civic Registry members can vote'
+                                      : 'Anyone signed in on NGMY can vote',
                                   style: TextStyle(color: muted, fontSize: 12),
                                 ),
                               ],
@@ -165,6 +302,7 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                                 Text('Ballot details', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 15)),
                                 const SizedBox(height: 12),
                                 TextFormField(
+                                  key: ValueKey('title_${voting.id}'),
                                   initialValue: voting.title,
                                   style: TextStyle(color: ink, fontWeight: FontWeight.w600),
                                   decoration: deco('Title', hint: 'Community President'),
@@ -173,6 +311,7 @@ Future<void> showNgmyCivicVotingAdminSheet(BuildContext context) async {
                                 ),
                                 const SizedBox(height: 10),
                                 TextFormField(
+                                  key: ValueKey('year_${voting.id}'),
                                   initialValue: voting.yearLabel,
                                   style: TextStyle(color: ink, fontWeight: FontWeight.w600),
                                   decoration: deco('Year label', hint: '2026'),

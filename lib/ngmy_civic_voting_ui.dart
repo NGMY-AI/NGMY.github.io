@@ -56,12 +56,11 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
     setState(() => _voting = v);
   }
 
-  @override
-  void dispose() {
-    _spin.dispose();
-    _pulse.dispose();
-    _spark.dispose();
-    super.dispose();
+  NgmyCivicVotingState get _cardPoll {
+    final open = _voting.openPolls;
+    if (open.isNotEmpty) return open.first;
+    final all = _voting.allPolls;
+    return all.isNotEmpty ? all.first : _voting;
   }
 
   Future<void> _open() async {
@@ -82,9 +81,10 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final year = _voting.yearLabel.trim().isEmpty ? '2026' : _voting.yearLabel.trim();
-    final title = _voting.title.trim().isEmpty ? 'Civic Voting' : _voting.title.trim();
-    final open = _voting.open;
+    final poll = _cardPoll;
+    final year = poll.yearLabel.trim().isEmpty ? '2026' : poll.yearLabel.trim();
+    final title = poll.title.trim().isEmpty ? 'Voting' : poll.title.trim();
+    final open = _voting.anyOpen;
 
     return AnimatedBuilder(
       animation: Listenable.merge([_spin, _pulse, _spark]),
@@ -263,9 +263,9 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                                             const SizedBox(height: 3),
                                             Text(
                                               open
-                                                  ? (_voting.dateLabel.trim().isEmpty
+                                                  ? (poll.dateLabel.trim().isEmpty
                                                       ? 'Tap to vote · live results'
-                                                      : _voting.dateLabel.trim())
+                                                      : poll.dateLabel.trim())
                                                   : 'Coming soon · we\'ll be back soon',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
@@ -301,6 +301,14 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    _pulse.dispose();
+    _spark.dispose();
+    super.dispose();
   }
 }
 
@@ -374,7 +382,8 @@ class NgmyCivicVotingScreen extends StatefulWidget {
 }
 
 class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
-  NgmyCivicVotingState _voting = NgmyCivicVotingState();
+  NgmyCivicVotingState _bundle = NgmyCivicVotingState();
+  NgmyCivicVotingState _poll = NgmyCivicVotingState();
   bool _busy = false;
   Timer? _livePoll;
   bool _searchOpen = false;
@@ -383,6 +392,8 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
 
   static const _accent = Color(0xFF22C55E);
   static const _gold = Color(0xFFFBBF24);
+  static const _silver = Color(0xFFC0C0C0);
+  static const _bronze = Color(0xFFCD7F32);
 
   @override
   void initState() {
@@ -390,18 +401,49 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     unawaited(_boot());
   }
 
+  void _selectPoll(NgmyCivicVotingState poll) {
+    _poll = poll;
+    _searchQuery = '';
+    _searchCtrl.clear();
+    _searchOpen = false;
+  }
+
+  void _applyBundle(NgmyCivicVotingState bundle, {String? keepPollId}) {
+    _bundle = bundle;
+    final polls = bundle.allPolls;
+    if (polls.isEmpty) {
+      _poll = NgmyCivicVotingState();
+      return;
+    }
+    final open = bundle.openPolls;
+    final preferId = keepPollId ?? _poll.id;
+    NgmyCivicVotingState? match;
+    for (final p in polls) {
+      if (p.id == preferId) {
+        match = p;
+        break;
+      }
+    }
+    if (match != null) {
+      _selectPoll(match);
+      return;
+    }
+    _selectPoll(open.isNotEmpty ? open.first : polls.first);
+  }
+
   Future<void> _boot() async {
     final v = await NgmyCivicVotingStore.load(forceCloud: true);
     if (!mounted) return;
-    setState(() => _voting = v);
+    setState(() => _applyBundle(v));
     _livePoll = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!mounted) return;
       final next = await NgmyCivicVotingStore.refreshWhileOpen();
       if (!mounted) return;
-      if (next.updatedAt != _voting.updatedAt || next.ballots.length != _voting.ballots.length) {
-        setState(() => _voting = next);
+      if (next.updatedAt != _bundle.updatedAt) {
+        setState(() => _applyBundle(next, keepPollId: _poll.id));
       } else {
-        setState(() {});
+        // Keep selected poll reference fresh for drip counts.
+        setState(() => _applyBundle(next, keepPollId: _poll.id));
       }
     });
   }
@@ -431,19 +473,24 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       email: widget.userEmail,
       phone: widget.userPhone,
       memberState: widget.memberState,
-      voting: _voting,
+      voting: _poll,
     );
     if (!can) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only linked Civic Registry members can vote.')),
+        SnackBar(
+          content: Text(
+            _poll.membersOnly ? 'Only linked Civic Registry members can vote.' : 'Sign in to vote.',
+          ),
+        ),
       );
       return;
     }
-    if (_voting.hasVoted(widget.userEmail, registryId: _registryId)) {
+    final rid = _poll.membersOnly ? _registryId : '';
+    if (_poll.hasVoted(widget.userEmail, registryId: rid)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Each member can vote only once.')),
+        const SnackBar(content: Text('You can vote only once in this poll.')),
       );
       return;
     }
@@ -458,7 +505,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
           title: Text('Confirm vote', style: TextStyle(color: _ink(isDark), fontWeight: FontWeight.w900)),
           content: Text(
-            'Vote for ${candidate.name}?\nEach member can vote only once. This cannot be changed later.',
+            'Vote for ${candidate.name}?\nYou can vote only once in this poll.',
             style: TextStyle(color: _muted(isDark), height: 1.4),
           ),
           actions: [
@@ -477,27 +524,36 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     setState(() => _busy = true);
     try {
       final latest = await NgmyCivicVotingStore.load(forceCloud: true);
-      final rid = _registryId;
-      if (latest.hasVoted(widget.userEmail, registryId: rid)) {
+      NgmyCivicVotingState? target;
+      for (final p in latest.allPolls) {
+        if (p.id == _poll.id) {
+          target = p;
+          break;
+        }
+      }
+      target ??= latest.allPolls.isNotEmpty ? latest.allPolls.first : null;
+      if (target == null) return;
+      final checkRid = target.membersOnly ? _registryId : '';
+      if (target.hasVoted(widget.userEmail, registryId: checkRid)) {
         if (mounted) {
-          setState(() => _voting = latest);
+          setState(() => _applyBundle(latest, keepPollId: target!.id));
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Each member can vote only once.')),
+            const SnackBar(content: Text('You can vote only once in this poll.')),
           );
         }
         return;
       }
-      latest.ballots.add(
+      target.ballots.add(
         NgmyCivicVotingBallot(
           voterEmail: widget.userEmail.toLowerCase().trim(),
           candidateId: candidate.id,
           at: DateTime.now().toUtc().toIso8601String(),
-          voterRegistryId: rid,
+          voterRegistryId: checkRid,
         ),
       );
       await NgmyCivicVotingStore.save(latest);
       if (!mounted) return;
-      setState(() => _voting = latest);
+      setState(() => _applyBundle(latest, keepPollId: target!.id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Your vote for ${candidate.name} was counted.'), backgroundColor: _accent),
       );
@@ -598,20 +654,20 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     );
     if (choice == null || !mounted) return;
 
-    final sorted = [..._voting.candidates]
-      ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
-    final year = _voting.yearLabel.trim().isEmpty ? 'voting' : _voting.yearLabel.trim();
+    final sorted = [..._poll.candidates]
+      ..sort((a, b) => _poll.votesFor(b.id).compareTo(_poll.votesFor(a.id)));
+    final year = _poll.yearLabel.trim().isEmpty ? 'voting' : _poll.yearLabel.trim();
 
     if (choice == 'csv') {
       final buf = StringBuffer()
         ..writeln('Rank,Candidate,Votes')
-        ..writeln('# ${_voting.title} · ${_voting.yearLabel} · ${_voting.dateLabel}')
+        ..writeln('# ${_poll.title} · ${_poll.yearLabel} · ${_poll.dateLabel}')
         ..writeln('# Downloaded ${DateTime.now().toLocal()}');
       for (var i = 0; i < sorted.length; i++) {
         final c = sorted[i];
-        buf.writeln('${i + 1},${c.name.replaceAll(',', ' ')},${_voting.votesFor(c.id)}');
+        buf.writeln('${i + 1},${c.name.replaceAll(',', ' ')},${_poll.votesFor(c.id)}');
       }
-      final total = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
+      final total = sorted.fold<int>(0, (n, c) => n + _poll.votesFor(c.id));
       buf.writeln('TOTAL,,$total');
       final msg = await ngmyDownloadCivicVotingResults(
         fileName: 'civic_voting_${year}_results.csv',
@@ -623,15 +679,15 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     }
 
     // Paper: open printable sheet immediately + download PDF.
-    final html = ngmyCivicVotingResultsPaperHtml(voting: _voting);
+    final html = ngmyCivicVotingResultsPaperHtml(voting: _poll);
     unawaited(
       ngmyPrintCivicMemberReport(
         htmlContent: html,
-        plainText: '${_voting.title} results',
+        plainText: '${_poll.title} results',
         fileName: 'civic_voting_${year}_results',
       ),
     );
-    final pdfBytes = await ngmyBuildCivicVotingResultsPdfBytes(voting: _voting);
+    final pdfBytes = await ngmyBuildCivicVotingResultsPdfBytes(voting: _poll);
     final msg = await ngmyDownloadCivicVotingPdfResults(
       fileName: 'civic_voting_${year}_results.pdf',
       pdfBytes: pdfBytes,
@@ -648,14 +704,14 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     final muted = _muted(isDark);
     final card = _card(isDark);
 
-    if (!_voting.open) {
+    if (!_poll.open && !_bundle.anyOpen) {
       return Scaffold(
         backgroundColor: bg,
         appBar: AppBar(
           backgroundColor: bg,
           foregroundColor: ink,
           elevation: 0,
-          title: Text(_voting.title, style: const TextStyle(fontWeight: FontWeight.w900)),
+          title: Text(_poll.title, style: const TextStyle(fontWeight: FontWeight.w900)),
         ),
         body: Center(
           child: Padding(
@@ -663,7 +719,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
             child: ngmyComingSoonFrame(
               context: context,
               icon: Icons.how_to_vote_rounded,
-              title: _voting.yearLabel.trim().isEmpty ? 'Voting' : '${_voting.yearLabel} Voting',
+              title: _poll.yearLabel.trim().isEmpty ? 'Voting' : '${_poll.yearLabel} Voting',
               message: 'We\'ll be back soon. Check back when voting opens.',
             ),
           ),
@@ -676,17 +732,24 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       email: widget.userEmail,
       phone: widget.userPhone,
       memberState: widget.memberState,
-      voting: _voting,
+      voting: _poll,
     );
-    final myPick = _voting.votedCandidateId(widget.userEmail, registryId: _registryId);
+    final voteRid = _poll.membersOnly ? _registryId : '';
+    final myPick = _poll.votedCandidateId(widget.userEmail, registryId: voteRid);
     final q = _searchQuery.trim().toLowerCase();
-    final sorted = [..._voting.candidates]
-      ..sort((a, b) => _voting.votesFor(b.id).compareTo(_voting.votesFor(a.id)));
+    final sorted = [..._poll.candidates]
+      ..sort((a, b) {
+        final vb = _poll.votesFor(b.id);
+        final va = _poll.votesFor(a.id);
+        if (vb != va) return vb.compareTo(va);
+        return a.name.compareTo(b.name);
+      });
     final visible = q.isEmpty
         ? sorted
         : sorted.where((c) => c.name.toLowerCase().contains(q)).toList();
-    final totalVotes = sorted.fold<int>(0, (n, c) => n + _voting.votesFor(c.id));
-    final leadVotes = sorted.isEmpty ? 0 : _voting.votesFor(sorted.first.id);
+    final totalVotes = sorted.fold<int>(0, (n, c) => n + _poll.votesFor(c.id));
+    final leadVotes = sorted.isEmpty ? 0 : _poll.votesFor(sorted.first.id);
+    final openPolls = _bundle.openPolls.isNotEmpty ? _bundle.openPolls : _bundle.allPolls;
 
     return Scaffold(
       backgroundColor: bg,
@@ -695,7 +758,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
         foregroundColor: ink,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: Text(_voting.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+        title: Text(_poll.title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
         actions: [
           IconButton(
             tooltip: 'Download results',
@@ -708,6 +771,35 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
+          if (openPolls.length > 1) ...[
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: openPolls.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final p = openPolls[i];
+                  final selected = p.id == _poll.id;
+                  return ChoiceChip(
+                    label: Text(
+                      p.title.trim().isEmpty ? NgmyVotingCategory.labelOf(p.category) : p.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        color: selected ? Colors.white : ink,
+                      ),
+                    ),
+                    selected: selected,
+                    selectedColor: _accent,
+                    backgroundColor: card,
+                    onSelected: (_) => setState(() => _selectPoll(p)),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           Container(
             padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
             decoration: BoxDecoration(
@@ -749,17 +841,17 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                               ),
                             )
                           : Text(
-                              _voting.dateLabel.trim().isEmpty ? 'Cast your vote' : _voting.dateLabel.trim(),
+                              _poll.dateLabel.trim().isEmpty ? 'Cast your vote' : _poll.dateLabel.trim(),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 15),
                             ),
                     ),
-                    if (!_searchOpen && _voting.yearLabel.trim().isNotEmpty)
+                    if (!_searchOpen && _poll.yearLabel.trim().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(right: 2),
                         child: Text(
-                          _voting.yearLabel,
+                          _poll.yearLabel,
                           style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 13),
                         ),
                       ),
@@ -801,7 +893,9 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                 ] else if (!canVote) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Linked Civic Registry members in allowed states only.',
+                    _poll.membersOnly
+                        ? 'Linked Civic Registry members in allowed states only.'
+                        : 'Anyone signed in can vote in this poll.',
                     style: TextStyle(color: _gold, fontWeight: FontWeight.w700, fontSize: 12),
                   ),
                 ],
@@ -821,12 +915,19 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
             ),
           ...visible.map((c) {
             final rank = sorted.indexWhere((x) => x.id == c.id) + 1;
-            final votes = _voting.votesFor(c.id);
+            final votes = _poll.votesFor(c.id);
             final selected = myPick == c.id;
             final photo = ngmyCivicVotingPhotoProvider(c.photoUrl);
             final hasProfile = c.bioNote.trim().isNotEmpty || c.voiceNoteUrl.trim().isNotEmpty;
             final share = leadVotes <= 0 ? 0.0 : (votes / leadVotes).clamp(0.0, 1.0);
             final canCast = canVote && myPick == null && !_busy;
+            final crownColor = rank == 1
+                ? _gold
+                : rank == 2
+                    ? _silver
+                    : rank == 3
+                        ? _bronze
+                        : null;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 14),
@@ -835,8 +936,12 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                 color: card,
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(
-                  color: selected ? _accent : (isDark ? Colors.white10 : const Color(0xFFE4E4E7)),
-                  width: selected ? 1.6 : 1,
+                  color: selected
+                      ? _accent
+                      : (rank == 1
+                          ? _gold.withValues(alpha: 0.55)
+                          : (isDark ? Colors.white10 : const Color(0xFFE4E4E7))),
+                  width: selected || rank == 1 ? 1.6 : 1,
                 ),
               ),
               child: Column(
@@ -847,42 +952,62 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                     children: [
                       GestureDetector(
                         onTap: photo == null ? null : () => _openPhotoZoom(c.photoUrl),
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 34,
-                              backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
-                              backgroundImage: photo,
-                              child: photo == null
-                                  ? Text(
-                                      c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
-                                      style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
-                                    )
-                                  : null,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 0,
-                              child: Container(
-                                width: 22,
-                                height: 22,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: rank == 1 ? _gold : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: card, width: 2),
+                        child: SizedBox(
+                          width: 72,
+                          height: 78,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.bottomCenter,
+                            children: [
+                              if (crownColor != null)
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Icon(
+                                    Icons.workspace_premium_rounded,
+                                    color: crownColor,
+                                    size: rank == 1 ? 26 : 22,
+                                  ),
                                 ),
-                                child: Text(
-                                  '$rank',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w900,
-                                    color: rank == 1 ? const Color(0xFF18181B) : ink,
+                              Positioned(
+                                bottom: 0,
+                                child: CircleAvatar(
+                                  radius: 34,
+                                  backgroundColor: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE4E4E7),
+                                  backgroundImage: photo,
+                                  child: photo == null
+                                      ? Text(
+                                          c.name.trim().isEmpty ? '?' : c.name.trim()[0].toUpperCase(),
+                                          style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 24),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              Positioned(
+                                right: 2,
+                                bottom: 0,
+                                child: Container(
+                                  width: 22,
+                                  height: 22,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: crownColor ?? (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF4F4F5)),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: card, width: 2),
+                                  ),
+                                  child: Text(
+                                    '$rank',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      color: crownColor != null ? const Color(0xFF18181B) : ink,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -890,7 +1015,18 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(c.name, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                                ),
+                                if (crownColor != null)
+                                  Text(
+                                    rank == 1 ? '1st' : (rank == 2 ? '2nd' : '3rd'),
+                                    style: TextStyle(color: crownColor, fontWeight: FontWeight.w900, fontSize: 12),
+                                  ),
+                              ],
+                            ),
                             const SizedBox(height: 4),
                             Text(
                               '$votes vote${votes == 1 ? '' : 's'}',
@@ -1018,7 +1154,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
                       Text(c.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
                       const SizedBox(height: 4),
                       Text(
-                        '${_voting.votesFor(c.id)} vote${_voting.votesFor(c.id) == 1 ? '' : 's'}',
+                        '${_poll.votesFor(c.id)} vote${_poll.votesFor(c.id) == 1 ? '' : 's'}',
                         style: const TextStyle(color: _accent, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(height: 14),

@@ -14,6 +14,56 @@ import 'ngmy_settings_cloud.dart';
 const String kNgmyCivicVotingSettingsKey = 'civic_voting_settings';
 const String _kNgmyCivicVotingPrefsKey = 'ngmy_civic_voting_settings_v1';
 
+/// Vote category templates.
+class NgmyVotingCategory {
+  static const civic = 'civic';
+  static const music = 'music';
+  static const movie = 'movie';
+  static const artistYear = 'artist_year';
+  static const artistMonth = 'artist_month';
+  static const custom = 'custom';
+
+  static const List<(String id, String label, bool membersOnly)> all = [
+    (civic, 'Civic Registry', true),
+    (music, 'Music / Artists', false),
+    (movie, 'Movies', false),
+    (artistYear, 'Best Artist of the Year', false),
+    (artistMonth, 'Best Artist of the Month', false),
+    (custom, 'Custom (public)', false),
+  ];
+
+  static String labelOf(String id) {
+    for (final c in all) {
+      if (c.$1 == id) return c.$2;
+    }
+    return 'Voting';
+  }
+
+  static bool membersOnlyFor(String id) {
+    for (final c in all) {
+      if (c.$1 == id) return c.$3;
+    }
+    return false;
+  }
+
+  static String defaultTitle(String id) {
+    switch (id) {
+      case civic:
+        return 'Civic Voting';
+      case music:
+        return 'Best Music Artist';
+      case movie:
+        return 'Best Movie';
+      case artistYear:
+        return 'Best Artist of the Year';
+      case artistMonth:
+        return 'Best Artist of the Month';
+      default:
+        return 'Community Vote';
+    }
+  }
+}
+
 class NgmyCivicVotingCandidate {
   NgmyCivicVotingCandidate({
     required this.id,
@@ -110,6 +160,9 @@ class NgmyCivicVotingBallot {
 
 class NgmyCivicVotingState {
   NgmyCivicVotingState({
+    this.id = '',
+    this.category = NgmyVotingCategory.civic,
+    this.membersOnly = true,
     this.open = false,
     this.title = 'Civic Voting',
     this.yearLabel = '2026',
@@ -122,9 +175,20 @@ class NgmyCivicVotingState {
     List<NgmyCivicVotingCandidate>? candidates,
     List<NgmyCivicVotingBallot>? ballots,
     this.updatedAt = '',
+    List<NgmyCivicVotingState>? polls,
   })  : allowedStates = allowedStates ?? <String>[],
         candidates = candidates ?? <NgmyCivicVotingCandidate>[],
-        ballots = ballots ?? <NgmyCivicVotingBallot>[];
+        ballots = ballots ?? <NgmyCivicVotingBallot>[],
+        polls = polls ?? <NgmyCivicVotingState>[];
+
+  /// Unique poll id (multi-poll bundle). Empty for legacy single-poll rows.
+  String id;
+
+  /// civic | music | movie | artist_year | artist_month | custom
+  String category;
+
+  /// Civic Registry poll = members only; other categories = anyone.
+  bool membersOnly;
 
   bool open;
   String title;
@@ -143,13 +207,33 @@ class NgmyCivicVotingState {
   /// If admin closed during a cycle, do not auto-reopen until the next cycle.
   String manualClosedCycleKey;
 
-  /// Empty = all states.
+  /// Empty = all states. Only applies when [membersOnly] is true.
   List<String> allowedStates;
   List<NgmyCivicVotingCandidate> candidates;
   List<NgmyCivicVotingBallot> ballots;
   String updatedAt;
 
+  /// Multi-poll container. When non-empty, this object is the bundle root
+  /// and each entry is an independent vote (civic / music / movies / …).
+  List<NgmyCivicVotingState> polls;
+
+  bool get isBundle => polls.isNotEmpty;
+
+  List<NgmyCivicVotingState> get allPolls {
+    if (polls.isNotEmpty) return polls;
+    return <NgmyCivicVotingState>[this];
+  }
+
+  List<NgmyCivicVotingState> get openPolls => allPolls.where((p) => p.open).toList();
+
+  bool get anyOpen => openPolls.isNotEmpty;
+
+  void syncMembersOnlyFromCategory() {
+    membersOnly = NgmyVotingCategory.membersOnlyFor(category);
+  }
+
   bool allowsState(String state) {
+    if (!membersOnly) return true;
     if (allowedStates.isEmpty) return true;
     final want = state.trim().toLowerCase();
     return allowedStates.any((s) => s.trim().toLowerCase() == want);
@@ -257,6 +341,13 @@ class NgmyCivicVotingState {
 
   /// Apply calendar auto-open. Returns true if state mutated.
   bool applySchedule({DateTime? now}) {
+    if (polls.isNotEmpty) {
+      var any = false;
+      for (final p in polls) {
+        if (p.applySchedule(now: now)) any = true;
+      }
+      return any;
+    }
     final cycle = currentOrPastCycleDate(now: now);
     if (cycle == null) return false;
     final key = cycleKey(cycle);
@@ -270,7 +361,20 @@ class NgmyCivicVotingState {
     return true;
   }
 
-  Map<String, dynamic> toJson() => {
+  Map<String, dynamic> toJson() {
+    if (polls.isNotEmpty) {
+      return {
+        'polls': polls.map((p) => p._pollToJson()).toList(),
+        'updatedAt': updatedAt,
+      };
+    }
+    return _pollToJson();
+  }
+
+  Map<String, dynamic> _pollToJson() => {
+        'id': id,
+        'category': category,
+        'membersOnly': membersOnly,
         'open': open,
         'title': title,
         'yearLabel': yearLabel,
@@ -286,9 +390,39 @@ class NgmyCivicVotingState {
       };
 
   factory NgmyCivicVotingState.fromJson(Map<String, dynamic> json) {
+    final rawPolls = json['polls'];
+    if (rawPolls is List && rawPolls.isNotEmpty) {
+      final list = rawPolls
+          .whereType<Map>()
+          .map((e) => NgmyCivicVotingState._pollFromJson(Map<String, dynamic>.from(e)))
+          .toList();
+      return NgmyCivicVotingState(
+        polls: list,
+        updatedAt: (json['updatedAt'] ?? list.first.updatedAt).toString(),
+      );
+    }
+    // Legacy single-poll payload → wrap as a one-poll bundle for consistency.
+    final single = NgmyCivicVotingState._pollFromJson(json);
+    if (single.id.trim().isEmpty) {
+      single.id = 'poll_${DateTime.now().microsecondsSinceEpoch}';
+    }
     return NgmyCivicVotingState(
+      polls: [single],
+      updatedAt: single.updatedAt,
+    );
+  }
+
+  factory NgmyCivicVotingState._pollFromJson(Map<String, dynamic> json) {
+    final category = (json['category'] ?? NgmyVotingCategory.civic).toString();
+    final membersOnly = json.containsKey('membersOnly')
+        ? json['membersOnly'] == true
+        : NgmyVotingCategory.membersOnlyFor(category);
+    return NgmyCivicVotingState(
+      id: (json['id'] ?? '').toString(),
+      category: category,
+      membersOnly: membersOnly,
       open: json['open'] == true,
-      title: (json['title'] ?? 'Civic Voting').toString(),
+      title: (json['title'] ?? NgmyVotingCategory.defaultTitle(category)).toString(),
       yearLabel: (json['yearLabel'] ?? '2026').toString(),
       dateLabel: (json['dateLabel'] ?? '').toString(),
       scheduleOpenDate: (json['scheduleOpenDate'] ?? '').toString(),
@@ -310,6 +444,8 @@ class NgmyCivicVotingState {
   }
 
   NgmyCivicVotingState copy() => NgmyCivicVotingState.fromJson(toJson());
+
+  NgmyCivicVotingState copyPoll() => NgmyCivicVotingState._pollFromJson(_pollToJson());
 }
 
 String ngmyCivicVoterRegistryId({
@@ -325,7 +461,7 @@ String ngmyCivicVoterRegistryId({
   return (passport?['registryId'] ?? '').toString().trim();
 }
 
-/// Linked / passport-granted Civic Registry members may vote (once each).
+/// Who may cast a ballot on this poll.
 bool ngmyCanCivicVote({
   required dynamic config,
   required String email,
@@ -335,6 +471,11 @@ bool ngmyCanCivicVote({
 }) {
   if (!voting.open) return false;
   if (!voting.allowsState(memberState)) return false;
+  // Public categories (music, movies, artists, …) — any signed-in user.
+  if (!voting.membersOnly) {
+    return email.trim().isNotEmpty;
+  }
+  // Civic Registry poll — linked passport members only.
   final passport = NgmyCivicRegistryMembers.passportForAppUser(
     config,
     email: email,
@@ -431,9 +572,19 @@ class NgmyCivicVotingStore {
 
   /// One settings write per mutation (vote / admin edit / schedule open).
   static Future<bool> save(NgmyCivicVotingState state) async {
-    state.dedupeBallots();
-    for (final c in state.candidates) {
-      c.name = c.name.toUpperCase();
+    for (final poll in state.allPolls) {
+      poll.dedupeBallots();
+      poll.syncMembersOnlyFromCategory();
+      for (final c in poll.candidates) {
+        c.name = c.name.toUpperCase();
+      }
+      if (poll.id.trim().isEmpty) {
+        poll.id = 'poll_${DateTime.now().microsecondsSinceEpoch}';
+      }
+    }
+    // Always persist as a polls bundle.
+    if (state.polls.isEmpty && (state.candidates.isNotEmpty || state.title.trim().isNotEmpty || state.open)) {
+      state.polls = [state.copyPoll()..id = state.id.isEmpty ? 'poll_main' : state.id];
     }
     state.updatedAt = DateTime.now().toUtc().toIso8601String();
     _cache = state;
