@@ -259,7 +259,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.marriageDocument:
         return 2599;
       case NgmyStripeProduct.phoneUnlock:
-        return 100;
+        return 200;
       case NgmyStripeProduct.menuStudio:
         return 1599;
       case NgmyStripeProduct.bioStudio:
