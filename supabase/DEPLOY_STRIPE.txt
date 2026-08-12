@@ -78,6 +78,7 @@ Product slugs (used automatically in checkout links):
 Access durations (set by webhook):
   Marriage docs  → 4 hours
   Phone Unlock   → 10 days
+  QR Generator   → 14 days (2 weeks)
   Other features → 30 days
 
 ────────────────────────────────────────────────────────────

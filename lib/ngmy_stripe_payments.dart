@@ -295,7 +295,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.bioPhotoPack:
         return '2 photo changes';
       case NgmyStripeProduct.qrGenerator:
-        return '1 week';
+        return '2 weeks';
       case NgmyStripeProduct.swahiliLevel:
         return 'lifetime';
       default:
@@ -479,7 +479,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.bioPhotoPack:
         return 'Pay \$1.99 for 2 more Bio photo changes (profile, header, or background).';
       case NgmyStripeProduct.qrGenerator:
-        return 'Create, template, save, and download QR codes.';
+        return 'Create, template, save, and download QR codes for 2 weeks after payment.';
       case NgmyStripeProduct.swahiliLevel:
         return 'Unlock this level to keep learning.';
     }
