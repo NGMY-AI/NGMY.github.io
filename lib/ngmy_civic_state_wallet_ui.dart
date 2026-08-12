@@ -321,6 +321,15 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         ],
                       ),
                     ),
+                    if (widget.canAdminBrowseStates && existing == null)
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx, 'admin_states'),
+                        icon: Icon(
+                          Icons.table_rows_rounded,
+                          color: tone.secondaryText.withValues(alpha: 0.7),
+                          size: 20,
+                        ),
+                      ),
                     if (existing != null)
                       IconButton(
                         tooltip: 'Delete (takes 24 hours)',
@@ -379,6 +388,13 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
         );
       },
     );
+
+    if (action == 'admin_states') {
+      amountC.dispose();
+      noteC.dispose();
+      if (mounted) await _openAdminStateCases();
+      return;
+    }
 
     // Trash → schedule 24h delete.
     if (action == 'delete' && existing != null && mounted) {
@@ -816,13 +832,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Remove available · $state',
+                  state,
                   style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Available now: ${_money(available)}',
-                  style: TextStyle(color: tone.secondaryText, fontSize: 13),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -830,7 +841,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700),
                   decoration: InputDecoration(
-                    labelText: 'Amount to remove',
+                    labelText: 'Amount',
                     labelStyle: TextStyle(color: tone.secondaryText),
                     filled: true,
                     fillColor: tone.fieldFill,
@@ -844,7 +855,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         ? available.toStringAsFixed(0)
                         : available.toStringAsFixed(2);
                   },
-                  child: Text('Use full available (${_money(available)})', style: TextStyle(color: tone.accent)),
+                  child: Text(_money(available), style: TextStyle(color: tone.accent)),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -863,7 +874,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           foregroundColor: Colors.white,
                         ),
                         onPressed: () => Navigator.pop(ctx, true),
-                        child: const Text('Remove'),
+                        child: const Text('Save'),
                       ),
                     ),
                   ],
@@ -883,10 +894,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     if (amount <= 0) return false;
     final clipped = amount > available ? available : amount;
     await remove(state: state, amount: clipped);
-    if (!mounted) return true;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Removed ${_money(clipped)} from $state available.')),
-    );
     return true;
   }
 
@@ -933,21 +940,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       ],
                     ),
                   ),
-                  if (widget.canAdminBrowseStates)
-                    IconButton(
-                      tooltip: 'All state cases',
-                      onPressed: _openAdminStateCases,
-                      icon: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: tone.iconWell,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: tone.cardBorder),
-                        ),
-                        child: Icon(Icons.table_rows_rounded, color: tone.headerFg, size: 20),
-                      ),
-                    ),
                   if (widget.canEdit)
                     IconButton(
                       tooltip: 'Record spending',
@@ -962,7 +954,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         child: Icon(Icons.add, color: tone.isDark ? Colors.black : Colors.white),
                       ),
                     )
-                  else if (!widget.canAdminBrowseStates)
+                  else
                     const SizedBox(width: 48),
                 ],
               ),

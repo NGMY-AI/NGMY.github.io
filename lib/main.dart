@@ -31876,12 +31876,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         allStates: _usStates,
         snapshotForState: _buildCivicStateWalletSnapshot,
         onOpenStateCase: _openAdminCivicStateCase,
-        onAdminRemoveAvailable: ({required String state, required double amount}) =>
-            _addCivicWalletSpending(
-              state: state,
-              amount: amount,
-              description: 'Admin available balance adjustment',
-            ),
+        onAdminRemoveAvailable: _silentAdminRemoveAvailable,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
@@ -31974,12 +31969,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       allStates: _usStates,
       snapshotForState: _buildCivicStateWalletSnapshot,
       onOpenStateCase: _openAdminCivicStateCase,
-      onAdminRemoveAvailable: ({required String state, required double amount}) =>
-          _addCivicWalletSpending(
-            state: state,
-            amount: amount,
-            description: 'Admin available balance adjustment',
-          ),
+      onAdminRemoveAvailable: _silentAdminRemoveAvailable,
     );
   }
 
@@ -32606,7 +32596,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final id = campaignId.trim();
     if (id.isEmpty) return const [];
     return widget.config.helpCampaignSpendings
-        .where((e) => (e['campaignId'] ?? '').toString().trim() == id)
+        .where((e) {
+          final row = Map<String, dynamic>.from(e);
+          if (ngmyIsSilentAdminWalletRemoval(row)) return false;
+          return (row['campaignId'] ?? '').toString().trim() == id;
+        })
         .map((e) => Map<String, dynamic>.from(e))
         .toList()
       ..sort((a, b) {
@@ -32622,6 +32616,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   double _totalSpentForCampaign(String campaignId) {
     return _spendingsForCampaign(campaignId).fold<double>(0.0, (s, e) => s + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+  }
+
+  Future<void> _silentAdminRemoveAvailable({
+    required String state,
+    required double amount,
+  }) async {
+    final st = state.trim();
+    if (st.isEmpty || amount <= 0 || !_isGlobalCivicRegistryAdmin()) return;
+    final record = {
+      'id': 'admin_cut_${DateTime.now().microsecondsSinceEpoch}',
+      'campaignId': 'wallet_${st.toLowerCase()}',
+      'amount': amount,
+      'description': '',
+      'recordedAt': DateTime.now().toUtc().toIso8601String(),
+      'recordedByEmail': widget.user.email.toLowerCase().trim(),
+      'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+      'state': st,
+      'silentAdminRemoval': true,
+    };
+    setState(() {
+      widget.config.helpCampaignSpendings = [
+        ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+        record,
+      ];
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
   }
 
   void _recordHelpCampaignSpending({String? campaignId, String? campaignTitle}) {

@@ -634,6 +634,14 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
 }
 
 // Wallet screen UI lives in ngmy_civic_state_wallet_ui.dart (dark/light themed).
+
+/// Silent admin cuts — reduce collected/available/budget, never shown in txns.
+bool ngmyIsSilentAdminWalletRemoval(Map<String, dynamic> row) {
+  if (row['silentAdminRemoval'] == true) return true;
+  final desc = (row['description'] ?? '').toString().trim();
+  return desc == 'Admin available balance adjustment';
+}
+
 /// Build a wallet snapshot from civic contribution + spending maps.
 NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   required String state,
@@ -667,6 +675,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   }
 
   double spent = 0;
+  double silentCollectedCut = 0;
   final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
   final now = DateTime.now();
@@ -678,6 +687,11 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     // Already past the 24h window — omit from wallet UI.
     if (pendingAt != null && !pendingAt.isAfter(now)) continue;
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
+    if (ngmyIsSilentAdminWalletRemoval(row)) {
+      // Cuts monthly budget + available with no spending / last-txn trail.
+      silentCollectedCut += amount;
+      continue;
+    }
     final desc = (row['description'] ?? 'Spending').toString().trim();
     spent += amount;
     byCat[desc.isEmpty ? 'Spending' : desc] = (byCat[desc.isEmpty ? 'Spending' : desc] ?? 0) + amount;
@@ -703,6 +717,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       ),
     );
   }
+  collected = math.max(0.0, collected - silentCollectedCut);
 
   spendings.sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
   recent.sort((a, b) => b.at.compareTo(a.at));
