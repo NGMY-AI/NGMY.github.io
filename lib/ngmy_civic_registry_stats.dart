@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-const int kNgmyMaxRegistrarsPerState = 15;
+const int kNgmyMaxRegistrarsPerState = 5;
 
 /// Civic Registry per-state registrar caps and lists.
 class NgmyCivicRegistryStats {

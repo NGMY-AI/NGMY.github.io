@@ -32131,6 +32131,233 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Widget _authorizedRegistrarSoftDeleteIcon(bool isDark) {
+    final canOpen = _canUseRegistrarToolsHere();
+    final badge = canOpen
+        ? NgmyCivicRegistryMembers.softDeletedCountForState(widget.config, _selectedState)
+        : 0;
+    final icon = Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 18),
+    );
+    if (!canOpen) return icon;
+    return Tooltip(
+      message: badge > 0 ? 'Pending deletes ($badge)' : 'Pending deletes',
+      child: InkWell(
+        onTap: _showSoftDeletedMembersSheet,
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(child: Center(child: icon)),
+              if (badge > 0)
+                Positioned(
+                  right: -2,
+                  top: -2,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(99),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      badge > 9 ? '9+' : '$badge',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showSoftDeletedMembersSheet() async {
+    if (!_canUseRegistrarToolsHere()) return;
+    NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final card = isDark ? const Color(0xFF151C2C) : Colors.white;
+    final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final softDeleted = NgmyCivicRegistryMembers.softDeletedForState(
+          widget.config,
+          _selectedState,
+        );
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.45 : 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white24 : const Color(0xFFD0D5DD),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pending deletes',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
+                            ),
+                            Text(
+                              '$_selectedState · recoverable for 7 days',
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${softDeleted.length}',
+                          style: const TextStyle(
+                            color: Color(0xFFEF4444),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (softDeleted.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      child: Text(
+                        'No pending deletes for $_selectedState.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: softDeleted.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final row = softDeleted[i];
+                          final snap = row['snapshot'] is Map
+                              ? Map<String, dynamic>.from(row['snapshot'] as Map)
+                              : <String, dynamic>{};
+                          final name = (snap['fullName'] ?? row['email'] ?? 'Member').toString();
+                          final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toLocal();
+                          final daysLeft = purge == null
+                              ? NgmyCivicRegistryMembers.softDeleteDays
+                              : purge.difference(DateTime.now()).inDays.clamp(0, 7);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: card,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink)),
+                                      Text(
+                                        '$daysLeft day(s) left to recover',
+                                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                FilledButton(
+                                  onPressed: () async {
+                                    Navigator.pop(ctx);
+                                    await _restoreSoftDeletedMember(row);
+                                  },
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF059669),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    minimumSize: const Size(0, 34),
+                                  ),
+                                  child: const Text('Recover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (mounted) setState(() {});
+  }
+
   Future<void> _restoreSoftDeletedMember(Map<String, dynamic> tombstone) async {
     final email = NgmyCivicRegistryMembers.emailKey((tombstone['email'] ?? '').toString());
     final rid = (tombstone['registryId'] ?? '').toString().trim();
@@ -32186,7 +32413,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       return;
     }
-    NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
     final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
@@ -32198,10 +32424,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        final softDeleted = NgmyCivicRegistryMembers.softDeletedForState(
-          widget.config,
-          _selectedState,
-        );
         Widget gridBox({
           required IconData icon,
           required Color accent,
@@ -32256,75 +32478,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (softDeleted.isNotEmpty) ...[
-                    Text(
-                      'Pending delete (${softDeleted.length})',
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: ink),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Hidden from members for 7 days. Recover before then.',
-                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 160),
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: softDeleted.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (_, i) {
-                          final row = softDeleted[i];
-                          final snap = row['snapshot'] is Map
-                              ? Map<String, dynamic>.from(row['snapshot'] as Map)
-                              : <String, dynamic>{};
-                          final name = (snap['fullName'] ?? row['email'] ?? 'Member').toString();
-                          final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toLocal();
-                          final daysLeft = purge == null
-                              ? NgmyCivicRegistryMembers.softDeleteDays
-                              : purge.difference(DateTime.now()).inDays.clamp(0, 7);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: card,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: ink)),
-                                      Text(
-                                        '$daysLeft day(s) left to recover',
-                                        style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () async {
-                                    Navigator.pop(ctx);
-                                    await _restoreSoftDeletedMember(row);
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFF059669),
-                                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                                    minimumSize: const Size(0, 32),
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Text('Recover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
                   Row(
                     children: [
                       Text('Registry Backup', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink, letterSpacing: -0.3)),
@@ -37142,7 +37295,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         title: adminHard ? 'Permanently delete member?' : 'Remove this member?',
                         message: adminHard
                             ? 'Admin delete is permanent. ${u.fullName ?? u.username} will be removed from the registry right away and cannot be recovered.'
-                            : 'This hides ${u.fullName ?? u.username} from members, search, and rankings for 7 days. You can recover them from the green registry pin before then.',
+                            : 'This hides ${u.fullName ?? u.username} from members, search, and rankings for 7 days. Recover them from the green verified icon next to Authorized Registrar before then.',
                         cancelLabel: 'Keep',
                         confirmLabel: adminHard ? 'Delete forever' : 'Remove',
                         icon: Icons.person_remove_rounded,
@@ -37276,11 +37429,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 18),
-          ),
+          _authorizedRegistrarSoftDeleteIcon(isDark),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -37387,10 +37536,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               padding: const EdgeInsets.only(left: 4),
                               child: NgmyCivicBackupPinButton(
                                 onPressed: _showCivicRegistryBackupSheet,
-                                badgeCount: NgmyCivicRegistryMembers.softDeletedCountForState(
-                                  widget.config,
-                                  _selectedState,
-                                ),
                               ),
                             ),
                         ],
