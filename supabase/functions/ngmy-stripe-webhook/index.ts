@@ -39,7 +39,59 @@ const PRODUCT_SLUGS = new Set([
   "swahili_level",
   "slides_studio",
   "device_transfer",
+  "state_registrar",
 ]);
+
+const STATE_REGISTRAR_SETTINGS_KEY = "civic_state_registrar_subscriptions";
+
+// deno-lint-ignore no-explicit-any
+async function upsertStateRegistrarSponsorship(
+  admin: any,
+  scope: string,
+  email: string,
+  accessUntil: string,
+): Promise<void> {
+  if (!scope || !/^[A-Za-z0-9_]+$/.test(scope)) return;
+  const { data } = await admin
+    .from("ngmy_settings")
+    .select("value")
+    .eq("key", STATE_REGISTRAR_SETTINGS_KEY)
+    .maybeSingle();
+  const root = data?.value && typeof data.value === "object" && !Array.isArray(data.value)
+    ? { ...(data.value as Record<string, unknown>) }
+    : {};
+  const byStateRaw = root.byState;
+  const byState = byStateRaw && typeof byStateRaw === "object" && !Array.isArray(byStateRaw)
+    ? { ...(byStateRaw as Record<string, unknown>) }
+    : {};
+  const existingRaw = byState[scope];
+  const existing = existingRaw && typeof existingRaw === "object" && !Array.isArray(existingRaw)
+    ? { ...(existingRaw as Record<string, unknown>) }
+    : {};
+  const priorUntil = Date.parse(String(existing.accessUntil ?? ""));
+  const nextUntil = Date.parse(accessUntil);
+  const bestUntil = Number.isFinite(priorUntil) && priorUntil > nextUntil
+    ? new Date(priorUntil).toISOString()
+    : accessUntil;
+  const priorPayer = normalize(existing.payerEmail);
+  byState[scope] = {
+    ...existing,
+    displayState: String(existing.displayState ?? scope.replaceAll("_", " ")),
+    payerEmail: priorPayer.includes("@") ? priorPayer : email,
+    accessUntil: bestUntil,
+    product: "state_registrar",
+    updatedAt: new Date().toISOString(),
+  };
+  const now = new Date().toISOString();
+  const { error } = await admin.from("ngmy_settings").upsert({
+    key: STATE_REGISTRAR_SETTINGS_KEY,
+    value: { ...root, byState, updatedAt: now },
+    updated_at: now,
+  }, { onConflict: "key" });
+  if (error) {
+    console.error("[ngmy-stripe-webhook] state registrar settings upsert failed:", error.message);
+  }
+}
 
 const ACCESS_DAYS_DEFAULT = 30;
 const ACCESS_DAYS_PHONE_UNLOCK = 10;
@@ -314,6 +366,16 @@ serve(async (req) => {
       })
       .eq("stripe_subscription_id", subscriptionId);
     if (renewalError) return json({ error: renewalError.message }, 500);
+    const productName = String(access.product ?? "");
+    if (productName.startsWith("state_registrar:")) {
+      const scope = productName.slice("state_registrar:".length);
+      await upsertStateRegistrarSponsorship(
+        admin,
+        scope,
+        normalize(access.email),
+        accessUntil,
+      );
+    }
     console.log(`[ngmy-stripe-webhook] renewed ${access.product} for ${access.email} until ${accessUntil}`);
     return json({ received: true, renewed: true, access_until: accessUntil });
   }
@@ -370,6 +432,13 @@ serve(async (req) => {
     }
     product = `swahili_level:${scope}`;
   }
+  if (product === "state_registrar") {
+    if (!scope || !/^[A-Za-z0-9_]+$/.test(scope)) {
+      console.error("[ngmy-stripe-webhook] missing/invalid state registrar scope", session?.id);
+      return json({ error: "Missing state registrar scope" }, 422);
+    }
+    product = `state_registrar:${scope}`;
+  }
 
   const { data: existing } = await admin
     .from("ngmy_stripe_access")
@@ -407,6 +476,15 @@ serve(async (req) => {
   if (error) {
     console.error("[ngmy-stripe-webhook] upsert failed:", error.message);
     return json({ error: error.message }, 500);
+  }
+
+  if (product.startsWith("state_registrar:")) {
+    await upsertStateRegistrarSponsorship(
+      admin,
+      product.slice("state_registrar:".length),
+      email,
+      accessUntil,
+    );
   }
 
   console.log(`[ngmy-stripe-webhook] granted ${product} for ${email} until ${accessUntil}`);

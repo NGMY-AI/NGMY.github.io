@@ -222,7 +222,7 @@ class _ResetCivicStateSwitchesSheetState extends State<_ResetCivicStateSwitchesS
 
               Text(
 
-                'Users get ${NgmyCivicStateSwitches.maxSwitches} state changes after their first state. Reset restores all ${NgmyCivicStateSwitches.maxSwitches}.',
+                'Members get ${NgmyCivicStateSwitches.maxSwitches} state changes, then a 1-hour lock. Authorized Registrars are unlimited. Reset clears the counter and lock.',
 
                 style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
 
@@ -283,6 +283,8 @@ class _ResetCivicStateSwitchesSheetState extends State<_ResetCivicStateSwitchesS
                             isAdmin: false,
 
                             isCivicRegistryAdmin: u.isCivicRegistryAdmin,
+
+                            isAuthorizedRegistrar: false,
 
                             switchesUsed: u.stateSwitchesUsed,
 

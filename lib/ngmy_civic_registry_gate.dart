@@ -138,6 +138,7 @@ Future<void> civicRegistryClearUnlock() async {
 }
 
 /// Red gate screen — state PIN → member name → DOB → registry ID.
+/// Only shown for states that already have an Authorized Registrar.
 class CivicRegistryGateScreen extends StatefulWidget {
   final List<String> usStates;
   final Map<String, String> pinsByState;
@@ -147,6 +148,8 @@ class CivicRegistryGateScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String globalPin;
   final List<Map<String, dynamic>> members;
+  /// When false for a picked state, unlock immediately (no PIN / identity).
+  final bool Function(String state)? stateRequiresUnlock;
 
   const CivicRegistryGateScreen({
     super.key,
@@ -158,6 +161,7 @@ class CivicRegistryGateScreen extends StatefulWidget {
     required this.onUnlocked,
     this.onBack,
     this.members = const [],
+    this.stateRequiresUnlock,
   });
 
   @override
@@ -525,6 +529,11 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
 
     if (!mounted) return;
     if (picked == null || picked.trim().isEmpty) return;
+    final requires = widget.stateRequiresUnlock?.call(picked) ?? true;
+    if (!requires) {
+      widget.onUnlocked(picked);
+      return;
+    }
     setState(() {
       _state = picked;
       _error = null;

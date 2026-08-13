@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_civic_registry_gate.dart';
+import 'ngmy_civic_registry_stats.dart';
 
 /// Per-state settings the admin teaches each Mshauri (president name, faction notes, etc.).
 class NgmyMshauriStateSettings {
@@ -168,6 +169,13 @@ Future<Map<String, dynamic>> ngmyMshauriRefreshSession({
 
   final verified = session['verified'] == true;
   final pendingState = (session['pendingState'] ?? '').toString().trim();
+  final appsRaw = (config as dynamic).civicRegistrarApplications;
+  final applications = appsRaw is List
+      ? appsRaw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
+      : <Map<String, dynamic>>[];
 
   if (!verified) {
     final named = _matchStateInText(text, states);
@@ -178,6 +186,22 @@ Future<Map<String, dynamic>> ngmyMshauriRefreshSession({
 
     final stateForPin = (session['pendingState'] ?? named ?? userProfileState).toString().trim();
     if (stateForPin.isNotEmpty) {
+      // No Authorized Registrar yet → no Civic Registry code required.
+      if (!NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
+        state: stateForPin,
+        applications: applications,
+      )) {
+        session = {
+          'state': stateForPin,
+          'pendingState': stateForPin,
+          'verified': true,
+          'verifiedAt': DateTime.now().toUtc().toIso8601String(),
+          'viaNoRegistrar': true,
+        };
+        await NgmyMshauriCivicStore.save(email, profileId, session);
+        return session;
+      }
+
       final expected = civicRegistryEffectivePin(
         globalPin: globalPin,
         pinsByState: pinMap,
@@ -229,6 +253,24 @@ String ngmyMshauriPromptBlock({
   final pending = (session['pendingState'] ?? '').toString().trim();
   final settings = state.isNotEmpty ? settingsByState[state] : null;
 
+  final appsRaw = (config as dynamic).civicRegistrarApplications;
+  final applications = appsRaw is List
+      ? appsRaw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList()
+      : <Map<String, dynamic>>[];
+  final stateNeedsCode = state.isNotEmpty &&
+      NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
+        state: state,
+        applications: applications,
+      );
+  final pendingNeedsCode = pending.isNotEmpty &&
+      NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
+        state: pending,
+        applications: applications,
+      );
+
   final buf = StringBuffer();
   buf.writeln('MSHAURI CIVIC REGISTRY LINK (mandatory onboarding until verified):');
   if (!verified) {
@@ -238,7 +280,11 @@ String ngmyMshauriPromptBlock({
     buf.writeln(
       '- Step 1 (casual): figure out which US state they belong to for civic registry (${states.take(8).join(", ")}${states.length > 8 ? ", …" : ""}). Work it into conversation — do not interrogate.',
     );
-    if (pending.isNotEmpty) {
+    if (pending.isNotEmpty && !pendingNeedsCode) {
+      buf.writeln(
+        '- $pending has no Authorized Registrar yet — do NOT ask for a Civic Registry code. Treat them as connected for $pending and continue normally.',
+      );
+    } else if (pending.isNotEmpty) {
       buf.writeln(
         '- Step 2 NOW: They may have named $pending — ask naturally for their Civic Registry code for $pending (same code as NGMY Civic Registry).',
       );
@@ -247,14 +293,20 @@ String ngmyMshauriPromptBlock({
       );
     } else {
       buf.writeln(
-        '- Step 2: After state is clear, ask for their Civic Registry code for that state before deep state-leadership advice — still talk human, not robotic.',
+        '- Step 2: After state is clear, only ask for their Civic Registry code if that state already has an Authorized Registrar. If it does not, skip the code and continue normally.',
       );
     }
     buf.writeln('- Until verified, keep it conversational — state + code can come up over a few messages, not one formal script.');
     return buf.toString();
   }
 
-  buf.writeln('- VERIFIED for state: $state. They completed Civic Registry connection for this state.');
+  if (!stateNeedsCode && state.isNotEmpty) {
+    buf.writeln(
+      '- Connected for state: $state (no Authorized Registrar yet — Civic Registry code was not required).',
+    );
+  } else {
+    buf.writeln('- VERIFIED for state: $state. They completed Civic Registry connection for this state.');
+  }
   if (settings != null && settings.hasContent) {
     if (settings.groupLabel.isNotEmpty) {
       buf.writeln('- Their community / side you serve: ${settings.groupLabel}.');

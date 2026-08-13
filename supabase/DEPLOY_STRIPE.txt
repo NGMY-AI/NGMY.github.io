@@ -81,6 +81,7 @@ Access durations (set by webhook):
   QR Generator   → 14 days (2 weeks)
   Slides Pro     → 30 days ($4.99/mo)
   Device Transfer → 30 days ($4.99/mo, 2 free first)
+  State Registrar → 30 days ($50/mo per state; Georgia free; joiners share first payer)
   Other features → 30 days
 
 ────────────────────────────────────────────────────────────

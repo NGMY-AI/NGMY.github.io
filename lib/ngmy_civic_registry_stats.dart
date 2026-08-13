@@ -177,14 +177,14 @@ class NgmyCivicRegistryStats {
       if (status != 'approved' && status != 'pending') continue;
       if ((a['state'] ?? '').toString().trim().toLowerCase() == st) return true;
     }
+    // Home state from approved application — never treat a temporary
+    // viewing state (user.state after a switch) as registrar assignment.
     final serving = registrarStateForUser(
       email: email,
       userState: userState,
       applications: applications,
     );
-    if (serving.trim().toLowerCase() == st) return true;
-    if (userState.trim().toLowerCase() == st) return true;
-    return false;
+    return serving.trim().toLowerCase() == st;
   }
 
   static List<Map<String, dynamic>> approvedApplicationsForState(
@@ -198,13 +198,31 @@ class NgmyCivicRegistryStats {
     }).map((e) => Map<String, dynamic>.from(e)).toList();
   }
 
+  /// True when this state has at least one Authorized Registrar
+  /// (approved application and/or an active registrar user assigned there).
+  /// Member PIN / name / DOB / registry ID unlock is required only then.
+  static bool stateHasAuthorizedRegistrar({
+    required String state,
+    required List<Map<String, dynamic>> applications,
+    Iterable<dynamic> users = const [],
+  }) {
+    if (state.trim().isEmpty) return false;
+    if (approvedApplicationsForState(applications, state).isNotEmpty) return true;
+    if (users.isEmpty) return false;
+    return activeRegistrarsInState(
+          state: state,
+          applications: applications,
+          users: users,
+        ) >
+        0;
+  }
+
   static int activeRegistrarsInState({
     required String state,
     required List<Map<String, dynamic>> applications,
     required Iterable<dynamic> users,
     bool excludeRegistryAdmins = true,
   }) {
-    final st = state.trim().toLowerCase();
     final emails = <String>{};
     for (final u in users) {
       final isReg = (u as dynamic).isAuthorizedRegistrar == true;

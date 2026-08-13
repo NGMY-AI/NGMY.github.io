@@ -28,6 +28,7 @@ enum NgmyStripeProduct {
   swahiliLevel,
   slidesStudio,
   deviceTransfer,
+  stateRegistrar,
 }
 
 class NgmyStripePayments {
@@ -63,6 +64,8 @@ class NgmyStripePayments {
       'https://buy.stripe.com/3cIaEX1Bf4xzeIzd0Fb7y0i';
   static const String deviceTransferUrl =
       'https://buy.stripe.com/8x2fZh2Fjc01cAr7Glb7y0j';
+  static const String stateRegistrarUrl =
+      'https://buy.stripe.com/cNi9AT93H2prbwn7Glb7y0k';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -136,6 +139,8 @@ class NgmyStripePayments {
         return 'slides_studio';
       case NgmyStripeProduct.deviceTransfer:
         return 'device_transfer';
+      case NgmyStripeProduct.stateRegistrar:
+        return 'state_registrar';
     }
   }
 
@@ -173,6 +178,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.slidesStudio;
       case 'device_transfer':
         return NgmyStripeProduct.deviceTransfer;
+      case 'state_registrar':
+        return NgmyStripeProduct.stateRegistrar;
       default:
         return null;
     }
@@ -212,6 +219,8 @@ class NgmyStripePayments {
         return slidesStudioUrl;
       case NgmyStripeProduct.deviceTransfer:
         return deviceTransferUrl;
+      case NgmyStripeProduct.stateRegistrar:
+        return stateRegistrarUrl;
     }
   }
 
@@ -294,6 +303,8 @@ class NgmyStripePayments {
         return 499;
       case NgmyStripeProduct.deviceTransfer:
         return 499;
+      case NgmyStripeProduct.stateRegistrar:
+        return 5000;
     }
   }
 
@@ -361,6 +372,8 @@ class NgmyStripePayments {
         return const [Color(0xFF60A5FA), Color(0xFF1D4ED8)]; // presentation blue
       case NgmyStripeProduct.deviceTransfer:
         return const [Color(0xFF38BDF8), Color(0xFF0369A1)]; // transfer sky
+      case NgmyStripeProduct.stateRegistrar:
+        return const [Color(0xFF34D399), Color(0xFF065F46)]; // registrar emerald
     }
   }
 
@@ -399,6 +412,8 @@ class NgmyStripePayments {
         return const Color(0xFFDBEAFE);
       case NgmyStripeProduct.deviceTransfer:
         return const Color(0xFFE0F2FE);
+      case NgmyStripeProduct.stateRegistrar:
+        return const Color(0xFFD1FAE5);
     }
   }
 
@@ -450,6 +465,8 @@ class NgmyStripePayments {
         return 'NGMY Slides Pro';
       case NgmyStripeProduct.deviceTransfer:
         return 'NGMY Transfer';
+      case NgmyStripeProduct.stateRegistrar:
+        return 'State Registrar';
     }
   }
 
@@ -487,6 +504,8 @@ class NgmyStripePayments {
         return Icons.slideshow_rounded;
       case NgmyStripeProduct.deviceTransfer:
         return Icons.sync_alt_rounded;
+      case NgmyStripeProduct.stateRegistrar:
+        return Icons.verified_user_rounded;
     }
   }
 
@@ -524,6 +543,8 @@ class NgmyStripePayments {
         return 'Unlock Professional, Luxury, and Bold presentation features for 30 days.';
       case NgmyStripeProduct.deviceTransfer:
         return 'Transfer files, decks, and backups with QR or download — 2 free, then \$4.99/mo.';
+      case NgmyStripeProduct.stateRegistrar:
+        return 'First Authorized Registrar in a state sponsors that state for \$50/month. Georgia is free.';
     }
   }
 

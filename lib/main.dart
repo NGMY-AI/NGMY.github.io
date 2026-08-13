@@ -167,6 +167,7 @@ import 'ngmy_referral.dart';
 import 'ngmy_family_tree_payments.dart';
 import 'ngmy_invoice_payments.dart';
 import 'ngmy_stripe_payments.dart';
+import 'ngmy_state_registrar_payments.dart';
 import 'ngmy_music_payments.dart';
 import 'ngmy_app_studio_payments.dart';
 import 'ngmy_admin_domain_calendar.dart';
@@ -22202,7 +22203,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ListTile(
                 leading: const Icon(Icons.restart_alt_rounded, color: Color(0xFF6200EE)),
                 title: const Text('Reset State Change Limit', style: TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: const Text('Search users — reset their 5 state changes'),
+                subtitle: Text('Search users — reset their ${NgmyCivicStateSwitches.maxSwitches} state changes / 1-hour lock'),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -22219,6 +22220,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         email: widget.allUsers[i].email,
                         switchesUsed: 0,
                         anchorState: widget.allUsers[i].civicRegistryAnchorState,
+                        lockedUntil: null,
                       ));
                       widget.onDataChanged();
                       if (!context.mounted) return;
@@ -29926,6 +29928,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Timer? _helpModePoll;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
+  /// Member state-switch cooldown after [NgmyCivicStateSwitches.maxSwitches] changes.
+  DateTime? _stateSwitchLockedUntil;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -29947,6 +29951,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
       _checkRegistryUnlock();
+      unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
     });
     unawaited(_refreshCivicHelpModeAndContributions());
@@ -29954,6 +29959,36 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!mounted) return;
       unawaited(_refreshCivicHelpModeAndContributions());
     });
+  }
+
+  Future<void> _hydrateStateSwitchLock() async {
+    final local = await NgmyCivicStateSwitches.loadLocal(widget.user.email);
+    if (!mounted) return;
+    var lock = local == null
+        ? null
+        : NgmyCivicStateSwitches.parseLockedUntil(local['lockedUntil']);
+    var used = widget.user.civicRegistryStateSwitchesUsed;
+    final cleared = NgmyCivicStateSwitches.refreshLockIfNeeded(
+      switchesUsed: used,
+      lockedUntil: lock,
+      setSwitchesUsed: (n) {
+        used = n;
+        widget.user.civicRegistryStateSwitchesUsed = n;
+      },
+      setLockedUntil: (u) => lock = u,
+    );
+    if (!mounted) return;
+    setState(() => _stateSwitchLockedUntil = lock);
+    if (cleared) unawaited(_persistStateSwitchLocal());
+  }
+
+  Future<void> _persistStateSwitchLocal() async {
+    await NgmyCivicStateSwitches.saveLocal(
+      email: widget.user.email,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      anchorState: widget.user.civicRegistryAnchorState,
+      lockedUntil: _stateSwitchLockedUntil,
+    );
   }
 
   Future<void> _refreshCivicHelpModeAndContributions() async {
@@ -29974,6 +30009,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void _onCivicLiveRefresh() {
     if (!mounted) return;
     unawaited(_refreshCivicMembersFromCloud());
+    unawaited(_checkRegistryUnlock());
     unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) {
       if (mounted) setState(() {});
     }));
@@ -30053,10 +30089,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return _hasEffectiveRegistrarAccess(widget.config, widget.user);
   }
 
-  bool _canBypassCivicGate() => _hasRegistrarAccess();
+  /// AR tools (and PIN bypass) only in the registrar's home state, or for King/Admin.
+  bool _canUseRegistrarToolsHere([String? state]) {
+    if (_isGlobalCivicRegistryAdmin()) return true;
+    if (!_hasRegistrarAccess()) return false;
+    final st = (state ?? _selectedState).trim().toLowerCase();
+    return st == _registrarHomeState().trim().toLowerCase();
+  }
+
+  bool _canBypassCivicGate() => _canUseRegistrarToolsHere();
+
+  /// PIN / name / DOB / registry ID only after a state has an Authorized Registrar.
+  bool _stateRequiresMemberUnlock([String? state]) {
+    return NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
+      state: (state ?? _selectedState).trim(),
+      applications: widget.config.civicRegistrarApplications,
+      users: widget.allUsers,
+    );
+  }
 
   Future<void> _checkRegistryUnlock() async {
-    if (_canBypassCivicGate()) {
+    if (_canBypassCivicGate() || !_stateRequiresMemberUnlock()) {
       if (mounted) setState(() {
         _registryUnlocked = true;
         _unlockChecked = true;
@@ -30088,26 +30141,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _selectedState = state;
       _registryUnlocked = true;
     });
-    unawaited(NgmyCivicStateSwitches.saveLocal(
-      email: widget.user.email,
-      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-      anchorState: widget.user.civicRegistryAnchorState,
-    ));
+    unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
   }
 
-  // Everyone gets the same 5 free state switches (King/Admin/Civic
-  // Registry Admin bypass the limit entirely) — a plain Authorized
-  // Registrar used to be blocked from ever changing state at all here,
-  // before NgmyCivicStateSwitches.canChangeState below even got a
-  // chance to count their switches.
-  bool _canChangeCivicState() => NgmyCivicStateSwitches.canChangeState(
-        isAdmin: widget.user.isAdmin,
-        isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
-        isCivicRegistryKing: widget.user.isCivicRegistryKing,
-        switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-      );
+  // Members: 8 state changes, then a 1-hour lock. Authorized Registrars /
+  // King / Admin are unlimited.
+  bool _canChangeCivicState() {
+    NgmyCivicStateSwitches.refreshLockIfNeeded(
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      lockedUntil: _stateSwitchLockedUntil,
+      setSwitchesUsed: (n) => widget.user.civicRegistryStateSwitchesUsed = n,
+      setLockedUntil: (u) => _stateSwitchLockedUntil = u,
+    );
+    return NgmyCivicStateSwitches.canChangeState(
+      isAdmin: widget.user.isAdmin,
+      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      isCivicRegistryKing: widget.user.isCivicRegistryKing,
+      isAuthorizedRegistrar: _hasRegistrarAccess(),
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      lockedUntil: _stateSwitchLockedUntil,
+    );
+  }
 
   Future<bool> _applyCivicStateChange(String newState) async {
     final from = _selectedState;
@@ -30116,33 +30172,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       isAdmin: widget.user.isAdmin,
       isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
       isCivicRegistryKing: widget.user.isCivicRegistryKing,
+      isAuthorizedRegistrar: _hasRegistrarAccess(),
       fromState: from,
       toState: newState,
       anchorState: widget.user.civicRegistryAnchorState,
       setAnchorState: (s) => widget.user.civicRegistryAnchorState = s,
       switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
       setSwitchesUsed: (n) => widget.user.civicRegistryStateSwitchesUsed = n,
+      lockedUntil: _stateSwitchLockedUntil,
+      setLockedUntil: (u) => _stateSwitchLockedUntil = u,
     );
     if (!ok) {
       if (mounted) {
+        final lock = _stateSwitchLockedUntil;
+        final locked = lock != null && DateTime.now().toUtc().isBefore(lock.toUtc());
+        final mins = locked
+            ? lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60)
+            : 60;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'You have used all 5 state changes. Ask an admin to reset your limit in Civic Registry settings.',
+              locked
+                  ? 'State changes locked. Try again in ${mins}m.'
+                  : 'You have used all ${NgmyCivicStateSwitches.maxSwitches} state changes. Wait 1 hour, then you can change again.',
             ),
           ),
         );
       }
       return false;
     }
-    unawaited(NgmyCivicStateSwitches.saveLocal(
-      email: widget.user.email,
-      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-      anchorState: widget.user.civicRegistryAnchorState,
-    ));
+    unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
-    if (!_canBypassCivicGate()) {
+    if (!_canUseRegistrarToolsHere(newState) && _stateRequiresMemberUnlock(newState)) {
       final unlocked = await civicRegistryIsUnlocked(
         widget.user.email,
         state: newState,
@@ -30156,6 +30218,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           _selectedCity = 'All Cities';
           _selectedRoom = 'All Rooms';
           _registryUnlocked = false;
+          if (!_canUseRegistrarToolsHere(newState) && _activeTab > 1) {
+            _activeTab = 0;
+          }
         });
         return false;
       }
@@ -30168,12 +30233,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _selectedState = newState;
       _selectedCity = 'All Cities';
       _selectedRoom = 'All Rooms';
+      // Away from home AR state → member UI (no Enroll / Members tools).
+      if (!_canUseRegistrarToolsHere() && _activeTab > 1) {
+        _activeTab = 0;
+      }
     });
-    unawaited(NgmyCivicStateSwitches.saveLocal(
-      email: widget.user.email,
-      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-      anchorState: widget.user.civicRegistryAnchorState,
-    ));
+    unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
     return true;
@@ -30190,13 +30255,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         applications: widget.config.civicRegistrarApplications,
       );
 
-  bool _canManageCitiesForSelectedState() {
-    if (!_canManageCivicRegistry()) return false;
-    if (_isCivicRegistryKing(widget.user) || widget.user.isAdmin || widget.user.isCivicRegistryAdmin) {
-      return true;
-    }
-    return _selectedState.trim().toLowerCase() == _registrarHomeState().trim().toLowerCase();
-  }
+  bool _canManageCitiesForSelectedState() => _canUseRegistrarToolsHere();
 
   List<String> _citiesForSelectedState() => NgmyCivicRegistryStats.citiesForState(
         civicCitiesByState: widget.config.civicCitiesByState,
@@ -30218,7 +30277,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  int get _maxCivicTabIndex => _canManageCivicRegistry() ? 3 : 1;
+  int get _maxCivicTabIndex => _canUseRegistrarToolsHere() ? 3 : 1;
 
   Future<void> _hydrateRegistrarApplication() async {
     final email = widget.user.email;
@@ -30299,6 +30358,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       return;
     }
+    final applyState = widget.user.state.trim().isNotEmpty ? widget.user.state.trim() : _selectedState.trim();
+    final canApply = await NgmyStateRegistrarPayments.ensureCanApply(
+      context: context,
+      email: widget.user.email,
+      state: applyState,
+      isAdmin: widget.user.isAdmin,
+    );
+    if (!canApply || !mounted) return;
     final nameC = TextEditingController(text: (widget.user.fullName ?? '').trim().isNotEmpty ? widget.user.fullName!.trim() : widget.user.username);
     final phoneC = TextEditingController(text: widget.user.phone);
     final reasonC = TextEditingController();
@@ -31846,13 +31913,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _openAdminCivicStateCase(String state) async {
     final st = state.trim();
     if (st.isEmpty || !mounted) return;
-    final isRegistrar = _canManageCivicRegistry();
-    final isAdmin = _isGlobalCivicRegistryAdmin();
+    final canEdit = _canUseRegistrarToolsHere(st);
     await NgmyNavigator.push<void>(
       context,
       NgmyCivicStateWalletScreen(
         state: st,
-        canEdit: isRegistrar || isAdmin,
+        canEdit: canEdit,
         snapshotBuilder: () => _buildCivicStateWalletSnapshot(st),
         onAddSpending: ({required double amount, required String description}) =>
             _addCivicWalletSpending(state: st, amount: amount, description: description),
@@ -31895,7 +31961,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           await ngmyPersistCivicHelpModeSettings(widget.config);
         },
         onPurgeExpired: _purgeExpiredWalletSpendings,
-        canAdminBrowseStates: isAdmin,
+        canAdminBrowseStates: _isGlobalCivicRegistryAdmin(),
         allStates: _usStates,
         snapshotForState: _buildCivicStateWalletSnapshot,
         onOpenStateCase: _openAdminCivicStateCase,
@@ -31965,8 +32031,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Future<void> _openCivicStateWalletFlow() async {
     await _purgeExpiredWalletSpendings();
-    final isRegistrar = _canManageCivicRegistry();
-    final isAdmin = _isGlobalCivicRegistryAdmin();
+    final toolsHere = _canUseRegistrarToolsHere();
     await openNgmyCivicStateWalletFlow(
       context: context,
       state: _selectedState,
@@ -31974,9 +32039,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       pinsByState: widget.config.civicRegistryPinsByState,
       members: ngmyCivicMembersForState(widget.config, _selectedState),
       snapshotBuilder: () => _buildCivicStateWalletSnapshot(),
-      canEdit: isRegistrar || isAdmin,
-      // Authorized registrars never enter wallet unlock codes.
-      skipUnlockCodes: isRegistrar || isAdmin,
+      canEdit: toolsHere,
+      // Home-state AR / admin skip codes; members (and ARs away from home)
+      // skip only until that state has an Authorized Registrar.
+      skipUnlockCodes: toolsHere || !_stateRequiresMemberUnlock(),
       onAddSpending: ({required double amount, required String description}) =>
           _addCivicWalletSpending(
             state: _selectedState,
@@ -32023,7 +32089,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await ngmyPersistCivicHelpModeSettings(widget.config);
       },
       onPurgeExpired: _purgeExpiredWalletSpendings,
-      canAdminBrowseStates: isAdmin,
+      canAdminBrowseStates: _isGlobalCivicRegistryAdmin(),
       allStates: _usStates,
       snapshotForState: _buildCivicStateWalletSnapshot,
       onOpenStateCase: _openAdminCivicStateCase,
@@ -32035,6 +32101,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _showCivicRegistryBackupSheet() async {
+    if (!_canUseRegistrarToolsHere()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Registry backup is only available in ${_registrarHomeState()}.')),
+      );
+      return;
+    }
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
     final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
@@ -32461,9 +32534,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       widget.user.isAdmin || widget.user.isCivicRegistryKing || widget.user.isCivicRegistryAdmin;
 
   bool _canCurrentUserSeeHelpMode() {
-    if (!widget.config.helpActiveFor(_helpModeState())) return false;
-    if (_canManageCivicRegistry()) return true;
-    return _memberMatchesHelpScope(widget.user);
+    final st = _selectedState;
+    if (!widget.config.helpActiveFor(st)) return false;
+    // Home-state AR / King / Admin manage help; elsewhere behave like a member.
+    if (_canUseRegistrarToolsHere()) return true;
+    return _memberMatchesHelpScope(widget.user, forState: st);
   }
 
   Map<String, dynamic> _decodeContributionMeta(AppTransaction t) {
@@ -32478,7 +32553,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _audienceMatchForViewer(String scopeType, String scopeValue) {
-    if (_canManageCivicRegistry()) return true;
+    if (_canUseRegistrarToolsHere()) return true;
     final wanted = scopeValue.trim().toLowerCase();
     if (scopeType != 'city' && scopeType != 'room') return true;
     if (wanted.isEmpty) return false;
@@ -32607,16 +32682,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _canDeleteReceiptForState(String receiptState) {
-    if (!_hasEffectiveRegistrarAccess(widget.config, widget.user)) return false;
-    final st = receiptState.trim().isEmpty ? widget.user.state.trim() : receiptState.trim();
+    final st = receiptState.trim().isEmpty ? _selectedState.trim() : receiptState.trim();
     if (st.isEmpty) return false;
-    return NgmyCivicRegistryStats.isRegistrarAssignedToState(
-      email: widget.user.email,
-      userState: widget.user.state,
-      isAuthorizedRegistrar: true,
-      applications: widget.config.civicRegistrarApplications,
-      state: st,
-    );
+    return _canUseRegistrarToolsHere(st);
   }
 
   Future<void> _deleteContributionReceipt(String key) async {
@@ -32775,7 +32843,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _recordHelpCampaignSpending({String? campaignId, String? campaignTitle}) {
-    if (!_canManageCivicRegistry()) return;
+    if (!_canUseRegistrarToolsHere()) return;
     final cid = (campaignId ?? _activeHelpCampaignId()).trim();
     if (cid.isEmpty) return;
     final amountC = TextEditingController();
@@ -33289,9 +33357,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   // still shouldn't be able to end a campaign for a
                                   // state that isn't their own (only King/Admin
                                   // operate across states).
-                                  if (_selectedState.trim().toLowerCase() != widget.user.state.trim().toLowerCase() && !_isGlobalCivicRegistryAdmin()) {
+                                  if (!_canUseRegistrarToolsHere()) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('You can only manage help mode for ${widget.user.state}.')),
+                                      SnackBar(content: Text('You can only manage help mode for ${_registrarHomeState()}.')),
                                     );
                                     return;
                                   }
@@ -33399,9 +33467,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 // activating Georgia can no longer stomp Alabama's. A regular
                                 // registrar can still only manage their own state's campaign;
                                 // only King/Admin operate across every state.
-                                if (_selectedState.trim().toLowerCase() != widget.user.state.trim().toLowerCase() && !_isGlobalCivicRegistryAdmin()) {
+                                if (!_canUseRegistrarToolsHere()) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('You can only manage help mode for ${widget.user.state}.')),
+                                    SnackBar(content: Text('You can only manage help mode for ${_registrarHomeState()}.')),
                                   );
                                   return;
                                 }
@@ -33682,7 +33750,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showMemberProfile(UserData u) {
-    if (!_canManageCivicRegistry()) {
+    if (!_canUseRegistrarToolsHere()) {
       _showPublicMemberProfile(u);
       return;
     }
@@ -34131,7 +34199,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  if (_canManageCivicRegistry()) _passportAdminPanel(u, isDark),
+                  if (_canUseRegistrarToolsHere()) _passportAdminPanel(u, isDark),
                   if (_canAdminTransferCivicState()) ...[
                     const SizedBox(height: 10),
                     SizedBox(
@@ -35620,7 +35688,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    if (!_registryUnlocked && !_canBypassCivicGate()) {
+    if (!_registryUnlocked && !_canBypassCivicGate() && _stateRequiresMemberUnlock()) {
       return CivicRegistryGateScreen(
         usStates: _usStates,
         pinsByState: widget.config.civicRegistryPinsByState,
@@ -35630,6 +35698,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         members: NgmyCivicRegistryMembers.listFrom(widget.config),
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
+        stateRequiresUnlock: _stateRequiresMemberUnlock,
       );
     }
 
@@ -35703,7 +35772,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ),
-                  if (_canManageCivicRegistry())
+                  if (_canUseRegistrarToolsHere())
                     SelectionContainer.disabled(
                       child: IconButton(
                         onPressed: _copyCivicEnrollShareLink,
@@ -35811,7 +35880,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   ),
                                 ),
                               ),
-                              if (_canManageCivicRegistry()) ...[
+                              if (_canUseRegistrarToolsHere()) ...[
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: FilledButton.icon(
@@ -35844,8 +35913,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             _authorizedRegistrarCard(isDark),
             const SizedBox(height: 25),
 
-            // Tabs Grid
-            if (_canManageCivicRegistry()) ...[
+            // Tabs Grid — home-state AR only; elsewhere same as members.
+            if (_canUseRegistrarToolsHere()) ...[
               Row(
                 children: [
                   Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
@@ -35872,7 +35941,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             const SizedBox(height: 30),
 
             // Search/Action Box — voting card only on Search, at the bottom.
-            if (_canManageCivicRegistry()) ...[
+            if (_canUseRegistrarToolsHere()) ...[
               if (_activeTab == 0) ...[
                 _searchSection(isDark),
                 const SizedBox(height: 20),
@@ -36454,7 +36523,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   String? _enrollLabelTapKey;
 
   void _onEnrollLabelTap(String fieldKey) {
-    if (!_canManageCivicRegistry()) return;
+    if (!_canUseRegistrarToolsHere()) return;
     final now = DateTime.now();
     if (_enrollLabelTapKey != fieldKey ||
         _enrollLabelLastTap == null ||
@@ -36788,11 +36857,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ],
 
         const SizedBox(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canManageCivicRegistry()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canUseRegistrarToolsHere()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
-        else ...members.map((m) => _memberCard(m, isDark, manageActions: _canManageCivicRegistry())),
+        else ...members.map((m) => _memberCard(m, isDark, manageActions: _canUseRegistrarToolsHere())),
       ],
     );
   }
@@ -37154,7 +37223,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 9))
                           else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
                             Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 9)),
-                          if (_canManageCivicRegistry())
+                          if (_canUseRegistrarToolsHere())
                             Padding(
                               padding: const EdgeInsets.only(left: 4),
                               child: NgmyCivicBackupPinButton(
@@ -37166,11 +37235,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ],
                 ),
-                if (_canManageCivicRegistry()) ...[
-                  // Any Authorized Registrar manages Activate/Deactivate +
-                  // spending for their own state's campaign; King/Admin can
-                  // additionally do this across every state (enforced at
-                  // the actual action buttons, not here).
+                if (_canUseRegistrarToolsHere()) ...[
+                  // Home-state AR manages Activate/Deactivate + spending;
+                  // King/Admin can do this across every state.
                   const SizedBox(height: 5),
                   SelectionContainer.disabled(
                     child: GestureDetector(
@@ -37299,10 +37366,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ],
           ),
         ),
-        if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin) ...[
+        if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin && !_hasRegistrarAccess()) ...[
           const SizedBox(height: 8),
           Text(
-            'State changes left: ${NgmyCivicStateSwitches.remainingSwitches(isAdmin: widget.user.isAdmin, isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin, isCivicRegistryKing: widget.user.isCivicRegistryKing, switchesUsed: widget.user.civicRegistryStateSwitchesUsed)}',
+            NgmyCivicStateSwitches.statusLabel(
+              isAdmin: widget.user.isAdmin,
+              isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+              isCivicRegistryKing: widget.user.isCivicRegistryKing,
+              isAuthorizedRegistrar: _hasRegistrarAccess(),
+              switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+              lockedUntil: _stateSwitchLockedUntil,
+            ),
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 10, color: muted),
           ),
