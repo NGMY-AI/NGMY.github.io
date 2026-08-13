@@ -13406,8 +13406,54 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
 class FloatingTitle extends StatelessWidget {
   final String title; final Widget? leading; final Widget? trailing; final VoidCallback? onTap;
-  const FloatingTitle({super.key, required this.title, this.leading, this.trailing, this.onTap});
-  @override Widget build(BuildContext context) { return GestureDetector(onTap: onTap, child: Container(height: 60, padding: const EdgeInsets.symmetric(horizontal: 10), decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(30), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))]), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [leading ?? const SizedBox(width: 40), Expanded(child: Center(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 1)))), trailing ?? const SizedBox(width: 40)]))); }
+  /// Larger title chip — used for NGMY Hub so the header reads clearly.
+  final bool large;
+  const FloatingTitle({
+    super.key,
+    required this.title,
+    this.leading,
+    this.trailing,
+    this.onTap,
+    this.large = false,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final h = large ? 76.0 : 60.0;
+    final size = large ? 22.0 : 15.0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: h,
+        padding: EdgeInsets.symmetric(horizontal: large ? 14 : 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(large ? 38 : 30),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            leading ?? SizedBox(width: large ? 48 : 40),
+            Expanded(
+              child: Center(
+                child: Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: size,
+                    letterSpacing: large ? 1.6 : 1,
+                    height: 1.05,
+                  ),
+                ),
+              ),
+            ),
+            trailing ?? SizedBox(width: large ? 48 : 40),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // --- SCREENS ---
@@ -27772,7 +27818,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
           padding: EdgeInsets.fromLTRB(20, 20, 20, _ngmyBottomNavScrollPadding(context)),
           child: Column(
             children: [
-              const FloatingTitle(title: 'NGMY HUB'),
+              const FloatingTitle(title: 'NGMY HUB', large: true),
               const SizedBox(height: 20),
               // Main Top Card — 3D animated NGMY Services frame
               _ngmyServicesHeroCard(isDark: isDark, topColors: topColors),
@@ -44058,7 +44104,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B0F1A) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
       floatingActionButton: Padding(padding: const EdgeInsets.only(bottom: 8), child: _sellItemButton()),
       body: Column(
         children: [

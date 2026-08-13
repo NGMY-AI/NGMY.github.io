@@ -179,7 +179,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF0B1020)
+          ? const Color(0xFF121212)
           : const Color(0xFFF1F5F9),
       body: SafeArea(
         bottom: false,

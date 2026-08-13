@@ -1200,7 +1200,6 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       animation: _ambient,
       builder: (context, _) {
         final t = _ambient.value;
-        final bgShift = math.sin(t * math.pi * 2) * 0.08;
         final slotHint = _slotsLeft == 2 ? '2 pages' : '1 more';
 
         return Scaffold(
@@ -1208,17 +1207,9 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
             fit: StackFit.expand,
             children: [
               Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment(-0.8 + bgShift, -1),
-                    end: Alignment(1.2 - bgShift, 1),
-                    colors: const [
-                      Color(0xFF0F172A),
-                      Color(0xFF1E1B4B),
-                      Color(0xFF134E4A),
-                      Color(0xFF312E81),
-                    ],
-                  ),
+                decoration: const BoxDecoration(
+                  // Match NGMY Hub canvas darkness.
+                  color: Color(0xFF121212),
                 ),
               ),
               ...List.generate(8, (i) {

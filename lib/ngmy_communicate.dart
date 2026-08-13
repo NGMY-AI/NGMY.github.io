@@ -3431,7 +3431,8 @@ class _LoveWorldBackground extends StatelessWidget {
                   center: Alignment(0.2 + math.sin(t * math.pi * 2) * 0.3, -0.3 + math.cos(t * math.pi * 2) * 0.2),
                   radius: 1.2,
                   colors: isDark
-                      ? [const Color(0xFF4C1D95), const Color(0xFF1E0A28), const Color(0xFF121212)]
+                      // Match NGMY Hub canvas — solid dark, no purple/blue wash.
+                      ? const [Color(0xFF121212), Color(0xFF121212), Color(0xFF121212)]
                       : [const Color(0xFFFCE7F3), const Color(0xFFF3F7FF), const Color(0xFFFFFFFF)],
                 ),
               ),

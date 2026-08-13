@@ -501,7 +501,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF050810) : const Color(0xFFF0F4FF);
+    final bg = isDark ? const Color(0xFF121212) : const Color(0xFFF0F4FF);
     final services = _cfg.activeServices();
 
     return Scaffold(
@@ -1580,13 +1580,17 @@ class _HelpCenterBgPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (isDark) {
+      // Keep Hub-dark canvas clean — no bluish glow wash.
+      return;
+    }
     final paint = Paint();
     paint.shader = RadialGradient(
-      colors: [const Color(0xFF7C3AED).withOpacity(isDark ? 0.14 : 0.08), Colors.transparent],
+      colors: [const Color(0xFF7C3AED).withOpacity(0.08), Colors.transparent],
     ).createShader(Rect.fromCircle(center: Offset(size.width * 0.85, size.height * 0.08), radius: size.width * 0.45));
     canvas.drawRect(Offset.zero & size, paint);
     paint.shader = RadialGradient(
-      colors: [const Color(0xFF00E5FF).withOpacity(isDark ? 0.1 : 0.06), Colors.transparent],
+      colors: [const Color(0xFF00E5FF).withOpacity(0.06), Colors.transparent],
     ).createShader(Rect.fromCircle(center: Offset(size.width * 0.1, size.height * 0.55), radius: size.width * 0.4));
     canvas.drawRect(Offset.zero & size, paint);
   }
