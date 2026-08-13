@@ -532,7 +532,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final picked = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0B1020),
+      backgroundColor: const Color(0xFF121212),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => DraggableScrollableSheet(
         expand: false,
@@ -1366,7 +1366,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [accent, Color.lerp(accent, const Color(0xFF0B1020), 0.35)!],
+              colors: [accent, Color.lerp(accent, const Color(0xFF121212), 0.35)!],
             ),
             boxShadow: [
               BoxShadow(color: accent.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 8)),
@@ -2276,7 +2276,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0B1020),
+        backgroundColor: Color(0xFF121212),
         body: Center(child: CircularProgressIndicator(color: Color(0xFF2563EB))),
       );
     }
@@ -2287,7 +2287,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   Widget _buildLibrary() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
       body: SafeArea(
         bottom: false,
         child: ListView(
@@ -2694,7 +2694,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final hideChrome = keyboardOpen || editing;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFE8EEF6),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFE8EEF6),
       // Avoid double-inset with MainScreen + iOS keyboard (caused the black void).
       resizeToAvoidBottomInset: false,
       body: SafeArea(
@@ -5324,7 +5324,7 @@ class _HatiTransferSheetScaffold extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFF152033), Color(0xFF0B1020)],
+          colors: [Color(0xFF152033), Color(0xFF121212)],
         ),
       ),
       child: SafeArea(

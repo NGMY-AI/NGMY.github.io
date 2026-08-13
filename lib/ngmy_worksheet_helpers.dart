@@ -271,7 +271,7 @@ class WorksheetPalette {
   static const greenDark = Color(0xFF059669);
   static const teal = Color(0xFF14B8A6);
 
-  Color get pageBg => isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F4F6);
+  Color get pageBg => isDark ? const Color(0xFF121212) : const Color(0xFFF3F4F6);
   Color get cardBg => isDark ? const Color(0xFF141414) : Colors.white;
   Color get cardBorder => isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E7EB);
   Color get primaryText => isDark ? const Color(0xFFF8FAFC) : const Color(0xFF111827);

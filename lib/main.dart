@@ -248,10 +248,10 @@ void _ngmyApplySystemChromeForThemeMode(ThemeMode mode) {
   SystemChrome.setSystemUIOverlayStyle(
     dark
         ? const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF0B1020),
+            statusBarColor: Color(0xFF121212),
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
-            systemNavigationBarColor: Color(0xFF0B1020),
+            systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
@@ -9292,10 +9292,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final isDarkMode = mode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF0B1020),
+            statusBarColor: Color(0xFF121212),
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
-            systemNavigationBarColor: Color(0xFF0B1020),
+            systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
@@ -12888,10 +12888,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF0B1020),
+            statusBarColor: Color(0xFF121212),
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
-            systemNavigationBarColor: Color(0xFF0B1020),
+            systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
@@ -12944,7 +12944,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           fontFamily: 'Roboto',
           colorSchemeSeed: const Color(0xFFBB86FC),
           brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF0B1020),
+          scaffoldBackgroundColor: const Color(0xFF121212),
           cardColor: const Color(0xFF141414),
           pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
@@ -12957,11 +12957,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           ),
           appBarTheme: const AppBarTheme(
             systemOverlayStyle: SystemUiOverlayStyle(
-              statusBarColor: Color(0xFF0B1020),
+              statusBarColor: Color(0xFF121212),
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
             ),
-            backgroundColor: Color(0xFF0B1020),
+            backgroundColor: Color(0xFF121212),
             elevation: 0,
           ),
           textSelectionTheme: TextSelectionThemeData(
@@ -13665,10 +13665,10 @@ class _AuthScreenState extends State<AuthScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final style = isDark
         ? const SystemUiOverlayStyle(
-            statusBarColor: Color(0xFF0B1020),
+            statusBarColor: Color(0xFF121212),
             statusBarIconBrightness: Brightness.light,
             statusBarBrightness: Brightness.dark,
-            systemNavigationBarColor: Color(0xFF0B1020),
+            systemNavigationBarColor: Color(0xFF121212),
             systemNavigationBarIconBrightness: Brightness.light,
           )
         : const SystemUiOverlayStyle(
@@ -15801,7 +15801,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isDark
           ? const SystemUiOverlayStyle(
-              statusBarColor: Color(0xFF0B1020),
+              statusBarColor: Color(0xFF121212),
               statusBarIconBrightness: Brightness.light,
               statusBarBrightness: Brightness.dark,
               systemNavigationBarColor: Colors.transparent,
@@ -16399,7 +16399,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override Widget build(BuildContext context) {
     final isLight = Theme.of(context).brightness == Brightness.light;
-    final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF0B1020);
+    final bg = isLight ? const Color(0xFFF3FBFF) : const Color(0xFF121212);
     return ColoredBox(
       color: bg,
       child: LayoutBuilder(
@@ -16505,7 +16505,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _homePastelBackdrop(bool isLight) {
     if (!isLight) {
       // Match NGMY Hub darkness — solid canvas, no bluish gradient wash.
-      return const ColoredBox(color: Color(0xFF0B1020));
+      return const ColoredBox(color: Color(0xFF121212));
     }
     final baseColors = const [Color(0xFFF7FCFF), Color(0xFFEFF8FF), Color(0xFFF9F1FF)];
     return DecoratedBox(
@@ -23508,7 +23508,7 @@ class _InvestScreenState extends State<InvestScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? const [Color(0xFF0B1020), Color(0xFF0B1020), Color(0xFF0B1020), Color(0xFF0F766E)]
+              ? const [Color(0xFF121212), Color(0xFF121212), Color(0xFF121212), Color(0xFF0F766E)]
               : const [Color(0xFFE0F2FE), Color(0xFFEDE9FE), Color(0xFFDCFCE7), Color(0xFFFFFFFF)],
         ),
         border: Border.all(color: Colors.white.withValues(alpha: isDark ? 0.14 : 0.76), width: 1.2),
@@ -23846,7 +23846,7 @@ class _InvestScreenState extends State<InvestScreen> {
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: isDark
-                                  ? const [Color(0xFF0B1020), Color(0xFF0B1020), Color(0xFF141414)]
+                                  ? const [Color(0xFF121212), Color(0xFF121212), Color(0xFF1A1A1A)]
                                   : const [Color(0xFFFFFFFF), Color(0xFFE0F2FE), Color(0xFFF8FAFC)],
                             ),
                             border: Border.all(color: colors.first.withValues(alpha: 0.32)),
@@ -24370,7 +24370,7 @@ class _InvestScreenState extends State<InvestScreen> {
             margin: const EdgeInsets.all(14),
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0B1020) : Colors.white,
+              color: isDark ? const Color(0xFF121212) : Colors.white,
               borderRadius: BorderRadius.circular(28),
               border: Border.all(color: colors.first.withValues(alpha: 0.38)),
               boxShadow: [BoxShadow(color: colors.last.withValues(alpha: 0.25), blurRadius: 28, offset: const Offset(0, 14))],
@@ -26481,7 +26481,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     const profileColors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
     const legalFrameColors = [Color(0xFF3B82F6), Color(0xFF8B5CF6)];
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
       body: SafeArea(
         bottom: false,
         child: NgmyHudMotion(
@@ -28407,7 +28407,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-            backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFF091323),
+            backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFF091323),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             child: SizedBox(
               width: dialogW,
@@ -28629,7 +28629,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
             return Dialog(
               insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              backgroundColor: isDark ? const Color(0xFF0B1020) : Colors.white,
+              backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               child: SizedBox(
                 width: math.min(1250, screen.width - 16),
@@ -32200,7 +32200,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
     final card = isDark ? const Color(0xFF151C2C) : Colors.white;
-    final bg = isDark ? const Color(0xFF0B1020) : const Color(0xFFF7F8FA);
+    final bg = isDark ? const Color(0xFF121212) : const Color(0xFFF7F8FA);
 
     await showModalBottomSheet<void>(
       context: context,
@@ -32442,7 +32442,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
-    final bg = isDark ? const Color(0xFF0B1020) : const Color(0xFFF7F8FA);
+    final bg = isDark ? const Color(0xFF121212) : const Color(0xFFF7F8FA);
     final card = isDark ? const Color(0xFF151C2C) : Colors.white;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
 
@@ -36041,7 +36041,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       activeTab: _activeTab,
       onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, _maxCivicTabIndex)),
       child: Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF5F7FB),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -45413,7 +45413,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
     final savedPosts = _savedPostsForUser();
     final hasSavedPosts = savedPosts.isNotEmpty;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F7FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF),
       body: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -45643,9 +45643,9 @@ class _NgmySavedMediaScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F7FF),
+      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF),
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF0B1020) : Colors.white,
+        backgroundColor: isDark ? const Color(0xFF121212) : Colors.white,
         foregroundColor: isDark ? Colors.white : Colors.black87,
         elevation: 0,
         title: const Text('Saved', style: TextStyle(fontWeight: FontWeight.w800)),

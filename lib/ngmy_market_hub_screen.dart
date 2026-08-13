@@ -451,7 +451,7 @@ class _EssentialsThumbPreview extends StatelessWidget {
               end: Alignment.bottomRight,
               colors: isDark
                   ? const [
-                      Color(0xFF0B1020),
+                      Color(0xFF121212),
                       Color(0xFF0E7490),
                       Color(0xFF1E3A8A),
                     ]
