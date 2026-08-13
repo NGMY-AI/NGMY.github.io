@@ -876,8 +876,16 @@ List<FamilyMember> visibleMembers(FamilyTree tree) =>
     tree.members.where((m) => !m.hidden).toList();
 
 List<FamilyMember> childrenOf(FamilyTree tree, String parentId) {
+  final parent = tree.members.where((m) => m.id == parentId).firstOrNull;
   return visibleMembers(tree)
-      .where((m) => m.parentId == parentId)
+      .where((m) {
+        if (m.parentId != parentId) return false;
+        // Spouses linked to this parent should not count as their children.
+        if (parent != null) {
+          if (parent.spouseId == m.id || m.spouseId == parentId) return false;
+        }
+        return true;
+      })
       .toList()
     ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
 }

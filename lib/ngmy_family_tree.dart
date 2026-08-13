@@ -1309,19 +1309,43 @@ class _FamilyTreeLayout {
     }
 
     FamilyMember? layoutSpouseOf(FamilyMember member) {
-      final sid = member.spouseId;
-      if (sid == null || sid.isEmpty || !visibleIds.contains(sid)) return null;
-      if (nodes.containsKey(sid) || placingAncestors.contains(sid)) return null;
-      if (member.parentId == sid) return null;
-      return visible.firstWhere((m) => m.id == sid);
+      FamilyMember? candidate(String? sid) {
+        if (sid == null || sid.isEmpty || !visibleIds.contains(sid)) return null;
+        if (nodes.containsKey(sid) || placingAncestors.contains(sid)) return null;
+        if (member.parentId == sid) return null;
+        return visible.firstWhere((m) => m.id == sid);
+      }
+
+      // Prefer the explicit spouseId on this member.
+      final forward = candidate(member.spouseId);
+      if (forward != null) return forward;
+
+      // Also honor reverse links (partner listed this member as spouse).
+      for (final other in visible) {
+        if (other.id == member.id) continue;
+        if (other.spouseId != member.id) continue;
+        if (nodes.containsKey(other.id) || placingAncestors.contains(other.id)) continue;
+        if (member.parentId == other.id) continue;
+        return other;
+      }
+      return null;
     }
 
     bool canPairSpouseWidth(FamilyMember member) {
+      if (layoutSpouseOf(member) != null) return true;
       final sid = member.spouseId;
-      if (sid == null || sid.isEmpty || !visibleIds.contains(sid)) return false;
-      if (member.parentId == sid) return false;
-      if (placingAncestors.contains(sid)) return false;
-      return true;
+      if (sid != null &&
+          sid.isNotEmpty &&
+          visibleIds.contains(sid) &&
+          member.parentId != sid &&
+          !placingAncestors.contains(sid)) {
+        return true;
+      }
+      return visible.any((other) =>
+          other.id != member.id &&
+          other.spouseId == member.id &&
+          !placingAncestors.contains(other.id) &&
+          member.parentId != other.id);
     }
 
     double measure(String id) {
@@ -1396,7 +1420,11 @@ class _FamilyTreeLayout {
           // Only draw a line when this child was newly placed under this parent.
           if (!before && nodes.containsKey(child.id)) {
             final childNode = nodes[child.id]!;
-            final childSpouseId = childNode.member.spouseId;
+            final childSpouseId = childNode.member.spouseId ??
+                visible
+                    .where((o) => o.spouseId == child.id && nodes.containsKey(o.id))
+                    .map((o) => o.id)
+                    .firstOrNull;
             if (childSpouseId != null &&
                 nodes.containsKey(childSpouseId) &&
                 !placingAncestors.contains(childSpouseId)) {
@@ -1481,6 +1509,63 @@ class _FamilyTreeLayout {
 
     measure(root.id);
     place(root.id, 0, 0);
+
+    // Place any remaining visible members (disconnected branches / partners
+    // that were skipped) so the canvas always matches the member count.
+    var forestLeft = (subtreeWidths[root.id] ?? nodeWidth) + horizontalGap * 3;
+    for (final m in visible) {
+      if (nodes.containsKey(m.id)) continue;
+      // If this person is only a reverse-spouse of someone already placed, attach beside them.
+      final partner = visible.where((o) => o.spouseId == m.id || m.spouseId == o.id).where((o) => nodes.containsKey(o.id)).firstOrNull;
+      if (partner != null) {
+        final pNode = nodes[partner.id]!;
+        if (!nodes.containsKey(m.id)) {
+          final beside = Offset(pNode.position.dx + nodeWidth + horizontalGap, pNode.position.dy);
+          nodes[m.id] = _LayoutNode(member: m, position: beside);
+          edges.add(_TreeEdge(
+            _avatarCenter(pNode.position),
+            _avatarCenter(beside),
+            isSpouse: true,
+          ));
+        }
+        continue;
+      }
+      measure(m.id);
+      place(m.id, forestLeft, 0);
+      forestLeft += (subtreeWidths[m.id] ?? nodeWidth) + horizontalGap * 3;
+    }
+
+    // Drop parent→child edges that no longer point at a real node / overflow chip.
+    bool nearPlaced(Offset top) {
+      for (final n in nodes.values) {
+        if ((n.position.dx - top.dx).abs() <= nodeWidth && (n.position.dy - top.dy).abs() <= 2) {
+          return true;
+        }
+      }
+      for (final o in overflowNodes) {
+        if ((o.position.dx - top.dx).abs() <= nodeWidth && (o.position.dy - top.dy).abs() <= 2) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    edges.removeWhere((e) {
+      if (e.isSpouse) return false;
+      final tops = e.childTops;
+      if (tops == null || tops.isEmpty) return true;
+      final kept = tops.where(nearPlaced).toList();
+      if (kept.isEmpty) return true;
+      return false;
+    });
+    for (var i = 0; i < edges.length; i++) {
+      final e = edges[i];
+      if (e.isSpouse || e.childTops == null) continue;
+      final kept = e.childTops!.where(nearPlaced).toList();
+      if (kept.length != e.childTops!.length) {
+        edges[i] = _TreeEdge(e.from, e.to, childTops: kept);
+      }
+    }
 
     var minX = double.infinity;
     var maxX = 0.0;

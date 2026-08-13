@@ -115,8 +115,8 @@ class NgmyHudTechFrame extends StatelessWidget {
     // Opaque fills only — translucent + BackdropFilter made Advisors look milky/blurry.
     final fill = dark
         ? [
-            const Color(0xFF0B1220),
-            Color.lerp(const Color(0xFF0B1220), colors.first, 0.28 + pulse * 0.08)!,
+            const Color(0xFF0B1020),
+            Color.lerp(const Color(0xFF0B1020), colors.first, 0.28 + pulse * 0.08)!,
             Color.lerp(const Color(0xFF020617), colors.last, 0.18)!,
             const Color(0xFF020617),
           ]
@@ -682,7 +682,7 @@ class NgmyToolkitAlivePageChrome extends StatelessWidget {
     final dark = NgmyHudInk.isDark(context);
     final pageColors = dark
         ? [
-            const Color(0xFF0B1220),
+            const Color(0xFF0B1020),
             Color.lerp(const Color(0xFF111827), colors.first.withValues(alpha: 0.22), pulse)!,
             Color.lerp(const Color(0xFF0B1020), colors.last.withValues(alpha: 0.18), 1 - pulse)!,
           ]

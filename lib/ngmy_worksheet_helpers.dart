@@ -271,12 +271,12 @@ class WorksheetPalette {
   static const greenDark = Color(0xFF059669);
   static const teal = Color(0xFF14B8A6);
 
-  Color get pageBg => isDark ? const Color(0xFF0B1018) : const Color(0xFFF3F4F6);
-  Color get cardBg => isDark ? const Color(0xFF151D2B) : Colors.white;
-  Color get cardBorder => isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB);
+  Color get pageBg => isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F4F6);
+  Color get cardBg => isDark ? const Color(0xFF141414) : Colors.white;
+  Color get cardBorder => isDark ? const Color(0xFF2A2A2A) : const Color(0xFFE5E7EB);
   Color get primaryText => isDark ? const Color(0xFFF8FAFC) : const Color(0xFF111827);
-  Color get secondaryText => isDark ? const Color(0xFF94A3B8) : const Color(0xFF6B7280);
-  Color get mutedSurface => isDark ? const Color(0xFF1E293B) : const Color(0xFFF9FAFB);
+  Color get secondaryText => isDark ? const Color(0xFFA3A3A3) : const Color(0xFF6B7280);
+  Color get mutedSurface => isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF9FAFB);
   Color get shadow => Colors.black.withValues(alpha: isDark ? 0.35 : 0.08);
   Color get tabInactive => secondaryText;
 }

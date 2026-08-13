@@ -3063,7 +3063,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     }
     final topPad = MediaQuery.paddingOf(context).top + (_searchOpen ? 188 : 178);
     final bottomPad = MediaQuery.paddingOf(context).bottom + 12;
-    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
+    final scaffoldBg = isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F7FF);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
@@ -5099,7 +5099,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         : _isTextCoach || ngmyCommunicateRoleIsRomantic(widget.profile.role)
             ? const Color(0xFF9333EA)
             : kNgmyAdvisorsHubAccent2;
-    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF3F7FF);
+    final scaffoldBg = isDark ? const Color(0xFF0B1020) : const Color(0xFFF3F7FF);
 
     return Scaffold(
       backgroundColor: scaffoldBg,
