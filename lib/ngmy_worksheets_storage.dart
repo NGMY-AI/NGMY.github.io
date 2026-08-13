@@ -804,7 +804,7 @@ Future<List<FamilyTree>> loadFamilyTrees(String userEmail) async {
   final remote = await _fetchFamilyTreesFromCloud(userEmail);
   if (remote == null) return local;
 
-  final merged = _mergeFamilyTreeLists(local, remote);
+  final merged = _mergeFamilyTreeLists(local, remote, forUserEmail: userEmail);
   final mergedJson = jsonEncode(merged.map((t) => t.toJson()).toList());
   if (mergedJson != (raw ?? '')) {
     await _persistFamilyTreesLocally(userEmail, merged);
@@ -994,6 +994,7 @@ FamilyTree mergeFamilyTreeCloudIntoLocal(FamilyTree local, FamilyTree remote) {
   return local.copyWith(
     name: remote.name.isNotEmpty ? remote.name : local.name,
     code: remote.code.isNotEmpty ? remote.code : local.code,
+    isPrivate: remote.isPrivate,
     collaboratorEmails: remote.collaboratorEmails.isNotEmpty ? remote.collaboratorEmails : local.collaboratorEmails,
     members: merged,
     ownerEmail: local.ownerEmail.isNotEmpty ? local.ownerEmail : remote.ownerEmail,
@@ -1144,8 +1145,18 @@ Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
     } catch (e) {
       debugPrint('[family_trees] collaborator fetch: $e');
     }
+    List<dynamic> publicRows = const [];
+    try {
+      publicRows = await Supabase.instance.client
+          .from('family_trees')
+          .select()
+          .eq('isPrivate', false)
+          .timeout(kNgmyCloudLoadTimeout);
+    } catch (e) {
+      debugPrint('[family_trees] public fetch: $e');
+    }
     final byId = <String, Map<String, dynamic>>{};
-    for (final row in [...(ownedRows as List), ...(collabRows as List)]) {
+    for (final row in [...(ownedRows as List), ...(collabRows as List), ...(publicRows as List)]) {
       if (row is Map) {
         final map = Map<String, dynamic>.from(row);
         final id = (map['id'] ?? '').toString();
@@ -1167,12 +1178,27 @@ Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
   }
 }
 
-List<FamilyTree> _mergeFamilyTreeLists(List<FamilyTree> local, List<FamilyTree> remote) {
+List<FamilyTree> _mergeFamilyTreeLists(
+  List<FamilyTree> local,
+  List<FamilyTree> remote, {
+  String forUserEmail = '',
+}) {
   if (remote.isEmpty) return local;
-  if (local.isEmpty) return remote;
+  final me = _normalizedEmail(forUserEmail);
+  final remoteIds = remote.map((t) => t.id).where((id) => id.isNotEmpty).toSet();
   final byId = <String, FamilyTree>{};
   for (final t in local) {
-    if (t.id.isNotEmpty) byId[t.id] = t;
+    if (t.id.isEmpty) continue;
+    // Drop cached public trees from other owners once they are no longer public/shared.
+    final owner = familyTreeOwnerEmail(t, me);
+    final foreignViewer = me.isNotEmpty &&
+        owner != me &&
+        t.localRole == FamilyTreeAccessRole.viewer &&
+        !t.collaboratorEmails.map(_normalizedEmail).contains(me);
+    if (foreignViewer && !remoteIds.contains(t.id)) {
+      continue;
+    }
+    byId[t.id] = t;
   }
   for (final r in remote) {
     if (r.id.isEmpty) continue;
@@ -1181,7 +1207,12 @@ List<FamilyTree> _mergeFamilyTreeLists(List<FamilyTree> local, List<FamilyTree> 
       byId[r.id] = r;
       continue;
     }
-    byId[r.id] = mergeFamilyTreeCloudIntoLocal(existing, r);
+    final merged = mergeFamilyTreeCloudIntoLocal(existing, r);
+    // Prefer remote role when this user does not own the tree.
+    final owner = familyTreeOwnerEmail(merged, me);
+    byId[r.id] = owner == me
+        ? merged.copyWith(localRole: FamilyTreeAccessRole.owner, isPrivate: r.isPrivate)
+        : merged.copyWith(localRole: r.localRole, isPrivate: r.isPrivate);
   }
   return byId.values.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }

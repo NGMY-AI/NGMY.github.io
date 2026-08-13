@@ -298,7 +298,9 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
                       Text(tree.name, style: TextStyle(fontWeight: FontWeight.w800, color: p.primaryText)),
                       const SizedBox(height: 2),
                       Text(
-                        '${tree.visibleMemberCount} members · Code: ${tree.code}${tree.isViewOnly ? ' · View only' : ''}',
+                        '${tree.visibleMemberCount} members · Code: ${tree.code}'
+                        '${tree.isPrivate ? '' : ' · Public'}'
+                        '${tree.isViewOnly ? ' · View only' : ''}',
                         style: TextStyle(color: p.secondaryText, fontSize: 12),
                       ),
                     ],
@@ -342,6 +344,10 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   final List<FamilyTree> _undoStack = [];
   bool _showHidden = false;
   final Set<String> _expandedChildGroups = {};
+  final ScrollController _hScroll = ScrollController();
+  final ScrollController _vScroll = ScrollController();
+  bool _didCenterRoot = false;
+  String? _centeredForTreeId;
 
   @override
   void initState() {
@@ -358,9 +364,65 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     }
   }
 
+  @override
+  void dispose() {
+    _hScroll.dispose();
+    _vScroll.dispose();
+    super.dispose();
+  }
+
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
 
   bool get _canEdit => familyTreeCanEdit(_tree, widget.userEmail);
+
+  Future<void> _togglePrivacy() async {
+    if (!_isAdmin) {
+      _toast('Only an admin can make a family tree public or private.');
+      return;
+    }
+    final nextPrivate = !_tree.isPrivate;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(nextPrivate ? 'Make private?' : 'Make public?'),
+        content: Text(
+          nextPrivate
+              ? 'Private trees are only visible to the owner and invited collaborators.'
+              : 'Public trees appear in Family Trees for every NGMY user (view only for others).',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: WorksheetPalette.teal),
+            child: Text(nextPrivate ? 'Make private' : 'Make public'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _pushUndo();
+    setState(() => _tree = _tree.copyWith(isPrivate: nextPrivate));
+    await _persist();
+    widget.onDataChanged();
+    _toast(nextPrivate ? 'Family tree is now private.' : 'Family tree is now public for all users.');
+  }
+
+  void _scheduleCenterRoot({
+    required double rootCenterX,
+  }) {
+    if (_centeredForTreeId == _tree.id && _didCenterRoot) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_hScroll.hasClients) return;
+      final maxScroll = _hScroll.position.maxScrollExtent;
+      final target = rootCenterX.clamp(0.0, maxScroll);
+      if ((_hScroll.offset - target).abs() > 1) {
+        _hScroll.jumpTo(target);
+      }
+      _didCenterRoot = true;
+      _centeredForTreeId = _tree.id;
+    });
+  }
 
   Future<void> _loadLocalTree() async {
     final trees = await loadFamilyTreesLocalOnly(widget.userEmail);
@@ -873,31 +935,40 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                     )
                   : LayoutBuilder(
                       builder: (context, constraints) {
+                        final layout = _FamilyTreeLayout.compute(
+                          _tree,
+                          showHidden: _showHidden,
+                          expandedChildGroups: _expandedChildGroups,
+                        );
+                        final vpW = constraints.maxWidth;
+                        final rootX = layout.rootCenterX;
+                        if (layout.nodes.isNotEmpty) {
+                          _scheduleCenterRoot(rootCenterX: rootX);
+                        }
                         return SingleChildScrollView(
+                          controller: _hScroll,
                           scrollDirection: Axis.horizontal,
                           child: SingleChildScrollView(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minWidth: constraints.maxWidth,
-                                minHeight: math.max(320, constraints.maxHeight),
-                              ),
-                              child: Center(
-                                child: FamilyTreeCanvas(
-                                  tree: _tree,
-                                  showHidden: _showHidden,
-                                  expandedChildGroups: _expandedChildGroups,
-                                  onToggleChildGroup: (parentId) {
-                                    setState(() {
-                                      if (_expandedChildGroups.contains(parentId)) {
-                                        _expandedChildGroups.remove(parentId);
-                                      } else {
-                                        _expandedChildGroups.add(parentId);
-                                      }
-                                    });
-                                  },
-                                  onMemberTap: _onMemberTap,
-                                  isDark: p.isDark,
-                                ),
+                            controller: _vScroll,
+                            child: Padding(
+                              // Extra side padding so the root can sit in the middle of the screen.
+                              padding: EdgeInsets.symmetric(horizontal: vpW / 2),
+                              child: _FamilyTreeCanvas(
+                                tree: _tree,
+                                layout: layout,
+                                showHidden: _showHidden,
+                                expandedChildGroups: _expandedChildGroups,
+                                onToggleChildGroup: (parentId) {
+                                  setState(() {
+                                    if (_expandedChildGroups.contains(parentId)) {
+                                      _expandedChildGroups.remove(parentId);
+                                    } else {
+                                      _expandedChildGroups.add(parentId);
+                                    }
+                                  });
+                                },
+                                onMemberTap: _onMemberTap,
+                                isDark: p.isDark,
                               ),
                             ),
                           ),
@@ -978,7 +1049,19 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                   runSpacing: 4,
                   children: [
                     _metaChip(Icons.people_outline, '${_tree.visibleMemberCount} members'),
-                    _metaChip(Icons.lock_outline, _tree.isPrivate ? 'Private' : 'Public'),
+                    InkWell(
+                      onTap: _isAdmin ? _togglePrivacy : null,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                        child: _metaChip(
+                          _tree.isPrivate ? Icons.lock_outline : Icons.public,
+                          _tree.isPrivate
+                              ? (_isAdmin ? 'Private · tap to publish' : 'Private')
+                              : (_isAdmin ? 'Public · tap to privatize' : 'Public'),
+                        ),
+                      ),
+                    ),
                     _metaChip(Icons.tag, 'Code: ${_tree.code}'),
                     InkWell(
                       onTap: _manageCollaborators,
@@ -1011,17 +1094,18 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 }
 
-class FamilyTreeCanvas extends StatelessWidget {
+class _FamilyTreeCanvas extends StatelessWidget {
   final FamilyTree tree;
+  final _FamilyTreeLayout? layout;
   final bool showHidden;
   final Set<String> expandedChildGroups;
   final ValueChanged<String> onToggleChildGroup;
   final ValueChanged<FamilyMember> onMemberTap;
   final bool isDark;
 
-  const FamilyTreeCanvas({
-    super.key,
+  const _FamilyTreeCanvas({
     required this.tree,
+    this.layout,
     required this.showHidden,
     required this.expandedChildGroups,
     required this.onToggleChildGroup,
@@ -1031,11 +1115,12 @@ class FamilyTreeCanvas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final layout = _FamilyTreeLayout.compute(
-      tree,
-      showHidden: showHidden,
-      expandedChildGroups: expandedChildGroups,
-    );
+    final layout = this.layout ??
+        _FamilyTreeLayout.compute(
+          tree,
+          showHidden: showHidden,
+          expandedChildGroups: expandedChildGroups,
+        );
     if (layout.nodes.isEmpty && layout.overflowNodes.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -1137,6 +1222,7 @@ class _FamilyTreeLayout {
   final List<_OverflowLayoutNode> overflowNodes;
   final double width;
   final double height;
+  final String? rootId;
 
   const _FamilyTreeLayout({
     required this.nodes,
@@ -1144,7 +1230,21 @@ class _FamilyTreeLayout {
     this.overflowNodes = const [],
     required this.width,
     required this.height,
+    this.rootId,
   });
+
+  /// Root X in scroll content (canvas left padding included).
+  double get rootCenterX {
+    if (rootId == null) return width / 2;
+    final root = nodes[rootId!];
+    if (root == null) return width / 2;
+    final spouseId = root.member.spouseId;
+    if (spouseId != null && nodes.containsKey(spouseId)) {
+      final spouse = nodes[spouseId]!;
+      return (root.position.dx + spouse.position.dx) / 2 + 16;
+    }
+    return root.position.dx + 16;
+  }
 
   static Offset _nodeBottom(Offset topCenter) => Offset(topCenter.dx, topCenter.dy + nodeHeight);
 
@@ -1192,10 +1292,36 @@ class _FamilyTreeLayout {
     final edges = <_TreeEdge>[];
     final overflowNodes = <_OverflowLayoutNode>[];
     final subtreeWidths = <String, double>{};
+    final placingAncestors = <String>{};
+
+    bool isPartnerOf(String parentId, FamilyMember m) {
+      final parent = visible.where((x) => x.id == parentId).firstOrNull;
+      if (parent == null) return false;
+      if (parent.spouseId == m.id) return true;
+      if (m.spouseId == parentId) return true;
+      return false;
+    }
 
     List<FamilyMember> kidsOf(String id) {
-      return visible.where((m) => m.parentId == id).toList()
+      // Never lay out a spouse as a child of their partner — that creates orphan lines.
+      return visible.where((m) => m.parentId == id && !isPartnerOf(id, m)).toList()
         ..sort((a, b) => a.birthOrder.compareTo(b.birthOrder));
+    }
+
+    FamilyMember? layoutSpouseOf(FamilyMember member) {
+      final sid = member.spouseId;
+      if (sid == null || sid.isEmpty || !visibleIds.contains(sid)) return null;
+      if (nodes.containsKey(sid) || placingAncestors.contains(sid)) return null;
+      if (member.parentId == sid) return null;
+      return visible.firstWhere((m) => m.id == sid);
+    }
+
+    bool canPairSpouseWidth(FamilyMember member) {
+      final sid = member.spouseId;
+      if (sid == null || sid.isEmpty || !visibleIds.contains(sid)) return false;
+      if (member.parentId == sid) return false;
+      if (placingAncestors.contains(sid)) return false;
+      return true;
     }
 
     double measure(String id) {
@@ -1205,7 +1331,7 @@ class _FamilyTreeLayout {
       final split = _splitChildren(tree, member, kids, expandedChildGroups);
 
       var width = nodeWidth;
-      if (member.spouseId != null && visibleIds.contains(member.spouseId)) {
+      if (canPairSpouseWidth(member)) {
         width = nodeWidth * 2 + horizontalGap;
       }
 
@@ -1230,85 +1356,127 @@ class _FamilyTreeLayout {
     void place(String id, double left, int depth) {
       if (nodes.containsKey(id)) return;
 
-      final member = visible.firstWhere((m) => m.id == id);
-      final kids = kidsOf(id);
-      final split = _splitChildren(tree, member, kids, expandedChildGroups);
+      placingAncestors.add(id);
+      try {
+        final member = visible.firstWhere((m) => m.id == id);
+        final kids = kidsOf(id);
+        final split = _splitChildren(tree, member, kids, expandedChildGroups);
 
-      final subtreeW = subtreeWidths[id] ?? nodeWidth;
-      final rowTop = titleBlockHeight + depth * verticalStep;
+        final subtreeW = subtreeWidths[id] ?? nodeWidth;
+        final rowTop = titleBlockHeight + depth * verticalStep;
+        final spouse = layoutSpouseOf(member);
 
-      FamilyMember? spouse;
-      if (member.spouseId != null && visibleIds.contains(member.spouseId)) {
-        spouse = visible.firstWhere((m) => m.id == member.spouseId);
-      }
+        if (split.shown.isEmpty) {
+          final centerX = left + subtreeW / 2;
+          if (spouse != null && !nodes.containsKey(spouse.id)) {
+            final half = nodeWidth / 2 + horizontalGap / 2;
+            final memberTop = Offset(centerX - half, rowTop);
+            final spouseTop = Offset(centerX + half, rowTop);
+            nodes[member.id] = _LayoutNode(member: member, position: memberTop);
+            nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
+            edges.add(_TreeEdge(
+              _avatarCenter(memberTop),
+              _avatarCenter(spouseTop),
+              isSpouse: true,
+            ));
+          } else {
+            nodes[id] = _LayoutNode(member: member, position: Offset(centerX, rowTop));
+          }
+          return;
+        }
 
-      if (split.shown.isEmpty) {
-        final centerX = left + subtreeW / 2;
+        var cursor = left;
+        final childRowTop = titleBlockHeight + (depth + 1) * verticalStep;
+        final childConnectorTops = <Offset>[];
+
+        for (final child in split.shown) {
+          final w = subtreeWidths[child.id] ?? nodeWidth;
+          final before = nodes.containsKey(child.id);
+          place(child.id, cursor, depth + 1);
+          // Only draw a line when this child was newly placed under this parent.
+          if (!before && nodes.containsKey(child.id)) {
+            final childNode = nodes[child.id]!;
+            final childSpouseId = childNode.member.spouseId;
+            if (childSpouseId != null &&
+                nodes.containsKey(childSpouseId) &&
+                !placingAncestors.contains(childSpouseId)) {
+              final spousePos = nodes[childSpouseId]!.position;
+              // Couple must share this row — otherwise the spouse belongs elsewhere.
+              if ((spousePos.dy - childNode.position.dy).abs() < 1) {
+                final mid = Offset(
+                  (childNode.position.dx + spousePos.dx) / 2,
+                  childNode.position.dy,
+                );
+                childConnectorTops.add(_nodeTop(mid));
+              } else {
+                childConnectorTops.add(_nodeTop(childNode.position));
+              }
+            } else {
+              childConnectorTops.add(_nodeTop(childNode.position));
+            }
+          }
+          cursor += w + horizontalGap;
+        }
+
+        if (split.hasOverflow) {
+          final overflowCenter = cursor + nodeWidth / 2;
+          overflowNodes.add(_OverflowLayoutNode(
+            parentId: id,
+            position: Offset(overflowCenter, childRowTop),
+            hiddenMembers: split.hidden,
+            count: split.hidden.length,
+          ));
+          childConnectorTops.add(_nodeTop(Offset(overflowCenter, childRowTop)));
+          cursor += nodeWidth;
+        }
+
+        if (childConnectorTops.isEmpty) {
+          final centerX = left + subtreeW / 2;
+          if (spouse != null && !nodes.containsKey(spouse.id)) {
+            final half = nodeWidth / 2 + horizontalGap / 2;
+            final memberTop = Offset(centerX - half, rowTop);
+            final spouseTop = Offset(centerX + half, rowTop);
+            nodes[member.id] = _LayoutNode(member: member, position: memberTop);
+            nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
+            edges.add(_TreeEdge(
+              _avatarCenter(memberTop),
+              _avatarCenter(spouseTop),
+              isSpouse: true,
+            ));
+          } else if (!nodes.containsKey(id)) {
+            nodes[id] = _LayoutNode(member: member, position: Offset(centerX, rowTop));
+          }
+          return;
+        }
+
+        final parentCenterX = childConnectorTops.length == 1
+            ? childConnectorTops.first.dx
+            : (childConnectorTops.first.dx + childConnectorTops.last.dx) / 2;
+
+        Offset parentTop;
+        Offset parentConnectorBottom;
         if (spouse != null && !nodes.containsKey(spouse.id)) {
           final half = nodeWidth / 2 + horizontalGap / 2;
-          final memberTop = Offset(centerX - half, rowTop);
-          final spouseTop = Offset(centerX + half, rowTop);
-          nodes[member.id] = _LayoutNode(member: member, position: memberTop);
+          parentTop = Offset(parentCenterX - half, rowTop);
+          final spouseTop = Offset(parentCenterX + half, rowTop);
+          nodes[member.id] = _LayoutNode(member: member, position: parentTop);
           nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
-          edges.add(_TreeEdge(
-            _avatarCenter(memberTop),
-            _avatarCenter(spouseTop),
-            isSpouse: true,
-          ));
+          edges.add(_TreeEdge(_avatarCenter(parentTop), _avatarCenter(spouseTop), isSpouse: true));
+          parentConnectorBottom = Offset(parentCenterX, rowTop + nodeHeight);
         } else {
-          nodes[id] = _LayoutNode(member: member, position: Offset(centerX, rowTop));
+          parentTop = Offset(parentCenterX, rowTop);
+          nodes[id] = _LayoutNode(member: member, position: parentTop);
+          parentConnectorBottom = _nodeBottom(parentTop);
         }
-        return;
-      }
 
-      var cursor = left;
-      final childRowTop = titleBlockHeight + (depth + 1) * verticalStep;
-      final childConnectorTops = <Offset>[];
-
-      for (final child in split.shown) {
-        final w = subtreeWidths[child.id] ?? nodeWidth;
-        place(child.id, cursor, depth + 1);
-        childConnectorTops.add(_nodeTop(nodes[child.id]!.position));
-        cursor += w + horizontalGap;
-      }
-
-      if (split.hasOverflow) {
-        final overflowCenter = cursor + nodeWidth / 2;
-        overflowNodes.add(_OverflowLayoutNode(
-          parentId: id,
-          position: Offset(overflowCenter, childRowTop),
-          hiddenMembers: split.hidden,
-          count: split.hidden.length,
+        edges.add(_TreeEdge(
+          parentConnectorBottom,
+          Offset.zero,
+          childTops: childConnectorTops,
         ));
-        childConnectorTops.add(_nodeTop(Offset(overflowCenter, childRowTop)));
-        cursor += nodeWidth;
+      } finally {
+        placingAncestors.remove(id);
       }
-
-      final parentCenterX = childConnectorTops.length == 1
-          ? childConnectorTops.first.dx
-          : (childConnectorTops.first.dx + childConnectorTops.last.dx) / 2;
-
-      Offset parentTop;
-      Offset parentConnectorBottom;
-      if (spouse != null && !nodes.containsKey(spouse.id)) {
-        final half = nodeWidth / 2 + horizontalGap / 2;
-        parentTop = Offset(parentCenterX - half, rowTop);
-        final spouseTop = Offset(parentCenterX + half, rowTop);
-        nodes[member.id] = _LayoutNode(member: member, position: parentTop);
-        nodes[spouse.id] = _LayoutNode(member: spouse, position: spouseTop);
-        edges.add(_TreeEdge(_avatarCenter(parentTop), _avatarCenter(spouseTop), isSpouse: true));
-        parentConnectorBottom = Offset(parentCenterX, rowTop + nodeHeight);
-      } else {
-        parentTop = Offset(parentCenterX, rowTop);
-        nodes[id] = _LayoutNode(member: member, position: parentTop);
-        parentConnectorBottom = _nodeBottom(parentTop);
-      }
-
-      edges.add(_TreeEdge(
-        parentConnectorBottom,
-        Offset.zero,
-        childTops: childConnectorTops,
-      ));
     }
 
     measure(root.id);
@@ -1327,6 +1495,7 @@ class _FamilyTreeLayout {
       maxX = math.max(maxX, overflow.position.dx + nodeWidth / 2);
       maxY = math.max(maxY, overflow.position.dy + nodeHeight + 40);
     }
+    if (minX == double.infinity) minX = 0;
 
     final shiftX = canvasPad - minX;
     if (shiftX != 0) {
@@ -1364,6 +1533,7 @@ class _FamilyTreeLayout {
       overflowNodes: overflowNodes,
       width: maxX + canvasPad,
       height: maxY + canvasPad,
+      rootId: root.id,
     );
   }
 }
@@ -1386,12 +1556,19 @@ class _FamilyTreeLinesPainter extends CustomPainter {
     if (childTops.isEmpty) return;
     childTops.sort((a, b) => a.dx.compareTo(b.dx));
 
+    final midY = parentBottom.dy + (childTops.first.dy - parentBottom.dy) / 2;
     if (childTops.length == 1) {
-      canvas.drawLine(parentBottom, childTops.first, paint);
+      final childTop = childTops.first;
+      if ((childTop.dx - parentBottom.dx).abs() < 0.5) {
+        canvas.drawLine(parentBottom, childTop, paint);
+      } else {
+        canvas.drawLine(parentBottom, Offset(parentBottom.dx, midY), paint);
+        canvas.drawLine(Offset(parentBottom.dx, midY), Offset(childTop.dx, midY), paint);
+        canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
+      }
       return;
     }
 
-    final midY = parentBottom.dy + (childTops.first.dy - parentBottom.dy) / 2;
     final path = Path()
       ..moveTo(parentBottom.dx, parentBottom.dy)
       ..lineTo(parentBottom.dx, midY)
