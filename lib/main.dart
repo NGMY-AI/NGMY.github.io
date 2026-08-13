@@ -32194,6 +32194,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _showSoftDeletedMembersSheet() async {
     if (!_canUseRegistrarToolsHere()) return;
     NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
+    NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(widget.config);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
     final card = isDark ? const Color(0xFF151C2C) : Colors.white;
@@ -32204,161 +32205,176 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        final softDeleted = NgmyCivicRegistryMembers.softDeletedForState(
-          widget.config,
-          _selectedState,
-        );
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-            child: Container(
-              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.45 : 0.12),
-                    blurRadius: 28,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : const Color(0xFFD0D5DD),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Pending deletes',
-                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
-                            ),
-                            Text(
-                              '$_selectedState · recoverable for 7 days',
-                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444).withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${softDeleted.length}',
-                          style: const TextStyle(
-                            color: Color(0xFFEF4444),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 12,
-                          ),
-                        ),
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final softDeleted = NgmyCivicRegistryMembers.softDeletedForState(
+              widget.config,
+              _selectedState,
+            );
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                child: Container(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.7),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.45 : 0.12),
+                        blurRadius: 28,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  if (softDeleted.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 28),
-                      child: Text(
-                        'No pending deletes for $_selectedState.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white24 : const Color(0xFFD0D5DD),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                        ),
                       ),
-                    )
-                  else
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: softDeleted.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) {
-                          final row = softDeleted[i];
-                          final snap = row['snapshot'] is Map
-                              ? Map<String, dynamic>.from(row['snapshot'] as Map)
-                              : <String, dynamic>{};
-                          final name = (snap['fullName'] ?? row['email'] ?? 'Member').toString();
-                          final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toLocal();
-                          final daysLeft = purge == null
-                              ? NgmyCivicRegistryMembers.softDeleteDays
-                              : purge.difference(DateTime.now()).inDays.clamp(0, 7);
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: card,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                              color: Colors.green.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            child: Row(
+                            child: const Icon(Icons.verified_user_rounded, color: Colors.green, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink)),
-                                      Text(
-                                        '$daysLeft day(s) left to recover',
-                                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-                                      ),
-                                    ],
-                                  ),
+                                Text(
+                                  'Pending deletes',
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
                                 ),
-                                FilledButton(
-                                  onPressed: () async {
-                                    Navigator.pop(ctx);
-                                    await _restoreSoftDeletedMember(row);
-                                  },
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: const Color(0xFF059669),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    minimumSize: const Size(0, 34),
-                                  ),
-                                  child: const Text('Recover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                Text(
+                                  '$_selectedState · recoverable for 7 days',
+                                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
                                 ),
                               ],
                             ),
-                          );
-                        },
+                          ),
+                          if (softDeleted.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEF4444).withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${softDeleted.length}',
+                                style: const TextStyle(
+                                  color: Color(0xFFEF4444),
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                ],
+                      const SizedBox(height: 12),
+                      if (softDeleted.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 28),
+                          child: Text(
+                            'No pending deletes for $_selectedState.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: isDark ? Colors.white54 : Colors.black54),
+                          ),
+                        )
+                      else
+                        Flexible(
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: softDeleted.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            itemBuilder: (_, i) {
+                              final row = softDeleted[i];
+                              final snap = row['snapshot'] is Map
+                                  ? Map<String, dynamic>.from(row['snapshot'] as Map)
+                                  : <String, dynamic>{};
+                              final name = (snap['fullName'] ?? row['email'] ?? 'Member').toString();
+                              final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toLocal();
+                              final daysLeft = purge == null
+                                  ? NgmyCivicRegistryMembers.softDeleteDays
+                                  : purge.difference(DateTime.now()).inDays.clamp(0, 7);
+                              return Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: card,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink)),
+                                          Text(
+                                            '$daysLeft day(s) left to recover',
+                                            style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () async {
+                                        final ok = await _restoreSoftDeletedMember(row);
+                                        if (!ctx.mounted) return;
+                                        setSheet(() {});
+                                        if (mounted) setState(() {});
+                                        if (ok &&
+                                            NgmyCivicRegistryMembers.softDeletedCountForState(
+                                                  widget.config,
+                                                  _selectedState,
+                                                ) ==
+                                                0) {
+                                          Navigator.pop(ctx);
+                                        }
+                                      },
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: const Color(0xFF059669),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        minimumSize: const Size(0, 34),
+                                      ),
+                                      child: const Text('Recover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
     if (mounted) setState(() {});
   }
 
-  Future<void> _restoreSoftDeletedMember(Map<String, dynamic> tombstone) async {
+  Future<bool> _restoreSoftDeletedMember(Map<String, dynamic> tombstone) async {
     final email = NgmyCivicRegistryMembers.emailKey((tombstone['email'] ?? '').toString());
     final rid = (tombstone['registryId'] ?? '').toString().trim();
     final ok = NgmyCivicRegistryMembers.restoreSoftDeleted(
@@ -32367,11 +32383,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       registryId: rid,
     );
     if (!ok) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not restore that member.')),
       );
-      return;
+      return false;
     }
     final snap = tombstone['snapshot'];
     if (snap is Map && email.isNotEmpty) {
@@ -32393,8 +32409,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     }
     await ngmyPersistCivicRegistryMembers(widget.config);
+    // Persist can re-merge cloud tombstones — strip any that belong to live members
+    // and push again so other devices stop showing them as pending deletes.
+    final cleaned = NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(widget.config);
+    if (cleaned > 0) {
+      await ngmyPersistCivicRegistryMembers(widget.config);
+    } else {
+      await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    }
     NgmyAdminLiveRefresh.notify();
-    if (!mounted) return;
+    if (!mounted) return true;
     setState(() {});
     widget.onDataChanged();
     ScaffoldMessenger.of(context).showSnackBar(
@@ -32403,6 +32427,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: Color(0xFF059669),
       ),
     );
+    return true;
   }
 
   Future<void> _showCivicRegistryBackupSheet() async {

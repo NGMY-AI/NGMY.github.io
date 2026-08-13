@@ -79,12 +79,43 @@ class NgmyCivicRegistryMembers {
     } catch (_) {}
   }
 
-  static void _clearTombstone(dynamic config, String email) {
+  static void _clearTombstone(dynamic config, String email, {String registryId = ''}) {
     final key = emailKey(email);
-    if (key.isEmpty) return;
+    final rid = registryId.trim().toUpperCase();
+    if (key.isEmpty && rid.isEmpty) return;
     final next = removedFrom(config)
-      ..removeWhere((r) => emailKey((r['email'] ?? '').toString()) == key);
+      ..removeWhere((r) {
+        final e = emailKey((r['email'] ?? '').toString());
+        final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+        if (key.isNotEmpty && e == key) return true;
+        if (rid.isNotEmpty && id == rid) return true;
+        return false;
+      });
     setRemoved(config, next);
+  }
+
+  /// Drop soft-delete rows for anyone already back on the live roster.
+  static int clearSoftDeletesForActiveMembers(dynamic config) {
+    final activeEmails = <String>{};
+    final activeRids = <String>{};
+    for (final m in listFrom(config)) {
+      final e = emailKey((m['email'] ?? '').toString());
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (e.isNotEmpty) activeEmails.add(e);
+      if (id.isNotEmpty) activeRids.add(id);
+    }
+    final before = removedFrom(config);
+    final next = before.where((r) {
+      if (r['permanent'] == true) return true;
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      if (e.isNotEmpty && activeEmails.contains(e)) return false;
+      if (id.isNotEmpty && activeRids.contains(id)) return false;
+      return true;
+    }).map((e) => Map<String, dynamic>.from(e)).toList();
+    if (next.length == before.length) return 0;
+    setRemoved(config, next);
+    return before.length - next.length;
   }
 
   static const softDeleteDays = 7;
@@ -126,12 +157,25 @@ class NgmyCivicRegistryMembers {
   static List<Map<String, dynamic>> softDeletedForState(dynamic config, String state) {
     final st = state.trim().toLowerCase();
     final now = DateTime.now().toUtc();
+    final activeEmails = <String>{};
+    final activeRids = <String>{};
+    for (final m in listFrom(config)) {
+      final e = emailKey((m['email'] ?? '').toString());
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (e.isNotEmpty) activeEmails.add(e);
+      if (id.isNotEmpty) activeRids.add(id);
+    }
     return removedFrom(config).where((r) {
       if (r['permanent'] == true) return false;
-      if (r['softDelete'] != true && r['snapshot'] == null) return false;
+      if (r['softDelete'] != true) return false;
       if (st.isNotEmpty && (r['state'] ?? '').toString().trim().toLowerCase() != st) {
         return false;
       }
+      final email = emailKey((r['email'] ?? '').toString());
+      final rid = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      // Already restored into the live roster — never show as pending delete.
+      if (email.isNotEmpty && activeEmails.contains(email)) return false;
+      if (rid.isNotEmpty && activeRids.contains(rid)) return false;
       final purge = DateTime.tryParse((r['purgeAt'] ?? '').toString())?.toUtc();
       if (purge != null && !purge.isAfter(now)) return false;
       return true;
@@ -183,22 +227,49 @@ class NgmyCivicRegistryMembers {
     final key = emailKey(email);
     final rid = registryId.trim().toUpperCase();
     final removed = removedFrom(config);
-    final idx = removed.indexWhere((r) {
-      if (r['permanent'] == true) return false;
+    final matches = <int>[];
+    for (var i = 0; i < removed.length; i++) {
+      final r = removed[i];
+      if (r['permanent'] == true) continue;
       final e = emailKey((r['email'] ?? '').toString());
       final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
-      if (key.isNotEmpty && e == key) return true;
-      if (rid.isNotEmpty && id == rid) return true;
-      return false;
-    });
-    if (idx < 0) return false;
-    final row = Map<String, dynamic>.from(removed[idx]);
-    final snapRaw = row['snapshot'];
-    if (snapRaw is! Map) return false;
-    final snap = Map<String, dynamic>.from(snapRaw);
-    removed.removeAt(idx);
-    setRemoved(config, removed);
+      if (key.isNotEmpty && e == key) {
+        matches.add(i);
+        continue;
+      }
+      if (rid.isNotEmpty && id == rid) matches.add(i);
+    }
+    if (matches.isEmpty) return false;
+
+    Map<String, dynamic>? snap;
+    for (final i in matches) {
+      final snapRaw = removed[i]['snapshot'];
+      if (snapRaw is Map) {
+        snap = Map<String, dynamic>.from(snapRaw);
+        break;
+      }
+    }
+    if (snap == null) return false;
+
+    // Remove every matching soft-delete row (email and/or registry id).
+    final drop = matches.toSet();
+    final nextRemoved = <Map<String, dynamic>>[];
+    for (var i = 0; i < removed.length; i++) {
+      if (drop.contains(i)) continue;
+      nextRemoved.add(Map<String, dynamic>.from(removed[i]));
+    }
+    setRemoved(config, nextRemoved);
+
+    // Newer stamp so cloud tombstone merges cannot resurrect this delete.
+    final now = DateTime.now().toUtc().toIso8601String();
+    snap['updatedAt'] = now;
+    snap['restoredAt'] = now;
+    final snapEmail = emailKey((snap['email'] ?? key).toString());
+    final snapRid = (snap['registryId'] ?? rid).toString();
+    if (snapEmail.isNotEmpty) snap['email'] = snapEmail;
     upsert(config, snap);
+    _clearTombstone(config, snapEmail, registryId: snapRid);
+    clearSoftDeletesForActiveMembers(config);
     return true;
   }
 
@@ -352,7 +423,9 @@ class NgmyCivicRegistryMembers {
 
     // Registrar can enroll without email; registryId is the unique row key.
     if (email.isEmpty && rid.isEmpty) return;
-    if (email.isNotEmpty) _clearTombstone(config, email);
+    if (email.isNotEmpty || rid.isNotEmpty) {
+      _clearTombstone(config, email, registryId: rid);
+    }
 
     if (forceNew) {
       if (rid.isEmpty) return;
@@ -1316,8 +1389,47 @@ class NgmyCivicRegistryMembers {
         if (e is Map) remoteRemoved.add(Map<String, dynamic>.from(e));
       }
     }
+    final liveByEmail = <String, Map<String, dynamic>>{};
+    final liveByRid = <String, Map<String, dynamic>>{};
+    for (final m in listFrom(config)) {
+      final email = emailKey((m['email'] ?? '').toString());
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (email.isNotEmpty) liveByEmail[email] = m;
+      if (rid.isNotEmpty) liveByRid[rid] = m;
+    }
+    for (final m in remoteMembers) {
+      final email = emailKey((m['email'] ?? '').toString());
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (email.isNotEmpty) {
+        final prev = liveByEmail[email];
+        liveByEmail[email] = prev == null ? m : _preferNewerMember(prev, m);
+      }
+      if (rid.isNotEmpty) {
+        final prev = liveByRid[rid];
+        liveByRid[rid] = prev == null ? m : _preferNewerMember(prev, m);
+      }
+    }
+
+    bool softDeleteSuperseded(Map<String, dynamic> tomb) {
+      if (tomb['permanent'] == true) return false;
+      if (tomb['softDelete'] != true) return false;
+      final email = emailKey((tomb['email'] ?? '').toString());
+      final rid = (tomb['registryId'] ?? '').toString().trim().toUpperCase();
+      final live = (email.isNotEmpty ? liveByEmail[email] : null) ??
+          (rid.isNotEmpty ? liveByRid[rid] : null);
+      if (live == null) return false;
+      final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
+      final updatedAt = _memberStamp(live);
+      // Restored member (or any newer roster row) wins over soft-delete tombstone.
+      if (removedAt == null) return true;
+      if (updatedAt != null && !updatedAt.isBefore(removedAt)) return true;
+      if ((live['restoredAt'] ?? '').toString().trim().isNotEmpty) return true;
+      return false;
+    }
+
     final tombstones = <String, Map<String, dynamic>>{};
     for (final r in [...removedFrom(config), ...remoteRemoved]) {
+      if (softDeleteSuperseded(r)) continue;
       final email = emailKey((r['email'] ?? '').toString());
       final rid = (r['registryId'] ?? '').toString().trim().toUpperCase();
       final key = email.isNotEmpty ? 'em:$email' : (rid.isNotEmpty ? 'id:$rid' : '');
@@ -1332,6 +1444,7 @@ class NgmyCivicRegistryMembers {
       if (b != null && (a == null || b.isAfter(a))) tombstones[key] = r;
     }
     setRemoved(config, tombstones.values.toList());
+    clearSoftDeletesForActiveMembers(config);
 
     bool isTombstoned(Map<String, dynamic> m) {
       final email = emailKey((m['email'] ?? '').toString());
@@ -1342,8 +1455,11 @@ class NgmyCivicRegistryMembers {
       if (tomb == null) return false;
       final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
       final updatedAt = _memberStamp(m);
+      final restoredAt = DateTime.tryParse((m['restoredAt'] ?? '').toString());
       if (removedAt == null) return true;
-      if (updatedAt != null && updatedAt.isAfter(removedAt)) return false;
+      // Recover stamps restoredAt/updatedAt so soft-delete tombstones lose.
+      if (restoredAt != null && !restoredAt.isBefore(removedAt)) return false;
+      if (updatedAt != null && !updatedAt.isBefore(removedAt)) return false;
       return true;
     }
 

@@ -957,6 +957,8 @@ Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {
     if (row != null && row.isNotEmpty) {
       NgmyCivicRegistryMembers.applyPayload(config, row);
     }
+    // Never write soft-delete rows for people already back on the roster.
+    NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
     cloudOk = await _upsertNgmySettingSafe(
       NgmyCivicRegistryMembers.cloudSettingsKey,
       NgmyCivicRegistryMembers.payload(config),
