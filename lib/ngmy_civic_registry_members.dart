@@ -87,19 +87,208 @@ class NgmyCivicRegistryMembers {
     setRemoved(config, next);
   }
 
-  static void _addTombstone(dynamic config, {required String email, String registryId = '', String state = ''}) {
+  static const softDeleteDays = 7;
+
+  static void _addTombstone(
+    dynamic config, {
+    required String email,
+    String registryId = '',
+    String state = '',
+    Map<String, dynamic>? snapshot,
+    bool permanent = false,
+  }) {
     final key = emailKey(email);
-    if (key.isEmpty) return;
-    final now = DateTime.now().toUtc().toIso8601String();
+    final rid = registryId.trim();
+    if (key.isEmpty && rid.isEmpty) return;
+    final now = DateTime.now().toUtc();
     final next = removedFrom(config);
-    next.removeWhere((r) => emailKey((r['email'] ?? '').toString()) == key);
+    next.removeWhere((r) {
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      if (key.isNotEmpty && e == key) return true;
+      if (rid.isNotEmpty && id == rid.toUpperCase()) return true;
+      return false;
+    });
     next.add({
       'email': key,
-      'registryId': registryId.trim(),
+      'registryId': rid,
       'state': state.trim(),
-      'removedAt': now,
+      'removedAt': now.toIso8601String(),
+      'permanent': permanent,
+      'softDelete': !permanent,
+      if (!permanent) 'purgeAt': now.add(const Duration(days: softDeleteDays)).toIso8601String(),
+      if (snapshot != null) 'snapshot': Map<String, dynamic>.from(snapshot),
     });
     setRemoved(config, next);
+  }
+
+  /// Recoverable soft-deletes for [state] that are still inside the 7-day window.
+  static List<Map<String, dynamic>> softDeletedForState(dynamic config, String state) {
+    final st = state.trim().toLowerCase();
+    final now = DateTime.now().toUtc();
+    return removedFrom(config).where((r) {
+      if (r['permanent'] == true) return false;
+      if (r['softDelete'] != true && r['snapshot'] == null) return false;
+      if (st.isNotEmpty && (r['state'] ?? '').toString().trim().toLowerCase() != st) {
+        return false;
+      }
+      final purge = DateTime.tryParse((r['purgeAt'] ?? '').toString())?.toUtc();
+      if (purge != null && !purge.isAfter(now)) return false;
+      return true;
+    }).map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  static int softDeletedCountForState(dynamic config, String state) =>
+      softDeletedForState(config, state).length;
+
+  /// Drop expired soft-deletes (past purgeAt). Permanent tombstones stay.
+  static int purgeExpiredSoftDeletes(dynamic config) {
+    final now = DateTime.now().toUtc();
+    final kept = <Map<String, dynamic>>[];
+    var purged = 0;
+    for (final r in removedFrom(config)) {
+      final row = Map<String, dynamic>.from(r);
+      if (row['permanent'] == true) {
+        kept.add(row);
+        continue;
+      }
+      final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toUtc();
+      final removedAt = DateTime.tryParse((row['removedAt'] ?? '').toString())?.toUtc();
+      final deadline = purge ??
+          (removedAt == null ? null : removedAt.add(const Duration(days: softDeleteDays)));
+      if (deadline != null && !deadline.isAfter(now)) {
+        // Keep a permanent tombstone so cloud merges cannot resurrect the row.
+        kept.add({
+          'email': emailKey((row['email'] ?? '').toString()),
+          'registryId': (row['registryId'] ?? '').toString(),
+          'state': (row['state'] ?? '').toString(),
+          'removedAt': (row['removedAt'] ?? now.toIso8601String()).toString(),
+          'permanent': true,
+          'softDelete': false,
+        });
+        purged++;
+        continue;
+      }
+      kept.add(row);
+    }
+    if (purged > 0) setRemoved(config, kept);
+    return purged;
+  }
+
+  static bool restoreSoftDeleted(
+    dynamic config, {
+    String email = '',
+    String registryId = '',
+  }) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    final removed = removedFrom(config);
+    final idx = removed.indexWhere((r) {
+      if (r['permanent'] == true) return false;
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      if (key.isNotEmpty && e == key) return true;
+      if (rid.isNotEmpty && id == rid) return true;
+      return false;
+    });
+    if (idx < 0) return false;
+    final row = Map<String, dynamic>.from(removed[idx]);
+    final snapRaw = row['snapshot'];
+    if (snapRaw is! Map) return false;
+    final snap = Map<String, dynamic>.from(snapRaw);
+    removed.removeAt(idx);
+    setRemoved(config, removed);
+    upsert(config, snap);
+    return true;
+  }
+
+  /// AR soft-delete: hide for 7 days, recoverable, then permanent.
+  static void softDeleteByEmail(dynamic config, String email) {
+    final key = emailKey(email);
+    if (key.isEmpty) return;
+    final existing = findByEmail(config, email);
+    if (existing == null) {
+      _addTombstone(config, email: key, permanent: false);
+      return;
+    }
+    final registryId = (existing['registryId'] ?? '').toString();
+    final state = (existing['state'] ?? '').toString();
+    final members = listFrom(config);
+    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
+    if (idx >= 0) members.removeAt(idx);
+    setList(config, members);
+    _addTombstone(
+      config,
+      email: key,
+      registryId: registryId,
+      state: state,
+      snapshot: existing,
+      permanent: false,
+    );
+  }
+
+  static void softDeleteByRegistryId(dynamic config, String registryId) {
+    final rid = registryId.trim().toUpperCase();
+    if (rid.isEmpty) return;
+    final existing = findByRegistryId(config, rid);
+    if (existing == null) return;
+    final email = emailKey((existing['email'] ?? '').toString());
+    final state = (existing['state'] ?? '').toString();
+    final members = listFrom(config);
+    final idx = members.indexWhere(
+      (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
+    );
+    if (idx >= 0) members.removeAt(idx);
+    setList(config, members);
+    _addTombstone(
+      config,
+      email: email,
+      registryId: rid,
+      state: state,
+      snapshot: existing,
+      permanent: false,
+    );
+  }
+
+  /// Admin hard-delete: gone immediately, not recoverable.
+  static void permanentDeleteByEmail(dynamic config, String email) {
+    final key = emailKey(email);
+    if (key.isEmpty) return;
+    final existing = findByEmail(config, email);
+    final registryId = (existing?['registryId'] ?? '').toString();
+    final state = (existing?['state'] ?? '').toString();
+    final members = listFrom(config);
+    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
+    if (idx >= 0) members.removeAt(idx);
+    setList(config, members);
+    _addTombstone(
+      config,
+      email: key,
+      registryId: registryId,
+      state: state,
+      permanent: true,
+    );
+  }
+
+  static void permanentDeleteByRegistryId(dynamic config, String registryId) {
+    final rid = registryId.trim().toUpperCase();
+    if (rid.isEmpty) return;
+    final existing = findByRegistryId(config, rid);
+    final email = emailKey((existing?['email'] ?? '').toString());
+    final state = (existing?['state'] ?? '').toString();
+    final members = listFrom(config);
+    final idx = members.indexWhere(
+      (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
+    );
+    if (idx >= 0) members.removeAt(idx);
+    setList(config, members);
+    _addTombstone(
+      config,
+      email: email,
+      registryId: rid,
+      state: state,
+      permanent: true,
+    );
   }
 
   static Map<String, dynamic> buildRecord({
@@ -728,47 +917,12 @@ class NgmyCivicRegistryMembers {
     );
   }
 
-  static void removeByEmail(dynamic config, String email) {
-    final key = emailKey(email);
-    if (key.isEmpty) return;
-    final existing = findByEmail(config, email);
-    final registryId = (existing?['registryId'] ?? '').toString();
-    final state = (existing?['state'] ?? '').toString();
-    // Only remove the first match with this email (shared emails are allowed).
-    final members = listFrom(config);
-    final idx = members.indexWhere((m) => emailKey((m['email'] ?? '').toString()) == key);
-    if (idx >= 0) members.removeAt(idx);
-    setList(config, members);
-    _addTombstone(config, email: key, registryId: registryId, state: state);
-  }
+  /// Legacy helper — soft-delete (7-day recover window).
+  static void removeByEmail(dynamic config, String email) => softDeleteByEmail(config, email);
 
-  static void removeByRegistryId(dynamic config, String registryId) {
-    final rid = registryId.trim().toUpperCase();
-    if (rid.isEmpty) return;
-    final members = listFrom(config);
-    final idx = members.indexWhere(
-      (m) => (m['registryId'] ?? '').toString().trim().toUpperCase() == rid,
-    );
-    if (idx < 0) return;
-    final existing = members[idx];
-    final email = emailKey((existing['email'] ?? '').toString());
-    final state = (existing['state'] ?? '').toString();
-    members.removeAt(idx);
-    setList(config, members);
-    if (email.isNotEmpty) {
-      _addTombstone(config, email: email, registryId: rid, state: state);
-    } else {
-      final next = removedFrom(config);
-      next.removeWhere((r) => (r['registryId'] ?? '').toString().trim().toUpperCase() == rid);
-      next.add({
-        'email': '',
-        'registryId': rid,
-        'state': state,
-        'removedAt': DateTime.now().toUtc().toIso8601String(),
-      });
-      setRemoved(config, next);
-    }
-  }
+  /// Legacy helper — soft-delete (7-day recover window).
+  static void removeByRegistryId(dynamic config, String registryId) =>
+      softDeleteByRegistryId(config, registryId);
 
   static bool isEnrolled(dynamic config, String email) {
     final key = emailKey(email);

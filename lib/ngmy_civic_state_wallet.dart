@@ -15,9 +15,15 @@ export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
 
 /// Compact Registry Backup pin - thin animated outline, no thick white plate.
 class NgmyCivicBackupPinButton extends StatefulWidget {
-  const NgmyCivicBackupPinButton({super.key, required this.onPressed});
+  const NgmyCivicBackupPinButton({
+    super.key,
+    required this.onPressed,
+    this.badgeCount = 0,
+  });
 
   final VoidCallback onPressed;
+  /// Soft-deleted members waiting for recover / auto-purge.
+  final int badgeCount;
 
   @override
   State<NgmyCivicBackupPinButton> createState() => _NgmyCivicBackupPinButtonState();
@@ -38,28 +44,65 @@ class _NgmyCivicBackupPinButtonState extends State<NgmyCivicBackupPinButton>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final iconColor = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF059669);
+    final badge = widget.badgeCount.clamp(0, 99);
     return Tooltip(
-      message: 'Registry Backup',
+      message: badge > 0 ? 'Registry Backup · $badge pending delete' : 'Registry Backup',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: widget.onPressed,
           customBorder: const CircleBorder(),
-          child: AnimatedBuilder(
-            animation: _spin,
-            builder: (context, _) {
-              return CustomPaint(
-                painter: _BackupPinFramePainter(
-                  t: _spin.value,
-                  accent: iconColor,
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: _spin,
+                    builder: (context, _) {
+                      return CustomPaint(
+                        painter: _BackupPinFramePainter(
+                          t: _spin.value,
+                          accent: iconColor,
+                        ),
+                        child: Center(
+                          child: Icon(Icons.pin_rounded, size: 14, color: iconColor),
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: Icon(Icons.pin_rounded, size: 14, color: iconColor),
-                ),
-              );
-            },
+                if (badge > 0)
+                  Positioned(
+                    right: -4,
+                    top: -4,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(99),
+                        border: Border.all(
+                          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        badge > 9 ? '9+' : '$badge',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

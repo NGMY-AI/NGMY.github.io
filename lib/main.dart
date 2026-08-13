@@ -2643,7 +2643,7 @@ bool _isCivicRegistryKing(UserData user) => user.isCivicRegistryKing;
 
 String _reviewerCivicStateScope(UserData reviewer, AppConfig config) {
   if (reviewer.isAdmin) return '';
-  if (!_isCivicRegistryKing(reviewer)) return '';
+  if (!_hasCivicRegistrarReviewAccess(reviewer, config)) return '';
   final serving = NgmyCivicRegistryStats.registrarStateForUser(
     email: reviewer.email,
     userState: reviewer.state,
@@ -2661,10 +2661,12 @@ bool _reviewerCanActOnRegistrarApp(UserData reviewer, Map<String, dynamic> app, 
   return (app['state'] ?? '').toString().trim().toLowerCase() == scope;
 }
 
-/// Only app admin or Civic Registry Admin (king) may approve registrar applications.
+/// App admin, Civic Registry King, or an Authorized Registrar may review
+/// applications — ARs/Kings only for their own state (see scope helpers).
 bool _hasCivicRegistrarReviewAccess(UserData reviewer, AppConfig config) {
   if (reviewer.isAdmin) return true;
-  return _isCivicRegistryKing(reviewer);
+  if (_isCivicRegistryKing(reviewer)) return true;
+  return _hasEffectiveRegistrarAccess(config, reviewer);
 }
 
 void _openCivicRegistryPinSheet(
@@ -29950,6 +29952,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_hydrateRegistrarApplication());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _runHelpModeLifecycleMaintenance();
+      final purged = NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
+      if (purged > 0) {
+        unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+        widget.onDataChanged();
+      }
       _checkRegistryUnlock();
       unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
@@ -30204,7 +30211,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
-    if (!_canUseRegistrarToolsHere(newState) && _stateRequiresMemberUnlock(newState)) {
+
+    // Home-state AR (or King/Admin) never sits behind membership verify.
+    if (_canUseRegistrarToolsHere(newState)) {
+      if (!mounted) return false;
+      setState(() {
+        widget.user.state = newState;
+        _selectedState = newState;
+        _selectedCity = 'All Cities';
+        _selectedRoom = 'All Rooms';
+        _registryUnlocked = true;
+      });
+      unawaited(_persistStateSwitchLocal());
+      unawaited(_pushUserAuthorizedRegistrar(widget.user));
+      widget.onDataChanged();
+      return true;
+    }
+
+    if (_stateRequiresMemberUnlock(newState)) {
       final unlocked = await civicRegistryIsUnlocked(
         widget.user.email,
         state: newState,
@@ -30214,13 +30238,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!unlocked) {
         if (!mounted) return false;
         setState(() {
+          widget.user.state = newState;
           _selectedState = newState;
           _selectedCity = 'All Cities';
           _selectedRoom = 'All Rooms';
           _registryUnlocked = false;
-          if (!_canUseRegistrarToolsHere(newState) && _activeTab > 1) {
-            _activeTab = 0;
-          }
+          if (_activeTab > 1) _activeTab = 0;
         });
         return false;
       }
@@ -30233,6 +30256,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _selectedState = newState;
       _selectedCity = 'All Cities';
       _selectedRoom = 'All Rooms';
+      _registryUnlocked = true;
       // Away from home AR state → member UI (no Enroll / Members tools).
       if (!_canUseRegistrarToolsHere() && _activeTab > 1) {
         _activeTab = 0;
@@ -31374,13 +31398,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Future<bool> _removeRegistryMember(UserData member) async {
+  Future<bool> _removeRegistryMember(UserData member, {bool permanent = false}) async {
     final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final registryId = (member.registryId ?? '').trim();
-    if (registryId.isNotEmpty) {
-      NgmyCivicRegistryMembers.removeByRegistryId(widget.config, registryId);
+    final hard = permanent || _isGlobalCivicRegistryAdmin();
+    if (hard) {
+      if (registryId.isNotEmpty) {
+        NgmyCivicRegistryMembers.permanentDeleteByRegistryId(widget.config, registryId);
+      } else if (emailKey.isNotEmpty) {
+        NgmyCivicRegistryMembers.permanentDeleteByEmail(widget.config, member.email);
+      }
+    } else if (registryId.isNotEmpty) {
+      NgmyCivicRegistryMembers.softDeleteByRegistryId(widget.config, registryId);
     } else if (emailKey.isNotEmpty) {
-      NgmyCivicRegistryMembers.removeByEmail(widget.config, member.email);
+      NgmyCivicRegistryMembers.softDeleteByEmail(widget.config, member.email);
     }
     void clearCivicFields(UserData u) {
       u.isEnrolledInRegistry = false;
@@ -32100,6 +32131,53 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<void> _restoreSoftDeletedMember(Map<String, dynamic> tombstone) async {
+    final email = NgmyCivicRegistryMembers.emailKey((tombstone['email'] ?? '').toString());
+    final rid = (tombstone['registryId'] ?? '').toString().trim();
+    final ok = NgmyCivicRegistryMembers.restoreSoftDeleted(
+      widget.config,
+      email: email,
+      registryId: rid,
+    );
+    if (!ok) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore that member.')),
+      );
+      return;
+    }
+    final snap = tombstone['snapshot'];
+    if (snap is Map && email.isNotEmpty) {
+      _setCivicEnrollmentFlagForAccount(widget.allUsers, email, true);
+      final idx = widget.allUsers.indexWhere(
+        (u) => NgmyCivicRegistryMembers.emailKey(u.email) == email,
+      );
+      if (idx >= 0) {
+        final u = widget.allUsers[idx];
+        u.isEnrolledInRegistry = true;
+        final restoredId = (snap['registryId'] ?? '').toString().trim();
+        if (restoredId.isNotEmpty) u.registryId = restoredId;
+        final st = (snap['state'] ?? '').toString().trim();
+        if (st.isNotEmpty) u.state = st;
+        final city = (snap['city'] ?? '').toString().trim();
+        if (city.isNotEmpty) u.city = city;
+        final room = (snap['room'] ?? '').toString().trim();
+        if (room.isNotEmpty) u.room = room;
+      }
+    }
+    await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
+    if (!mounted) return;
+    setState(() {});
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Member restored to the registry.'),
+        backgroundColor: Color(0xFF059669),
+      ),
+    );
+  }
+
   Future<void> _showCivicRegistryBackupSheet() async {
     if (!_canUseRegistrarToolsHere()) {
       if (!mounted) return;
@@ -32108,6 +32186,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       return;
     }
+    NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
     final bg = isDark ? const Color(0xFF0B1220) : const Color(0xFFF7F8FA);
@@ -32119,6 +32198,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
+        final softDeleted = NgmyCivicRegistryMembers.softDeletedForState(
+          widget.config,
+          _selectedState,
+        );
         Widget gridBox({
           required IconData icon,
           required Color accent,
@@ -32173,6 +32256,75 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  if (softDeleted.isNotEmpty) ...[
+                    Text(
+                      'Pending delete (${softDeleted.length})',
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: ink),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Hidden from members for 7 days. Recover before then.',
+                      style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                    ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: softDeleted.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 6),
+                        itemBuilder: (_, i) {
+                          final row = softDeleted[i];
+                          final snap = row['snapshot'] is Map
+                              ? Map<String, dynamic>.from(row['snapshot'] as Map)
+                              : <String, dynamic>{};
+                          final name = (snap['fullName'] ?? row['email'] ?? 'Member').toString();
+                          final purge = DateTime.tryParse((row['purgeAt'] ?? '').toString())?.toLocal();
+                          final daysLeft = purge == null
+                              ? NgmyCivicRegistryMembers.softDeleteDays
+                              : purge.difference(DateTime.now()).inDays.clamp(0, 7);
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: card,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.35)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(name, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: ink)),
+                                      Text(
+                                        '$daysLeft day(s) left to recover',
+                                        style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    Navigator.pop(ctx);
+                                    await _restoreSoftDeletedMember(row);
+                                  },
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF059669),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    minimumSize: const Size(0, 32),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Recover', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   Row(
                     children: [
                       Text('Registry Backup', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink, letterSpacing: -0.3)),
@@ -35698,7 +35850,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         members: NgmyCivicRegistryMembers.listFrom(widget.config),
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
-        stateRequiresUnlock: _stateRequiresMemberUnlock,
+        // AR home / King / Admin never need PIN — picking home while on the
+        // gate must dismiss verify membership immediately.
+        stateRequiresUnlock: (state) =>
+            !_canUseRegistrarToolsHere(state) && _stateRequiresMemberUnlock(state),
       );
     }
 
@@ -36981,19 +37136,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     _mBtn(Icons.warning_amber_rounded, 'Claim', Colors.orange, () => _showClaimDialog(u)),
                     _mBtn(Icons.undo_rounded, 'Clean', Colors.grey.shade200, () => _showResolveClaimDialog(u), textColor: Colors.grey),
                     _mBtn(Icons.delete_outline_rounded, '', Colors.red, () async {
+                      final adminHard = _isGlobalCivicRegistryAdmin();
                       final confirm = await showNgmyLightConfirm(
                         context,
-                        title: 'Remove this member?',
-                        message:
-                            'This will remove ${u.fullName ?? u.username} from the registry for your state. Only continue if you are sure.',
+                        title: adminHard ? 'Permanently delete member?' : 'Remove this member?',
+                        message: adminHard
+                            ? 'Admin delete is permanent. ${u.fullName ?? u.username} will be removed from the registry right away and cannot be recovered.'
+                            : 'This hides ${u.fullName ?? u.username} from members, search, and rankings for 7 days. You can recover them from the green registry pin before then.',
                         cancelLabel: 'Keep',
-                        confirmLabel: 'Remove',
+                        confirmLabel: adminHard ? 'Delete forever' : 'Remove',
                         icon: Icons.person_remove_rounded,
                         destructive: true,
                       );
                       if (confirm != true) return;
                       setState(() {});
-                      await _removeRegistryMember(u);
+                      await _removeRegistryMember(u, permanent: adminHard);
+                      if (mounted) setState(() {});
                       widget.onDataChanged();
                     }),
                   ],
@@ -37189,7 +37347,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               style: TextStyle(fontSize: 9, color: muted),
                             ),
                           ),
-                          if (_canManageCivicRegistry() && _hasCivicRegistrarReviewAccess(widget.user, widget.config))
+                          if (_canUseRegistrarToolsHere() &&
+                              _hasCivicRegistrarReviewAccess(widget.user, widget.config))
                             TextButton(
                               onPressed: () {
                                 showNgmyCivicRegistrarApplicationsSheet(
@@ -37228,6 +37387,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               padding: const EdgeInsets.only(left: 4),
                               child: NgmyCivicBackupPinButton(
                                 onPressed: _showCivicRegistryBackupSheet,
+                                badgeCount: NgmyCivicRegistryMembers.softDeletedCountForState(
+                                  widget.config,
+                                  _selectedState,
+                                ),
                               ),
                             ),
                         ],

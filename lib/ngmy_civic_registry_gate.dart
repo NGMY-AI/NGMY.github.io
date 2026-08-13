@@ -200,6 +200,13 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   void initState() {
     super.initState();
     _state = widget.usStates.contains(widget.initialState) ? widget.initialState : widget.usStates.first;
+    // Authorized Registrar returning home (or any state that does not require
+    // unlock) should never be stuck on verify membership.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final requires = widget.stateRequiresUnlock?.call(_state) ?? true;
+      if (!requires) widget.onUnlocked(_state);
+    });
   }
 
   @override
