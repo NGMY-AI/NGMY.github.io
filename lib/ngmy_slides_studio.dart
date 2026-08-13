@@ -2245,7 +2245,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             _header(
               title: 'NGMY SLIDES',
-              subtitle: 'Free basic decks · Transfer: 2 free, then \$4.99/mo',
+              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
               icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
               onIconTap: () async {

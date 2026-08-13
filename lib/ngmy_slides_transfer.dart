@@ -333,7 +333,6 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   String _mode = 'one';
   String? _selectedDeckId;
   bool _busy = false;
-  String _transferStatus = '';
   bool _sendNeedsPay = false;
 
   NgmySlideDeck? get _selectedDeck {
@@ -365,19 +364,12 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   }
 
   Future<void> _refreshTransferStatus() async {
-    final status = await NgmyTransferPayments.statusLabel(
-      email: widget.ownerEmail,
-      isAdmin: widget.isAdmin,
-    );
     final needsPay = !await NgmyTransferPayments.canTransferWithoutPaying(
       email: widget.ownerEmail,
       isAdmin: widget.isAdmin,
     );
     if (!mounted) return;
-    setState(() {
-      _transferStatus = status;
-      _sendNeedsPay = needsPay;
-    });
+    setState(() => _sendNeedsPay = needsPay);
   }
 
   Future<void> _showQr() async {
@@ -708,21 +700,21 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Move presentations between devices',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, height: 1.2),
-                    ),
-                    if (_transferStatus.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        _transferStatus,
+                    const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Move presentations between devices',
+                        maxLines: 1,
+                        softWrap: false,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          height: 1.1,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),
