@@ -40352,18 +40352,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Widget _storeGlassFrame({required bool isDark, required Widget child}) {
-    final border = isDark ? Colors.white.withOpacity(0.22) : Colors.black.withOpacity(0.1);
-    return ngmyClipBackdrop(
-      borderRadius: BorderRadius.circular(28),
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF121726) : Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: border, width: 1.2),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.08), blurRadius: 12, offset: const Offset(0, 4))],
-        ),
-        child: child,
+    final border = isDark ? Colors.white.withOpacity(0.28) : Colors.black.withOpacity(0.12);
+    // Transparent chrome — listings stay visible when scrolling underneath (like bottom nav).
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: border, width: 1.2),
       ),
+      child: child,
     );
   }
 
@@ -40618,6 +40615,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Widget _buyerPurchasesTab(List<Map<String, dynamic>> bought, bool isDark) {
+    final topPad = _storeHeaderClearance;
     return RefreshIndicator(
       color: _storePurple,
       onRefresh: () async {
@@ -40628,15 +40626,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           if (bought.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(child: Text('No purchases yet.', style: TextStyle(color: Colors.grey))),
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(24, topPad, 24, 24),
+                  child: const Text('No purchases yet.', style: TextStyle(color: Colors.grey)),
+                ),
+              ),
             )
           else
             SliverList(
               delegate: SliverChildBuilderDelegate(
                 (_, i) => Padding(
-                  padding: EdgeInsets.fromLTRB(14, i == 0 ? 4 : 0, 14, 0),
+                  padding: EdgeInsets.fromLTRB(14, i == 0 ? topPad : 0, 14, 0),
                   child: _orderReceiptCard(bought[i], isBuyer: true),
                 ),
                 childCount: bought.length,
@@ -40650,6 +40653,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _sellerSalesTab(List<Map<String, dynamic>> sales) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topPad = _storeHeaderClearance;
     final awaitingReview = _myPendingPaymentReviewOrders().length;
     final pending = sales.where((o) => (o['fulfillmentStatus'] ?? 'pending').toString() == 'pending').length;
     return RefreshIndicator(
@@ -40663,7 +40667,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           if (awaitingReview > 0)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                padding: EdgeInsets.fromLTRB(14, topPad, 14, 4),
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -40688,7 +40692,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+              padding: EdgeInsets.fromLTRB(14, awaitingReview > 0 ? 10 : topPad, 14, 4),
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -44106,48 +44110,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF1F5F9),
       floatingActionButton: Padding(padding: const EdgeInsets.only(bottom: 8), child: _sellItemButton()),
-      body: Column(
+      body: Stack(
         children: [
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: _storeGlassFrame(
-                isDark: isDark,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(2, 4, 8, 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          IconButton(
-                            visualDensity: VisualDensity.compact,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                            icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black87),
-                            onPressed: () => NgmyNavigator.pop(context),
-                          ),
-                          const Icon(Icons.storefront_rounded, color: _storePurple, size: 18),
-                          const SizedBox(width: 6),
-                          const Text('NGMY Store', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: _storePurple)),
-                          const Spacer(),
-                          _storeTabChip(0, 'Shop', shop.length, isDark),
-                          if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
-                          _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
-                        ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-                      child: _storeTopActionBar(isDark, frameBorder),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
+          Positioned.fill(
             child: TabBarView(
               controller: _tabCtrl,
               physics: const NeverScrollableScrollPhysics(),
@@ -44163,20 +44128,62 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                     ],
             ),
           ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: _storeGlassFrame(
+                  isDark: isDark,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 4, 8, 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: isDark ? Colors.white : Colors.black87),
+                              onPressed: () => NgmyNavigator.pop(context),
+                            ),
+                            const Icon(Icons.storefront_rounded, color: _storePurple, size: 18),
+                            const SizedBox(width: 6),
+                            const Text('NGMY Store', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: _storePurple)),
+                            const Spacer(),
+                            _storeTabChip(0, 'Shop', shop.length, isDark),
+                            if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
+                            _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                        child: _storeTopActionBar(isDark, frameBorder),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _storeTopActionBar(bool isDark, Color frameBorder) {
-    final barFill = isDark ? const Color(0xFF0F172A) : Colors.white;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: barFill,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: frameBorder, width: 1.4),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.2 : 0.06), blurRadius: 8, offset: const Offset(0, 2))],
+        border: Border.all(color: frameBorder.withValues(alpha: isDark ? 0.75 : 1), width: 1.4),
       ),
       child: Row(
         children: [
@@ -44204,6 +44211,8 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                 hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey.shade500, fontSize: 14),
                 border: InputBorder.none,
                 isDense: true,
+                filled: true,
+                fillColor: Colors.transparent,
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -44226,10 +44235,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     );
   }
 
+  double get _storeHeaderClearance => MediaQuery.paddingOf(context).top + 128;
+
   Widget _shopGrid(List<Map<String, dynamic>> items) {
     if (_storeLoading && items.isEmpty && _listings.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: _storePurple));
     }
+    final topPad = _storeHeaderClearance;
     return RefreshIndicator(
       color: _storePurple,
       onRefresh: () => _refreshStoreListingsFromCloud(force: true),
@@ -44240,7 +44252,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
               hasScrollBody: false,
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.fromLTRB(24, topPad, 24, 24),
                   child: Text(
                     _canSell ? 'No items for sale yet. Tap Sell Item to post!' : 'No items for sale yet.',
                     textAlign: TextAlign.center,
@@ -44251,7 +44263,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 100),
+              padding: EdgeInsets.fromLTRB(12, topPad, 12, 100),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
@@ -44271,8 +44283,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   Widget _listingList(List<Map<String, dynamic>> items, {required String empty, required bool showBuy, required bool showManage}) {
+    final topPad = _storeHeaderClearance;
     if (items.isEmpty) {
-      return Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(empty, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey))));
+      return Center(child: Padding(padding: EdgeInsets.fromLTRB(24, topPad, 24, 24), child: Text(empty, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey))));
     }
     if (showManage) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -44283,7 +44296,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         return s != 'sold' && s != 'active';
       }).toList();
       return ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: EdgeInsets.fromLTRB(16, topPad, 16, 100),
         children: [
           if (sold.isNotEmpty) ...[
             Text('Sold (Resell moves item back to Shop)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: isDark ? Colors.white70 : Colors.black54)),
@@ -44301,7 +44314,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, topPad, 16, 100),
       itemCount: items.length,
       itemBuilder: (_, i) => _listingCard(items[i], showBuy: showBuy, showManage: showManage),
     );
