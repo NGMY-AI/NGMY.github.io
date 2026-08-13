@@ -40353,14 +40353,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Widget _storeGlassFrame({required bool isDark, required Widget child}) {
     final border = isDark ? Colors.white.withOpacity(0.28) : Colors.black.withOpacity(0.12);
-    // Transparent chrome — listings stay visible when scrolling underneath (like bottom nav).
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: border, width: 1.2),
+    // Frosted darkish glass — listings show faintly underneath (like bottom nav), not crystal-clear.
+    return ngmyClipBackdrop(
+      borderRadius: BorderRadius.circular(28),
+      sigma: 18,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark
+              ? const Color(0xFF0F172A).withValues(alpha: 0.72)
+              : Colors.white.withValues(alpha: 0.78),
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: border, width: 1.2),
+        ),
+        child: child,
       ),
-      child: child,
     );
   }
 
@@ -44181,7 +44187,9 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.transparent,
+        color: isDark
+            ? Colors.black.withValues(alpha: 0.22)
+            : Colors.white.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(22),
         border: Border.all(color: frameBorder.withValues(alpha: isDark ? 0.75 : 1), width: 1.4),
       ),
