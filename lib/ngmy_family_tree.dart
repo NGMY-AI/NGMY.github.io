@@ -1637,6 +1637,19 @@ class _FamilyTreeLinesPainter extends CustomPainter {
 
   _FamilyTreeLinesPainter({required this.layout});
 
+  void _drawSpouseLink(Canvas canvas, Paint paint, Offset a, Offset b) {
+    // Keep the marriage bar in the gap between avatars — never draw through the circles.
+    final left = a.dx <= b.dx ? a : b;
+    final right = a.dx <= b.dx ? b : a;
+    const r = _FamilyTreeLayout.avatarSize / 2;
+    const pad = 4.0;
+    final x1 = left.dx + r + pad;
+    final x2 = right.dx - r - pad;
+    if (x2 <= x1 + 2) return;
+    final y = (left.dy + right.dy) / 2;
+    canvas.drawLine(Offset(x1, y), Offset(x2, y), paint);
+  }
+
   void _drawParentChildGroup(Canvas canvas, Paint paint, Offset parentBottom, List<Offset> childTops) {
     if (childTops.isEmpty) return;
     childTops.sort((a, b) => a.dx.compareTo(b.dx));
@@ -1678,7 +1691,7 @@ class _FamilyTreeLinesPainter extends CustomPainter {
 
     for (final edge in layout.edges) {
       if (edge.isSpouse) {
-        canvas.drawLine(edge.from, edge.to, paint);
+        _drawSpouseLink(canvas, paint, edge.from, edge.to);
         continue;
       }
       if (edge.childTops != null && edge.childTops!.isNotEmpty) {
@@ -2057,24 +2070,45 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
                 palette: p,
                 label: 'Family links',
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    Text(
+                      '1. Parent',
+                      style: TextStyle(
+                        color: p.secondaryText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     _MemberEditorDropdown<String?>(
                       palette: p,
                       value: _parentId,
                       icon: Icons.account_tree_outlined,
-                      hint: 'Parent',
+                      hint: 'Who is their parent?',
                       items: [
                         const DropdownMenuItem(value: null, child: Text('None — root ancestor')),
                         ...widget.parents.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
                       ],
                       onChanged: (v) => setState(() => _parentId = v),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
+                    Text(
+                      '2. Spouse',
+                      style: TextStyle(
+                        color: p.secondaryText,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     _MemberEditorDropdown<String?>(
                       palette: p,
                       value: _spouseId,
                       icon: Icons.favorite_border_rounded,
-                      hint: 'Spouse',
+                      hint: 'Who is their spouse / partner?',
                       items: [
                         const DropdownMenuItem(value: null, child: Text('None')),
                         ...spouseOptions.map((m) => DropdownMenuItem(value: m.id, child: Text(m.name))),
@@ -2678,8 +2712,8 @@ class _MemberViewDialog extends StatelessWidget {
               ]),
               const SizedBox(height: 12),
               _section('Family links', [
-                _infoTile('Parent', _memberName(member.parentId), icon: Icons.account_tree_outlined),
-                _infoTile('Spouse', _memberName(member.spouseId), icon: Icons.favorite_border_rounded),
+                _infoTile('1. Parent', _memberName(member.parentId), icon: Icons.account_tree_outlined),
+                _infoTile('2. Spouse', _memberName(member.spouseId), icon: Icons.favorite_border_rounded),
               ]),
               if (member.notes.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
