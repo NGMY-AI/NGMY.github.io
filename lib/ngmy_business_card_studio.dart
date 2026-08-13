@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
@@ -55,37 +55,38 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   int _galleryReload = 0;
   NgmyBusinessCardAccess _access = NgmyBusinessCardAccess.neverPurchased;
 
+  // Unicode escapes stay encoding-safe (plain emoji bytes were corrupted to mojibake).
   static const _businessEmojis = [
-    'ðŸ’¼',
-    'ðŸ“‡',
-    'âœ¨',
-    'ðŸ¢',
-    'ðŸ’¡',
-    'ðŸŽ¯',
-    'â­',
-    'ðŸ”¥',
-    'ðŸ’Ž',
-    'ðŸš€',
-    'ðŸ“ž',
-    'âœ‰ï¸',
-    'ðŸŒ',
-    'ðŸ“',
-    'ðŸ’°',
-    'ðŸ¤',
-    'ðŸŽ¨',
-    'ðŸ“Š',
-    'ðŸ†',
-    'ðŸ‘”',
-    'ðŸ’»',
-    'ðŸ“',
-    'ðŸ””',
-    'âœ…',
-    'ðŸŒŸ',
-    'ðŸ ',
-    'ðŸ“±',
-    'ðŸ’³',
-    'ðŸŽ“',
-    'âš¡',
+    '\u{1F4BC}', // briefcase
+    '\u{1F4C7}', // card index
+    '\u{2728}', // sparkles
+    '\u{1F3E2}', // office
+    '\u{1F4A1}', // bulb
+    '\u{1F3AF}', // target
+    '\u{2B50}', // star
+    '\u{1F525}', // fire
+    '\u{1F48E}', // gem
+    '\u{1F680}', // rocket
+    '\u{1F4DE}', // phone
+    '\u{2709}\u{FE0F}', // envelope
+    '\u{1F310}', // globe
+    '\u{1F4CD}', // pin
+    '\u{1F4B0}', // money bag
+    '\u{1F91D}', // handshake
+    '\u{1F3A8}', // art
+    '\u{1F4CA}', // chart
+    '\u{1F3C6}', // trophy
+    '\u{1F454}', // necktie
+    '\u{1F4BB}', // laptop
+    '\u{1F4DD}', // memo
+    '\u{1F514}', // bell
+    '\u{2705}', // check
+    '\u{1F31F}', // glowing star
+    '\u{1F3E0}', // house
+    '\u{1F4F1}', // mobile
+    '\u{1F4B3}', // credit card
+    '\u{1F393}', // graduation
+    '\u{26A1}', // lightning
   ];
 
   static const _accentColors = [
@@ -1060,7 +1061,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
           ),
         ),
         Text(
-          'None clears emoji Â· tap to place Â· drag to move Â· use +/- to resize',
+          'None clears emoji · tap to place · drag to move · use +/- to resize',
           style: TextStyle(color: t.muted, fontSize: 9),
         ),
       ],
@@ -1070,12 +1071,12 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
   Widget _iconStrip() {
     final t = NgmyHubTheme.of(context);
     const icons = [
-      (Icons.phone_rounded, 'ðŸ“ž '),
-      (Icons.email_rounded, 'âœ‰ï¸ '),
-      (Icons.language_rounded, 'ðŸŒ '),
-      (Icons.location_on_rounded, 'ðŸ“ '),
-      (Icons.business_rounded, 'ðŸ¢ '),
-      (Icons.star_rounded, 'â­ '),
+      (Icons.phone_rounded, '\u{1F4DE} '),
+      (Icons.email_rounded, '\u{2709}\u{FE0F} '),
+      (Icons.language_rounded, '\u{1F310} '),
+      (Icons.location_on_rounded, '\u{1F4CD} '),
+      (Icons.business_rounded, '\u{1F3E2} '),
+      (Icons.star_rounded, '\u{2B50} '),
     ];
     return SizedBox(
       height: 32,
