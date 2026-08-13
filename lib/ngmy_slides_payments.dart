@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_stripe_payments.dart';
 
 /// NGMY Slides freemium gate.
 ///
-/// Free: blank decks, Normal class templates, first 5 slide designs,
+/// Free: blank decks, first 4 class templates, first 5 slide designs,
 /// basic editing, basic transitions, Present, PDF download.
-/// Pro ($4.99/mo): remaining designs, all shapes/signature, fancy transitions,
-/// Professional/Luxury/Bold templates, HD/PDF tools, school quiz packs, etc.
+/// Pro ($4.99/mo): remaining templates/designs, shapes/signature, fancy
+/// transitions, HD/PDF tools, school quiz packs, etc.
 abstract final class NgmySlidesPayments {
   /// First N entries in [ngmySlideDesignTemplates] stay free.
   static const freeDesignCount = 5;
 
-  static const freeClassCategories = {'Normal'};
-  static const paidClassCategories = {'Professional', 'Luxury', 'Bold'};
+  /// First N entries in [ngmyClassPresentationTemplates] stay free.
+  static const freeClassTemplateCount = 4;
 
   static const freeThemeIds = {
     'office_blue',
@@ -129,11 +130,12 @@ abstract final class NgmySlidesPayments {
     );
   }
 
-  static bool isFreeClassCategory(String category) =>
-      freeClassCategories.contains(category.trim());
-
-  static bool isPaidClassCategory(String category) =>
-      paidClassCategories.contains(category.trim());
+  /// Only the first [freeClassTemplateCount] class templates stay free.
+  static bool isPaidClassTemplate(NgmyClassTemplateDef template) {
+    final index = ngmyClassPresentationTemplates.indexWhere((t) => t.id == template.id);
+    if (index < 0) return true;
+    return index >= freeClassTemplateCount;
+  }
 
   /// Only the first [freeDesignCount] designs in the catalog are free.
   static bool isPaidDesign(NgmySlideDesignDef design) {

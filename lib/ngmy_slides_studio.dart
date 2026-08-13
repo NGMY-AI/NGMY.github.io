@@ -244,8 +244,45 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     return deck.slides[_slideIndex.clamp(0, deck.slides.length - 1)];
   }
 
-  NgmySlidesTheme get _theme =>
-      NgmySlidesTemplates.themeById(_activeDeck?.themeId ?? 'office_blue');
+  NgmySlidesTheme get _theme {
+    final themeId = _activeDeck?.themeId ?? 'office_blue';
+    final classTheme = ngmyClassThemeByThemeId(themeId);
+    if (classTheme != null) return classTheme;
+    // Fall back to colors from the current (or first) slide when theme id is custom.
+    final ref = _currentSlide ??
+        (_activeDeck != null && _activeDeck!.slides.isNotEmpty ? _activeDeck!.slides.first : null);
+    if (ref != null && themeId.startsWith('class_')) {
+      return NgmySlidesTheme(
+        id: themeId,
+        label: 'Class template',
+        accent: Color(ref.backgroundEnd ?? ref.background),
+        titleColor: _inferTitleColor(ref),
+        bodyColor: _inferBodyColor(ref),
+        slideBg: Color(ref.background),
+        slideBgEnd: ref.backgroundEnd == null ? null : Color(ref.backgroundEnd!),
+      );
+    }
+    return NgmySlidesTemplates.themeById(themeId);
+  }
+
+  Color _inferTitleColor(NgmySlide slide) {
+    for (final e in slide.elements) {
+      if (e.type == NgmySlideElementType.text &&
+          (e.fontSize >= 28 || e.fontWeight.index >= FontWeight.w800.index)) {
+        return Color(e.color);
+      }
+    }
+    return const Color(0xFF0F172A);
+  }
+
+  Color _inferBodyColor(NgmySlide slide) {
+    for (final e in slide.elements) {
+      if (e.type == NgmySlideElementType.text && e.fontSize < 28) {
+        return Color(e.color);
+      }
+    }
+    return const Color(0xFF334155);
+  }
 
   void _openDeck(NgmySlideDeck deck) {
     if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
@@ -513,7 +550,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                   const Text('Choose a class template', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
                   const SizedBox(height: 6),
                   Text(
-                    'Normal templates are free · Pro unlocks Professional, Luxury & Bold — \$4.99/mo',
+                    'Top 4 templates are free · lock icon means Slides Pro',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
                   ),
                 ],
@@ -527,7 +564,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 itemCount: ngmyClassPresentationTemplates.length,
                 itemBuilder: (_, i) {
                   final t = ngmyClassPresentationTemplates[i];
-                  final isPro = NgmySlidesPayments.isPaidClassCategory(t.category);
+                  final isPro = NgmySlidesPayments.isPaidClassTemplate(t);
                   return Material(
                     color: Colors.transparent,
                     child: InkWell(
@@ -623,8 +660,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   void _addSlide({NgmySlideLayout layout = NgmySlideLayout.titleContent}) {
     _mutate(() {
+      final theme = _theme;
       final slide = NgmySlide(id: NgmySlidesTemplates.newId());
-      NgmySlidesTemplates.applyLayout(slide, layout, _theme);
+      NgmySlidesTemplates.applyLayout(slide, layout, theme);
+      // Prefer the open slide's exact colors so class templates stay consistent.
+      final ref = _currentSlide;
+      if (ref != null && layout != NgmySlideLayout.section) {
+        slide.background = ref.background;
+        slide.backgroundEnd = ref.backgroundEnd;
+      }
       _activeDeck!.slides.insert(_slideIndex + 1, slide);
       _slideIndex++;
       _selectedElementId = null;
@@ -2214,8 +2258,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     if (NgmySlidesPayments.isPaidSchoolLayout(layout) && !await _ensureSlidesPro()) return;
     if (!mounted) return;
     _mutate(() {
+      final theme = _theme;
       final slide = NgmySlide(id: NgmySlidesTemplates.newId());
-      NgmySlidesTemplates.applyLayout(slide, layout, _theme);
+      NgmySlidesTemplates.applyLayout(slide, layout, theme);
+      final ref = _currentSlide;
+      if (ref != null && layout != NgmySlideLayout.section) {
+        slide.background = ref.background;
+        slide.backgroundEnd = ref.backgroundEnd;
+      }
       _activeDeck!.slides.insert(_slideIndex + 1, slide);
       _slideIndex++;
       _selectedElementId = null;
@@ -2245,7 +2295,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             _header(
               title: 'NGMY SLIDES',
-              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present',
+              subtitle: 'School & document toolkit — edit PDFs, photos, sign papers, present, and build class decks',
               icon: Icons.auto_stories_rounded,
               accent: const Color(0xFF2563EB),
               onIconTap: () async {

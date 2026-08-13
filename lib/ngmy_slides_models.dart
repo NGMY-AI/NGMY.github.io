@@ -518,6 +518,11 @@ class NgmySlidesTemplates {
   static void applyLayout(NgmySlide slide, NgmySlideLayout layout, NgmySlidesTheme theme) {
     slide.layout = layout;
     slide.elements.clear();
+    // Keep new slides on the same background as the deck theme / class template.
+    if (layout != NgmySlideLayout.section) {
+      slide.background = theme.slideBg.value;
+      slide.backgroundEnd = theme.slideBgEnd?.value;
+    }
     switch (layout) {
       case NgmySlideLayout.blank:
         break;

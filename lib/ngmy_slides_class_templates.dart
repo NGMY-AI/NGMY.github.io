@@ -24,6 +24,17 @@ class NgmyClassTemplateDef {
   final Color titleColor;
   final Color bodyColor;
 
+  /// Theme used when adding new slides so they match this template.
+  NgmySlidesTheme get theme => NgmySlidesTheme(
+        id: 'class_$id',
+        label: name,
+        accent: accent,
+        titleColor: titleColor,
+        bodyColor: bodyColor,
+        slideBg: bg,
+        slideBgEnd: bgEnd,
+      );
+
   NgmySlideDeck build() {
     final deck = NgmySlideDeck(
       id: NgmySlidesTemplates.newId(),
@@ -172,3 +183,14 @@ const ngmyClassPresentationTemplates = <NgmyClassTemplateDef>[
 
 NgmyClassTemplateDef ngmyClassTemplateById(String id) =>
     ngmyClassPresentationTemplates.firstWhere((t) => t.id == id, orElse: () => ngmyClassPresentationTemplates.first);
+
+/// Resolves `class_<id>` theme ids used by class presentation decks.
+NgmySlidesTheme? ngmyClassThemeByThemeId(String themeId) {
+  final raw = themeId.trim();
+  if (!raw.startsWith('class_')) return null;
+  final id = raw.substring('class_'.length);
+  if (id.isEmpty) return null;
+  final match = ngmyClassPresentationTemplates.where((t) => t.id == id);
+  if (match.isEmpty) return null;
+  return match.first.theme;
+}
