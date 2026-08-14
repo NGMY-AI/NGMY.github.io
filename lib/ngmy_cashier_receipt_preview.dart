@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 
 import 'ngmy_cashier_iou.dart';
 import 'ngmy_cashier_receipt_pdf.dart';
+import 'ngmy_invoice_signature.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -15,6 +16,9 @@ const _kGreen = Color(0xFF059669);
 const _kRed = Color(0xFFDC2626);
 const _kInk = Color(0xFF0F172A);
 const _kMuted = Color(0xFF64748B);
+
+/// Match the Cashier sign pad so receipt signatures read as large as when signing.
+const _kReceiptSignatureHeight = NgmyInvoiceSignaturePad.padHeight;
 
 /// Paper-style on-screen debt / payment receipt (like in-app invoices).
 class NgmyCashierIouReceiptPreview extends StatelessWidget {
@@ -264,11 +268,11 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                 if (iou.hasSignature) ...[
                   const SizedBox(height: 10),
                   Container(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFFCBD5E1), width: 1.6),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,13 +285,24 @@ class NgmyCashierIouReceiptPreview extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        SizedBox(
-                          height: 68,
-                          width: double.infinity,
-                          child: CustomPaint(
-                            painter:
-                                _CashierSignaturePainter(iou.signaturePoints),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: ColoredBox(
+                            color: Colors.white,
+                            child: SizedBox(
+                              height: _kReceiptSignatureHeight,
+                              width: double.infinity,
+                              child: CustomPaint(
+                                painter: NgmySignaturePainter(
+                                  iou.signaturePoints,
+                                  color: _kInk,
+                                  canvasSize: const Size(280, _kReceiptSignatureHeight),
+                                  liveDraw: true,
+                                  strokeWidthBase: 3.5,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -450,50 +465,14 @@ class _CashierSignaturePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (points.isEmpty) return;
-    double minX = double.infinity, minY = double.infinity;
-    double maxX = 0, maxY = 0;
-    var any = false;
-    for (final p in points) {
-      if (p == null) continue;
-      any = true;
-      if (p.dx < minX) minX = p.dx;
-      if (p.dy < minY) minY = p.dy;
-      if (p.dx > maxX) maxX = p.dx;
-      if (p.dy > maxY) maxY = p.dy;
-    }
-    if (!any) return;
-    final srcW = (maxX - minX).clamp(1.0, 10000.0);
-    final srcH = (maxY - minY).clamp(1.0, 10000.0);
-    final scale =
-        (size.width * 0.85 / srcW).clamp(0.0, size.height * 0.7 / srcH);
-    final ox = (size.width - srcW * scale) / 2;
-    final oy = (size.height - srcH * scale) / 2;
-
-    final paint = Paint()
-      ..color = _kInk
-      ..strokeWidth = 2.2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final path = Path();
-    var started = false;
-    for (final p in points) {
-      if (p == null) {
-        started = false;
-        continue;
-      }
-      final x = ox + (p.dx - minX) * scale;
-      final y = oy + (p.dy - minY) * scale;
-      if (!started) {
-        path.moveTo(x, y);
-        started = true;
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(path, paint);
+    // Same mapping as the live sign pad — fill the box like when signing.
+    NgmySignaturePainter(
+      points,
+      color: _kInk,
+      canvasSize: size,
+      liveDraw: true,
+      strokeWidthBase: 3.5,
+    ).paint(canvas, size);
   }
 
   @override
@@ -802,7 +781,7 @@ Future<void> showNgmyCashierSignatureViewer(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
-                    height: 160,
+                    height: 200,
                     width: double.infinity,
                     color: Colors.white,
                     child: CustomPaint(

@@ -11,22 +11,11 @@ import 'ngmy_worksheet_helpers.dart';
 
 Future<Uint8List?> _signaturePng(List<Offset?> points) async {
   if (!points.any((p) => p != null)) return null;
-  double minX = double.infinity, minY = double.infinity;
-  double maxX = 0, maxY = 0;
-  for (final p in points) {
-    if (p == null) continue;
-    if (p.dx < minX) minX = p.dx;
-    if (p.dy < minY) minY = p.dy;
-    if (p.dx > maxX) maxX = p.dx;
-    if (p.dy > maxY) maxY = p.dy;
-  }
-  const w = 520.0;
-  const h = 140.0;
-  final srcW = (maxX - minX).clamp(1.0, 10000.0);
-  final srcH = (maxY - minY).clamp(1.0, 10000.0);
-  final scale = (w * 0.85 / srcW).clamp(0.0, h * 0.7 / srcH);
-  final ox = (w - srcW * scale) / 2;
-  final oy = (h - srcH * scale) / 2;
+
+  // Match on-screen sign pad proportions so PDF signatures look as large as signing.
+  const w = 560.0;
+  const h = 200.0;
+  final normalized = points.every((p) => p == null || (p.dx.abs() <= 1.5 && p.dy.abs() <= 1.5));
 
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder, const ui.Rect.fromLTWH(0, 0, w, h));
@@ -36,27 +25,68 @@ Future<Uint8List?> _signaturePng(List<Offset?> points) async {
   );
   final paint = ui.Paint()
     ..color = const ui.Color(0xFF0F172A)
-    ..strokeWidth = 2.4
+    ..strokeWidth = 3.6
     ..style = ui.PaintingStyle.stroke
     ..strokeCap = ui.StrokeCap.round
     ..strokeJoin = ui.StrokeJoin.round;
-  final path = ui.Path();
-  var started = false;
-  for (final p in points) {
-    if (p == null) {
-      started = false;
-      continue;
-    }
-    final x = ox + (p.dx - minX) * scale;
-    final y = oy + (p.dy - minY) * scale;
-    if (!started) {
-      path.moveTo(x, y);
-      started = true;
-    } else {
-      path.lineTo(x, y);
-    }
+
+  Offset mapPoint(Offset p) {
+    if (normalized) return Offset(p.dx * w, p.dy * h);
+    // Legacy pixel strokes — fit into the pad like the live preview.
+    return p;
   }
-  canvas.drawPath(path, paint);
+
+  if (!normalized) {
+    double minX = double.infinity, minY = double.infinity;
+    double maxX = 0, maxY = 0;
+    for (final p in points) {
+      if (p == null) continue;
+      if (p.dx < minX) minX = p.dx;
+      if (p.dy < minY) minY = p.dy;
+      if (p.dx > maxX) maxX = p.dx;
+      if (p.dy > maxY) maxY = p.dy;
+    }
+    final srcW = (maxX - minX).clamp(1.0, 10000.0);
+    final srcH = (maxY - minY).clamp(1.0, 10000.0);
+    final scale = (w * 0.92 / srcW).clamp(0.0, h * 0.92 / srcH);
+    final ox = (w - srcW * scale) / 2;
+    final oy = (h - srcH * scale) / 2;
+    final path = ui.Path();
+    var started = false;
+    for (final p in points) {
+      if (p == null) {
+        started = false;
+        continue;
+      }
+      final x = ox + (p.dx - minX) * scale;
+      final y = oy + (p.dy - minY) * scale;
+      if (!started) {
+        path.moveTo(x, y);
+        started = true;
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(path, paint);
+  } else {
+    final path = ui.Path();
+    var started = false;
+    for (final p in points) {
+      if (p == null) {
+        started = false;
+        continue;
+      }
+      final mapped = mapPoint(p);
+      if (!started) {
+        path.moveTo(mapped.dx, mapped.dy);
+        started = true;
+      } else {
+        path.lineTo(mapped.dx, mapped.dy);
+      }
+    }
+    canvas.drawPath(path, paint);
+  }
+
   final picture = recorder.endRecording();
   final image = await picture.toImage(w.toInt(), h.toInt());
   final bd = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -324,10 +354,12 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
           ),
           pw.SizedBox(height: 6),
           pw.Container(
-            height: 70,
-            width: 260,
+            height: 110,
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(6),
             decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey400, width: 0.7),
+              border: pw.Border.all(color: PdfColors.grey400, width: 1),
+              borderRadius: pw.BorderRadius.circular(6),
             ),
             child: pw.Image(sigImage, fit: pw.BoxFit.contain),
           ),
