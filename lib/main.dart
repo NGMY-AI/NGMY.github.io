@@ -29599,75 +29599,111 @@ int _ngmyLevenshtein(String a, String b) {
   return prev[b.length];
 }
 
-double _ngmyFuzzyFieldScore(String query, String field) {
-  final q = query.trim().toLowerCase();
-  final f = field.trim().toLowerCase();
-  if (q.isEmpty) return 1;
-  if (f.isEmpty) return 0;
-  if (f == q) return 1;
-  if (f.contains(q)) return 0.96;
-  if (q.contains(f) && f.length >= 3) return 0.9;
-
-  var best = 0.0;
-  final words = f.split(RegExp(r'[^a-z0-9]+')).where((w) => w.isNotEmpty);
-  for (final w in words) {
-    if (w.startsWith(q) || q.startsWith(w)) {
-      best = best < 0.92 ? 0.92 : best;
-      continue;
-    }
-    final maxLen = w.length > q.length ? w.length : q.length;
-    if (maxLen == 0) continue;
-    final sim = 1.0 - (_ngmyLevenshtein(q, w) / maxLen);
-    if (sim > best) best = sim;
-  }
-
-  final maxFull = f.length > q.length ? f.length : q.length;
-  if (maxFull > 0) {
-    final fullSim = 1.0 - (_ngmyLevenshtein(q, f) / maxFull);
-    if (fullSim > best) best = fullSim;
-  }
-
-  // Soft token: allow 1–2 character typos on longer names.
-  if (q.length >= 3) {
-    for (final w in words) {
-      if ((w.length - q.length).abs() > 2) continue;
-      final d = _ngmyLevenshtein(q, w);
-      if (d <= 2 && w.length >= 3) {
-        final s = 0.88 - (d * 0.08);
-        if (s > best) best = s;
-      }
-    }
-  }
-  return best.clamp(0.0, 1.0);
+/// Max letter edits allowed for name typos (1 missing / 1–2 different).
+int _ngmyCivicNameMaxEdits(int queryLen) {
+  if (queryLen <= 2) return 0; // prefix / exact only while typing short
+  if (queryLen <= 4) return 1;
+  return 2;
 }
 
+List<String> _ngmyCivicNameTokens(String raw) {
+  return raw
+      .trim()
+      .toLowerCase()
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((w) => w.length >= 2)
+      .toList(growable: false);
+}
+
+/// Score a query token against one name token. 0 = not similar enough.
+double _ngmyCivicNameTokenScore(String query, String token) {
+  final q = query.trim().toLowerCase();
+  final w = token.trim().toLowerCase();
+  if (q.isEmpty || w.isEmpty) return 0;
+  if (w == q) return 1;
+  // Typing a first/last name prefix ("jer" → Jerry) — require 2+ letters.
+  if (q.length >= 2 && w.startsWith(q)) return 0.95;
+  // Rare: stored short form contained in longer typed query.
+  if (w.length >= 3 && q.startsWith(w)) return 0.9;
+
+  final maxEdits = _ngmyCivicNameMaxEdits(q.length);
+  if (maxEdits <= 0) return 0;
+  if ((w.length - q.length).abs() > maxEdits) return 0;
+  final d = _ngmyLevenshtein(q, w);
+  if (d <= 0) return 1;
+  if (d > maxEdits) return 0;
+  // 1 edit ≈ 0.88, 2 edits ≈ 0.78 — never pass unrelated names.
+  return (0.96 - (d * 0.10)).clamp(0.0, 1.0);
+}
+
+double _ngmyCivicNameFieldsScore(String query, Iterable<String> nameFields) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return 1;
+  final tokens = q.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+  if (tokens.isEmpty) return 0;
+
+  final nameTokens = <String>{};
+  for (final field in nameFields) {
+    nameTokens.addAll(_ngmyCivicNameTokens(field));
+  }
+  if (nameTokens.isEmpty) return 0;
+
+  // Multi-word ("jerry smith"): every query word must match some name token.
+  if (tokens.length > 1) {
+    var sum = 0.0;
+    for (final t in tokens) {
+      var best = 0.0;
+      for (final w in nameTokens) {
+        final s = _ngmyCivicNameTokenScore(t, w);
+        if (s > best) best = s;
+      }
+      if (best <= 0) return 0;
+      sum += best;
+    }
+    return sum / tokens.length;
+  }
+
+  final t = tokens.first;
+  var best = 0.0;
+  for (final w in nameTokens) {
+    final s = _ngmyCivicNameTokenScore(t, w);
+    if (s > best) best = s;
+  }
+  return best;
+}
+
+double _ngmyCivicExactishFieldScore(String query, String field) {
+  final q = query.trim().toLowerCase();
+  final f = field.trim().toLowerCase();
+  if (q.isEmpty || f.isEmpty) return 0;
+  if (f == q) return 1;
+  if (q.length >= 3 && f.contains(q)) return 0.92;
+  if (q.length >= 2 && f.startsWith(q)) return 0.9;
+  return 0;
+}
+
+/// Civic Registry member search: names must be the same or close (1–2 letter typos).
+/// ID / city / phone only match as exact-ish substrings — not fuzzy against city names.
 double _ngmyCivicMemberSearchScore(String query, UserData u, List<String> nicks) {
   final q = query.trim().toLowerCase();
   if (q.isEmpty) return 1;
-  final fields = <String>[
-    u.username,
+
+  final nameScore = _ngmyCivicNameFieldsScore(q, [
     u.fullName ?? '',
-    u.registryId ?? '',
-    u.city ?? '',
-    u.phone,
+    u.username,
     ...nicks,
-  ];
-  var best = 0.0;
-  for (final f in fields) {
-    final s = _ngmyFuzzyFieldScore(q, f);
-    if (s > best) best = s;
-  }
-  // Multi-word query: score each token against full name / username.
-  final tokens = q.split(RegExp(r'\s+')).where((t) => t.length >= 2).toList();
-  if (tokens.length > 1) {
-    final nameHay = '${u.fullName ?? ''} ${u.username}'.toLowerCase();
-    var tokenHits = 0.0;
-    for (final t in tokens) {
-      tokenHits += _ngmyFuzzyFieldScore(t, nameHay);
-    }
-    final avg = tokenHits / tokens.length;
-    if (avg > best) best = avg;
-  }
+  ]);
+
+  final idScore = _ngmyCivicExactishFieldScore(q, u.registryId ?? '');
+  final cityScore = _ngmyCivicExactishFieldScore(q, u.city ?? '');
+  final phoneDigits = u.phone.replaceAll(RegExp(r'\D'), '');
+  final qDigits = q.replaceAll(RegExp(r'\D'), '');
+  final phoneScore = (qDigits.length >= 3 && phoneDigits.contains(qDigits)) ? 0.9 : 0.0;
+
+  var best = nameScore;
+  if (idScore > best) best = idScore;
+  if (cityScore > best) best = cityScore;
+  if (phoneScore > best) best = phoneScore;
   return best;
 }
 
@@ -30644,8 +30680,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
       final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
       final score = _ngmyCivicMemberSearchScore(q, u, nicks);
-      // Keep close / partial / typo matches (Facebook-style).
-      if (score >= 0.48) scored.add((u: u, score: score));
+      // Keep close name matches only (exact / prefix / 1–2 letter typos).
+      if (score >= 0.75) scored.add((u: u, score: score));
     }
     scored.sort((a, b) {
       final byScore = b.score.compareTo(a.score);
@@ -36416,7 +36452,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // below update on every keystroke via onChanged.
             onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             decoration: InputDecoration(
-              hintText: 'Search by name (typos OK), ID, city...',
+              hintText: 'Search by name, ID, city...',
               hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
               prefixIcon: const Icon(Icons.search, size: 22),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
@@ -37005,8 +37041,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           final searchResults = query.isEmpty
               ? withMissed
               : withMissed.where((m) {
-                  final name = (m.fullName ?? m.username).toLowerCase();
-                  return name.contains(query) || m.email.toLowerCase().contains(query);
+                  final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email);
+                  final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+                  return _ngmyCivicMemberSearchScore(query, m, nicks) >= 0.75 ||
+                      m.email.toLowerCase().contains(query);
                 }).toList();
           return AlertDialog(
             title: const Text('Clear Missed'),
@@ -37149,7 +37187,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (q.isEmpty) return true;
       final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
       final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-      return _ngmyCivicMemberSearchScore(q, u, nicks) >= 0.48;
+      return _ngmyCivicMemberSearchScore(q, u, nicks) >= 0.75;
     }).toList();
     if (q.isNotEmpty) {
       members.sort((a, b) {
@@ -37184,7 +37222,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
         TextField(
           onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
-          decoration: InputDecoration(hintText: 'Search by name (typos OK), ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+          decoration: InputDecoration(hintText: 'Search by name, ID, city...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: isDark ? Colors.white10 : Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
         ),
         const SizedBox(height: 20),
 
