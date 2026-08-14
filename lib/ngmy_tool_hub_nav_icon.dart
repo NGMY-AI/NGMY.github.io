@@ -13,7 +13,12 @@ class NgmyToolHubNavIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (dimmed) {
-      return Icon(Icons.view_quilt_rounded, size: size * 0.92, color: Colors.grey);
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Icon(
+        Icons.view_quilt_rounded,
+        size: size * 0.92,
+        color: isDark ? Colors.white70 : const Color(0xFF0F172A),
+      );
     }
     return SizedBox(
       width: size,

@@ -27,7 +27,9 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = dimmed ? Colors.grey : Colors.white;
+    final fg = dimmed
+        ? (Theme.of(context).brightness == Brightness.dark ? Colors.white70 : const Color(0xFF0F172A))
+        : Colors.white;
     return Container(
       width: size,
       height: size,
@@ -41,7 +43,14 @@ class NgmyStudioHubNavIcon extends StatelessWidget {
                 colors: [kNgmyStudioHubAccent, kNgmyStudioHubAccent2],
               ),
         color: dimmed ? Colors.transparent : null,
-        border: dimmed ? Border.all(color: Colors.grey.shade400, width: 1.4) : null,
+        border: dimmed
+            ? Border.all(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white54
+                    : const Color(0xFF334155),
+                width: 1.6,
+              )
+            : null,
         boxShadow: dimmed
             ? null
             : [

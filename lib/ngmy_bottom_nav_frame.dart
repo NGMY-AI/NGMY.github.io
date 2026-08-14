@@ -112,8 +112,10 @@ class _NgmySculptedBottomNavFrameState extends State<NgmySculptedBottomNavFrame>
                               ],
                       ),
                       border: Border.all(
-                        color: const Color(0xFF67E8F9).withValues(alpha: borderA),
-                        width: 1.35,
+                        color: isDark
+                            ? const Color(0xFF67E8F9).withValues(alpha: borderA)
+                            : const Color(0xFF0EA5E9).withValues(alpha: 0.55 + t * 0.20),
+                        width: isDark ? 1.35 : 1.7,
                       ),
                     ),
                   ),

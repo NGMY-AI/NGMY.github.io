@@ -341,22 +341,25 @@ class _BusinessCardThumbPreview extends StatelessWidget {
               Text(
                 'KB PABLO QR',
                 style: TextStyle(
-                  color: const Color(0xFFD4AF37),
-                  fontWeight: FontWeight.w300,
-                  fontSize: 11,
-                  letterSpacing: 2,
+                  color: isDark ? const Color(0xFFD4AF37) : const Color(0xFF92400E),
+                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  letterSpacing: 1.6,
                 ),
               ),
               const Spacer(),
-              Container(height: 2, width: 40, color: const Color(0xFFD4AF37)),
+              Container(
+                height: 2,
+                width: 40,
+                color: isDark ? const Color(0xFFD4AF37) : const Color(0xFFB45309),
+              ),
               const SizedBox(height: 6),
               Text(
                 'Business Card Studio',
                 style: TextStyle(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.5)
-                      : const Color(0xFF64748B),
-                  fontSize: 9,
+                  color: isDark ? Colors.white.withValues(alpha: 0.5) : const Color(0xFF0F172A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -402,14 +405,18 @@ class _MenuStudioThumbPreview extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.restaurant_menu_rounded, color: accent, size: 22),
+              Icon(
+                Icons.restaurant_menu_rounded,
+                color: isDark ? accent : const Color(0xFF92400E),
+                size: 22,
+              ),
               const SizedBox(height: 8),
               Text(
                 'YOUR MENU',
                 style: TextStyle(
-                  color: accent,
+                  color: isDark ? accent : const Color(0xFF78350F),
                   fontWeight: FontWeight.w900,
-                  fontSize: 12,
+                  fontSize: 13,
                   letterSpacing: 1.2,
                 ),
               ),
@@ -417,8 +424,9 @@ class _MenuStudioThumbPreview extends StatelessWidget {
               Text(
                 'Burgers · Drinks · QR',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                  fontSize: 9,
+                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -516,9 +524,9 @@ class _EssentialsThumbPreview extends StatelessWidget {
               Text(
                 'Notes · Contacts · Tools',
                 style: TextStyle(
-                  color: isDark ? Colors.white54 : const Color(0xFF64748B),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white54 : const Color(0xFF0F172A),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],

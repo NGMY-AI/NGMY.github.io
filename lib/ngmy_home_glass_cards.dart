@@ -1437,7 +1437,7 @@ class _WelcomeGlassFrame extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 8.5,
                   fontWeight: FontWeight.w800,
-                  color: isLight ? const Color(0xFF64748B) : Colors.white.withValues(alpha: 0.95),
+                  color: isLight ? const Color(0xFF334155) : Colors.white.withValues(alpha: 0.95),
                 ),
               ),
               const SizedBox(height: 1),

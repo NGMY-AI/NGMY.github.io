@@ -6,7 +6,7 @@ import 'ngmy_offline_close_button.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
 
-/// Ink / surface tokens for HUD chrome — dark mode unchanged, light mode readable.
+/// Ink / surface tokens for HUD chrome — dark mode unchanged, light mode high-contrast.
 class NgmyHudInk {
   NgmyHudInk._();
 
@@ -17,24 +17,24 @@ class NgmyHudInk {
 
   static Color subtitle(BuildContext context, {double pulse = 0}) => isDark(context)
       ? Colors.white.withValues(alpha: 0.82 + pulse * 0.06)
-      : const Color(0xFF334155);
+      : const Color(0xFF1E293B);
 
   static Color muted(BuildContext context) =>
-      isDark(context) ? Colors.white54 : const Color(0xFF64748B);
+      isDark(context) ? Colors.white54 : const Color(0xFF334155);
 
   static Color faint(BuildContext context) =>
-      isDark(context) ? Colors.white38 : const Color(0xFF94A3B8);
+      isDark(context) ? Colors.white38 : const Color(0xFF475569);
 
   static Color icon(BuildContext context) =>
-      isDark(context) ? Colors.white.withValues(alpha: 0.9) : const Color(0xFF1E293B);
+      isDark(context) ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF0F172A);
 
   static Color panel(BuildContext context) => isDark(context)
       ? Colors.white.withValues(alpha: 0.06)
-      : const Color(0xFFF1F5F9);
+      : const Color(0xFFE2E8F0);
 
   static Color panelBorder(BuildContext context) => isDark(context)
       ? Colors.white.withValues(alpha: 0.14)
-      : const Color(0xFFCBD5E1);
+      : const Color(0xFF94A3B8);
 }
 
 /// Shared pulse / scan / orbit clocks — same motion language as home tech frames.
@@ -113,6 +113,7 @@ class NgmyHudTechFrame extends StatelessWidget {
     final scanV = (scan + phase) % 1.0;
     final orbitV = (orbit + phase * 0.7) % 1.0;
     // Opaque fills only — translucent + BackdropFilter made Advisors look milky/blurry.
+    // Light mode: keep strong accent color so labels/icons stay readable (no washed-out pastels).
     final fill = dark
         ? [
             const Color(0xFF0B1220),
@@ -121,14 +122,14 @@ class NgmyHudTechFrame extends StatelessWidget {
             const Color(0xFF020617),
           ]
         : [
-            Colors.white,
-            Color.lerp(Colors.white, colors.first, 0.12 + pulse * 0.06)!,
-            Color.lerp(const Color(0xFFF8FAFC), colors.last, 0.08)!,
-            const Color(0xFFF8FAFC),
+            Color.lerp(Colors.white, colors.first, 0.22 + pulse * 0.06)!,
+            Color.lerp(const Color(0xFFF8FAFC), colors.first, 0.38)!,
+            Color.lerp(const Color(0xFFF1F5F9), colors.last, 0.32)!,
+            Color.lerp(Colors.white, colors.last, 0.18)!,
           ];
     final borderColor = dark
         ? colors.first.withValues(alpha: 0.22 + pulse * 0.12)
-        : colors.first.withValues(alpha: 0.45 + pulse * 0.15);
+        : colors.first.withValues(alpha: 0.72 + pulse * 0.18);
 
     Widget framed = CustomPaint(
       painter: NgmyHudFramePainter(
@@ -162,9 +163,14 @@ class NgmyHudTechFrame extends StatelessWidget {
                     ? null
                     : [
                         BoxShadow(
-                          color: colors.first.withValues(alpha: 0.12 + pulse * 0.08),
-                          blurRadius: 16,
+                          color: colors.first.withValues(alpha: 0.22 + pulse * 0.10),
+                          blurRadius: 18,
                           offset: const Offset(0, 6),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
                         ),
                       ],
               ),
@@ -209,6 +215,7 @@ class NgmyHudMiniOrb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = NgmyHudInk.isDark(context);
     return SizedBox(
       width: size,
       height: size,
@@ -217,12 +224,21 @@ class NgmyHudMiniOrb extends StatelessWidget {
         children: [
           CustomPaint(
             size: Size.square(size),
-            painter: NgmyHudMiniOrbPainter(colors: colors, pulse: pulse, orbit: orbit),
+            painter: NgmyHudMiniOrbPainter(
+              colors: colors,
+              pulse: pulse,
+              orbit: orbit,
+              lightMode: !dark,
+            ),
           ),
           if (emoji != null && emoji!.trim().isNotEmpty)
             NgmyOfflineEmoji(emoji!, fontSize: size * 0.42)
           else if (icon != null)
-            Icon(icon, color: Colors.white.withValues(alpha: 0.95), size: size * 0.42),
+            Icon(
+              icon,
+              color: dark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF0F172A),
+              size: size * 0.42,
+            ),
         ],
       ),
     );
@@ -252,16 +268,16 @@ class NgmyHudFramePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final r = RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(borderRadius));
     final midStroke = lightMode
-        ? colors.first.withValues(alpha: 0.55)
+        ? colors.first.withValues(alpha: 0.92)
         : Colors.white.withValues(alpha: 0.35);
     final border = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = lightMode ? 1.8 : 1.4
+      ..strokeWidth = lightMode ? 2.2 : 1.4
       ..shader = LinearGradient(
         colors: [
-          colors.first.withValues(alpha: 0.35 + glow * 0.45),
+          colors.first.withValues(alpha: lightMode ? 0.85 : 0.35 + glow * 0.45),
           midStroke,
-          colors.last.withValues(alpha: 0.45 + glow * 0.35),
+          colors.last.withValues(alpha: lightMode ? 0.88 : 0.45 + glow * 0.35),
         ],
       ).createShader(Offset.zero & size);
     canvas.drawRRect(r, border);
@@ -304,11 +320,13 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
     required this.colors,
     required this.pulse,
     required this.orbit,
+    this.lightMode = false,
   });
 
   final List<Color> colors;
   final double pulse;
   final double orbit;
+  final bool lightMode;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -320,8 +338,8 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
         radius + i * 3.2 + pulse * 2.2,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = colors.first.withValues(alpha: 0.12 * i),
+          ..strokeWidth = lightMode ? 1.4 : 1
+          ..color = colors.first.withValues(alpha: lightMode ? 0.28 * i : 0.12 * i),
       );
     }
     canvas.drawCircle(
@@ -329,11 +347,17 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
       radius,
       Paint()
         ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.55),
-            colors.first.withValues(alpha: 0.85),
-            colors.last.withValues(alpha: 0.55),
-          ],
+          colors: lightMode
+              ? [
+                  Color.lerp(Colors.white, colors.first, 0.35)!,
+                  colors.first,
+                  colors.last,
+                ]
+              : [
+                  Colors.white.withValues(alpha: 0.55),
+                  colors.first.withValues(alpha: 0.85),
+                  colors.last.withValues(alpha: 0.55),
+                ],
         ).createShader(Rect.fromCircle(center: c, radius: radius)),
     );
     canvas.drawCircle(
@@ -341,19 +365,22 @@ class NgmyHudMiniOrbPainter extends CustomPainter {
       radius + 2,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = Colors.white.withValues(alpha: 0.55 + pulse * 0.35),
+        ..strokeWidth = lightMode ? 2.4 : 2
+        ..color = lightMode
+            ? colors.last.withValues(alpha: 0.85 + pulse * 0.15)
+            : Colors.white.withValues(alpha: 0.55 + pulse * 0.35),
     );
     for (var i = 0; i < 4; i++) {
       final a = orbit * math.pi * 2 + i * (math.pi / 2);
       final p = Offset(c.dx + math.cos(a) * (radius + 8), c.dy + math.sin(a) * (radius + 8));
       canvas.drawCircle(p, 2.0, Paint()..color = colors[i % colors.length]);
-      canvas.drawLine(c, p, Paint()..color = colors.first.withValues(alpha: 0.35)..strokeWidth = 1);
+      canvas.drawLine(c, p, Paint()..color = colors.first.withValues(alpha: lightMode ? 0.55 : 0.35)..strokeWidth = 1);
     }
   }
 
   @override
-  bool shouldRepaint(covariant NgmyHudMiniOrbPainter old) => old.pulse != pulse || old.orbit != orbit;
+  bool shouldRepaint(covariant NgmyHudMiniOrbPainter old) =>
+      old.pulse != pulse || old.orbit != orbit || old.lightMode != lightMode;
 }
 
 /// Frosted glass pill — matches home bottom-nav frame (transparent + curved ends).

@@ -16,8 +16,8 @@ class NgmyHubTheme {
   Color get surfaceElevated => isDark ? const Color(0xFF111827) : const Color(0xFFF8FAFC);
   Color get panel => isDark ? const Color(0xFF0B1020) : const Color(0xFFF8FAFC);
   Color get title => isDark ? Colors.white : const Color(0xFF0F172A);
-  Color get subtitle => isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF64748B);
-  Color get muted => isDark ? Colors.white.withValues(alpha: 0.48) : const Color(0xFF94A3B8);
+  Color get subtitle => isDark ? Colors.white.withValues(alpha: 0.55) : const Color(0xFF334155);
+  Color get muted => isDark ? Colors.white.withValues(alpha: 0.48) : const Color(0xFF475569);
   Color get iconButtonBg => isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05);
   Color get iconButtonIcon => isDark ? Colors.white70 : const Color(0xFF475569);
   Color get border => isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFFE2E8F0);

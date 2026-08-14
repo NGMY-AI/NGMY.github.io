@@ -13420,6 +13420,7 @@ class FloatingTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     final h = large ? 76.0 : 60.0;
     final size = large ? 22.0 : 15.0;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -13428,7 +13429,17 @@ class FloatingTitle extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(large ? 38 : 30),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 5))],
+          border: Border.all(
+            color: isDark ? Colors.white.withValues(alpha: 0.12) : const Color(0xFF94A3B8),
+            width: isDark ? 1 : 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isDark ? 0.08 : 0.12),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -13444,6 +13455,7 @@ class FloatingTitle extends StatelessWidget {
                     fontSize: size,
                     letterSpacing: large ? 1.6 : 1,
                     height: 1.05,
+                    color: isDark ? null : const Color(0xFF0F172A),
                   ),
                 ),
               ),
@@ -16024,7 +16036,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     icon,
                     color: _idx == i
                         ? (selectedColor ?? const Color(0xFF67E8F9))
-                        : (Theme.of(context).brightness == Brightness.dark ? Colors.white54 : Colors.black45),
+                        : (Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white70
+                            : const Color(0xFF0F172A)),
                     size: NgmyBottomNavMetrics.sideIconSize,
                   ),
                 ),
@@ -27796,19 +27810,19 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
 
     final civicColors = isDark
       ? [const Color(0xFF3949AB), const Color(0xFF512DA8)]
-      : [const Color(0xFF7986CB), const Color(0xFF9575CD)];
+      : [const Color(0xFF4338CA), const Color(0xFF6D28D9)];
 
     final storeColors = isDark
       ? [const Color(0xFFC2185B), const Color(0xFF7B1FA2)]
-      : [const Color(0xFFF06292), const Color(0xFFBA68C8)];
+      : [const Color(0xFFDB2777), const Color(0xFF9333EA)];
 
     final helpColors = isDark
       ? [const Color(0xFF880E4F), const Color(0xFF4A148C)]
-      : [const Color(0xFFF06292), const Color(0xFF9C27B0)];
+      : [const Color(0xFFBE185D), const Color(0xFF7E22CE)];
 
     final docColors = isDark
       ? [const Color(0xFF0F766E), const Color(0xFF115E59)]
-      : [const Color(0xFF14B8A6), const Color(0xFF0D9488)];
+      : [const Color(0xFF0F766E), const Color(0xFF0D9488)];
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -29350,7 +29364,12 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: Colors.white, letterSpacing: 0.2),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              fontSize: 12.5,
+              color: NgmyHudInk.title(context),
+              letterSpacing: 0.2,
+            ),
           ),
         ],
       ),
