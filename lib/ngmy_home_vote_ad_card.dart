@@ -112,7 +112,7 @@ class _NgmyHomeVoteAdCardState extends State<NgmyHomeVoteAdCard> with TickerProv
                   ),
                 ),
               _Wash(styleId: style.id),
-              if (c.showMarquee)
+              if (c.showMarquee && style.id != 'editorial' && style.id != 'parade')
                 Positioned(
                   top: 0,
                   left: 0,
@@ -123,7 +123,7 @@ class _NgmyHomeVoteAdCardState extends State<NgmyHomeVoteAdCard> with TickerProv
                     accent: accent,
                   ),
                 ),
-              if (style.id == 'rally' || style.id == 'parade')
+              if (style.id == 'rally')
                 Positioned(
                   left: 0,
                   top: 0,
@@ -134,33 +134,41 @@ class _NgmyHomeVoteAdCardState extends State<NgmyHomeVoteAdCard> with TickerProv
               if (style.id == 'neon')
                 IgnorePointer(
                   child: Container(
+                    margin: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: accent.withValues(alpha: 0.55 + _pulse.value * 0.25), width: 2),
                     ),
                   ),
                 ),
-              IgnorePointer(
-                child: Transform.translate(
-                  offset: Offset((_shimmer.value * 2.4 - 0.7) * 240, 0),
-                  child: Transform.rotate(
-                    angle: -0.4,
-                    child: Container(
-                      width: 64,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white.withValues(alpha: 0),
-                            Colors.white.withValues(alpha: 0.12),
-                            Colors.white.withValues(alpha: 0),
-                          ],
+              if (style.id != 'editorial')
+                IgnorePointer(
+                  child: Transform.translate(
+                    offset: Offset((_shimmer.value * 2.4 - 0.7) * 240, 0),
+                    child: Transform.rotate(
+                      angle: -0.4,
+                      child: Container(
+                        width: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withValues(alpha: 0),
+                              Colors.white.withValues(alpha: style.id == 'neon' ? 0.18 : 0.10),
+                              Colors.white.withValues(alpha: 0),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
               Padding(
-                padding: EdgeInsets.fromLTRB(14, c.showMarquee ? 28 : 14, 14, 14),
+                padding: EdgeInsets.fromLTRB(
+                  14,
+                  c.showMarquee && style.id != 'editorial' && style.id != 'parade' ? 28 : 14,
+                  14,
+                  14,
+                ),
                 child: Opacity(
                   opacity: 0.35 + enter * 0.65,
                   child: Transform.translate(
@@ -202,41 +210,172 @@ class _Backdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = switch (styleId) {
-      'billboard' => const [Color(0xFF7F1D1D), Color(0xFF111827)],
-      'ticker' => const [Color(0xFF0C4A6E), Color(0xFF020617)],
-      'rally' => const [Color(0xFF7C2D12), Color(0xFF111827)],
-      'spotlight' => const [Color(0xFF0A0A0A), Color(0xFF1C1917)],
-      'portrait' => const [Color(0xFF1E1B4B), Color(0xFF0F172A)],
-      'neon' => const [Color(0xFF090014), Color(0xFF020617)],
-      'parade' => const [Color(0xFF064E3B), Color(0xFF111827)],
-      'editorial' => const [Color(0xFF1C1917), Color(0xFF292524)],
-      'stadium' => const [Color(0xFF1E3A8A), Color(0xFF0F172A)],
-      _ => const [Color(0xFF052E16), Color(0xFF0F172A), Color(0xFF7F1D1D)],
-    };
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: colors.length == 2 ? colors : colors,
-        ),
-      ),
-      child: styleId == 'spotlight'
-          ? Center(
+    switch (styleId) {
+      case 'billboard':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [const Color(0xFF450A0A), accent.withValues(alpha: 0.55), const Color(0xFF0B0F19)],
+            ),
+          ),
+        );
+      case 'ticker':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF020617)),
+            Positioned(
+              right: -40,
+              top: -30,
+              child: Transform.rotate(
+                angle: 0.35,
+                child: Container(
+                  width: 160,
+                  height: 220,
+                  color: accent.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 54,
+              child: ColoredBox(color: accent.withValues(alpha: 0.22)),
+            ),
+          ],
+        );
+      case 'rally':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFF431407), accent.withValues(alpha: 0.45), const Color(0xFF111827)],
+                ),
+              ),
+            ),
+            Positioned(
+              left: -30,
+              top: 40,
+              child: Transform.rotate(
+                angle: -0.55,
+                child: Container(width: 280, height: 48, color: Colors.white.withValues(alpha: 0.12)),
+              ),
+            ),
+          ],
+        );
+      case 'spotlight':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF050505)),
+            Center(
               child: Container(
-                width: 180 + pulse * 20,
-                height: 180 + pulse * 20,
+                width: 200 + pulse * 28,
+                height: 200 + pulse * 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
-                    colors: [accent.withValues(alpha: 0.28), Colors.transparent],
+                    colors: [accent.withValues(alpha: 0.38), accent.withValues(alpha: 0.08), Colors.transparent],
                   ),
                 ),
               ),
-            )
-          : null,
-    );
+            ),
+          ],
+        );
+      case 'portrait':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: SweepGradient(
+              colors: [
+                const Color(0xFF1E1B4B),
+                accent.withValues(alpha: 0.55),
+                const Color(0xFF0F172A),
+                const Color(0xFF1E1B4B),
+              ],
+            ),
+          ),
+        );
+      case 'neon':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF05010F)),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.2),
+                    radius: 1.1,
+                    colors: [accent.withValues(alpha: 0.22), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      case 'parade':
+        return Column(
+          children: [
+            Expanded(child: ColoredBox(color: accent.withValues(alpha: 0.85))),
+            const Expanded(flex: 2, child: ColoredBox(color: Color(0xFF0F172A))),
+            Expanded(child: ColoredBox(color: Colors.white.withValues(alpha: 0.92))),
+          ],
+        );
+      case 'editorial':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F4),
+            border: Border.all(color: const Color(0xFF1C1917), width: 3),
+          ),
+        );
+      case 'stadium':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [const Color(0xFF1E3A8A), accent.withValues(alpha: 0.35), const Color(0xFF020617)],
+                ),
+              ),
+            ),
+            for (final y in [0.22, 0.48, 0.74])
+              Positioned(
+                left: 12,
+                right: 12,
+                top: (y * 220).clamp(20, 200),
+                child: Container(height: 1, color: Colors.white.withValues(alpha: 0.12)),
+              ),
+          ],
+        );
+      case 'cinematic':
+      default:
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [const Color(0xFF0B1220), const Color(0xFF111827), accent.withValues(alpha: 0.45)],
+                ),
+              ),
+            ),
+            Positioned(top: 0, left: 0, right: 0, height: 18, child: ColoredBox(color: Colors.black.withValues(alpha: 0.55))),
+            Positioned(bottom: 0, left: 0, right: 0, height: 28, child: ColoredBox(color: Colors.black.withValues(alpha: 0.7))),
+          ],
+        );
+    }
   }
 }
 
@@ -246,22 +385,36 @@ class _Wash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (styleId == 'editorial' || styleId == 'parade') {
+      return const SizedBox.shrink();
+    }
     return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: styleId == 'billboard'
-              ? [
-                  Colors.black.withValues(alpha: 0.05),
-                  Colors.black.withValues(alpha: 0.55),
-                  Colors.black.withValues(alpha: 0.88),
-                ]
-              : [
-                  Colors.black.withValues(alpha: 0.18),
-                  Colors.black.withValues(alpha: 0.4),
-                  Colors.black.withValues(alpha: 0.84),
-                ],
+          colors: switch (styleId) {
+            'billboard' => [
+                Colors.black.withValues(alpha: 0.05),
+                Colors.black.withValues(alpha: 0.45),
+                Colors.black.withValues(alpha: 0.9),
+              ],
+            'spotlight' => [
+                Colors.black.withValues(alpha: 0.35),
+                Colors.black.withValues(alpha: 0.15),
+                Colors.black.withValues(alpha: 0.75),
+              ],
+            'ticker' => [
+                Colors.black.withValues(alpha: 0.25),
+                Colors.transparent,
+                Colors.black.withValues(alpha: 0.55),
+              ],
+            _ => [
+                Colors.black.withValues(alpha: 0.18),
+                Colors.black.withValues(alpha: 0.35),
+                Colors.black.withValues(alpha: 0.82),
+              ],
+          },
         ),
       ),
     );
@@ -333,133 +486,347 @@ class _SlideBody extends StatelessWidget {
   final bool showCircle;
   final double orbit;
 
+  Color get _ink => styleId == 'editorial' || styleId == 'parade' ? const Color(0xFF0F172A) : Colors.white;
+  Color get _muted => styleId == 'editorial' || styleId == 'parade'
+      ? const Color(0xFF334155)
+      : Colors.white.withValues(alpha: 0.9);
+
+  Widget? _face({double size = 70, bool square = false}) {
+    if (!showCircle || face == null) return null;
+    return Transform.scale(
+      scale: breathe,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(square ? 12 : 999),
+          border: Border.all(color: accent, width: 2.5),
+          boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 14)],
+          image: DecorationImage(image: face!, fit: BoxFit.cover),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (styleId == 'portrait') {
-      return Column(
-        children: [
-          Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.4)),
-          const Spacer(),
-          if (showCircle && face != null)
-            Transform.scale(
-              scale: breathe,
-              child: Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: accent, width: 3),
-                  boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.4), blurRadius: 18)],
-                  image: DecorationImage(image: face!, fit: BoxFit.cover),
+    switch (styleId) {
+      case 'portrait':
+        return Column(
+          children: [
+            Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.4)),
+            const Spacer(),
+            if (_face(size: 92) != null) _face(size: 92)!,
+            const SizedBox(height: 8),
+            Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 20)),
+            const SizedBox(height: 4),
+            Text(support, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontWeight: FontWeight.w600, fontSize: 11)),
+            const Spacer(),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
+      case 'billboard':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              color: accent,
+              child: Text(headline, style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.4)),
+            ),
+            const Spacer(),
+            Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 30, height: 0.92, letterSpacing: -0.8)),
+            const SizedBox(height: 6),
+            Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontWeight: FontWeight.w700, fontSize: 12)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _CtaChip(label: cta, accent: accent, pulse: breathe),
+                const Spacer(),
+                if (_face(size: 52) != null) _face(size: 52)!,
+              ],
+            ),
+          ],
+        );
+
+      case 'ticker':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  color: const Color(0xFFEF4444),
+                  child: const Text('BREAKING', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12)),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (_face(size: 64, square: true) != null) ...[
+                  _face(size: 64, square: true)!,
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                      const SizedBox(height: 4),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              color: Colors.black.withValues(alpha: 0.55),
+              child: Text(cta, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.1)),
+            ),
+          ],
+        );
+
+      case 'rally':
+        return Stack(
+          children: [
+            Positioned(
+              right: -8,
+              top: 24,
+              child: Transform.rotate(
+                angle: -0.2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  color: accent,
+                  child: Text(headline, style: const TextStyle(color: Color(0xFF111827), fontWeight: FontWeight.w900, fontSize: 11)),
                 ),
               ),
             ),
-          const SizedBox(height: 8),
-          Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-          const SizedBox(height: 4),
-          Text(support, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontWeight: FontWeight.w600, fontSize: 11)),
-          const Spacer(),
-          _CtaChip(label: cta, accent: accent, pulse: breathe),
-        ],
-      );
-    }
-
-    if (styleId == 'billboard') {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 1.6)),
-          const Spacer(),
-          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, height: 0.95, letterSpacing: -0.5)),
-          const SizedBox(height: 6),
-          Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 12)),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _CtaChip(label: cta, accent: accent, pulse: breathe),
-              const Spacer(),
-              if (showCircle && face != null)
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                    image: DecorationImage(image: face!, fit: BoxFit.cover),
-                  ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 36),
+                Text('STAND WITH', style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 2)),
+                const SizedBox(height: 4),
+                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 26, height: 0.95)),
+                const Spacer(),
+                Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontWeight: FontWeight.w600, fontSize: 12)),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _CtaChip(label: cta, accent: accent, pulse: breathe)),
+                    if (_face(size: 48) != null) ...[const SizedBox(width: 8), _face(size: 48)!],
+                  ],
                 ),
+              ],
+            ),
+          ],
+        );
+
+      case 'spotlight':
+        return Column(
+          children: [
+            Text(headline, textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
+            const Spacer(),
+            if (_face(size: 88) != null) _face(size: 88)!,
+            const SizedBox(height: 10),
+            Text(name, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 22)),
+            const SizedBox(height: 6),
+            Text(support, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11.5)),
+            const Spacer(),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
+      case 'neon':
+        return Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: accent.withValues(alpha: 0.7), width: 1.6),
+            boxShadow: [
+              BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 16),
             ],
           ),
-        ],
-      );
-    }
-
-    // Default / cinematic / rally / neon / etc.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _LiveTag(pulse: breathe),
-            const Spacer(),
-            _CtaChip(label: headline, accent: accent, pulse: breathe),
-          ],
-        ),
-        const Spacer(),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (showCircle && face != null) ...[
-              Transform.translate(
-                offset: Offset(math.cos(orbit * math.pi * 2) * 2, math.sin(orbit * math.pi * 2) * 2),
-                child: Transform.scale(
-                  scale: breathe,
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: accent, width: 2.5),
-                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 14)],
-                      image: DecorationImage(image: face!, fit: BoxFit.cover),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: styleId == 'editorial' ? 18 : 20,
-                      height: 1.05,
-                      letterSpacing: styleId == 'editorial' ? 0.8 : 0.3,
+                  Icon(Icons.bolt_rounded, color: accent, size: 18),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2))),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  if (_face(size: 62) != null) ...[_face(size: 62)!, const SizedBox(width: 10)],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 18, shadows: [Shadow(color: accent, blurRadius: 10)])),
+                        const SizedBox(height: 4),
+                        Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    support,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w600, fontSize: 11.5, height: 1.25),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(cta, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.1)),
                 ],
+              ),
+              const SizedBox(height: 10),
+              Align(alignment: Alignment.centerRight, child: _CtaChip(label: cta, accent: accent, pulse: breathe)),
+            ],
+          ),
+        );
+
+      case 'parade':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(headline, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.5)),
+            const Spacer(),
+            Row(
+              children: [
+                if (_face(size: 58) != null) ...[_face(size: 58)!, const SizedBox(width: 10)],
+                Expanded(
+                  child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, fontSize: 12)),
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                color: const Color(0xFF0F172A),
+                child: Text(cta, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
               ),
             ),
           ],
-        ),
-      ],
-    );
+        );
+
+      case 'editorial':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('THE BALLOT', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 2.2)),
+            const SizedBox(height: 4),
+            Container(height: 2, width: 42, color: const Color(0xFF1C1917)),
+            const SizedBox(height: 8),
+            Text(headline, style: const TextStyle(color: Color(0xFF1C1917), fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 0.6)),
+            const SizedBox(height: 6),
+            Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0C0A09), fontWeight: FontWeight.w900, fontSize: 22, height: 1.05, letterSpacing: -0.3)),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Text(support, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF44403C), fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w600)),
+            ),
+            Row(
+              children: [
+                if (_face(size: 44, square: true) != null) ...[_face(size: 44, square: true)!, const SizedBox(width: 8)],
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(border: Border.all(color: const Color(0xFF1C1917), width: 1.4)),
+                    child: Text(cta, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF1C1917), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 0.8)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+
+      case 'stadium':
+        return Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.45),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: accent.withValues(alpha: 0.5)),
+              ),
+              child: Text(headline, textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.6)),
+            ),
+            const Spacer(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_face(size: 72) != null) _face(size: 72)!,
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 20)),
+            const SizedBox(height: 4),
+            Text(support, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+            const Spacer(),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [accent, Color.lerp(accent, Colors.white, 0.2)!]),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(cta, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1)),
+            ),
+          ],
+        );
+
+      case 'cinematic':
+      default:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _LiveTag(pulse: breathe),
+                const Spacer(),
+                Text('FEATURE', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4)),
+              ],
+            ),
+            const Spacer(),
+            Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.5)),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                if (_face(size: 74) != null) ...[
+                  Transform.translate(
+                    offset: Offset(math.cos(orbit * math.pi * 2) * 2, math.sin(orbit * math.pi * 2) * 2),
+                    child: _face(size: 74)!,
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 22, height: 1.02)),
+                      const SizedBox(height: 4),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontWeight: FontWeight.w600, fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Align(alignment: Alignment.centerRight, child: _CtaChip(label: cta, accent: accent, pulse: breathe)),
+          ],
+        );
+    }
   }
 }
 

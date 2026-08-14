@@ -17,8 +17,8 @@ const _kRed = Color(0xFFDC2626);
 const _kInk = Color(0xFF0F172A);
 const _kMuted = Color(0xFF64748B);
 
-/// Match the Cashier sign pad so receipt signatures read as large as when signing.
-const _kReceiptSignatureHeight = NgmyInvoiceSignaturePad.padHeight;
+/// Between the old tiny preview and the full sign pad — readable, not receipt-bloating.
+const _kReceiptSignatureHeight = 88.0;
 
 /// Paper-style on-screen debt / payment receipt (like in-app invoices).
 class NgmyCashierIouReceiptPreview extends StatelessWidget {

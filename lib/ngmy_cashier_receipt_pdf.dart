@@ -12,9 +12,9 @@ import 'ngmy_worksheet_helpers.dart';
 Future<Uint8List?> _signaturePng(List<Offset?> points) async {
   if (!points.any((p) => p != null)) return null;
 
-  // Match on-screen sign pad proportions so PDF signatures look as large as signing.
-  const w = 560.0;
-  const h = 200.0;
+  // Match on-screen receipt proportions (readable, not oversized).
+  const w = 520.0;
+  const h = 160.0;
   final normalized = points.every((p) => p == null || (p.dx.abs() <= 1.5 && p.dy.abs() <= 1.5));
 
   final recorder = ui.PictureRecorder();
@@ -354,7 +354,7 @@ Future<Uint8List> ngmyBuildCashierIouReceiptPdf(NgmyCashierIou iou) async {
           ),
           pw.SizedBox(height: 6),
           pw.Container(
-            height: 110,
+            height: 82,
             width: double.infinity,
             padding: const pw.EdgeInsets.all(6),
             decoration: pw.BoxDecoration(
