@@ -1510,39 +1510,119 @@ class _FamilyTreeLayout {
     // Root placed at origin center; canvas shift later recenters content.
     place(root.id, 0, 0);
 
-    // Separate only same-generation overlaps (not full descendant bounding boxes),
-    // so sparse upper generations stay tight when lower gens get crowded.
+    // Keep same-generation people from colliding, and keep cousin families
+    // clearly separated so their connector bars never look like one shared line.
     void separateGenerationOverlaps() {
       final depths = nodeDepth.values.toSet().toList()..sort((a, b) => b.compareTo(a));
-      const minCenterGap = nodeWidth + horizontalGap;
+      const siblingGap = nodeWidth + horizontalGap;
+      // Extra space between different parents' children on the same row.
+      const familyClusterGap = nodeWidth * 2 + horizontalGap * 2;
+
       for (final depth in depths) {
-        final atDepth = nodes.entries
-            .where((e) => nodeDepth[e.key] == depth)
-            .map((e) => e.key)
-            .toList()
-          ..sort((a, b) => nodes[a]!.position.dx.compareTo(nodes[b]!.position.dx));
+        for (var guard = 0; guard < 64; guard++) {
+          final atDepth = nodes.entries
+              .where((e) => nodeDepth[e.key] == depth)
+              .map((e) => e.key)
+              .toList()
+            ..sort((a, b) => nodes[a]!.position.dx.compareTo(nodes[b]!.position.dx));
 
-        for (var i = 1; i < atDepth.length; i++) {
-          final leftId = atDepth[i - 1];
-          final rightId = atDepth[i];
-          final left = nodes[leftId]!;
-          final right = nodes[rightId]!;
+          var moved = false;
+          for (var i = 1; i < atDepth.length; i++) {
+            final leftId = atDepth[i - 1];
+            final rightId = atDepth[i];
+            final left = nodes[leftId]!;
+            final right = nodes[rightId]!;
 
-          // Spouses on the same row are intentionally close — skip.
-          final leftSpouse = left.member.spouseId;
-          final rightSpouse = right.member.spouseId;
-          if (leftSpouse == rightId || rightSpouse == leftId) continue;
+            // Spouses on the same row are intentionally close — skip.
+            final leftSpouse = left.member.spouseId;
+            final rightSpouse = right.member.spouseId;
+            if (leftSpouse == rightId || rightSpouse == leftId) continue;
 
-          final gap = right.position.dx - left.position.dx;
-          if (gap >= minCenterGap - 0.5) continue;
+            final leftParent = (left.member.parentId ?? '').trim();
+            final rightParent = (right.member.parentId ?? '').trim();
+            final differentFamilies =
+                leftParent.isNotEmpty && rightParent.isNotEmpty && leftParent != rightParent;
+            final minGap = differentFamilies ? familyClusterGap : siblingGap;
 
-          // Move the right person and everyone under them — leave the left sibling put.
-          shiftSubtree(rightId, minCenterGap - gap, includeSelf: true);
+            final gap = right.position.dx - left.position.dx;
+            if (gap >= minGap - 0.5) continue;
+
+            final dx = minGap - gap;
+            if (differentFamilies) {
+              // Shift the whole right-hand family cluster (all siblings of that parent).
+              final cluster = atDepth.where((id) {
+                final p = (nodes[id]!.member.parentId ?? '').trim();
+                return p == rightParent && nodes[id]!.position.dx + 0.5 >= right.position.dx;
+              }).toList();
+              for (final id in cluster) {
+                shiftSubtree(id, dx, includeSelf: true);
+              }
+            } else {
+              shiftSubtree(rightId, dx, includeSelf: true);
+            }
+            moved = true;
+            break;
+          }
+          if (!moved) break;
         }
       }
     }
 
+    void recenterParentsOverChildren() {
+      for (final entry in childIdsOf.entries) {
+        final parentId = entry.key;
+        final parentNode = nodes[parentId];
+        if (parentNode == null) continue;
+        final kidNodes = entry.value.map((id) => nodes[id]).whereType<_LayoutNode>().toList();
+        if (kidNodes.isEmpty) continue;
+
+        final xs = <double>[];
+        for (final kn in kidNodes) {
+          final spouseId = kn.member.spouseId;
+          if (spouseId != null && nodes.containsKey(spouseId)) {
+            final s = nodes[spouseId]!;
+            if ((s.position.dy - kn.position.dy).abs() < 1) {
+              xs.add((kn.position.dx + s.position.dx) / 2);
+              continue;
+            }
+          }
+          xs.add(kn.position.dx);
+        }
+        for (final o in overflowNodes.where((o) => o.parentId == parentId)) {
+          xs.add(o.position.dx);
+        }
+        if (xs.isEmpty) continue;
+        xs.sort();
+        final targetCx = xs.length == 1 ? xs.first : (xs.first + xs.last) / 2;
+        final spouseId = parentNode.member.spouseId;
+        if (spouseId != null && nodes.containsKey(spouseId)) {
+          final s = nodes[spouseId]!;
+          if ((s.position.dy - parentNode.position.dy).abs() < 1) {
+            final currentCx = (parentNode.position.dx + s.position.dx) / 2;
+            final dx = targetCx - currentCx;
+            if (dx.abs() < 0.5) continue;
+            nodes[parentId] = _LayoutNode(
+              member: parentNode.member,
+              position: Offset(parentNode.position.dx + dx, parentNode.position.dy),
+            );
+            nodes[spouseId] = _LayoutNode(
+              member: s.member,
+              position: Offset(s.position.dx + dx, s.position.dy),
+            );
+            continue;
+          }
+        }
+        final dx = targetCx - parentNode.position.dx;
+        if (dx.abs() < 0.5) continue;
+        nodes[parentId] = _LayoutNode(
+          member: parentNode.member,
+          position: Offset(parentNode.position.dx + dx, parentNode.position.dy),
+        );
+      }
+    }
+
     separateGenerationOverlaps();
+    recenterParentsOverChildren();
 
     void rebuildParentChildEdges() {
       edges.removeWhere((e) => !e.isSpouse);
@@ -1623,6 +1703,7 @@ class _FamilyTreeLayout {
     }
 
     separateGenerationOverlaps();
+    recenterParentsOverChildren();
     rebuildParentChildEdges();
 
     // Drop parent→child edges that no longer point at a real node / overflow chip.
@@ -1745,25 +1826,30 @@ class _FamilyTreeLinesPainter extends CustomPainter {
     childTops.sort((a, b) => a.dx.compareTo(b.dx));
 
     final midY = parentBottom.dy + (childTops.first.dy - parentBottom.dy) / 2;
+    final barPaint = Paint()
+      ..color = paint.color
+      ..strokeWidth = paint.strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.butt
+      ..strokeJoin = StrokeJoin.round;
+
     if (childTops.length == 1) {
       final childTop = childTops.first;
       if ((childTop.dx - parentBottom.dx).abs() < 0.5) {
         canvas.drawLine(parentBottom, childTop, paint);
       } else {
         canvas.drawLine(parentBottom, Offset(parentBottom.dx, midY), paint);
-        canvas.drawLine(Offset(parentBottom.dx, midY), Offset(childTop.dx, midY), paint);
+        canvas.drawLine(Offset(parentBottom.dx, midY), Offset(childTop.dx, midY), barPaint);
         canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
       }
       return;
     }
 
-    final path = Path()
-      ..moveTo(parentBottom.dx, parentBottom.dy)
-      ..lineTo(parentBottom.dx, midY)
-      ..lineTo(childTops.first.dx, midY)
-      ..lineTo(childTops.last.dx, midY);
-
-    canvas.drawPath(path, paint);
+    // Bar only spans THIS parent's children — never visually fuse with a neighbor family.
+    final leftX = childTops.first.dx;
+    final rightX = childTops.last.dx;
+    canvas.drawLine(parentBottom, Offset(parentBottom.dx, midY), paint);
+    canvas.drawLine(Offset(leftX, midY), Offset(rightX, midY), barPaint);
 
     for (final childTop in childTops) {
       canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
