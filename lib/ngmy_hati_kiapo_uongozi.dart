@@ -23,6 +23,12 @@ const String kKiapoVideoFileName = '__kiapo_video__';
 
 const int _softLine = 0xFFE2D8C8;
 
+String _kiapoTodayDate() {
+  final now = DateTime.now();
+  String p2(int n) => n.toString().padLeft(2, '0');
+  return '${p2(now.day)}/${p2(now.month)}/${now.year}';
+}
+
 const String kNgmyHatiKiapoBodyP1 =
     'Mimi [Jina Kamili la Rais], nikiwa Rais wa jamii yetu ya Kikongo, '
     'ninasimama mbele ya wanajamii wote kuapa kwamba nitawaongoza kwa haki, '
@@ -50,6 +56,39 @@ bool ngmyKiapoElementIsVideoZone(NgmySlideElement e) =>
 bool ngmyKiapoHasVideo(NgmySlideElement e) {
   final ref = (e.imageRef ?? '').trim();
   return ngmyKiapoElementIsVideoZone(e) && ref.isNotEmpty;
+}
+
+/// After the president signs, registrars keep edit rights for 5 more hours.
+const Duration kNgmyKiapoPostSignEditWindow = Duration(hours: 5);
+
+bool ngmyKiapoHasPresidentSignature(NgmySlideDeck deck) {
+  if ((deck.kiapoSignedAt ?? '').trim().isNotEmpty) return true;
+  for (final slide in deck.slides) {
+    for (final e in slide.elements) {
+      if (e.type == NgmySlideElementType.signature &&
+          e.fileName.startsWith('${kMarriageSignPrefix}placed_rais')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/// True while fields / video / signature may still be changed.
+bool ngmyKiapoEditWindowOpen(NgmySlideDeck deck) {
+  final raw = (deck.kiapoSignedAt ?? '').trim();
+  if (raw.isEmpty) {
+    // Legacy decks that already have a signature but no timestamp — lock them.
+    return !ngmyKiapoHasPresidentSignature(deck);
+  }
+  final at = DateTime.tryParse(raw);
+  if (at == null) return !ngmyKiapoHasPresidentSignature(deck);
+  return DateTime.now().toUtc().isBefore(at.toUtc().add(kNgmyKiapoPostSignEditWindow));
+}
+
+void ngmyKiapoMarkSignedNow(NgmySlideDeck deck) {
+  if ((deck.kiapoSignedAt ?? '').trim().isNotEmpty) return;
+  deck.kiapoSignedAt = DateTime.now().toUtc().toIso8601String();
 }
 
 // ── Shared civic store (one oath document per state) ─────────────────────────
@@ -120,7 +159,9 @@ class NgmyHatiKiapoStore {
     await load();
     final key = _stateKey(state);
     if (key.isEmpty) return null;
-    return _byState[key]?.copy();
+    final deck = _byState[key]?.copy();
+    if (deck == null) return null;
+    return ngmyEnsureHatiKiapoLayout(deck);
   }
 
   static Future<bool> save(NgmySlideDeck deck) async {
@@ -129,7 +170,17 @@ class NgmyHatiKiapoStore {
     if (key.isEmpty) return false;
     deck.deckKind = kNgmyHatiKiapoUongoziDeckKind;
     deck.updatedAt = DateTime.now();
-    _byState[key] = deck.copy();
+    // Never persist inline data:video blobs into shared prefs / cloud.
+    final safe = deck.copy();
+    for (final slide in safe.slides) {
+      for (final e in slide.elements) {
+        final ref = (e.imageRef ?? '').trim();
+        if (ngmyKiapoElementIsVideoZone(e) && ref.startsWith('data:')) {
+          e.imageRef = null;
+        }
+      }
+    }
+    _byState[key] = safe;
     _loaded = true;
     await _saveLocal();
     if (!await ngmyCanReachCloud()) return false;
@@ -149,11 +200,10 @@ class NgmyHatiKiapoStore {
     if (picked == null) return null;
     final bytes = await picked.readAsBytes();
     if (bytes.isEmpty) return null;
+    // Always upload to storage — embedding base64 video in the deck JSON
+    // was large enough to freeze / remount the app on save.
     final cloud = await _uploadVideoBytes(state: state, bytes: bytes);
-    if (cloud != null) return cloud;
-    // Fallback for offline — keep under ~4MB to avoid blowing prefs.
-    if (bytes.length > 4 * 1024 * 1024) return null;
-    return 'data:video/mp4;base64,${base64Encode(bytes)}';
+    return cloud;
   }
 
   static Future<String?> _uploadVideoBytes({
@@ -340,14 +390,42 @@ List<NgmySlideElement> _buildKiapoPage({
     tag: 'watermark',
   ));
 
+  // Tarehe — top-right corner, auto-filled with today's date (same as other Hati docs).
+  const tareheX = 0.70;
+  const tareheY = 0.026;
+  const tareheLabelW = 0.10;
+  final tareheValueX = tareheX + tareheLabelW + 0.006;
+  out.add(_kLockedText(
+    'TAREHE:',
+    x: tareheX,
+    y: tareheY,
+    w: tareheLabelW,
+    h: _kBlankH(16),
+    fontSize: 16,
+    fontWeight: FontWeight.w800,
+    color: accent,
+    tag: 'tarehe_lbl',
+  ));
+  out.add(_kBlank(
+    'tarehe',
+    tareheValueX,
+    tareheY,
+    0.18,
+    ink: ink,
+    fontSize: 16,
+    startText: _kiapoTodayDate(),
+    align: TextAlign.left,
+  ));
+  out.add(_kBlankUnderline(tareheValueX + 0.004, tareheY + _kBlankH(16) * 0.8, 0.12, color: accent));
+
   // Title block
   out.add(_kLockedText(
     'HATI YA KIAPO CHA UONGOZI',
     x: cx,
-    y: 0.034,
+    y: 0.055,
     w: cw,
-    h: 0.055,
-    fontSize: 28,
+    h: 0.048,
+    fontSize: 26,
     fontWeight: FontWeight.w900,
     align: TextAlign.center,
     color: ink,
@@ -356,10 +434,10 @@ List<NgmySlideElement> _buildKiapoPage({
   out.add(_kLockedText(
     'Kiapo cha Rais · Presidential Oath of Leadership',
     x: cx,
-    y: 0.086,
+    y: 0.100,
     w: cw,
-    h: 0.028,
-    fontSize: 12,
+    h: 0.024,
+    fontSize: 11,
     fontWeight: FontWeight.w600,
     fontStyle: FontStyle.italic,
     align: TextAlign.center,
@@ -369,7 +447,7 @@ List<NgmySlideElement> _buildKiapoPage({
   out.add(_kLockedShape(
     shape: NgmySlideShapeKind.line,
     x: cx + cw * 0.18,
-    y: 0.118,
+    y: 0.128,
     w: cw * 0.64,
     h: 0.002,
     strokeColor: accent,
@@ -377,53 +455,21 @@ List<NgmySlideElement> _buildKiapoPage({
     tag: 'title_rule',
   ));
 
-  // Tarehe
-  out.add(_kLockedText(
-    'Tarehe:',
-    x: cx,
-    y: 0.135,
-    w: 0.12,
-    h: 0.028,
-    fontSize: 14,
-    fontWeight: FontWeight.w800,
-    color: ink,
-    tag: 'tarehe_lbl',
-  ));
-  out.add(_kBlank('tarehe_top', cx + 0.13, 0.135, 0.42, ink: ink, fontSize: 14, startText: '[Weka Tarehe Hapa]'));
-  out.add(_kBlankUnderline(cx + 0.13, 0.155, 0.42));
-
-  // Oath body
-  out.add(_kLockedShape(
-    shape: NgmySlideShapeKind.rectangle,
-    x: cx,
-    y: 0.175,
-    w: cw,
-    h: 0.028,
-    fillColor: accent,
-    strokeColor: accent,
-    strokeWidth: 0,
-    tag: 'ribbon',
-  ));
-  out.add(_kLockedText(
-    'KIAPO CHA UONGOZI',
-    x: cx,
-    y: 0.177,
-    w: cw,
-    h: 0.024,
-    fontSize: 12,
-    fontWeight: FontWeight.w900,
-    align: TextAlign.center,
-    color: 0xFFFFFFFF,
-    tag: 'ribbon_txt',
-  ));
-
-  out.add(_kParagraphField('body_p1', cx, 0.215, cw, 0.14, startText: kNgmyHatiKiapoBodyP1, ink: ink, fontSize: 12.2));
-  out.add(_kParagraphField('body_p2', cx, 0.362, cw, 0.12, startText: kNgmyHatiKiapoBodyP2, ink: ink, fontSize: 12.2));
-  out.add(_kParagraphField('body_p3', cx, 0.488, cw, 0.115, startText: kNgmyHatiKiapoBodyP3, ink: ink, fontSize: 12.2));
+  // Oath body — tight paragraph stack (no ribbon banner).
+  const bodyFont = 12.0;
+  const p1Y = 0.145;
+  const p1H = 0.105;
+  const p2Y = 0.255;
+  const p2H = 0.092;
+  const p3Y = 0.352;
+  const p3H = 0.095;
+  out.add(_kParagraphField('body_p1', cx, p1Y, cw, p1H, startText: kNgmyHatiKiapoBodyP1, ink: ink, fontSize: bodyFont));
+  out.add(_kParagraphField('body_p2', cx, p2Y, cw, p2H, startText: kNgmyHatiKiapoBodyP2, ink: ink, fontSize: bodyFont));
+  out.add(_kParagraphField('body_p3', cx, p3Y, cw, p3H, startText: kNgmyHatiKiapoBodyP3, ink: ink, fontSize: bodyFont));
 
   // Video of the president reading the oath
-  const videoY = 0.615;
-  const videoH = 0.145;
+  const videoY = 0.460;
+  const videoH = 0.175;
   out.add(_kLockedShape(
     shape: NgmySlideShapeKind.rectangle,
     x: cx,
@@ -450,14 +496,14 @@ List<NgmySlideElement> _buildKiapoPage({
     id: NgmySlidesTemplates.newId(),
     type: NgmySlideElementType.image,
     x: cx + 0.03,
-    y: videoY + 0.03,
+    y: videoY + 0.032,
     w: cw - 0.06,
-    h: videoH - 0.04,
+    h: videoH - 0.044,
     fileName: kKiapoVideoFileName,
   ));
 
   // Rais Anayeapa
-  const signY = 0.78;
+  const signY = 0.655;
   out.add(_kLockedText(
     'Rais Anayeapa:',
     x: cx,
@@ -473,31 +519,31 @@ List<NgmySlideElement> _buildKiapoPage({
   out.add(_kBlank('rais_jina', cx + 0.11, signY + 0.038, 0.62, ink: ink, fontSize: 13));
   out.add(_kBlankUnderline(cx + 0.11, signY + 0.058, 0.62));
 
-  out.add(_kLockedText('Sahihi:', x: cx, y: signY + 0.078, w: 0.12, h: 0.026, fontSize: 13, fontWeight: FontWeight.w700, color: ink, tag: 'sahihi_lbl'));
+  out.add(_kLockedText('Sahihi:', x: cx, y: signY + 0.085, w: 0.12, h: 0.026, fontSize: 13, fontWeight: FontWeight.w700, color: ink, tag: 'sahihi_lbl'));
   out.add(NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
     type: NgmySlideElementType.shape,
     shape: NgmySlideShapeKind.rectangle,
     x: cx + 0.13,
-    y: signY + 0.068,
+    y: signY + 0.075,
     w: 0.38,
-    h: 0.055,
+    h: 0.070,
     fillColor: 0x00000000,
     strokeColor: 0x00000000,
     fileName: '${kMarriageSignPrefix}rais',
   ));
-  out.add(_kBlankUnderline(cx + 0.13, signY + 0.118, 0.38));
+  out.add(_kBlankUnderline(cx + 0.13, signY + 0.140, 0.38));
 
-  out.add(_kLockedText('Tarehe:', x: cx + 0.54, y: signY + 0.078, w: 0.12, h: 0.026, fontSize: 13, fontWeight: FontWeight.w700, color: ink, tag: 'tarehe2_lbl'));
-  out.add(_kBlank('rais_tarehe', cx + 0.66, signY + 0.078, 0.2, ink: ink, fontSize: 12));
-  out.add(_kBlankUnderline(cx + 0.66, signY + 0.098, 0.2));
+  out.add(_kLockedText('Tarehe:', x: cx + 0.54, y: signY + 0.085, w: 0.12, h: 0.026, fontSize: 13, fontWeight: FontWeight.w700, color: ink, tag: 'tarehe2_lbl'));
+  out.add(_kBlank('rais_tarehe', cx + 0.66, signY + 0.085, 0.2, ink: ink, fontSize: 12, startText: _kiapoTodayDate()));
+  out.add(_kBlankUnderline(cx + 0.66, signY + 0.105, 0.2));
 
   final trimmedState = state.trim();
   if (trimmedState.isNotEmpty) {
     const stateBoxH = 0.032;
     const stateBoxW = 0.72;
     final stateBoxX = cx + (cw - stateBoxW) / 2;
-    const stateY = 0.935;
+    const stateY = 0.875;
     out.addAll([
       _kLockedShape(
         shape: NgmySlideShapeKind.rectangle,
@@ -526,6 +572,85 @@ List<NgmySlideElement> _buildKiapoPage({
   }
 
   return out;
+}
+
+String? _kiapoFieldKey(NgmySlideElement e) {
+  if (!e.fileName.startsWith(kMarriageFieldPrefix)) return null;
+  return e.fileName.replaceFirst(kMarriageFieldPrefix, '').split(':').first;
+}
+
+/// Rebuilds the paper layout for older saved decks while keeping filled
+/// fields, video, and the presidential signature.
+NgmySlideDeck ngmyEnsureHatiKiapoLayout(NgmySlideDeck deck) {
+  if (!ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) return deck;
+  final state = (deck.marriageState ?? '').trim();
+  final oldSlide = deck.slides.isEmpty ? null : deck.slides.first;
+
+  final fieldValues = <String, String>{};
+  String? videoRef;
+  NgmySlideElement? placedSign;
+  if (oldSlide != null) {
+    for (final e in oldSlide.elements) {
+      final key = _kiapoFieldKey(e);
+      if (key != null && e.text.trim().isNotEmpty) fieldValues[key] = e.text;
+      if (ngmyKiapoHasVideo(e)) videoRef = e.imageRef;
+      if (e.type == NgmySlideElementType.signature &&
+          e.fileName.startsWith('${kMarriageSignPrefix}placed_rais')) {
+        placedSign = e.copy();
+      }
+    }
+  }
+
+  final built = ngmyBuildHatiKiapoUongoziDeck(state: state);
+  final fresh = NgmySlideDeck(
+    id: deck.id,
+    name: deck.name,
+    themeId: built.themeId,
+    aspectRatio: built.aspectRatio,
+    deckKind: kNgmyHatiKiapoUongoziDeckKind,
+    marriageState: deck.marriageState ?? state,
+    signatureStrokeWidth: deck.signatureStrokeWidth,
+    signatureInkColor: deck.signatureInkColor,
+    kiapoSignedAt: deck.kiapoSignedAt,
+    updatedAt: deck.updatedAt,
+    slides: built.slides,
+  );
+
+  final slide = fresh.slides.first;
+  for (final e in slide.elements) {
+    final key = _kiapoFieldKey(e);
+    if (key != null && fieldValues.containsKey(key)) {
+      e.text = fieldValues[key]!;
+    }
+    if (ngmyKiapoElementIsVideoZone(e) && videoRef != null) {
+      e.imageRef = videoRef;
+    }
+  }
+  if (placedSign != null) {
+    NgmySlideElement? emptyZone;
+    for (final e in slide.elements) {
+      if (ngmyMarriageElementIsSignZone(e) && e.fileName.endsWith('rais')) {
+        emptyZone = e;
+        break;
+      }
+    }
+    if (emptyZone != null) {
+      placedSign.x = emptyZone.x;
+      placedSign.y = emptyZone.y;
+      placedSign.w = emptyZone.w;
+      placedSign.h = emptyZone.h;
+      slide.elements.removeWhere((e) => e.id == emptyZone!.id);
+    } else {
+      slide.elements.removeWhere((e) => ngmyMarriageElementIsSignZone(e) && e.fileName.contains('rais'));
+    }
+    slide.elements.add(placedSign);
+  }
+
+  // Stamp signedAt for legacy signed docs so the 5-hour window can apply.
+  if ((fresh.kiapoSignedAt ?? '').trim().isEmpty && ngmyKiapoHasPresidentSignature(fresh)) {
+    fresh.kiapoSignedAt = deck.updatedAt.toUtc().toIso8601String();
+  }
+  return fresh;
 }
 
 /// Builds the single-page presidential oath document for a Civic Registry state.
@@ -581,8 +706,10 @@ Future<void> launchNgmyHatiKiapoUongozi({
   final existing = await NgmyHatiKiapoStore.loadForState(trimmed);
   if (!context.mounted) return;
 
+  final editAllowed = canEdit && (existing == null || ngmyKiapoEditWindowOpen(existing));
+
   if (existing != null) {
-    if (canEdit) {
+    if (editAllowed) {
       final action = await showModalBottomSheet<String>(
         context: context,
         backgroundColor: const Color(0xFF14110C),
@@ -663,12 +790,14 @@ Future<void> launchNgmyHatiKiapoUongozi({
     return;
   }
 
-  if (!canEdit) {
+  if (!editAllowed) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Registrar wa $trimmed bado hajachapisha Hati ya Kiapo cha Uongozi.',
+            existing != null
+                ? 'Hati ya Kiapo cha Uongozi ya $trimmed imefungwa kwa uhariri. Unaweza kuiona tu.'
+                : 'Registrar wa $trimmed bado hajachapisha Hati ya Kiapo cha Uongozi.',
           ),
         ),
       );

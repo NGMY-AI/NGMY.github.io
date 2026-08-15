@@ -318,6 +318,7 @@ class NgmySlideDeck {
     this.marriageState,
     this.signatureStrokeWidth,
     this.signatureInkColor,
+    this.kiapoSignedAt,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -338,6 +339,8 @@ class NgmySlideDeck {
   double? signatureStrokeWidth;
   /// ARGB ink color from the first signature (same propagation as stroke).
   int? signatureInkColor;
+  /// When the president first signed Hati ya Kiapo — starts a 5-hour edit window.
+  String? kiapoSignedAt;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
 
@@ -365,6 +368,7 @@ class NgmySlideDeck {
         marriageState: marriageState,
         signatureStrokeWidth: signatureStrokeWidth,
         signatureInkColor: signatureInkColor,
+        kiapoSignedAt: kiapoSignedAt,
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -379,6 +383,7 @@ class NgmySlideDeck {
         if (marriageState != null) 'marriageState': marriageState,
         if (signatureStrokeWidth != null) 'signatureStrokeWidth': signatureStrokeWidth,
         if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
+        if (kiapoSignedAt != null && kiapoSignedAt!.trim().isNotEmpty) 'kiapoSignedAt': kiapoSignedAt,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -393,6 +398,7 @@ class NgmySlideDeck {
         marriageState: json['marriageState']?.toString(),
         signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
+        kiapoSignedAt: json['kiapoSignedAt']?.toString(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))

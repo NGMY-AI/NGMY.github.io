@@ -123,6 +123,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   bool _canEditKiapoDeck([NgmySlideDeck? deck]) {
     final d = deck ?? _activeDeck;
     if (!ngmyIsHatiKiapoUongoziDeck(d?.deckKind)) return true;
+    // After the president signs, only a 5-hour edit window remains.
+    if (d != null && !ngmyKiapoEditWindowOpen(d)) return false;
     if (widget.isAdmin || widget.isCivicRegistryKing || widget.isCivicRegistryAdmin) return true;
     if (!widget.isAuthorizedRegistrar) return false;
     final docState = (d?.marriageState ?? '').trim().toLowerCase();
@@ -354,7 +356,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         );
         return;
       }
-      unawaited(_openMarriageDraftAsync(deck));
+      unawaited(_openMarriageDraftAsync(ngmyEnsureHatiKiapoLayout(deck)));
       return;
     }
     if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
@@ -401,12 +403,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _openMarriageDraftAsync(NgmySlideDeck deck) async {
-    if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
+    var openDeck = deck;
+    if (ngmyIsHatiKiapoUongoziDeck(openDeck.deckKind)) {
+      openDeck = ngmyEnsureHatiKiapoLayout(openDeck);
+    }
+    if (NgmyStripePayments.marriageDocDeckKind(openDeck.deckKind)) {
       final ok = await _ensureMarriageDocPaid();
       if (!ok || !mounted) return;
     }
     setState(() {
-      _activeDeck = deck.copy();
+      _activeDeck = openDeck.copy();
       _slideIndex = 0;
       _selectedElementId = null;
       _isDraft = true;
@@ -417,6 +423,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _ribbonTab = 'Home';
     });
     unawaited(_maybeShowMarriageHint());
+    if (mounted &&
+        ngmyIsHatiKiapoUongoziDeck(openDeck.deckKind) &&
+        !_canEditKiapoDeck(openDeck) &&
+        ngmyKiapoHasPresidentSignature(openDeck)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This oath is locked for editing (5 hours after the president signed). You can still view and play the video.'),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<bool> _ensureMarriageDocPaid() async {
@@ -522,7 +539,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       return;
     }
     final state = _kiapoStateForUser;
-    final canEdit = widget.isAdmin ||
+    var canEdit = widget.isAdmin ||
         widget.isCivicRegistryKing ||
         widget.isCivicRegistryAdmin ||
         (widget.isAuthorizedRegistrar &&
@@ -532,8 +549,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       context: context,
       state: state,
       canEdit: canEdit,
-      openDraftEditor: _openMarriageDraft,
-      openSavedDeck: _openDeck,
+      openDraftEditor: (d) => _openMarriageDraft(ngmyEnsureHatiKiapoLayout(d)),
+      openSavedDeck: (d) => _openDeck(ngmyEnsureHatiKiapoLayout(d)),
     );
   }
 
@@ -1861,6 +1878,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _currentSlide!.elements.add(el);
       _currentSlide!.elements.removeWhere((e) => e.id == zone.id);
       _selectedElementId = null;
+      if (ngmyIsHatiKiapoUongoziDeck(_activeDeck?.deckKind) &&
+          zone.fileName.contains('rais')) {
+        ngmyKiapoMarkSignedNow(_activeDeck!);
+      }
     });
   }
 
@@ -1934,14 +1955,47 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       );
       return;
     }
-    final state = (_activeDeck?.marriageState ?? '').trim();
-    if (state.isEmpty) return;
+    final deck = _activeDeck;
+    final state = (deck?.marriageState ?? '').trim();
+    if (deck == null || state.isEmpty) return;
+
+    // Keep the open editor alive across the picker — do not use _mutate
+    // (draft commit + undo snapshot) until the upload finishes.
     final ref = await NgmyHatiKiapoStore.pickAndUploadOathVideo(state: state);
-    if (ref == null || !mounted) return;
-    _mutate(() {
+    if (!mounted) return;
+    if (ref == null || ref.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Video upload failed. Check your connection and try again.'),
+        ),
+      );
+      return;
+    }
+    if (!identical(_activeDeck, deck) && _activeDeck?.id != deck.id) {
+      // Editor was closed while picking — still persist onto the civic store.
+      final slide = deck.slides.isEmpty ? null : deck.slides.first;
+      if (slide != null) {
+        for (final e in slide.elements) {
+          if (ngmyKiapoElementIsVideoZone(e)) {
+            e.imageRef = ref;
+            e.fileName = kKiapoVideoFileName;
+          }
+        }
+      }
+      unawaited(NgmyHatiKiapoStore.save(deck));
+      return;
+    }
+    setState(() {
       zone.imageRef = ref;
       zone.fileName = kKiapoVideoFileName;
       _selectedElementId = null;
+      _isDraft = false;
+    });
+    _syncDeckIntoList();
+    // Persist off the UI frame so the video player can mount first.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(_persistDecks());
     });
   }
 
