@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_pdf_embed_stub.dart'
     if (dart.library.html) 'ngmy_slides_pdf_embed_web.dart';
@@ -23,6 +24,7 @@ class NgmySlideElementView extends StatelessWidget {
     this.onTap,
     this.onDoubleTap,
     this.showEmptyHint = true,
+    this.kiapoVideoCanUpload = false,
   });
 
   final NgmySlideElement element;
@@ -41,8 +43,19 @@ class NgmySlideElementView extends StatelessWidget {
   /// print, where an empty field should just read as blank space.
   final bool showEmptyHint;
 
+  /// When true, empty kiapo video slot shows registrar upload hint.
+  final bool kiapoVideoCanUpload;
+
   @override
   Widget build(BuildContext context) {
+    if (ngmyKiapoElementIsVideoZone(element)) {
+      return NgmyKiapoVideoSlot(
+        videoRef: element.imageRef,
+        scale: scale,
+        emptyHint: showEmptyHint,
+        canUpload: kiapoVideoCanUpload,
+      );
+    }
     switch (element.type) {
       case NgmySlideElementType.text:
         return _textView();

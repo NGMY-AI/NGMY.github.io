@@ -15716,9 +15716,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         '${widget.user.email}|$invSig|'
         '${widget.user.pendingInvestmentName}|${widget.allMedia.length}|'
         '${_announcementsSig(widget.allAnnouncements)}|${widget.config.logoUrl}|$_investPurchaseInFlight|'
-        '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}';
+        '${_investmentPlansSig(widget.globalPlans)}|${_legalContentSig(widget.config)}|'
+        '${widget.user.isEnrolledInRegistry}|${widget.user.isAuthorizedRegistrar}|'
+        '${widget.user.state}|${widget.user.isCivicRegistryKing}|${widget.user.isCivicRegistryAdmin}';
     if (_tabContentBuilders != null && _tabPagesKey == cacheKey) return;
     _tabPagesKey = cacheKey;
+    final civicEnrolled = widget.user.isEnrolledInRegistry ||
+        NgmyCivicRegistryMembers.isEnrolled(widget.config, widget.user.email);
+    final registrarServing = NgmyCivicRegistryStats.registrarStateForUser(
+      email: widget.user.email,
+      userState: widget.user.state,
+      applications: widget.config.civicRegistrarApplications,
+    );
     _tabContentBuilders = {
       1: () => NgmyMarketHubScreen(
                 userEmail: widget.user.email,
@@ -15729,6 +15738,12 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         userEmail: widget.user.email,
         isAdmin: widget.user.isAdmin,
         bottomScrollPadding: _ngmyBottomNavScrollPadding(context),
+        isCivicEnrolled: civicEnrolled,
+        isAuthorizedRegistrar: widget.user.isAuthorizedRegistrar,
+        isCivicRegistryKing: widget.user.isCivicRegistryKing,
+        isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+        memberState: widget.user.state,
+        registrarServingState: registrarServing,
       ),
       3: () => NgmyHubScreen(
         user: widget.user,

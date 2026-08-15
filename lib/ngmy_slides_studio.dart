@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_hati_document_transfer.dart';
+import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -33,11 +34,25 @@ class NgmySlidesStudioScreen extends StatefulWidget {
     required this.userEmail,
     this.isAdmin = false,
     this.bottomScrollPadding = 96,
+    this.isCivicEnrolled = false,
+    this.isAuthorizedRegistrar = false,
+    this.isCivicRegistryKing = false,
+    this.isCivicRegistryAdmin = false,
+    this.memberState = '',
+    this.registrarServingState = '',
   });
 
   final String userEmail;
   final bool isAdmin;
   final double bottomScrollPadding;
+
+  /// Enrolled Civic Registry passport member (or registrar/admin with access).
+  final bool isCivicEnrolled;
+  final bool isAuthorizedRegistrar;
+  final bool isCivicRegistryKing;
+  final bool isCivicRegistryAdmin;
+  final String memberState;
+  final String registrarServingState;
 
   @override
   State<NgmySlidesStudioScreen> createState() => _NgmySlidesStudioScreenState();
@@ -91,8 +106,44 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     super.dispose();
   }
 
+  bool get _hasCivicRegistryAccess =>
+      widget.isCivicEnrolled ||
+      widget.isAuthorizedRegistrar ||
+      widget.isCivicRegistryKing ||
+      widget.isCivicRegistryAdmin ||
+      widget.isAdmin;
+
+  String get _kiapoStateForUser {
+    if (widget.isAuthorizedRegistrar && widget.registrarServingState.trim().isNotEmpty) {
+      return widget.registrarServingState.trim();
+    }
+    return widget.memberState.trim();
+  }
+
+  bool _canEditKiapoDeck([NgmySlideDeck? deck]) {
+    final d = deck ?? _activeDeck;
+    if (!ngmyIsHatiKiapoUongoziDeck(d?.deckKind)) return true;
+    if (widget.isAdmin || widget.isCivicRegistryKing || widget.isCivicRegistryAdmin) return true;
+    if (!widget.isAuthorizedRegistrar) return false;
+    final docState = (d?.marriageState ?? '').trim().toLowerCase();
+    final mine = widget.registrarServingState.trim().toLowerCase();
+    return docState.isNotEmpty && mine.isNotEmpty && docState == mine;
+  }
+
   Future<void> _loadDecks() async {
     final decks = await NgmySlidesStorage.loadDecks(widget.userEmail);
+    if (_hasCivicRegistryAccess) {
+      final state = _kiapoStateForUser;
+      if (state.isNotEmpty) {
+        final kiapo = await NgmyHatiKiapoStore.loadForState(state);
+        if (kiapo != null) {
+          decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+          decks.insert(0, kiapo);
+        }
+      }
+    } else {
+      decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+    }
     if (!mounted) return;
     setState(() {
       _decks = decks;
@@ -101,7 +152,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _persistDecks() async {
-    await NgmySlidesStorage.saveDecks(widget.userEmail, _decks);
+    final personal = _decks.where((d) => !ngmyIsHatiKiapoUongoziDeck(d.deckKind)).toList();
+    await NgmySlidesStorage.saveDecks(widget.userEmail, personal);
+    final active = _activeDeck;
+    if (active != null && ngmyIsHatiKiapoUongoziDeck(active.deckKind) && _canEditKiapoDeck(active)) {
+      await NgmyHatiKiapoStore.save(active);
+      final i = _decks.indexWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
+      if (i >= 0) {
+        _decks[i] = active.copy();
+      } else {
+        _decks.insert(0, active.copy());
+      }
+    }
   }
 
   void _scheduleAutosave() {
@@ -285,6 +347,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _openDeck(NgmySlideDeck deck) {
+    if (ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) {
+      if (!_hasCivicRegistryAccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in to Civic Registry to view this document.')),
+        );
+        return;
+      }
+      unawaited(_openMarriageDraftAsync(deck));
+      return;
+    }
     if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
       unawaited(_openMarriageDraftAsync(deck));
       return;
@@ -361,6 +433,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   Future<bool> _ensureSlidesPro() async {
     // Marriage / Hati decks use their own one-time paywall — never ask for Slides Pro.
     if (NgmyStripePayments.marriageDocDeckKind(_activeDeck?.deckKind)) return true;
+    // Civic Registry presidential oath — free for enrolled members / registrars.
+    if (ngmyIsHatiKiapoUongoziDeck(_activeDeck?.deckKind)) return true;
     return NgmySlidesPayments.ensureProAccess(
       context: context,
       email: widget.userEmail,
@@ -440,13 +514,36 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  void _launchHatiKiapoUongozi() {
+    if (!_hasCivicRegistryAccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to Civic Registry to view Hati ya Kiapo cha Uongozi.')),
+      );
+      return;
+    }
+    final state = _kiapoStateForUser;
+    final canEdit = widget.isAdmin ||
+        widget.isCivicRegistryKing ||
+        widget.isCivicRegistryAdmin ||
+        (widget.isAuthorizedRegistrar &&
+            widget.registrarServingState.trim().isNotEmpty &&
+            widget.registrarServingState.trim().toLowerCase() == state.toLowerCase());
+    launchNgmyHatiKiapoUongozi(
+      context: context,
+      state: state,
+      canEdit: canEdit,
+      openDraftEditor: _openMarriageDraft,
+      openSavedDeck: _openDeck,
+    );
+  }
+
   Future<void> _openDocumentCategoryPicker() async {
     final category = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1C1917),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -487,6 +584,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 subtitle: 'Makubaliano ya mahari iliyosalia',
                 onTap: () => Navigator.pop(ctx, 'hati_malipo_awamu'),
               ),
+              if (_hasCivicRegistryAccess) ...[
+                const SizedBox(height: 10),
+                _DocumentCategoryTile(
+                  icon: Icons.workspace_premium_rounded,
+                  colors: const [Color(0xFFB8860B), Color(0xFF12213D), Color(0xFF0A1526)],
+                  title: 'HATI YA KIAPO CHA UONGOZI',
+                  subtitle: 'Kiapo cha Rais · Civic Registry',
+                  onTap: () => Navigator.pop(ctx, 'hati_kiapo_uongozi'),
+                ),
+              ],
             ],
           ),
         ),
@@ -501,6 +608,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _launchHatiKuhowesha();
     } else if (category == 'hati_malipo_awamu') {
       _launchHatiMalipoAwamu();
+    } else if (category == 'hati_kiapo_uongozi') {
+      _launchHatiKiapoUongozi();
     }
   }
 
@@ -761,6 +870,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _startTextEditing(String id) {
+    if (!_canEditKiapoDeck()) return;
     final el = _findElement(id);
     if (el == null || el.type != NgmySlideElementType.text) return;
     final placeholder = el.text.trim().toLowerCase();
@@ -1727,6 +1837,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addMarriageSignatureAtZone(NgmySlideElement zone) async {
+    if (!_canEditKiapoDeck()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the authorized registrar for this state can sign this document.')),
+      );
+      return;
+    }
     final result = await _captureDocumentSignature();
     if (result == null || _currentSlide == null) return;
     _mutate(() {
@@ -1748,6 +1865,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _redoMarriageSignature(NgmySlideElement placed) async {
+    if (!_canEditKiapoDeck()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the authorized registrar for this state can update this signature.')),
+      );
+      return;
+    }
     final result = await _captureDocumentSignature();
     if (result == null || _currentSlide == null) return;
     _mutate(() {
@@ -1787,16 +1911,38 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     if (ngmyMarriageElementIsLocked(e)) return false;
     if (ngmyMarriageElementIsField(e)) return false;
     if (ngmyMarriageElementIsSignZone(e)) return false;
+    if (ngmyKiapoElementIsVideoZone(e)) return false;
     if (e.type == NgmySlideElementType.signature && e.fileName.startsWith(kMarriageSignPrefix)) return false;
     return false;
   }
 
   bool _marriageElementSelectable(NgmySlideElement e) {
     if (_activeDeck?.isLockedTemplateDoc != true) return true;
+    if (!_canEditKiapoDeck()) return false;
     if (ngmyMarriageElementIsLocked(e)) return false;
     if (ngmyMarriageElementIsSignZone(e)) return false;
+    if (ngmyKiapoElementIsVideoZone(e)) return false;
     if (e.type == NgmySlideElementType.signature && e.fileName.startsWith(kMarriageSignPrefix)) return false;
     return ngmyMarriageElementIsField(e);
+  }
+
+  Future<void> _attachKiapoVideo(NgmySlideElement zone) async {
+    if (!_canEditKiapoDeck()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only the authorized registrar for this state can add the oath video.')),
+      );
+      return;
+    }
+    final state = (_activeDeck?.marriageState ?? '').trim();
+    if (state.isEmpty) return;
+    final ref = await NgmyHatiKiapoStore.pickAndUploadOathVideo(state: state);
+    if (ref == null || !mounted) return;
+    _mutate(() {
+      zone.imageRef = ref;
+      zone.fileName = kKiapoVideoFileName;
+      _selectedElementId = null;
+    });
   }
 
   Future<void> _addEnhancedPhoto() async {
@@ -2600,9 +2746,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         ? const [Color(0xFF2E4270), Color(0xFF12213D)]
         : deck.deckKind == 'hati_kuhoweya'
             ? const [Color(0xFF3E7A4F), Color(0xFF14532D)]
-            : deck.isLockedTemplateDoc
-                ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
-                : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
+            : ngmyIsHatiKiapoUongoziDeck(deck.deckKind)
+                ? const [Color(0xFFB8860B), Color(0xFF12213D)]
+                : deck.isLockedTemplateDoc
+                    ? const [Color(0xFFB8860B), Color(0xFF8B6914)]
+                    : const [Color(0xFF22D3EE), Color(0xFF6366F1)];
     return AnimatedBuilder(
       animation: _framePulse,
       builder: (context, _) {
@@ -2663,7 +2811,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                                 ? 'Hati ya Kuhowa • Updated ${_formatDate(deck.updatedAt)}'
                                 : deck.deckKind == 'hati_kuhoweya'
                                     ? 'Hati ya Kuhoweya • Updated ${_formatDate(deck.updatedAt)}'
-                                    : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
+                                    : ngmyIsHatiKiapoUongoziDeck(deck.deckKind)
+                                        ? 'Kiapo cha Uongozi • ${(deck.marriageState ?? '').trim().isEmpty ? 'Civic Registry' : deck.marriageState} • Updated ${_formatDate(deck.updatedAt)}'
+                                        : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
                         style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
                       ),
                       trailing: IconButton(
@@ -3888,13 +4038,35 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final marriage = _activeDeck?.isLockedTemplateDoc == true;
     final signZone = marriage && ngmyMarriageElementIsSignZone(e);
     final placedSign = marriage && ngmyMarriageElementIsPlacedSign(e);
+    final videoZone = marriage && ngmyKiapoElementIsVideoZone(e);
     final selectable = !marriage || _marriageElementSelectable(e);
     final movable = !marriage || _marriageElementMovable(e);
     final selected = selectable && _selectedElementId == e.id;
     final scale = cw / 960;
     final isDesign = e.fileName.startsWith('__design__') || e.id.startsWith('design_');
     final accentColor = isDesign ? const Color(0xFFF97316) : const Color(0xFF2563EB);
-  final marriageField = marriage && ngmyMarriageElementIsField(e);
+    final marriageField = marriage && ngmyMarriageElementIsField(e);
+    final void Function()? onCanvasTap;
+    if (videoZone && ngmyKiapoHasVideo(e)) {
+      // Defer to the embedded video player (play/pause).
+      onCanvasTap = null;
+    } else {
+      onCanvasTap = () {
+        if (videoZone) {
+          unawaited(_attachKiapoVideo(e));
+          return;
+        }
+        if (signZone) {
+          unawaited(_addMarriageSignatureAtZone(e));
+          return;
+        }
+        if (placedSign) {
+          unawaited(_redoMarriageSignature(e));
+          return;
+        }
+        if (selectable) _selectElement(e.id);
+      };
+    }
     return Positioned(
       key: ValueKey('el_${e.id}'),
       left: e.x * cw,
@@ -3902,17 +4074,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       width: e.w * cw,
       height: e.h * ch,
       child: GestureDetector(
-        onTap: () {
-          if (signZone) {
-            unawaited(_addMarriageSignatureAtZone(e));
-            return;
-          }
-          if (placedSign) {
-            unawaited(_redoMarriageSignature(e));
-            return;
-          }
-          if (selectable) _selectElement(e.id);
-        },
+        onTap: onCanvasTap,
+        onLongPress: videoZone && ngmyKiapoHasVideo(e) && _canEditKiapoDeck()
+            ? () => unawaited(_attachKiapoVideo(e))
+            : null,
         onDoubleTap: selectable && e.type == NgmySlideElementType.text
             ? () => _startTextEditing(e.id)
             : null,
@@ -3965,12 +4130,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                         editing: _editingTextId == e.id && !_isCompactLayout(context),
                         selected: selected,
                         compactText: marriageField,
+                        kiapoVideoCanUpload: videoZone && _canEditKiapoDeck(),
                         controller: e.type == NgmySlideElementType.text ? _controllerFor(e) : null,
                         focusNode: e.type == NgmySlideElementType.text ? _focusNodeFor(e) : null,
                         onTextChanged: _editingTextId == e.id && !_isCompactLayout(context)
                             ? (v) => _updateElementText(e.id, v)
                             : null,
                         onTap: () {
+                          if (videoZone) {
+                            if (!ngmyKiapoHasVideo(e)) {
+                              unawaited(_attachKiapoVideo(e));
+                            }
+                            return;
+                          }
                           if (!selectable) return;
                           if (_editingTextId == e.id) return;
                           _selectElement(e.id);
@@ -4536,6 +4708,10 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
     if (deck.deckKind == 'marriage_agreement') return 'Hati ya Kuhowesha · $when';
     if (deck.deckKind == 'hati_kuhowa') return 'Hati ya Kuhowa · $when';
     if (deck.deckKind == 'hati_kuhoweya') return 'Hati ya Kuhoweya · $when';
+    if (ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) {
+      final st = (deck.marriageState ?? '').trim();
+      return st.isEmpty ? 'Hati ya Kiapo cha Uongozi · $when' : 'Kiapo cha Uongozi · $st · $when';
+    }
     return '${deck.slides.length} slides · $when';
   }
 
