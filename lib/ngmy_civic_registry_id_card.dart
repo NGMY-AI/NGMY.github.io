@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -192,7 +193,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _headerRow(stateUpper, docTitle, badge, code, scale),
+                  _headerRow(stateUpper, docTitle, badge, code, registryId, scale, context),
                   SizedBox(height: 6 * scale),
                   Expanded(
                     child: Row(
@@ -235,7 +236,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                                 alignment: Alignment.topLeft,
                                 child: SizedBox(
                                   width: constraints.maxWidth,
-                                  child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale),
+                                  child: _dataColumn(registryId, dob, name, address, city, code, room, iss, exp, scale, context),
                                 ),
                               );
                             },
@@ -307,7 +308,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 4 * scale),
-                  _footerRow(registryId, phone, stateUpper, scale, onQrTap: onQrTap),
+                  _footerRow(registryId, phone, stateUpper, scale, context, onQrTap: onQrTap),
                 ],
               ),
             ),
@@ -317,7 +318,60 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _headerRow(String stateUpper, String docTitle, String badge, String code, double scale) {
+  Future<void> _copyRegistryId(BuildContext context, String registryId) async {
+    final id = registryId.trim();
+    if (id.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: id));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ID copied: $id'), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Widget _copyableIdChip(BuildContext context, String registryId, double scale, {bool compact = false}) {
+    final id = registryId.trim();
+    if (id.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => unawaited(_copyRegistryId(context, id)),
+        borderRadius: BorderRadius.circular(4 * scale),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 2 * scale, vertical: 1 * scale),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  id,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: (compact ? 7 : 8) * scale,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF111827),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              SizedBox(width: 3 * scale),
+              Icon(Icons.copy_rounded, size: (compact ? 10 : 11) * scale, color: const Color(0xFF1E3A8A)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _headerRow(
+    String stateUpper,
+    String docTitle,
+    String badge,
+    String code,
+    String registryId,
+    double scale,
+    BuildContext context,
+  ) {
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerLeft,
@@ -369,25 +423,34 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
             ),
           ),
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(badge, style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w900)),
-            SizedBox(width: 4 * scale),
-            Container(
-              width: 16 * scale,
-              height: 16 * scale,
-              decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-              child: Icon(Icons.star_rounded, size: 10 * scale, color: const Color(0xFFE2E8F0)),
-            ),
-            SizedBox(width: 4 * scale),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text('USA', style: TextStyle(fontSize: 5.5 * scale, fontWeight: FontWeight.w800, color: const Color(0xFFB91C1C))),
-                Text(code, style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w900)),
+                Text(badge, style: TextStyle(fontSize: 12 * scale, fontWeight: FontWeight.w900)),
+                SizedBox(width: 4 * scale),
+                Container(
+                  width: 16 * scale,
+                  height: 16 * scale,
+                  decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                  child: Icon(Icons.star_rounded, size: 10 * scale, color: const Color(0xFFE2E8F0)),
+                ),
+                SizedBox(width: 4 * scale),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('USA', style: TextStyle(fontSize: 5.5 * scale, fontWeight: FontWeight.w800, color: const Color(0xFFB91C1C))),
+                    Text(code, style: TextStyle(fontSize: 6.5 * scale, fontWeight: FontWeight.w900)),
+                  ],
+                ),
               ],
             ),
+            if (registryId.trim().isNotEmpty) ...[
+              SizedBox(height: 3 * scale),
+              _copyableIdChip(context, registryId, scale, compact: true),
+            ],
           ],
         ),
       ],
@@ -407,6 +470,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     String iss,
     String exp,
     double scale,
+    BuildContext context,
   ) {
     Widget field(String label, String value, {bool bold = false}) {
       return Padding(
@@ -433,6 +497,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     }
 
     final addrLine = [address, if (city.isNotEmpty) '$city, $code', if (room.isNotEmpty) room].where((s) => s.isNotEmpty).join('\n');
+    final idText = registryId.isEmpty ? '--------' : registryId;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,7 +505,25 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            Expanded(child: field('4d DL NO.', registryId.isEmpty ? '--------' : registryId)),
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: registryId.trim().isEmpty ? null : () => unawaited(_copyRegistryId(context, registryId)),
+                  borderRadius: BorderRadius.circular(3 * scale),
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 2 * scale, bottom: 2 * scale),
+                    child: Row(
+                      children: [
+                        Expanded(child: field('4d DL NO.', idText)),
+                        if (registryId.trim().isNotEmpty)
+                          Icon(Icons.copy_rounded, size: 10 * scale, color: const Color(0xFF1E3A8A)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             Expanded(child: field('3 DOB', dob.isEmpty ? '--/--/----' : dob, bold: true)),
           ],
         ),
@@ -476,7 +559,14 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _footerRow(String registryId, String phone, String stateUpper, double scale, {VoidCallback? onQrTap}) {
+  Widget _footerRow(
+    String registryId,
+    String phone,
+    String stateUpper,
+    double scale,
+    BuildContext context, {
+    VoidCallback? onQrTap,
+  }) {
     final dd = "EMO 'YA M'MBONDO · $stateUpper";
     final qrData = registryId.isNotEmpty ? ngmyCivicIdQrPayload(registryId) : 'NGMY-CIVIC';
     final qr = Container(
@@ -526,22 +616,45 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
         else
           qr,
         SizedBox(width: 4 * scale),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.favorite, size: 9 * scale, color: const Color(0xFF111827)),
-            SizedBox(width: 3 * scale),
-            Text(
-              'CIVIC REGISTRY',
-              style: TextStyle(
-                fontSize: 7.5 * scale,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.3,
-                color: const Color(0xFF111827),
-                decoration: TextDecoration.none,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: registryId.trim().isEmpty ? null : () => unawaited(_copyRegistryId(context, registryId)),
+            borderRadius: BorderRadius.circular(4 * scale),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 2 * scale, vertical: 1 * scale),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.favorite, size: 9 * scale, color: const Color(0xFF111827)),
+                  SizedBox(width: 3 * scale),
+                  Text(
+                    'CIVIC REGISTRY',
+                    style: TextStyle(
+                      fontSize: 7.5 * scale,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.3,
+                      color: const Color(0xFF111827),
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                  if (registryId.trim().isNotEmpty) ...[
+                    SizedBox(width: 4 * scale),
+                    Text(
+                      registryId,
+                      style: TextStyle(
+                        fontSize: 7 * scale,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF1E3A8A),
+                      ),
+                    ),
+                    SizedBox(width: 2 * scale),
+                    Icon(Icons.copy_rounded, size: 9 * scale, color: const Color(0xFF1E3A8A)),
+                  ],
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ],
     );

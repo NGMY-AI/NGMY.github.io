@@ -13582,7 +13582,7 @@ class _AuthScreenState extends State<AuthScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Username already taken')));
         return;
       }
-      final existsPhone = widget.allUsers.any((u) => u.phone.trim() == phone);
+      final existsPhone = NgmyCivicRegistryMembers.isAppPhoneTaken(widget.allUsers, phone);
       if (existsPhone) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number already registered')));
         return;
@@ -26832,8 +26832,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 return;
               }
               final myEmail = widget.user.email.toLowerCase().trim();
-              final taken = widget.allUsers.any(
-                (u) => u.email.toLowerCase().trim() != myEmail && u.phone.trim() == phone,
+              final taken = NgmyCivicRegistryMembers.isAppPhoneTaken(
+                widget.allUsers,
+                phone,
+                excludeEmail: myEmail,
               );
               if (taken) {
                 ScaffoldMessenger.of(dialogCtx).showSnackBar(
@@ -36001,14 +36003,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _showCivicIdCardForRecord(record, allowPhotoChange: true);
   }
 
-  Future<void> _grantRegistryPassport(UserData member) async {
+  Future<void> _grantRegistryPassport(UserData member, {String? forceLinkEmail}) async {
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
     if (raw == null) return;
-    final linkEmail = NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, raw);
-    if (linkEmail == null) {
+    final linkEmail = (forceLinkEmail ?? '').trim().isNotEmpty
+        ? NgmyCivicRegistryMembers.emailKey(forceLinkEmail!)
+        : NgmyCivicRegistryMembers.findLinkableAppEmail(widget.allUsers, raw);
+    if (linkEmail == null || linkEmail.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No app user has signed up with this member\'s email or phone yet.')),
+        const SnackBar(content: Text('No app user found. Use search to pick an email or phone to link.')),
       );
       return;
     }
@@ -36105,6 +36109,118 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  Future<void> _searchAndGrantPassport(UserData member) async {
+    final searchC = TextEditingController();
+    var results = <dynamic>[];
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            void runSearch(String q) {
+              setSheet(() {
+                results = NgmyCivicRegistryMembers.searchAppUsersForLink(widget.allUsers, q);
+              });
+            }
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF111827) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Find app account to link',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Search by email or phone, then grant passport for ${member.fullName ?? member.username}.',
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: searchC,
+                      autofocus: true,
+                      keyboardType: TextInputType.emailAddress,
+                      onChanged: runSearch,
+                      decoration: InputDecoration(
+                        hintText: 'Email or phone number',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.42),
+                      child: results.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Text(
+                                searchC.text.trim().isEmpty
+                                    ? 'Type an email or phone to search.'
+                                    : 'No matching app accounts.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: results.length,
+                              separatorBuilder: (_, __) => const Divider(height: 1),
+                              itemBuilder: (_, i) {
+                                final u = results[i];
+                                final email = (u.email ?? '').toString();
+                                final username = (u.username ?? '').toString();
+                                final phone = (u.phone ?? '').toString();
+                                return ListTile(
+                                  leading: const Icon(Icons.person_outline_rounded),
+                                  title: Text(username.isEmpty ? email : username, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                  subtitle: Text([email, if (phone.trim().isNotEmpty) phone].join(' · ')),
+                                  trailing: const Icon(Icons.verified_user_outlined, color: Color(0xFF059669)),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    unawaited(_grantRegistryPassport(member, forceLinkEmail: email));
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchC.dispose();
+  }
+
   Widget _passportAdminPanel(UserData member, bool isDark) {
     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
     if (raw == null) return const SizedBox.shrink();
@@ -36136,9 +36252,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             children: [
               Icon(Icons.link_rounded, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D), size: 20),
               const SizedBox(width: 8),
-              Text(
-                'App account link',
-                style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF14532D)),
+              Expanded(
+                child: Text(
+                  'App account link',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF14532D)),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Search email or phone to link & grant ID',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                onPressed: () => unawaited(_searchAndGrantPassport(member)),
+                icon: Icon(
+                  Icons.search_rounded,
+                  size: 22,
+                  color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                ),
               ),
             ],
           ),
@@ -36170,7 +36300,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ),
           ] else
             Text(
-              'No matching app sign-up yet. When someone creates an app account with this member\'s email or phone, you can grant their passport here to connect them.',
+              'No matching app sign-up detected yet. Tap search to find them by email or phone and grant their ID instantly — or wait until they sign up with this member\'s email/phone and the Grant button will appear automatically.',
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
             ),
         ],

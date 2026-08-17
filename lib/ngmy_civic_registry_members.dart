@@ -900,6 +900,15 @@ class NgmyCivicRegistryMembers {
     return digits;
   }
 
+  /// Public phone fingerprint for uniqueness / linking checks.
+  static String phoneMatchKey(String phone) => _phoneMatchKey(phone);
+
+  static bool phonesMatch(String a, String b) {
+    final ka = _phoneMatchKey(a);
+    final kb = _phoneMatchKey(b);
+    return ka.length >= 7 && kb.length >= 7 && ka == kb;
+  }
+
   static bool isGuestSyntheticEmail(String email) => emailKey(email).endsWith('@guest.ngmy');
 
   /// Change a member's email key while keeping the same registry record.
@@ -919,12 +928,12 @@ class NgmyCivicRegistryMembers {
   /// Email of an app account matching this civic record by email or phone.
   static String? findLinkableAppEmail(List<dynamic> allUsers, Map<String, dynamic> member) {
     final memberEmail = emailKey((member['email'] ?? '').toString());
-    final memberPhone = _phoneKey((member['phone'] ?? '').toString());
+    final memberPhone = _phoneMatchKey((member['phone'] ?? '').toString());
     String? byPhone;
     String? byPhoneLogin;
     for (final raw in allUsers) {
       final email = emailKey((raw.email ?? '').toString());
-      final phone = _phoneKey((raw.phone ?? '').toString());
+      final phone = _phoneMatchKey((raw.phone ?? '').toString());
       if (email.isEmpty || isGuestSyntheticEmail(email)) continue;
       final isLogin = (() {
         try {
@@ -942,6 +951,43 @@ class NgmyCivicRegistryMembers {
     return byPhoneLogin ?? byPhone;
   }
 
+  /// Search app login accounts by email, username, or phone (for registrar linking).
+  static List<dynamic> searchAppUsersForLink(List<dynamic> allUsers, String query) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return const [];
+    final qPhone = _phoneMatchKey(q);
+    final out = <dynamic>[];
+    for (final raw in allUsers) {
+      final email = emailKey((raw.email ?? '').toString());
+      if (email.isEmpty || isGuestSyntheticEmail(email)) continue;
+      final username = (raw.username ?? '').toString().toLowerCase().trim();
+      final phone = _phoneMatchKey((raw.phone ?? '').toString());
+      final emailHit = email.contains(q);
+      final userHit = username.contains(q);
+      final phoneHit = qPhone.length >= 3 && phone.contains(qPhone);
+      if (emailHit || userHit || phoneHit) out.add(raw);
+    }
+    out.sort((a, b) {
+      final ae = emailKey((a.email ?? '').toString());
+      final be = emailKey((b.email ?? '').toString());
+      return ae.compareTo(be);
+    });
+    return out.take(40).toList();
+  }
+
+  /// True when another app account already owns this phone number.
+  static bool isAppPhoneTaken(List<dynamic> allUsers, String phone, {String? excludeEmail}) {
+    final key = _phoneMatchKey(phone);
+    if (key.length < 7) return false;
+    final exclude = emailKey(excludeEmail ?? '');
+    for (final raw in allUsers) {
+      final email = emailKey((raw.email ?? '').toString());
+      if (email.isEmpty || (exclude.isNotEmpty && email == exclude)) continue;
+      if (_phoneMatchKey((raw.phone ?? '').toString()) == key) return true;
+    }
+    return false;
+  }
+
   /// Civic passport visible to a logged-in app user (granted + email or phone match).
   static Map<String, dynamic>? passportForAppUser(
     dynamic config, {
@@ -949,14 +995,14 @@ class NgmyCivicRegistryMembers {
     required String phone,
   }) {
     final userEmail = emailKey(email);
-    final userPhone = _phoneKey(phone);
+    final userPhone = _phoneMatchKey(phone);
     for (final m in listFrom(config)) {
       if (!passportGranted(m)) continue;
       final linked = emailKey((m['linkedAppEmail'] ?? '').toString());
       if (linked.isNotEmpty && linked == userEmail) return m;
       final memberEmail = emailKey((m['email'] ?? '').toString());
       if (memberEmail.isNotEmpty && memberEmail == userEmail) return m;
-      final memberPhone = _phoneKey((m['phone'] ?? '').toString());
+      final memberPhone = _phoneMatchKey((m['phone'] ?? '').toString());
       if (userPhone.length >= 7 && memberPhone.isNotEmpty && memberPhone == userPhone) return m;
     }
     return null;
