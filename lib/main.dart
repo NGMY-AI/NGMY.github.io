@@ -36326,16 +36326,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
               ),
             ),
-          ] else if (alreadyHasCard)
+          ] else if (alreadyHasCard) ...[
             Text(
               'The matching app account already has a Civic Registry ID card, so it cannot be granted another one.',
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
             ),
-          else
+          ] else ...[
             Text(
               'No matching app sign-up detected yet. Tap search to find them by email or phone and grant their ID instantly — or wait until they sign up with this member\'s email/phone and the Grant button will appear automatically.',
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
             ),
+          ],
         ],
       ),
     );
