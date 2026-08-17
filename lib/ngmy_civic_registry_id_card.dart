@@ -328,7 +328,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     );
   }
 
-  Widget _copyableIdChip(BuildContext context, String registryId, double scale, {bool compact = false}) {
+  Widget _copyableIdText(BuildContext context, String registryId, double scale, {bool compact = false}) {
     final id = registryId.trim();
     if (id.isEmpty) return const SizedBox.shrink();
     return Material(
@@ -338,25 +338,16 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(4 * scale),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 2 * scale, vertical: 1 * scale),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
-                child: Text(
-                  id,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: (compact ? 7 : 8) * scale,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF111827),
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-              SizedBox(width: 3 * scale),
-              Icon(Icons.copy_rounded, size: (compact ? 10 : 11) * scale, color: const Color(0xFF1E3A8A)),
-            ],
+          child: Text(
+            id,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: (compact ? 7 : 8) * scale,
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF1E3A8A),
+              letterSpacing: 0.2,
+            ),
           ),
         ),
       ),
@@ -449,7 +440,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
             ),
             if (registryId.trim().isNotEmpty) ...[
               SizedBox(height: 3 * scale),
-              _copyableIdChip(context, registryId, scale, compact: true),
+              _copyableIdText(context, registryId, scale, compact: true),
             ],
           ],
         ),
@@ -513,13 +504,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(3 * scale),
                   child: Padding(
                     padding: EdgeInsets.only(right: 2 * scale, bottom: 2 * scale),
-                    child: Row(
-                      children: [
-                        Expanded(child: field('4d DL NO.', idText)),
-                        if (registryId.trim().isNotEmpty)
-                          Icon(Icons.copy_rounded, size: 10 * scale, color: const Color(0xFF1E3A8A)),
-                      ],
-                    ),
+                    child: field('4d DL NO.', idText),
                   ),
                 ),
               ),
@@ -616,45 +601,26 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
         else
           qr,
         SizedBox(width: 4 * scale),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: registryId.trim().isEmpty ? null : () => unawaited(_copyRegistryId(context, registryId)),
-            borderRadius: BorderRadius.circular(4 * scale),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 2 * scale, vertical: 1 * scale),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.favorite, size: 9 * scale, color: const Color(0xFF111827)),
-                  SizedBox(width: 3 * scale),
-                  Text(
-                    'CIVIC REGISTRY',
-                    style: TextStyle(
-                      fontSize: 7.5 * scale,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.3,
-                      color: const Color(0xFF111827),
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  if (registryId.trim().isNotEmpty) ...[
-                    SizedBox(width: 4 * scale),
-                    Text(
-                      registryId,
-                      style: TextStyle(
-                        fontSize: 7 * scale,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF1E3A8A),
-                      ),
-                    ),
-                    SizedBox(width: 2 * scale),
-                    Icon(Icons.copy_rounded, size: 9 * scale, color: const Color(0xFF1E3A8A)),
-                  ],
-                ],
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.favorite, size: 9 * scale, color: const Color(0xFF111827)),
+            SizedBox(width: 3 * scale),
+            Text(
+              'CIVIC REGISTRY',
+              style: TextStyle(
+                fontSize: 7.5 * scale,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                color: const Color(0xFF111827),
+                decoration: TextDecoration.none,
               ),
             ),
-          ),
+            if (registryId.trim().isNotEmpty) ...[
+              SizedBox(width: 4 * scale),
+              _copyableIdText(context, registryId, scale, compact: true),
+            ],
+          ],
         ),
       ],
     );
@@ -897,41 +863,31 @@ Future<void> showNgmyEnlargedCivicQrDialog(BuildContext context, String registry
             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white),
           ),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: registryId.isEmpty
+                  ? null
+                  : () async {
+                      await Clipboard.setData(ClipboardData(text: registryId));
+                      if (!ctx.mounted) return;
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text('ID copied: $registryId'),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Text(
                   registryId.isEmpty ? 'Registry QR' : registryId,
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700),
                 ),
               ),
-              if (registryId.isNotEmpty) ...[
-                const SizedBox(width: 6),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () async {
-                      await Clipboard.setData(ClipboardData(text: registryId));
-                      if (!ctx.mounted) return;
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(
-                          content: Text('ID number copied'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Icon(Icons.copy_rounded, size: 18, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
           const SizedBox(height: 18),
           Container(

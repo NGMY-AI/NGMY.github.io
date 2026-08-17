@@ -701,6 +701,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 const SizedBox(height: 10),
                 _fieldShell(
                   child: TextField(
+                    key: ValueKey('civic-gate-$_step'),
                     controller: _activeController,
                     obscureText: _obscure,
                     keyboardType: _keyboard,

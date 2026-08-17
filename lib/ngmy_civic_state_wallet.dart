@@ -364,7 +364,7 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
       case 0:
         return TextInputType.number;
       case 2:
-        return TextInputType.datetime;
+        return TextInputType.number;
       case 3:
         return TextInputType.text;
       default:
@@ -545,6 +545,7 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
                             ),
                             const SizedBox(height: 12),
                             TextField(
+                              key: ValueKey('wallet-verify-$_step'),
                               controller: _activeController,
                               obscureText: _obscure,
                               keyboardType: _keyboard,

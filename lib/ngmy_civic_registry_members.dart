@@ -951,8 +951,60 @@ class NgmyCivicRegistryMembers {
     return byPhoneLogin ?? byPhone;
   }
 
-  /// Search app login accounts by email, username, or phone (for registrar linking).
-  static List<dynamic> searchAppUsersForLink(List<dynamic> allUsers, String query) {
+  /// True when this app account already has a granted Civic Registry ID card.
+  static bool appUserHasGrantedPassport(dynamic config, dynamic raw) {
+    if (config == null || raw == null) return false;
+    try {
+      return passportForAppUser(
+            config,
+            email: (raw.email ?? '').toString(),
+            phone: (raw.phone ?? '').toString(),
+          ) !=
+          null;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// App account shares this civic member's real email or phone.
+  static bool appUserMatchesMember(dynamic raw, Map<String, dynamic> member) {
+    return accountMatchesMember(
+      member,
+      email: (raw.email ?? '').toString(),
+      phone: (raw.phone ?? '').toString(),
+    );
+  }
+
+  static bool accountMatchesMember(
+    Map<String, dynamic> member, {
+    required String email,
+    required String phone,
+  }) {
+    final userEmail = emailKey(email);
+    final userPhone = _phoneMatchKey(phone);
+    final memberEmail = emailKey((member['email'] ?? '').toString());
+    final memberPhone = _phoneMatchKey((member['phone'] ?? '').toString());
+    if (userEmail.isNotEmpty &&
+        memberEmail.isNotEmpty &&
+        !isGuestSyntheticEmail(memberEmail) &&
+        userEmail == memberEmail) {
+      return true;
+    }
+    if (userPhone.length >= 7 && memberPhone.length >= 7 && userPhone == memberPhone) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Search app login accounts by email, username, name, or phone (for registrar linking).
+  /// Hides accounts that already have a granted Civic Registry ID. When [member]
+  /// is set, only accounts that share that member's email or phone are returned.
+  static List<dynamic> searchAppUsersForLink(
+    List<dynamic> allUsers,
+    String query, {
+    dynamic config,
+    Map<String, dynamic>? member,
+  }) {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
     final qPhone = _phoneMatchKey(q);
@@ -960,10 +1012,13 @@ class NgmyCivicRegistryMembers {
     for (final raw in allUsers) {
       final email = emailKey((raw.email ?? '').toString());
       if (email.isEmpty || isGuestSyntheticEmail(email)) continue;
+      if (appUserHasGrantedPassport(config, raw)) continue;
+      if (member != null && !appUserMatchesMember(raw, member)) continue;
       final username = (raw.username ?? '').toString().toLowerCase().trim();
+      final fullName = (raw.fullName ?? '').toString().toLowerCase().trim();
       final phone = _phoneMatchKey((raw.phone ?? '').toString());
       final emailHit = email.contains(q);
-      final userHit = username.contains(q);
+      final userHit = username.contains(q) || fullName.contains(q);
       final phoneHit = qPhone.length >= 3 && phone.contains(qPhone);
       if (emailHit || userHit || phoneHit) out.add(raw);
     }

@@ -36023,6 +36023,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         break;
       }
     }
+    if (!NgmyCivicRegistryMembers.accountMatchesMember(
+      raw,
+      email: appUser?.email ?? linkEmail,
+      phone: appUser?.phone ?? '',
+    )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('That app account must use this member\'s same email or phone before an ID can be granted.'),
+        ),
+      );
+      return;
+    }
+    if (appUser != null && NgmyCivicRegistryMembers.appUserHasGrantedPassport(widget.config, appUser)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('That app account already has a Civic Registry ID card.')),
+      );
+      return;
+    }
     final appLabel = appUser?.username ?? linkEmail;
     final memberEmailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final confirm = await showDialog<bool>(
@@ -36112,6 +36132,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _searchAndGrantPassport(UserData member) async {
     final searchC = TextEditingController();
     var results = <dynamic>[];
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -36122,7 +36143,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           builder: (ctx, setSheet) {
             void runSearch(String q) {
               setSheet(() {
-                results = NgmyCivicRegistryMembers.searchAppUsersForLink(widget.allUsers, q);
+                results = NgmyCivicRegistryMembers.searchAppUsersForLink(
+                  widget.allUsers,
+                  q,
+                  config: widget.config,
+                  member: raw,
+                );
               });
             }
 
@@ -36157,7 +36183,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Search by email or phone, then grant passport for ${member.fullName ?? member.username}.',
+                      'Search by email, phone, or name. Only people who share this member\'s email or phone and do not already have a Civic Registry ID can be granted a card.',
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
                     ),
                     const SizedBox(height: 12),
@@ -36182,8 +36208,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 24),
                               child: Text(
                                 searchC.text.trim().isEmpty
-                                    ? 'Type an email or phone to search.'
-                                    : 'No matching app accounts.',
+                                    ? 'Type an email, phone, or name to search.'
+                                    : 'No eligible app accounts. They must share this member\'s email or phone, and must not already have a Civic Registry ID.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
                               ),
@@ -36235,6 +36261,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         }
       }
     }
+    final alreadyHasCard = appUser != null &&
+        NgmyCivicRegistryMembers.appUserHasGrantedPassport(widget.config, appUser);
 
     return Container(
       width: double.infinity,
@@ -36283,7 +36311,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 'Linked: ${raw['linkedAppEmail']}',
                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
               ),
-          ] else if (appUser != null) ...[
+          ] else if (appUser != null && !alreadyHasCard) ...[
             Text(
               'App user "${appUser.username}" signed up with the same email or phone — grant passport to connect their account to this civic record.',
               style: TextStyle(fontSize: 13, color: isDark ? Colors.white70 : const Color(0xFF166534)),
@@ -36298,7 +36326,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 style: FilledButton.styleFrom(backgroundColor: const Color(0xFF059669)),
               ),
             ),
-          ] else
+          ] else if (alreadyHasCard)
+            Text(
+              'The matching app account already has a Civic Registry ID card, so it cannot be granted another one.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
+            ),
+          else
             Text(
               'No matching app sign-up detected yet. Tap search to find them by email or phone and grant their ID instantly — or wait until they sign up with this member\'s email/phone and the Grant button will appear automatically.',
               style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54, height: 1.35),
