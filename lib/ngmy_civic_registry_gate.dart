@@ -249,7 +249,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   List<TextInputFormatter>? get _formatters {
     if (_step == 2) {
       return [
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
+        const NgmyCivicDobInputFormatter(),
         LengthLimitingTextInputFormatter(10),
       ];
     }

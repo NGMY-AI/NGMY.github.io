@@ -4,6 +4,10 @@ class NgmyCivicRegistryEnrollment {
       raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
   static String normalizeDob(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 8) {
+      return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4, 8)}';
+    }
     final t = raw.trim();
     if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(t)) return '';
     return t;

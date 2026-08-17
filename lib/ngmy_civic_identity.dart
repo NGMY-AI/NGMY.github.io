@@ -1,9 +1,29 @@
+import 'package:flutter/services.dart';
+
 /// Shared Civic Registry identity matching (name / DOB / registry ID).
 class NgmyCivicWalletIdentity {
   static String normalizeName(String raw) =>
       raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
+  static String digitsOnly(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+
+  /// Formats as MM/DD/YYYY while typing (auto-inserts `/`).
+  static String formatDobInput(String raw) {
+    final digits = digitsOnly(raw);
+    if (digits.isEmpty) return '';
+    final buf = StringBuffer();
+    for (var i = 0; i < digits.length && i < 8; i++) {
+      if (i == 2 || i == 4) buf.write('/');
+      buf.write(digits[i]);
+    }
+    return buf.toString();
+  }
+
   static String normalizeDob(String raw) {
+    final digits = digitsOnly(raw);
+    if (digits.length == 8) {
+      return '${digits.substring(0, 2)}/${digits.substring(2, 4)}/${digits.substring(4, 8)}';
+    }
     final t = raw.trim();
     final m = RegExp(r'^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$').firstMatch(t);
     if (m == null) return t.toLowerCase();
@@ -42,5 +62,19 @@ class NgmyCivicWalletIdentity {
     final a = normalizeId((member['registryId'] ?? '').toString());
     final b = normalizeId(registryId);
     return a.isNotEmpty && b.isNotEmpty && a == b;
+  }
+}
+
+/// Auto-inserts `/` while typing a Civic Registry date of birth (MM/DD/YYYY).
+class NgmyCivicDobInputFormatter extends TextInputFormatter {
+  const NgmyCivicDobInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final formatted = NgmyCivicWalletIdentity.formatDobInput(newValue.text);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

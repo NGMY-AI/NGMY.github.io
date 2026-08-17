@@ -10,7 +10,7 @@ import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_state_wallet_ui.dart';
 import 'ngmy_nav.dart';
 
-export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity;
+export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity, NgmyCivicDobInputFormatter;
 export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
 
 /// Compact Registry Backup pin - thin animated outline, no thick white plate.
@@ -576,7 +576,12 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
                               ),
                               inputFormatters: _step == 0
                                   ? [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(12)]
-                                  : null,
+                                  : _step == 2
+                                      ? [
+                                          const NgmyCivicDobInputFormatter(),
+                                          LengthLimitingTextInputFormatter(10),
+                                        ]
+                                      : null,
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 12),

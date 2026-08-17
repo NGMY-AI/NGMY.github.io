@@ -13167,21 +13167,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                   unawaited(_persistLocalOnly());
                   } else {
-                    // A caller mutated an already-known transaction in place
-                    // (e.g. Civic Registry claim delete/resolve sets
-                    // t.status = rejected directly) and re-fired this
-                    // callback expecting the change to sync. Nothing above
-                    // runs for the exists==true case, so without this the
-                    // status flip never gets marked dirty or pushed to
-                    // Supabase — the claim disappears for whoever mutated
-                    // it locally but stays visible to everyone else. `t`
-                    // here may not be the same object reference as the one
-                    // already in _allTransactions (civic screens can read
-                    // through a separately-fetched community list), so copy
-                    // the status across before syncing.
-                    if (!identical(_allTransactions[existingIdx], t)) {
-                      _allTransactions[existingIdx].status = t.status;
-                    }
+                    // Update an existing row in place (status flips, contribution
+                    // amount/note edits, etc.). Replace the list entry so final
+                    // fields like amount/sourceDetails actually change.
+                    _allTransactions[existingIdx] = t;
                     unawaited(_pushTransactionToCloudReliable(t));
                     unawaited(_pushTransactionToCloudFast(t));
                     _markTransactionDirty(t.id);
@@ -35271,10 +35260,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;
     }
+    final existing = _activeCampaignContributionForMember(u, forState: state);
     final inScope = _memberMatchesHelpScope(u, forState: state);
     void openDialog() {
+    final existingNote = existing == null
+        ? ''
+        : (_decodeContributionMeta(existing)['note'] ?? '').toString().trim();
     final amountC = TextEditingController();
-    final noteC = TextEditingController(text: widget.config.helpPurposeFor(state).isNotEmpty ? widget.config.helpPurposeFor(state) : 'Community contribution');
+    final noteC = TextEditingController(
+      text: existingNote.isNotEmpty
+          ? existingNote
+          : (widget.config.helpPurposeFor(state).isNotEmpty
+              ? widget.config.helpPurposeFor(state)
+              : 'Community contribution'),
+    );
     // A rapid double-tap on Save (common on mobile, especially with any UI
     // lag before the dialog actually closes) would otherwise fire
     // onPressed twice and record the SAME contribution twice — money
@@ -35291,10 +35290,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
         final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
         final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-        InputDecoration framedInput(String label, {String? prefixText}) {
+        InputDecoration framedInput(String label, {String? prefixText, String? helperText}) {
           return InputDecoration(
             labelText: label,
             prefixText: prefixText,
+            helperText: helperText,
+            helperMaxLines: 2,
             filled: true,
             fillColor: inputBg,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: borderColor)),
@@ -35333,7 +35334,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Add Contribution', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                              Text(
+                                existing != null ? 'Update Contribution' : 'Add Contribution',
+                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
+                              ),
                               Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
@@ -35350,7 +35354,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             controller: amountC,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                            decoration: framedInput('Amount', prefixText: '\$ '),
+                            decoration: framedInput(
+                              existing != null ? 'Amount to add' : 'Amount',
+                              prefixText: '\$ ',
+                              helperText: existing != null
+                                  ? 'Current record: \$${formatCurrency(existing.amount)}. This amount is added to it (same help campaign).'
+                                  : null,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           TextField(
@@ -35386,10 +35396,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               final campaignId = _activeHelpCampaignId(state);
                               final memberEmail = NgmyCivicRegistryMembers.emailKey(u.email);
                               final memberRid = (u.registryId ?? '').trim().toUpperCase();
+                              final note = noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim();
                               final payload = jsonEncode({
                                 'kind': 'contribution',
                                 'purpose': widget.config.helpPurposeFor(state),
-                                'note': noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim(),
+                                'note': note,
                                 'scopeType': widget.config.helpScopeTypeFor(state),
                                 'scopeValue': widget.config.helpScopeValueFor(state),
                                 // The campaign's own state, not widget.user.state —
@@ -35402,22 +35413,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 'memberEmail': memberEmail,
                                 'registryId': memberRid,
                               });
+                              final isUpdate = existing != null;
+                              final stableKey = memberEmail.isNotEmpty ? memberEmail : memberRid;
+                              final txId = isUpdate
+                                  ? existing.id
+                                  : (campaignId.trim().isNotEmpty
+                                      ? 'contrib_${stableKey}_$campaignId'
+                                      : 'contrib_${stableKey}_${now.microsecondsSinceEpoch}');
                               final tx = AppTransaction(
-                                id: 'contrib_${memberEmail.isNotEmpty ? memberEmail : memberRid}_${now.microsecondsSinceEpoch}',
+                                id: txId,
                                 userEmail: memberEmail.isNotEmpty ? memberEmail : u.email,
-                                amount: amount,
+                                amount: isUpdate ? (existing.amount + amount) : amount,
                                 type: TransactionType.contribution,
                                 method: PaymentMethod.system,
                                 sourceDetails: payload,
                                 status: TransactionStatus.approved,
-                                timestamp: now,
+                                timestamp: isUpdate ? existing.timestamp : now,
                               );
                               widget.onAddTransaction(tx);
                               // Keep civic money list in sync instantly so Remove /
                               // deactivate / receipts see this contribution immediately
                               // (do not wait on a cloud round-trip).
                               setState(() {
-                                u.helps += 1;
+                                if (!isUpdate) u.helps += 1;
                                 _communityContributions = [
                                   ..._communityContributions.where((t) => t.id != tx.id),
                                   tx,
@@ -35426,6 +35444,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               unawaited(_persistCivicMemberActivity(u));
                               widget.onDataChanged();
                               Navigator.pop(ctx);
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isUpdate
+                                          ? 'Updated contribution to \$${formatCurrency(tx.amount)}.'
+                                          : 'Contribution recorded: \$${formatCurrency(tx.amount)}.',
+                                    ),
+                                  ),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF059669),
@@ -35433,7 +35462,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
-                            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                            child: Text(existing != null ? 'Update' : 'Save', style: const TextStyle(fontWeight: FontWeight.w800)),
                           ),
                         ),
                       ],
@@ -35652,6 +35681,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   List<AppTransaction> _contributionsForMember(UserData u) {
     return _civicTransactionsForDisplay().where((t) => _contributionBelongsToMember(t, u)).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  /// The member's contribution for the *currently active* help campaign only.
+  /// Returns null when help is off or they have not contributed this round yet.
+  AppTransaction? _activeCampaignContributionForMember(UserData u, {String? forState}) {
+    final state = (forState ?? _selectedState).trim();
+    if (state.isEmpty || !widget.config.helpActiveFor(state)) return null;
+    final campaignId = _activeHelpCampaignId(state).trim();
+    final startedRaw = widget.config.helpCampaignStartedAtFor(state).trim();
+    final startedAt = DateTime.tryParse(startedRaw);
+    for (final t in _contributionsForMember(u)) {
+      if (t.status != TransactionStatus.approved) continue;
+      final meta = _decodeContributionMeta(t);
+      final cid = (meta['campaignId'] ?? '').toString().trim();
+      if (campaignId.isNotEmpty && cid.isNotEmpty) {
+        if (cid == campaignId) return t;
+        continue;
+      }
+      // Legacy rows without campaignId: treat as this campaign only if they
+      // were recorded after the current campaign started.
+      if (cid.isEmpty && startedAt != null && !t.timestamp.isBefore(startedAt)) {
+        final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
+        if (receiptState.isEmpty || receiptState == state.toLowerCase()) return t;
+      }
+    }
+    return null;
   }
 
   bool _contributionBelongsToMember(AppTransaction t, UserData u) {
@@ -36725,7 +36780,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               TextField(
                 controller: _dobC,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')), DateSlashFormatter()],
+                inputFormatters: [
+                  const NgmyCivicDobInputFormatter(),
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 decoration: InputDecoration(hintText: 'MM/DD/YYYY', hintStyle: const TextStyle(fontSize: 13, color: Colors.grey), filled: true, fillColor: isDark ? Colors.black26 : Colors.grey.shade50, border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none)),
               ),
               const SizedBox(height: 20),
@@ -37324,11 +37382,57 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!mounted) return;
     final helpOn = widget.config.helpActiveFor(_selectedState);
     final records = _contributionsForMember(u);
-    if (helpOn && records.isEmpty) {
+    final active = _activeCampaignContributionForMember(u);
+    if (helpOn && active == null) {
       _showContributionDialog(u);
       return;
     }
+    if (helpOn && active != null) {
+      showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          return Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF111827) : Colors.white,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.add_circle_outline, color: Color(0xFF059669)),
+                  title: const Text('Update contribution', style: TextStyle(fontWeight: FontWeight.w800)),
+                  subtitle: Text(
+                    'Adds to the current \$${formatCurrency(active.amount)} for this help campaign',
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showContributionDialog(u);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                  title: const Text('Remove money record', style: TextStyle(fontWeight: FontWeight.w800)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _showMoneyRecordsManageDialog(u);
+                  },
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      return;
+    }
     if (helpOn && records.isNotEmpty) {
+      // Help is on but no row for *this* campaign — still allow add, plus
+      // remove for older records.
       showModalBottomSheet<void>(
         context: context,
         backgroundColor: Colors.transparent,
