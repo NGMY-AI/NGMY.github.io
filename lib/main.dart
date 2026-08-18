@@ -15802,7 +15802,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _ensureTabContentBuilders(sorted);
     final builder = _tabContentBuilders![_idx];
     return _NgmyLazyTabSlot(
-      key: ValueKey<String>('ngmy_tab_active_$_idx'),
+      key: ValueKey<String>(
+        _idx == 2
+            ? 'ngmy_tab_active_${_idx}_${widget.user.state.trim().toLowerCase()}'
+            : 'ngmy_tab_active_$_idx',
+      ),
       tabIndex: _idx,
       activeIndex: _idx,
       buildContent: builder!,

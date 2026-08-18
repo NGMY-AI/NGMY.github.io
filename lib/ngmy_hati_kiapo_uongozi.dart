@@ -91,6 +91,54 @@ void ngmyKiapoMarkSignedNow(NgmySlideDeck deck) {
   deck.kiapoSignedAt = DateTime.now().toUtc().toIso8601String();
 }
 
+/// Per-user hide list: removing the oath from Your presentations must not
+/// erase the civic store copy opened from Documents.
+class NgmyHatiKiapoHiddenPresentations {
+  NgmyHatiKiapoHiddenPresentations._();
+
+  static String _prefsKey(String email) =>
+      'ngmy_kiapo_hidden_presentations_${email.trim().toLowerCase()}';
+
+  static String _stateKey(String state) => state.trim().toLowerCase();
+
+  static Future<Set<String>> load(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_prefsKey(email)) ?? const <String>[];
+      return list.map(_stateKey).where((s) => s.isNotEmpty).toSet();
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  static Future<void> hide(String email, String state) async {
+    final key = _stateKey(state);
+    if (key.isEmpty || email.trim().isEmpty) return;
+    final hidden = await load(email);
+    if (!hidden.add(key)) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_prefsKey(email), hidden.toList());
+    } catch (_) {}
+  }
+
+  static Future<void> unhide(String email, String state) async {
+    final key = _stateKey(state);
+    if (key.isEmpty || email.trim().isEmpty) return;
+    final hidden = await load(email);
+    if (!hidden.remove(key)) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_prefsKey(email), hidden.toList());
+    } catch (_) {}
+  }
+
+  static Future<bool> isHidden(String email, String state) async {
+    final hidden = await load(email);
+    return hidden.contains(_stateKey(state));
+  }
+}
+
 // ── Shared civic store (one oath document per state) ─────────────────────────
 
 class NgmyHatiKiapoStore {
@@ -691,6 +739,7 @@ Future<void> launchNgmyHatiKiapoUongozi({
   required bool canEdit,
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
+  bool bypassEditWindow = false,
 }) async {
   final trimmed = state.trim();
   if (trimmed.isEmpty) {
@@ -706,7 +755,8 @@ Future<void> launchNgmyHatiKiapoUongozi({
   final existing = await NgmyHatiKiapoStore.loadForState(trimmed);
   if (!context.mounted) return;
 
-  final editAllowed = canEdit && (existing == null || ngmyKiapoEditWindowOpen(existing));
+  final editAllowed =
+      canEdit && (bypassEditWindow || existing == null || ngmyKiapoEditWindowOpen(existing));
 
   if (existing != null) {
     if (editAllowed) {

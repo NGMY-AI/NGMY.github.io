@@ -80,6 +80,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   final Map<String, TextEditingController> _notesControllers = {};
   String? _notesSlideId;
   bool _isDraft = false;
+  Set<String> _hiddenKiapoStates = {};
 
   late final AnimationController _framePulse;
 
@@ -88,6 +89,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     super.initState();
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
     unawaited(_loadDecks());
+  }
+
+  @override
+  void didUpdateWidget(NgmySlidesStudioScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final stateChanged = oldWidget.memberState.trim().toLowerCase() != widget.memberState.trim().toLowerCase() ||
+        oldWidget.registrarServingState.trim().toLowerCase() != widget.registrarServingState.trim().toLowerCase();
+    if (stateChanged || oldWidget.userEmail != widget.userEmail) {
+      _activeDeck = null;
+      _isDraft = false;
+      _selectedElementId = null;
+      _editingTextId = null;
+      _loading = true;
+      unawaited(_loadDecks());
+    }
   }
 
   @override
@@ -114,18 +130,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       widget.isAdmin;
 
   String get _kiapoStateForUser {
+    // Admin / King / Civic Admin follow the Civic Registry viewing state so
+    // switching states shows that state's oath in NGMY Slides.
+    if (widget.isAdmin || widget.isCivicRegistryKing || widget.isCivicRegistryAdmin) {
+      final switched = widget.memberState.trim();
+      if (switched.isNotEmpty) return switched;
+    }
     if (widget.isAuthorizedRegistrar && widget.registrarServingState.trim().isNotEmpty) {
       return widget.registrarServingState.trim();
     }
     return widget.memberState.trim();
   }
 
+  bool _isKiapoHiddenFromPresentations(String state) =>
+      _hiddenKiapoStates.contains(state.trim().toLowerCase());
+
   bool _canEditKiapoDeck([NgmySlideDeck? deck]) {
     final d = deck ?? _activeDeck;
     if (!ngmyIsHatiKiapoUongoziDeck(d?.deckKind)) return true;
-    // After the president signs, only a 5-hour edit window remains.
+    // App admin may edit any state's oath at any time, including after the
+    // 5-hour post-sign lock.
+    if (widget.isAdmin) return true;
     if (d != null && !ngmyKiapoEditWindowOpen(d)) return false;
-    if (widget.isAdmin || widget.isCivicRegistryKing || widget.isCivicRegistryAdmin) return true;
+    if (widget.isCivicRegistryKing || widget.isCivicRegistryAdmin) return true;
     if (!widget.isAuthorizedRegistrar) return false;
     final docState = (d?.marriageState ?? '').trim().toLowerCase();
     final mine = widget.registrarServingState.trim().toLowerCase();
@@ -134,13 +161,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   Future<void> _loadDecks() async {
     final decks = await NgmySlidesStorage.loadDecks(widget.userEmail);
+    _hiddenKiapoStates = await NgmyHatiKiapoHiddenPresentations.load(widget.userEmail);
     if (_hasCivicRegistryAccess) {
       final state = _kiapoStateForUser;
       if (state.isNotEmpty) {
         final kiapo = await NgmyHatiKiapoStore.loadForState(state);
         if (kiapo != null) {
           decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
-          decks.insert(0, kiapo);
+          if (!_isKiapoHiddenFromPresentations(state)) {
+            decks.insert(0, kiapo);
+          }
         }
       }
     } else {
@@ -159,6 +189,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final active = _activeDeck;
     if (active != null && ngmyIsHatiKiapoUongoziDeck(active.deckKind) && _canEditKiapoDeck(active)) {
       await NgmyHatiKiapoStore.save(active);
+      final state = (active.marriageState ?? _kiapoStateForUser).trim();
+      if (_isKiapoHiddenFromPresentations(state)) return;
       final i = _decks.indexWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
       if (i >= 0) {
         _decks[i] = active.copy();
@@ -261,7 +293,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   void _commitDraftIfNeeded() {
     if (!_isDraft || _activeDeck == null) return;
     _isDraft = false;
-    _decks.insert(0, _activeDeck!.copy());
+    final already = _decks.any((d) => d.id == _activeDeck!.id);
+    if (!already) {
+      final isKiapo = ngmyIsHatiKiapoUongoziDeck(_activeDeck!.deckKind);
+      final hidden = isKiapo &&
+          _isKiapoHiddenFromPresentations(_activeDeck!.marriageState ?? _kiapoStateForUser);
+      if (!hidden) {
+        _decks.insert(0, _activeDeck!.copy());
+      }
+    }
     _syncDeckIntoList();
     _scheduleAutosave();
   }
@@ -399,13 +439,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   static const _kMarriageHintSeenKey = 'ngmy_marriage_hint_seen';
 
   void _openMarriageDraft(NgmySlideDeck deck) {
-    unawaited(_openMarriageDraftAsync(deck));
+    unawaited(_openMarriageDraftAsync(deck, restoreKiapoToPresentations: true));
   }
 
-  Future<void> _openMarriageDraftAsync(NgmySlideDeck deck) async {
+  Future<void> _openMarriageDraftAsync(
+    NgmySlideDeck deck, {
+    bool restoreKiapoToPresentations = false,
+  }) async {
     var openDeck = deck;
     if (ngmyIsHatiKiapoUongoziDeck(openDeck.deckKind)) {
       openDeck = ngmyEnsureHatiKiapoLayout(openDeck);
+      if (restoreKiapoToPresentations) {
+        final state = (openDeck.marriageState ?? _kiapoStateForUser).trim();
+        _hiddenKiapoStates.remove(state.toLowerCase());
+        unawaited(NgmyHatiKiapoHiddenPresentations.unhide(widget.userEmail, state));
+      }
     }
     if (NgmyStripePayments.marriageDocDeckKind(openDeck.deckKind)) {
       final ok = await _ensureMarriageDocPaid();
@@ -549,6 +597,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       context: context,
       state: state,
       canEdit: canEdit,
+      bypassEditWindow: widget.isAdmin,
       openDraftEditor: (d) => _openMarriageDraft(ngmyEnsureHatiKiapoLayout(d)),
       openSavedDeck: (d) => _openDeck(ngmyEnsureHatiKiapoLayout(d)),
     );
@@ -838,12 +887,21 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     });
   }
 
-  void _deleteDeck(NgmySlideDeck deck) {
+  Future<void> _deleteDeck(NgmySlideDeck deck) async {
+    if (ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) {
+      final state = (deck.marriageState ?? _kiapoStateForUser).trim();
+      await NgmyHatiKiapoHiddenPresentations.hide(widget.userEmail, state);
+      _hiddenKiapoStates.add(state.toLowerCase());
+    }
+    if (!mounted) return;
     setState(() {
       _decks.removeWhere((d) => d.id == deck.id);
-      if (_activeDeck?.id == deck.id) _activeDeck = null;
+      if (_activeDeck?.id == deck.id) {
+        _activeDeck = null;
+        _isDraft = false;
+      }
     });
-    _scheduleAutosave();
+    await _persistDecks();
   }
 
   void _renameDeck(NgmySlideDeck deck, String name) {
@@ -2698,7 +2756,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           );
         },
       );
-      if (ok == true) _deleteDeck(deck);
+      if (ok == true) unawaited(_deleteDeck(deck));
     } else if (action == 'rename') {
       final name = await _promptText('Rename presentation', deck.name);
       if (name != null) _renameDeck(deck, name);
