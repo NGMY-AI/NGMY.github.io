@@ -35041,213 +35041,276 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_persistReceiptReadState());
     String? selectedKey;
 
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) {
+    unawaited(NgmyNavigator.push<void>(
+      context,
+      StatefulBuilder(
+        builder: (ctx, setPage) {
           final groups = _groupContributionReceipts(_visibleContributionTx());
           final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final panelBg = isDark ? const Color(0xFF232A2E) : const Color(0xFFE9F7EF);
-          final tileBg = isDark ? const Color(0xFF1B2025) : Colors.white;
-          final lineColor = isDark ? Colors.white24 : Colors.black12;
+          final pageBg = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB);
+          final panelBg = isDark ? const Color(0xFF121212) : const Color(0xFFE9F7EF);
+          final tileBg = isDark ? const Color(0xFF161616) : Colors.white;
+          final lineColor = isDark ? const Color(0xFF2A2A2A) : Colors.black12;
           final strongText = isDark ? Colors.white : Colors.black87;
           final softText = isDark ? Colors.white70 : Colors.black54;
+          final hintGreen = isDark ? const Color(0xFF4ADE80) : Colors.green.shade800;
           final selected = selectedKey != null ? (groups[selectedKey] ?? <AppTransaction>[]) : <AppTransaction>[];
           final first = selected.isNotEmpty ? selected.first : null;
           final total = selected.fold<double>(0.0, (s, t) => s + t.amount);
           final contributors = selected.map((e) => e.userEmail).toSet().length;
           final meta = first != null ? _decodeContributionMeta(first) : <String, dynamic>{};
-          return Dialog(
-            insetPadding: const EdgeInsets.all(16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-            backgroundColor: isDark ? const Color(0xFF1B1824) : Colors.white,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+
+          void goBack() {
+            if (selectedKey != null) {
+              setPage(() => selectedKey = null);
+            } else {
+              NgmyNavigator.pop(ctx);
+            }
+          }
+
+          Widget receiptStat(String label, String value, Color fg) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: tileBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: lineColor),
+              ),
+              child: Column(
+                children: [
+                  Text(label, style: TextStyle(fontSize: 12, color: softText)),
+                  const SizedBox(height: 6),
+                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: fg)),
+                ],
+              ),
+            );
+          }
+
+          return PopScope(
+            canPop: selectedKey == null,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && selectedKey != null) {
+                setPage(() => selectedKey = null);
+              }
+            },
+            child: Scaffold(
+              backgroundColor: pageBg,
+              appBar: AppBar(
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  onPressed: goBack,
+                ),
+                title: Text(
+                  selectedKey == null ? 'Contribution Receipts' : 'Contribution Receipt',
+                  style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                ),
+                centerTitle: true,
+                backgroundColor: pageBg,
+                foregroundColor: strongText,
+                elevation: 0,
+                actions: [
+                  IconButton(
+                    tooltip: 'State wallet',
+                    onPressed: () {
+                      NgmyNavigator.pop(ctx);
+                      unawaited(_openCivicStateWalletFlow());
+                    },
+                    icon: const Icon(Icons.shield_outlined),
+                  ),
+                ],
+              ),
+              body: selectedKey == null
+                  ? (keys.isEmpty
+                      ? Center(child: Text('No contribution receipts yet.', style: TextStyle(color: softText)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          itemCount: keys.length + 1,
+                          itemBuilder: (_, i) {
+                            if (i == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 14),
+                                child: Text("Past week's community contributions", style: TextStyle(color: softText, fontSize: 13)),
+                              );
+                            }
+                            final k = keys[i - 1];
+                            final txs = groups[k] ?? [];
+                            if (txs.isEmpty) return const SizedBox.shrink();
+                            final seed = txs.first;
+                            final m = _decodeContributionMeta(seed);
+                            final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
+                            final c = txs.map((e) => e.userEmail).toSet().length;
+                            final receiptState = (m['state'] ?? widget.user.state).toString();
+                            final canDelete = _canDeleteReceiptForState(receiptState);
+                            final title = (m['purpose'] ?? 'Contribution Campaign').toString();
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                                  decoration: BoxDecoration(
+                                    color: panelBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.greenAccent.shade400),
+                                  ),
+                                  clipBehavior: Clip.hardEdge,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: strongText),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(color: softText),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('${seed.timestamp.month}/${seed.timestamp.day}/${seed.timestamp.year}', style: TextStyle(color: softText)),
+                                      Divider(color: lineColor),
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            flex: 3,
+                                            child: Text(
+                                              'Click to view full receipt →',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(color: hintGreen, fontWeight: FontWeight.w700),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Flexible(
+                                            flex: 2,
+                                            child: Text(
+                                              '\$${formatCurrency(t)} • $c contributors',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(fontWeight: FontWeight.bold, color: strongText),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      SelectionContainer.disabled(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            setPage(() {
+                                              selectedKey = k;
+                                              _openedReceiptKeys.add(k);
+                                            });
+                                            unawaited(_persistReceiptReadState());
+                                            if (mounted) setState(() {});
+                                          },
+                                          child: Container(
+                                            height: 38,
+                                            width: double.infinity,
+                                            decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
+                                            child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                _campaignReceiptCornerActions(
+                                  campaignKey: k,
+                                  receiptState: receiptState,
+                                  campaignTitle: title,
+                                  campaignTxs: txs,
+                                  canDelete: canDelete,
+                                  onDeleted: () {
+                                    setPage(() => selectedKey = null);
+                                    if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
+                                      NgmyNavigator.pop(ctx);
+                                    }
+                                  },
+                                ),
+                              ],
+                            );
+                          },
+                        ))
+                  : ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       children: [
-                        // Looks the same — opens full-screen state wallet unlock.
-                        Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(12),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              unawaited(_openCivicStateWalletFlow());
-                            },
-                            child: Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(colors: [Color(0xFF6A3DE8), Color(0xFF4F2FD6)]),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.shield_outlined, color: Colors.white),
-                            ),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: panelBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: Colors.greenAccent.shade400),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Contribution Receipts', style: TextStyle(fontSize: 34 * 0.6, fontWeight: FontWeight.w800)),
-                              Text("Past week's community contributions"),
+                              Text(
+                                (meta['purpose'] ?? 'Contribution Campaign').toString(),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: strongText),
+                              ),
+                              Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
+                              Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(child: receiptStat('Total Collected', '\$${formatCurrency(total)}', isDark ? const Color(0xFF4ADE80) : Colors.green.shade800)),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: receiptStat('Contributors', contributors.toString(), isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800)),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: tileBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: lineColor),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(10),
+                                      child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                    ),
+                                    Divider(height: 1, color: lineColor),
+                                    if (selected.isEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.all(20),
+                                        child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
+                                      )
+                                    else
+                                      ...selected.map(
+                                        (t) => ListTile(
+                                          dense: true,
+                                          leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                          title: Text(t.userEmail, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: strongText)),
+                                          subtitle: Text(_txReadableDetails(t), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: softText)),
+                                          trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                        SelectionContainer.disabled(
-                          child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 14),
-                    if (keys.isEmpty)
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(child: Text('No contribution receipts yet.', style: TextStyle(color: softText))),
-                      )
-                    else if (selectedKey == null)
-                      ...keys.map((k) {
-                        final txs = groups[k] ?? [];
-                        final seed = txs.first;
-                        final m = _decodeContributionMeta(seed);
-                        final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
-                        final c = txs.map((e) => e.userEmail).toSet().length;
-                        final receiptState = (m['state'] ?? widget.user.state).toString();
-                        final canDelete = _canDeleteReceiptForState(receiptState);
-                        final title = (m['purpose'] ?? 'Contribution Campaign').toString();
-                        return Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                          decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.greenAccent.shade400)),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.7, color: strongText)),
-                              const SizedBox(height: 4),
-                              Text('${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}', style: TextStyle(color: softText)),
-                              const SizedBox(height: 4),
-                              Text('${seed.timestamp.month}/${seed.timestamp.day}/${seed.timestamp.year}', style: TextStyle(color: softText)),
-                              Divider(color: lineColor),
-                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                                Text('Click to view full receipt →', style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.w700)),
-                                Text('\$${formatCurrency(t)}  •  $c contributors', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                              ]),
-                              const SizedBox(height: 6),
-                              SelectionContainer.disabled(
-                                child: GestureDetector(
-                                  onTap: () {
-                                    setDialog(() {
-                                      selectedKey = k;
-                                      _openedReceiptKeys.add(k);
-                                    });
-                                    unawaited(_persistReceiptReadState());
-                                    if (mounted) setState(() {});
-                                  },
-                                  child: Container(
-                                    height: 38,
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
-                                    child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                            _campaignReceiptCornerActions(
-                              campaignKey: k,
-                              receiptState: receiptState,
-                              campaignTitle: title,
-                              campaignTxs: txs,
-                              canDelete: canDelete,
-                              onDeleted: () {
-                                setDialog(() => selectedKey = null);
-                                if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
-                                  Navigator.pop(ctx);
-                                }
-                              },
-                            ),
-                          ],
-                        );
-                      })
-                    else
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: panelBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.greenAccent.shade400)),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                SelectionContainer.disabled(
-                                  child: TextButton(onPressed: () => setDialog(() => selectedKey = null), child: const Text('← Back to All Receipts')),
-                                ),
-                              ],
-                            ),
-                            Text((meta['purpose'] ?? 'Contribution Campaign').toString(), style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22 * 0.8, color: strongText)),
-                            Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
-                            Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(child: _statCard('Total Collected', '\$${formatCurrency(total)}', tileBg, Colors.green.shade800)),
-                                const SizedBox(width: 10),
-                                Expanded(child: _statCard('Contributors', contributors.toString(), tileBg, Colors.blue.shade800)),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Container(
-                              decoration: BoxDecoration(color: tileBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: lineColor)),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.all(10),
-                                    child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                  ),
-                                  Divider(height: 1, color: lineColor),
-                                  if (selected.isEmpty)
-                                    Padding(
-                                      padding: EdgeInsets.all(20),
-                                      child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
-                                    )
-                                  else
-                                    ...selected.map(
-                                      (t) => ListTile(
-                                        dense: true,
-                                        leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                        title: Text(t.userEmail, style: TextStyle(color: strongText)),
-                                        subtitle: Text(_txReadableDetails(t), style: TextStyle(color: softText)),
-                                        trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
             ),
           );
         },
       ),
-    );
+      routeName: 'ContributionReceipts',
+    ));
   }
 
   void _showContributionDialog(UserData u) {
