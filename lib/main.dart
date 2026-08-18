@@ -35175,29 +35175,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       const SizedBox(height: 4),
                                       Text('${seed.timestamp.month}/${seed.timestamp.day}/${seed.timestamp.year}', style: TextStyle(color: softText)),
                                       Divider(color: lineColor),
-                                      Row(
-                                        children: [
-                                          Flexible(
-                                            flex: 3,
-                                            child: Text(
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment: Alignment.centerLeft,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(
                                               'Click to view full receipt →',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(color: hintGreen, fontWeight: FontWeight.w700),
+                                              style: TextStyle(color: hintGreen, fontWeight: FontWeight.w700, fontSize: 12),
                                             ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            flex: 2,
-                                            child: Text(
+                                            const SizedBox(width: 8),
+                                            Text(
                                               '\$${formatCurrency(t)} • $c contributors',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              textAlign: TextAlign.right,
-                                              style: TextStyle(fontWeight: FontWeight.bold, color: strongText),
+                                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: strongText),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                       const SizedBox(height: 8),
                                       SelectionContainer.disabled(
