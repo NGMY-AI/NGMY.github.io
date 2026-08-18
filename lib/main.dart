@@ -38084,18 +38084,100 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  String _helperSpeedIdentityForTx(AppTransaction t, Map<String, dynamic> meta) {
+    final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+    if (metaEmail.isNotEmpty) return metaEmail;
+    final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+    if (txEmail.isNotEmpty) return txEmail;
+    final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+    if (rid.isNotEmpty) return 'rid:$rid';
+    return '';
+  }
+
+  _NgmyHelperSpeedStats _speedStatsForMember(UserData u, Map<String, _NgmyHelperSpeedStats> stats) {
+    final email = NgmyCivicRegistryMembers.emailKey(u.email);
+    if (email.isNotEmpty && stats.containsKey(email)) return stats[email]!;
+    final rid = (u.registryId ?? '').trim().toUpperCase();
+    if (rid.isNotEmpty && stats.containsKey('rid:$rid')) return stats['rid:$rid']!;
+    return _NgmyHelperSpeedStats();
+  }
+
+  /// Per-campaign order of who put money in first → last. First place is
+  /// whoever's contribution timestamp is earliest in that campaign.
+  Map<String, _NgmyHelperSpeedStats> _helperSpeedStatsForState(String state) {
+    final st = state.trim().toLowerCase();
+    final campaigns = <String, Map<String, DateTime>>{};
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final meta = _decodeContributionMeta(t);
+      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
+      if (st.isNotEmpty && receiptState.isNotEmpty && receiptState != st) continue;
+      final campaignId = (meta['campaignId'] ?? '').toString().trim();
+      final campaignKey = campaignId.isNotEmpty
+          ? campaignId
+          : '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState';
+      final who = _helperSpeedIdentityForTx(t, meta);
+      if (who.isEmpty) continue;
+      final byUser = campaigns.putIfAbsent(campaignKey, () => <String, DateTime>{});
+      final prev = byUser[who];
+      if (prev == null || t.timestamp.isBefore(prev)) {
+        byUser[who] = t.timestamp;
+      }
+    }
+
+    final stats = <String, _NgmyHelperSpeedStats>{};
+    for (final order in campaigns.values) {
+      if (order.isEmpty) continue;
+      final ranked = order.entries.toList()..sort((a, b) => a.value.compareTo(b.value));
+      final n = ranked.length;
+      for (var i = 0; i < n; i++) {
+        final s = stats.putIfAbsent(ranked[i].key, () => _NgmyHelperSpeedStats());
+        s.campaignsHelped += 1;
+        s.speedPoints += n - i;
+        if (i == 0) s.firsts += 1;
+        if (n > 1 && i == n - 1) s.lasts += 1;
+      }
+    }
+    return stats;
+  }
+
+  int _compareTopHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats) {
+    final sa = _speedStatsForMember(a, stats);
+    final sb = _speedStatsForMember(b, stats);
+    final firsts = sb.firsts.compareTo(sa.firsts);
+    if (firsts != 0) return firsts;
+    final speed = sb.speedPoints.compareTo(sa.speedPoints);
+    if (speed != 0) return speed;
+    final helps = b.helps.compareTo(a.helps);
+    if (helps != 0) return helps;
+    return a.missed.compareTo(b.missed);
+  }
+
+  int _compareLeastHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats) {
+    final sa = _speedStatsForMember(a, stats);
+    final sb = _speedStatsForMember(b, stats);
+    final lasts = sb.lasts.compareTo(sa.lasts);
+    if (lasts != 0) return lasts;
+    final firsts = sa.firsts.compareTo(sb.firsts);
+    if (firsts != 0) return firsts;
+    final speed = sa.speedPoints.compareTo(sb.speedPoints);
+    if (speed != 0) return speed;
+    final helps = a.helps.compareTo(b.helps);
+    if (helps != 0) return helps;
+    return b.missed.compareTo(a.missed);
+  }
+
   Widget _rankingsSection(bool isDark) {
     final st = _selectedState.trim();
     final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
         .where((u) => u.state.trim().toLowerCase() == st.toLowerCase())
         .toList();
 
-    final topHelpers = enrolled.where((u) => u.helps > 0).toList()..sort((a, b) => b.helps.compareTo(a.helps));
+    final speed = _helperSpeedStatsForState(st);
+    final topHelpers = enrolled.where((u) => u.helps > 0).toList()
+      ..sort((a, b) => _compareTopHelpers(a, b, speed));
     final leastHelpers = enrolled.where((u) => u.missed > 0).toList()
-      ..sort((a, b) {
-        final c = a.helps.compareTo(b.helps);
-        return c != 0 ? c : b.missed.compareTo(a.missed);
-      });
+      ..sort((a, b) => _compareLeastHelpers(a, b, speed));
     final nonHelpers = enrolled.where((u) => u.helps == 0).toList()..sort((a, b) => b.missed.compareTo(a.missed));
 
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -38127,7 +38209,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('$st Rankings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-                    Text('Your home state community leaderboards.', style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
+                    Text('Ranked by who puts money in first when help starts.', style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
                   ],
                 ),
               ),
@@ -38343,6 +38425,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     );
   }
+}
+
+class _NgmyHelperSpeedStats {
+  int firsts = 0;
+  int lasts = 0;
+  int speedPoints = 0;
+  int campaignsHelped = 0;
 }
 
 /// Animated live shipment track (vehicle moves smoothly along the route).
