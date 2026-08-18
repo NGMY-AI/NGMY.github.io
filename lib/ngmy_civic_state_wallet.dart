@@ -229,7 +229,8 @@ Future<void> openNgmyCivicStateWalletFlow({
   required List<Map<String, dynamic>> members,
   required NgmyCivicWalletSnapshot Function() snapshotBuilder,
   required bool canEdit,
-  /// Authorized registrars skip PIN / name / DOB / ID â€” open wallet directly.
+  /// Authorized registrars skip PIN / name / DOB / ID only when the caller
+  /// sets [skipUnlockCodes] (first AR of the state, or King/Admin).
   bool skipUnlockCodes = false,
   required Future<void> Function({
     required double amount,

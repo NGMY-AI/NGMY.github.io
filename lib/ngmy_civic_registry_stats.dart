@@ -266,6 +266,75 @@ class NgmyCivicRegistryStats {
     return slotsRemaining(state: state, applications: applications, users: users) > 0;
   }
 
+  static DateTime? _applicationTime(Map<String, dynamic> a) {
+    final raw = (a['reviewedAt'] ?? a['approvedAt'] ?? a['createdAt'] ?? a['updatedAt'] ?? '').toString();
+    if (raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw)?.toUtc();
+  }
+
+  /// Email of the earliest still-active Authorized Registrar for [state]
+  /// (the first of up to five). Civic Registry Admin/King are not this slot.
+  static String? firstAuthorizedRegistrarEmail({
+    required String state,
+    required List<Map<String, dynamic>> applications,
+    required Iterable<dynamic> users,
+  }) {
+    final st = state.trim();
+    if (st.isEmpty) return null;
+    final active = <String>{};
+    for (final u in users) {
+      final isReg = (u as dynamic).isAuthorizedRegistrar == true;
+      if (!isReg) continue;
+      if ((u as dynamic).isCivicRegistryAdmin == true) continue;
+      if ((u as dynamic).isCivicRegistryKing == true) continue;
+      final email = (u as dynamic).email.toString();
+      final userState = (u as dynamic).state.toString();
+      if (isRegistrarAssignedToState(
+        email: email,
+        userState: userState,
+        isAuthorizedRegistrar: true,
+        applications: applications,
+        state: st,
+      )) {
+        active.add(_emailKey(email));
+      }
+    }
+    if (active.isEmpty) return null;
+
+    final approved = approvedApplicationsForState(applications, st)
+        .where((a) => active.contains(_emailKey((a['userEmail'] ?? '').toString())))
+        .toList();
+    approved.sort((a, b) {
+      final ta = _applicationTime(a);
+      final tb = _applicationTime(b);
+      if (ta == null && tb == null) return 0;
+      if (ta == null) return 1;
+      if (tb == null) return -1;
+      return ta.compareTo(tb);
+    });
+    if (approved.isNotEmpty) {
+      final email = _emailKey((approved.first['userEmail'] ?? '').toString());
+      if (email.isNotEmpty) return email;
+    }
+    final leftover = active.toList()..sort();
+    return leftover.isEmpty ? null : leftover.first;
+  }
+
+  static bool isFirstAuthorizedRegistrar({
+    required String email,
+    required String state,
+    required List<Map<String, dynamic>> applications,
+    required Iterable<dynamic> users,
+  }) {
+    final first = firstAuthorizedRegistrarEmail(
+      state: state,
+      applications: applications,
+      users: users,
+    );
+    if (first == null || first.isEmpty) return false;
+    return first == _emailKey(email);
+  }
+
   /// Registrars listed for a state (includes Civic Registry Admin on every state).
   static List<dynamic> registrarsListedForState({
     required String state,

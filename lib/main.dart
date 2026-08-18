@@ -30215,6 +30215,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _canBypassCivicGate() => _canUseRegistrarToolsHere();
 
+  /// State case (wallet) never remembers PIN / name / DOB / ID except for
+  /// this state's first Authorized Registrar. Other ARs and all members
+  /// re-enter every visit. King / Admin still skip so they are not locked
+  /// out of cases they may not have a member record for.
+  bool _shouldSkipStateCaseUnlock([String? state]) {
+    final st = (state ?? _selectedState).trim();
+    if (!_stateRequiresMemberUnlock(st)) return true;
+    if (_isGlobalCivicRegistryAdmin()) return true;
+    return NgmyCivicRegistryStats.isFirstAuthorizedRegistrar(
+      email: widget.user.email,
+      state: st,
+      applications: widget.config.civicRegistrarApplications,
+      users: widget.allUsers,
+    );
+  }
+
   /// PIN / name / DOB / registry ID only after a state has an Authorized Registrar.
   bool _stateRequiresMemberUnlock([String? state]) {
     return NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
@@ -32053,6 +32069,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _openAdminCivicStateCase(String state) async {
     final st = state.trim();
     if (st.isEmpty || !mounted) return;
+    if (!_shouldSkipStateCaseUnlock(st)) {
+      final unlocked = await NgmyNavigator.push<bool>(
+        context,
+        NgmyCivicStateWalletVerifyScreen(
+          state: st,
+          globalPin: widget.config.civicRegistryPin,
+          pinsByState: widget.config.civicRegistryPinsByState,
+          members: ngmyCivicMembersForState(widget.config, st),
+        ),
+        routeName: 'NgmyCivicStateWalletVerifyScreen',
+      );
+      if (unlocked != true || !mounted) return;
+    }
     final canEdit = _canUseRegistrarToolsHere(st);
     await NgmyNavigator.push<void>(
       context,
@@ -32180,9 +32209,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       members: ngmyCivicMembersForState(widget.config, _selectedState),
       snapshotBuilder: () => _buildCivicStateWalletSnapshot(),
       canEdit: toolsHere,
-      // Home-state AR / admin skip codes; members (and ARs away from home)
-      // skip only until that state has an Authorized Registrar.
-      skipUnlockCodes: toolsHere || !_stateRequiresMemberUnlock(),
+      // Only this state's first AR (and King/Admin) skip codes. Other ARs
+      // and members must enter PIN / name / DOB / ID every visit.
+      skipUnlockCodes: _shouldSkipStateCaseUnlock(),
       onAddSpending: ({required double amount, required String description}) =>
           _addCivicWalletSpending(
             state: _selectedState,
