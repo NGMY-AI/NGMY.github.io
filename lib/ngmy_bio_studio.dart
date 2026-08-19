@@ -593,9 +593,12 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     return n;
   }
 
+  bool get _linkGalleryUnlimited => widget.isAdmin;
+
   Future<void> _pickLinkGalleryImage(NgmyBioLink link) async {
     final replacing = link.hasGalleryImage;
     if (!replacing &&
+        !_linkGalleryUnlimited &&
         _linkGalleryPhotoCount(excludingLinkId: link.id) >=
             kNgmyBioMaxLinkGalleryPhotos) {
       if (!mounted) return;
@@ -700,8 +703,10 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Text(
-                      'Icons are free. Gallery photos are limited to '
-                      '$kNgmyBioMaxLinkGalleryPhotos per Bio.',
+                      widget.isAdmin
+                          ? 'Icons are free. Admin can add a gallery photo on every link.'
+                          : 'Icons are free. Gallery photos are limited to '
+                              '$kNgmyBioMaxLinkGalleryPhotos per Bio.',
                       style: TextStyle(color: t.muted, fontSize: 12.5),
                     ),
                   ),
@@ -1767,7 +1772,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
             child: Text(
-              'Gallery photos on links: $galleryUsed / $kNgmyBioMaxLinkGalleryPhotos  ·  Icons are free',
+              widget.isAdmin
+                  ? 'Gallery photos on links: $galleryUsed  ·  No limit for admin  ·  Icons are free'
+                  : 'Gallery photos on links: $galleryUsed / $kNgmyBioMaxLinkGalleryPhotos  ·  Icons are free',
               style: TextStyle(
                 color: t.muted,
                 fontSize: 11,
