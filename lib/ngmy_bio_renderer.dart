@@ -157,7 +157,7 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  double _ringClearance(double avatarSize) => avatarSize * 0.2 + (compact ? 16.0 : 22.0);
+  double _ringClearance(double avatarSize) => avatarSize * 0.55 + (compact ? 12.0 : 16.0);
 
   Color _layoutBodyFill(NgmyBioTemplate tpl) {
     if (_usesSceneBackdrop(tpl)) return Colors.transparent;
@@ -1309,7 +1309,8 @@ class NgmyBioPreview extends StatelessWidget {
     final usePill = bioSite || isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
     final radius = bioSite ? 14.0 : (usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0));
     final compactPad = compact;
-    final thumbSize = compactPad ? 36.0 : 42.0;
+    final hasRing = link.ringStyleId.trim().isNotEmpty && link.ringStyleId != 'none';
+    final thumbSize = hasRing ? (compactPad ? 26.0 : 30.0) : (compactPad ? 36.0 : 42.0);
     final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
 
     final linkIcon = link.hasGalleryImage
@@ -1326,7 +1327,7 @@ class NgmyBioPreview extends StatelessWidget {
               child: Icon(
                 linkIcon ?? Icons.link_rounded,
                 color: tpl.subtitleColor,
-                size: compactPad ? 20 : 22,
+                size: compactPad ? 16 : 18,
               ),
             ),
     );
@@ -1340,13 +1341,13 @@ class NgmyBioPreview extends StatelessWidget {
     final content = Row(
       children: [
         thumb,
-        SizedBox(width: compactPad ? 12 : 14),
+        SizedBox(width: compactPad ? 10 : 12),
         Expanded(
           child: Text(
             displayTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            textAlign: bioSite ? TextAlign.left : TextAlign.center,
+            textAlign: TextAlign.left,
             style: TextStyle(
               fontFamily: bioSite ? 'Georgia' : (tpl.serifTitle ? 'Georgia' : null),
               fontSize: compactPad ? 12 : 14,
@@ -1357,20 +1358,21 @@ class NgmyBioPreview extends StatelessWidget {
             ),
           ),
         ),
-        if (!bioSite) SizedBox(width: thumbSize),
       ],
     );
 
     final decoration = _linkDecoration(tpl, radius);
     final borderRadius = BorderRadius.circular(radius.clamp(8, 999));
+    final vPad = hasRing ? (compactPad ? 12.0 : 16.0) : (compactPad ? 8.0 : 10.0);
     final padded = Padding(
-      padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 12, vertical: compactPad ? 8 : 10),
+      padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 14, vertical: vPad),
       child: content,
     );
 
     Widget card;
     if (tpl.linkStyle == NgmyBioLinkStyle.glass && !lightweight) {
       card = ClipRRect(
+        clipBehavior: hasRing ? Clip.none : Clip.antiAlias,
         borderRadius: borderRadius,
         child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,

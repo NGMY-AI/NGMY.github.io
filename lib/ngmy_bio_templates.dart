@@ -225,6 +225,22 @@ BoxDecoration _ringHolo(double s) => BoxDecoration(
       gradient: const SweepGradient(colors: [Color(0xFF22D3EE), Color(0xFFA78BFA), Color(0xFFF472B6), Color(0xFFFBBF24), Color(0xFF22D3EE)]),
     );
 
+BoxDecoration _ringCrimson(double s) => BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: const LinearGradient(colors: [Color(0xFFFEE2E2), Color(0xFFEF4444), Color(0xFF7F1D1D)]),
+    );
+
+BoxDecoration _ringElectric(double s) => BoxDecoration(
+      shape: BoxShape.circle,
+      border: Border.all(color: const Color(0xFF22D3EE), width: 2.5),
+      boxShadow: [BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.55), blurRadius: 14, spreadRadius: 1)],
+    );
+
+BoxDecoration _ringSunset(double s) => BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: const SweepGradient(colors: [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFFFB7185), Color(0xFF7C3AED), Color(0xFFFDE68A)]),
+    );
+
 const List<NgmyBioRingStyle> kNgmyBioRingStyles = [
   NgmyBioRingStyle(id: 'none', label: 'None', buildRing: _ringNone),
   NgmyBioRingStyle(id: 'white', label: 'Clean White', buildRing: _ringWhite),
@@ -287,6 +303,9 @@ const List<NgmyBioRingStyle> kNgmyBioRingStyles = [
   NgmyBioRingStyle(id: 'bronze', label: 'Bronze', buildRing: _ringBronze),
   NgmyBioRingStyle(id: 'carbon', label: 'Carbon', buildRing: _ringCarbon),
   NgmyBioRingStyle(id: 'holo', label: 'Holo', buildRing: _ringHolo, ringAnimation: NgmyBioRingAnimation.orbit, auraColor: Color(0xFF22D3EE)),
+  NgmyBioRingStyle(id: 'crimson', label: 'Crimson', buildRing: _ringCrimson, ringAnimation: NgmyBioRingAnimation.pulse, auraColor: Color(0xFFEF4444)),
+  NgmyBioRingStyle(id: 'electric', label: 'Electric', buildRing: _ringElectric, ringAnimation: NgmyBioRingAnimation.shimmer, auraColor: Color(0xFF22D3EE)),
+  NgmyBioRingStyle(id: 'sunset', label: 'Sunset', buildRing: _ringSunset, ringAnimation: NgmyBioRingAnimation.smoke, auraColor: Color(0xFFF97316)),
 ];
 
 NgmyBioRingStyle ngmyBioRingById(String id) {

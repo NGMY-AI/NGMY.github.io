@@ -40,7 +40,8 @@ class _NgmyBioRingFrameState extends State<NgmyBioRingFrame> with SingleTickerPr
   Widget build(BuildContext context) {
     if (widget.ringId == 'none') return widget.child;
 
-    final pad = widget.size * 0.18;
+    // Leave room for glow, ticks, and orbit dots so the ring is never boxed.
+    final pad = math.max(widget.size * 0.52, 16.0);
     final outer = widget.size + pad * 2;
     return SizedBox(
       width: outer,
@@ -80,10 +81,8 @@ class NgmyBioRingFramePainter extends CustomPainter {
     final r = coreSize / 2;
     canvas.save();
     canvas.clipPath(
-      Path()
-        ..fillType = PathFillType.evenOdd
-        ..addRect(Offset.zero & size)
-        ..addOval(Rect.fromCircle(center: o, radius: r - 0.4)),
+      Path()..addOval(Rect.fromCircle(center: o, radius: r - 0.5)),
+      ClipOp.difference,
     );
     const boost = 1.55;
     double ringR(double extra) => r + extra * boost;
@@ -171,6 +170,18 @@ class NgmyBioRingFramePainter extends CustomPainter {
         _stroke(canvas, o, ringR(7), const Color(0xFF71717A), ringW(2));
       case 'holo':
         _prismFacetRing(canvas, o, ringR(5.5), phase, ringW(5.5));
+      case 'crimson':
+        _warmPulse(canvas, o, ringR(8), const Color(0xFFEF4444));
+        _luxBand(canvas, o, ringR(4.5), const [Color(0xFFFEE2E2), Color(0xFFEF4444), Color(0xFF7F1D1D)], ringW(4.5));
+        _orbitBeads(canvas, o, ringR(9), 8, const Color(0xFFFECACA), phase);
+      case 'electric':
+        _glowRing(canvas, o, ringR(8), const Color(0xFF22D3EE), 0.4 + math.sin(phase * math.pi * 2) * 0.18);
+        _stroke(canvas, o, ringR(3.5), const Color(0xFF67E8F9), ringW(2.8));
+        _fineRays(canvas, o, ringR(6.5), 16, const Color(0xFF22D3EE), phase);
+      case 'sunset':
+        _warmPulse(canvas, o, ringR(8), const Color(0xFFFB7185));
+        _luxBand(canvas, o, ringR(5), const [Color(0xFFFDE68A), Color(0xFFF97316), Color(0xFFFB7185), Color(0xFF7C3AED)], ringW(5));
+        _shimmerArc(canvas, o, ringR(6.5), const Color(0xFFFFF7ED), ringW(3));
       default:
         _vibePulse(canvas, o, ringR(5), accent, phase);
         _stroke(canvas, o, ringR(3.5), accent, ringW(3));
