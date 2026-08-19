@@ -158,7 +158,8 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
-  double _ringClearance(double avatarSize) => avatarSize * 0.55 + (compact ? 12.0 : 16.0);
+  double _avatarWidgetSize(NgmyBioRingStyle ring, double avatarSize) =>
+      ngmyBioRingFrameOuterSize(ring.id, avatarSize);
 
   Color _layoutBodyFill(NgmyBioTemplate tpl) {
     if (_usesSceneBackdrop(tpl)) return Colors.transparent;
@@ -321,9 +322,10 @@ class NgmyBioPreview extends StatelessWidget {
     double minPageHeight = 0,
   }) {
     final curveDepth = curveH;
+    final avatarSpan = _avatarWidgetSize(ring, avatarSize);
     final avatarCenterY = headerH - curveDepth * 0.5;
-    final avatarTop = avatarCenterY - avatarSize * 0.5;
-    final contentTop = avatarCenterY + avatarSize * 0.5 + _ringClearance(avatarSize);
+    final avatarTop = avatarCenterY - avatarSpan * 0.5;
+    final contentTop = avatarCenterY + avatarSpan * 0.5 + (compact ? 10.0 : 14.0);
     final bodyTop = headerH - curveDepth;
     final bodyColor = _layoutBodyFill(tpl);
     final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
@@ -662,9 +664,10 @@ class NgmyBioPreview extends StatelessWidget {
     final headerH = compact ? 172.0 : 228.0;
     final curveDepth = compact ? 52.0 : 68.0;
     final bodyColor = _layoutBodyFill(tpl);
+    final avatarSpan = _avatarWidgetSize(ring, avatarSize);
     final avatarCenterY = headerH - curveDepth * 0.5;
-    final avatarTop = avatarCenterY - avatarSize * 0.5;
-    final contentTop = avatarCenterY + avatarSize * 0.5 + _ringClearance(avatarSize);
+    final avatarTop = avatarCenterY - avatarSpan * 0.5;
+    final contentTop = avatarCenterY + avatarSpan * 0.5 + (compact ? 10.0 : 14.0);
     final bodyTop = headerH - curveDepth;
     final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
 
