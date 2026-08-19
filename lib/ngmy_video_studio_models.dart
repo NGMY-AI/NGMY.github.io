@@ -264,16 +264,9 @@ class NgmyVideoStudioExportConfig {
   int get outputWidth => format.exportWidth;
   int get outputHeight => format.exportHeight;
 
-  /// True when templates, logos, text, or backdrop must be baked into the export.
-  bool get needsComposedExport => !canDirectDownload;
+  /// Video Studio always records the template, logos, and overlay into the file.
+  bool get needsComposedExport => true;
 
-  /// One local video with zero studio graphics — otherwise templates must be recorded in.
-  bool get canDirectDownload {
-    final filled = videoSourcesBySlot.values.where((s) => s.trim().isNotEmpty).length;
-    return filled == 1 &&
-        logoDataUrlBySlot.isEmpty &&
-        newsBannerStyle == null &&
-        !showTextOverlay &&
-        (backgroundAsset == null || backgroundAsset!.trim().isEmpty);
-  }
+  /// Never skip composition — a raw clip download would drop the template.
+  bool get canDirectDownload => false;
 }

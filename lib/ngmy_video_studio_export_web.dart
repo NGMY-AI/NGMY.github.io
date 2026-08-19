@@ -11,6 +11,9 @@ import 'ngmy_studio_download.dart';
 import 'ngmy_news_banner_painter.dart';
 import 'ngmy_video_studio_models.dart';
 
+/// Creator Toolkit → Video Studio export only.
+/// Do not reuse this pipeline for Vault, Recorder Studio, Hub, or Kiapo video.
+
 const _metaTimeout = Duration(seconds: 18);
 
 /// Up to 10 minutes — full-length template export.
@@ -329,11 +332,7 @@ Future<void> _resumeExportAudioContextImpl() async {
 }
 
 Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
-  if (video == null) {
-    await Future<void>.delayed(const Duration(milliseconds: 33));
-    return;
-  }
-  if (js_util.hasProperty(video, 'requestVideoFrameCallback')) {
+  if (video != null && js_util.hasProperty(video, 'requestVideoFrameCallback')) {
     final done = Completer<void>();
     js_util.callMethod(video, 'requestVideoFrameCallback', [
       js_util.allowInterop((_, __) {
@@ -341,29 +340,33 @@ Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
       }),
     ]);
     try {
-      await done.future.timeout(const Duration(milliseconds: 120));
+      await done.future.timeout(const Duration(milliseconds: 48));
       return;
     } catch (_) {}
   }
-  await _waitVideoFrameReady(video);
+  final raf = Completer<void>();
+  html.window.requestAnimationFrame((_) {
+    if (!raf.isCompleted) raf.complete();
+  });
+  try {
+    await raf.future.timeout(const Duration(milliseconds: 33));
+  } catch (_) {}
 }
 
 void _stageHiddenVideoElement(html.VideoElement v) {
-  // Keep videos technically painted — fully transparent or off-screen videos
-  // get throttled on mobile Safari and freeze during canvas capture.
+  // Keep a real painted surface in the viewport. 2×2 / fully hidden videos
+  // get decoder-throttled, which freezes template recording on one frame.
   v
     ..style.position = 'fixed'
-    ..style.left = '0'
-    ..style.top = '0'
-    // Keep a tiny painted surface in the viewport. Browsers throttle video
-    // elements positioned far off-screen, which froze template recording.
-    ..style.width = '2px'
-    ..style.height = '2px'
+    ..style.left = '8px'
+    ..style.bottom = '8px'
+    ..style.width = '240px'
+    ..style.height = '135px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '0.01'
+    ..style.opacity = '0.04'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '0'
+    ..style.zIndex = '2147483000'
     ..style.transform = 'translateZ(0)';
   v.style.setProperty('will-change', 'transform');
   v.style.removeProperty('clip');
@@ -582,13 +585,9 @@ double _exportProgress(double durationSec, double videoTimeSec, int wallMs, int 
 int _exportFps() => _ngmyIsMobileBrowser() ? _exportCanvasFpsMobile : _exportCanvasFps;
 
 bool _webCodecsFastExportSupported() {
-  try {
-    if (!js_util.hasProperty(html.window, 'ngmyStudioFastExportSupported')) return false;
-    final result = js_util.callMethod(html.window, 'ngmyStudioFastExportSupported', []);
-    return result == true;
-  } catch (_) {
-    return false;
-  }
+  // Seek-frame WebCodecs export is disabled: JS cannot await Dart seeks, so
+  // the file becomes a slideshow (stuck image, then robot-like jumps).
+  return false;
 }
 
 Future<void> _waitSeekSettled(html.VideoElement v) async {
@@ -831,14 +830,14 @@ List<String> _recorderMimeCandidates() {
 void _styleExportCanvas(html.CanvasElement canvas) {
   canvas
     ..style.position = 'fixed'
-    ..style.left = '0'
-    ..style.top = '0'
-    ..style.width = '2px'
-    ..style.height = '2px'
-    ..style.opacity = '0.01'
+    ..style.right = '8px'
+    ..style.bottom = '8px'
+    ..style.width = '176px'
+    ..style.height = '99px'
+    ..style.opacity = '0.05'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '0'
+    ..style.zIndex = '2147483001'
     ..style.transform = 'translateZ(0)';
   canvas.style.setProperty('will-change', 'transform');
   canvas.style.removeProperty('clip');
@@ -1321,39 +1320,31 @@ Future<List<html.Blob>> _recordCanvasExport({
   paintFrame();
   _requestCanvasFrame(canvasStream);
 
-  var tick = 0;
+  var frame = 0;
   var lastT = -1.0;
   var lastProgressWallMs = 0;
-  final fps = _exportFps();
-  final frameMs = math.max(16, (1000 / fps).round());
 
   while (DateTime.now().isBefore(wallEnd) &&
       DateTime.now().isBefore(deadline) &&
       DateTime.now().isBefore(attemptDeadline)) {
     if (_exportWasCancelled) break;
     for (final v in videoList) {
+      v.playbackRate = 1.0;
       if (!v.ended && v.paused) {
         unawaited(_playVideoForRecord(v));
       }
     }
-    if (useDedicatedAudio && tick % 2 == 0) {
+    if (useDedicatedAudio && frame % 2 == 0) {
       unawaited(_syncExportAudioPlayback(primary, playing: true));
     }
+    await _waitNextVideoFrame(primary);
     paintFrame();
     _requestCanvasFrame(canvasStream);
-    tick++;
-    if (tick % 6 == 0) {
+    frame++;
+    if (frame % 8 == 0) {
       try {
         js_util.callMethod(recorder, 'requestData', const []);
       } catch (_) {}
-    }
-
-    final targetWall = wallStart.add(Duration(milliseconds: tick * frameMs));
-    final waitMs = targetWall.difference(DateTime.now()).inMilliseconds;
-    if (waitMs > 0) {
-      await Future<void>.delayed(Duration(milliseconds: waitMs));
-    } else {
-      await Future<void>.delayed(Duration.zero);
     }
 
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
@@ -1835,7 +1826,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       }
     }
     if (config.newsBannerStyle != null && bannerOverlay == null) {
-      return 'Export failed: your news template could not be rendered. Keep this screen open until the preview loads, then tap Download again.';
+      debugPrint('[studio export] PNG banner failed — drawing template on canvas each frame');
     }
     await _flushProgress(onProgress, 0.09, 'Setting up recorder…');
     exportCanvas = html.CanvasElement(width: w, height: h);
@@ -1896,6 +1887,8 @@ Future<String> _exportNgmyVideoStudioComposedCore({
 
       if (bannerOverlay != null) {
         ctx.drawImageScaled(bannerOverlay, 0, 0, w, h);
+      } else if (config.newsBannerStyle != null) {
+        _drawNewsBannerOnCanvas(ctx, w.toDouble(), h.toDouble(), config);
       } else if (config.showTextOverlay) {
         _drawTextOverlay(ctx, w.toDouble(), h.toDouble(), config);
       }
@@ -1944,33 +1937,8 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     }
     paintFrame();
 
-    final fastAudioSrc =
-        primaryVideo == null
-            ? ''
-            : (primaryVideo.currentSrc.isNotEmpty ? primaryVideo.currentSrc : primaryVideo.src);
-    final fastBlob = await _tryFastWebCodecsExport(
-      canvas: canvas,
-      w: w,
-      h: h,
-      durationSec: durationSec,
-      videoList: videoList,
-      primaryVideo: primaryVideo,
-      paintFrame: paintFrame,
-      audioSrc: fastAudioSrc,
-      onProgress: onProgress,
-    );
-    if (fastBlob != null && !_exportWasCancelled) {
-      await _flushProgress(onProgress, 1.0, 'Saving your file…');
-      final fastResult = await _finalizeComposedBlob(
-        blob: fastBlob,
-        config: config,
-        w: w,
-        h: h,
-        startMs: startMs,
-        usedCanvasStream: true,
-      );
-      if (fastResult != null) return fastResult;
-    }
+    // Real-time MediaRecorder only. Seek-frame WebCodecs export is disabled
+    // because it records a slideshow instead of smooth video.
 
     final recordFps = _exportFps();
     final canvasStream = _safeCaptureStream(canvas, fps: recordFps);
