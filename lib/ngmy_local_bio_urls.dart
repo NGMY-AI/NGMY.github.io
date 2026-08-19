@@ -1,21 +1,13 @@
-import 'ngmy_menu_models.dart';
+import 'ngmy_bio_urls.dart';
 
 const String kNgmyLocalBioPublicBaseUrl = 'https://ngmy.org/local-bio/';
 
 String ngmyLocalBioPublicUrlForSlug(String slug) {
-  final s = slug.trim().toLowerCase();
+  final s = ngmySanitizeBioSlug(slug);
   if (s.isEmpty) return '';
   return '$kNgmyLocalBioPublicBaseUrl$s';
 }
 
 String ngmyBuildUniqueLocalBioSlug(String base, List<String> existingSlugs) {
-  var slug = ngmyMenuSlugify(base);
-  if (slug.isEmpty) slug = 'local-bio';
-  final taken = existingSlugs.map((e) => e.toLowerCase()).toSet();
-  if (!taken.contains(slug)) return slug;
-  for (var i = 2; i < 1000; i++) {
-    final candidate = '$slug-$i';
-    if (!taken.contains(candidate)) return candidate;
-  }
-  return '${slug}_${DateTime.now().millisecondsSinceEpoch}';
+  return ngmyBuildUniqueBioSlug(base, existingSlugs);
 }

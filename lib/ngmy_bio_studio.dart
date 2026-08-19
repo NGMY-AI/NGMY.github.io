@@ -71,9 +71,8 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   void initState() {
     super.initState();
     _doc = widget.document.copy();
-    _anchorDisplayName = _doc.displayName.trim() == kNgmyBioDefaultDisplayName
-        ? ''
-        : _doc.displayName.trim();
+    _originalPublishedSlug = _doc.slug.trim();
+    _anchorDisplayName = _doc.displayName.trim();
     _bind();
   }
 
@@ -83,9 +82,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     // Parent list reloads must not blank a name the user already has on screen.
     if (oldWidget.document.id != widget.document.id) {
       _doc = widget.document.copy();
-      _anchorDisplayName = _doc.displayName.trim() == kNgmyBioDefaultDisplayName
-          ? ''
-          : _doc.displayName.trim();
+      _anchorDisplayName = _doc.displayName.trim();
       _bind();
       return;
     }
@@ -119,6 +116,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   void dispose() {
     _nameC.dispose();
     _taglineC.dispose();
+    _slugC.removeListener(_onSlugEdited);
     _slugC.dispose();
     _socialInstagramC.dispose();
     _socialFacebookC.dispose();
@@ -128,18 +126,19 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   void _bind() {
-    // Older blank Bios stored the sample name as real text. Show the field as
-    // empty (hint only) without mutating the saved document in memory — that
-    // used to make an accidental Save wipe a real name after reopen.
-    final legacyPlaceholder =
-        _doc.displayName.trim() == kNgmyBioDefaultDisplayName;
-    final showName = legacyPlaceholder ? '' : _doc.displayName;
-    _nameC.text = showName;
-    if (!legacyPlaceholder && showName.trim().isNotEmpty) {
-      _anchorDisplayName = showName.trim();
+    _nameC.text = _doc.displayName;
+    if (_doc.displayName.trim().isNotEmpty) {
+      _anchorDisplayName = _doc.displayName.trim();
     }
     _taglineC.text = _doc.tagline;
-    _slugC.text = _doc.slug;
+    final slug = ngmySanitizeBioSlug(_doc.slug);
+    _doc.slug = slug;
+    _slugC.text = slug;
+    if (slug.isNotEmpty) {
+      _doc.publicUrl = widget._isLocal
+          ? ngmyLocalBioPublicUrlForSlug(slug)
+          : ngmyBioPublicUrlForSlug(slug);
+    }
     _socialInstagramC.text = _doc.socialLinks.instagram;
     _socialFacebookC.text = _doc.socialLinks.facebook;
     _socialYoutubeC.text = _doc.socialLinks.youtube;
@@ -148,11 +147,31 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       c.removeListener(_previewRefresh);
       c.addListener(_previewRefresh);
     }
+    _slugC.removeListener(_onSlugEdited);
+    _slugC.addListener(_onSlugEdited);
+  }
+
+  void _onSlugEdited() {
+    final cleaned = ngmySanitizeBioSlug(_slugC.text);
+    if (cleaned != _slugC.text) {
+      _slugC.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+    }
+    _doc.slug = cleaned;
+    if (cleaned.isNotEmpty) {
+      _doc.publicUrl = widget._isLocal
+          ? ngmyLocalBioPublicUrlForSlug(cleaned)
+          : ngmyBioPublicUrlForSlug(cleaned);
+    }
+    if (mounted) setState(() {});
   }
 
   /// Last non-empty display name the user saved or typed — never wiped by an
   /// empty field, reload race, or accidental Save.
   String _anchorDisplayName = '';
+  String _originalPublishedSlug = '';
 
   void _previewRefresh() {
     final typed = _nameC.text;
@@ -183,7 +202,13 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       _doc.displayName = '';
     }
     _doc.tagline = _taglineC.text.trim();
-    _doc.slug = _slugC.text.trim().toLowerCase();
+    _doc.slug = ngmySanitizeBioSlug(_slugC.text);
+    if (_slugC.text != _doc.slug) {
+      _slugC.value = TextEditingValue(
+        text: _doc.slug,
+        selection: TextSelection.collapsed(offset: _doc.slug.length),
+      );
+    }
     _doc.socialLinks = _doc.socialLinks.copyWith(
       instagram: _socialInstagramC.text.trim(),
       facebook: _socialFacebookC.text.trim(),
@@ -307,12 +332,13 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     final slugs = widget._isLocal
         ? await NgmyLocalBioPublishRegistry.fetchAllSlugs()
         : await NgmyBioPublishRegistry.fetchAllSlugs();
+    _doc.slug = ngmySanitizeBioSlug(_slugC.text);
     if (_doc.slug.isEmpty) {
       _doc.slug = widget._isLocal
           ? ngmyBuildUniqueLocalBioSlug(_doc.displayName, slugs)
           : ngmyBuildUniqueBioSlug(_doc.displayName, slugs);
-      _slugC.text = _doc.slug;
     }
+    _slugC.text = _doc.slug;
     final String? err;
     if (widget._isLocal) {
       err = await NgmyLocalBioPublishRegistry.publish(
@@ -327,6 +353,18 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       );
     }
     if (err == null) {
+      final stale = _originalPublishedSlug.trim();
+      if (stale.isNotEmpty &&
+          stale.toLowerCase() != _doc.slug &&
+          ngmySanitizeBioSlug(stale) != _doc.slug) {
+        if (!widget._isLocal) {
+          await NgmyBioPublishRegistry.unpublishSlug(
+            stale,
+            ownerEmail: widget.userEmail,
+          );
+        }
+      }
+      _originalPublishedSlug = _doc.slug;
       final base = widget._isLocal
           ? ngmyLocalBioPublicUrlForSlug(_doc.slug)
           : ngmyBioPublicUrlForSlug(_doc.slug);
@@ -1203,9 +1241,15 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               NgmyModernField(
                 controller: _slugC,
                 label: 'Custom link slug',
-                hint: 'my-bio',
+                hint: 'kbpabloq',
                 icon: Icons.link_rounded,
                 accent: _kBioAccent,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Public link is ngmy.org/bio/ plus up to 10 letters. '
+                'You can put 1–2 numbers in front. Do not paste Instagram or other website URLs here.',
+                style: TextStyle(color: t.muted, fontSize: 12, height: 1.35, fontWeight: FontWeight.w500),
               ),
             ],
           ),

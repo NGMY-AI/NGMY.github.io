@@ -202,7 +202,7 @@ class NgmyBioDocument {
   }
 }
 
-const kNgmyBioDefaultDisplayName = 'KB PABLO QR';
+const kNgmyBioDefaultDisplayName = 'Your name';
 
 NgmyBioDocument ngmyBioBlankDocument() => NgmyBioDocument(
   id: ngmyBioNewId(),

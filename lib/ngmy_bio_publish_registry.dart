@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_bio_urls.dart';
 import 'ngmy_cloud_policy.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
@@ -14,7 +15,7 @@ class NgmyBioPublishRegistry {
   static const settingsKey = 'ngmy_bio_publish_registry';
   static const _guestFetchTimeout = Duration(seconds: 8);
 
-  static String _normSlug(String slug) => slug.trim().toLowerCase();
+  static String _normSlug(String slug) => ngmySanitizeBioSlug(slug);
 
   static String _slugSettingsKey(String slug) => 'ngmy_bio_pub_${_normSlug(slug)}';
 
@@ -122,7 +123,7 @@ class NgmyBioPublishRegistry {
     required String createdByEmail,
   }) async {
     final clean = _normSlug(slug);
-    if (clean.isEmpty) return 'Bio needs a link slug before publishing.';
+    if (clean.isEmpty) return 'Bio needs a short link (up to 10 letters) before publishing.';
     if (!await ngmyCanReachCloud()) {
       return 'No internet — publish again when online so guests can open your Bio.';
     }

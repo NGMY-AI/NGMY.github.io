@@ -3,13 +3,14 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_bio_urls.dart';
 import 'ngmy_local_url_payload.dart';
 
 /// Host-phone bios: device-local master copy + optional URL payload for guests. No Supabase.
 class NgmyLocalBioPublishRegistry {
   static const settingsKey = 'ngmy_local_bio_publish_registry';
 
-  static String _normSlug(String slug) => slug.trim().toLowerCase();
+  static String _normSlug(String slug) => ngmySanitizeBioSlug(slug);
 
   static String _slugStorageKey(String slug) => 'ngmy_local_bio_pub_${_normSlug(slug)}';
 
@@ -80,7 +81,7 @@ class NgmyLocalBioPublishRegistry {
     required Map<String, dynamic> data,
   }) async {
     final clean = _normSlug(slug);
-    if (clean.isEmpty) return 'Bio needs a link slug before publishing.';
+    if (clean.isEmpty) return 'Bio needs a short link (up to 10 letters) before publishing.';
     try {
       final encoded = jsonEncode(data);
       if (encoded.length > 900000) {

@@ -69,9 +69,9 @@ List<NgmyBioDocument> _protectBioDisplayNames(
     }
   }
   for (final doc in winners) {
-    if (doc.displayName.trim().isNotEmpty) continue;
     final named = newestWithName[doc.id];
-    if (named != null) {
+    if (named == null) continue;
+    if (doc.displayName.trim().isEmpty) {
       doc.displayName = named.displayName;
     }
   }
