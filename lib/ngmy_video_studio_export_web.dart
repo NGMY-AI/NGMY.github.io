@@ -331,39 +331,119 @@ Future<void> _resumeExportAudioContextImpl() async {
   }
 }
 
-Future<void> _waitNextVideoFrame(html.VideoElement? video) async {
-  if (video != null && js_util.hasProperty(video, 'requestVideoFrameCallback')) {
-    final done = Completer<void>();
+Future<int?> _decodedFrameCount(html.VideoElement v) async {
+  try {
+    if (js_util.hasProperty(v, 'webkitDecodedFrameCount')) {
+      final n = js_util.getProperty(v, 'webkitDecodedFrameCount');
+      if (n is num) return n.toInt();
+    }
+  } catch (_) {}
+  try {
+    if (js_util.hasProperty(v, 'getVideoPlaybackQuality')) {
+      final q = js_util.callMethod(v, 'getVideoPlaybackQuality', const []);
+      final n = js_util.getProperty(q, 'totalVideoFrames');
+      if (n is num) return n.toInt();
+    }
+  } catch (_) {}
+  return null;
+}
+
+/// Wait until the source clip actually presents a new decoded frame.
+/// Timing out and painting anyway produced a moving scrubber on a frozen picture.
+Future<bool> _waitForNewPresentedFrame(
+  html.VideoElement? video, {
+  required double lastTime,
+  required int lastDecoded,
+}) async {
+  if (video == null) {
+    await Future<void>.delayed(const Duration(milliseconds: 33));
+    return false;
+  }
+  if (js_util.hasProperty(video, 'requestVideoFrameCallback')) {
+    final done = Completer<bool>();
     js_util.callMethod(video, 'requestVideoFrameCallback', [
       js_util.allowInterop((_, __) {
-        if (!done.isCompleted) done.complete();
+        if (!done.isCompleted) done.complete(true);
       }),
     ]);
     try {
-      await done.future.timeout(const Duration(milliseconds: 48));
-      return;
+      return await done.future.timeout(const Duration(milliseconds: 90));
     } catch (_) {}
   }
-  final raf = Completer<void>();
-  html.window.requestAnimationFrame((_) {
-    if (!raf.isCompleted) raf.complete();
-  });
+  final deadline = DateTime.now().add(const Duration(milliseconds: 80));
+  while (DateTime.now().isBefore(deadline)) {
+    final decoded = await _decodedFrameCount(video);
+    if (decoded != null && decoded > lastDecoded) return true;
+    if (decoded == null && (video.currentTime - lastTime).abs() >= 0.03 && !video.paused) {
+      return true;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 8));
+  }
+  return false;
+}
+
+html.DivElement? _exportHudChip;
+
+void _showExportHud(String text) {
+  _hideExportHud();
+  final chip = html.DivElement()
+    ..text = text
+    ..style.position = 'fixed'
+    ..style.left = '12px'
+    ..style.right = '12px'
+    ..style.top = '10px'
+    ..style.padding = '10px 14px'
+    ..style.borderRadius = '12px'
+    ..style.background = 'rgba(6,8,15,0.88)'
+    ..style.color = '#fff'
+    ..style.fontSize = '14px'
+    ..style.fontWeight = '700'
+    ..style.zIndex = '2147483647'
+    ..style.pointerEvents = 'none'
+    ..style.textAlign = 'center';
+  html.document.body?.append(chip);
+  _exportHudChip = chip;
+}
+
+void _hideExportHud() {
   try {
-    await raf.future.timeout(const Duration(milliseconds: 33));
+    _exportHudChip?.remove();
   } catch (_) {}
+  _exportHudChip = null;
+}
+
+void _stageExportSourceVideo(html.VideoElement v) {
+  // iPhone will not decode new frames for a tiny / near-invisible <video>.
+  // Keep the source clip on-screen so drawImage receives a moving picture.
+  final apple = _ngmyIsAppleMobileBrowser();
+  v
+    ..style.position = 'fixed'
+    ..style.left = apple ? '0' : '8px'
+    ..style.top = apple ? '48px' : 'auto'
+    ..style.bottom = apple ? 'auto' : '8px'
+    ..style.width = apple ? '100vw' : '320px'
+    ..style.height = apple ? 'calc(100vh - 48px)' : '180px'
+    ..style.objectFit = 'contain'
+    ..style.backgroundColor = '#000'
+    ..style.opacity = '1'
+    ..style.visibility = 'visible'
+    ..style.pointerEvents = 'none'
+    ..style.zIndex = '2147483645'
+    ..style.transform = 'translateZ(0)';
+  v.style.setProperty('will-change', 'transform');
+  v.style.removeProperty('clip');
+  v.style.removeProperty('clip-path');
 }
 
 void _stageHiddenVideoElement(html.VideoElement v) {
-  // Keep a real painted surface in the viewport. 2×2 / fully hidden videos
-  // get decoder-throttled, which freezes template recording on one frame.
   v
     ..style.position = 'fixed'
     ..style.left = '8px'
     ..style.bottom = '8px'
-    ..style.width = '240px'
-    ..style.height = '135px'
+    ..style.width = '160px'
+    ..style.height = '90px'
     ..style.objectFit = 'contain'
-    ..style.opacity = '0.04'
+    ..style.opacity = '0.2'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
     ..style.zIndex = '2147483000'
@@ -374,10 +454,11 @@ void _stageHiddenVideoElement(html.VideoElement v) {
 }
 
 void _applyExportVideoStaging(html.VideoElement v, {int? canvasW, int? canvasH}) {
-  _stageHiddenVideoElement(v);
+  _stageExportSourceVideo(v);
 }
 
 void _cleanupExportElements() {
+  _hideExportHud();
   try {
     _exportAudioElement?.pause();
     _exportAudioElement?.remove();
@@ -828,16 +909,20 @@ List<String> _recorderMimeCandidates() {
 }
 
 void _styleExportCanvas(html.CanvasElement canvas) {
+  // Keep the composed preview small so it does not cover the source clip.
+  // iPhone stops decoding a <video> that is fully hidden behind another layer.
   canvas
     ..style.position = 'fixed'
-    ..style.right = '8px'
-    ..style.bottom = '8px'
-    ..style.width = '176px'
-    ..style.height = '99px'
-    ..style.opacity = '0.05'
+    ..style.right = '10px'
+    ..style.bottom = '10px'
+    ..style.width = '120px'
+    ..style.height = '213px'
+    ..style.opacity = '1'
     ..style.visibility = 'visible'
     ..style.pointerEvents = 'none'
-    ..style.zIndex = '2147483001'
+    ..style.zIndex = '2147483646'
+    ..style.border = '2px solid rgba(0,178,90,0.9)'
+    ..style.borderRadius = '8px'
     ..style.transform = 'translateZ(0)';
   canvas.style.setProperty('will-change', 'transform');
   canvas.style.removeProperty('clip');
@@ -1252,17 +1337,20 @@ Future<List<html.Blob>> _recordCanvasExport({
   await Future<void>.delayed(const Duration(milliseconds: 80));
 
   final primary = primaryVideo ?? _pickPrimaryVideo(videoList);
-  final useDedicatedAudio = withAudio && _exportAudioElement != null;
-  final audioVideo = withAudio && !useDedicatedAudio ? primary : null;
+  final appleMobilePlay = appleMobile;
+  // A second <video> on the same blob steals iPhone decode from the clip we draw.
+  final useDedicatedAudio = withAudio && _exportAudioElement != null && !appleMobilePlay;
+  final unmutePrimary = appleMobilePlay || (withAudio && !useDedicatedAudio);
 
   var maxRecordedSec = 0.0;
   var abortedFrozen = false;
+  var liveFrameCount = 0;
 
   for (final v in videoList) {
     v.pause();
     v.playbackRate = 1.0;
     await _seekVideoTo(v, 0, fast: false);
-    if (withAudio && v == audioVideo) {
+    if (unmutePrimary && v == primary) {
       v
         ..muted = false
         ..volume = 1.0
@@ -1287,19 +1375,15 @@ Future<List<html.Blob>> _recordCanvasExport({
   final attemptDeadline = _exportAttemptDeadline(durationSec);
   final wallStart = DateTime.now();
   final wallEnd = wallStart.add(Duration(milliseconds: durationMs + 800));
-  // Real elapsed time with no playback progress, not a tick count — a tick
-  // count assumes each loop iteration costs a certain amount of wall time,
-  // which broke once per-frame work got cheaper/more expensive elsewhere
-  // (a faster loop blew through the same tick budget in a fraction of the
-  // real time it was calibrated for, truncating recordings early).
   final stallLimitMs = _ngmyIsMobileBrowser() ? 9000 : 7000;
   final startupGraceMs = _ngmyIsMobileBrowser() ? 8000 : 3500;
 
   onProgress(0.06, 'Starting playback…');
+  _showExportHud('Recording your clip with the template — keep this screen open');
   for (final v in videoList) {
     if (_exportWasCancelled) return const [];
     v.playbackRate = 1.0;
-    if (withAudio && v == audioVideo) {
+    if (unmutePrimary && v == primary) {
       v
         ..muted = false
         ..volume = 1.0;
@@ -1320,9 +1404,10 @@ Future<List<html.Blob>> _recordCanvasExport({
   paintFrame();
   _requestCanvasFrame(canvasStream);
 
-  var frame = 0;
-  var lastT = -1.0;
+  var lastT = primary?.currentTime.toDouble() ?? 0.0;
+  var lastDecoded = await _decodedFrameCount(primary ?? videoList.first) ?? 0;
   var lastProgressWallMs = 0;
+  var lastLiveFrameWallMs = 0;
 
   while (DateTime.now().isBefore(wallEnd) &&
       DateTime.now().isBefore(deadline) &&
@@ -1334,34 +1419,42 @@ Future<List<html.Blob>> _recordCanvasExport({
         unawaited(_playVideoForRecord(v));
       }
     }
-    if (useDedicatedAudio && frame % 2 == 0) {
+    if (useDedicatedAudio && liveFrameCount % 2 == 0) {
       unawaited(_syncExportAudioPlayback(primary, playing: true));
     }
-    await _waitNextVideoFrame(primary);
-    paintFrame();
-    _requestCanvasFrame(canvasStream);
-    frame++;
-    if (frame % 8 == 0) {
-      try {
-        js_util.callMethod(recorder, 'requestData', const []);
-      } catch (_) {}
+
+    final gotNewFrame = await _waitForNewPresentedFrame(
+      primary,
+      lastTime: lastT,
+      lastDecoded: lastDecoded,
+    );
+    final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
+    if (gotNewFrame) {
+      paintFrame();
+      _requestCanvasFrame(canvasStream);
+      liveFrameCount++;
+      lastLiveFrameWallMs = wallMs;
+      lastT = primary?.currentTime.toDouble() ?? lastT;
+      lastDecoded = await _decodedFrameCount(primary ?? videoList.first) ?? lastDecoded;
+      if (liveFrameCount % 8 == 0) {
+        try {
+          js_util.callMethod(recorder, 'requestData', const []);
+        } catch (_) {}
+      }
     }
 
     final t = primary != null ? primary.currentTime.toDouble() : 0.0;
     maxRecordedSec = math.max(maxRecordedSec, t);
-    final wallMs = DateTime.now().difference(wallStart).inMilliseconds;
-    if (wallMs > (_ngmyIsMobileBrowser() ? 22000 : 18000) && t < 0.04) {
-      debugPrint('[studio export] video frozen at t=$t — aborting realtime attempt');
+    if (wallMs > (_ngmyIsMobileBrowser() ? 14000 : 12000) && liveFrameCount < 8) {
+      debugPrint('[studio export] picture frozen (liveFrames=$liveFrameCount t=$t) — aborting');
       abortedFrozen = true;
       break;
     }
     if (wallMs >= startupGraceMs) {
-      if ((t - lastT).abs() >= 0.006) {
-        lastT = t;
+      if (gotNewFrame) {
         lastProgressWallMs = wallMs;
       }
     } else {
-      lastT = t;
       lastProgressWallMs = wallMs;
     }
 
@@ -1370,6 +1463,9 @@ Future<List<html.Blob>> _recordCanvasExport({
 
     final ended = primary != null && (primary.ended || primary.currentTime >= durationSec - 0.05);
     if (wallMs >= durationMs || ended || (wallMs - lastProgressWallMs) > stallLimitMs) {
+      break;
+    }
+    if (liveFrameCount > 12 && wallMs - lastLiveFrameWallMs > stallLimitMs) {
       break;
     }
   }
@@ -1382,21 +1478,16 @@ Future<List<html.Blob>> _recordCanvasExport({
     _exportAudioElement!.pause();
   }
 
-  await _awaitWallTime(wallStart, durationMs);
-
-  paintFrame();
-  _requestCanvasFrame(canvasStream);
-  await Future<void>.delayed(Duration(milliseconds: appleMobile ? 180 : 120));
+  await Future<void>.delayed(Duration(milliseconds: appleMobile ? 180 : 80));
   try {
     js_util.callMethod(recorder, 'requestData', const []);
   } catch (_) {}
   await _stopRecorderDrain(recorder, done);
   if (_exportWasCancelled) return const [];
-  final minRecorded = math.min(0.45, durationSec * 0.08);
-  final recordedWallSec = DateTime.now().difference(wallStart).inMilliseconds / 1000.0;
-  if (abortedFrozen || (recordedWallSec < durationSec * 0.82 && maxRecordedSec < minRecorded)) {
+  final minLiveFrames = math.max(8, (durationSec * 6).round());
+  if (abortedFrozen || liveFrameCount < minLiveFrames) {
     debugPrint(
-      '[studio export] rejected realtime recording: maxTime=$maxRecordedSec wall=${recordedWallSec.toStringAsFixed(1)}s need=$minRecorded frozen=$abortedFrozen',
+      '[studio export] rejected still export: liveFrames=$liveFrameCount need=$minLiveFrames t=$maxRecordedSec',
     );
     return const [];
   }
@@ -1569,6 +1660,10 @@ void _appendVideoAudioTracks(html.MediaStream composed, html.VideoElement video)
 }
 
 Future<void> _attachExportAudio(html.MediaStream recordStream, html.VideoElement primary) async {
+  if (_ngmyIsAppleMobileBrowser()) {
+    _appendVideoAudioTracks(recordStream, primary);
+    return;
+  }
   final audioEl = await _ensureExportAudioElement(primary);
   _appendVideoAudioTracks(recordStream, audioEl ?? primary);
 }
@@ -1591,7 +1686,18 @@ html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFp
   for (var attempt = 0; attempt < 4; attempt++) {
     try {
       if (element is html.CanvasElement) {
-        final stream = element.captureStream(fps);
+        // fps=0 + requestFrame: only emit a sample when we painted a new
+        // video frame. captureStream(30) would stamp a frozen canvas 30 times
+        // a second and Photos would show a moving bar on a still picture.
+        html.MediaStream? stream;
+        try {
+          stream = element.captureStream(0);
+        } catch (_) {
+          stream = element.captureStream(fps);
+        }
+        if (stream.getVideoTracks().isEmpty && fps > 0) {
+          stream = element.captureStream(fps);
+        }
         if (stream.getVideoTracks().isNotEmpty) return stream;
       } else if (element is html.VideoElement) {
         final stream = element.captureStream();
@@ -1601,7 +1707,6 @@ html.MediaStream? _safeCaptureStream(dynamic element, {int fps = _exportCanvasFp
       debugPrint('[studio export] captureStream attempt ${attempt + 1}: $e');
     }
     if (attempt < 3) {
-      // Safari sometimes needs a painted frame before captureStream works.
       try {
         if (element is html.CanvasElement) {
           element.context2D.fillRect(0, 0, 1, 1);
@@ -1928,7 +2033,7 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       v.pause();
       await _seekVideoTo(v, 0, fast: true);
     }
-    if (primaryVideo != null) {
+    if (primaryVideo != null && !_ngmyIsAppleMobileBrowser()) {
       try {
         await _ensureExportAudioElement(primaryVideo).timeout(Duration(seconds: _ngmyIsMobileBrowser() ? 4 : 6));
       } catch (e) {
