@@ -1529,6 +1529,15 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     );
   }
 
+  void _moveLink(int index, int delta) {
+    final next = index + delta;
+    if (next < 0 || next >= _doc.links.length) return;
+    setState(() {
+      final item = _doc.links.removeAt(index);
+      _doc.links.insert(next, item);
+    });
+  }
+
   Widget _linksTab(NgmyHubTheme t) {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -1537,7 +1546,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
           t,
           title: 'Link cards',
           subtitle:
-              'Photo, name, and URL — tap a card to edit. Guests tap these on your bio page.',
+              'Photo, name, and URL. Use the arrows to pick which link shows first, second, and so on on your live page.',
           child: Column(
             children: [
               if (_doc.links.isEmpty)
@@ -1715,6 +1724,27 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                       fontSize: 10,
                       letterSpacing: 0.8,
                     ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Move up — show this link first',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: index == 0 ? null : () => _moveLink(index, -1),
+                  icon: Icon(
+                    Icons.keyboard_arrow_up_rounded,
+                    color: index == 0 ? t.muted.withValues(alpha: 0.35) : _kBioAccent,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Move down',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: index >= _doc.links.length - 1 ? null : () => _moveLink(index, 1),
+                  icon: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: index >= _doc.links.length - 1
+                        ? t.muted.withValues(alpha: 0.35)
+                        : _kBioAccent,
                   ),
                 ),
                 const Spacer(),
