@@ -10,14 +10,10 @@ class NgmyBioLinkIconChoice {
 
 /// Large set of Material icons for social apps, messaging, commerce, and general links.
 const List<NgmyBioLinkIconChoice> kNgmyBioLinkIcons = [
-  NgmyBioLinkIconChoice('Facebook', Icons.facebook),
-  NgmyBioLinkIconChoice('Instagram', Icons.camera_alt_rounded),
   NgmyBioLinkIconChoice('Messenger', Icons.messenger_outline_rounded),
   NgmyBioLinkIconChoice('WhatsApp', Icons.chat_rounded),
   NgmyBioLinkIconChoice('Telegram', Icons.send_rounded),
   NgmyBioLinkIconChoice('X / Twitter', Icons.alternate_email_rounded),
-  NgmyBioLinkIconChoice('TikTok', Icons.music_note_rounded),
-  NgmyBioLinkIconChoice('YouTube', Icons.play_circle_filled_rounded),
   NgmyBioLinkIconChoice('LinkedIn', Icons.work_rounded),
   NgmyBioLinkIconChoice('Discord', Icons.headset_mic_rounded),
   NgmyBioLinkIconChoice('Snapchat', Icons.flash_on_rounded),
@@ -107,6 +103,65 @@ IconData? ngmyBioLinkIconFromCodePoint(int codePoint) {
     if (choice.codePoint == codePoint) return choice.icon;
   }
   return Icons.link_rounded;
+}
+
+/// Picture icons shown at the bottom of the link-icon picker. These are free
+/// and do not count toward the 2 gallery-photo limit.
+class NgmyBioBrandLinkIcon {
+  const NgmyBioBrandLinkIcon({required this.id, required this.label, required this.asset});
+  final String id;
+  final String label;
+  final String asset;
+}
+
+const List<NgmyBioBrandLinkIcon> kNgmyBioBrandLinkIcons = [
+  NgmyBioBrandLinkIcon(id: 'instagram', label: 'Instagram', asset: 'assets/bio_link_icons/instagram.png'),
+  NgmyBioBrandLinkIcon(id: 'youtube', label: 'YouTube', asset: 'assets/bio_link_icons/youtube.png'),
+  NgmyBioBrandLinkIcon(id: 'tiktok', label: 'TikTok', asset: 'assets/bio_link_icons/tiktok.png'),
+  NgmyBioBrandLinkIcon(id: 'facebook', label: 'Facebook', asset: 'assets/bio_link_icons/facebook.png'),
+];
+
+String? ngmyBioBrandLinkAsset(String id) {
+  final clean = id.trim().toLowerCase();
+  if (clean.isEmpty) return null;
+  for (final brand in kNgmyBioBrandLinkIcons) {
+    if (brand.id == clean) return brand.asset;
+  }
+  return null;
+}
+
+String? ngmyBioBrandAssetForLink({
+  required int iconCodePoint,
+  required String iconAsset,
+}) {
+  return ngmyBioBrandLinkAsset(iconAsset) ??
+      ngmyBioBrandLinkAsset(ngmyBioBrandIdFromLegacyCodePoint(iconCodePoint));
+}
+
+/// Old Material icons for these brands become the new picture icons.
+String ngmyBioBrandIdFromLegacyCodePoint(int codePoint) {
+  if (codePoint == Icons.facebook.codePoint) return 'facebook';
+  if (codePoint == Icons.camera_alt_rounded.codePoint) return 'instagram';
+  if (codePoint == Icons.music_note_rounded.codePoint) return 'tiktok';
+  if (codePoint == Icons.play_circle_filled_rounded.codePoint) return 'youtube';
+  return '';
+}
+
+Widget ngmyBioCircularBrandIcon(String asset, {required double size}) {
+  return SizedBox(
+    width: size,
+    height: size,
+    child: ClipOval(
+      child: Image.asset(
+        asset,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.high,
+        errorBuilder: (_, _, _) => Icon(Icons.link_rounded, size: size * 0.5),
+      ),
+    ),
+  );
 }
 
 const int kNgmyBioMaxLinkGalleryPhotos = 2;

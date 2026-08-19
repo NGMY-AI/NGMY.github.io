@@ -25,6 +25,15 @@ import 'ngmy_qr_download.dart';
 
 const _kBioAccent = Color(0xFFB8860B);
 
+class _LinkIconPick {
+  const _LinkIconPick.clear() : codePoint = 0, brandId = '', clear = true;
+  const _LinkIconPick.material(this.codePoint) : brandId = '', clear = false;
+  const _LinkIconPick.brand(this.brandId) : codePoint = 0, clear = false;
+  final bool clear;
+  final int codePoint;
+  final String brandId;
+}
+
 /// Bio page editor — opened from Menu Studio.
 class NgmyBioStudioEditor extends StatefulWidget {
   const NgmyBioStudioEditor({
@@ -628,6 +637,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       setState(() {
         link.imageBase64 = encoded;
         link.iconCodePoint = 0;
+        link.iconAsset = '';
       });
     } catch (e) {
       if (mounted) {
@@ -645,7 +655,56 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
   }
 
   Future<void> _openLinkIconPicker(NgmyBioLink link) async {
-    final picked = await showModalBottomSheet<int>(
+    const gridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 4,
+      mainAxisSpacing: 8,
+      crossAxisSpacing: 8,
+      childAspectRatio: 0.88,
+    );
+    Widget tile({
+      required bool selected,
+      required VoidCallback onTap,
+      required Widget glyph,
+      required String label,
+    }) {
+      final t = NgmyHubTheme.of(context);
+      return InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            color: selected ? _kBioAccent.withValues(alpha: 0.16) : t.fieldFill,
+            border: Border.all(
+              color: selected ? _kBioAccent : t.border,
+              width: selected ? 1.6 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              glyph,
+              const SizedBox(height: 6),
+              Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: t.muted,
+                  height: 1.15,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final picked = await showModalBottomSheet<_LinkIconPick>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -690,7 +749,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                         ),
                         if (link.hasIcon)
                           TextButton(
-                            onPressed: () => Navigator.pop(ctx, 0),
+                            onPressed: () => Navigator.pop(ctx, const _LinkIconPick.clear()),
                             child: const Text('Clear'),
                           ),
                         IconButton(
@@ -711,65 +770,74 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                     ),
                   ),
                   Expanded(
-                    child: GridView.builder(
+                    child: CustomScrollView(
                       controller: scrollController,
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        mainAxisSpacing: 8,
-                        crossAxisSpacing: 8,
-                        childAspectRatio: 0.88,
-                      ),
-                      itemCount: kNgmyBioLinkIcons.length,
-                      itemBuilder: (_, i) {
-                        final choice = kNgmyBioLinkIcons[i];
-                        final selected =
-                            link.iconCodePoint == choice.codePoint &&
-                                !link.hasGalleryImage;
-                        return InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () => Navigator.pop(ctx, choice.codePoint),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(14),
-                              color: selected
-                                  ? _kBioAccent.withValues(alpha: 0.16)
-                                  : t.fieldFill,
-                              border: Border.all(
-                                color: selected
-                                    ? _kBioAccent
-                                    : t.border,
-                                width: selected ? 1.6 : 1,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  choice.icon,
-                                  color: selected ? _kBioAccent : t.title,
-                                  size: 26,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  choice.label,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: t.muted,
-                                    height: 1.15,
+                      slivers: [
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                          sliver: SliverGrid(
+                            gridDelegate: gridDelegate,
+                            delegate: SliverChildBuilderDelegate(
+                              (_, i) {
+                                final choice = kNgmyBioLinkIcons[i];
+                                final selected = link.iconCodePoint == choice.codePoint &&
+                                    !link.hasGalleryImage &&
+                                    !link.hasBrandIcon;
+                                return tile(
+                                  selected: selected,
+                                  onTap: () => Navigator.pop(
+                                    ctx,
+                                    _LinkIconPick.material(choice.codePoint),
                                   ),
-                                ),
-                              ],
+                                  glyph: Icon(
+                                    choice.icon,
+                                    color: selected ? _kBioAccent : t.title,
+                                    size: 26,
+                                  ),
+                                  label: choice.label,
+                                );
+                              },
+                              childCount: kNgmyBioLinkIcons.length,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                            child: Text(
+                              'Picture icons',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 13,
+                                color: t.title,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 28),
+                          sliver: SliverGrid(
+                            gridDelegate: gridDelegate,
+                            delegate: SliverChildBuilderDelegate(
+                              (_, i) {
+                                final brand = kNgmyBioBrandLinkIcons[i];
+                                final selected = link.iconAsset == brand.id &&
+                                    !link.hasGalleryImage;
+                                return tile(
+                                  selected: selected,
+                                  onTap: () => Navigator.pop(
+                                    ctx,
+                                    _LinkIconPick.brand(brand.id),
+                                  ),
+                                  glyph: ngmyBioCircularBrandIcon(brand.asset, size: 36),
+                                  label: brand.label,
+                                );
+                              },
+                              childCount: kNgmyBioBrandLinkIcons.length,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -780,8 +848,11 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       },
     );
     if (picked == null || !mounted) return;
-    if (picked == 0) {
-      setState(() => link.iconCodePoint = 0);
+    if (picked.clear) {
+      setState(() {
+        link.iconCodePoint = 0;
+        link.iconAsset = '';
+      });
       return;
     }
     if (link.hasGalleryImage) {
@@ -789,8 +860,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     }
     if (!mounted) return;
     setState(() {
-      link.iconCodePoint = picked;
       link.imageBase64 = '';
+      if (picked.brandId.isNotEmpty) {
+        link.iconAsset = picked.brandId;
+        link.iconCodePoint = 0;
+      } else {
+        link.iconCodePoint = picked.codePoint;
+        link.iconAsset = '';
+      }
     });
   }
 
@@ -1679,7 +1756,15 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
 
   Widget _linkEditor(NgmyHubTheme t, int index, NgmyBioLink link) {
     final hasImage = link.hasGalleryImage;
-    final iconData = ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
+    final brandAsset = hasImage
+        ? null
+        : ngmyBioBrandAssetForLink(
+            iconCodePoint: link.iconCodePoint,
+            iconAsset: link.iconAsset,
+          );
+    final iconData = brandAsset != null
+        ? null
+        : ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
     final hasUrl = link.url.trim().isNotEmpty;
     final galleryUsed = _linkGalleryPhotoCount();
     return Container(
@@ -1825,7 +1910,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                                     filterQuality: FilterQuality.high,
                                   ),
                                 )
-                              : iconData != null
+                              : brandAsset != null
+                                  ? ngmyBioCircularBrandIcon(brandAsset, size: 72)
+                                  : iconData != null
                                   ? Icon(
                                       iconData,
                                       color: _kBioAccent,

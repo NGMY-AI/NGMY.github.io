@@ -1320,20 +1320,28 @@ class NgmyBioPreview extends StatelessWidget {
     final thumbSize = hasRing ? (compactPad ? 26.0 : 30.0) : (compactPad ? 36.0 : 42.0);
     final displayTitle = isGlass && isDark ? rawTitle.toUpperCase() : rawTitle;
 
-    final linkIcon = link.hasGalleryImage
+    final brandAsset = link.hasGalleryImage
+        ? null
+        : ngmyBioBrandAssetForLink(
+            iconCodePoint: link.iconCodePoint,
+            iconAsset: link.iconAsset,
+          );
+    final linkIcon = link.hasGalleryImage || brandAsset != null
         ? null
         : ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
     final linkRing = ngmyBioRingById(link.ringStyleId);
     Widget thumbCore = link.imageBase64.isNotEmpty
         ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
-        : ColoredBox(
-            color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
-            child: Icon(
-              linkIcon ?? Icons.link_rounded,
-              color: tpl.subtitleColor,
-              size: compactPad ? 16 : 18,
-            ),
-          );
+        : brandAsset != null
+            ? ngmyBioCircularBrandIcon(brandAsset, size: thumbSize)
+            : ColoredBox(
+                color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
+                child: Icon(
+                  linkIcon ?? Icons.link_rounded,
+                  color: tpl.subtitleColor,
+                  size: compactPad ? 16 : 18,
+                ),
+              );
     thumbCore = SizedBox(
       width: thumbSize,
       height: thumbSize,

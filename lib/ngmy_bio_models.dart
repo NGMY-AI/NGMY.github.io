@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'ngmy_bio_link_icons.dart';
 import 'ngmy_menu_models.dart';
 
 String ngmyBioNewId() => 'bio_${DateTime.now().microsecondsSinceEpoch}';
@@ -22,6 +23,7 @@ class NgmyBioLink {
     this.url = '',
     this.imageBase64 = '',
     this.iconCodePoint = 0,
+    this.iconAsset = '',
     this.ringStyleId = 'none',
     this.enabled = true,
   });
@@ -34,12 +36,16 @@ class NgmyBioLink {
   /// Material Icons code point. `0` means no icon. Gallery photo wins over icon.
   int iconCodePoint;
 
+  /// Built-in circular brand picture (`instagram`, `youtube`, `tiktok`, `facebook`).
+  String iconAsset;
+
   /// Same ring ids as the profile photo (`none`, `glow_blue`, `gold`, …).
   String ringStyleId;
   bool enabled;
 
   bool get hasGalleryImage => imageBase64.trim().isNotEmpty;
-  bool get hasIcon => iconCodePoint != 0;
+  bool get hasBrandIcon => iconAsset.trim().isNotEmpty;
+  bool get hasIcon => iconCodePoint != 0 || hasBrandIcon;
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -47,26 +53,33 @@ class NgmyBioLink {
     'url': url,
     'imageBase64': imageBase64,
     'iconCodePoint': iconCodePoint,
+    'iconAsset': iconAsset,
     'ringStyleId': ringStyleId,
     'enabled': enabled,
   };
 
-  factory NgmyBioLink.fromJson(Map<String, dynamic> json) => NgmyBioLink(
-    id: (json['id'] ?? ngmyBioNewId()).toString(),
-    title: (json['title'] ?? '').toString(),
-    url: (json['url'] ?? '').toString(),
-    imageBase64: (json['imageBase64'] ?? '').toString(),
-    iconCodePoint: () {
-      final raw = json['iconCodePoint'];
-      if (raw is int) return raw;
-      return int.tryParse(raw?.toString() ?? '') ?? 0;
-    }(),
-    ringStyleId: () {
-      final raw = (json['ringStyleId'] ?? 'none').toString().trim();
-      return raw.isEmpty ? 'none' : raw;
-    }(),
-    enabled: json['enabled'] != false,
-  );
+  factory NgmyBioLink.fromJson(Map<String, dynamic> json) {
+    final rawCode = json['iconCodePoint'];
+    var code = rawCode is int ? rawCode : int.tryParse(rawCode?.toString() ?? '') ?? 0;
+    var asset = (json['iconAsset'] ?? '').toString().trim();
+    if (asset.isEmpty) {
+      asset = ngmyBioBrandIdFromLegacyCodePoint(code);
+      if (asset.isNotEmpty) code = 0;
+    } else if (ngmyBioBrandLinkAsset(asset) == null) {
+      asset = '';
+    }
+    final ringRaw = (json['ringStyleId'] ?? 'none').toString().trim();
+    return NgmyBioLink(
+      id: (json['id'] ?? ngmyBioNewId()).toString(),
+      title: (json['title'] ?? '').toString(),
+      url: (json['url'] ?? '').toString(),
+      imageBase64: (json['imageBase64'] ?? '').toString(),
+      iconCodePoint: code,
+      iconAsset: asset,
+      ringStyleId: ringRaw.isEmpty ? 'none' : ringRaw,
+      enabled: json['enabled'] != false,
+    );
+  }
 
   NgmyBioLink copy() => NgmyBioLink.fromJson(toJson());
 }
