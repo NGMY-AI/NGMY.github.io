@@ -59440,10 +59440,13 @@ cCP:function cCP(a){this.a=a},
 cDB:function cDB(a,b){this.a=a
 this.b=b},
 cCR:function cCR(a){this.a=a},
-cDo:function cDo(a){this.a=a},
-cDn:function cDn(a,b,c){this.a=a
-this.b=b
-this.c=c},
+cDo:function cDo(a,b){this.a=a
+this.b=b},
+cDn:function cDn(a,b,c,d){var _=this
+_.a=a
+_.b=b
+_.c=c
+_.d=d},
 cDk:function cDk(a){this.a=a},
 cDl:function cDl(a){this.a=a},
 cDm:function cDm(a,b,c){this.a=a
@@ -256349,7 +256352,7 @@ Kk(a){return this.bJV(a)},
 bJV(a){var s=0,r=A.j(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f
 var $async$Kk=A.e(function(b,c){if(b===1){o.push(c)
 s=p}for(;;)switch(s){case 0:g=B.b.i(a.d).length!==0
-if(!g&&n.aEs(a.a)>=2){i=n.c
+if(!g&&!n.a.d&&n.aEs(a.a)>=2){i=n.c
 if(i==null){s=1
 break}i.D(t.q).f.O(B.dbe)
 s=1
@@ -256398,7 +256401,7 @@ var $async$SK=A.e(function(b,c){if(b===1)return A.f(c,r)
 for(;;)switch(s){case 0:n=p.c
 n.toString
 s=3
-return A.b(A.cD(B.K,new A.cDo(a),n,!0,!0,!0,null,!1,!1,t.S),$async$SK)
+return A.b(A.cD(B.K,new A.cDo(p,a),n,!0,!0,!0,null,!1,!1,t.S),$async$SK)
 case 3:o=c
 if(o==null||p.c==null){s=1
 break}if(o===0){p.n(new A.cDp(a))
@@ -256543,7 +256546,9 @@ else q=A.D(a4).ax.a===B.C?B.c.k(0.48):B.bm
 q=A.aI(c,c,c,c,A.W(B.a5a,q,c,c,c),c,c,c,new A.cD2(d,a9),c,c,c,c,"Link picture ring",c)
 m=t.p
 q=A.E(A.a([p,B.d3,o,n,B.b2,q,A.aI(c,c,c,c,A.W(B.eA,A.D(a4).ax.a===B.C?B.c.k(0.48):B.bm,c,c,c),c,c,c,new A.cD3(d,a8),c,c,c,c,"Remove link",c)],m),B.n,c,B.i,B.k,0,c,c)
-p=A.d("Gallery photos on links: "+a2+" / 2  \xb7  Icons are free",c,c,c,c,c,c,A.l(c,c,A.D(a4).ax.a===B.C?B.c.k(0.48):B.bm,c,c,c,c,c,c,c,c,11,c,c,B.Y,c,c,!0,c,c,c,c,c,c,c,c),c,c,c)
+p="Gallery photos on links: "+a2
+p=d.a.d?p+"  \xb7  No limit for admin  \xb7  Icons are free":p+" / 2  \xb7  Icons are free"
+p=A.d(p,c,c,c,c,c,c,A.l(c,c,A.D(a4).ax.a===B.C?B.c.k(0.48):B.bm,c,c,c,c,c,c,c,c,11,c,c,B.Y,c,c,!0,c,c,c,c,c,c,c,c),c,c,c)
 o=b?new A.cD4(d,a9):c
 n=a9.f
 l=A.e8F(n).e
@@ -256680,15 +256685,16 @@ A.cCR.prototype={
 $0(){return this.a.d=""},
 $S:0}
 A.cDo.prototype={
-$1(a){return A.pt(new A.cDn(new A.iu(a),this.a,a),!0,0.72,0.92,0.45,!1,null)},
+$1(a){return A.pt(new A.cDn(this.a,new A.iu(a),this.b,a),!0,0.72,0.92,0.45,!1,null)},
 $S:120}
 A.cDn.prototype={
-$2(a,b){var s,r=this,q=null,p=r.a,o=p.a,n=A.D(o).ax.a===B.C?B.c7:B.bH,m=A.J(A.D(o).ax.a===B.C?B.c.k(0.12):B.aI,B.q,1),l=A.p(q,q,B.j,q,q,new A.n((A.D(o).ax.a===B.C?B.c.k(0.48):B.bm).k(0.45),q,q,A.m(999),q,q,B.o),q,4,q,q,q,q,q,40),k=t.p,j=A.a([B.aVK],k),i=r.b
-if(i.e!==0)j.push(A.c5(!1,B.JY,q,q,!0,q,q,new A.cDk(r.c),q,q))
-s=r.c
-j.push(A.aI(q,q,q,q,B.lu,q,q,q,new A.cDl(s),q,q,q,q,q,q))
-j=A.E(j,B.n,q,B.i,B.k,0,q,q)
-return A.p(q,A.u(A.a([B.T,l,new A.A(B.uX,j,q),new A.A(B.uV,A.d("Icons are free. Gallery photos are limited to 2 per Bio.",q,q,q,q,q,q,A.l(q,q,A.D(o).ax.a===B.C?B.c.k(0.48):B.bm,q,q,q,q,q,q,q,q,12.5,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q,q),q),A.B(A.hr(b,B.F,B.d7o,new A.cDm(i,s,p),89,B.a1j,q,!1),1)],k),B.n,q,B.i,B.k,0,B.p),B.j,q,q,new A.n(n,q,m,B.u4,q,q,B.o),q,q,q,q,q,q,q,q)},
+$2(a,b){var s,r,q=this,p=null,o=q.b,n=o.a,m=A.D(n).ax.a===B.C?B.c7:B.bH,l=A.J(A.D(n).ax.a===B.C?B.c.k(0.12):B.aI,B.q,1),k=A.p(p,p,B.j,p,p,new A.n((A.D(n).ax.a===B.C?B.c.k(0.48):B.bm).k(0.45),p,p,A.m(999),p,p,B.o),p,4,p,p,p,p,p,40),j=t.p,i=A.a([B.aVK],j),h=q.c
+if(h.e!==0)i.push(A.c5(!1,B.JY,p,p,!0,p,p,new A.cDk(q.d),p,p))
+s=q.d
+i.push(A.aI(p,p,p,p,B.lu,p,p,p,new A.cDl(s),p,p,p,p,p,p))
+i=A.E(i,B.n,p,B.i,B.k,0,p,p)
+r=q.a.a.d?"Icons are free. Admin can add a gallery photo on every link.":"Icons are free. Gallery photos are limited to 2 per Bio."
+return A.p(p,A.u(A.a([B.T,k,new A.A(B.uX,i,p),new A.A(B.uV,A.d(r,p,p,p,p,p,p,A.l(p,p,A.D(n).ax.a===B.C?B.c.k(0.48):B.bm,p,p,p,p,p,p,p,p,12.5,p,p,p,p,p,!0,p,p,p,p,p,p,p,p),p,p,p),p),A.B(A.hr(b,B.F,B.d7o,new A.cDm(h,s,o),89,B.a1j,p,!1),1)],j),B.n,p,B.i,B.k,0,B.p),B.j,p,p,new A.n(m,p,l,B.u4,p,p,B.o),p,p,p,p,p,p,p,p)},
 $S:121}
 A.cDk.prototype={
 $0(){A.a0(this.a,!1).M(0)
