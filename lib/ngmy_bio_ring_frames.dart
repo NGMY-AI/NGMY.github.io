@@ -2,6 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+double ngmyBioRingFrameOuterSize(String ringId, double coreSize) {
+  if (ringId == 'none' || ringId.trim().isEmpty) return coreSize;
+  final pad = math.max(coreSize * 0.52, 16.0);
+  return coreSize + pad * 2;
+}
+
 /// Premium profile ring frames — each ring has a distinct jewelry-style design.
 class NgmyBioRingFrame extends StatefulWidget {
   const NgmyBioRingFrame({
@@ -40,22 +46,23 @@ class _NgmyBioRingFrameState extends State<NgmyBioRingFrame> with SingleTickerPr
   Widget build(BuildContext context) {
     if (widget.ringId == 'none') return widget.child;
 
-    // Leave room for glow, ticks, and orbit dots so the ring is never boxed.
-    final pad = math.max(widget.size * 0.52, 16.0);
-    final outer = widget.size + pad * 2;
+    final outer = ngmyBioRingFrameOuterSize(widget.ringId, widget.size);
     return SizedBox(
       width: outer,
       height: outer,
-      child: AnimatedBuilder(
-        animation: _tick,
-        builder: (context, _) => CustomPaint(
-          painter: NgmyBioRingFramePainter(
-            ringId: widget.ringId,
-            accent: widget.accent,
-            phase: _tick.value,
-            coreSize: widget.size,
+      child: ClipOval(
+        clipBehavior: Clip.antiAlias,
+        child: AnimatedBuilder(
+          animation: _tick,
+          builder: (context, _) => CustomPaint(
+            painter: NgmyBioRingFramePainter(
+              ringId: widget.ringId,
+              accent: widget.accent,
+              phase: _tick.value,
+              coreSize: widget.size,
+            ),
+            child: Center(child: widget.child),
           ),
-          child: Center(child: widget.child),
         ),
       ),
     );

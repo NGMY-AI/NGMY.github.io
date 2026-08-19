@@ -55,6 +55,7 @@ class NgmyBioPreview extends StatelessWidget {
             child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight),
           )
         : SingleChildScrollView(
+            clipBehavior: Clip.none,
             padding: EdgeInsets.only(bottom: pad + 20),
             child: _layoutBody(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: 0),
           );
@@ -444,6 +445,7 @@ class NgmyBioPreview extends StatelessWidget {
         intro,
         Expanded(
           child: SingleChildScrollView(
+            clipBehavior: Clip.none,
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -496,6 +498,7 @@ class NgmyBioPreview extends StatelessWidget {
           top,
           Expanded(
             child: SingleChildScrollView(
+              clipBehavior: Clip.none,
               physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -743,6 +746,7 @@ class NgmyBioPreview extends StatelessWidget {
         intro,
         Expanded(
           child: SingleChildScrollView(
+            clipBehavior: Clip.none,
             physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1283,15 +1287,17 @@ class NgmyBioPreview extends StatelessWidget {
   }
 
   Widget _avatar(String ref, double size, NgmyBioRingStyle ring) {
-    final inner = ClipOval(
-      child: ref.isNotEmpty
-          ? _bioImage(ref, fit: BoxFit.cover, width: size, height: size)
-          : Container(
-              width: size,
-              height: size,
-              color: const Color(0xFFE5E7EB),
-              child: Icon(Icons.person_rounded, size: size * 0.5, color: const Color(0xFF9CA3AF)),
-            ),
+    final inner = SizedBox(
+      width: size,
+      height: size,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFE5E7EB)),
+        child: ClipOval(
+          child: ref.isNotEmpty
+              ? _bioImage(ref, fit: BoxFit.cover, width: size, height: size)
+              : Icon(Icons.person_rounded, size: size * 0.5, color: const Color(0xFF9CA3AF)),
+        ),
+      ),
     );
     return NgmyBioRingFrame(
       ringId: ring.id,
@@ -1317,75 +1323,73 @@ class NgmyBioPreview extends StatelessWidget {
         ? null
         : ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
     final linkRing = ngmyBioRingById(link.ringStyleId);
-    Widget thumb = ClipOval(
-      child: link.imageBase64.isNotEmpty
-          ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
-          : Container(
-              width: thumbSize,
-              height: thumbSize,
-              color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
-              child: Icon(
-                linkIcon ?? Icons.link_rounded,
-                color: tpl.subtitleColor,
-                size: compactPad ? 16 : 18,
-              ),
+    Widget thumbCore = link.imageBase64.isNotEmpty
+        ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
+        : ColoredBox(
+            color: isDark ? Colors.white.withValues(alpha: 0.12) : tpl.subtitleColor.withValues(alpha: 0.15),
+            child: Icon(
+              linkIcon ?? Icons.link_rounded,
+              color: tpl.subtitleColor,
+              size: compactPad ? 16 : 18,
             ),
+          );
+    thumbCore = SizedBox(
+      width: thumbSize,
+      height: thumbSize,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(shape: BoxShape.circle),
+        child: ClipOval(child: thumbCore),
+      ),
     );
-    thumb = NgmyBioRingFrame(
+    final thumb = NgmyBioRingFrame(
       ringId: linkRing.id,
       size: thumbSize,
       accent: linkRing.auraColor ?? tpl.accent,
-      child: SizedBox(width: thumbSize, height: thumbSize, child: thumb),
+      child: thumbCore,
     );
+    final ringOuter = ngmyBioRingFrameOuterSize(linkRing.id, thumbSize);
 
-    final content = Row(
-      children: [
-        thumb,
-        SizedBox(width: compactPad ? 10 : 12),
-        Expanded(
-          child: Text(
-            displayTitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.left,
-            style: TextStyle(
-              fontFamily: bioSite ? 'Georgia' : (tpl.serifTitle ? 'Georgia' : null),
-              fontSize: compactPad ? 12 : 14,
-              fontWeight: FontWeight.w700,
-              letterSpacing: isGlass && isDark ? 0.6 : (bioSite ? 0.15 : 0),
-              height: 1.2,
-              color: tpl.linkTextColor,
-            ),
-          ),
-        ),
-      ],
+    final titleStyle = TextStyle(
+      fontFamily: bioSite ? 'Georgia' : (tpl.serifTitle ? 'Georgia' : null),
+      fontSize: compactPad ? 12 : 14,
+      fontWeight: FontWeight.w700,
+      letterSpacing: isGlass && isDark ? 0.6 : (bioSite ? 0.15 : 0),
+      height: 1.2,
+      color: tpl.linkTextColor,
+    );
+    final title = Text(
+      displayTitle,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: TextAlign.left,
+      style: titleStyle,
     );
 
     final decoration = _linkDecoration(tpl, radius);
     final borderRadius = BorderRadius.circular(radius.clamp(8, 999));
-    final vPad = hasRing ? (compactPad ? 12.0 : 16.0) : (compactPad ? 8.0 : 10.0);
-    final padded = Padding(
-      padding: EdgeInsets.symmetric(horizontal: compactPad ? 10 : 14, vertical: vPad),
-      child: content,
+    final barH = math.max(ringOuter, compactPad ? 48.0 : 56.0);
+
+    // Ring sits on top of the bar — never inside a ClipRRect/backdrop (that boxes it on the public web page).
+    final card = SizedBox(
+      height: barH,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(decoration: decoration),
+          ),
+          Padding(
+            padding: EdgeInsets.only(left: ringOuter + (compactPad ? 8 : 10), right: compactPad ? 12 : 16),
+            child: Align(alignment: Alignment.centerLeft, child: title),
+          ),
+          thumb,
+        ],
+      ),
     );
 
-    Widget card;
-    if (tpl.linkStyle == NgmyBioLinkStyle.glass && !lightweight) {
-      card = ClipRRect(
-        clipBehavior: hasRing ? Clip.none : Clip.antiAlias,
-        borderRadius: borderRadius,
-        child: ngmyClipBackdrop(
-              borderRadius: BorderRadius.zero,
-              sigma: 16,
-              child: DecoratedBox(decoration: decoration, child: padded),
-        ),
-      );
-    } else {
-      card = DecoratedBox(decoration: decoration, child: padded);
-    }
-
     return Padding(
-      padding: EdgeInsets.only(bottom: compactPad ? 10 : 12),
+      padding: EdgeInsets.only(bottom: compactPad ? 10 : 14),
       child: interactive
           ? _BioLinkTap(
               onTap: () => _openUrl(link.url),

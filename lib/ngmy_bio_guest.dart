@@ -47,23 +47,15 @@ class NgmyGuestBioHostScreen extends StatefulWidget {
   State<NgmyGuestBioHostScreen> createState() => _NgmyGuestBioHostScreenState();
 }
 
-class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with SingleTickerProviderStateMixin {
+class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
   NgmyBioDocument? _doc;
   String? _error;
   bool _loading = true;
-  late final AnimationController _unfold;
 
   @override
   void initState() {
     super.initState();
-    _unfold = AnimationController(vsync: this, duration: const Duration(milliseconds: 950));
     unawaited(_load());
-  }
-
-  @override
-  void dispose() {
-    _unfold.dispose();
-    super.dispose();
   }
 
   void _applyTemplateChrome(NgmyBioDocument doc) {
@@ -79,7 +71,6 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
       _error = null;
       _doc = null;
     });
-    _unfold.reset();
     ngmyApplyBioPageChrome(Colors.white);
     SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(Colors.white));
 
@@ -95,7 +86,6 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
             _loading = false;
           });
           _applyTemplateChrome(doc);
-          await _unfold.forward();
           return;
         }
         if (attempt == 0) await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -146,14 +136,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
       value: ngmyBioSystemUiOverlay(chrome),
       child: Scaffold(
         backgroundColor: chrome,
-        body: AnimatedBuilder(
-          animation: _unfold,
-          builder: (context, child) {
-            final t = Curves.easeOutCubic.transform(_unfold.value);
-            return Opacity(opacity: t.clamp(0.0, 1.0), child: child);
-          },
-          child: NgmyBioPreview(document: _doc!, fullBleed: true),
-        ),
+        body: NgmyBioPreview(document: _doc!, fullBleed: true),
       ),
     );
   }
