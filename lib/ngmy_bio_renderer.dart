@@ -1312,8 +1312,6 @@ class NgmyBioPreview extends StatelessWidget {
     final isDark = _isDarkBg(tpl.pageBg);
     final bioSite = _isBioSiteLayout(tpl);
     final isGlass = !bioSite && (tpl.linkStyle == NgmyBioLinkStyle.glass || tpl.linkStyle == NgmyBioLinkStyle.pill || tpl.linkStyle == NgmyBioLinkStyle.neonOutline);
-    final usePill = bioSite || isGlass || tpl.linkStyle == NgmyBioLinkStyle.outline || tpl.linkStyle == NgmyBioLinkStyle.goldBar;
-    final radius = bioSite ? 14.0 : (usePill ? 999.0 : tpl.cardRadius.clamp(8.0, 28.0));
     final compactPad = compact;
     final hasRing = link.ringStyleId.trim().isNotEmpty && link.ringStyleId != 'none';
     final thumbSize = hasRing ? (compactPad ? 26.0 : 30.0) : (compactPad ? 36.0 : 42.0);
@@ -1365,9 +1363,21 @@ class NgmyBioPreview extends StatelessWidget {
       style: titleStyle,
     );
 
-    final decoration = _linkDecoration(tpl, radius);
-    final borderRadius = BorderRadius.circular(radius.clamp(8, 999));
-    final barH = math.max(ringOuter, compactPad ? 48.0 : 56.0);
+    final barH = math.max(ringOuter + 6, compactPad ? 56.0 : 68.0);
+    final pillR = barH / 2;
+    final baseDeco = _linkDecoration(tpl, pillR);
+    final borderSide = baseDeco.border?.top;
+    final decoration = ShapeDecoration(
+      color: baseDeco.color,
+      gradient: baseDeco.gradient,
+      shadows: baseDeco.boxShadow,
+      shape: StadiumBorder(
+        side: borderSide == null
+            ? BorderSide.none
+            : BorderSide(color: borderSide.color, width: borderSide.width),
+      ),
+    );
+    final borderRadius = BorderRadius.circular(pillR);
 
     // Ring sits on top of the bar — never inside a ClipRRect/backdrop (that boxes it on the public web page).
     final card = SizedBox(
@@ -1404,7 +1414,7 @@ class NgmyBioPreview extends StatelessWidget {
     if (_isBioSiteLayout(tpl)) {
       return BoxDecoration(
         color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(radius.clamp(8.0, 20.0)),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: const Color(0xFFE8ECF1), width: 1),
         boxShadow: [
           BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 14, offset: const Offset(0, 4)),
