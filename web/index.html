@@ -794,8 +794,19 @@
       var firing = false;
       var lastDevicePixelRatio = window.devicePixelRatio || 1;
 
+      function isEditingText() {
+        try {
+          var el = document.activeElement;
+          if (!el) return false;
+          var tag = (el.tagName || '').toLowerCase();
+          if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+          if (el.isContentEditable) return true;
+        } catch (e) {}
+        return false;
+      }
+
       function remeasure() {
-        if (firing) return;
+        if (firing || isEditingText()) return;
         firing = true;
         try {
           var vv = window.visualViewport;
@@ -810,6 +821,7 @@
       }
 
       function resettle() {
+        if (isEditingText()) return;
         // iOS can also hand the page back scrolled down by the height of the
         // toolbar it just hid, which exposes the same strip.
         window.scrollTo(0, 0);
@@ -821,12 +833,12 @@
       // Toolbars animate for a moment after the page comes back, so keep asking
       // until the size settles instead of trusting the first frame.
       function resettleUntilSteady() {
+        if (isEditingText()) return;
         resettle();
         [50, 150, 350, 700, 1200].forEach(function (ms) { setTimeout(resettle, ms); });
       }
 
       window.addEventListener('pageshow', resettleUntilSteady);
-      window.addEventListener('focus', resettleUntilSteady);
       window.addEventListener('orientationchange', resettleUntilSteady);
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') resettleUntilSteady();

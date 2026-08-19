@@ -1382,6 +1382,9 @@ class NgmyBioPreview extends StatelessWidget {
     );
     final borderRadius = BorderRadius.circular(pillR);
 
+    final leftInset = hasRing ? (compactPad ? 4.0 : 6.0) : (compactPad ? 14.0 : 18.0);
+    final titleLeft = leftInset + ringOuter + (compactPad ? 8 : 10);
+
     // Ring sits on top of the bar — never inside a ClipRRect/backdrop (that boxes it on the public web page).
     final card = SizedBox(
       height: barH,
@@ -1393,10 +1396,13 @@ class NgmyBioPreview extends StatelessWidget {
             child: DecoratedBox(decoration: decoration),
           ),
           Padding(
-            padding: EdgeInsets.only(left: ringOuter + (compactPad ? 8 : 10), right: compactPad ? 12 : 16),
+            padding: EdgeInsets.only(left: titleLeft, right: compactPad ? 12 : 16),
             child: Align(alignment: Alignment.centerLeft, child: title),
           ),
-          thumb,
+          Padding(
+            padding: EdgeInsets.only(left: leftInset),
+            child: thumb,
+          ),
         ],
       ),
     );

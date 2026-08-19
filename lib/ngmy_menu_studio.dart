@@ -154,22 +154,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       _menus = menus;
       _bios = bios;
       _loading = false;
-      // Keep the open editor's saved fields if this bio is still in the list.
-      final editingId = _editingBio?.id;
-      if (editingId != null) {
-        for (final b in bios) {
-          if (b.id == editingId) {
-            final next = b.copy();
-            // Never replace an on-screen name with a blank reload.
-            if (next.displayName.trim().isEmpty &&
-                (_editingBio?.displayName.trim().isNotEmpty ?? false)) {
-              next.displayName = _editingBio!.displayName;
-            }
-            _editingBio = next;
-            break;
-          }
-        }
-      }
     });
 
     if (!syncCloud || widget._isLocal) return;
@@ -184,29 +168,11 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     setState(() {
       _menus = syncedMenus;
       _bios = syncedBios;
-      final editingId = _editingBio?.id;
-      if (editingId != null) {
-        for (final b in syncedBios) {
-          if (b.id == editingId) {
-            // Only adopt cloud if it is strictly newer than the open editor copy.
-            if (b.updatedAt.isAfter(_editingBio!.updatedAt)) {
-              final next = b.copy();
-              if (next.displayName.trim().isEmpty &&
-                  _editingBio!.displayName.trim().isNotEmpty) {
-                next.displayName = _editingBio!.displayName;
-              }
-              _editingBio = next;
-            }
-            break;
-          }
-        }
-      }
     });
   }
 
   Future<void> _reloadAfterBioSave(NgmyBioDocument saved) async {
-    // Apply the just-saved doc immediately so the open editor title never
-    // blinks empty while storage reloads.
+    if (!mounted) return;
     setState(() {
       _editingBio = saved.copy();
       final i = _bios.indexWhere((b) => b.id == saved.id);
@@ -214,20 +180,6 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
         _bios[i] = saved.copy();
       } else {
         _bios.insert(0, saved.copy());
-      }
-    });
-    await _reload(syncCloud: false);
-    if (!mounted) return;
-    // Defend against a stale reload that came back with a blank name.
-    if (saved.displayName.trim().isEmpty) return;
-    setState(() {
-      final i = _bios.indexWhere((b) => b.id == saved.id);
-      if (i >= 0 && _bios[i].displayName.trim().isEmpty) {
-        _bios[i] = saved.copy();
-      }
-      if (_editingBio?.id == saved.id &&
-          (_editingBio?.displayName.trim().isEmpty ?? true)) {
-        _editingBio = saved.copy();
       }
     });
   }
