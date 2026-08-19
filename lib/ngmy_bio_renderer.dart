@@ -325,7 +325,7 @@ class NgmyBioPreview extends StatelessWidget {
     final avatarSpan = _avatarWidgetSize(ring, avatarSize);
     final avatarCenterY = headerH - curveDepth * 0.5;
     final avatarTop = avatarCenterY - avatarSpan * 0.5;
-    final contentTop = avatarCenterY + avatarSpan * 0.5 + (compact ? 10.0 : 14.0);
+    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 18.0 : 22.0);
     final bodyTop = headerH - curveDepth;
     final bodyColor = _layoutBodyFill(tpl);
     final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
@@ -412,7 +412,7 @@ class NgmyBioPreview extends StatelessWidget {
       curveH: curveH,
       curvePainter: ngmyBioWavePanelPainter,
       minPageHeight: minPageHeight,
-      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 8 : 12),
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 6 : 8),
     );
   }
 
@@ -425,7 +425,7 @@ class NgmyBioPreview extends StatelessWidget {
     double minPageHeight = 0,
     double? nameGap,
   }) {
-    final gap = nameGap ?? (compact ? 14.0 : 18.0);
+    final gap = nameGap ?? (compact ? 8.0 : 10.0);
     final intro = Column(
       children: [
         _belowName(tpl, name, tagline),
@@ -646,7 +646,7 @@ class NgmyBioPreview extends StatelessWidget {
       curveH: curveH,
       curvePainter: ngmyBioCurvedPanelPainter,
       minPageHeight: minPageHeight,
-      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 12 : 16),
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 8 : 10),
     );
   }
 
@@ -667,7 +667,7 @@ class NgmyBioPreview extends StatelessWidget {
     final avatarSpan = _avatarWidgetSize(ring, avatarSize);
     final avatarCenterY = headerH - curveDepth * 0.5;
     final avatarTop = avatarCenterY - avatarSpan * 0.5;
-    final contentTop = avatarCenterY + avatarSpan * 0.5 + (compact ? 10.0 : 14.0);
+    final contentTop = avatarCenterY + avatarSize * 0.5 + (compact ? 18.0 : 22.0);
     final bodyTop = headerH - curveDepth;
     final bodyHeight = minPageHeight > 0 ? math.max(minPageHeight - bodyTop, 400.0) : 1400.0;
 
@@ -961,7 +961,7 @@ class NgmyBioPreview extends StatelessWidget {
       curveH: curveH,
       curvePainter: ngmyBioCurvedPanelPainter,
       minPageHeight: minPageHeight,
-      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 8 : 12),
+      belowAvatar: () => _belowAvatarLinks(tpl, name, tagline, links, pad, minPageHeight: minPageHeight, nameGap: compact ? 6 : 8),
     );
   }
 
