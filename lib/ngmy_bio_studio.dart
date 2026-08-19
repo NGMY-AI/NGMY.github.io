@@ -789,6 +789,130 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
     });
   }
 
+  Future<void> _openLinkRingPicker(NgmyBioLink link) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final t = NgmyHubTheme.of(ctx);
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: t.scaffold,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                border: Border.all(color: t.border),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: t.muted.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Link picture ring',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17),
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text(
+                      'Same rings as your profile photo. The link picture stays a circle.',
+                      style: TextStyle(color: t.muted, fontSize: 12.5),
+                    ),
+                  ),
+                  Expanded(
+                    child: GridView.builder(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 0.78,
+                      ),
+                      itemCount: kNgmyBioRingStyles.length,
+                      itemBuilder: (_, i) {
+                        final ring = kNgmyBioRingStyles[i];
+                        final selected = link.ringStyleId == ring.id;
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () {
+                            setState(() => link.ringStyleId = ring.id);
+                            Navigator.pop(ctx);
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              color: selected ? _kBioAccent.withValues(alpha: 0.16) : t.fieldFill,
+                              border: Border.all(
+                                color: selected ? _kBioAccent : t.border,
+                                width: selected ? 1.6 : 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                NgmyBioRingFrame(
+                                  ringId: ring.id,
+                                  size: 28,
+                                  accent: ring.auraColor ?? _kBioAccent,
+                                  child: const CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: Color(0xFFE5E7EB),
+                                    child: Icon(Icons.link_rounded, size: 14),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  ring.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w800,
+                                    color: selected ? _kBioAccent : t.subtitle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
@@ -1595,6 +1719,14 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                 ),
                 const Spacer(),
                 IconButton(
+                  tooltip: 'Link picture ring',
+                  onPressed: () => _openLinkRingPicker(link),
+                  icon: Icon(
+                    Icons.radio_button_unchecked_rounded,
+                    color: link.ringStyleId != 'none' ? _kBioAccent : t.muted,
+                  ),
+                ),
+                IconButton(
                   tooltip: 'Remove link',
                   onPressed: () => setState(() => _doc.links.removeAt(index)),
                   icon: Icon(Icons.delete_outline_rounded, color: t.muted),
@@ -1625,55 +1757,65 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
                       : null,
                   child: Stack(
                     children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          gradient: LinearGradient(
-                            colors: [
-                              _kBioAccent.withValues(alpha: 0.18),
-                              _kBioAccent.withValues(alpha: 0.05),
-                            ],
+                      NgmyBioRingFrame(
+                        ringId: link.ringStyleId,
+                        size: 72,
+                        accent: ngmyBioRingById(link.ringStyleId).auraColor ?? _kBioAccent,
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                _kBioAccent.withValues(alpha: 0.18),
+                                _kBioAccent.withValues(alpha: 0.05),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: _kBioAccent.withValues(alpha: 0.4),
+                              width: 1.3,
+                            ),
                           ),
-                          border: Border.all(
-                            color: _kBioAccent.withValues(alpha: 0.4),
-                            width: 1.3,
-                          ),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: hasImage
-                            ? Image.memory(
-                                base64Decode(link.imageBase64.split(',').last),
-                                fit: BoxFit.cover,
-                              )
-                            : iconData != null
-                                ? Icon(
-                                    iconData,
-                                    color: _kBioAccent,
-                                    size: 32,
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.add_photo_alternate_outlined,
-                                        color: _kBioAccent.withValues(
-                                          alpha: 0.85,
-                                        ),
-                                        size: 24,
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Photo',
-                                        style: TextStyle(
-                                          color: t.muted,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
+                          clipBehavior: Clip.antiAlias,
+                          child: hasImage
+                              ? ClipOval(
+                                  child: Image.memory(
+                                    base64Decode(link.imageBase64.split(',').last),
+                                    fit: BoxFit.cover,
+                                    width: 72,
+                                    height: 72,
+                                    filterQuality: FilterQuality.high,
                                   ),
+                                )
+                              : iconData != null
+                                  ? Icon(
+                                      iconData,
+                                      color: _kBioAccent,
+                                      size: 32,
+                                    )
+                                  : Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.add_photo_alternate_outlined,
+                                          color: _kBioAccent.withValues(
+                                            alpha: 0.85,
+                                          ),
+                                          size: 24,
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Photo',
+                                          style: TextStyle(
+                                            color: t.muted,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                        ),
                       ),
                       Positioned(
                         right: 4,

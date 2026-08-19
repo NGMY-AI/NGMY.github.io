@@ -3,13 +3,20 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_bio_urls.dart';
 import 'ngmy_local_url_payload.dart';
 
 /// Host-phone menus: device-local master copy + optional URL payload for guests. No Supabase.
 class NgmyLocalMenuPublishRegistry {
   static const settingsKey = 'ngmy_local_menu_publish_registry';
 
-  static String _normSlug(String slug) => slug.trim().toLowerCase();
+  static String _normSlug(String slug) {
+    final cleaned = ngmySanitizeBioSlug(slug);
+    if (cleaned.isNotEmpty) return cleaned;
+    return slug.trim().toLowerCase();
+  }
+
+  static String _exactKey(String slug) => slug.trim().toLowerCase();
 
   static String _slugStorageKey(String slug) => 'ngmy_local_menu_pub_${_normSlug(slug)}';
 
@@ -36,7 +43,7 @@ class NgmyLocalMenuPublishRegistry {
   }
 
   static Future<Map<String, dynamic>?> _fetchLocalSlug(String slug) async {
-    final target = _normSlug(slug);
+    final target = _exactKey(slug);
     if (target.isEmpty) return null;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_slugStorageKey(target));
@@ -61,11 +68,12 @@ class NgmyLocalMenuPublishRegistry {
       return {'data': fromHash, 'publishedAt': DateTime.now().toUtc().toIso8601String()};
     }
 
-    final target = _normSlug(slug);
-    if (target.isEmpty) return null;
-
-    final viaLocal = await _fetchLocalSlug(target);
-    if (viaLocal != null && viaLocal['data'] is Map) return viaLocal;
+    final clean = ngmySanitizeBioSlug(slug);
+    final raw = slug.trim().toLowerCase();
+    for (final target in {if (clean.isNotEmpty) clean, if (raw.isNotEmpty) raw}) {
+      final viaLocal = await _fetchLocalSlug(target);
+      if (viaLocal != null && viaLocal['data'] is Map) return viaLocal;
+    }
     return null;
   }
 

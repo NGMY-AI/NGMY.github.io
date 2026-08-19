@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_bio_urls.dart';
 import 'ngmy_cloud_policy.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
@@ -14,7 +15,20 @@ class NgmyMenuPublishRegistry {
   static const settingsKey = 'ngmy_menu_publish_registry';
   static const _guestFetchTimeout = Duration(seconds: 8);
 
-  static String _normSlug(String slug) => slug.trim().toLowerCase();
+  static String _normSlug(String slug) {
+    final cleaned = ngmySanitizeBioSlug(slug);
+    if (cleaned.isNotEmpty) return cleaned;
+    return slug.trim().toLowerCase();
+  }
+
+  static List<String> _slugLookupKeys(String slug) {
+    final keys = <String>[];
+    final raw = slug.trim().toLowerCase();
+    final clean = ngmySanitizeBioSlug(slug);
+    if (clean.isNotEmpty) keys.add(clean);
+    if (raw.isNotEmpty && raw != clean) keys.add(raw);
+    return keys;
+  }
 
   static String _slugSettingsKey(String slug) => 'ngmy_menu_pub_${_normSlug(slug)}';
 
@@ -59,7 +73,7 @@ class NgmyMenuPublishRegistry {
   }
 
   static Future<Map<String, dynamic>?> _fetchSlugEntryViaRest(String slug) async {
-    final target = _normSlug(slug);
+    final target = slug.trim().toLowerCase();
     if (target.isEmpty) return null;
 
     final perSlug = await _fetchSettingsRowViaRest(_slugSettingsKey(target));
@@ -74,7 +88,7 @@ class NgmyMenuPublishRegistry {
   }
 
   static Future<Map<String, dynamic>?> _fetchSlugEntryViaSupabase(String slug) async {
-    final target = _normSlug(slug);
+    final target = slug.trim().toLowerCase();
     if (target.isEmpty) return null;
     if (!await ngmyCanReachCloud()) return null;
     await ngmyWaitForSupabaseReady(timeout: _guestFetchTimeout);
@@ -100,9 +114,13 @@ class NgmyMenuPublishRegistry {
   }
 
   static Future<Map<String, dynamic>?> fetchBySlug(String slug) async {
-    final viaRest = await _fetchSlugEntryViaRest(slug);
-    if (viaRest != null) return viaRest;
-    return _fetchSlugEntryViaSupabase(slug);
+    for (final key in _slugLookupKeys(slug)) {
+      final viaRest = await _fetchSlugEntryViaRest(key);
+      if (viaRest != null) return viaRest;
+      final viaSb = await _fetchSlugEntryViaSupabase(key);
+      if (viaSb != null) return viaSb;
+    }
+    return null;
   }
 
   static Future<List<String>> fetchAllSlugs() async {

@@ -78,6 +78,13 @@ class NgmyBioRingFramePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final o = Offset(size.width / 2, size.height / 2);
     final r = coreSize / 2;
+    canvas.save();
+    canvas.clipPath(
+      Path()
+        ..fillType = PathFillType.evenOdd
+        ..addRect(Offset.zero & size)
+        ..addOval(Rect.fromCircle(center: o, radius: r - 0.4)),
+    );
     const boost = 1.55;
     double ringR(double extra) => r + extra * boost;
     double ringW(double w) => w * boost;
@@ -168,6 +175,7 @@ class NgmyBioRingFramePainter extends CustomPainter {
         _vibePulse(canvas, o, ringR(5), accent, phase);
         _stroke(canvas, o, ringR(3.5), accent, ringW(3));
     }
+    canvas.restore();
   }
 
   void _stroke(Canvas c, Offset o, double radius, Color color, double w) {

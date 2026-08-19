@@ -298,8 +298,6 @@ NgmyBioRingStyle ngmyBioRingById(String id) {
     'black_gold': 'gold',
     'pearl': 'white',
     'champagne': 'gold',
-    'rainbow': 'ornate',
-    'glow_blue': 'glow_blue',
   };
   final resolved = legacy[id] ?? id;
   return kNgmyBioRingStyles.firstWhere((r) => r.id == resolved, orElse: () => kNgmyBioRingStyles.firstWhere((r) => r.id == 'gold'));

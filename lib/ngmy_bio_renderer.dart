@@ -69,7 +69,12 @@ class NgmyBioPreview extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                _bioImage(document.backgroundImageBase64, fit: BoxFit.cover, alignment: Alignment.topCenter),
+                _bioImage(
+                  document.backgroundImageBase64,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  downsample: lightweight,
+                ),
                 Container(color: Colors.black.withValues(alpha: tpl.layout == NgmyBioLayoutStyle.photoImmersive ? 0.25 : 0.4)),
               ],
             ),
@@ -1310,6 +1315,7 @@ class NgmyBioPreview extends StatelessWidget {
     final linkIcon = link.hasGalleryImage
         ? null
         : ngmyBioLinkIconFromCodePoint(link.iconCodePoint);
+    final linkRing = ngmyBioRingById(link.ringStyleId);
     Widget thumb = ClipOval(
       child: link.imageBase64.isNotEmpty
           ? _bioImage(link.imageBase64, width: thumbSize, height: thumbSize, fit: BoxFit.cover)
@@ -1323,6 +1329,12 @@ class NgmyBioPreview extends StatelessWidget {
                 size: compactPad ? 20 : 22,
               ),
             ),
+    );
+    thumb = NgmyBioRingFrame(
+      ringId: linkRing.id,
+      size: thumbSize,
+      accent: linkRing.auraColor ?? tpl.accent,
+      child: SizedBox(width: thumbSize, height: thumbSize, child: thumb),
     );
 
     final content = Row(
@@ -1408,13 +1420,20 @@ class NgmyBioPreview extends StatelessWidget {
     }
   }
 
-  Widget _bioImage(String ref, {double? width, double? height, BoxFit fit = BoxFit.contain, Alignment alignment = Alignment.center}) {
+  Widget _bioImage(
+    String ref, {
+    double? width,
+    double? height,
+    BoxFit fit = BoxFit.contain,
+    Alignment alignment = Alignment.center,
+    bool downsample = false,
+  }) {
     try {
       if (!ref.startsWith('data:image')) return const SizedBox.shrink();
       final bytes = base64Decode(ref.split(',').last);
       int? cacheW;
       int? cacheH;
-      if (lightweight) {
+      if (downsample) {
         cacheW = width != null ? (width * 2).round().clamp(80, 720) : 640;
         cacheH = height != null ? (height * 2).round().clamp(80, 720) : null;
       }
@@ -1429,6 +1448,7 @@ class NgmyBioPreview extends StatelessWidget {
         cacheHeight: cacheH,
         gaplessPlayback: true,
         filterQuality: FilterQuality.high,
+        isAntiAlias: true,
         errorBuilder: (_, _, _) => const Icon(Icons.broken_image_outlined),
       );
     } catch (_) {

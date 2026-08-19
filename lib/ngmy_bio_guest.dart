@@ -150,20 +150,9 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> with Si
           animation: _unfold,
           builder: (context, child) {
             final t = Curves.easeOutCubic.transform(_unfold.value);
-            final fold = (1 - t).clamp(0.0, 1.0);
-            return Opacity(
-              opacity: (t * 1.1).clamp(0.0, 1.0),
-              child: Transform(
-                alignment: Alignment.topCenter,
-                transform: Matrix4.identity()
-                  ..setEntry(3, 2, 0.0012)
-                  ..rotateX(fold * 0.65)
-                  ..translateByDouble(0.0, fold * 48.0, 0.0, 1.0),
-                child: child,
-              ),
-            );
+            return Opacity(opacity: t.clamp(0.0, 1.0), child: child);
           },
-          child: NgmyBioPreview(document: _doc!, lightweight: true, fullBleed: true),
+          child: NgmyBioPreview(document: _doc!, fullBleed: true),
         ),
       ),
     );

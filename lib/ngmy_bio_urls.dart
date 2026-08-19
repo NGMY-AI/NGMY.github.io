@@ -50,16 +50,22 @@ String ngmySanitizeBioSlug(String raw) {
   return out;
 }
 
-String ngmyBuildUniqueBioSlug(String base, List<String> existingSlugs) {
+String ngmyBuildUniqueBioSlug(
+  String base,
+  List<String> existingSlugs, {
+  String emptyFallback = 'bio',
+}) {
   var slug = ngmySanitizeBioSlug(base);
+  if (slug.isEmpty) slug = ngmySanitizeBioSlug(emptyFallback);
+  if (slug.isEmpty) slug = emptyFallback.replaceAll(RegExp(r'[^a-z]'), '');
   if (slug.isEmpty) slug = 'bio';
-    final taken = <String>{
-      for (final e in existingSlugs) ngmySanitizeBioSlug(e),
-    }..removeWhere((e) => e.isEmpty);
-    if (!taken.contains(slug)) return slug;
+  final taken = <String>{
+    for (final e in existingSlugs) ngmySanitizeBioSlug(e),
+  }..removeWhere((e) => e.isEmpty);
+  if (!taken.contains(slug)) return slug;
 
   final letters = slug.replaceFirst(RegExp(r'^[0-9]+'), '');
-  final core = letters.isEmpty ? 'bio' : letters;
+  final core = letters.isEmpty ? slug : letters;
   for (var n = 1; n <= 99; n++) {
     final candidate = ngmySanitizeBioSlug('$n$core');
     if (candidate.isNotEmpty && !taken.contains(candidate)) return candidate;

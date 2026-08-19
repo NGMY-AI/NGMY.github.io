@@ -22,6 +22,7 @@ class NgmyBioLink {
     this.url = '',
     this.imageBase64 = '',
     this.iconCodePoint = 0,
+    this.ringStyleId = 'none',
     this.enabled = true,
   });
 
@@ -32,6 +33,9 @@ class NgmyBioLink {
 
   /// Material Icons code point. `0` means no icon. Gallery photo wins over icon.
   int iconCodePoint;
+
+  /// Same ring ids as the profile photo (`none`, `glow_blue`, `gold`, …).
+  String ringStyleId;
   bool enabled;
 
   bool get hasGalleryImage => imageBase64.trim().isNotEmpty;
@@ -43,6 +47,7 @@ class NgmyBioLink {
     'url': url,
     'imageBase64': imageBase64,
     'iconCodePoint': iconCodePoint,
+    'ringStyleId': ringStyleId,
     'enabled': enabled,
   };
 
@@ -55,6 +60,10 @@ class NgmyBioLink {
       final raw = json['iconCodePoint'];
       if (raw is int) return raw;
       return int.tryParse(raw?.toString() ?? '') ?? 0;
+    }(),
+    ringStyleId: () {
+      final raw = (json['ringStyleId'] ?? 'none').toString().trim();
+      return raw.isEmpty ? 'none' : raw;
     }(),
     enabled: json['enabled'] != false,
   );

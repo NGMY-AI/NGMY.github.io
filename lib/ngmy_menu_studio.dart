@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_bio_urls.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_bio_models.dart';
 import 'ngmy_bio_storage.dart';
@@ -120,6 +121,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
   void dispose() {
     _nameC.removeListener(_refreshPreview);
     _taglineC.removeListener(_refreshPreview);
+    _slugC.removeListener(_onMenuSlugEdited);
     _nameC.dispose();
     _taglineC.dispose();
     _slugC.dispose();
@@ -279,7 +281,14 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     doc.ensureMenuPages();
     _nameC.text = doc.restaurantName;
     _taglineC.text = doc.tagline;
-    _slugC.text = doc.slug;
+    final slug = ngmySanitizeBioSlug(doc.slug);
+    doc.slug = slug;
+    _slugC.text = slug;
+    if (slug.isNotEmpty) {
+      doc.publicUrl = widget._isLocal
+          ? ngmyLocalMenuPublicUrlForSlug(slug)
+          : ngmyMenuPublicUrlForSlug(slug);
+    }
     _centerLabelC.text = doc.qrStyle.centerLabel;
     _cardPhoneC.text = doc.qrStyle.cardPhone;
     _cardAddressC.text = doc.qrStyle.cardAddress;
@@ -298,8 +307,29 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     }
     _nameC.removeListener(_refreshPreview);
     _taglineC.removeListener(_refreshPreview);
+    _slugC.removeListener(_onMenuSlugEdited);
     _nameC.addListener(_refreshPreview);
     _taglineC.addListener(_refreshPreview);
+    _slugC.addListener(_onMenuSlugEdited);
+  }
+
+  void _onMenuSlugEdited() {
+    final doc = _editing;
+    if (doc == null) return;
+    final cleaned = ngmySanitizeBioSlug(_slugC.text);
+    if (cleaned != _slugC.text) {
+      _slugC.value = TextEditingValue(
+        text: cleaned,
+        selection: TextSelection.collapsed(offset: cleaned.length),
+      );
+    }
+    doc.slug = cleaned;
+    if (cleaned.isNotEmpty) {
+      doc.publicUrl = widget._isLocal
+          ? ngmyLocalMenuPublicUrlForSlug(cleaned)
+          : ngmyMenuPublicUrlForSlug(cleaned);
+    }
+    if (mounted) setState(() {});
   }
 
   void _refreshPreview() {
@@ -315,7 +345,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
     if (doc == null) return;
     doc.restaurantName = _nameC.text.trim();
     doc.tagline = _taglineC.text.trim();
-    doc.slug = _slugC.text.trim().toLowerCase();
+    doc.slug = ngmySanitizeBioSlug(_slugC.text);
     doc.qrStyle = doc.qrStyle.copyWith(
       centerLabel: _centerLabelC.text.trim(),
       cardPhone: _cardPhoneC.text.trim(),
@@ -449,8 +479,15 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
       doc.slug = widget._isLocal
           ? ngmyBuildUniqueLocalMenuSlug(doc.restaurantName, slugs)
           : ngmyBuildUniqueMenuSlug(doc.restaurantName, slugs);
-      _slugC.text = doc.slug;
+    } else {
+      doc.slug = ngmySanitizeBioSlug(doc.slug);
+      if (doc.slug.isEmpty) {
+        doc.slug = widget._isLocal
+            ? ngmyBuildUniqueLocalMenuSlug(doc.restaurantName, slugs)
+            : ngmyBuildUniqueMenuSlug(doc.restaurantName, slugs);
+      }
     }
+    _slugC.text = doc.slug;
 
     final String? err;
     if (widget._isLocal) {
@@ -1118,7 +1155,12 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
             children: [
               NgmyModernField(controller: _nameC, label: 'Restaurant name', hint: 'Your restaurant name', icon: Icons.storefront_rounded, accent: _kMenuAccent),
               NgmyModernField(controller: _taglineC, label: 'Tagline', hint: 'Fresh flavors · crafted daily', icon: Icons.format_quote_rounded, accent: _kMenuAccent),
-              NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'your-restaurant-name', icon: Icons.link_rounded, accent: _kMenuAccent),
+              NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'mymenu', icon: Icons.link_rounded, accent: _kMenuAccent),
+              const SizedBox(height: 6),
+              Text(
+                'Public link is ngmy.org/menu/ plus up to 10 letters. You can put 1–2 numbers in front. Do not paste a long restaurant name or website URL.',
+                style: TextStyle(color: t.muted, fontSize: 12, height: 1.35, fontWeight: FontWeight.w500),
+              ),
             ],
           ),
         ),
