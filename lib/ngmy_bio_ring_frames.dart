@@ -81,8 +81,10 @@ class NgmyBioRingFramePainter extends CustomPainter {
     final r = coreSize / 2;
     canvas.save();
     canvas.clipPath(
-      Path()..addOval(Rect.fromCircle(center: o, radius: r - 0.5)),
-      ClipOp.difference,
+      Path()
+        ..fillType = PathFillType.evenOdd
+        ..addOval(Rect.fromCircle(center: o, radius: math.max(size.width, size.height)))
+        ..addOval(Rect.fromCircle(center: o, radius: r - 0.5)),
     );
     const boost = 1.55;
     double ringR(double extra) => r + extra * boost;
