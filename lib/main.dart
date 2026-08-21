@@ -35076,6 +35076,182 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return 'Contribution';
   }
 
+  /// Never show a raw email on contribution receipts — prefer registry / account name.
+  String _contributionMemberDisplayName(AppTransaction t) {
+    final meta = _decodeContributionMeta(t);
+    for (final key in ['memberName', 'fullName', 'name']) {
+      final stored = (meta[key] ?? '').toString().trim();
+      if (stored.isNotEmpty && !stored.contains('@')) return stored;
+    }
+
+    final email = NgmyCivicRegistryMembers.emailKey(
+      (meta['memberEmail'] ?? t.userEmail).toString(),
+    );
+    final rid = (meta['registryId'] ?? '').toString().trim();
+
+    final registry = email.isNotEmpty
+        ? NgmyCivicRegistryMembers.findByEmail(widget.config, email)
+        : (rid.isNotEmpty ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid) : null);
+    final registryName = (registry?['fullName'] ?? '').toString().trim();
+    if (registryName.isNotEmpty) return registryName;
+
+    if (email.isNotEmpty) {
+      for (final u in widget.allUsers) {
+        if (NgmyCivicRegistryMembers.emailKey(u.email) != email) continue;
+        final full = (u.fullName ?? '').trim();
+        if (full.isNotEmpty) return full;
+        final un = u.username.trim();
+        if (un.isNotEmpty && un != 'User' && !un.contains('@')) return un;
+      }
+    }
+
+    if (rid.isNotEmpty) {
+      for (final u in widget.allUsers) {
+        if ((u.registryId ?? '').trim().toUpperCase() != rid.toUpperCase()) continue;
+        final full = (u.fullName ?? '').trim();
+        if (full.isNotEmpty) return full;
+        final un = u.username.trim();
+        if (un.isNotEmpty && un != 'User' && !un.contains('@')) return un;
+      }
+    }
+
+    if (email.contains('@')) {
+      final local = email.split('@').first.trim();
+      if (local.isNotEmpty) return local;
+    }
+    return rid.isNotEmpty ? rid : 'Mwanachama';
+  }
+
+  List<UserData> _membersForReceiptMeta(Map<String, dynamic> meta) {
+    final state = (meta['state'] ?? _selectedState).toString().trim();
+    final stateLower = state.toLowerCase();
+    if (stateLower.isEmpty) return const [];
+
+    final allInState = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((m) => m.state.trim().toLowerCase() == stateLower)
+        .toList();
+    final scopeType = (meta['scopeType'] ?? 'all').toString().trim().toLowerCase();
+    final scopeValue = (meta['scopeValue'] ?? '').toString().trim();
+    if (scopeType != 'city' && scopeType != 'room') return allInState;
+    if (scopeValue.isEmpty) return allInState;
+    final wanted = scopeValue.toLowerCase();
+    return allInState.where((m) {
+      final registry = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email) ??
+          (((m.registryId ?? '').trim().isNotEmpty)
+              ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, m.registryId!)
+              : null);
+      final memberCity = ((registry?['city'] ?? m.city) ?? '').toString().trim().toLowerCase();
+      final memberRoom = ((registry?['room'] ?? m.room) ?? '').toString().trim().toLowerCase();
+      if (scopeType == 'city') return memberCity == wanted;
+      return memberRoom == wanted;
+    }).toList();
+  }
+
+  String _memberDisplayNameFromUser(UserData u) {
+    final full = (u.fullName ?? '').trim();
+    if (full.isNotEmpty) return full;
+    final un = u.username.trim();
+    if (un.isNotEmpty && un != 'User' && !un.contains('@')) return un;
+    final registry = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final registryName = (registry?['fullName'] ?? '').toString().trim();
+    if (registryName.isNotEmpty) return registryName;
+    final rid = (u.registryId ?? '').trim();
+    if (rid.isNotEmpty) return rid;
+    final email = u.email.trim();
+    if (email.contains('@')) {
+      final local = email.split('@').first.trim();
+      if (local.isNotEmpty) return local;
+    }
+    return 'Mwanachama';
+  }
+
+  String _buildContributionReceiptWhatsAppSwahili({
+    required Map<String, dynamic> meta,
+    required List<AppTransaction> txs,
+  }) {
+    final purpose = (meta['purpose'] ?? 'Michango ya jamii').toString().trim();
+    final state = (meta['state'] ?? _selectedState).toString().trim();
+    final scopeType = (meta['scopeType'] ?? 'all').toString().trim().toLowerCase();
+    final scopeValue = (meta['scopeValue'] ?? '').toString().trim();
+    final scopeLabel = scopeType == 'city'
+        ? 'Jiji: $scopeValue'
+        : scopeType == 'room'
+            ? 'Chumba: $scopeValue'
+            : 'Wanachama wote';
+    final when = txs.isNotEmpty
+        ? '${txs.first.timestamp.month}/${txs.first.timestamp.day}/${txs.first.timestamp.year}'
+        : '';
+
+    final totalsByKey = <String, double>{};
+    final namesByKey = <String, String>{};
+    for (final t in txs) {
+      final m = _decodeContributionMeta(t);
+      final emailKey = NgmyCivicRegistryMembers.emailKey(
+        (m['memberEmail'] ?? t.userEmail).toString(),
+      );
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      final key = emailKey.isNotEmpty ? emailKey : (rid.isNotEmpty ? 'rid:$rid' : t.id);
+      if (key.isEmpty) continue;
+      totalsByKey[key] = (totalsByKey[key] ?? 0) + t.amount;
+      namesByKey.putIfAbsent(key, () => _contributionMemberDisplayName(t));
+    }
+
+    final contributedKeys = totalsByKey.keys.toSet();
+    final contributedNames = totalsByKey.entries.toList()
+      ..sort((a, b) => (namesByKey[a.key] ?? '').toLowerCase().compareTo((namesByKey[b.key] ?? '').toLowerCase()));
+
+    final pendingNames = <String>[];
+    for (final m in _membersForReceiptMeta(meta)) {
+      final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
+      final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
+      final contributed = (emailKey.isNotEmpty && contributedKeys.contains(emailKey)) ||
+          (ridKey != 'rid:' && contributedKeys.contains(ridKey));
+      if (contributed) continue;
+      pendingNames.add(_memberDisplayNameFromUser(m));
+    }
+    pendingNames.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    final totalAmount = txs.fold<double>(0, (s, t) => s + t.amount);
+    final buf = StringBuffer()
+      ..writeln("*EMO 'YA M'MBONDO · $state*")
+      ..writeln('📋 *RIPOTI YA MICHANGO*')
+      ..writeln('')
+      ..writeln('Kampeni: $purpose')
+      ..writeln('Eneo: $scopeLabel');
+    if (when.isNotEmpty) buf.writeln('Tarehe: $when');
+    buf
+      ..writeln('')
+      ..writeln('✅ *WALIOCHANGIA (${contributedNames.length})*');
+    if (contributedNames.isEmpty) {
+      buf.writeln('Hakuna aliyetoa bado.');
+    } else {
+      for (var i = 0; i < contributedNames.length; i++) {
+        final e = contributedNames[i];
+        buf.writeln('${i + 1}. ${namesByKey[e.key]} — \$${formatCurrency(e.value)}');
+      }
+    }
+    buf
+      ..writeln('')
+      ..writeln('❌ *HAWAJACHANGIA (${pendingNames.length})*');
+    if (pendingNames.isEmpty) {
+      buf.writeln('Wote walio kwenye orodha wamechangia. 🙌');
+    } else {
+      for (var i = 0; i < pendingNames.length; i++) {
+        buf.writeln('${i + 1}. ${pendingNames[i]}');
+      }
+    }
+    buf
+      ..writeln('')
+      ..writeln('────────')
+      ..writeln('Jumla iliyokusanywa: *\$${formatCurrency(totalAmount)}*')
+      ..writeln(
+        'Waliochangia: *${contributedNames.length}* / Jumla: *${contributedNames.length + pendingNames.length}*',
+      )
+      ..writeln('')
+      ..writeln('_Usajili wa Raia wa NGMY · ${state}_');
+    return buf.toString().trim();
+  }
+
   void _showContributionReceipts() {
     final initialGroups = _groupContributionReceipts(_visibleContributionTx());
     setState(() {
@@ -35278,67 +35454,110 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   : ListView(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: panelBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: Colors.greenAccent.shade400),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                (meta['purpose'] ?? 'Contribution Campaign').toString(),
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: strongText),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.fromLTRB(14, 14, 40, 14),
+                              decoration: BoxDecoration(
+                                color: panelBg,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.greenAccent.shade400),
                               ),
-                              Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
-                              Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
-                              const SizedBox(height: 12),
-                              Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Expanded(child: receiptStat('Total Collected', '\$${formatCurrency(total)}', isDark ? const Color(0xFF4ADE80) : Colors.green.shade800)),
-                                  const SizedBox(width: 10),
-                                  Expanded(child: receiptStat('Contributors', contributors.toString(), isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800)),
+                                  Text(
+                                    (meta['purpose'] ?? 'Contribution Campaign').toString(),
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: strongText),
+                                  ),
+                                  Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
+                                  Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(child: receiptStat('Total Collected', '\$${formatCurrency(total)}', isDark ? const Color(0xFF4ADE80) : Colors.green.shade800)),
+                                      const SizedBox(width: 10),
+                                      Expanded(child: receiptStat('Contributors', contributors.toString(), isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: tileBg,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: lineColor),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.all(10),
+                                          child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                        ),
+                                        Divider(height: 1, color: lineColor),
+                                        if (selected.isEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.all(20),
+                                            child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
+                                          )
+                                        else
+                                          ...selected.map(
+                                            (t) => ListTile(
+                                              dense: true,
+                                              leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                              title: Text(
+                                                _contributionMemberDisplayName(t),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(color: strongText),
+                                              ),
+                                              subtitle: Text(_txReadableDetails(t), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: softText)),
+                                              trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: tileBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: lineColor),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(10),
-                                      child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                    ),
-                                    Divider(height: 1, color: lineColor),
-                                    if (selected.isEmpty)
-                                      Padding(
-                                        padding: const EdgeInsets.all(20),
-                                        child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
-                                      )
-                                    else
-                                      ...selected.map(
-                                        (t) => ListTile(
-                                          dense: true,
-                                          leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                          title: Text(t.userEmail, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: strongText)),
-                                          subtitle: Text(_txReadableDetails(t), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: softText)),
-                                          trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                        ),
+                            ),
+                            Positioned(
+                              top: 6,
+                              right: 6,
+                              child: Material(
+                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                                elevation: 1,
+                                shape: const CircleBorder(),
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () {
+                                    final text = _buildContributionReceiptWhatsAppSwahili(
+                                      meta: meta,
+                                      txs: selected,
+                                    );
+                                    Clipboard.setData(ClipboardData(text: text));
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Ripoti imenakiliwa — bandika kwenye WhatsApp.'),
+                                        backgroundColor: Color(0xFF059669),
                                       ),
-                                  ],
+                                    );
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(6),
+                                    child: Icon(
+                                      Icons.copy_rounded,
+                                      size: 14,
+                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -35513,6 +35732,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 'state': state,
                                 'campaignId': campaignId,
                                 'memberEmail': memberEmail,
+                                'memberName': (u.fullName ?? '').trim().isNotEmpty
+                                    ? u.fullName!.trim()
+                                    : (u.username.trim().isNotEmpty && u.username.trim() != 'User'
+                                        ? u.username.trim()
+                                        : ''),
                                 'registryId': memberRid,
                               });
                               final isUpdate = existing != null;
