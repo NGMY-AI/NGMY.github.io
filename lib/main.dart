@@ -1148,6 +1148,30 @@ enum PaymentMethod { cashApp, bitcoin, system }
 const int kNgmyWalletReceiptRetentionDays = 5;
 const int kNgmyWalletHistoryDisplayMax = 500;
 
+/// Civic help-mode / contribution campaigns may run this long before the app
+/// auto-deactivates and records missed once. Registrars can still end earlier.
+const int kNgmyHelpCampaignMaxMonths = 5;
+
+/// After a campaign is closed, contribution receipts stay visible this long.
+const int kNgmyContributionReceiptAfterCloseDays = 5;
+
+/// True when [startedAt] has reached the 5-month help-campaign limit.
+bool ngmyHelpCampaignReachedMaxDuration(DateTime startedAt, [DateTime? now]) {
+  final n = now ?? DateTime.now();
+  final localStart = startedAt.toLocal();
+  final limit = DateTime(
+    localStart.year,
+    localStart.month + kNgmyHelpCampaignMaxMonths,
+    localStart.day,
+    localStart.hour,
+    localStart.minute,
+    localStart.second,
+    localStart.millisecond,
+    localStart.microsecond,
+  );
+  return !n.toLocal().isBefore(limit);
+}
+
 /// Civic Registry claims a registrar has resolved (rejected/deleted) stay
 /// visible as history for this long, then auto-disappear and get purged.
 const int kNgmyCivicClaimRetentionDays = 60;
@@ -30915,16 +30939,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (widget.config.helpActiveFor(state) && startedAtRaw.isNotEmpty) {
       try {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
-        // Use a full 5×24h window (not calendar inDays) so a campaign started
-        // late Monday is not auto-closed early Thursday morning.
-        if (now.difference(startedAt) >= const Duration(days: 5)) {
+        // Campaigns may run for months (up to 5). Missed is recorded only when
+        // that limit is reached — never after a few days of normal fundraising.
+        if (ngmyHelpCampaignReachedMaxDuration(startedAt, now)) {
           final campaignId = _activeHelpCampaignId(state);
           final alreadyClosed = campaignId.trim().isNotEmpty &&
               widget.config.helpCampaignClosures.any(
                 (c) => (c['campaignId'] ?? '').toString().trim() == campaignId.trim(),
               );
-          // Snapshot members while help is still active, then close first so
-          // a second pass (or another device) cannot re-increment missed.
+          // Snapshot members while help is still active so a second pass
+          // (or another device) cannot re-increment missed.
           final membersInScope = alreadyClosed
               ? const <UserData>[]
               : _membersInCurrentHelpScope(forState: state);
@@ -30976,7 +31000,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     if (widget.config.helpCampaignClosures.isNotEmpty) {
       // Closures stay forever — they are the missed-count idempotency key.
-      // Only dismiss old receipts once a campaign has been closed ≥ 5 days.
+      // Only dismiss old receipts once a campaign has been closed long enough.
       for (final c in widget.config.helpCampaignClosures) {
         final campaignId = (c['campaignId'] ?? '').toString().trim();
         final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
@@ -30986,7 +31010,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           closedAt = DateTime.parse(closedAtRaw).toLocal();
         } catch (_) {}
         if (closedAt == null) continue;
-        if (now.difference(closedAt) < const Duration(days: 5)) continue;
+        if (now.difference(closedAt) < const Duration(days: kNgmyContributionReceiptAfterCloseDays)) {
+          continue;
+        }
         _dismissedReceiptKeys.add(campaignId);
         if (!widget.config.dismissedContributionReceiptKeys.contains(campaignId)) {
           widget.config.dismissedContributionReceiptKeys = [
@@ -33090,7 +33116,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   // been deactivated that's false for everyone, so calling this after
   // deactivateHelpCampaign() with no snapshot silently checks zero
   // members and nobody is ever marked missed. Defaults to a live lookup
-  // for callers (like the 5-day auto-expiry) that still run this before
+  // for callers (like the 5-month auto-expiry) that still run this before
   // deactivating.
   void _markMissedForNonContributorsInCampaign(
     String campaignId, {
@@ -33102,7 +33128,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
     // Idempotency guard: a campaign can only ever be closed out once. Two
     // devices/sessions racing to deactivate the same campaign (or a
-    // manual Deactivate overlapping the 5-day auto-expiry sweep) would
+    // manual Deactivate overlapping the 5-month auto-expiry sweep) would
     // otherwise each independently decide "these members haven't
     // contributed yet" and both increment missed for them — double
     // counting. helpCampaignClosures already records every campaign this
@@ -33320,7 +33346,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _contributionReceiptExpired(String receiptKey, Map<String, dynamic> meta) {
     final closedAt = _contributionCampaignClosedAt(receiptKey, meta);
     if (closedAt == null) return false;
-    return DateTime.now().difference(closedAt).inDays >= 5;
+    return DateTime.now().difference(closedAt) >=
+        const Duration(days: kNgmyContributionReceiptAfterCloseDays);
   }
 
   bool _canDeleteReceiptForState(String receiptState) {
