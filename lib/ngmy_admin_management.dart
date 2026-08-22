@@ -1537,12 +1537,26 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
     config.helpCampaignStartedAt = (payload['helpCampaignStartedAt'] ?? '').toString().trim();
   }
   if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map && !deferLiveFields) {
-    config.helpModeByState = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
+    final remote = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
+    // Merge closures first when both arrive in the same payload so inactive
+    // closed campaigns cannot be resurrected by a stale active cloud row.
+    final pendingClosures = payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List
+        ? _mergeHelpCampaignClosuresLists(
+            config.helpCampaignClosures,
+            (payload['helpCampaignClosures'] as List).map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+          )
+        : config.helpCampaignClosures;
+    config.helpModeByState = _mergeHelpModeByStateMaps(
+      config.helpModeByState,
+      remote,
+      closures: pendingClosures,
+    );
   }
   if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List && !deferLiveFields) {
-    config.helpCampaignClosures = (payload['helpCampaignClosures'] as List)
+    final remote = (payload['helpCampaignClosures'] as List)
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
+    config.helpCampaignClosures = _mergeHelpCampaignClosuresLists(config.helpCampaignClosures, remote);
   }
   if (payload.containsKey('helpCampaignSpendings') && payload['helpCampaignSpendings'] is List) {
     final remote = (payload['helpCampaignSpendings'] as List)
@@ -1605,6 +1619,7 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
         'helpState': config.helpState,
         'helpCampaignId': config.helpCampaignId,
         'helpCampaignStartedAt': config.helpCampaignStartedAt,
+        'helpModeByState': config.helpModeByState,
         'helpCampaignClosures': config.helpCampaignClosures,
       };
       for (var i = 0; i < 8; i++) {

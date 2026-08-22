@@ -3004,6 +3004,114 @@ List<Map<String, dynamic>> _mergeHelpCampaignSpendingsLists(
     });
 }
 
+/// Closures are the missed-count idempotency key. Never replace — union by campaignId.
+List<Map<String, dynamic>> _mergeHelpCampaignClosuresLists(
+  List<Map<String, dynamic>> local,
+  List<Map<String, dynamic>> remote,
+) {
+  final byId = <String, Map<String, dynamic>>{};
+  void take(Map<String, dynamic> raw) {
+    final row = Map<String, dynamic>.from(raw);
+    final id = (row['campaignId'] ?? '').toString().trim();
+    if (id.isEmpty) return;
+    final prev = byId[id];
+    if (prev == null) {
+      byId[id] = row;
+      return;
+    }
+    final prevAt = DateTime.tryParse((prev['closedAt'] ?? '').toString());
+    final nextAt = DateTime.tryParse((row['closedAt'] ?? '').toString());
+    if (prevAt == null || (nextAt != null && nextAt.isBefore(prevAt))) {
+      byId[id] = row;
+    }
+  }
+  for (final raw in [...local, ...remote]) {
+    take(Map<String, dynamic>.from(raw));
+  }
+  return byId.values.toList();
+}
+
+/// Prefer inactive when either side already closed that campaign — stops cloud
+/// from resurrecting an auto-expired / deactivated help mode and re-blinking it.
+Map<String, dynamic> _mergeHelpModeByStateMaps(
+  Map<String, dynamic> local,
+  Map<String, dynamic> remote, {
+  List<Map<String, dynamic>> closures = const [],
+}) {
+  final closedIds = <String>{
+    for (final c in closures)
+      if ((c['campaignId'] ?? '').toString().trim().isNotEmpty) (c['campaignId'] ?? '').toString().trim(),
+  };
+
+  Map<String, Map<String, dynamic>> normalize(Map<String, dynamic> src) {
+    final out = <String, Map<String, dynamic>>{};
+    src.forEach((k, v) {
+      final key = k.toString().trim().toLowerCase();
+      if (key.isEmpty || v is! Map) return;
+      out[key] = Map<String, dynamic>.from(v);
+    });
+    return out;
+  }
+
+  final localNorm = normalize(local);
+  final remoteNorm = normalize(remote);
+  final keys = <String>{...localNorm.keys, ...remoteNorm.keys};
+  final out = <String, dynamic>{};
+
+  for (final key in keys) {
+    final l = localNorm[key];
+    final r = remoteNorm[key];
+    if (l == null && r == null) continue;
+    if (l == null) {
+      final campaign = Map<String, dynamic>.from(r!);
+      final cid = (campaign['campaignId'] ?? '').toString().trim();
+      if (cid.isNotEmpty && closedIds.contains(cid)) campaign['active'] = false;
+      out[key] = campaign;
+      continue;
+    }
+    if (r == null) {
+      out[key] = Map<String, dynamic>.from(l);
+      continue;
+    }
+
+    final localId = (l['campaignId'] ?? '').toString().trim();
+    final remoteId = (r['campaignId'] ?? '').toString().trim();
+    final localActive = l['active'] == true;
+    final remoteActive = r['active'] == true;
+    final sameCampaign = localId.isNotEmpty && localId == remoteId;
+
+    late final Map<String, dynamic> chosen;
+    if (sameCampaign) {
+      chosen = Map<String, dynamic>.from(remoteActive ? r : l);
+      if (!localActive || !remoteActive) chosen['active'] = false;
+      if ((chosen['campaignId'] ?? '').toString().trim().isEmpty && localId.isNotEmpty) {
+        chosen['campaignId'] = localId;
+      }
+      if ((chosen['campaignStartedAt'] ?? '').toString().trim().isEmpty &&
+          (l['campaignStartedAt'] ?? '').toString().trim().isNotEmpty) {
+        chosen['campaignStartedAt'] = l['campaignStartedAt'];
+      }
+    } else if (localActive && !remoteActive) {
+      chosen = Map<String, dynamic>.from(l);
+    } else if (remoteActive && !localActive) {
+      chosen = Map<String, dynamic>.from(r);
+    } else if (localActive && remoteActive) {
+      final lt = DateTime.tryParse((l['campaignStartedAt'] ?? '').toString());
+      final rt = DateTime.tryParse((r['campaignStartedAt'] ?? '').toString());
+      chosen = Map<String, dynamic>.from(
+        (rt != null && (lt == null || rt.isAfter(lt))) ? r : l,
+      );
+    } else {
+      chosen = Map<String, dynamic>.from(l);
+      chosen['active'] = false;
+    }
+
+    final cid = (chosen['campaignId'] ?? '').toString().trim();
+    if (cid.isNotEmpty && closedIds.contains(cid)) chosen['active'] = false;
+    out[key] = chosen;
+  }
+  return out;
+}
 /// Keeps local civic/game admin settings when Supabase row is missing jsonb columns.
 void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppConfig keep) {
   if (record.containsKey('gameTimeLimits') && record['gameTimeLimits'] is Map) {
@@ -30133,6 +30241,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _communityContributions = results[0];
       _communityClaims = results[1];
     });
+    // After a cloud hydrate, re-run lifecycle so a resurrected "active"
+    // campaign that already has a closure stays off (and gets persisted).
+    _queueHelpModeLifecycleMaintenance();
     unawaited(_pruneExpiredResolvedClaims());
   }
 
@@ -30778,8 +30889,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _runHelpModeLifecycleMaintenance() {
     var changed = false;
+    var helpModeNeedsPersist = false;
     final now = DateTime.now();
-    final state = _helpModeState();
+    // Always evaluate the state the user is currently viewing — registrars
+    // can switch states, and auto-expiry must hit that campaign, not the
+    // stale home-state stamp on widget.user.state.
+    final state = _selectedState.trim().isNotEmpty ? _selectedState.trim() : _helpModeState();
 
     final startedAtRaw = widget.config.helpCampaignStartedAtFor(state).trim();
     if (widget.config.helpActiveFor(state) && startedAtRaw.isEmpty) {
@@ -30795,29 +30910,74 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       next[key] = campaign;
       widget.config.helpModeByState = next;
       changed = true;
+      helpModeNeedsPersist = true;
     }
     if (widget.config.helpActiveFor(state) && startedAtRaw.isNotEmpty) {
       try {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
-        if (now.difference(startedAt).inDays >= 5) {
+        // Use a full 5×24h window (not calendar inDays) so a campaign started
+        // late Monday is not auto-closed early Thursday morning.
+        if (now.difference(startedAt) >= const Duration(days: 5)) {
           final campaignId = _activeHelpCampaignId(state);
-          _markMissedForNonContributorsInCampaign(
-            campaignId,
-            members: _membersInCurrentHelpScope(forState: state),
-            campaignStartedAt: startedAt,
-            campaignState: state,
-          );
+          final alreadyClosed = campaignId.trim().isNotEmpty &&
+              widget.config.helpCampaignClosures.any(
+                (c) => (c['campaignId'] ?? '').toString().trim() == campaignId.trim(),
+              );
+          // Snapshot members while help is still active, then close first so
+          // a second pass (or another device) cannot re-increment missed.
+          final membersInScope = alreadyClosed
+              ? const <UserData>[]
+              : _membersInCurrentHelpScope(forState: state);
+          if (!alreadyClosed) {
+            // Missed first, then close — markMissed treats an existing closure
+            // as "already handled" and would skip if we closed first.
+            _markMissedForNonContributorsInCampaign(
+              campaignId,
+              members: membersInScope,
+              campaignStartedAt: startedAt,
+              campaignState: state,
+            );
+            _markCampaignClosed(campaignId, now, state: state);
+          }
           widget.config.deactivateHelpCampaign(state);
-          _markCampaignClosed(campaignId, now, state: state);
           changed = true;
+          helpModeNeedsPersist = true;
         }
       } catch (_) {}
     }
 
+    // Force any campaign that already has a closure record to stay inactive —
+    // protects against a stale cloud "active" row resurrecting the banner.
     if (widget.config.helpCampaignClosures.isNotEmpty) {
-      final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
-      final retained = <Map<String, dynamic>>[];
-      for (final c in closures) {
+      final closedIds = <String>{
+        for (final c in widget.config.helpCampaignClosures)
+          if ((c['campaignId'] ?? '').toString().trim().isNotEmpty)
+            (c['campaignId'] ?? '').toString().trim(),
+      };
+      final next = Map<String, dynamic>.from(widget.config.helpModeByState);
+      var forcedOff = false;
+      next.forEach((key, raw) {
+        if (raw is! Map) return;
+        final campaign = Map<String, dynamic>.from(raw);
+        final cid = (campaign['campaignId'] ?? '').toString().trim();
+        if (cid.isEmpty || !closedIds.contains(cid)) return;
+        if (campaign['active'] == true) {
+          campaign['active'] = false;
+          next[key] = campaign;
+          forcedOff = true;
+        }
+      });
+      if (forcedOff) {
+        widget.config.helpModeByState = next;
+        changed = true;
+        helpModeNeedsPersist = true;
+      }
+    }
+
+    if (widget.config.helpCampaignClosures.isNotEmpty) {
+      // Closures stay forever — they are the missed-count idempotency key.
+      // Only dismiss old receipts once a campaign has been closed ≥ 5 days.
+      for (final c in widget.config.helpCampaignClosures) {
         final campaignId = (c['campaignId'] ?? '').toString().trim();
         final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
         if (campaignId.isEmpty || closedAtRaw.isEmpty) continue;
@@ -30826,27 +30986,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           closedAt = DateTime.parse(closedAtRaw).toLocal();
         } catch (_) {}
         if (closedAt == null) continue;
-        final ageDays = now.difference(closedAt).inDays;
-        if (ageDays >= 5) {
-          _dismissedReceiptKeys.add(campaignId);
-          if (!widget.config.dismissedContributionReceiptKeys.contains(campaignId)) {
-            widget.config.dismissedContributionReceiptKeys = [
-              ...widget.config.dismissedContributionReceiptKeys,
-              campaignId,
-            ];
-          }
+        if (now.difference(closedAt) < const Duration(days: 5)) continue;
+        _dismissedReceiptKeys.add(campaignId);
+        if (!widget.config.dismissedContributionReceiptKeys.contains(campaignId)) {
+          widget.config.dismissedContributionReceiptKeys = [
+            ...widget.config.dismissedContributionReceiptKeys,
+            campaignId,
+          ];
           changed = true;
-        } else {
-          retained.add(c);
         }
       }
-      widget.config.helpCampaignClosures = retained;
     }
 
     if (changed) {
       unawaited(_persistReceiptReadState());
       widget.onDataChanged();
       if (mounted) setState(() {});
+    }
+    if (helpModeNeedsPersist) {
+      // Critical: without this, cloud still says "active" and the 75s poll
+      // resurrects the banner, re-runs expiry, and re-counts missed.
+      unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
     }
   }
 
@@ -36708,7 +36868,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ),
         title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
         centerTitle: true,
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
+        foregroundColor: isDark ? Colors.white : Colors.black87,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
         actions: [
           if (_canViewCivicIdForCurrentUser())
@@ -36781,7 +36944,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
             if (_canCurrentUserSeeHelpMode()) ...[
               Builder(builder: (context) {
-                final helpModeStateName = _helpModeState();
+                final helpModeStateName = _selectedState.trim().isNotEmpty ? _selectedState.trim() : _helpModeState();
                 return Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
