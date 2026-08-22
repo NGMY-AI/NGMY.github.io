@@ -36888,31 +36888,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       onTabBack: () => setState(() => _activeTab = (_activeTab - 1).clamp(0, _maxCivicTabIndex)),
       child: Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => NgmyNavigator.pop(context),
-        ),
-        title: const Text('Civic Registry', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
-        centerTitle: true,
-        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
-        foregroundColor: isDark ? Colors.white : Colors.black87,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        elevation: 0,
-        actions: [
-          if (_canViewCivicIdForCurrentUser())
-            IconButton(
-              tooltip: 'View Registry ID / Passport',
-              onPressed: _showMyCivicIdCard,
-              icon: const Icon(Icons.badge_outlined),
-            ),
-        ],
-      ),
-      body: SelectionContainer.disabled(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
+      body: Stack(
+        children: [
+          SelectionContainer.disabled(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.paddingOf(context).top + 8 + 64 + 14,
+                20,
+                20,
+              ),
+              child: Column(
             children: [
             // Top Header Card
             Container(
@@ -37144,9 +37130,96 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ],
 
               const SizedBox(height: 50),
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
+                child: ngmyClipBackdrop(
+                  borderRadius: BorderRadius.circular(35),
+                  sigma: 22,
+                  child: Container(
+                    height: 64,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(35),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? [
+                                Colors.white.withValues(alpha: 0.14),
+                                const Color(0xFF121212).withValues(alpha: 0.48),
+                                const Color(0xFF0F172A).withValues(alpha: 0.58),
+                              ]
+                            : [
+                                Colors.white.withValues(alpha: 0.72),
+                                Colors.white.withValues(alpha: 0.52),
+                                const Color(0xFFE0F2FE).withValues(alpha: 0.42),
+                              ],
+                      ),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.22)
+                            : const Color(0xFF0EA5E9).withValues(alpha: 0.28),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.10),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Back',
+                          onPressed: () => NgmyNavigator.pop(context),
+                          icon: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Civic Registry',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                              fontSize: 17,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        if (_canViewCivicIdForCurrentUser())
+                          IconButton(
+                            tooltip: 'View Registry ID / Passport',
+                            onPressed: _showMyCivicIdCard,
+                            icon: Icon(
+                              Icons.badge_outlined,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          )
+                        else
+                          const SizedBox(width: 48),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     ),
     );
