@@ -158,6 +158,7 @@ class NgmyCivicWalletTxn {
     required this.at,
     required this.isInflow,
     this.pendingDeleteAt,
+    this.fund = 'contribution',
   });
 
   final String id;
@@ -167,8 +168,11 @@ class NgmyCivicWalletTxn {
   final bool isInflow;
   /// When set, this spending is scheduled for full removal after this time.
   final DateTime? pendingDeleteAt;
+  /// `contribution` = community case · `trust` = State Trust ledger.
+  final String fund;
 
   bool get isPendingDelete => pendingDeleteAt != null;
+  bool get isTrust => fund == 'trust';
 }
 
 class NgmyCivicWalletCategory {
@@ -191,6 +195,7 @@ class NgmyCivicWalletSpendingRow {
     required this.recordedAt,
     this.campaignId = '',
     this.pendingDeleteAt,
+    this.fund = 'contribution',
   });
 
   final String id;
@@ -199,6 +204,9 @@ class NgmyCivicWalletSpendingRow {
   final DateTime recordedAt;
   final String campaignId;
   final DateTime? pendingDeleteAt;
+  final String fund;
+
+  bool get isTrust => fund == 'trust';
 }
 
 class NgmyCivicWalletSnapshot {
@@ -209,16 +217,41 @@ class NgmyCivicWalletSnapshot {
     required this.categories,
     required this.recent,
     required this.spendings,
+    this.trustDeposited = 0,
+    this.trustSpent = 0,
   });
 
   final String state;
+  /// Community contribution inflows (never mixed into State Trust).
   final double collected;
+  /// Spending recorded against the contribution case.
   final double spent;
+  /// Registrar deposits into State Trust.
+  final double trustDeposited;
+  /// Spending recorded against State Trust.
+  final double trustSpent;
   final List<NgmyCivicWalletCategory> categories;
   final List<NgmyCivicWalletTxn> recent;
   final List<NgmyCivicWalletSpendingRow> spendings;
 
   double get available => math.max(0, collected - spent);
+  double get trustBalance => math.max(0, trustDeposited - trustSpent);
+  double get totalTracked => available + trustBalance;
+}
+
+bool ngmyIsStateTrustDeposit(Map<String, dynamic> row) {
+  if (row['walletTrustDeposit'] == true) return true;
+  final kind = (row['kind'] ?? '').toString().trim();
+  if (kind == 'state_trust_deposit') return true;
+  final id = (row['id'] ?? '').toString();
+  return id.startsWith('trust_deposit_');
+}
+
+String ngmyWalletFundOf(Map<String, dynamic> row) {
+  if (ngmyIsStateTrustDeposit(row)) return 'trust';
+  final fund = (row['fund'] ?? '').toString().trim().toLowerCase();
+  if (fund == 'trust' || fund == 'contribution') return fund;
+  return 'contribution';
 }
 
 Future<void> openNgmyCivicStateWalletFlow({
@@ -235,7 +268,12 @@ Future<void> openNgmyCivicStateWalletFlow({
   required Future<void> Function({
     required double amount,
     required String description,
+    String fund,
   }) onAddSpending,
+  required Future<void> Function({
+    required double amount,
+    required String description,
+  }) onAddTrustDeposit,
   required Future<void> Function({
     required String spendingId,
     required double amount,
@@ -281,6 +319,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       canEdit: canEdit,
       snapshotBuilder: snapshotBuilder,
       onAddSpending: onAddSpending,
+      onAddTrustDeposit: onAddTrustDeposit,
       onUpdateSpending: onUpdateSpending,
       onDeleteSpending: onDeleteSpending,
       onPurgeExpired: onPurgeExpired,
@@ -738,12 +777,15 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
           amount: amount,
           at: DateTime.tryParse((row['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0),
           isInflow: true,
+          fund: 'contribution',
         ),
       );
     }
   }
 
   double spent = 0;
+  double trustDeposited = 0;
+  double trustSpent = 0;
   double silentCollectedCut = 0;
   final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
@@ -758,34 +800,65 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
     if (ngmyIsSilentAdminWalletRemoval(row)) {
       if (hideBudget || hideSpendings) continue;
-      // Cuts monthly budget + available with no spending / last-txn trail.
+      // Cuts contribution case available with no spending / last-txn trail.
       silentCollectedCut += amount;
       continue;
     }
+
+    // State Trust deposits — never counted as contributions.
+    if (ngmyIsStateTrustDeposit(row)) {
+      if (!hideBudget) trustDeposited += amount;
+      if (!hideBudget && !hideTransactions) {
+        final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final desc = (row['description'] ?? 'State Trust deposit').toString().trim();
+        recent.add(
+          NgmyCivicWalletTxn(
+            id: (row['id'] ?? '').toString(),
+            title: desc.isEmpty ? 'State Trust deposit' : desc,
+            amount: amount,
+            at: at,
+            isInflow: true,
+            fund: 'trust',
+            pendingDeleteAt: pendingAt,
+          ),
+        );
+      }
+      continue;
+    }
+
     if (hideSpendings) continue;
+    final fund = ngmyWalletFundOf(row);
     final desc = (row['description'] ?? 'Spending').toString().trim();
-    spent += amount;
-    byCat[desc.isEmpty ? 'Spending' : desc] = (byCat[desc.isEmpty ? 'Spending' : desc] ?? 0) + amount;
+    final label = desc.isEmpty ? 'Spending' : desc;
+    if (fund == 'trust') {
+      trustSpent += amount;
+    } else {
+      spent += amount;
+      byCat[label] = (byCat[label] ?? 0) + amount;
+    }
     final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
     spendings.add(
       NgmyCivicWalletSpendingRow(
         id: (row['id'] ?? '').toString(),
-        description: desc.isEmpty ? 'Spending' : desc,
+        description: label,
         amount: amount,
         recordedAt: at,
         campaignId: (row['campaignId'] ?? '').toString(),
         pendingDeleteAt: pendingAt,
+        fund: fund,
       ),
     );
     if (!hideTransactions) {
       recent.add(
         NgmyCivicWalletTxn(
           id: (row['id'] ?? '').toString(),
-          title: desc.isEmpty ? 'Spending' : desc,
+          title: label,
           amount: amount,
           at: at,
           isInflow: false,
           pendingDeleteAt: pendingAt,
+          fund: fund,
         ),
       );
     }
@@ -807,6 +880,8 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     state: state,
     collected: collected,
     spent: spent,
+    trustDeposited: trustDeposited,
+    trustSpent: trustSpent,
     categories: cats,
     recent: recent,
     spendings: spendings,

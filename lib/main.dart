@@ -32241,9 +32241,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     required String state,
     required double amount,
     required String description,
+    String fund = 'contribution',
   }) async {
     final st = state.trim();
     if (st.isEmpty || amount <= 0) return;
+    final ledger = fund == 'trust' ? 'trust' : 'contribution';
     final record = {
       'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
       'campaignId': _activeHelpCampaignId().trim().isEmpty
@@ -32255,6 +32257,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       'recordedByEmail': widget.user.email.toLowerCase().trim(),
       'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
       'state': st,
+      'fund': ledger,
+    };
+    setState(() {
+      widget.config.helpCampaignSpendings = [
+        ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+        record,
+      ];
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Future<void> _addCivicWalletTrustDeposit({
+    required String state,
+    required double amount,
+    required String description,
+  }) async {
+    final st = state.trim();
+    if (st.isEmpty || amount <= 0) return;
+    final record = {
+      'id': 'trust_deposit_${DateTime.now().microsecondsSinceEpoch}',
+      'campaignId': 'wallet_${st.toLowerCase()}',
+      'amount': amount,
+      'description': description.trim().isEmpty ? 'State Trust deposit' : description.trim(),
+      'recordedAt': DateTime.now().toUtc().toIso8601String(),
+      'recordedByEmail': widget.user.email.toLowerCase().trim(),
+      'recordedByName': (widget.user.fullName ?? widget.user.username).trim(),
+      'state': st,
+      'fund': 'trust',
+      'walletTrustDeposit': true,
+      'kind': 'state_trust_deposit',
     };
     setState(() {
       widget.config.helpCampaignSpendings = [
@@ -32289,8 +32322,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         state: st,
         canEdit: canEdit,
         snapshotBuilder: () => _buildCivicStateWalletSnapshot(st),
-        onAddSpending: ({required double amount, required String description}) =>
-            _addCivicWalletSpending(state: st, amount: amount, description: description),
+        onAddSpending: ({required double amount, required String description, String fund = 'contribution'}) =>
+            _addCivicWalletSpending(state: st, amount: amount, description: description, fund: fund),
+        onAddTrustDeposit: ({required double amount, required String description}) =>
+            _addCivicWalletTrustDeposit(state: st, amount: amount, description: description),
         onUpdateSpending: ({
           required String spendingId,
           required double amount,
@@ -32412,8 +32447,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // Only this state's first AR (and King/Admin) skip codes. Other ARs
       // and members must enter PIN / name / DOB / ID every visit.
       skipUnlockCodes: _shouldSkipStateCaseUnlock(),
-      onAddSpending: ({required double amount, required String description}) =>
+      onAddSpending: ({required double amount, required String description, String fund = 'contribution'}) =>
           _addCivicWalletSpending(
+            state: _selectedState,
+            amount: amount,
+            description: description,
+            fund: fund,
+          ),
+      onAddTrustDeposit: ({required double amount, required String description}) =>
+          _addCivicWalletTrustDeposit(
             state: _selectedState,
             amount: amount,
             description: description,

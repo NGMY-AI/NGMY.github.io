@@ -37,6 +37,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required this.canEdit,
     required this.snapshotBuilder,
     required this.onAddSpending,
+    required this.onAddTrustDeposit,
     required this.onUpdateSpending,
     required this.onDeleteSpending,
     this.onPurgeExpired,
@@ -56,7 +57,12 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final Future<void> Function({
     required double amount,
     required String description,
+    String fund,
   }) onAddSpending;
+  final Future<void> Function({
+    required double amount,
+    required String description,
+  }) onAddTrustDeposit;
   final Future<void> Function({
     required String spendingId,
     required double amount,
@@ -263,16 +269,86 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     setState(() => _dateFilter = picked);
   }
 
-  Future<void> _promptSpending({NgmyCivicWalletSpendingRow? existing}) async {
+  Future<void> _promptPlusMenu() async {
     if (!widget.canEdit) return;
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
-    final amountC = TextEditingController(
-      text: existing == null
-          ? ''
-          : existing.amount.toStringAsFixed(existing.amount == existing.amount.roundToDouble() ? 0 : 2),
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: tone.dialogBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: tone.cardBorder, borderRadius: BorderRadius.circular(99)),
+                ),
+                const SizedBox(height: 14),
+                Text('State case actions', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17)),
+                const SizedBox(height: 6),
+                Text(
+                  'State Trust stays separate from contribution money.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: tone.secondaryText, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: const Color(0xFF0F766E).withValues(alpha: tone.isDark ? 0.22 : 0.1),
+                  leading: const Icon(Icons.account_balance_rounded, color: Color(0xFF0F766E)),
+                  title: Text('Add to State Trust', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800)),
+                  subtitle: Text('Registrar deposit into the protected state reserve', style: TextStyle(color: tone.secondaryText, fontSize: 12)),
+                  onTap: () => Navigator.pop(ctx, 'trust_deposit'),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: tone.chipBg,
+                  leading: Icon(Icons.receipt_long_rounded, color: tone.accent),
+                  title: Text('Record spending', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800)),
+                  subtitle: Text('Spend from State Trust or Contribution Case', style: TextStyle(color: tone.secondaryText, fontSize: 12)),
+                  onTap: () => Navigator.pop(ctx, 'spend'),
+                ),
+                if (widget.canAdminBrowseStates) ...[
+                  const SizedBox(height: 8),
+                  ListTile(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    leading: Icon(Icons.table_rows_rounded, color: tone.secondaryText),
+                    title: Text('Browse all state cases', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700)),
+                    onTap: () => Navigator.pop(ctx, 'admin_states'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
-    final noteC = TextEditingController(text: existing?.description ?? '');
-    final action = await showDialog<String>(
+    if (!mounted || choice == null) return;
+    if (choice == 'admin_states') {
+      await _openAdminStateCases();
+      return;
+    }
+    if (choice == 'trust_deposit') {
+      await _promptTrustDeposit();
+      return;
+    }
+    if (choice == 'spend') {
+      await _promptSpending();
+    }
+  }
+
+  Future<void> _promptTrustDeposit() async {
+    if (!widget.canEdit) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    final amountC = TextEditingController();
+    final noteC = TextEditingController();
+    final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -286,70 +362,18 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               color: tone.dialogBg,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: tone.cardBorder),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: tone.isDark ? 0.45 : 0.12),
-                  blurRadius: 28,
-                  offset: const Offset(0, 12),
-                ),
-              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: tone.accent.withValues(alpha: tone.isDark ? 0.22 : 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.receipt_long_rounded, color: tone.accent),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            existing == null ? 'Record spending' : 'Update spending',
-                            style: TextStyle(
-                              color: tone.primaryText,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 18,
-                            ),
-                          ),
-                          Text(
-                            existing == null
-                                ? 'Money stays available until you record it here.'
-                                : 'Edit this spending, or use trash to schedule delete.',
-                            style: TextStyle(color: tone.secondaryText, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (widget.canAdminBrowseStates && existing == null)
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx, 'admin_states'),
-                        icon: Icon(
-                          Icons.table_rows_rounded,
-                          color: tone.secondaryText.withValues(alpha: 0.7),
-                          size: 20,
-                        ),
-                      ),
-                    if (existing != null)
-                      IconButton(
-                        tooltip: 'Delete (takes 24 hours)',
-                        onPressed: () => Navigator.pop(ctx, 'delete'),
-                        icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
-                      ),
-                  ],
+                Text('Add to State Trust', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                const SizedBox(height: 6),
+                Text(
+                  'This goes into the state reserve — never mixed with contribution money.',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 12, height: 1.35),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 TextField(
                   controller: amountC,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -361,34 +385,23 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   controller: noteC,
                   style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w600),
                   maxLines: 2,
-                  decoration: _fieldDec(tone, 'What was it spent on?', Icons.edit_note_rounded),
+                  decoration: _fieldDec(tone, 'Note (optional)', Icons.edit_note_rounded),
                 ),
                 const SizedBox(height: 18),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx, 'cancel'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: tone.secondaryText,
-                          side: BorderSide(color: tone.fieldBorder),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: FilledButton(
-                        onPressed: () => Navigator.pop(ctx, 'save'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: tone.accent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(backgroundColor: const Color(0xFF0F766E)),
+                        child: const Text('Deposit'),
                       ),
                     ),
                   ],
@@ -396,6 +409,194 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               ],
             ),
           ),
+        );
+      },
+    );
+    final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0;
+    amountC.dispose();
+    final note = noteC.text.trim();
+    noteC.dispose();
+    if (saved != true || !mounted) return;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid deposit amount.')));
+      return;
+    }
+    await widget.onAddTrustDeposit(
+      amount: amount,
+      description: note.isEmpty ? 'State Trust deposit' : note,
+    );
+    if (!mounted) return;
+    _reload();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deposited ${_money(amount)} into State Trust.')),
+    );
+  }
+
+  Future<void> _promptSpending({NgmyCivicWalletSpendingRow? existing}) async {
+    if (!widget.canEdit) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    var fund = existing?.fund ?? 'contribution';
+    final amountC = TextEditingController(
+      text: existing == null
+          ? ''
+          : existing.amount.toStringAsFixed(existing.amount == existing.amount.roundToDouble() ? 0 : 2),
+    );
+    final noteC = TextEditingController(text: existing?.description ?? '');
+    final action = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                decoration: BoxDecoration(
+                  color: tone.dialogBg,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: tone.cardBorder),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: tone.isDark ? 0.45 : 0.12),
+                      blurRadius: 28,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: tone.accent.withValues(alpha: tone.isDark ? 0.22 : 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.receipt_long_rounded, color: tone.accent),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                existing == null ? 'Record spending' : 'Update spending',
+                                style: TextStyle(
+                                  color: tone.primaryText,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              Text(
+                                existing == null
+                                    ? 'Choose which ledger this spend comes from.'
+                                    : 'Edit this spending, or use trash to schedule delete.',
+                                style: TextStyle(color: tone.secondaryText, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (existing != null)
+                          IconButton(
+                            tooltip: 'Delete (takes 24 hours)',
+                            onPressed: () => Navigator.pop(ctx, 'delete'),
+                            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
+                          ),
+                      ],
+                    ),
+                    if (existing == null) ...[
+                      const SizedBox(height: 14),
+                      Text('Fund', style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ChoiceChip(
+                              label: Text('Contribution Case (${_money(_snap.available)})'),
+                              selected: fund == 'contribution',
+                              onSelected: (_) => setLocal(() => fund = 'contribution'),
+                              selectedColor: tone.accent,
+                              labelStyle: TextStyle(
+                                color: fund == 'contribution' ? Colors.white : tone.secondaryText,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ChoiceChip(
+                              label: Text('State Trust (${_money(_snap.trustBalance)})'),
+                              selected: fund == 'trust',
+                              onSelected: (_) => setLocal(() => fund = 'trust'),
+                              selectedColor: const Color(0xFF0F766E),
+                              labelStyle: TextStyle(
+                                color: fund == 'trust' ? Colors.white : tone.secondaryText,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    TextField(
+                      controller: amountC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700),
+                      decoration: _fieldDec(tone, 'Amount (\$)', Icons.attach_money_rounded),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteC,
+                      style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      decoration: _fieldDec(tone, 'What was it spent on?', Icons.edit_note_rounded),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, 'cancel'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: tone.secondaryText,
+                              side: BorderSide(color: tone.fieldBorder),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(ctx, 'save'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: tone.accent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w800)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -580,7 +781,20 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     if (confirmed != true || !mounted) return;
 
     if (existing == null) {
-      await widget.onAddSpending(amount: amount, description: note);
+      final bal = fund == 'trust' ? _snap.trustBalance : _snap.available;
+      if (amount > bal + 0.001) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              fund == 'trust'
+                  ? 'State Trust only has ${_money(bal)} available.'
+                  : 'Contribution Case only has ${_money(bal)} available.',
+            ),
+          ),
+        );
+        return;
+      }
+      await widget.onAddSpending(amount: amount, description: note, fund: fund);
     } else {
       await widget.onUpdateSpending(spendingId: existing.id, amount: amount, description: note);
     }
@@ -1158,16 +1372,16 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       children: [
                         Text(
                           'State case · ${_snap.state}',
-                          style: TextStyle(color: tone.headerMuted, fontWeight: FontWeight.w600, fontSize: 12),
+                          style: TextStyle(color: tone.headerMuted, fontWeight: FontWeight.w700, fontSize: 12),
                         ),
-                        Text('Available', style: TextStyle(color: tone.headerMuted, fontSize: 11)),
+                        const SizedBox(height: 2),
                         Text(
-                          _money(available),
+                          'Tracked total ${_money(_snap.totalTracked)}',
                           style: TextStyle(
                             color: tone.headerFg,
                             fontWeight: FontWeight.w900,
-                            fontSize: 32,
-                            letterSpacing: -1,
+                            fontSize: 22,
+                            letterSpacing: -0.6,
                             height: 1.05,
                           ),
                         ),
@@ -1176,14 +1390,20 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   ),
                   if (widget.canEdit)
                     IconButton(
-                      tooltip: 'Record spending',
-                      onPressed: () => _promptSpending(),
+                      tooltip: 'Add deposit or record spending',
+                      onPressed: () => _promptPlusMenu(),
                       icon: Container(
                         width: 40,
                         height: 40,
                         decoration: BoxDecoration(
                           color: tone.isDark ? Colors.white : Colors.black,
                           shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: tone.accent.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                            ),
+                          ],
                         ),
                         child: Icon(Icons.add, color: tone.isDark ? Colors.black : Colors.white),
                       ),
@@ -1194,11 +1414,39 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _FundFrame(
+                      title: 'State Trust',
+                      subtitle: 'Registrar reserve',
+                      amount: _money(_snap.trustBalance),
+                      detail: 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)}',
+                      gradient: const [Color(0xFF0F766E), Color(0xFF134E4A)],
+                      icon: Icons.account_balance_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _FundFrame(
+                      title: 'Contribution Case',
+                      subtitle: 'Community funds',
+                      amount: _money(available),
+                      detail: 'In ${_money(_snap.collected)} · Out ${_money(spent)}',
+                      gradient: const [Color(0xFF047857), Color(0xFF065F46)],
+                      icon: Icons.volunteer_activism_rounded,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: Text(
-                'Contributions stay available until an authorized registrar records spending.',
+                'Contribution money never enters State Trust. Only an authorized registrar can deposit into Trust or record spending from either ledger.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.3),
+                style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.35),
               ),
             ),
             Expanded(
@@ -1210,7 +1458,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Monthly Budget', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: tone.primaryText)),
+                        Text('Contribution budget', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: tone.primaryText)),
                         const SizedBox(height: 14),
                         Row(
                           children: [
@@ -1287,7 +1535,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               child: Column(
                                 children: [
                                   if (_snap.categories.isEmpty)
-                                    Text('No spending recorded yet.', style: TextStyle(color: tone.secondaryText, fontSize: 13))
+                                    Text('No contribution spending recorded yet.', style: TextStyle(color: tone.secondaryText, fontSize: 13))
                                   else
                                     for (final c in _snap.categories.take(6))
                                       Padding(
@@ -1327,7 +1575,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         Row(
                           children: [
                             Expanded(
-                              child: Text('Last Transactions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: tone.primaryText)),
+                              child: Text('Activity ledger', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: tone.primaryText)),
                             ),
                             IconButton(
                               tooltip: _dateFilter == null ? 'Filter dates' : 'Clear date filter',
@@ -1435,7 +1683,9 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                               )
                                             else
                                               Text(
-                                                t.isInflow ? 'Contribution' : 'Spending',
+                                                t.isTrust
+                                                    ? (t.isInflow ? 'State Trust deposit' : 'State Trust spend')
+                                                    : (t.isInflow ? 'Contribution' : 'Contribution spend'),
                                                 style: TextStyle(color: tone.secondaryText, fontSize: 12),
                                               ),
                                           ],
@@ -1482,6 +1732,105 @@ class _BudgetStat extends StatelessWidget {
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: tone.primaryText)),
       ],
+    );
+  }
+}
+
+class _FundFrame extends StatelessWidget {
+  const _FundFrame({
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    required this.detail,
+    required this.gradient,
+    required this.icon,
+  });
+
+  final String title;
+  final String subtitle;
+  final String amount;
+  final String detail;
+  final List<Color> gradient;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.92, end: 1),
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: gradient,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: gradient.first.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),
+                      Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 10)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 700),
+              curve: Curves.easeOutCubic,
+              builder: (context, t, _) => Opacity(
+                opacity: t,
+                child: Text(
+                  amount,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: -0.5,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              detail,
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 10, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
