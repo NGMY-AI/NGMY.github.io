@@ -263,6 +263,3 @@ Widget ngmyVaultRealisticGameScreen(VaultGameDef game) {
 
 bool ngmyVaultIsRealisticGame(String id) =>
     kVaultRealisticGames.any((g) => g.id == id);
-
-/// Full Vault Channel grid: core row games + twenty adult skill games.
-const kVaultGames = [...kVaultCoreGames, ...kVaultRealisticGames];

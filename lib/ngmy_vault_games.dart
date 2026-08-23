@@ -71,48 +71,6 @@ const kVaultCoreGames = <VaultGameDef>[
     colors: [Color(0xFF34D399), Color(0xFF22D3EE)],
     icon: Icons.polyline_rounded,
   ),
-  // Row 2
-  VaultGameDef(
-    id: 'color_sprint',
-    title: 'Color Sprint',
-    shortTitle: 'Color Sprint',
-    tagline: 'Tap the matching color before it changes.',
-    techLabel: 'REFLEX',
-    engine: VaultEngine.pulseForge,
-    colors: [Color(0xFFFB7185), Color(0xFFFACC15)],
-    icon: Icons.palette_rounded,
-  ),
-  VaultGameDef(
-    id: 'beat_bounce',
-    title: 'Beat Bounce',
-    shortTitle: 'Beat Bounce',
-    tagline: 'Tap in rhythm to keep the streak alive.',
-    techLabel: 'RHYTHM',
-    engine: VaultEngine.laserLane,
-    colors: [Color(0xFF60A5FA), Color(0xFF818CF8)],
-    icon: Icons.graphic_eq_rounded,
-  ),
-  VaultGameDef(
-    id: 'maze_dash',
-    title: 'Maze Dash',
-    shortTitle: 'Maze Dash',
-    tagline: 'Swipe to steer through the maze to the exit.',
-    techLabel: 'MAZE',
-    engine: VaultEngine.orbPop,
-    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
-    icon: Icons.route_rounded,
-  ),
-  // Extra keep
-  VaultGameDef(
-    id: 'memory_flip',
-    title: 'Memory Flip',
-    shortTitle: 'Memory Flip',
-    tagline: 'Flip cards, find every pair, beat the clock.',
-    techLabel: 'MEMORY',
-    engine: VaultEngine.gravityHook,
-    colors: [Color(0xFF2DD4BF), Color(0xFF22D3EE)],
-    icon: Icons.style_rounded,
-  ),
 ];
 
 // Large offline banks for Type Rush

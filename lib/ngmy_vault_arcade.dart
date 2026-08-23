@@ -5,9 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_vault_arcade_play.dart';
+import 'ngmy_vault_arcade_wave.dart';
 import 'ngmy_vault_games.dart';
-import 'ngmy_vault_new_games.dart';
-import 'ngmy_vault_realistic_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
 
@@ -87,17 +86,9 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
         return const NgmyVaultSyncScreen();
       case 'word_match':
         return const NgmyVaultWordMatchScreen();
-      case 'color_sprint':
-        return const NgmyVaultColorSprintGame();
-      case 'beat_bounce':
-        return const NgmyVaultBeatBounceGame();
-      case 'maze_dash':
-        return const NgmyVaultMazeDashGame();
-      case 'memory_flip':
-        return const NgmyVaultMemoryFlipGame();
       default:
-        if (ngmyVaultIsRealisticGame(game.id)) {
-          return ngmyVaultRealisticGameScreen(game);
+        if (ngmyVaultIsArcadeWaveGame(game.id)) {
+          return ngmyVaultArcadeWaveScreen(game);
         }
         if (game.engine == VaultEngine.neonSerpent) {
           return NgmyVaultLeveledGameScreen(game: game);
