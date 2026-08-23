@@ -38,6 +38,12 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required this.snapshotBuilder,
     required this.onAddSpending,
     required this.onAddTrustDeposit,
+    required this.onTransferFunds,
+    required this.onApproveTransfer,
+    required this.onRejectTransfer,
+    required this.currentUserEmail,
+    required this.isGlobalAdmin,
+    required this.trustOutRequiresDualApproval,
     required this.onUpdateSpending,
     required this.onDeleteSpending,
     this.onPurgeExpired,
@@ -63,6 +69,17 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required double amount,
     required String description,
   }) onAddTrustDeposit;
+  final Future<void> Function({
+    required double amount,
+    required String description,
+    required String direction,
+  }) onTransferFunds;
+  final Future<void> Function(String transferId) onApproveTransfer;
+  final Future<void> Function(String transferId) onRejectTransfer;
+  final String currentUserEmail;
+  final bool isGlobalAdmin;
+  /// When true, Trust → Contribution needs a second state registrar (admins bypass).
+  final bool trustOutRequiresDualApproval;
   final Future<void> Function({
     required String spendingId,
     required double amount,
@@ -105,6 +122,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   int _editTapCount = 0;
   Timer? _editTapReset;
   Timer? _countdownTick;
+  Timer? _livePoll;
 
   @override
   void initState() {
@@ -112,12 +130,17 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _snap = widget.snapshotBuilder();
     _searchC.addListener(() => setState(() {}));
     _ensureCountdownTicker();
+    _livePoll = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      _reload();
+    });
   }
 
   @override
   void dispose() {
     _editTapReset?.cancel();
     _countdownTick?.cancel();
+    _livePoll?.cancel();
     _searchC.dispose();
     super.dispose();
   }
@@ -308,6 +331,20 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 const SizedBox(height: 8),
                 ListTile(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  tileColor: const Color(0xFF1D4ED8).withValues(alpha: tone.isDark ? 0.22 : 0.1),
+                  leading: const Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB)),
+                  title: Text('Transfer between ledgers', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800)),
+                  subtitle: Text(
+                    widget.trustOutRequiresDualApproval && !widget.isGlobalAdmin
+                        ? 'Trust → Contribution needs a second registrar approval'
+                        : 'Move money between Contribution Case and State Trust',
+                    style: TextStyle(color: tone.secondaryText, fontSize: 12),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'transfer'),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   tileColor: tone.chipBg,
                   leading: Icon(Icons.receipt_long_rounded, color: tone.accent),
                   title: Text('Record spending', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800)),
@@ -338,9 +375,159 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       await _promptTrustDeposit();
       return;
     }
+    if (choice == 'transfer') {
+      await _promptTransfer();
+      return;
+    }
     if (choice == 'spend') {
       await _promptSpending();
     }
+  }
+
+  Future<void> _promptTransfer() async {
+    if (!widget.canEdit) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    var direction = 'to_trust';
+    final amountC = TextEditingController();
+    final noteC = TextEditingController();
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final needsDual = direction == 'to_contribution' &&
+                widget.trustOutRequiresDualApproval &&
+                !widget.isGlobalAdmin;
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.all(20),
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                decoration: BoxDecoration(
+                  color: tone.dialogBg,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: tone.cardBorder),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('Transfer funds', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
+                    const SizedBox(height: 6),
+                    Text(
+                      needsDual
+                          ? 'Removing money from State Trust requires approval from another authorized registrar in this state.'
+                          : 'Transfers are recorded on both ledgers for every member to see.',
+                      style: TextStyle(color: tone.secondaryText, fontSize: 12, height: 1.35),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('Direction', style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
+                    const SizedBox(height: 8),
+                    ChoiceChip(
+                      label: Text('Contribution → State Trust (${_money(_snap.available)})'),
+                      selected: direction == 'to_trust',
+                      onSelected: (_) => setLocal(() => direction = 'to_trust'),
+                      selectedColor: const Color(0xFF0F766E),
+                      labelStyle: TextStyle(
+                        color: direction == 'to_trust' ? Colors.white : tone.secondaryText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ChoiceChip(
+                      label: Text('State Trust → Contribution (${_money(_snap.trustBalance)})'),
+                      selected: direction == 'to_contribution',
+                      onSelected: (_) => setLocal(() => direction = 'to_contribution'),
+                      selectedColor: const Color(0xFF2563EB),
+                      labelStyle: TextStyle(
+                        color: direction == 'to_contribution' ? Colors.white : tone.secondaryText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: amountC,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w700),
+                      decoration: _fieldDec(tone, 'Amount (\$)', Icons.attach_money_rounded),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteC,
+                      style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      decoration: _fieldDec(tone, 'Note (optional)', Icons.edit_note_rounded),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: needsDual ? const Color(0xFF2563EB) : const Color(0xFF0F766E),
+                            ),
+                            child: Text(needsDual ? 'Request approval' : 'Transfer'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    final amount = double.tryParse(amountC.text.trim().replaceAll(',', '')) ?? 0;
+    final note = noteC.text.trim();
+    amountC.dispose();
+    noteC.dispose();
+    if (saved != true || !mounted) return;
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid transfer amount.')));
+      return;
+    }
+    final bal = direction == 'to_trust' ? _snap.available : _snap.trustBalance;
+    if (amount > bal + 0.001) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Only ${_money(bal)} is available in that ledger.')),
+      );
+      return;
+    }
+    await widget.onTransferFunds(
+      amount: amount,
+      description: note.isEmpty
+          ? (direction == 'to_trust' ? 'Transfer to State Trust' : 'Transfer to Contribution Case')
+          : note,
+      direction: direction,
+    );
+    if (!mounted) return;
+    _reload();
+    final needsDual = direction == 'to_contribution' &&
+        widget.trustOutRequiresDualApproval &&
+        !widget.isGlobalAdmin;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          needsDual
+              ? 'Transfer requested — waiting for a second registrar to approve.'
+              : 'Transfer of ${_money(amount)} recorded.',
+        ),
+      ),
+    );
   }
 
   Future<void> _promptTrustDeposit() async {
@@ -1422,7 +1609,9 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       title: 'State Trust',
                       subtitle: 'Registrar reserve',
                       amount: _money(_snap.trustBalance),
-                      detail: 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)}',
+                      detail: _snap.trustReserved > 0
+                          ? 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)} · Reserved ${_money(_snap.trustReserved)}'
+                          : 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)}',
                       gradient: const [Color(0xFF0F766E), Color(0xFF134E4A)],
                       icon: Icons.account_balance_rounded,
                     ),
@@ -1433,7 +1622,9 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       title: 'Contribution Case',
                       subtitle: 'Community funds',
                       amount: _money(available),
-                      detail: 'In ${_money(_snap.collected)} · Out ${_money(spent)}',
+                      detail: _snap.transferCredits > 0
+                          ? 'In ${_money(_snap.collected)} · Credits ${_money(_snap.transferCredits)} · Out ${_money(spent)}'
+                          : 'In ${_money(_snap.collected)} · Out ${_money(spent)}',
                       gradient: const [Color(0xFF047857), Color(0xFF065F46)],
                       icon: Icons.volunteer_activism_rounded,
                     ),
@@ -1453,6 +1644,29 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
                 children: [
+                  if (_snap.pendingTransfers.isNotEmpty) ...[
+                    for (final p in _snap.pendingTransfers)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _PendingTransferCard(
+                          transfer: p,
+                          money: _money,
+                          canAct: widget.canEdit || widget.isGlobalAdmin,
+                          currentEmail: widget.currentUserEmail,
+                          isGlobalAdmin: widget.isGlobalAdmin,
+                          onApprove: () async {
+                            await widget.onApproveTransfer(p.id);
+                            if (!mounted) return;
+                            _reload();
+                          },
+                          onReject: () async {
+                            await widget.onRejectTransfer(p.id);
+                            if (!mounted) return;
+                            _reload();
+                          },
+                        ),
+                      ),
+                  ],
                   _Card(
                     tone: tone,
                     child: Column(
@@ -1711,6 +1925,113 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PendingTransferCard extends StatelessWidget {
+  const _PendingTransferCard({
+    required this.transfer,
+    required this.money,
+    required this.canAct,
+    required this.currentEmail,
+    required this.isGlobalAdmin,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final NgmyCivicWalletPendingTransfer transfer;
+  final String Function(double) money;
+  final bool canAct;
+  final String currentEmail;
+  final bool isGlobalAdmin;
+  final Future<void> Function() onApprove;
+  final Future<void> Function() onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final me = currentEmail.toLowerCase().trim();
+    final already = transfer.approvals.any(
+      (a) => (a['email'] ?? '').toString().toLowerCase().trim() == me,
+    );
+    final isRequester = transfer.requestedByEmail.toLowerCase().trim() == me;
+    final canApprove = canAct && !already && (isGlobalAdmin || !isRequester);
+    final canReject = canAct && (isGlobalAdmin || isRequester || canApprove);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E3A8A), Color(0xFF1E40AF)],
+        ),
+        border: Border.all(color: Colors.white24),
+        boxShadow: [
+          BoxShadow(color: const Color(0xFF2563EB).withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.hourglass_top_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  transfer.isToContribution
+                      ? 'Pending Trust → Contribution'
+                      : 'Pending Contribution → Trust',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
+                ),
+              ),
+              Text(
+                money(transfer.amount),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${transfer.description} · by ${transfer.requestedByName}',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Approvals ${transfer.approvalCount}/${transfer.requiredApprovals}'
+            '${transfer.approvalsNeeded > 0 ? ' · needs ${transfer.approvalsNeeded} more' : ''}',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          if (canApprove || canReject) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (canReject)
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => onReject(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white54),
+                      ),
+                      child: const Text('Reject'),
+                    ),
+                  ),
+                if (canReject && canApprove) const SizedBox(width: 10),
+                if (canApprove)
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => onApprove(),
+                      style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF1E3A8A)),
+                      child: const Text('Approve'),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

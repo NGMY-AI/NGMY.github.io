@@ -32299,6 +32299,243 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     await ngmyPersistCivicHelpModeSettings(widget.config);
   }
 
+  int _stateRegistrarCountExcludingAdmins(String state) {
+    final scopedUsers = widget.allUsers.where((u) {
+      if (u.isAdmin || u.isCivicRegistryAdmin || u.isCivicRegistryKing) return false;
+      return true;
+    });
+    return NgmyCivicRegistryStats.activeRegistrarsInState(
+      state: state,
+      applications: widget.config.civicRegistrarApplications,
+      users: scopedUsers,
+      excludeRegistryAdmins: true,
+    );
+  }
+
+  bool _trustOutRequiresDualApproval(String state) =>
+      _stateRegistrarCountExcludingAdmins(state) > 2;
+
+  List<Map<String, dynamic>> _completedTransferRows({
+    required String state,
+    required double amount,
+    required String description,
+    required String direction,
+    required String linkId,
+  }) {
+    final st = state.trim();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final byEmail = widget.user.email.toLowerCase().trim();
+    final byName = (widget.user.fullName ?? widget.user.username).trim();
+    final campaignId = 'wallet_${st.toLowerCase()}';
+    if (direction == 'to_trust') {
+      return [
+        {
+          'id': 'xfer_out_contrib_$linkId',
+          'campaignId': campaignId,
+          'amount': amount,
+          'description': description,
+          'recordedAt': now,
+          'recordedByEmail': byEmail,
+          'recordedByName': byName,
+          'state': st,
+          'fund': 'contribution',
+          'kind': 'transfer_to_trust',
+          'transferLinkId': linkId,
+        },
+        {
+          'id': 'xfer_in_trust_$linkId',
+          'campaignId': campaignId,
+          'amount': amount,
+          'description': description,
+          'recordedAt': now,
+          'recordedByEmail': byEmail,
+          'recordedByName': byName,
+          'state': st,
+          'fund': 'trust',
+          'walletTrustDeposit': true,
+          'kind': 'transfer_from_contribution',
+          'transferLinkId': linkId,
+        },
+      ];
+    }
+    return [
+      {
+        'id': 'xfer_out_trust_$linkId',
+        'campaignId': campaignId,
+        'amount': amount,
+        'description': description,
+        'recordedAt': now,
+        'recordedByEmail': byEmail,
+        'recordedByName': byName,
+        'state': st,
+        'fund': 'trust',
+        'kind': 'transfer_to_contribution',
+        'transferLinkId': linkId,
+      },
+      {
+        'id': 'xfer_in_contrib_$linkId',
+        'campaignId': campaignId,
+        'amount': amount,
+        'description': description,
+        'recordedAt': now,
+        'recordedByEmail': byEmail,
+        'recordedByName': byName,
+        'state': st,
+        'fund': 'contribution',
+        'kind': 'transfer_from_trust',
+        'contributionTransferCredit': true,
+        'transferLinkId': linkId,
+      },
+    ];
+  }
+
+  Future<void> _civicWalletTransferFunds({
+    required String state,
+    required double amount,
+    required String description,
+    required String direction,
+  }) async {
+    final st = state.trim();
+    if (st.isEmpty || amount <= 0) return;
+    final dir = direction == 'to_contribution' ? 'to_contribution' : 'to_trust';
+    final snap = _buildCivicStateWalletSnapshot(st);
+    final bal = dir == 'to_trust' ? snap.available : snap.trustBalance;
+    if (amount > bal + 0.001) return;
+
+    final needsDual = dir == 'to_contribution' &&
+        _trustOutRequiresDualApproval(st) &&
+        !_isGlobalCivicRegistryAdmin();
+
+    if (needsDual) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      final byEmail = widget.user.email.toLowerCase().trim();
+      final byName = (widget.user.fullName ?? widget.user.username).trim();
+      final pending = {
+        'id': 'xfer_pending_${DateTime.now().microsecondsSinceEpoch}',
+        'campaignId': 'wallet_${st.toLowerCase()}',
+        'amount': amount,
+        'description': description.trim().isEmpty ? 'Transfer to Contribution Case' : description.trim(),
+        'recordedAt': now,
+        'requestedAt': now,
+        'requestedByEmail': byEmail,
+        'requestedByName': byName,
+        'state': st,
+        'kind': 'fund_transfer_pending',
+        'direction': dir,
+        'status': 'pending',
+        'requiredApprovals': 2,
+        'approvals': [
+          {'email': byEmail, 'name': byName, 'at': now},
+        ],
+      };
+      setState(() {
+        widget.config.helpCampaignSpendings = [
+          ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+          pending,
+        ];
+      });
+      widget.onDataChanged();
+      await ngmyPersistCivicHelpModeSettings(widget.config);
+      return;
+    }
+
+    final linkId = DateTime.now().microsecondsSinceEpoch.toString();
+    final rows = _completedTransferRows(
+      state: st,
+      amount: amount,
+      description: description.trim().isEmpty
+          ? (dir == 'to_trust' ? 'Transfer to State Trust' : 'Transfer to Contribution Case')
+          : description.trim(),
+      direction: dir,
+      linkId: linkId,
+    );
+    setState(() {
+      widget.config.helpCampaignSpendings = [
+        ...widget.config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)),
+        ...rows,
+      ];
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Future<void> _approveCivicWalletTransfer(String transferId) async {
+    final id = transferId.trim();
+    if (id.isEmpty) return;
+    final me = widget.user.email.toLowerCase().trim();
+    final myName = (widget.user.fullName ?? widget.user.username).trim();
+    final now = DateTime.now().toUtc().toIso8601String();
+    Map<String, dynamic>? pending;
+    for (final e in widget.config.helpCampaignSpendings) {
+      if ((e['id'] ?? '').toString().trim() == id && ngmyIsFundTransferPending(e)) {
+        pending = Map<String, dynamic>.from(e);
+        break;
+      }
+    }
+    if (pending == null) return;
+    if ((pending['status'] ?? 'pending').toString().toLowerCase() != 'pending') return;
+
+    final approvals = <Map<String, dynamic>>[
+      ...((pending['approvals'] is List)
+          ? (pending['approvals'] as List).map((e) => Map<String, dynamic>.from(e as Map))
+          : const <Map<String, dynamic>>[]),
+    ];
+    if (approvals.any((a) => (a['email'] ?? '').toString().toLowerCase().trim() == me)) {
+      return; // already approved by this user
+    }
+    final requester = (pending['requestedByEmail'] ?? '').toString().toLowerCase().trim();
+    if (!_isGlobalCivicRegistryAdmin() && requester == me) return;
+
+    approvals.add({'email': me, 'name': myName, 'at': now});
+    final required = (pending['requiredApprovals'] as num?)?.toInt() ?? 2;
+    final st = (pending['state'] ?? '').toString().trim();
+    final amount = (pending['amount'] as num?)?.toDouble() ?? 0;
+    final desc = (pending['description'] ?? 'Transfer to Contribution Case').toString();
+    final direction = (pending['direction'] ?? 'to_contribution').toString();
+
+    if (_isGlobalCivicRegistryAdmin() || approvals.length >= required) {
+      final linkId = id.replaceFirst('xfer_pending_', '');
+      final rows = _completedTransferRows(
+        state: st,
+        amount: amount,
+        description: desc,
+        direction: direction,
+        linkId: linkId.isEmpty ? DateTime.now().microsecondsSinceEpoch.toString() : linkId,
+      );
+      setState(() {
+        widget.config.helpCampaignSpendings = [
+          ...widget.config.helpCampaignSpendings
+              .where((e) => (e['id'] ?? '').toString().trim() != id)
+              .map((e) => Map<String, dynamic>.from(e)),
+          ...rows,
+        ];
+      });
+    } else {
+      pending['approvals'] = approvals;
+      setState(() {
+        widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings.map((e) {
+          if ((e['id'] ?? '').toString().trim() != id) return Map<String, dynamic>.from(e);
+          return pending!;
+        }).toList();
+      });
+    }
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
+  Future<void> _rejectCivicWalletTransfer(String transferId) async {
+    final id = transferId.trim();
+    if (id.isEmpty) return;
+    setState(() {
+      widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings
+          .where((e) => (e['id'] ?? '').toString().trim() != id)
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+  }
+
   Future<void> _openAdminCivicStateCase(String state) async {
     final st = state.trim();
     if (st.isEmpty || !mounted) return;
@@ -32326,6 +32563,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             _addCivicWalletSpending(state: st, amount: amount, description: description, fund: fund),
         onAddTrustDeposit: ({required double amount, required String description}) =>
             _addCivicWalletTrustDeposit(state: st, amount: amount, description: description),
+        onTransferFunds: ({
+          required double amount,
+          required String description,
+          required String direction,
+        }) =>
+            _civicWalletTransferFunds(
+              state: st,
+              amount: amount,
+              description: description,
+              direction: direction,
+            ),
+        onApproveTransfer: _approveCivicWalletTransfer,
+        onRejectTransfer: _rejectCivicWalletTransfer,
+        currentUserEmail: widget.user.email,
+        isGlobalAdmin: _isGlobalCivicRegistryAdmin(),
+        trustOutRequiresDualApproval: _trustOutRequiresDualApproval(st),
         onUpdateSpending: ({
           required String spendingId,
           required double amount,
@@ -32460,6 +32713,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             amount: amount,
             description: description,
           ),
+      onTransferFunds: ({
+        required double amount,
+        required String description,
+        required String direction,
+      }) =>
+          _civicWalletTransferFunds(
+            state: _selectedState,
+            amount: amount,
+            description: description,
+            direction: direction,
+          ),
+      onApproveTransfer: _approveCivicWalletTransfer,
+      onRejectTransfer: _rejectCivicWalletTransfer,
+      currentUserEmail: widget.user.email,
+      isGlobalAdmin: _isGlobalCivicRegistryAdmin(),
+      trustOutRequiresDualApproval: _trustOutRequiresDualApproval(_selectedState),
       onUpdateSpending: ({
         required String spendingId,
         required double amount,

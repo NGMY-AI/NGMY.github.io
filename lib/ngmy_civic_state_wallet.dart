@@ -219,6 +219,9 @@ class NgmyCivicWalletSnapshot {
     required this.spendings,
     this.trustDeposited = 0,
     this.trustSpent = 0,
+    this.transferCredits = 0,
+    this.trustReserved = 0,
+    this.pendingTransfers = const [],
   });
 
   final String state;
@@ -230,21 +233,26 @@ class NgmyCivicWalletSnapshot {
   final double trustDeposited;
   /// Spending recorded against State Trust.
   final double trustSpent;
+  /// Credits moved into Contribution Case from State Trust.
+  final double transferCredits;
+  /// Trust amount locked in pending dual-approval transfers out.
+  final double trustReserved;
+  final List<NgmyCivicWalletPendingTransfer> pendingTransfers;
   final List<NgmyCivicWalletCategory> categories;
   final List<NgmyCivicWalletTxn> recent;
   final List<NgmyCivicWalletSpendingRow> spendings;
 
-  double get available => math.max(0, collected - spent);
-  double get trustBalance => math.max(0, trustDeposited - trustSpent);
+  double get available => math.max(0, collected + transferCredits - spent);
+  double get trustBalance => math.max(0, trustDeposited - trustSpent - trustReserved);
   double get totalTracked => available + trustBalance;
 }
 
 bool ngmyIsStateTrustDeposit(Map<String, dynamic> row) {
   if (row['walletTrustDeposit'] == true) return true;
   final kind = (row['kind'] ?? '').toString().trim();
-  if (kind == 'state_trust_deposit') return true;
+  if (kind == 'state_trust_deposit' || kind == 'transfer_from_contribution') return true;
   final id = (row['id'] ?? '').toString();
-  return id.startsWith('trust_deposit_');
+  return id.startsWith('trust_deposit_') || id.startsWith('xfer_in_trust_');
 }
 
 String ngmyWalletFundOf(Map<String, dynamic> row) {
@@ -252,6 +260,55 @@ String ngmyWalletFundOf(Map<String, dynamic> row) {
   final fund = (row['fund'] ?? '').toString().trim().toLowerCase();
   if (fund == 'trust' || fund == 'contribution') return fund;
   return 'contribution';
+}
+
+bool ngmyIsFundTransferPending(Map<String, dynamic> row) {
+  final kind = (row['kind'] ?? '').toString().trim();
+  if (kind == 'fund_transfer_pending') return true;
+  return (row['id'] ?? '').toString().startsWith('xfer_pending_') &&
+      (row['status'] ?? 'pending').toString().toLowerCase() == 'pending';
+}
+
+bool ngmyIsFundTransferCompleted(Map<String, dynamic> row) {
+  final kind = (row['kind'] ?? '').toString().trim();
+  return kind == 'transfer_to_trust' ||
+      kind == 'transfer_to_contribution' ||
+      kind == 'transfer_from_contribution' ||
+      kind == 'transfer_from_trust';
+}
+
+bool ngmyIsContributionTransferCredit(Map<String, dynamic> row) {
+  final kind = (row['kind'] ?? '').toString().trim();
+  return kind == 'transfer_from_trust' || row['contributionTransferCredit'] == true;
+}
+
+class NgmyCivicWalletPendingTransfer {
+  const NgmyCivicWalletPendingTransfer({
+    required this.id,
+    required this.amount,
+    required this.description,
+    required this.direction,
+    required this.requestedByEmail,
+    required this.requestedByName,
+    required this.requestedAt,
+    required this.approvals,
+    required this.requiredApprovals,
+  });
+
+  final String id;
+  final double amount;
+  final String description;
+  /// `to_trust` | `to_contribution`
+  final String direction;
+  final String requestedByEmail;
+  final String requestedByName;
+  final DateTime requestedAt;
+  final List<Map<String, dynamic>> approvals;
+  final int requiredApprovals;
+
+  int get approvalCount => approvals.length;
+  int get approvalsNeeded => math.max(0, requiredApprovals - approvalCount);
+  bool get isToContribution => direction == 'to_contribution';
 }
 
 Future<void> openNgmyCivicStateWalletFlow({
@@ -274,6 +331,16 @@ Future<void> openNgmyCivicStateWalletFlow({
     required double amount,
     required String description,
   }) onAddTrustDeposit,
+  required Future<void> Function({
+    required double amount,
+    required String description,
+    required String direction,
+  }) onTransferFunds,
+  required Future<void> Function(String transferId) onApproveTransfer,
+  required Future<void> Function(String transferId) onRejectTransfer,
+  required String currentUserEmail,
+  required bool isGlobalAdmin,
+  required bool trustOutRequiresDualApproval,
   required Future<void> Function({
     required String spendingId,
     required double amount,
@@ -320,6 +387,12 @@ Future<void> openNgmyCivicStateWalletFlow({
       snapshotBuilder: snapshotBuilder,
       onAddSpending: onAddSpending,
       onAddTrustDeposit: onAddTrustDeposit,
+      onTransferFunds: onTransferFunds,
+      onApproveTransfer: onApproveTransfer,
+      onRejectTransfer: onRejectTransfer,
+      currentUserEmail: currentUserEmail,
+      isGlobalAdmin: isGlobalAdmin,
+      trustOutRequiresDualApproval: trustOutRequiresDualApproval,
       onUpdateSpending: onUpdateSpending,
       onDeleteSpending: onDeleteSpending,
       onPurgeExpired: onPurgeExpired,
@@ -786,9 +859,12 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   double spent = 0;
   double trustDeposited = 0;
   double trustSpent = 0;
+  double transferCredits = 0;
+  double trustReserved = 0;
   double silentCollectedCut = 0;
   final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
+  final pendingTransfers = <NgmyCivicWalletPendingTransfer>[];
   for (final row in spendingRows) {
     final rowState = (row['state'] ?? '').toString().trim().toLowerCase();
     if (st.isNotEmpty && rowState.isNotEmpty && rowState != st) continue;
@@ -805,17 +881,88 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       continue;
     }
 
+    // Dual-approval transfers waiting on a second registrar.
+    if (ngmyIsFundTransferPending(row)) {
+      final status = (row['status'] ?? 'pending').toString().toLowerCase();
+      if (status != 'pending') continue;
+      final direction = (row['direction'] ?? 'to_contribution').toString();
+      if (!hideBudget && direction == 'to_contribution') {
+        trustReserved += amount;
+      }
+      final approvalsRaw = row['approvals'];
+      final approvals = approvalsRaw is List
+          ? approvalsRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
+          : <Map<String, dynamic>>[];
+      final at = DateTime.tryParse((row['requestedAt'] ?? row['recordedAt'] ?? '').toString()) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final desc = (row['description'] ?? 'Fund transfer').toString().trim();
+      pendingTransfers.add(
+        NgmyCivicWalletPendingTransfer(
+          id: (row['id'] ?? '').toString(),
+          amount: amount,
+          description: desc.isEmpty ? 'Fund transfer' : desc,
+          direction: direction,
+          requestedByEmail: (row['requestedByEmail'] ?? '').toString(),
+          requestedByName: (row['requestedByName'] ?? 'Registrar').toString(),
+          requestedAt: at,
+          approvals: approvals,
+          requiredApprovals: (row['requiredApprovals'] as num?)?.toInt() ?? 2,
+        ),
+      );
+      if (!hideTransactions) {
+        recent.add(
+          NgmyCivicWalletTxn(
+            id: (row['id'] ?? '').toString(),
+            title: direction == 'to_contribution'
+                ? 'Pending: Trust → Contribution'
+                : 'Pending: Contribution → Trust',
+            amount: amount,
+            at: at,
+            isInflow: direction == 'to_trust',
+            fund: direction == 'to_contribution' ? 'trust' : 'contribution',
+          ),
+        );
+      }
+      continue;
+    }
+
+    // Credits into Contribution Case from completed Trust → Contribution transfers.
+    if (ngmyIsContributionTransferCredit(row)) {
+      if (!hideBudget) transferCredits += amount;
+      if (!hideBudget && !hideTransactions) {
+        final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final desc = (row['description'] ?? 'Transfer from State Trust').toString().trim();
+        recent.add(
+          NgmyCivicWalletTxn(
+            id: (row['id'] ?? '').toString(),
+            title: desc.isEmpty ? 'Transfer from State Trust' : desc,
+            amount: amount,
+            at: at,
+            isInflow: true,
+            fund: 'contribution',
+            pendingDeleteAt: pendingAt,
+          ),
+        );
+      }
+      continue;
+    }
+
     // State Trust deposits — never counted as contributions.
     if (ngmyIsStateTrustDeposit(row)) {
       if (!hideBudget) trustDeposited += amount;
       if (!hideBudget && !hideTransactions) {
         final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
             DateTime.fromMillisecondsSinceEpoch(0);
-        final desc = (row['description'] ?? 'State Trust deposit').toString().trim();
+        final kind = (row['kind'] ?? '').toString();
+        final defaultTitle = kind == 'transfer_from_contribution'
+            ? 'Transfer from Contribution Case'
+            : 'State Trust deposit';
+        final desc = (row['description'] ?? defaultTitle).toString().trim();
         recent.add(
           NgmyCivicWalletTxn(
             id: (row['id'] ?? '').toString(),
-            title: desc.isEmpty ? 'State Trust deposit' : desc,
+            title: desc.isEmpty ? defaultTitle : desc,
             amount: amount,
             at: at,
             isInflow: true,
@@ -830,12 +977,21 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     if (hideSpendings) continue;
     final fund = ngmyWalletFundOf(row);
     final desc = (row['description'] ?? 'Spending').toString().trim();
-    final label = desc.isEmpty ? 'Spending' : desc;
+    final kind = (row['kind'] ?? '').toString();
+    final label = desc.isEmpty
+        ? (kind == 'transfer_to_trust'
+            ? 'Transfer to State Trust'
+            : kind == 'transfer_to_contribution'
+                ? 'Transfer to Contribution Case'
+                : 'Spending')
+        : desc;
     if (fund == 'trust') {
       trustSpent += amount;
     } else {
       spent += amount;
-      byCat[label] = (byCat[label] ?? 0) + amount;
+      if (kind != 'transfer_to_trust') {
+        byCat[label] = (byCat[label] ?? 0) + amount;
+      }
     }
     final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
     spendings.add(
@@ -867,6 +1023,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
 
   spendings.sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
   recent.sort((a, b) => b.at.compareTo(a.at));
+  pendingTransfers.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
 
   final cats = <NgmyCivicWalletCategory>[];
   var i = 0;
@@ -882,6 +1039,9 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     spent: spent,
     trustDeposited: trustDeposited,
     trustSpent: trustSpent,
+    transferCredits: transferCredits,
+    trustReserved: trustReserved,
+    pendingTransfers: pendingTransfers,
     categories: cats,
     recent: recent,
     spendings: spendings,
