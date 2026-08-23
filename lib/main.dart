@@ -1149,13 +1149,13 @@ const int kNgmyWalletReceiptRetentionDays = 5;
 const int kNgmyWalletHistoryDisplayMax = 500;
 
 /// Civic help-mode / contribution campaigns may run this long before the app
-/// auto-deactivates and records missed once. Registrars can still end earlier.
-const int kNgmyHelpCampaignMaxMonths = 5;
+/// auto-deactivates once (and records missed). Registrars can still end earlier.
+const int kNgmyHelpCampaignMaxMonths = 2;
 
 /// After a campaign is closed, contribution receipts stay visible this long.
 const int kNgmyContributionReceiptAfterCloseDays = 5;
 
-/// True when [startedAt] has reached the 5-month help-campaign limit.
+/// True when [startedAt] has reached the 2-month help-campaign limit.
 bool ngmyHelpCampaignReachedMaxDuration(DateTime startedAt, [DateTime? now]) {
   final n = now ?? DateTime.now();
   final localStart = startedAt.toLocal();
@@ -30939,8 +30939,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (widget.config.helpActiveFor(state) && startedAtRaw.isNotEmpty) {
       try {
         final startedAt = DateTime.parse(startedAtRaw).toLocal();
-        // Campaigns may run for months (up to 5). Missed is recorded only when
-        // that limit is reached — never after a few days of normal fundraising.
+        // Hard cap: 2 months. Then auto-deactivate once, persist to cloud, and
+        // never blink back on. Missed is recorded only at that close.
         if (ngmyHelpCampaignReachedMaxDuration(startedAt, now)) {
           final campaignId = _activeHelpCampaignId(state);
           final alreadyClosed = campaignId.trim().isNotEmpty &&
@@ -33116,7 +33116,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   // been deactivated that's false for everyone, so calling this after
   // deactivateHelpCampaign() with no snapshot silently checks zero
   // members and nobody is ever marked missed. Defaults to a live lookup
-  // for callers (like the 5-month auto-expiry) that still run this before
+  // for callers (like the 2-month auto-expiry) that still run this before
   // deactivating.
   void _markMissedForNonContributorsInCampaign(
     String campaignId, {
@@ -33128,7 +33128,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
     // Idempotency guard: a campaign can only ever be closed out once. Two
     // devices/sessions racing to deactivate the same campaign (or a
-    // manual Deactivate overlapping the 5-month auto-expiry sweep) would
+    // manual Deactivate overlapping the 2-month auto-expiry sweep) would
     // otherwise each independently decide "these members haven't
     // contributed yet" and both increment missed for them — double
     // counting. helpCampaignClosures already records every campaign this
