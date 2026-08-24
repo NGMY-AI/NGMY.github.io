@@ -235844,7 +235844,7 @@ l=B.f.er(o,0,new A.c8x())
 k=new A.af(m,new A.c8y(),A.V(m).j("af<1>")).gH(0)
 r=j.c
 r.toString
-A.cg(i,i,!0,i,new A.c8z(j,a,q,k,l,o,m),r,i,!0,!0,t.z)},
+A.cg(i,i,!0,i,new A.c8z(j,a,q,l,k,o,m),r,i,!0,!0,t.z)},
 bS0(a){var s=null,r=B.b.i(a.a.toLowerCase()),q=this.c
 q.toString
 A.cg(s,s,!0,s,new A.c8X(this,a,r),q,s,!0,!0,t.z)},
@@ -238373,7 +238373,7 @@ e=A.q(m,A.u(A.a([a3,B.a7,a2,B.U,b,a,s,r,a0.Ax("State / City / Room",q+" / "+p+" 
 d=A.fD(a0.a.w,a1.a)
 if(d==null){d=a0.a.w
 c=a1.p1
-d=A.lB(d,c==null?"":c)}a4=A.a([f,B.aI,e,B.aI,a0.aAC(d,k),B.aI,A.E(A.a([A.B(a0.a6x("Contributions",B.m.t(a1.id),B.yj,B.mV),2),B.ah,A.B(a0.a6x("Open Claims",B.m.t(n.d),B.D7,B.Mb),2),B.ah,A.B(a0.alx("Money Given","$"+A.d6(n.e),B.CI,B.yi,!0),3)],a4),B.G,m,B.i,B.k,0,m,m),B.aW,A.d("Contribution records",m,m,m,m,m,m,A.l(m,m,i,m,m,m,m,m,m,m,m,15,m,m,B.I,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),B.P],a4)
+d=A.lB(d,c==null?"":c)}a4=A.a([f,B.aI,e,B.aI,a0.aAC(d,k),B.aI,A.E(A.a([A.B(a0.a6x("Contributions",B.m.t(a1.id),B.yj,B.mV),2),B.ah,A.B(a0.alx("Money Given","$"+A.d6(n.d),B.CI,B.yi,!0),3),B.ah,A.B(a0.a6x("Open Claims",B.m.t(n.e),B.D7,B.Mb),2)],a4),B.G,m,B.i,B.k,0,m,m),B.aW,A.d("Contribution records",m,m,m,m,m,m,A.l(m,m,i,m,m,m,m,m,m,m,m,15,m,m,B.I,m,m,!0,m,m,m,m,m,m,m,m),m,m,m),B.P],a4)
 f=n.f
 if(f.length===0)a4.push(A.d("No contribution records yet.",m,m,m,m,m,m,A.l(m,m,h,m,m,m,m,m,m,m,m,m,m,m,m,m,m,!0,m,m,m,m,m,m,m,m),m,m,m))
 else{f=A.er(f,0,A.f8(12,"count",t.S),A.V(f).c)
@@ -238468,7 +238468,7 @@ b=b1.b
 b=b0.aeO("Phone Number",b.length===0?a6:b,a7)
 k=A.q(a5,A.u(A.a([h,B.a7,A.q(a5,A.u(A.a([d,c,b,A.kZ(a7?B.aH:B.cp,1,a5),b0.aeO("Email Address",b1.a,a7)],n),B.n,a5,B.i,B.k,0,B.p),B.j,a5,a5,new A.o(g,a5,e,f,a5,a5,B.o),a5,a5,a5,a5,B.br,a5,a5,a5)],n),B.G,a5,B.i,B.k,0,B.p),B.j,a5,a5,new A.o(k,a5,i,j,a5,a5,B.o),a5,a5,a5,a5,B.bE,a5,a5,1/0)
 j=b0.bBk(b1,a7)
-i=A.E(A.a([A.B(b0.a6x("Contributions",B.m.t(b1.id),B.yj,B.mV),2),B.ah,A.B(b0.a6x("Open Claims",B.m.t(q.length),B.D7,B.Mb),2),B.ah,A.B(b0.alx("Money Given","$"+A.d6(p),B.CI,B.yi,!0),3)],n),B.G,a5,B.i,B.k,0,a5,a5)
+i=A.E(A.a([A.B(b0.a6x("Contributions",B.m.t(b1.id),B.yj,B.mV),2),B.ah,A.B(b0.alx("Money Given","$"+A.d6(p),B.CI,B.yi,!0),3),B.ah,A.B(b0.a6x("Open Claims",B.m.t(q.length),B.D7,B.Mb),2)],n),B.G,a5,B.i,B.k,0,a5,a5)
 if(b5.length===0)h=B.dri
 else{h=A.er(b5,0,A.f8(8,"count",t.S),A.V(b5).c).ey(0)
 h=new A.hh(h,A.V(h).j("hh<1>"))
