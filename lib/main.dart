@@ -34833,8 +34833,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       children: [
                         Expanded(flex: 2, child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
                         const SizedBox(width: 8),
-                        Expanded(flex: 2, child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800)),
-                        const SizedBox(width: 8),
                         Expanded(
                           flex: 3,
                           child: _statCard(
@@ -34845,6 +34843,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             emphasize: true,
                           ),
                         ),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800)),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -35108,8 +35108,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     children: [
                       Expanded(flex: 2, child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
                       const SizedBox(width: 8),
-                      Expanded(flex: 2, child: _statCard('Open Claims', openClaims.length.toString(), Colors.red.shade50, Colors.red.shade800)),
-                      const SizedBox(width: 8),
                       Expanded(
                         flex: 3,
                         child: _statCard(
@@ -35120,6 +35118,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           emphasize: true,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: _statCard('Open Claims', openClaims.length.toString(), Colors.red.shade50, Colors.red.shade800)),
                     ],
                   ),
                   const SizedBox(height: 18),
