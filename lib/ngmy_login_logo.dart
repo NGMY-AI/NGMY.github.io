@@ -176,7 +176,18 @@ class _NgmyLoginLogoHeroState extends State<NgmyLoginLogoHero> with TickerProvid
       child: SizedBox(
         width: _kStageSize,
         height: _kStageSize,
-        child: Material(
+        child: GestureDetector(
+          // Claim vertical/horizontal drag in this stage so the parent
+          // login SingleChildScrollView does not scroll while users play
+          // with the logo. Listener below still receives pointer moves.
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: (_) {},
+          onVerticalDragUpdate: (_) {},
+          onVerticalDragEnd: (_) {},
+          onHorizontalDragStart: (_) {},
+          onHorizontalDragUpdate: (_) {},
+          onHorizontalDragEnd: (_) {},
+          child: Material(
         color: Colors.transparent,
         child: Listener(
           behavior: HitTestBehavior.translucent,
@@ -264,6 +275,7 @@ class _NgmyLoginLogoHeroState extends State<NgmyLoginLogoHero> with TickerProvid
           ),
         ),
       ),
+        ),
       ),
     );
   }
