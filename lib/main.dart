@@ -34829,12 +34829,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                     const SizedBox(height: 14),
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _statCard('Helps', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
-                        const SizedBox(width: 10),
-                        Expanded(child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800)),
-                        const SizedBox(width: 10),
-                        Expanded(child: _statCard('Money Given', '\$${formatCurrency(contributionTotal)}', Colors.blue.shade50, Colors.blue.shade800)),
+                        Expanded(flex: 2, child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
+                        const SizedBox(width: 8),
+                        Expanded(flex: 2, child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: _statCard(
+                            'Money Given',
+                            '\$${formatCurrency(contributionTotal)}',
+                            Colors.blue.shade50,
+                            Colors.blue.shade800,
+                            emphasize: true,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -35094,12 +35104,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   _nicknameAdminPanel(u, isDark),
                   const SizedBox(height: 18),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _statCard('Open Claims', openClaims.length.toString(), Colors.red.shade50, Colors.red.shade800)),
-                      const SizedBox(width: 10),
-                      Expanded(child: _statCard('Money Given', '\$${formatCurrency(contributionTotal)}', Colors.blue.shade50, Colors.blue.shade800)),
+                      Expanded(flex: 2, child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800)),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: _statCard('Open Claims', openClaims.length.toString(), Colors.red.shade50, Colors.red.shade800)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 3,
+                        child: _statCard(
+                          'Money Given',
+                          '\$${formatCurrency(contributionTotal)}',
+                          Colors.blue.shade50,
+                          Colors.blue.shade800,
+                          emphasize: true,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 18),
@@ -35466,15 +35486,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _contactDivider(bool isDark) => Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB));
 
-  Widget _statCard(String label, String value, Color bg, Color fg) {
+  Widget _statCard(String label, String value, Color bg, Color fg, {bool emphasize = false}) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.fromLTRB(emphasize ? 12 : 8, 12, emphasize ? 12 : 8, 12),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+          Text(
+            label,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: Colors.black54, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: fg)),
+          SizedBox(
+            height: emphasize ? 34 : 30,
+            width: double.infinity,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text(
+                value,
+                maxLines: 1,
+                softWrap: false,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: emphasize ? 28 : 26,
+                  fontWeight: FontWeight.bold,
+                  color: fg,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
