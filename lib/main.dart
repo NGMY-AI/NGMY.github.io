@@ -13863,7 +13863,7 @@ class _AuthScreenState extends State<AuthScreen> {
       child: ColoredBox(
         color: isDark ? Colors.transparent : Colors.white,
         child: Scaffold(
-          resizeToAvoidBottomInset: false,
+          resizeToAvoidBottomInset: true,
           backgroundColor: isDark ? null : Colors.white,
           body: Stack(
             children: [
@@ -13879,8 +13879,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: SelectionContainer.disabled(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      final keyboard = MediaQuery.viewInsetsOf(context).bottom;
                       return SingleChildScrollView(
-                        physics: const NeverScrollableScrollPhysics(),
+                        // Scroll only when content is taller than the screen
+                        // (small phones). Large phones keep a single non-scrolling view.
+                        physics: const ClampingScrollPhysics(),
+                        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: EdgeInsets.only(bottom: keyboard > 0 ? 12 : 8),
                         child: ConstrainedBox(
                           constraints: BoxConstraints(minHeight: constraints.maxHeight),
                           child: Padding(
