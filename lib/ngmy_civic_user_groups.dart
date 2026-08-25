@@ -39,16 +39,19 @@ class NgmyCivicUserGroupMember {
     required this.email,
     required this.name,
     required this.joinedAt,
+    this.missed = 0,
   });
 
   final String email;
   final String name;
   final DateTime joinedAt;
+  int missed;
 
   Map<String, dynamic> toJson() => {
         'email': email,
         'name': name,
         'joinedAt': joinedAt.toUtc().toIso8601String(),
+        'missed': missed,
       };
 
   factory NgmyCivicUserGroupMember.fromJson(Map<String, dynamic> j) =>
@@ -57,6 +60,7 @@ class NgmyCivicUserGroupMember {
         name: (j['name'] ?? '').toString().trim(),
         joinedAt: DateTime.tryParse((j['joinedAt'] ?? '').toString()) ??
             DateTime.now().toUtc(),
+        missed: j['missed'] is num ? (j['missed'] as num).toInt() : 0,
       );
 }
 
@@ -100,6 +104,7 @@ class NgmyCivicUserGroupLedgerEntry {
     required this.note,
     required this.at,
     required this.byEmail,
+    this.campaignId = '',
   });
 
   final String id;
@@ -109,6 +114,7 @@ class NgmyCivicUserGroupLedgerEntry {
   final String note;
   final DateTime at;
   final String byEmail;
+  final String campaignId;
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -120,6 +126,7 @@ class NgmyCivicUserGroupLedgerEntry {
         'note': note,
         'at': at.toUtc().toIso8601String(),
         'byEmail': byEmail,
+        if (campaignId.isNotEmpty) 'campaignId': campaignId,
       };
 
   factory NgmyCivicUserGroupLedgerEntry.fromJson(Map<String, dynamic> j) {
@@ -136,6 +143,7 @@ class NgmyCivicUserGroupLedgerEntry {
       note: (j['note'] ?? '').toString(),
       at: DateTime.tryParse((j['at'] ?? '').toString()) ?? DateTime.now().toUtc(),
       byEmail: (j['byEmail'] ?? '').toString().toLowerCase().trim(),
+      campaignId: (j['campaignId'] ?? '').toString().trim(),
     );
   }
 }
@@ -151,9 +159,16 @@ class NgmyCivicUserGroup {
     List<NgmyCivicUserGroupMember>? members,
     List<NgmyCivicUserGroupNote>? notes,
     List<NgmyCivicUserGroupLedgerEntry>? ledger,
+    this.helpModeActive = false,
+    this.helpPurpose = '',
+    this.helpCampaignId = '',
+    this.helpCampaignStartedAt,
+    this.ownerMissed = 0,
+    List<String>? helpCampaignClosures,
   })  : members = members ?? <NgmyCivicUserGroupMember>[],
         notes = notes ?? <NgmyCivicUserGroupNote>[],
-        ledger = ledger ?? <NgmyCivicUserGroupLedgerEntry>[];
+        ledger = ledger ?? <NgmyCivicUserGroupLedgerEntry>[],
+        helpCampaignClosures = helpCampaignClosures ?? <String>[];
 
   final String id;
   String name;
@@ -164,6 +179,12 @@ class NgmyCivicUserGroup {
   final List<NgmyCivicUserGroupMember> members;
   final List<NgmyCivicUserGroupNote> notes;
   final List<NgmyCivicUserGroupLedgerEntry> ledger;
+  bool helpModeActive;
+  String helpPurpose;
+  String helpCampaignId;
+  DateTime? helpCampaignStartedAt;
+  int ownerMissed;
+  final List<String> helpCampaignClosures;
 
   bool isOwner(String email) =>
       ownerEmail.toLowerCase().trim() == email.toLowerCase().trim();
@@ -192,6 +213,59 @@ class NgmyCivicUserGroup {
 
   double get balance => totalContributions - totalSpending;
 
+  bool contributedToCampaign(String memberName, String campaignId) {
+    final cid = campaignId.trim();
+    if (cid.isEmpty) return false;
+    final key = memberName.trim().toLowerCase();
+    return ledger.any(
+      (e) =>
+          e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
+          e.campaignId == cid &&
+          e.label.trim().toLowerCase() == key,
+    );
+  }
+
+  void activateHelpMode(String purpose) {
+    helpModeActive = true;
+    helpPurpose = purpose.trim();
+    helpCampaignId =
+        'lg_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 16)}';
+    helpCampaignStartedAt = DateTime.now().toUtc();
+  }
+
+  void deactivateHelpMode() {
+    final cid = helpCampaignId.trim();
+    if (cid.isNotEmpty && !helpCampaignClosures.contains(cid)) {
+      _markMissedForCampaign(cid);
+      helpCampaignClosures.add(cid);
+    }
+    helpModeActive = false;
+    helpPurpose = '';
+    helpCampaignId = '';
+    helpCampaignStartedAt = null;
+  }
+
+  void _markMissedForCampaign(String campaignId) {
+    if (!contributedToCampaign(ownerName, campaignId)) {
+      ownerMissed += 1;
+    }
+    for (final m in members) {
+      if (!contributedToCampaign(m.name, campaignId)) {
+        m.missed += 1;
+      }
+    }
+  }
+
+  int missedFor(String name, String email) {
+    if (isOwner(email)) return ownerMissed;
+    final e = email.toLowerCase().trim();
+    try {
+      return members.firstWhere((m) => m.email == e).missed;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
@@ -202,6 +276,13 @@ class NgmyCivicUserGroup {
         'members': members.map((m) => m.toJson()).toList(),
         'notes': notes.map((n) => n.toJson()).toList(),
         'ledger': ledger.map((e) => e.toJson()).toList(),
+        'helpModeActive': helpModeActive,
+        'helpPurpose': helpPurpose,
+        'helpCampaignId': helpCampaignId,
+        if (helpCampaignStartedAt != null)
+          'helpCampaignStartedAt': helpCampaignStartedAt!.toUtc().toIso8601String(),
+        'ownerMissed': ownerMissed,
+        'helpCampaignClosures': helpCampaignClosures,
       };
 
   factory NgmyCivicUserGroup.fromJson(Map<String, dynamic> j) {
@@ -225,6 +306,18 @@ class NgmyCivicUserGroup {
       notes: asMaps(j['notes']).map(NgmyCivicUserGroupNote.fromJson).toList(),
       ledger:
           asMaps(j['ledger']).map(NgmyCivicUserGroupLedgerEntry.fromJson).toList(),
+      helpModeActive: j['helpModeActive'] == true,
+      helpPurpose: (j['helpPurpose'] ?? '').toString(),
+      helpCampaignId: (j['helpCampaignId'] ?? '').toString(),
+      helpCampaignStartedAt:
+          DateTime.tryParse((j['helpCampaignStartedAt'] ?? '').toString()),
+      ownerMissed: j['ownerMissed'] is num ? (j['ownerMissed'] as num).toInt() : 0,
+      helpCampaignClosures: j['helpCampaignClosures'] is List
+          ? (j['helpCampaignClosures'] as List)
+              .map((e) => e.toString())
+              .where((e) => e.isNotEmpty)
+              .toList()
+          : null,
     );
   }
 }
@@ -233,6 +326,52 @@ class NgmyCivicUserGroup {
 abstract final class NgmyCivicUserGroupsStore {
   static const settingsKey = 'civic_user_groups_v1';
   static const _localKey = 'ngmy_civic_user_groups_v1';
+
+  static List<NgmyCivicUserGroup>? _memoryCache;
+
+  static List<NgmyCivicUserGroup> get cachedGroups =>
+      List.unmodifiable(_memoryCache ?? const []);
+
+  static NgmyCivicUserGroup? cachedById(String id) {
+    final list = _memoryCache;
+    if (list == null) return null;
+    try {
+      return list.firstWhere((g) => g.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<NgmyCivicUserGroup> cachedOwnedBy(String email) {
+    final e = email.toLowerCase().trim();
+    return cachedGroups.where((g) => g.ownerEmail == e).toList();
+  }
+
+  static List<NgmyCivicUserGroup> cachedJoinedBy(String email) {
+    final e = email.toLowerCase().trim();
+    return cachedGroups
+        .where((g) => g.isMember(e) && g.ownerEmail != e)
+        .toList();
+  }
+
+  static void _setMemoryCache(List<NgmyCivicUserGroup> list) {
+    _memoryCache = list;
+  }
+
+  static Future<void> warmCacheFromLocal() async {
+    if (_memoryCache != null && _memoryCache!.isNotEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_localKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        final groups = _groupsFromRoot(Map<String, dynamic>.from(decoded));
+        _setMemoryCache(groups.values.toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+      }
+    } catch (_) {}
+  }
 
   static String _newId() =>
       'cug_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 20)}';
@@ -279,6 +418,7 @@ abstract final class NgmyCivicUserGroupsStore {
     final root = await _loadRoot();
     final list = _groupsFromRoot(root).values.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _setMemoryCache(list);
     return list;
   }
 
@@ -339,6 +479,7 @@ abstract final class NgmyCivicUserGroupsStore {
     groups[group.id] = group;
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
+    _upsertMemoryGroup(group);
     return group;
   }
 
@@ -348,6 +489,21 @@ abstract final class NgmyCivicUserGroupsStore {
     groups[group.id] = group;
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
+    _upsertMemoryGroup(group);
+  }
+
+  static void _upsertMemoryGroup(NgmyCivicUserGroup group) {
+    _memoryCache ??= [];
+    final idx = _memoryCache!.indexWhere((g) => g.id == group.id);
+    if (idx >= 0) {
+      _memoryCache![idx] = group;
+    } else {
+      _memoryCache!.insert(0, group);
+    }
+  }
+
+  static void _removeMemoryGroup(String id) {
+    _memoryCache?.removeWhere((g) => g.id == id);
   }
 
   static Future<void> deleteGroup(String id) async {
@@ -356,6 +512,7 @@ abstract final class NgmyCivicUserGroupsStore {
     groups.remove(id);
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
+    _removeMemoryGroup(id);
   }
 
   static Future<NgmyCivicUserGroup?> joinByCode({

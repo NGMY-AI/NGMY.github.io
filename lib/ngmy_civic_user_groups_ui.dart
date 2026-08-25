@@ -55,6 +55,7 @@ Future<void> openNgmyCivicUserGroupsHub(
   required String userName,
   required bool isAdmin,
 }) {
+  NgmyCivicUserGroupsStore.warmCacheFromLocal();
   return NgmyNavigator.push(
     context,
     NgmyCivicUserGroupsHubScreen(
@@ -91,11 +92,12 @@ class _NgmyCivicUserGroupsHubScreenState
   late final AnimationController _stagger;
   List<NgmyCivicUserGroup> _owned = [];
   List<NgmyCivicUserGroup> _joined = [];
-  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    _owned = NgmyCivicUserGroupsStore.cachedOwnedBy(widget.userEmail);
+    _joined = NgmyCivicUserGroupsStore.cachedJoinedBy(widget.userEmail);
     _bolt = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -125,14 +127,12 @@ class _NgmyCivicUserGroupsHubScreenState
   }
 
   Future<void> _reload() async {
-    setState(() => _loading = true);
     final owned = await NgmyCivicUserGroupsStore.ownedBy(widget.userEmail);
     final joined = await NgmyCivicUserGroupsStore.joinedBy(widget.userEmail);
     if (!mounted) return;
     setState(() {
       _owned = owned;
       _joined = joined;
-      _loading = false;
     });
   }
 
@@ -299,11 +299,7 @@ class _NgmyCivicUserGroupsHubScreenState
                   ),
                 ),
                 Expanded(
-                  child: _loading
-                      ? const Center(
-                          child: CircularProgressIndicator(color: _kBolt),
-                        )
-                      : ListView(
+                  child: ListView(
                           padding: const EdgeInsets.fromLTRB(18, 10, 18, 36),
                           children: [
                             _LightningHeroPanel(
@@ -746,6 +742,7 @@ class _NgmyCivicUserGroupHomeScreenState
   @override
   void initState() {
     super.initState();
+    _group = NgmyCivicUserGroupsStore.cachedById(widget.groupId);
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1600),
@@ -772,6 +769,23 @@ class _NgmyCivicUserGroupHomeScreenState
 
   Future<void> _addLedger(NgmyCivicUserGroupLedgerKind kind) async {
     if (!_isOwner || _group == null) return;
+    if (kind == NgmyCivicUserGroupLedgerKind.contribution &&
+        !_group!.helpModeActive) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Activate help mode before recording a contribution.'),
+        ),
+      );
+      return;
+    }
+    if (kind == NgmyCivicUserGroupLedgerKind.contribution &&
+        _group!.helpModeActive &&
+        _group!.helpCampaignId.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Help mode is active but missing a campaign.')),
+      );
+      return;
+    }
     final people = <({String name, String email})>[
       (name: _group!.ownerName, email: _group!.ownerEmail),
       ..._group!.members.map((m) => (name: m.name, email: m.email)),
@@ -780,6 +794,10 @@ class _NgmyCivicUserGroupHomeScreenState
       context,
       kind: kind,
       members: people,
+      helpPurpose: kind == NgmyCivicUserGroupLedgerKind.contribution &&
+              _group!.helpModeActive
+          ? _group!.helpPurpose
+          : null,
     );
     if (result == null || !mounted) return;
     if (result.amount <= 0) {
@@ -787,6 +805,15 @@ class _NgmyCivicUserGroupHomeScreenState
         const SnackBar(content: Text('Enter a valid amount.')),
       );
       return;
+    }
+    if (kind == NgmyCivicUserGroupLedgerKind.contribution) {
+      final verified = await _showLightningContributionVerifySheet(
+        context,
+        memberName: result.label,
+        amount: result.amount,
+        helpPurpose: _group!.helpModeActive ? _group!.helpPurpose : null,
+      );
+      if (verified != true || !mounted) return;
     }
     _group!.ledger.insert(
       0,
@@ -798,8 +825,26 @@ class _NgmyCivicUserGroupHomeScreenState
         note: result.note,
         at: DateTime.now().toUtc(),
         byEmail: widget.userEmail,
+        campaignId: kind == NgmyCivicUserGroupLedgerKind.contribution &&
+                _group!.helpModeActive
+            ? _group!.helpCampaignId
+            : '',
       ),
     );
+    await NgmyCivicUserGroupsStore.saveGroup(_group!);
+    await _reload();
+  }
+
+  Future<void> _showHelpModeSheet() async {
+    if (!_isOwner || _group == null) return;
+    final g = _group!;
+    final updated = await _showLightningHelpModeSheet(
+      context,
+      group: g,
+      pulse: _pulse,
+    );
+    if (updated == null || !mounted) return;
+    _group = updated;
     await NgmyCivicUserGroupsStore.saveGroup(_group!);
     await _reload();
   }
@@ -874,12 +919,6 @@ class _NgmyCivicUserGroupHomeScreenState
   @override
   Widget build(BuildContext context) {
     final g = _group;
-    if (g == null) {
-      return const Scaffold(
-        backgroundColor: _kInk,
-        body: Center(child: CircularProgressIndicator(color: _kBolt)),
-      );
-    }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _kLightningStatusBar,
@@ -905,11 +944,18 @@ class _NgmyCivicUserGroupHomeScreenState
                     padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
                     child: _LightningTopBar(
                       title: 'GROUP',
-                      groupCode: g.inviteCode,
-                      onCopyCode: () => _copyGroupCodeSnack(context, g.inviteCode),
+                      groupCode: g?.inviteCode,
+                      onCopyCode: g == null
+                          ? null
+                          : () => _copyGroupCodeSnack(context, g.inviteCode),
                       onBack: () => NgmyNavigator.pop(context),
+                      helpModeActive: g?.helpModeActive ?? false,
+                      showHelpButton: _isOwner,
+                      helpPulse: _pulse,
+                      onHelpTap: _isOwner ? _showHelpModeSheet : null,
                     ),
                   ),
+                if (g != null) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                   child: _LightningStatFrame(
@@ -965,15 +1011,16 @@ class _NgmyCivicUserGroupHomeScreenState
                         (2, 'Invite'),
                       ])
                         Expanded(
-                          child: TextButton(
-                            onPressed: () => setState(() => _tab = e.$1),
-                            child: Text(
-                              e.$2,
-                              style: TextStyle(
-                                color: _tab == e.$1 ? _kBolt : Colors.white38,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                              ),
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: e.$1 == 2 ? 0 : 6,
+                            ),
+                            child: _LightningTabFrame(
+                              label: e.$2,
+                              selected: _tab == e.$1,
+                              pulse: _pulse,
+                              orbit: _orbit,
+                              onTap: () => setState(() => _tab = e.$1),
                             ),
                           ),
                         ),
@@ -981,6 +1028,10 @@ class _NgmyCivicUserGroupHomeScreenState
                   ),
                 ),
                 Expanded(child: _buildTab(g)),
+                ] else
+                  const Expanded(
+                    child: SizedBox.shrink(),
+                  ),
               ],
             ),
           ),
@@ -1107,9 +1158,6 @@ class _NgmyCivicUserGroupHomeScreenState
                         letterSpacing: 2,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.copy_rounded,
-                        color: _kBolt.withValues(alpha: 0.85), size: 20),
                   ],
                 ),
               ),
@@ -1220,6 +1268,10 @@ class _NgmyCivicUserGroupHomeScreenState
   }) {
     final total = _contributionTotalForMember(group, name);
     final hasPaid = total > 0;
+    final missedTotal = group.missedFor(name, email);
+    final missedThisRound = group.helpModeActive &&
+        group.helpCampaignId.isNotEmpty &&
+        !group.contributedToCampaign(name, group.helpCampaignId);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -1245,8 +1297,16 @@ class _NgmyCivicUserGroupHomeScreenState
                     border: Border.all(color: _kBolt.withValues(alpha: 0.4)),
                   ),
                   child: Icon(
-                    hasPaid ? Icons.bolt_rounded : Icons.person_outline_rounded,
-                    color: hasPaid ? _kBolt : Colors.white38,
+                    missedThisRound
+                        ? Icons.warning_amber_rounded
+                        : hasPaid
+                            ? Icons.bolt_rounded
+                            : Icons.person_outline_rounded,
+                    color: missedThisRound
+                        ? Colors.orangeAccent
+                        : hasPaid
+                            ? _kBolt
+                            : Colors.white38,
                     size: 20,
                   ),
                 ),
@@ -1263,11 +1323,21 @@ class _NgmyCivicUserGroupHomeScreenState
                               color: Colors.white38, fontSize: 11)),
                       const SizedBox(height: 2),
                       Text(
-                        hasPaid
-                            ? 'Contributed \$${total.toStringAsFixed(2)} · tap for profile'
-                            : 'No contributions yet · tap for profile',
+                        missedThisRound
+                            ? 'Missed this help round · tap for profile'
+                            : hasPaid
+                                ? 'Contributed \$${total.toStringAsFixed(2)} · tap for profile'
+                                : missedTotal > 0
+                                    ? '$missedTotal missed · tap for profile'
+                                    : 'No contributions yet · tap for profile',
                         style: TextStyle(
-                          color: hasPaid ? _kBolt.withValues(alpha: 0.85) : Colors.orangeAccent.withValues(alpha: 0.85),
+                          color: missedThisRound
+                              ? Colors.orangeAccent.withValues(alpha: 0.9)
+                              : hasPaid
+                                  ? _kBolt.withValues(alpha: 0.85)
+                                  : missedTotal > 0
+                                      ? Colors.orangeAccent.withValues(alpha: 0.85)
+                                      : Colors.orangeAccent.withValues(alpha: 0.85),
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1352,12 +1422,20 @@ class _LightningTopBar extends StatelessWidget {
     required this.onBack,
     this.groupCode,
     this.onCopyCode,
+    this.showHelpButton = false,
+    this.helpModeActive = false,
+    this.helpPulse,
+    this.onHelpTap,
   });
 
   final String title;
   final VoidCallback onBack;
   final String? groupCode;
   final VoidCallback? onCopyCode;
+  final bool showHelpButton;
+  final bool helpModeActive;
+  final Animation<double>? helpPulse;
+  final VoidCallback? onHelpTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1406,29 +1484,17 @@ class _LightningTopBar extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 4),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    groupCode!,
-                                    textAlign: TextAlign.center,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: _kBolt,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 2,
-                                      fontSize: 17,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Icon(Icons.copy_rounded,
-                                    size: 16,
-                                    color: _kBolt.withValues(alpha: 0.85)),
-                              ],
+                            child: Text(
+                              groupCode!,
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: _kBolt,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2,
+                                fontSize: 17,
+                              ),
                             ),
                           ),
                         ),
@@ -1448,9 +1514,138 @@ class _LightningTopBar extends StatelessWidget {
                     ),
                   ),
           ),
-          const SizedBox(width: 48),
+          if (showHelpButton)
+            _HelpModeTopButton(
+              active: helpModeActive,
+              pulse: helpPulse,
+              onTap: onHelpTap,
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
+    );
+  }
+}
+
+class _HelpModeTopButton extends StatelessWidget {
+  const _HelpModeTopButton({
+    required this.active,
+    this.pulse,
+    this.onTap,
+  });
+
+  final bool active;
+  final Animation<double>? pulse;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget iconButton(double glow) {
+      return IconButton(
+        tooltip: active ? 'Help mode active' : 'Activate help mode',
+        onPressed: onTap,
+        icon: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active
+                ? Colors.redAccent.withValues(alpha: 0.18 + glow * 0.12)
+                : Colors.white.withValues(alpha: 0.06),
+            border: Border.all(
+              color: active
+                  ? Colors.redAccent.withValues(alpha: 0.65 + glow * 0.25)
+                  : _kBolt.withValues(alpha: 0.35),
+              width: active ? 1.6 : 1.1,
+            ),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: Colors.redAccent.withValues(alpha: 0.25 + glow * 0.35),
+                      blurRadius: 14 + glow * 8,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            Icons.volunteer_activism_rounded,
+            size: 20,
+            color: active ? Colors.redAccent : _kBolt.withValues(alpha: 0.85),
+          ),
+        ),
+      );
+    }
+
+    if (pulse == null || !active) return iconButton(0);
+    return AnimatedBuilder(
+      animation: pulse!,
+      builder: (context, _) => iconButton(pulse!.value),
+    );
+  }
+}
+
+class _LightningTabFrame extends StatelessWidget {
+  const _LightningTabFrame({
+    required this.label,
+    required this.selected,
+    required this.pulse,
+    required this.orbit,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Animation<double> pulse;
+  final Animation<double> orbit;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: Listenable.merge([pulse, orbit]),
+      builder: (context, _) {
+        final g = pulse.value;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: CustomPaint(
+              painter: _LightningFramePainter(
+                intensity: selected ? 0.55 + g * 0.35 : 0.25 + g * 0.15,
+                corners: true,
+                phase: orbit.value,
+              ),
+              child: Ink(
+                height: 40,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  color: selected
+                      ? _kBolt.withValues(alpha: 0.12 + g * 0.06)
+                      : _kPanel.withValues(alpha: 0.85),
+                  border: Border.all(
+                    color: selected
+                        ? _kBolt.withValues(alpha: 0.55 + g * 0.25)
+                        : _kBolt.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: selected ? _kBoltHot : Colors.white38,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -1974,6 +2169,7 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
   BuildContext context, {
   required NgmyCivicUserGroupLedgerKind kind,
   required List<({String name, String email})> members,
+  String? helpPurpose,
 }) {
   final isContribution = kind == NgmyCivicUserGroupLedgerKind.contribution;
   final amountC = TextEditingController();
@@ -2041,6 +2237,28 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white54, fontSize: 12),
                     ),
+                    if (helpPurpose != null && helpPurpose.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.redAccent.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          'Help mode: ${helpPurpose.trim()}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 14),
                   if (isContribution) ...[
@@ -2362,12 +2580,16 @@ Future<void> _showLightningMemberProfileSheet(
 }) {
   final contributions = _contributionsForMember(group, name);
   final total = contributions.fold<double>(0, (s, e) => s + e.amount);
-  final othersPaid = group.ledger.any(
-    (e) =>
-        e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
-        e.label.trim().toLowerCase() != name.trim().toLowerCase(),
-  );
-  final missed = total <= 0 && othersPaid;
+  final missedTotal = group.missedFor(name, email);
+  final missedThisRound = group.helpModeActive &&
+      group.helpCampaignId.isNotEmpty &&
+      !group.contributedToCampaign(name, group.helpCampaignId);
+  final campaignContributions = group.helpCampaignId.isEmpty
+      ? const <NgmyCivicUserGroupLedgerEntry>[]
+      : contributions
+          .where((e) => e.campaignId == group.helpCampaignId)
+          .toList();
+  final missed = missedThisRound || (missedTotal > 0 && total <= 0);
 
   return showModalBottomSheet<void>(
     context: context,
@@ -2456,7 +2678,11 @@ Future<void> _showLightningMemberProfileSheet(
                     child: Column(
                       children: [
                         Text(
-                          missed ? 'NO CONTRIBUTIONS YET' : 'CONTRIBUTION STATUS',
+                          missedThisRound
+                              ? 'MISSED THIS HELP ROUND'
+                              : missedTotal > 0
+                                  ? 'MISSED CONTRIBUTIONS'
+                                  : 'CONTRIBUTION STATUS',
                           style: TextStyle(
                             color: missed
                                 ? Colors.orangeAccent
@@ -2468,9 +2694,11 @@ Future<void> _showLightningMemberProfileSheet(
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          missed
-                              ? 'This member has not contributed while others have. Follow up if a gift was expected.'
-                              : 'Total contributed: \$${total.toStringAsFixed(2)}',
+                          missedThisRound
+                              ? 'Not recorded for "${group.helpPurpose.trim()}". They will be marked missed when help mode ends.'
+                              : missedTotal > 0
+                                  ? '$missedTotal missed contribution${missedTotal == 1 ? '' : 's'} total · \$${total.toStringAsFixed(2)} contributed overall'
+                                  : 'Total contributed: \$${total.toStringAsFixed(2)}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white70,
@@ -2478,6 +2706,30 @@ Future<void> _showLightningMemberProfileSheet(
                             fontSize: 13,
                           ),
                         ),
+                        if (group.helpModeActive &&
+                            group.helpPurpose.trim().isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'Active help: ${group.helpPurpose.trim()}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.redAccent.withValues(alpha: 0.85),
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                        if (campaignContributions.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'This round: \$${campaignContributions.fold<double>(0, (s, e) => s + e.amount).toStringAsFixed(2)}',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: _kBolt,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -2548,6 +2800,264 @@ Future<void> _showLightningMemberProfileSheet(
       );
     },
   );
+}
+
+Future<bool?> _showLightningContributionVerifySheet(
+  BuildContext context, {
+  required String memberName,
+  required double amount,
+  String? helpPurpose,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+        child: _LightningSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kBolt.withValues(alpha: 0.14),
+                    border: Border.all(color: _kBolt.withValues(alpha: 0.55)),
+                  ),
+                  child: const Icon(Icons.fact_check_rounded, color: _kBolt),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Verify contribution',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _verifyRow('Member', memberName),
+              _verifyRow('Amount', '\$${amount.toStringAsFixed(2)}'),
+              if (helpPurpose != null && helpPurpose.trim().isNotEmpty)
+                _verifyRow('Help for', helpPurpose.trim()),
+              const SizedBox(height: 10),
+              const Text(
+                'Make sure this is correct before saving to the ledger.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Go back',
+                          style: TextStyle(color: Colors.white54)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kBolt,
+                        foregroundColor: _kInk,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Confirm & save',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _verifyRow(String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Text(label,
+            style: const TextStyle(color: Colors.white38, fontSize: 12)),
+        const Spacer(),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
+  BuildContext context, {
+  required NgmyCivicUserGroup group,
+  required Animation<double> pulse,
+}) {
+  final purposeC = TextEditingController(text: group.helpPurpose);
+  final active = group.helpModeActive;
+
+  return showModalBottomSheet<NgmyCivicUserGroup>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: _LightningSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AnimatedBuilder(
+                animation: pulse,
+                builder: (context, _) {
+                  final g = pulse.value;
+                  return Center(
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: active
+                            ? Colors.redAccent.withValues(alpha: 0.15 + g * 0.08)
+                            : _kBolt.withValues(alpha: 0.14),
+                        border: Border.all(
+                          color: active
+                              ? Colors.redAccent.withValues(alpha: 0.55 + g * 0.25)
+                              : _kBolt.withValues(alpha: 0.5),
+                        ),
+                        boxShadow: active
+                            ? [
+                                BoxShadow(
+                                  color: Colors.redAccent.withValues(alpha: 0.2 + g * 0.2),
+                                  blurRadius: 16,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Icon(
+                        Icons.volunteer_activism_rounded,
+                        color: active ? Colors.redAccent : _kBolt,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              Text(
+                active ? 'Help mode active' : 'Activate help mode',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                active
+                    ? 'Members who are not recorded for this round will be marked missed when you turn help mode off.'
+                    : 'Start a help round. Record contributions while it is on.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: purposeC,
+                maxLines: 2,
+                style: const TextStyle(color: Colors.white),
+                decoration: _lightningFieldDecoration('What is this help for?'),
+              ),
+              const SizedBox(height: 18),
+              if (active) ...[
+                FilledButton(
+                  onPressed: () {
+                    group.helpPurpose = purposeC.text.trim();
+                    group.deactivateHelpMode();
+                    Navigator.pop(ctx, group);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Deactivate help mode',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () {
+                    group.helpPurpose = purposeC.text.trim();
+                    Navigator.pop(ctx, group);
+                  },
+                  child: const Text('Save purpose only',
+                      style: TextStyle(color: _kBolt)),
+                ),
+              ] else
+                FilledButton(
+                  onPressed: () {
+                    final purpose = purposeC.text.trim();
+                    if (purpose.isEmpty) return;
+                    group.activateHelpMode(purpose);
+                    Navigator.pop(ctx, group);
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kBolt,
+                    foregroundColor: _kInk,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: const Text(
+                    'Activate help mode',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel',
+                    style: TextStyle(color: Colors.white54)),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  ).whenComplete(purposeC.dispose);
 }
 
 class _LightningSheetShell extends StatelessWidget {
