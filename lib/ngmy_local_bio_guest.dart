@@ -10,9 +10,8 @@ import 'ngmy_bio_templates.dart';
 import 'ngmy_guest_link_missing.dart';
 import 'ngmy_local_bio_launch_stub.dart' if (dart.library.html) 'ngmy_local_bio_launch_web.dart';
 import 'ngmy_local_bio_publish_registry.dart';
+import 'ngmy_guest_html_splash_stub.dart' if (dart.library.html) 'ngmy_guest_html_splash_web.dart';
 import 'ngmy_platform_graphics.dart';
-
-const _kBioGold = Color(0xFF0EA5E9);
 
 String? ngmyPublishedLocalBioSlugFromLaunch() => ngmyReadLocalBioSlugFromLaunchUrl();
 
@@ -93,6 +92,7 @@ class _NgmyGuestLocalBioHostScreenState extends State<NgmyGuestLocalBioHostScree
           _loading = false;
         });
         _applyTemplateChrome(doc);
+        ngmyReleaseGuestHtmlSplash();
         await _unfold.forward();
         return;
       }
@@ -104,25 +104,17 @@ class _NgmyGuestLocalBioHostScreenState extends State<NgmyGuestLocalBioHostScree
       _loading = false;
       _error = 'We could not open this Bio page. Ask the host to copy the full published link and try again.';
     });
+    ngmyReleaseGuestHtmlSplash();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: ngmyBioSystemUiOverlay(Colors.white),
+        value: ngmyBioSystemUiOverlay(const Color(0xFF121212)),
         child: const Scaffold(
-          backgroundColor: Colors.white,
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: _kBioGold),
-                SizedBox(height: 16),
-                Text('Opening local bio…', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
+          backgroundColor: Color(0xFF121212),
+          body: SizedBox.expand(),
         ),
       );
     }

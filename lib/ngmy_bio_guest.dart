@@ -10,9 +10,8 @@ import 'ngmy_bio_renderer.dart';
 import 'ngmy_bio_templates.dart';
 import 'ngmy_guest_link_missing.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
+import 'ngmy_guest_html_splash_stub.dart' if (dart.library.html) 'ngmy_guest_html_splash_web.dart';
 import 'ngmy_platform_graphics.dart';
-
-const _kBioGold = Color(0xFFB8860B);
 
 String? ngmyPublishedBioSlugFromLaunch() => ngmyReadBioSlugFromLaunchUrl();
 
@@ -86,6 +85,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
             _loading = false;
           });
           _applyTemplateChrome(doc);
+          ngmyReleaseGuestHtmlSplash();
           return;
         }
         if (attempt == 0) await Future<void>.delayed(const Duration(milliseconds: 400));
@@ -99,25 +99,19 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       _loading = false;
       _error = 'This Bio link is no longer available. Ask the owner for a new link.';
     });
+    ngmyReleaseGuestHtmlSplash();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
+      // Keep a blank underlay while the HTML "Loading NGMY" splash stays up.
+      // Do not show a second "Opening bio…" loader.
       return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: ngmyBioSystemUiOverlay(Colors.white),
+        value: ngmyBioSystemUiOverlay(const Color(0xFF121212)),
         child: const Scaffold(
-          backgroundColor: Colors.white,
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: _kBioGold),
-                SizedBox(height: 16),
-                Text('Opening bio…', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
+          backgroundColor: Color(0xFF121212),
+          body: SizedBox.expand(),
         ),
       );
     }
