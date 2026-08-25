@@ -29313,6 +29313,55 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         letterSpacing: 0.2,
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          final display =
+                              (widget.user.fullName ?? '').toString().trim().isNotEmpty
+                                  ? widget.user.fullName!.trim()
+                                  : (widget.user.username.trim().isNotEmpty
+                                      ? widget.user.username.trim()
+                                      : widget.user.email.split('@').first);
+                          openNgmyCivicUserGroupsHub(
+                            context,
+                            userEmail: widget.user.email,
+                            userName: display,
+                            isAdmin: widget.user.isAdmin,
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(16),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: const Color(0xFF67E8F9).withOpacity(0.16),
+                            border: Border.all(
+                              color: const Color(0xFF67E8F9).withOpacity(0.55),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.bolt_rounded,
+                                  color: Colors.white.withOpacity(0.95), size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Lightning Groups',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.95),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 13,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -37565,26 +37614,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                           ),
                         ),
-                        IconButton(
-                          tooltip: 'Lightning Groups',
-                          onPressed: () {
-                            final display = (widget.user.fullName ?? '').toString().trim().isNotEmpty
-                                ? widget.user.fullName!.trim()
-                                : (widget.user.username.trim().isNotEmpty
-                                    ? widget.user.username.trim()
-                                    : widget.user.email.split('@').first);
-                            openNgmyCivicUserGroupsHub(
-                              context,
-                              userEmail: widget.user.email,
-                              userName: display,
-                              isAdmin: widget.user.isAdmin,
-                            );
-                          },
-                          icon: Icon(
-                            Icons.bolt_rounded,
-                            color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0E7490),
-                          ),
-                        ),
                         if (_canViewCivicIdForCurrentUser())
                           IconButton(
                             tooltip: 'View Registry ID / Passport',
@@ -37593,7 +37622,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               Icons.badge_outlined,
                               color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
-                          ),
+                          )
+                        else
+                          const SizedBox(width: 48),
                       ],
                     ),
                   ),

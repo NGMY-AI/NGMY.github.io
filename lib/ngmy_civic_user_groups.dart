@@ -345,6 +345,46 @@ class NgmyCivicUserGroup {
         .toList();
   }
 
+  bool clearMissedEntry({required String entryId}) {
+    final idx = missedHistory.indexWhere((e) => e.id == entryId);
+    if (idx < 0) return false;
+    final entry = missedHistory.removeAt(idx);
+    if (isOwner(entry.memberEmail)) {
+      if (ownerMissed > 0) ownerMissed -= 1;
+    } else {
+      for (final m in members) {
+        if (m.email == entry.memberEmail) {
+          if (m.missed > 0) m.missed -= 1;
+          break;
+        }
+      }
+    }
+    return true;
+  }
+
+  void clearMissedForCampaignContribution({
+    required String memberName,
+    required String memberEmail,
+    required String campaignId,
+  }) {
+    final cid = campaignId.trim();
+    if (cid.isEmpty) return;
+    final emailKey = memberEmail.toLowerCase().trim();
+    final nameKey = memberName.trim().toLowerCase();
+    final ids = missedHistory
+        .where(
+          (e) =>
+              e.campaignId == cid &&
+              (e.memberEmail == emailKey ||
+                  e.memberName.trim().toLowerCase() == nameKey),
+        )
+        .map((e) => e.id)
+        .toList();
+    for (final id in ids) {
+      clearMissedEntry(entryId: id);
+    }
+  }
+
   int missedFor(String name, String email) {
     if (isOwner(email)) return ownerMissed;
     final e = email.toLowerCase().trim();
@@ -353,6 +393,15 @@ class NgmyCivicUserGroup {
     } catch (_) {
       return 0;
     }
+  }
+
+  String? emailForMemberName(String name) {
+    final key = name.trim().toLowerCase();
+    if (ownerName.trim().toLowerCase() == key) return ownerEmail;
+    for (final m in members) {
+      if (m.name.trim().toLowerCase() == key) return m.email;
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() => {

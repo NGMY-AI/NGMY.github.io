@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_civic_user_groups.dart';
 import 'ngmy_civic_user_groups_payments.dart';
@@ -68,9 +69,11 @@ class _MissedHistoryItem extends _MemberHistoryItem {
     required super.at,
     required this.purpose,
     required this.pending,
+    this.entryId = '',
   });
   final String purpose;
   final bool pending;
+  final String entryId;
 }
 
 List<_MemberHistoryItem> _memberHistoryItems(
@@ -87,6 +90,7 @@ List<_MemberHistoryItem> _memberHistoryItems(
         at: e.at,
         purpose: e.purpose,
         pending: false,
+        entryId: e.id,
       ),
     ),
   ];
@@ -105,6 +109,25 @@ List<_MemberHistoryItem> _memberHistoryItems(
   }
   items.sort((a, b) => b.at.compareTo(a.at));
   return items;
+}
+
+Future<void> _openLightningCashApp(String raw) async {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return;
+  final handle = trimmed.startsWith(r'$') ? trimmed.substring(1) : trimmed;
+  final uri = Uri.parse('https://cash.app/\$$handle');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+Future<void> _callLightningPhone(String raw) async {
+  final phone = raw.replaceAll(RegExp(r'[^\d+]'), '');
+  if (phone.isEmpty) return;
+  final uri = Uri.parse('tel:$phone');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 }
 
 Future<void> openNgmyCivicUserGroupsHub(
@@ -889,6 +912,18 @@ class _NgmyCivicUserGroupHomeScreenState
             : '',
       ),
     );
+    if (kind == NgmyCivicUserGroupLedgerKind.contribution &&
+        _group!.helpModeActive &&
+        _group!.helpCampaignId.isNotEmpty) {
+      final memberEmail = _group!.emailForMemberName(result.label);
+      if (memberEmail != null) {
+        _group!.clearMissedForCampaignContribution(
+          memberName: result.label,
+          memberEmail: memberEmail,
+          campaignId: _group!.helpCampaignId,
+        );
+      }
+    }
     await NgmyCivicUserGroupsStore.saveGroup(_group!);
     await _reload();
   }
@@ -942,6 +977,14 @@ class _NgmyCivicUserGroupHomeScreenState
       role: role,
       joinedAt: joinedAt,
       pulse: _pulse,
+      isOwner: _isOwner,
+      onClearMissed: _isOwner
+          ? (entryId) async {
+              g.clearMissedEntry(entryId: entryId);
+              await NgmyCivicUserGroupsStore.saveGroup(g);
+              await _reload();
+            }
+          : null,
     );
   }
 
@@ -2657,6 +2700,8 @@ Future<void> _showLightningMemberProfileSheet(
   required String role,
   DateTime? joinedAt,
   required Animation<double> pulse,
+  bool isOwner = false,
+  Future<void> Function(String entryId)? onClearMissed,
 }) {
   final contributions = _contributionsForMember(group, name);
   final total = contributions.fold<double>(0, (s, e) => s + e.amount);
@@ -2691,6 +2736,7 @@ Future<void> _showLightningMemberProfileSheet(
             return StatefulBuilder(
               builder: (context, setLocal) {
                 return _LightningSheetShell(
+                  cornerBolts: false,
                   child: _MemberProfileSheetBody(
                     scrollController: scrollController,
                     group: group,
@@ -2706,7 +2752,16 @@ Future<void> _showLightningMemberProfileSheet(
                     campaignContributions: campaignContributions,
                     missed: missed,
                     historyFilter: historyFilter,
+                    isOwner: isOwner,
                     onFilterChanged: (f) => setLocal(() => historyFilter = f),
+                    onClearMissed: onClearMissed == null
+                        ? null
+                        : (entryId) async {
+                            await onClearMissed(entryId);
+                            if (context.mounted) {
+                              setLocal(() {});
+                            }
+                          },
                   ),
                 );
               },
@@ -2734,7 +2789,9 @@ class _MemberProfileSheetBody extends StatelessWidget {
     required this.campaignContributions,
     required this.missed,
     required this.historyFilter,
+    required this.isOwner,
     required this.onFilterChanged,
+    this.onClearMissed,
   });
 
   final ScrollController scrollController;
@@ -2751,7 +2808,9 @@ class _MemberProfileSheetBody extends StatelessWidget {
   final List<NgmyCivicUserGroupLedgerEntry> campaignContributions;
   final bool missed;
   final _MemberHistoryFilter historyFilter;
+  final bool isOwner;
   final ValueChanged<_MemberHistoryFilter> onFilterChanged;
+  final Future<void> Function(String entryId)? onClearMissed;
 
   List<_MemberHistoryItem> get _filteredHistory {
     final all = _memberHistoryItems(group, name, email);
@@ -2767,6 +2826,20 @@ class _MemberProfileSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredHistory;
+    final liveContributions = _contributionsForMember(group, name);
+    final liveTotal =
+        liveContributions.fold<double>(0, (s, e) => s + e.amount);
+    final liveMissedTotal = group.missedFor(name, email);
+    final liveMissedThisRound = group.helpModeActive &&
+        group.helpCampaignId.isNotEmpty &&
+        !group.contributedToCampaign(name, group.helpCampaignId);
+    final liveCampaignContributions = group.helpCampaignId.isEmpty
+        ? const <NgmyCivicUserGroupLedgerEntry>[]
+        : liveContributions
+            .where((e) => e.campaignId == group.helpCampaignId)
+            .toList();
+    final liveMissed =
+        liveMissedThisRound || (liveMissedTotal > 0 && liveTotal <= 0);
     return ListView(
       controller: scrollController,
       children: [
@@ -2792,8 +2865,8 @@ class _MemberProfileSheetBody extends StatelessWidget {
                   ],
                 ),
                 child: Icon(
-                  missed ? Icons.warning_amber_rounded : Icons.bolt_rounded,
-                  color: missed ? Colors.orangeAccent : _kBolt,
+                  liveMissed ? Icons.warning_amber_rounded : Icons.bolt_rounded,
+                  color: liveMissed ? Colors.orangeAccent : _kBolt,
                   size: 32,
                 ),
               ),
@@ -2830,20 +2903,20 @@ class _MemberProfileSheetBody extends StatelessWidget {
             color: _kPanel,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: (missed ? Colors.orangeAccent : _kBolt)
+              color: (liveMissed ? Colors.orangeAccent : _kBolt)
                   .withValues(alpha: 0.35),
             ),
           ),
           child: Column(
             children: [
               Text(
-                missedThisRound
+                liveMissedThisRound
                     ? 'MISSED THIS HELP ROUND'
-                    : missedTotal > 0
+                    : liveMissedTotal > 0
                         ? 'MISSED CONTRIBUTIONS'
                         : 'CONTRIBUTION STATUS',
                 style: TextStyle(
-                  color: missed
+                  color: liveMissed
                       ? Colors.orangeAccent
                       : _kBolt.withValues(alpha: 0.9),
                   fontWeight: FontWeight.w800,
@@ -2853,11 +2926,11 @@ class _MemberProfileSheetBody extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                missedThisRound
+                liveMissedThisRound
                     ? 'Not recorded for "${group.helpPurpose.trim()}". They will be marked missed when help mode ends.'
-                    : missedTotal > 0
-                        ? '$missedTotal missed contribution${missedTotal == 1 ? '' : 's'} total · \$${total.toStringAsFixed(2)} contributed overall'
-                        : 'Total contributed: \$${total.toStringAsFixed(2)}',
+                    : liveMissedTotal > 0
+                        ? '$liveMissedTotal missed contribution${liveMissedTotal == 1 ? '' : 's'} total · \$${liveTotal.toStringAsFixed(2)} contributed overall'
+                        : 'Total contributed: \$${liveTotal.toStringAsFixed(2)}',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white70,
@@ -2877,10 +2950,10 @@ class _MemberProfileSheetBody extends StatelessWidget {
                   ),
                 ),
               ],
-              if (campaignContributions.isNotEmpty) ...[
+              if (liveCampaignContributions.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Text(
-                  'This round: \$${campaignContributions.fold<double>(0, (s, e) => s + e.amount).toStringAsFixed(2)}',
+                  'This round: \$${liveCampaignContributions.fold<double>(0, (s, e) => s + e.amount).toStringAsFixed(2)}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: _kBolt,
@@ -3027,7 +3100,7 @@ class _MemberProfileSheetBody extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: _kPanel,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: Colors.orangeAccent.withValues(alpha: missedItem.pending ? 0.35 : 0.5),
         ),
@@ -3058,14 +3131,32 @@ class _MemberProfileSheetBody extends StatelessWidget {
               ],
             ),
           ),
-          Text(
-            missedItem.pending ? 'PENDING' : 'MISSED',
-            style: const TextStyle(
-              color: Colors.orangeAccent,
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
+          if (isOwner &&
+              !missedItem.pending &&
+              missedItem.entryId.isNotEmpty &&
+              onClearMissed != null)
+            TextButton(
+              onPressed: () => onClearMissed!(missedItem.entryId),
+              style: TextButton.styleFrom(
+                foregroundColor: _kHelpGreenHot,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Clear',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
+              ),
+            )
+          else
+            Text(
+              missedItem.pending ? 'PENDING' : 'MISSED',
+              style: const TextStyle(
+                color: Colors.orangeAccent,
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -3409,6 +3500,7 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeMemberSheet(
           maxChildSize: 0.9,
           builder: (context, scrollController) {
             return _LightningSheetShell(
+              cornerBolts: false,
               child: ListView(
                 controller: scrollController,
                 children: [
@@ -3448,6 +3540,8 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeMemberSheet(
                       label: 'CASH APP',
                       value: group.helpCashApp.trim(),
                       icon: Icons.payments_rounded,
+                      onTap: () => _openLightningCashApp(group.helpCashApp),
+                      tapHint: 'Open Cash App',
                     ),
                   if (group.helpZelle.trim().isNotEmpty)
                     _helpInfoCard(
@@ -3462,6 +3556,8 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeMemberSheet(
                       label: 'PHONE',
                       value: group.helpPhone.trim(),
                       icon: Icons.phone_in_talk_rounded,
+                      onTap: () => _callLightningPhone(group.helpPhone),
+                      tapHint: 'Call',
                     ),
                   if (group.helpPurpose.trim().isEmpty &&
                       group.helpCashApp.trim().isEmpty &&
@@ -3547,13 +3643,15 @@ Widget _helpInfoCard(
   required String label,
   required String value,
   required IconData icon,
+  VoidCallback? onTap,
+  String? tapHint,
 }) {
-  return Container(
+  final card = Container(
     margin: const EdgeInsets.only(bottom: 10),
-    padding: const EdgeInsets.all(12),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     decoration: BoxDecoration(
       color: _kPanel,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(18),
       border: Border.all(color: _kHelpGreen.withValues(alpha: 0.35)),
     ),
     child: Row(
@@ -3577,13 +3675,26 @@ Widget _helpInfoCard(
               const SizedBox(height: 4),
               Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: onTap != null ? _kHelpGreenHot : Colors.white,
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
                   height: 1.3,
+                  decoration: onTap != null ? TextDecoration.underline : null,
+                  decorationColor: _kHelpGreen.withValues(alpha: 0.6),
                 ),
               ),
+              if (onTap != null && tapHint != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Tap to $tapHint',
+                  style: TextStyle(
+                    color: _kHelpGreen.withValues(alpha: 0.75),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -3602,12 +3713,26 @@ Widget _helpInfoCard(
       ],
     ),
   );
+
+  if (onTap == null) return card;
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: card,
+    ),
+  );
 }
 
 class _LightningSheetShell extends StatelessWidget {
-  const _LightningSheetShell({required this.child});
+  const _LightningSheetShell({
+    required this.child,
+    this.cornerBolts = true,
+  });
 
   final Widget child;
+  final bool cornerBolts;
 
   @override
   Widget build(BuildContext context) {
@@ -3625,7 +3750,10 @@ class _LightningSheetShell extends StatelessWidget {
         ],
       ),
       child: CustomPaint(
-        painter: _LightningFramePainter(intensity: 0.85),
+        painter: _LightningFramePainter(
+          intensity: 0.85,
+          corners: cornerBolts,
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
           child: child,
