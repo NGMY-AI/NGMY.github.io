@@ -15,21 +15,3 @@ void ngmyReleaseGuestHtmlSplash() {
     }
   } catch (_) {}
 }
-
-bool ngmyIsGuestBioUrlHeldSplash() {
-  try {
-    final path = html.window.location.pathname ?? '';
-    if (RegExp(r'/bio/[^/?#]+', caseSensitive: false).hasMatch(path)) return true;
-    if (RegExp(r'/local-bio/[^/?#]+', caseSensitive: false).hasMatch(path)) return true;
-    final search = html.window.location.search;
-    if (search.contains('ngmy_bio=') || search.contains('ngmy_local_bio=')) return true;
-    final hash = html.window.location.hash.replaceFirst('#', '');
-    if (hash.startsWith('bio/') ||
-        hash.startsWith('/bio/') ||
-        hash.startsWith('local-bio/') ||
-        hash.startsWith('/local-bio/')) {
-      return true;
-    }
-  } catch (_) {}
-  return false;
-}
