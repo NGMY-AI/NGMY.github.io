@@ -198,6 +198,9 @@ class NgmyCivicUserGroup {
     List<NgmyCivicUserGroupLedgerEntry>? ledger,
     this.helpModeActive = false,
     this.helpPurpose = '',
+    this.helpCashApp = '',
+    this.helpZelle = '',
+    this.helpPhone = '',
     this.helpCampaignId = '',
     this.helpCampaignStartedAt,
     this.ownerMissed = 0,
@@ -220,6 +223,9 @@ class NgmyCivicUserGroup {
   final List<NgmyCivicUserGroupLedgerEntry> ledger;
   bool helpModeActive;
   String helpPurpose;
+  String helpCashApp;
+  String helpZelle;
+  String helpPhone;
   String helpCampaignId;
   DateTime? helpCampaignStartedAt;
   int ownerMissed;
@@ -265,9 +271,21 @@ class NgmyCivicUserGroup {
     );
   }
 
-  void activateHelpMode(String purpose) {
-    helpModeActive = true;
+  void saveHelpSettings({
+    required String purpose,
+    required String cashApp,
+    required String zelle,
+    required String phone,
+  }) {
     helpPurpose = purpose.trim();
+    helpCashApp = cashApp.trim();
+    helpZelle = zelle.trim();
+    helpPhone = phone.trim();
+  }
+
+  void activateHelpMode() {
+    if (helpPurpose.trim().isEmpty) return;
+    helpModeActive = true;
     helpCampaignId =
         'lg_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 16)}';
     helpCampaignStartedAt = DateTime.now().toUtc();
@@ -281,7 +299,6 @@ class NgmyCivicUserGroup {
       helpCampaignClosures.add(cid);
     }
     helpModeActive = false;
-    helpPurpose = '';
     helpCampaignId = '';
     helpCampaignStartedAt = null;
   }
@@ -350,6 +367,9 @@ class NgmyCivicUserGroup {
         'ledger': ledger.map((e) => e.toJson()).toList(),
         'helpModeActive': helpModeActive,
         'helpPurpose': helpPurpose,
+        'helpCashApp': helpCashApp,
+        'helpZelle': helpZelle,
+        'helpPhone': helpPhone,
         'helpCampaignId': helpCampaignId,
         if (helpCampaignStartedAt != null)
           'helpCampaignStartedAt': helpCampaignStartedAt!.toUtc().toIso8601String(),
@@ -381,6 +401,9 @@ class NgmyCivicUserGroup {
           asMaps(j['ledger']).map(NgmyCivicUserGroupLedgerEntry.fromJson).toList(),
       helpModeActive: j['helpModeActive'] == true,
       helpPurpose: (j['helpPurpose'] ?? '').toString(),
+      helpCashApp: (j['helpCashApp'] ?? '').toString(),
+      helpZelle: (j['helpZelle'] ?? '').toString(),
+      helpPhone: (j['helpPhone'] ?? '').toString(),
       helpCampaignId: (j['helpCampaignId'] ?? '').toString(),
       helpCampaignStartedAt:
           DateTime.tryParse((j['helpCampaignStartedAt'] ?? '').toString()),

@@ -893,18 +893,22 @@ class _NgmyCivicUserGroupHomeScreenState
     await _reload();
   }
 
-  Future<void> _showHelpModeSheet() async {
-    if (!_isOwner || _group == null) return;
-    final g = _group!;
+  Future<void> _openHelpMode() async {
+    final g = _group;
+    if (g == null) return;
+    if (!_isOwner && !g.helpModeActive) return;
     final updated = await _showLightningHelpModeSheet(
       context,
       group: g,
       pulse: _pulse,
+      isOwner: _isOwner,
     );
     if (updated == null || !mounted) return;
-    _group = updated;
-    await NgmyCivicUserGroupsStore.saveGroup(_group!);
-    await _reload();
+    if (_isOwner) {
+      _group = updated;
+      await NgmyCivicUserGroupsStore.saveGroup(_group!);
+      await _reload();
+    }
   }
 
   Future<void> _removeMember(String name, String email) async {
@@ -1008,9 +1012,10 @@ class _NgmyCivicUserGroupHomeScreenState
                           : () => _copyGroupCodeSnack(context, g.inviteCode),
                       onBack: () => NgmyNavigator.pop(context),
                       helpModeActive: g?.helpModeActive ?? false,
-                      showHelpButton: _isOwner,
+                      showHelpButton:
+                          _isOwner || (g?.helpModeActive ?? false),
                       helpPulse: _pulse,
-                      onHelpTap: _isOwner ? _showHelpModeSheet : null,
+                      onHelpTap: _openHelpMode,
                     ),
                   ),
                 if (g != null) ...[
@@ -3184,9 +3189,26 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
   BuildContext context, {
   required NgmyCivicUserGroup group,
   required Animation<double> pulse,
+  required bool isOwner,
 }) {
+  if (!isOwner) {
+    return _showLightningHelpModeMemberSheet(context, group: group, pulse: pulse);
+  }
+
   final purposeC = TextEditingController(text: group.helpPurpose);
+  final cashC = TextEditingController(text: group.helpCashApp);
+  final zelleC = TextEditingController(text: group.helpZelle);
+  final phoneC = TextEditingController(text: group.helpPhone);
   final active = group.helpModeActive;
+
+  void applyFields() {
+    group.saveHelpSettings(
+      purpose: purposeC.text,
+      cashApp: cashC.text,
+      zelle: zelleC.text,
+      phone: phoneC.text,
+    );
+  }
 
   return showModalBottomSheet<NgmyCivicUserGroup>(
     context: context,
@@ -3195,144 +3217,391 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
     builder: (ctx) {
       return Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
-        child: _LightningSheetShell(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AnimatedBuilder(
-                animation: pulse,
-                builder: (context, _) {
-                  final g = pulse.value;
-                  return Center(
-                    child: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: active
-                            ? _kHelpGreen.withValues(alpha: 0.22 + g * 0.18)
-                            : _kBolt.withValues(alpha: 0.14),
-                        border: Border.all(
-                          color: active
-                              ? _kHelpGreenHot.withValues(alpha: 0.85 + g * 0.15)
-                              : _kBolt.withValues(alpha: 0.5),
-                          width: active ? 2 : 1,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.82,
+          minChildSize: 0.5,
+          maxChildSize: 0.94,
+          builder: (context, scrollController) {
+            return _LightningSheetShell(
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  _helpModeSheetHeader(pulse: pulse, active: active),
+                  const SizedBox(height: 8),
+                  Text(
+                    active ? 'Help mode is live' : 'Set up group help mode',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    active
+                        ? 'Members see the green icon and your payment details. Turn off when the round ends.'
+                        : 'Fill in where members send money. These details stay saved for next time.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'HELP DETAILS',
+                    style: TextStyle(
+                      color: _kHelpGreen.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: purposeC,
+                    maxLines: 2,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _lightningFieldDecoration(
+                      'What are you collecting for?',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: cashC,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _lightningFieldDecoration('Cash App'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: zelleC,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _lightningFieldDecoration('Zelle'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: phoneC,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _lightningFieldDecoration(
+                      'Phone — questions or confirm payment',
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (active) ...[
+                    FilledButton(
+                      onPressed: () {
+                        applyFields();
+                        group.deactivateHelpMode();
+                        Navigator.pop(ctx, group);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        boxShadow: active
-                            ? [
-                                BoxShadow(
-                                  color: _kHelpGreen.withValues(alpha: 0.4 + g * 0.35),
-                                  blurRadius: 18 + g * 10,
-                                  spreadRadius: 1 + g,
-                                ),
-                              ]
-                            : null,
                       ),
-                      child: Icon(
-                        Icons.volunteer_activism_rounded,
-                        color: active ? _kHelpGreenHot : _kBolt,
-                        shadows: active
-                            ? [
-                                Shadow(
-                                  color: _kHelpGreen.withValues(alpha: 0.95),
-                                  blurRadius: 12 + g * 8,
-                                ),
-                              ]
-                            : null,
+                      child: const Text(
+                        'Deactivate help mode',
+                        style: TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: () {
+                        applyFields();
+                        Navigator.pop(ctx, group);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kHelpGreenHot,
+                        side: BorderSide(color: _kHelpGreen.withValues(alpha: 0.55)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save details',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ] else ...[
+                    OutlinedButton(
+                      onPressed: () {
+                        applyFields();
+                        Navigator.pop(ctx, group);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _kBolt,
+                        side: BorderSide(color: _kBolt.withValues(alpha: 0.45)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save details for later',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      onPressed: () {
+                        applyFields();
+                        if (group.helpPurpose.trim().isEmpty) return;
+                        group.activateHelpMode();
+                        Navigator.pop(ctx, group);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kHelpGreen,
+                        foregroundColor: _kInk,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Activate help mode',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel',
+                        style: TextStyle(color: Colors.white54)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(
-                active ? 'Help mode active' : 'Activate help mode',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 18,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                active
-                    ? 'Members who are not recorded for this round will be marked missed when you turn help mode off.'
-                    : 'Start a help round. Record contributions while it is on.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.35),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: purposeC,
-                maxLines: 2,
-                style: const TextStyle(color: Colors.white),
-                decoration: _lightningFieldDecoration('What is this help for?'),
-              ),
-              const SizedBox(height: 18),
-              if (active) ...[
-                FilledButton(
-                  onPressed: () {
-                    group.helpPurpose = purposeC.text.trim();
-                    group.deactivateHelpMode();
-                    Navigator.pop(ctx, group);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+            );
+          },
+        ),
+      );
+    },
+  ).whenComplete(() {
+    purposeC.dispose();
+    cashC.dispose();
+    zelleC.dispose();
+    phoneC.dispose();
+  });
+}
+
+Future<NgmyCivicUserGroup?> _showLightningHelpModeMemberSheet(
+  BuildContext context, {
+  required NgmyCivicUserGroup group,
+  required Animation<double> pulse,
+}) {
+  return showModalBottomSheet<NgmyCivicUserGroup>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return _LightningSheetShell(
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  _helpModeSheetHeader(pulse: pulse, active: true),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'HELP MODE ACTIVE',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _kHelpGreenHot,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.6,
+                      fontSize: 14,
                     ),
                   ),
-                  child: const Text(
-                    'Deactivate help mode',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    group.helpPurpose = purposeC.text.trim();
-                    Navigator.pop(ctx, group);
-                  },
-                  child: const Text('Save purpose only',
-                      style: TextStyle(color: _kBolt)),
-                ),
-              ] else
-                FilledButton(
-                  onPressed: () {
-                    final purpose = purposeC.text.trim();
-                    if (purpose.isEmpty) return;
-                    group.activateHelpMode(purpose);
-                    Navigator.pop(ctx, group);
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _kHelpGreen,
-                    foregroundColor: _kInk,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Send your contribution using the details below. Call if you have questions or to confirm payment was received.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 12,
+                      height: 1.35,
                     ),
                   ),
-                  child: const Text(
-                    'Activate help mode',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                  const SizedBox(height: 16),
+                  if (group.helpPurpose.trim().isNotEmpty)
+                    _helpInfoCard(
+                      ctx,
+                      label: 'COLLECTING FOR',
+                      value: group.helpPurpose.trim(),
+                      icon: Icons.flag_rounded,
+                    ),
+                  if (group.helpCashApp.trim().isNotEmpty)
+                    _helpInfoCard(
+                      ctx,
+                      label: 'CASH APP',
+                      value: group.helpCashApp.trim(),
+                      icon: Icons.payments_rounded,
+                    ),
+                  if (group.helpZelle.trim().isNotEmpty)
+                    _helpInfoCard(
+                      ctx,
+                      label: 'ZELLE',
+                      value: group.helpZelle.trim(),
+                      icon: Icons.account_balance_rounded,
+                    ),
+                  if (group.helpPhone.trim().isNotEmpty)
+                    _helpInfoCard(
+                      ctx,
+                      label: 'PHONE',
+                      value: group.helpPhone.trim(),
+                      icon: Icons.phone_in_talk_rounded,
+                    ),
+                  if (group.helpPurpose.trim().isEmpty &&
+                      group.helpCashApp.trim().isEmpty &&
+                      group.helpZelle.trim().isEmpty &&
+                      group.helpPhone.trim().isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'The group owner has not added payment details yet.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white38),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close',
+                        style: TextStyle(color: Colors.white54)),
                   ),
-                ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel',
-                    style: TextStyle(color: Colors.white54)),
+                ],
               ),
-            ],
+            );
+          },
+        ),
+      );
+    },
+  );
+}
+
+Widget _helpModeSheetHeader({
+  required Animation<double> pulse,
+  required bool active,
+}) {
+  return AnimatedBuilder(
+    animation: pulse,
+    builder: (context, _) {
+      final g = pulse.value;
+      return Center(
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: active
+                ? _kHelpGreen.withValues(alpha: 0.22 + g * 0.18)
+                : _kBolt.withValues(alpha: 0.14),
+            border: Border.all(
+              color: active
+                  ? _kHelpGreenHot.withValues(alpha: 0.85 + g * 0.15)
+                  : _kBolt.withValues(alpha: 0.5),
+              width: active ? 2 : 1,
+            ),
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: _kHelpGreen.withValues(alpha: 0.4 + g * 0.35),
+                      blurRadius: 18 + g * 10,
+                      spreadRadius: 1 + g,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Icon(
+            Icons.volunteer_activism_rounded,
+            color: active ? _kHelpGreenHot : _kBolt,
+            shadows: active
+                ? [
+                    Shadow(
+                      color: _kHelpGreen.withValues(alpha: 0.95),
+                      blurRadius: 12 + g * 8,
+                    ),
+                  ]
+                : null,
           ),
         ),
       );
     },
-  ).whenComplete(purposeC.dispose);
+  );
+}
+
+Widget _helpInfoCard(
+  BuildContext context, {
+  required String label,
+  required String value,
+  required IconData icon,
+}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: _kPanel,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: _kHelpGreen.withValues(alpha: 0.35)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: _kHelpGreen, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: _kHelpGreen.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                  fontSize: 10,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: 'Copy',
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: value));
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Copied $label')),
+            );
+          },
+          icon: Icon(Icons.copy_rounded,
+              size: 18, color: _kHelpGreen.withValues(alpha: 0.9)),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LightningSheetShell extends StatelessWidget {
