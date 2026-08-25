@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
@@ -3634,6 +3635,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
     final buf = StringBuffer();
+    buf.writeln(
+      NgmyAdvisorAppKnowledge.forChat(
+        chatterIsBoss: _isBoss,
+        isBossPersonalHelper: ngmyAdvisorIsBossPersonalHelper(
+          name: widget.profile.name,
+          id: widget.profile.id,
+        ),
+      ),
+    );
     final promiseBlock = await NgmyCommunicatePromiseStore.promptBlock(_email, widget.profile.id);
     if (promiseBlock.trim().isNotEmpty) buf.writeln(promiseBlock);
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
