@@ -13,6 +13,8 @@ import 'ngmy_qr_download.dart';
 
 const _kBolt = Color(0xFF67E8F9);
 const _kBoltHot = Color(0xFFE0F2FE);
+const _kHelpGreen = Color(0xFF4ADE80);
+const _kHelpGreenHot = Color(0xFFBBF7D0);
 /// Matches Civic Registry dark chrome / status-bar area.
 const _kInk = Color(0xFF121212);
 const _kPanel = Color(0xFF0F111A);
@@ -48,6 +50,62 @@ List<NgmyCivicUserGroupLedgerEntry> _contributionsForMember(
 double _contributionTotalForMember(NgmyCivicUserGroup group, String memberName) =>
     _contributionsForMember(group, memberName)
         .fold<double>(0, (s, e) => s + e.amount);
+
+enum _MemberHistoryFilter { all, contributions, missed }
+
+sealed class _MemberHistoryItem {
+  const _MemberHistoryItem({required this.at});
+  final DateTime at;
+}
+
+class _ContributionHistoryItem extends _MemberHistoryItem {
+  const _ContributionHistoryItem({required super.at, required this.entry});
+  final NgmyCivicUserGroupLedgerEntry entry;
+}
+
+class _MissedHistoryItem extends _MemberHistoryItem {
+  const _MissedHistoryItem({
+    required super.at,
+    required this.purpose,
+    required this.pending,
+  });
+  final String purpose;
+  final bool pending;
+}
+
+List<_MemberHistoryItem> _memberHistoryItems(
+  NgmyCivicUserGroup group,
+  String name,
+  String email,
+) {
+  final items = <_MemberHistoryItem>[
+    ..._contributionsForMember(group, name).map(
+      (e) => _ContributionHistoryItem(at: e.at, entry: e),
+    ),
+    ...group.missedForMember(name, email).map(
+      (e) => _MissedHistoryItem(
+        at: e.at,
+        purpose: e.purpose,
+        pending: false,
+      ),
+    ),
+  ];
+  if (group.helpModeActive &&
+      group.helpCampaignId.isNotEmpty &&
+      !group.contributedToCampaign(name, group.helpCampaignId)) {
+    items.add(
+      _MissedHistoryItem(
+        at: group.helpCampaignStartedAt ?? DateTime.now().toUtc(),
+        purpose: group.helpPurpose.trim().isEmpty
+            ? 'Help round'
+            : group.helpPurpose.trim(),
+        pending: true,
+      ),
+    );
+  }
+  items.sort((a, b) => b.at.compareTo(a.at));
+  return items;
+}
 
 Future<void> openNgmyCivicUserGroupsHub(
   BuildContext context, {
@@ -1542,36 +1600,53 @@ class _HelpModeTopButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget iconButton(double glow) {
+      final scale = active ? 1.0 + glow * 0.12 : 1.0;
       return IconButton(
         tooltip: active ? 'Help mode active' : 'Activate help mode',
         onPressed: onTap,
-        icon: Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: active
-                ? Colors.redAccent.withValues(alpha: 0.18 + glow * 0.12)
-                : Colors.white.withValues(alpha: 0.06),
-            border: Border.all(
+        icon: Transform.scale(
+          scale: scale,
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
               color: active
-                  ? Colors.redAccent.withValues(alpha: 0.65 + glow * 0.25)
-                  : _kBolt.withValues(alpha: 0.35),
-              width: active ? 1.6 : 1.1,
+                  ? _kHelpGreen.withValues(alpha: 0.28 + glow * 0.22)
+                  : Colors.white.withValues(alpha: 0.06),
+              border: Border.all(
+                color: active
+                    ? _kHelpGreenHot.withValues(alpha: 0.85 + glow * 0.15)
+                    : _kBolt.withValues(alpha: 0.35),
+                width: active ? 2 : 1.1,
+              ),
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: _kHelpGreen.withValues(alpha: 0.45 + glow * 0.4),
+                        blurRadius: 16 + glow * 14,
+                        spreadRadius: 1 + glow * 2,
+                      ),
+                      BoxShadow(
+                        color: _kHelpGreenHot.withValues(alpha: 0.25 + glow * 0.35),
+                        blurRadius: 8 + glow * 6,
+                      ),
+                    ]
+                  : null,
             ),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: Colors.redAccent.withValues(alpha: 0.25 + glow * 0.35),
-                      blurRadius: 14 + glow * 8,
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            Icons.volunteer_activism_rounded,
-            size: 20,
-            color: active ? Colors.redAccent : _kBolt.withValues(alpha: 0.85),
+            child: Icon(
+              Icons.volunteer_activism_rounded,
+              size: 20,
+              color: active ? _kHelpGreenHot : _kBolt.withValues(alpha: 0.85),
+              shadows: active
+                  ? [
+                      Shadow(
+                        color: _kHelpGreen.withValues(alpha: 0.95),
+                        blurRadius: 10 + glow * 8,
+                      ),
+                    ]
+                  : null,
+            ),
           ),
         ),
       );
@@ -2242,10 +2317,10 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.1),
+                          color: _kHelpGreen.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.redAccent.withValues(alpha: 0.35),
+                            color: _kHelpGreen.withValues(alpha: 0.45),
                           ),
                         ),
                         child: Text(
@@ -2607,199 +2682,389 @@ Future<void> _showLightningMemberProfileSheet(
           minChildSize: 0.45,
           maxChildSize: 0.92,
           builder: (context, scrollController) {
-            return _LightningSheetShell(
-              child: ListView(
-                controller: scrollController,
-                children: [
-                  AnimatedBuilder(
-                    animation: pulse,
-                    builder: (context, _) {
-                      final g = pulse.value;
-                      return Center(
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: _kBolt.withValues(alpha: 0.12 + g * 0.08),
-                            border: Border.all(
-                              color: _kBolt.withValues(alpha: 0.45 + g * 0.25),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _kBolt.withValues(alpha: 0.2 + g * 0.15),
-                                blurRadius: 18,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            missed ? Icons.warning_amber_rounded : Icons.bolt_rounded,
-                            color: missed ? Colors.orangeAccent : _kBolt,
-                            size: 32,
-                          ),
-                        ),
-                      );
-                    },
+            var historyFilter = _MemberHistoryFilter.all;
+            return StatefulBuilder(
+              builder: (context, setLocal) {
+                return _LightningSheetShell(
+                  child: _MemberProfileSheetBody(
+                    scrollController: scrollController,
+                    group: group,
+                    name: name,
+                    email: email,
+                    role: role,
+                    joinedAt: joinedAt,
+                    pulse: pulse,
+                    contributions: contributions,
+                    total: total,
+                    missedTotal: missedTotal,
+                    missedThisRound: missedThisRound,
+                    campaignContributions: campaignContributions,
+                    missed: missed,
+                    historyFilter: historyFilter,
+                    onFilterChanged: (f) => setLocal(() => historyFilter = f),
                   ),
-                  const SizedBox(height: 12),
-                  Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 20,
-                    ),
-                  ),
-                  Text(
-                    '$role · $email',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                  if (joinedAt != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      'Joined ${joinedAt.toLocal().toString().split(' ').first}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white38, fontSize: 11),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: _kPanel,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: (missed ? Colors.orangeAccent : _kBolt)
-                            .withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          missedThisRound
-                              ? 'MISSED THIS HELP ROUND'
-                              : missedTotal > 0
-                                  ? 'MISSED CONTRIBUTIONS'
-                                  : 'CONTRIBUTION STATUS',
-                          style: TextStyle(
-                            color: missed
-                                ? Colors.orangeAccent
-                                : _kBolt.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          missedThisRound
-                              ? 'Not recorded for "${group.helpPurpose.trim()}". They will be marked missed when help mode ends.'
-                              : missedTotal > 0
-                                  ? '$missedTotal missed contribution${missedTotal == 1 ? '' : 's'} total · \$${total.toStringAsFixed(2)} contributed overall'
-                                  : 'Total contributed: \$${total.toStringAsFixed(2)}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            height: 1.35,
-                            fontSize: 13,
-                          ),
-                        ),
-                        if (group.helpModeActive &&
-                            group.helpPurpose.trim().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Active help: ${group.helpPurpose.trim()}',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.redAccent.withValues(alpha: 0.85),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                        if (campaignContributions.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(
-                            'This round: \$${campaignContributions.fold<double>(0, (s, e) => s + e.amount).toStringAsFixed(2)}',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: _kBolt,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'CONTRIBUTION HISTORY',
-                    style: TextStyle(
-                      color: _kBolt.withValues(alpha: 0.85),
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 1.4,
-                      fontSize: 11,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (contributions.isEmpty)
-                    const Text(
-                      'No recorded contributions for this member.',
-                      style: TextStyle(color: Colors.white38),
-                    )
-                  else
-                    ...contributions.map(
-                      (e) => Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: _kPanel,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _kBolt.withValues(alpha: 0.22),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.south_west_rounded,
-                                color: _kBolt, size: 18),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                e.at.toLocal().toString().split('.').first,
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              '\$${e.amount.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                color: _kBolt,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Close',
-                        style: TextStyle(color: Colors.white54)),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         ),
       );
     },
   );
+}
+
+class _MemberProfileSheetBody extends StatelessWidget {
+  const _MemberProfileSheetBody({
+    required this.scrollController,
+    required this.group,
+    required this.name,
+    required this.email,
+    required this.role,
+    required this.joinedAt,
+    required this.pulse,
+    required this.contributions,
+    required this.total,
+    required this.missedTotal,
+    required this.missedThisRound,
+    required this.campaignContributions,
+    required this.missed,
+    required this.historyFilter,
+    required this.onFilterChanged,
+  });
+
+  final ScrollController scrollController;
+  final NgmyCivicUserGroup group;
+  final String name;
+  final String email;
+  final String role;
+  final DateTime? joinedAt;
+  final Animation<double> pulse;
+  final List<NgmyCivicUserGroupLedgerEntry> contributions;
+  final double total;
+  final int missedTotal;
+  final bool missedThisRound;
+  final List<NgmyCivicUserGroupLedgerEntry> campaignContributions;
+  final bool missed;
+  final _MemberHistoryFilter historyFilter;
+  final ValueChanged<_MemberHistoryFilter> onFilterChanged;
+
+  List<_MemberHistoryItem> get _filteredHistory {
+    final all = _memberHistoryItems(group, name, email);
+    return switch (historyFilter) {
+      _MemberHistoryFilter.all => all,
+      _MemberHistoryFilter.contributions =>
+        all.whereType<_ContributionHistoryItem>().toList(),
+      _MemberHistoryFilter.missed =>
+        all.whereType<_MissedHistoryItem>().toList(),
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredHistory;
+    return ListView(
+      controller: scrollController,
+      children: [
+        AnimatedBuilder(
+          animation: pulse,
+          builder: (context, _) {
+            final g = pulse.value;
+            return Center(
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _kBolt.withValues(alpha: 0.12 + g * 0.08),
+                  border: Border.all(
+                    color: _kBolt.withValues(alpha: 0.45 + g * 0.25),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kBolt.withValues(alpha: 0.2 + g * 0.15),
+                      blurRadius: 18,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  missed ? Icons.warning_amber_rounded : Icons.bolt_rounded,
+                  color: missed ? Colors.orangeAccent : _kBolt,
+                  size: 32,
+                ),
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        Text(
+          name,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+            fontSize: 20,
+          ),
+        ),
+        Text(
+          '$role · $email',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white54, fontSize: 12),
+        ),
+        if (joinedAt != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Joined ${joinedAt!.toLocal().toString().split(' ').first}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+        ],
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _kPanel,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: (missed ? Colors.orangeAccent : _kBolt)
+                  .withValues(alpha: 0.35),
+            ),
+          ),
+          child: Column(
+            children: [
+              Text(
+                missedThisRound
+                    ? 'MISSED THIS HELP ROUND'
+                    : missedTotal > 0
+                        ? 'MISSED CONTRIBUTIONS'
+                        : 'CONTRIBUTION STATUS',
+                style: TextStyle(
+                  color: missed
+                      ? Colors.orangeAccent
+                      : _kBolt.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                  fontSize: 11,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                missedThisRound
+                    ? 'Not recorded for "${group.helpPurpose.trim()}". They will be marked missed when help mode ends.'
+                    : missedTotal > 0
+                        ? '$missedTotal missed contribution${missedTotal == 1 ? '' : 's'} total · \$${total.toStringAsFixed(2)} contributed overall'
+                        : 'Total contributed: \$${total.toStringAsFixed(2)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  height: 1.35,
+                  fontSize: 13,
+                ),
+              ),
+              if (group.helpModeActive && group.helpPurpose.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Active help: ${group.helpPurpose.trim()}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _kHelpGreen.withValues(alpha: 0.95),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+              if (campaignContributions.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'This round: \$${campaignContributions.fold<double>(0, (s, e) => s + e.amount).toStringAsFixed(2)}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: _kBolt,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'CONTRIBUTION HISTORY',
+                style: TextStyle(
+                  color: _kBolt.withValues(alpha: 0.85),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.4,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            PopupMenuButton<_MemberHistoryFilter>(
+              tooltip: 'Filter history',
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                Icons.filter_list_rounded,
+                size: 20,
+                color: historyFilter == _MemberHistoryFilter.all
+                    ? _kBolt.withValues(alpha: 0.75)
+                    : _kHelpGreenHot,
+              ),
+              color: _kPanel,
+              onSelected: onFilterChanged,
+              itemBuilder: (ctx) => [
+                _historyFilterItem('All', _MemberHistoryFilter.all),
+                _historyFilterItem('Contributions', _MemberHistoryFilter.contributions),
+                _historyFilterItem('Missed', _MemberHistoryFilter.missed),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (filtered.isEmpty)
+          Text(
+            historyFilter == _MemberHistoryFilter.missed
+                ? 'No missed contributions for this member.'
+                : historyFilter == _MemberHistoryFilter.contributions
+                    ? 'No recorded contributions for this member.'
+                    : 'No history yet for this member.',
+            style: const TextStyle(color: Colors.white38),
+          )
+        else
+          ...filtered.map(_historyTile),
+        const SizedBox(height: 12),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close', style: TextStyle(color: Colors.white54)),
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<_MemberHistoryFilter> _historyFilterItem(
+    String label,
+    _MemberHistoryFilter value,
+  ) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          if (historyFilter == value)
+            const Icon(Icons.check_rounded, color: _kHelpGreen, size: 16)
+          else
+            const SizedBox(width: 16),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: historyFilter == value ? _kHelpGreenHot : Colors.white70,
+              fontWeight:
+                  historyFilter == value ? FontWeight.w800 : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _historyTile(_MemberHistoryItem item) {
+    if (item is _ContributionHistoryItem) {
+      final e = item.entry;
+      return Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _kPanel,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _kBolt.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.south_west_rounded, color: _kBolt, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    e.at.toLocal().toString().split('.').first,
+                    style: const TextStyle(color: Colors.white54, fontSize: 11),
+                  ),
+                  if (e.campaignId.isNotEmpty && e.note.isNotEmpty)
+                    Text(e.note,
+                        style: const TextStyle(color: Colors.white38, fontSize: 10))
+                  else if (group.helpPurpose.isNotEmpty &&
+                      e.campaignId.isNotEmpty)
+                    Text(
+                      group.helpPurpose,
+                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              '\$${e.amount.toStringAsFixed(2)}',
+              style: const TextStyle(
+                color: _kBolt,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final missedItem = item as _MissedHistoryItem;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _kPanel,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.orangeAccent.withValues(alpha: missedItem.pending ? 0.35 : 0.5),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            missedItem.pending ? Icons.hourglass_top_rounded : Icons.close_rounded,
+            color: Colors.orangeAccent,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  missedItem.pending
+                      ? 'Active help round'
+                      : missedItem.at.toLocal().toString().split('.').first,
+                  style: const TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+                Text(
+                  missedItem.purpose,
+                  style: const TextStyle(color: Colors.white38, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            missedItem.pending ? 'PENDING' : 'MISSED',
+            style: const TextStyle(
+              color: Colors.orangeAccent,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<bool?> _showLightningContributionVerifySheet(
@@ -2946,25 +3211,35 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: active
-                            ? Colors.redAccent.withValues(alpha: 0.15 + g * 0.08)
+                            ? _kHelpGreen.withValues(alpha: 0.22 + g * 0.18)
                             : _kBolt.withValues(alpha: 0.14),
                         border: Border.all(
                           color: active
-                              ? Colors.redAccent.withValues(alpha: 0.55 + g * 0.25)
+                              ? _kHelpGreenHot.withValues(alpha: 0.85 + g * 0.15)
                               : _kBolt.withValues(alpha: 0.5),
+                          width: active ? 2 : 1,
                         ),
                         boxShadow: active
                             ? [
                                 BoxShadow(
-                                  color: Colors.redAccent.withValues(alpha: 0.2 + g * 0.2),
-                                  blurRadius: 16,
+                                  color: _kHelpGreen.withValues(alpha: 0.4 + g * 0.35),
+                                  blurRadius: 18 + g * 10,
+                                  spreadRadius: 1 + g,
                                 ),
                               ]
                             : null,
                       ),
                       child: Icon(
                         Icons.volunteer_activism_rounded,
-                        color: active ? Colors.redAccent : _kBolt,
+                        color: active ? _kHelpGreenHot : _kBolt,
+                        shadows: active
+                            ? [
+                                Shadow(
+                                  color: _kHelpGreen.withValues(alpha: 0.95),
+                                  blurRadius: 12 + g * 8,
+                                ),
+                              ]
+                            : null,
                       ),
                     ),
                   );
@@ -3034,7 +3309,7 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
                     Navigator.pop(ctx, group);
                   },
                   style: FilledButton.styleFrom(
-                    backgroundColor: _kBolt,
+                    backgroundColor: _kHelpGreen,
                     foregroundColor: _kInk,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(

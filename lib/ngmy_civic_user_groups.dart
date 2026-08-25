@@ -148,6 +148,43 @@ class NgmyCivicUserGroupLedgerEntry {
   }
 }
 
+class NgmyCivicUserGroupMissedEntry {
+  NgmyCivicUserGroupMissedEntry({
+    required this.id,
+    required this.memberName,
+    required this.memberEmail,
+    required this.campaignId,
+    required this.purpose,
+    required this.at,
+  });
+
+  final String id;
+  final String memberName;
+  final String memberEmail;
+  final String campaignId;
+  final String purpose;
+  final DateTime at;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'memberName': memberName,
+        'memberEmail': memberEmail,
+        'campaignId': campaignId,
+        'purpose': purpose,
+        'at': at.toUtc().toIso8601String(),
+      };
+
+  factory NgmyCivicUserGroupMissedEntry.fromJson(Map<String, dynamic> j) =>
+      NgmyCivicUserGroupMissedEntry(
+        id: (j['id'] ?? '').toString(),
+        memberName: (j['memberName'] ?? '').toString(),
+        memberEmail: (j['memberEmail'] ?? '').toString().toLowerCase().trim(),
+        campaignId: (j['campaignId'] ?? '').toString(),
+        purpose: (j['purpose'] ?? '').toString(),
+        at: DateTime.tryParse((j['at'] ?? '').toString()) ?? DateTime.now().toUtc(),
+      );
+}
+
 class NgmyCivicUserGroup {
   NgmyCivicUserGroup({
     required this.id,
@@ -165,10 +202,12 @@ class NgmyCivicUserGroup {
     this.helpCampaignStartedAt,
     this.ownerMissed = 0,
     List<String>? helpCampaignClosures,
+    List<NgmyCivicUserGroupMissedEntry>? missedHistory,
   })  : members = members ?? <NgmyCivicUserGroupMember>[],
         notes = notes ?? <NgmyCivicUserGroupNote>[],
         ledger = ledger ?? <NgmyCivicUserGroupLedgerEntry>[],
-        helpCampaignClosures = helpCampaignClosures ?? <String>[];
+        helpCampaignClosures = helpCampaignClosures ?? <String>[],
+        missedHistory = missedHistory ?? <NgmyCivicUserGroupMissedEntry>[];
 
   final String id;
   String name;
@@ -185,6 +224,7 @@ class NgmyCivicUserGroup {
   DateTime? helpCampaignStartedAt;
   int ownerMissed;
   final List<String> helpCampaignClosures;
+  final List<NgmyCivicUserGroupMissedEntry> missedHistory;
 
   bool isOwner(String email) =>
       ownerEmail.toLowerCase().trim() == email.toLowerCase().trim();
@@ -235,8 +275,9 @@ class NgmyCivicUserGroup {
 
   void deactivateHelpMode() {
     final cid = helpCampaignId.trim();
+    final purpose = helpPurpose;
     if (cid.isNotEmpty && !helpCampaignClosures.contains(cid)) {
-      _markMissedForCampaign(cid);
+      _markMissedForCampaign(cid, purpose: purpose);
       helpCampaignClosures.add(cid);
     }
     helpModeActive = false;
@@ -245,15 +286,46 @@ class NgmyCivicUserGroup {
     helpCampaignStartedAt = null;
   }
 
-  void _markMissedForCampaign(String campaignId) {
+  void _markMissedForCampaign(String campaignId, {required String purpose}) {
+    final now = DateTime.now().toUtc();
+    final purposeText = purpose.trim().isEmpty ? 'Help round' : purpose.trim();
+
+    void recordMissed(String name, String email) {
+      missedHistory.insert(
+        0,
+        NgmyCivicUserGroupMissedEntry(
+          id: 'miss_${now.millisecondsSinceEpoch}_${email.hashCode}',
+          memberName: name,
+          memberEmail: email.toLowerCase().trim(),
+          campaignId: campaignId,
+          purpose: purposeText,
+          at: now,
+        ),
+      );
+    }
+
     if (!contributedToCampaign(ownerName, campaignId)) {
       ownerMissed += 1;
+      recordMissed(ownerName, ownerEmail);
     }
     for (final m in members) {
       if (!contributedToCampaign(m.name, campaignId)) {
         m.missed += 1;
+        recordMissed(m.name, m.email);
       }
     }
+  }
+
+  List<NgmyCivicUserGroupMissedEntry> missedForMember(String name, String email) {
+    final nameKey = name.trim().toLowerCase();
+    final emailKey = email.toLowerCase().trim();
+    return missedHistory
+        .where(
+          (e) =>
+              e.memberEmail == emailKey ||
+              e.memberName.trim().toLowerCase() == nameKey,
+        )
+        .toList();
   }
 
   int missedFor(String name, String email) {
@@ -283,6 +355,7 @@ class NgmyCivicUserGroup {
           'helpCampaignStartedAt': helpCampaignStartedAt!.toUtc().toIso8601String(),
         'ownerMissed': ownerMissed,
         'helpCampaignClosures': helpCampaignClosures,
+        'missedHistory': missedHistory.map((e) => e.toJson()).toList(),
       };
 
   factory NgmyCivicUserGroup.fromJson(Map<String, dynamic> j) {
@@ -318,6 +391,9 @@ class NgmyCivicUserGroup {
               .where((e) => e.isNotEmpty)
               .toList()
           : null,
+      missedHistory: asMaps(j['missedHistory'])
+          .map(NgmyCivicUserGroupMissedEntry.fromJson)
+          .toList(),
     );
   }
 }
