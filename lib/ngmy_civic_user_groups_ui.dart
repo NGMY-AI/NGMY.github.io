@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -29,6 +30,24 @@ Future<void> _copyGroupCodeSnack(BuildContext context, String code) async {
     SnackBar(content: Text('Copied $code')),
   );
 }
+
+List<NgmyCivicUserGroupLedgerEntry> _contributionsForMember(
+  NgmyCivicUserGroup group,
+  String memberName,
+) {
+  final key = memberName.trim().toLowerCase();
+  return group.ledger
+      .where(
+        (e) =>
+            e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
+            e.label.trim().toLowerCase() == key,
+      )
+      .toList();
+}
+
+double _contributionTotalForMember(NgmyCivicUserGroup group, String memberName) =>
+    _contributionsForMember(group, memberName)
+        .fold<double>(0, (s, e) => s + e.amount);
 
 Future<void> openNgmyCivicUserGroupsHub(
   BuildContext context, {
@@ -68,6 +87,7 @@ class _NgmyCivicUserGroupsHubScreenState
     with TickerProviderStateMixin {
   late final AnimationController _bolt;
   late final AnimationController _pulse;
+  late final AnimationController _orbit;
   late final AnimationController _stagger;
   List<NgmyCivicUserGroup> _owned = [];
   List<NgmyCivicUserGroup> _joined = [];
@@ -84,6 +104,10 @@ class _NgmyCivicUserGroupsHubScreenState
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     )..repeat(reverse: true);
+    _orbit = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
     _stagger = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -95,6 +119,7 @@ class _NgmyCivicUserGroupsHubScreenState
   void dispose() {
     _bolt.dispose();
     _pulse.dispose();
+    _orbit.dispose();
     _stagger.dispose();
     super.dispose();
   }
@@ -250,13 +275,14 @@ class _NgmyCivicUserGroupsHubScreenState
         body: Stack(
           children: [
             AnimatedBuilder(
-              animation: Listenable.merge([_bolt, _pulse]),
-              builder: (context, _) {
-                return CustomPaint(
-                  painter: _LightningAtmospherePainter(
-                    progress: Curves.easeOutCubic.transform(_bolt.value),
-                    pulse: _pulse.value,
-                  ),
+            animation: Listenable.merge([_bolt, _pulse, _orbit]),
+            builder: (context, _) {
+              return CustomPaint(
+                painter: _LightningAtmospherePainter(
+                  progress: Curves.easeOutCubic.transform(_bolt.value),
+                  pulse: _pulse.value,
+                  orbit: _orbit.value,
+                ),
                   size: Size.infinite,
                 );
               },
@@ -283,6 +309,7 @@ class _NgmyCivicUserGroupsHubScreenState
                             _LightningHeroPanel(
                               bolt: _bolt,
                               pulse: _pulse,
+                              orbit: _orbit,
                               onCreate: _createGroup,
                               onJoin: _joinByCode,
                               onScan: _scanQr,
@@ -301,6 +328,7 @@ class _NgmyCivicUserGroupsHubScreenState
                                         subtitle:
                                             'Owner · ${e.value.memberCount}/$kNgmyCivicUserGroupFreeMemberCap seats',
                                         pulse: _pulse,
+                                        orbit: _orbit,
                                         onTap: () async {
                                           await NgmyNavigator.push(
                                             context,
@@ -330,6 +358,7 @@ class _NgmyCivicUserGroupsHubScreenState
                                         subtitle:
                                             'Member · Owner ${e.value.ownerName}',
                                         pulse: _pulse,
+                                        orbit: _orbit,
                                         onTap: () async {
                                           await NgmyNavigator.push(
                                             context,
@@ -467,19 +496,21 @@ class _GroupCard extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     required this.pulse,
+    required this.orbit,
   });
 
   final NgmyCivicUserGroup group;
   final String subtitle;
   final VoidCallback onTap;
   final Animation<double> pulse;
+  final Animation<double> orbit;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AnimatedBuilder(
-        animation: pulse,
+        animation: Listenable.merge([pulse, orbit]),
         builder: (context, _) {
           final g = pulse.value;
           return Material(
@@ -488,7 +519,11 @@ class _GroupCard extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(18),
               child: CustomPaint(
-                painter: _LightningFramePainter(intensity: 0.35 + g * 0.4, corners: false),
+                painter: _LightningFramePainter(
+                  intensity: 0.35 + g * 0.4,
+                  corners: true,
+                  phase: orbit.value,
+                ),
                 child: Ink(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -570,30 +605,74 @@ class _GroupCard extends StatelessWidget {
 }
 
 class _LightningAtmospherePainter extends CustomPainter {
-  _LightningAtmospherePainter({required this.progress, required this.pulse});
+  _LightningAtmospherePainter({
+    required this.progress,
+    required this.pulse,
+    this.orbit = 0,
+  });
 
   final double progress;
   final double pulse;
+  final double orbit;
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Solid civic-dark base — edges match status bar, no side glow bleed.
     canvas.drawRect(Offset.zero & size, Paint()..color = _kInk);
 
     final midGlow = Paint()
       ..shader = ui.Gradient.radial(
-        Offset(size.width * 0.5, size.height * 0.5),
-        size.width * 0.42,
+        Offset(size.width * 0.5, size.height * 0.48),
+        size.width * 0.38,
         [
-          _kBolt.withValues(alpha: 0.04 + pulse * 0.03),
+          _kBolt.withValues(alpha: 0.07 + pulse * 0.06),
           Colors.transparent,
         ],
       );
     canvas.drawRect(Offset.zero & size, midGlow);
 
-    // Center bolt only — kept away from screen edges.
+    // Orbiting energy ring (center — not screen edges).
     final cx = size.width * 0.5;
-    final cy = size.height * 0.42;
+    final cy = size.height * 0.44;
+    final ringR = size.width * 0.28;
+    final angle = orbit * math.pi * 2;
+    for (var i = 0; i < 3; i++) {
+      final a = angle + (i * math.pi * 2 / 3);
+      final ox = cx + math.cos(a) * ringR;
+      final oy = cy + math.sin(a) * ringR * 0.55;
+      canvas.drawCircle(
+        Offset(ox, oy),
+        3 + pulse * 2,
+        Paint()..color = _kBolt.withValues(alpha: 0.35 + pulse * 0.25),
+      );
+      canvas.drawCircle(
+        Offset(ox, oy),
+        8 + pulse * 4,
+        Paint()
+          ..color = _kBolt.withValues(alpha: 0.12)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+      );
+    }
+
+    // Traveling light arc along an inner ellipse.
+    final arcPaint = Paint()
+      ..color = _kBoltHot.withValues(alpha: 0.18 + pulse * 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    final arcPath = Path();
+    const segments = 48;
+    for (var i = 0; i <= segments; i++) {
+      final t = (i / segments) * math.pi * 1.4 + angle * 1.6;
+      final x = cx + math.cos(t) * ringR * 0.92;
+      final y = cy + math.sin(t) * ringR * 0.42;
+      if (i == 0) {
+        arcPath.moveTo(x, y);
+      } else {
+        arcPath.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(arcPath, arcPaint);
+
     final boltPath = Path()
       ..moveTo(cx + 14, cy - 52)
       ..lineTo(cx - 16, cy - 4)
@@ -601,14 +680,14 @@ class _LightningAtmospherePainter extends CustomPainter {
       ..lineTo(cx - 20, cy + 54);
 
     final glow = Paint()
-      ..color = _kBolt.withValues(alpha: 0.08 + pulse * 0.06)
+      ..color = _kBolt.withValues(alpha: 0.1 + pulse * 0.08)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 10
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
     final stroke = Paint()
-      ..color = _kBolt.withValues(alpha: 0.28 + progress * 0.35)
+      ..color = _kBolt.withValues(alpha: 0.32 + progress * 0.4)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
+      ..strokeWidth = 2.4
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
@@ -617,11 +696,20 @@ class _LightningAtmospherePainter extends CustomPainter {
       canvas.drawPath(drawn, glow);
       canvas.drawPath(drawn, stroke);
     }
+
+    final spark = Paint()..color = _kBoltHot.withValues(alpha: 0.14 + pulse * 0.2);
+    for (var i = 0; i < 14; i++) {
+      final x = (math.sin(i * 1.9 + orbit * math.pi * 4) * 0.35 + 0.5) * size.width;
+      final y = (math.cos(i * 2.3 + pulse * 3) * 0.22 + 0.46) * size.height;
+      canvas.drawCircle(Offset(x, y), 1.2 + pulse * 1.2, spark);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _LightningAtmospherePainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.pulse != pulse;
+      oldDelegate.progress != progress ||
+      oldDelegate.pulse != pulse ||
+      oldDelegate.orbit != orbit;
 }
 
 class NgmyCivicUserGroupHomeScreen extends StatefulWidget {
@@ -645,9 +733,10 @@ class NgmyCivicUserGroupHomeScreen extends StatefulWidget {
 
 class _NgmyCivicUserGroupHomeScreenState
     extends State<NgmyCivicUserGroupHomeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   NgmyCivicUserGroup? _group;
   late final AnimationController _pulse;
+  late final AnimationController _orbit;
   int _tab = 0; // 0 ledger, 1 people, 2 invite
 
   bool get _isOwner =>
@@ -661,12 +750,17 @@ class _NgmyCivicUserGroupHomeScreenState
       vsync: this,
       duration: const Duration(milliseconds: 1600),
     )..repeat(reverse: true);
+    _orbit = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
     _reload();
   }
 
   @override
   void dispose() {
     _pulse.dispose();
+    _orbit.dispose();
     super.dispose();
   }
 
@@ -710,25 +804,12 @@ class _NgmyCivicUserGroupHomeScreenState
     await _reload();
   }
 
-  Future<void> _removeMember(String email) async {
+  Future<void> _removeMember(String name, String email) async {
     if (!_isOwner || _group == null) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _kPanel,
-        title: const Text('Remove member?',
-            style: TextStyle(color: Colors.white)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove'),
-          ),
-        ],
-      ),
+    final confirm = await _showLightningRemoveMemberSheet(
+      context,
+      memberName: name,
+      memberEmail: email,
     );
     if (confirm != true) return;
     await NgmyCivicUserGroupsStore.removeMember(
@@ -736,6 +817,25 @@ class _NgmyCivicUserGroupHomeScreenState
       memberEmail: email,
     );
     await _reload();
+  }
+
+  Future<void> _openMemberProfile({
+    required String name,
+    required String email,
+    required String role,
+    DateTime? joinedAt,
+  }) async {
+    final g = _group;
+    if (g == null) return;
+    await _showLightningMemberProfileSheet(
+      context,
+      group: g,
+      name: name,
+      email: email,
+      role: role,
+      joinedAt: joinedAt,
+      pulse: _pulse,
+    );
   }
 
   Future<void> _copyCode() async {
@@ -788,11 +888,12 @@ class _NgmyCivicUserGroupHomeScreenState
         body: Stack(
           children: [
             AnimatedBuilder(
-              animation: _pulse,
+              animation: Listenable.merge([_pulse, _orbit]),
               builder: (context, _) => CustomPaint(
                 painter: _LightningAtmospherePainter(
                   progress: 1,
                   pulse: _pulse.value,
+                  orbit: _orbit.value,
                 ),
                 size: Size.infinite,
               ),
@@ -915,13 +1016,35 @@ class _NgmyCivicUserGroupHomeScreenState
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
-            _personTile(g.ownerName, g.ownerEmail, 'Owner', null),
+            _personTile(
+              g,
+              g.ownerName,
+              g.ownerEmail,
+              'Owner',
+              joinedAt: g.createdAt,
+              onTap: () => _openMemberProfile(
+                name: g.ownerName,
+                email: g.ownerEmail,
+                role: 'Owner',
+                joinedAt: g.createdAt,
+              ),
+            ),
             ...g.members.map(
               (m) => _personTile(
+                g,
                 m.name,
                 m.email,
                 'Member',
-                _isOwner ? () => _removeMember(m.email) : null,
+                joinedAt: m.joinedAt,
+                onTap: () => _openMemberProfile(
+                  name: m.name,
+                  email: m.email,
+                  role: 'Member',
+                  joinedAt: m.joinedAt,
+                ),
+                onRemove: _isOwner
+                    ? () => _removeMember(m.name, m.email)
+                    : null,
               ),
             ),
             if (g.memberCount >= kNgmyCivicUserGroupFreeMemberCap && _isOwner)
@@ -1087,41 +1210,85 @@ class _NgmyCivicUserGroupHomeScreenState
   }
 
   Widget _personTile(
+    NgmyCivicUserGroup group,
     String name,
     String email,
-    String role,
+    String role, {
+    DateTime? joinedAt,
+    required VoidCallback onTap,
     VoidCallback? onRemove,
-  ) {
+  }) {
+    final total = _contributionTotalForMember(group, name);
+    final hasPaid = total > 0;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _kPanel,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBolt.withValues(alpha: 0.15)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBolt.withValues(alpha: 0.2)),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: _kPanel,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
-                Text('$role · $email',
-                    style:
-                        const TextStyle(color: Colors.white38, fontSize: 11)),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kBolt.withValues(alpha: 0.12),
+                    border: Border.all(color: _kBolt.withValues(alpha: 0.4)),
+                  ),
+                  child: Icon(
+                    hasPaid ? Icons.bolt_rounded : Icons.person_outline_rounded,
+                    color: hasPaid ? _kBolt : Colors.white38,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w700)),
+                      Text('$role · $email',
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                      const SizedBox(height: 2),
+                      Text(
+                        hasPaid
+                            ? 'Contributed \$${total.toStringAsFixed(2)} · tap for profile'
+                            : 'No contributions yet · tap for profile',
+                        style: TextStyle(
+                          color: hasPaid ? _kBolt.withValues(alpha: 0.85) : Colors.orangeAccent.withValues(alpha: 0.85),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onRemove != null)
+                  IconButton(
+                    tooltip: 'Remove member',
+                    onPressed: onRemove,
+                    icon: Icon(Icons.person_remove_outlined,
+                        color: Colors.redAccent.withValues(alpha: 0.85)),
+                  )
+                else
+                  Icon(Icons.chevron_right_rounded,
+                      color: _kBolt.withValues(alpha: 0.6)),
               ],
             ),
           ),
-          if (onRemove != null)
-            IconButton(
-              onPressed: onRemove,
-              icon: const Icon(Icons.person_remove_outlined,
-                  color: Colors.white54),
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -1292,6 +1459,7 @@ class _LightningHeroPanel extends StatelessWidget {
   const _LightningHeroPanel({
     required this.bolt,
     required this.pulse,
+    required this.orbit,
     required this.onCreate,
     required this.onJoin,
     required this.onScan,
@@ -1299,6 +1467,7 @@ class _LightningHeroPanel extends StatelessWidget {
 
   final Animation<double> bolt;
   final Animation<double> pulse;
+  final Animation<double> orbit;
   final VoidCallback onCreate;
   final VoidCallback onJoin;
   final VoidCallback onScan;
@@ -1306,11 +1475,16 @@ class _LightningHeroPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([bolt, pulse]),
+      animation: Listenable.merge([bolt, pulse, orbit]),
       builder: (context, _) {
         final g = 0.35 + pulse.value * 0.45;
+        final ringAngle = orbit.value * math.pi * 2;
         return CustomPaint(
-          painter: _LightningFramePainter(intensity: 0.55 + g * 0.35, corners: false),
+          painter: _LightningFramePainter(
+            intensity: 0.55 + g * 0.35,
+            corners: true,
+            phase: orbit.value,
+          ),
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
             decoration: BoxDecoration(
@@ -1331,36 +1505,62 @@ class _LightningHeroPanel extends StatelessWidget {
               children: [
                 Transform.scale(
                   scale: 0.85 + bolt.value * 0.25,
-                  child: Container(
-                    width: 78,
-                    height: 78,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          _kBolt.withValues(alpha: 0.55),
-                          _kBolt.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Transform.translate(
+                          offset: Offset(
+                            38 * math.cos(ringAngle + i * math.pi * 2 / 3),
+                            28 * math.sin(ringAngle + i * math.pi * 2 / 3),
+                          ),
+                          child: Container(
+                            width: 6 + pulse.value * 4,
+                            height: 6 + pulse.value * 4,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _kBoltHot.withValues(alpha: 0.55 + g * 0.3),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _kBolt.withValues(alpha: 0.45),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Container(
+                        width: 78,
+                        height: 78,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: RadialGradient(
+                            colors: [
+                              _kBolt.withValues(alpha: 0.55),
+                              _kBolt.withValues(alpha: 0.08),
+                              Colors.transparent,
+                            ],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _kBolt.withValues(alpha: 0.45),
+                              blurRadius: 28,
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.bolt_rounded,
+                          size: 46,
+                          color: _kBoltHot,
+                          shadows: [
+                            Shadow(
+                              color: _kBolt.withValues(alpha: 0.9),
+                              blurRadius: 22,
+                            ),
+                          ],
+                        ),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _kBolt.withValues(alpha: 0.45),
-                          blurRadius: 28,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.bolt_rounded,
-                      size: 46,
-                      color: _kBoltHot,
-                      shadows: [
-                        Shadow(
-                          color: _kBolt.withValues(alpha: 0.9),
-                          blurRadius: 22,
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -1460,10 +1660,15 @@ class _LightningStatFrame extends StatelessWidget {
 }
 
 class _LightningFramePainter extends CustomPainter {
-  _LightningFramePainter({required this.intensity, this.corners = true});
+  _LightningFramePainter({
+    required this.intensity,
+    this.corners = true,
+    this.phase = 0,
+  });
 
   final double intensity;
   final bool corners;
+  final double phase;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1477,6 +1682,27 @@ class _LightningFramePainter extends CustomPainter {
       ..strokeWidth = 2
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawRRect(r, paint);
+
+    // Traveling spark along the card edge.
+    final sparkPaint = Paint()
+      ..color = _kBoltHot.withValues(alpha: 0.35 + 0.45 * intensity)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    final w = size.width;
+    final h = size.height;
+    final perimeter = 2 * (w + h);
+    final dist = (phase * perimeter) % perimeter;
+    Offset spark;
+    if (dist < w) {
+      spark = Offset(dist, 0);
+    } else if (dist < w + h) {
+      spark = Offset(w, dist - w);
+    } else if (dist < 2 * w + h) {
+      spark = Offset(2 * w + h - dist, h);
+    } else {
+      spark = Offset(0, perimeter - dist);
+    }
+    canvas.drawCircle(spark, 3.5 + intensity * 2, sparkPaint);
+    canvas.drawCircle(spark, 1.5, Paint()..color = _kBoltHot.withValues(alpha: 0.9));
 
     if (!corners) return;
 
@@ -1506,7 +1732,9 @@ class _LightningFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LightningFramePainter oldDelegate) =>
-      oldDelegate.intensity != intensity || oldDelegate.corners != corners;
+      oldDelegate.intensity != intensity ||
+      oldDelegate.corners != corners ||
+      oldDelegate.phase != phase;
 }
 
 class _LightningLedgerResult {
@@ -1750,7 +1978,9 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
   final isContribution = kind == NgmyCivicUserGroupLedgerKind.contribution;
   final amountC = TextEditingController();
   final labelC = TextEditingController();
+  final searchC = TextEditingController();
   var selectedName = members.isNotEmpty ? members.first.name : '';
+  var searchOpen = false;
 
   return showModalBottomSheet<_LightningLedgerResult>(
     context: context,
@@ -1761,24 +1991,69 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
         padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
         child: StatefulBuilder(
           builder: (ctx, setLocal) {
+            final query = searchC.text.trim().toLowerCase();
+            final filtered = query.isEmpty
+                ? members
+                : members
+                    .where(
+                      (m) =>
+                          m.name.toLowerCase().contains(query) ||
+                          m.email.toLowerCase().contains(query),
+                    )
+                    .toList();
+            if (filtered.isNotEmpty &&
+                !filtered.any((m) => m.name == selectedName)) {
+              selectedName = filtered.first.name;
+            }
+
             return _LightningSheetShell(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _sheetHeader(
-                    icon: isContribution
-                        ? Icons.add_card_rounded
-                        : Icons.payments_outlined,
-                    title: isContribution
-                        ? 'Record contribution'
-                        : 'Record spending',
-                    subtitle: isContribution
-                        ? 'Tap who put money in — people who joined this group.'
-                        : 'Log what left the group case.',
-                  ),
+                  if (isContribution)
+                    _contributionSheetHeader(
+                      searchOpen: searchOpen,
+                      onToggleSearch: () => setLocal(
+                        () => searchOpen = !searchOpen,
+                      ),
+                    )
+                  else
+                    _sheetHeader(
+                      icon: Icons.payments_outlined,
+                      title: 'Record spending',
+                      subtitle: 'Log what left the group case.',
+                    ),
+                  if (isContribution) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Record contribution',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Tap who put money in — people who joined this group.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54, fontSize: 12),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   if (isContribution) ...[
+                    if (searchOpen) ...[
+                      TextField(
+                        controller: searchC,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: _lightningFieldDecoration('Search member…'),
+                        onChanged: (_) => setLocal(() {}),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     Text(
                       'WHO CONTRIBUTED',
                       style: TextStyle(
@@ -1794,6 +2069,11 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                         'No members yet — invite people with your code first.',
                         style: TextStyle(color: Colors.white54, fontSize: 13),
                       )
+                    else if (filtered.isEmpty)
+                      const Text(
+                        'No member matches that search.',
+                        style: TextStyle(color: Colors.white54, fontSize: 13),
+                      )
                     else
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxHeight: 150),
@@ -1802,7 +2082,7 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final m in members)
+                              for (final m in filtered)
                                 ChoiceChip(
                                   label: Text(m.name),
                                   selected: selectedName == m.name,
@@ -1911,7 +2191,363 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
   ).whenComplete(() {
     amountC.dispose();
     labelC.dispose();
+    searchC.dispose();
   });
+}
+
+Widget _contributionSheetHeader({
+  required bool searchOpen,
+  required VoidCallback onToggleSearch,
+}) {
+  return Row(
+    children: [
+      Container(
+        width: 46,
+        height: 46,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _kBolt.withValues(alpha: 0.14),
+          border: Border.all(color: _kBolt.withValues(alpha: 0.5)),
+          boxShadow: [
+            BoxShadow(color: _kBolt.withValues(alpha: 0.25), blurRadius: 12),
+          ],
+        ),
+        child: const Icon(Icons.add_card_rounded, color: _kBolt),
+      ),
+      const Spacer(),
+      Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onToggleSearch,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: searchOpen
+                  ? _kBolt.withValues(alpha: 0.22)
+                  : Colors.white.withValues(alpha: 0.06),
+              border: Border.all(
+                color: searchOpen ? _kBolt : _kBolt.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Icon(
+              Icons.search_rounded,
+              color: searchOpen ? _kBoltHot : _kBolt,
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+Future<bool?> _showLightningRemoveMemberSheet(
+  BuildContext context, {
+  required String memberName,
+  required String memberEmail,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+        child: _LightningSheetShell(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.redAccent.withValues(alpha: 0.15),
+                    border: Border.all(
+                      color: Colors.redAccent.withValues(alpha: 0.55),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withValues(alpha: 0.25),
+                        blurRadius: 16,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.person_remove_rounded,
+                      color: Colors.redAccent),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Remove member?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                memberName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _kBolt,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                memberEmail,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'They will lose access to this group ledger and invite list.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Keep member',
+                          style: TextStyle(color: Colors.white54)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Remove',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _showLightningMemberProfileSheet(
+  BuildContext context, {
+  required NgmyCivicUserGroup group,
+  required String name,
+  required String email,
+  required String role,
+  DateTime? joinedAt,
+  required Animation<double> pulse,
+}) {
+  final contributions = _contributionsForMember(group, name);
+  final total = contributions.fold<double>(0, (s, e) => s + e.amount);
+  final othersPaid = group.ledger.any(
+    (e) =>
+        e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
+        e.label.trim().toLowerCase() != name.trim().toLowerCase(),
+  );
+  final missed = total <= 0 && othersPaid;
+
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(ctx).bottom,
+          left: 12,
+          right: 12,
+        ),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.72,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          builder: (context, scrollController) {
+            return _LightningSheetShell(
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  AnimatedBuilder(
+                    animation: pulse,
+                    builder: (context, _) {
+                      final g = pulse.value;
+                      return Center(
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _kBolt.withValues(alpha: 0.12 + g * 0.08),
+                            border: Border.all(
+                              color: _kBolt.withValues(alpha: 0.45 + g * 0.25),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _kBolt.withValues(alpha: 0.2 + g * 0.15),
+                                blurRadius: 18,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            missed ? Icons.warning_amber_rounded : Icons.bolt_rounded,
+                            color: missed ? Colors.orangeAccent : _kBolt,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 20,
+                    ),
+                  ),
+                  Text(
+                    '$role · $email',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  if (joinedAt != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Joined ${joinedAt.toLocal().toString().split(' ').first}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white38, fontSize: 11),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _kPanel,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: (missed ? Colors.orangeAccent : _kBolt)
+                            .withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          missed ? 'NO CONTRIBUTIONS YET' : 'CONTRIBUTION STATUS',
+                          style: TextStyle(
+                            color: missed
+                                ? Colors.orangeAccent
+                                : _kBolt.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          missed
+                              ? 'This member has not contributed while others have. Follow up if a gift was expected.'
+                              : 'Total contributed: \$${total.toStringAsFixed(2)}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            height: 1.35,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'CONTRIBUTION HISTORY',
+                    style: TextStyle(
+                      color: _kBolt.withValues(alpha: 0.85),
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (contributions.isEmpty)
+                    const Text(
+                      'No recorded contributions for this member.',
+                      style: TextStyle(color: Colors.white38),
+                    )
+                  else
+                    ...contributions.map(
+                      (e) => Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _kPanel,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _kBolt.withValues(alpha: 0.22),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.south_west_rounded,
+                                color: _kBolt, size: 18),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                e.at.toLocal().toString().split('.').first,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '\$${e.amount.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                color: _kBolt,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close',
+                        style: TextStyle(color: Colors.white54)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    },
+  );
 }
 
 class _LightningSheetShell extends StatelessWidget {
