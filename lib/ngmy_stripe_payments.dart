@@ -29,6 +29,8 @@ enum NgmyStripeProduct {
   slidesStudio,
   deviceTransfer,
   stateRegistrar,
+  civicUserGroupExtra,
+  civicUserGroupMembers,
 }
 
 class NgmyStripePayments {
@@ -66,6 +68,11 @@ class NgmyStripePayments {
       'https://buy.stripe.com/8x2fZh2Fjc01cAr7Glb7y0j';
   static const String stateRegistrarUrl =
       'https://buy.stripe.com/cNi9AT93H2prbwn7Glb7y0k';
+  // Placeholder Payment Links — replace with live Stripe links when ready.
+  static const String civicUserGroupExtraUrl =
+      'https://buy.stripe.com/test_ngmy_civic_user_group_extra';
+  static const String civicUserGroupMembersUrl =
+      'https://buy.stripe.com/test_ngmy_civic_user_group_members';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -141,6 +148,10 @@ class NgmyStripePayments {
         return 'device_transfer';
       case NgmyStripeProduct.stateRegistrar:
         return 'state_registrar';
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return 'civic_user_group_extra';
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return 'civic_user_group_members';
     }
   }
 
@@ -180,6 +191,10 @@ class NgmyStripePayments {
         return NgmyStripeProduct.deviceTransfer;
       case 'state_registrar':
         return NgmyStripeProduct.stateRegistrar;
+      case 'civic_user_group_extra':
+        return NgmyStripeProduct.civicUserGroupExtra;
+      case 'civic_user_group_members':
+        return NgmyStripeProduct.civicUserGroupMembers;
       default:
         return null;
     }
@@ -221,6 +236,10 @@ class NgmyStripePayments {
         return deviceTransferUrl;
       case NgmyStripeProduct.stateRegistrar:
         return stateRegistrarUrl;
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return civicUserGroupExtraUrl;
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return civicUserGroupMembersUrl;
     }
   }
 
@@ -305,6 +324,10 @@ class NgmyStripePayments {
         return 499;
       case NgmyStripeProduct.stateRegistrar:
         return 5000;
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return 499;
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return 299;
     }
   }
 
@@ -374,6 +397,10 @@ class NgmyStripePayments {
         return const [Color(0xFF38BDF8), Color(0xFF0369A1)]; // transfer sky
       case NgmyStripeProduct.stateRegistrar:
         return const [Color(0xFF34D399), Color(0xFF065F46)]; // registrar emerald
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return const [Color(0xFF67E8F9), Color(0xFF0E7490)]; // lightning cyan
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return const [Color(0xFFA5F3FC), Color(0xFF155E75)]; // bolt ice
     }
   }
 
@@ -414,6 +441,10 @@ class NgmyStripePayments {
         return const Color(0xFFE0F2FE);
       case NgmyStripeProduct.stateRegistrar:
         return const Color(0xFFD1FAE5);
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return const Color(0xFFECFEFF);
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return const Color(0xFFCFFAFE);
     }
   }
 
@@ -467,6 +498,10 @@ class NgmyStripePayments {
         return 'NGMY Transfer';
       case NgmyStripeProduct.stateRegistrar:
         return 'State Registrar';
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return 'Extra Civic Group';
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return 'Group 100+ Members';
     }
   }
 
@@ -506,6 +541,10 @@ class NgmyStripePayments {
         return Icons.sync_alt_rounded;
       case NgmyStripeProduct.stateRegistrar:
         return Icons.verified_user_rounded;
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return Icons.bolt_rounded;
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return Icons.groups_rounded;
     }
   }
 
@@ -545,6 +584,10 @@ class NgmyStripePayments {
         return 'Transfer files, decks, and backups with QR or download — 2 free, then \$4.99/mo.';
       case NgmyStripeProduct.stateRegistrar:
         return 'First Authorized Registrar in a state sponsors that state for \$50/month. Georgia is free.';
+      case NgmyStripeProduct.civicUserGroupExtra:
+        return 'Create an additional lightning Civic Group beyond your one free owned group (30 days).';
+      case NgmyStripeProduct.civicUserGroupMembers:
+        return 'Unlock more than 100 members in your lightning Civic Group (30 days).';
     }
   }
 

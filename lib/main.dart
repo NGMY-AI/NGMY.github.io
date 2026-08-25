@@ -150,6 +150,7 @@ import 'package:file_picker/file_picker.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_contribution_report.dart';
 import 'ngmy_civic_state_wallet.dart';
+import 'ngmy_civic_user_groups_ui.dart';
 import 'ngmy_civic_voting_ui.dart';
 import 'ngmy_civic_voting_admin.dart';
 import 'ngmy_civic_member_report.dart';
@@ -37564,6 +37565,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                           ),
                         ),
+                        IconButton(
+                          tooltip: 'Lightning Groups',
+                          onPressed: () {
+                            final display = (widget.user.fullName ?? '').toString().trim().isNotEmpty
+                                ? widget.user.fullName!.trim()
+                                : (widget.user.username.trim().isNotEmpty
+                                    ? widget.user.username.trim()
+                                    : widget.user.email.split('@').first);
+                            openNgmyCivicUserGroupsHub(
+                              context,
+                              userEmail: widget.user.email,
+                              userName: display,
+                              isAdmin: widget.user.isAdmin,
+                            );
+                          },
+                          icon: Icon(
+                            Icons.bolt_rounded,
+                            color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0E7490),
+                          ),
+                        ),
                         if (_canViewCivicIdForCurrentUser())
                           IconButton(
                             tooltip: 'View Registry ID / Passport',
@@ -37572,9 +37593,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               Icons.badge_outlined,
                               color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
-                          )
-                        else
-                          const SizedBox(width: 48),
+                          ),
                       ],
                     ),
                   ),
