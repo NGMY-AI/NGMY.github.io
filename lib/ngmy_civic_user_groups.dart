@@ -7,6 +7,15 @@ import 'ngmy_settings_cloud.dart';
 
 const kNgmyCivicUserGroupQrPrefix = 'NGMY-GROUP:';
 const kNgmyCivicUserGroupFreeMemberCap = 100;
+/// Exactly 3 uppercase letters + 1–5 digits (e.g. ABC12345).
+const kNgmyCivicUserGroupCodePattern = r'^[A-Z]{3}[0-9]{1,5}$';
+
+bool ngmyCivicUserGroupCodeIsValid(String raw) {
+  final c = raw.trim().toUpperCase();
+  return RegExp(kNgmyCivicUserGroupCodePattern).hasMatch(c);
+}
+
+String ngmyCivicUserGroupCodeHint() => 'ABC12345';
 
 String ngmyCivicUserGroupQrPayload(String inviteCode) =>
     '$kNgmyCivicUserGroupQrPrefix${inviteCode.trim().toUpperCase()}';
@@ -19,8 +28,10 @@ String? ngmyParseCivicUserGroupInviteCode(String raw) {
     final code = upper.substring(kNgmyCivicUserGroupQrPrefix.length).trim();
     return code.isEmpty ? null : code;
   }
-  final m = RegExp(r'^GRP-[A-Z0-9]{5,10}$').firstMatch(upper);
-  return m?.group(0);
+  final m = RegExp(r'^[A-Z]{3}[0-9]{1,5}$').firstMatch(upper);
+  if (m != null) return m.group(0);
+  final legacy = RegExp(r'^GRP-[A-Z0-9]{5,10}$').firstMatch(upper);
+  return legacy?.group(0);
 }
 
 class NgmyCivicUserGroupMember {
@@ -226,13 +237,6 @@ abstract final class NgmyCivicUserGroupsStore {
   static String _newId() =>
       'cug_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 20)}';
 
-  static String _newInviteCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final r = math.Random.secure();
-    final body = List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
-    return 'GRP-$body';
-  }
-
   static Future<Map<String, dynamic>> _loadRoot() async {
     final prefs = await SharedPreferences.getInstance();
     Map<String, dynamic> local = {'groups': <String, dynamic>{}};
@@ -311,19 +315,22 @@ abstract final class NgmyCivicUserGroupsStore {
   }
 
   static Future<NgmyCivicUserGroup> createGroup({
-    required String name,
+    required String inviteCode,
     required String ownerEmail,
     required String ownerName,
   }) async {
+    final code = inviteCode.trim().toUpperCase();
+    if (!ngmyCivicUserGroupCodeIsValid(code)) {
+      throw ArgumentError('Group code must be 3 letters + 1–5 numbers (e.g. ABC123).');
+    }
     final root = await _loadRoot();
     final groups = _groupsFromRoot(root);
-    var code = _newInviteCode();
-    while (groups.values.any((g) => g.inviteCode == code)) {
-      code = _newInviteCode();
+    if (groups.values.any((g) => g.inviteCode == code)) {
+      throw StateError('That group code is already taken. Try another.');
     }
     final group = NgmyCivicUserGroup(
       id: _newId(),
-      name: name.trim().isEmpty ? 'My Group' : name.trim(),
+      name: code,
       ownerEmail: ownerEmail.toLowerCase().trim(),
       ownerName: ownerName.trim().isEmpty ? 'Owner' : ownerName.trim(),
       inviteCode: code,

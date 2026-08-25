@@ -13,8 +13,23 @@ import 'ngmy_qr_download.dart';
 
 const _kBolt = Color(0xFF67E8F9);
 const _kBoltHot = Color(0xFFE0F2FE);
-const _kInk = Color(0xFF020617);
-const _kPanel = Color(0xFF0B1224);
+/// Matches Civic Registry dark chrome / status-bar area.
+const _kInk = Color(0xFF121212);
+const _kPanel = Color(0xFF0F111A);
+
+const _kLightningStatusBar = SystemUiOverlayStyle(
+  statusBarColor: _kInk,
+  statusBarIconBrightness: Brightness.light,
+  statusBarBrightness: Brightness.dark,
+);
+
+Future<void> _copyGroupCodeSnack(BuildContext context, String code) async {
+  await Clipboard.setData(ClipboardData(text: code));
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('Copied $code')),
+  );
+}
 
 Future<void> openNgmyCivicUserGroupsHub(
   BuildContext context, {
@@ -104,40 +119,45 @@ class _NgmyCivicUserGroupsHubScreenState
       isAdmin: widget.isAdmin,
     );
     if (!ok || !mounted) return;
-    final name = await _showNgmyLightningTextSheet(
-      context,
-      title: 'Create lightning group',
-      subtitle: 'One free owned group. Extra groups unlock with a short subscription.',
-      hint: 'Name your group',
-      confirmLabel: 'Create group',
-      icon: Icons.bolt_rounded,
-    );
-    if (name == null || !mounted) return;
-    final group = await NgmyCivicUserGroupsStore.createGroup(
-      name: name,
-      ownerEmail: widget.userEmail,
-      ownerName: widget.userName,
-    );
-    await _reload();
-    if (!mounted) return;
-    await NgmyNavigator.push(
-      context,
-      NgmyCivicUserGroupHomeScreen(
-        groupId: group.id,
-        userEmail: widget.userEmail,
-        userName: widget.userName,
-        isAdmin: widget.isAdmin,
-      ),
-    );
-    await _reload();
+    final code = await _showNgmyLightningCreateGroupSheet(context);
+    if (code == null || !mounted) return;
+    try {
+      final group = await NgmyCivicUserGroupsStore.createGroup(
+        inviteCode: code,
+        ownerEmail: widget.userEmail,
+        ownerName: widget.userName,
+      );
+      await _reload();
+      if (!mounted) return;
+      await NgmyNavigator.push(
+        context,
+        NgmyCivicUserGroupHomeScreen(
+          groupId: group.id,
+          userEmail: widget.userEmail,
+          userName: widget.userName,
+          isAdmin: widget.isAdmin,
+        ),
+      );
+      await _reload();
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e')),
+      );
+    }
   }
 
   Future<void> _joinByCode() async {
     final code = await _showNgmyLightningTextSheet(
       context,
       title: 'Join with code',
-      subtitle: 'Enter the GRP code from the group owner.',
-      hint: 'GRP-XXXXXX',
+      subtitle: 'Enter the group code from the owner (3 letters + numbers).',
+      hint: ngmyCivicUserGroupCodeHint(),
       confirmLabel: 'Join group',
       icon: Icons.vpn_key_rounded,
       capitalize: true,
@@ -224,26 +244,26 @@ class _NgmyCivicUserGroupsHubScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kInk,
-      body: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: Listenable.merge([_bolt, _pulse]),
-            builder: (context, _) {
-              return CustomPaint(
-                painter: _LightningAtmospherePainter(
-                  progress: Curves.easeOutCubic.transform(_bolt.value),
-                  pulse: _pulse.value,
-                ),
-                size: Size.infinite,
-              );
-            },
-          ),
-          // Dark top + bottom edges like Civic Registry, fading toward middle.
-          const Positioned.fill(child: IgnorePointer(child: _DarkEdgeVignette())),
-          SafeArea(
-            child: Column(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _kLightningStatusBar,
+      child: Scaffold(
+        backgroundColor: _kInk,
+        body: Stack(
+          children: [
+            AnimatedBuilder(
+              animation: Listenable.merge([_bolt, _pulse]),
+              builder: (context, _) {
+                return CustomPaint(
+                  painter: _LightningAtmospherePainter(
+                    progress: Curves.easeOutCubic.transform(_bolt.value),
+                    pulse: _pulse.value,
+                  ),
+                  size: Size.infinite,
+                );
+              },
+            ),
+            SafeArea(
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
@@ -333,6 +353,7 @@ class _NgmyCivicUserGroupsHubScreenState
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -468,7 +489,7 @@ class _GroupCard extends StatelessWidget {
               onTap: onTap,
               borderRadius: BorderRadius.circular(18),
               child: CustomPaint(
-                painter: _LightningFramePainter(intensity: 0.35 + g * 0.4),
+                painter: _LightningFramePainter(intensity: 0.35 + g * 0.4, corners: false),
                 child: Ink(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -518,11 +539,12 @@ class _GroupCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              group.name,
+                              group.inviteCode,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                                letterSpacing: 1.4,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -556,88 +578,45 @@ class _LightningAtmospherePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Deep ink base with a softer glow in the middle (edges stay darker).
-    final bg = Paint()
-      ..shader = ui.Gradient.linear(
-        Offset(0, 0),
-        Offset(0, size.height),
-        const [
-          Color(0xFF000000),
-          Color(0xFF020617),
-          Color(0xFF0A1628),
-          Color(0xFF020617),
-          Color(0xFF000000),
-        ],
-        const [0.0, 0.18, 0.5, 0.82, 1.0],
-      );
-    canvas.drawRect(Offset.zero & size, bg);
+    // Solid civic-dark base — edges match status bar, no side glow bleed.
+    canvas.drawRect(Offset.zero & size, Paint()..color = _kInk);
 
     final midGlow = Paint()
       ..shader = ui.Gradient.radial(
-        Offset(size.width * 0.5, size.height * 0.48),
-        size.width * 0.55,
+        Offset(size.width * 0.5, size.height * 0.5),
+        size.width * 0.42,
         [
-          Color.lerp(const Color(0xFF083344), _kBolt, 0.15 + pulse * 0.12)!
-              .withValues(alpha: 0.55),
+          _kBolt.withValues(alpha: 0.04 + pulse * 0.03),
           Colors.transparent,
         ],
       );
     canvas.drawRect(Offset.zero & size, midGlow);
 
-    // Center bolt (not top-corner).
+    // Center bolt only — kept away from screen edges.
     final cx = size.width * 0.5;
-    final cy = size.height * 0.46;
+    final cy = size.height * 0.42;
     final boltPath = Path()
-      ..moveTo(cx + 18, cy - 70)
-      ..lineTo(cx - 22, cy - 8)
-      ..lineTo(cx + 4, cy - 8)
-      ..lineTo(cx - 28, cy + 72);
+      ..moveTo(cx + 14, cy - 52)
+      ..lineTo(cx - 16, cy - 4)
+      ..lineTo(cx + 2, cy - 4)
+      ..lineTo(cx - 20, cy + 54);
 
     final glow = Paint()
-      ..color = _kBolt.withValues(alpha: 0.14 + pulse * 0.12)
+      ..color = _kBolt.withValues(alpha: 0.08 + pulse * 0.06)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 14
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
+      ..strokeWidth = 10
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14);
     final stroke = Paint()
-      ..color = _kBolt.withValues(alpha: 0.4 + progress * 0.5)
+      ..color = _kBolt.withValues(alpha: 0.28 + progress * 0.35)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.8
+      ..strokeWidth = 2.2
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final metrics = boltPath.computeMetrics();
-    for (final metric in metrics) {
+    for (final metric in boltPath.computeMetrics()) {
       final drawn = metric.extractPath(0, metric.length * progress);
       canvas.drawPath(drawn, glow);
       canvas.drawPath(drawn, stroke);
-    }
-
-    // Side micro-bolts framing the content zone.
-    void sideBolt(double x, double y0, double scale) {
-      final p = Path()
-        ..moveTo(x, y0)
-        ..lineTo(x - 10 * scale, y0 + 28 * scale)
-        ..lineTo(x + 4 * scale, y0 + 28 * scale)
-        ..lineTo(x - 12 * scale, y0 + 58 * scale);
-      final a = (0.12 + pulse * 0.18) * progress;
-      canvas.drawPath(
-        p,
-        Paint()
-          ..color = _kBolt.withValues(alpha: a)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..strokeCap = StrokeCap.round,
-      );
-    }
-
-    sideBolt(size.width * 0.12, size.height * 0.28, 0.9);
-    sideBolt(size.width * 0.88, size.height * 0.55, 0.85);
-
-    final spark = Paint()..color = _kBoltHot.withValues(alpha: 0.12 + pulse * 0.18);
-    for (var i = 0; i < 16; i++) {
-      final x = (math.sin(i * 1.7 + pulse * 3) * 0.42 + 0.5) * size.width;
-      final y = (math.cos(i * 2.1 + pulse * 2) * 0.28 + 0.48) * size.height;
-      canvas.drawCircle(Offset(x, y), 1.4 + pulse, spark);
     }
   }
 
@@ -670,7 +649,7 @@ class _NgmyCivicUserGroupHomeScreenState
     with SingleTickerProviderStateMixin {
   NgmyCivicUserGroup? _group;
   late final AnimationController _pulse;
-  int _tab = 0; // 0 ledger, 1 notes, 2 members, 3 invite
+  int _tab = 0; // 0 ledger, 1 people, 2 invite
 
   bool get _isOwner =>
       _group != null &&
@@ -732,55 +711,6 @@ class _NgmyCivicUserGroupHomeScreenState
     await _reload();
   }
 
-  Future<void> _addNote() async {
-    if (!_isOwner || _group == null) return;
-    final textC = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: _kPanel,
-        title: const Text('Group note',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        content: TextField(
-          controller: textC,
-          maxLines: 4,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Write a note…',
-            hintStyle: TextStyle(color: Colors.white54),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: _kBolt),
-            child: const Text('Save', style: TextStyle(color: _kInk)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final text = textC.text.trim();
-    textC.dispose();
-    if (text.isEmpty) return;
-    _group!.notes.insert(
-      0,
-      NgmyCivicUserGroupNote(
-        id: 'note_${DateTime.now().millisecondsSinceEpoch}',
-        text: text,
-        at: DateTime.now().toUtc(),
-        byEmail: widget.userEmail,
-      ),
-    );
-    await NgmyCivicUserGroupsStore.saveGroup(_group!);
-    await _reload();
-  }
-
   Future<void> _removeMember(String email) async {
     if (!_isOwner || _group == null) return;
     final confirm = await showDialog<bool>(
@@ -812,11 +742,7 @@ class _NgmyCivicUserGroupHomeScreenState
   Future<void> _copyCode() async {
     final g = _group;
     if (g == null) return;
-    await Clipboard.setData(ClipboardData(text: g.inviteCode));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Copied ${g.inviteCode}')),
-    );
+    await _copyGroupCodeSnack(context, g.inviteCode);
   }
 
   Future<void> _downloadQr() async {
@@ -856,31 +782,34 @@ class _NgmyCivicUserGroupHomeScreenState
       );
     }
 
-    return Scaffold(
-      backgroundColor: _kInk,
-      body: Stack(
-        children: [
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, _) => CustomPaint(
-              painter: _LightningAtmospherePainter(
-                progress: 1,
-                pulse: _pulse.value,
-              ),
-              size: Size.infinite,
-            ),
-          ),
-          const Positioned.fill(child: IgnorePointer(child: _DarkEdgeVignette())),
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                  child: _LightningTopBar(
-                    title: g.name.toUpperCase(),
-                    onBack: () => NgmyNavigator.pop(context),
-                  ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _kLightningStatusBar,
+      child: Scaffold(
+        backgroundColor: _kInk,
+        body: Stack(
+          children: [
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, _) => CustomPaint(
+                painter: _LightningAtmospherePainter(
+                  progress: 1,
+                  pulse: _pulse.value,
                 ),
+                size: Size.infinite,
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                    child: _LightningTopBar(
+                      title: 'GROUP',
+                      groupCode: g.inviteCode,
+                      onCopyCode: () => _copyGroupCodeSnack(context, g.inviteCode),
+                      onBack: () => NgmyNavigator.pop(context),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                   child: _LightningStatFrame(
@@ -932,9 +861,8 @@ class _NgmyCivicUserGroupHomeScreenState
                     children: [
                       for (final e in [
                         (0, 'Ledger'),
-                        (1, 'Notes'),
-                        (2, 'People'),
-                        (3, 'Invite'),
+                        (1, 'People'),
+                        (2, 'Invite'),
                       ])
                         Expanded(
                           child: TextButton(
@@ -957,6 +885,7 @@ class _NgmyCivicUserGroupHomeScreenState
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -984,39 +913,6 @@ class _NgmyCivicUserGroupHomeScreenState
   Widget _buildTab(NgmyCivicUserGroup g) {
     switch (_tab) {
       case 1:
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            if (_isOwner)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _GlowButton(
-                  label: 'Add note',
-                  icon: Icons.note_add_outlined,
-                  pulse: _pulse,
-                  onTap: _addNote,
-                ),
-              ),
-            if (g.notes.isEmpty)
-              const Text('No notes yet.',
-                  style: TextStyle(color: Colors.white38))
-            else
-              ...g.notes.map(
-                (n) => Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _kPanel,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _kBolt.withValues(alpha: 0.15)),
-                  ),
-                  child: Text(n.text,
-                      style: const TextStyle(color: Colors.white70, height: 1.35)),
-                ),
-              ),
-          ],
-        );
-      case 2:
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
@@ -1049,7 +945,7 @@ class _NgmyCivicUserGroupHomeScreenState
               ),
           ],
         );
-      case 3:
+      case 2:
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
@@ -1075,14 +971,32 @@ class _NgmyCivicUserGroupHomeScreenState
             ),
             const SizedBox(height: 16),
             Center(
-              child: SelectableText(
-                g.inviteCode,
-                style: const TextStyle(
-                  color: _kBolt,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  letterSpacing: 2,
+              child: GestureDetector(
+                onTap: () => _copyGroupCodeSnack(context, g.inviteCode),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      g.inviteCode,
+                      style: const TextStyle(
+                        color: _kBolt,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(Icons.copy_rounded,
+                        color: _kBolt.withValues(alpha: 0.85), size: 20),
+                  ],
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Center(
+              child: Text(
+                'Tap code to copy',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
               ),
             ),
             const SizedBox(height: 14),
@@ -1265,60 +1179,33 @@ class _NgmyCivicUserGroupScanScreenState
   }
 }
 
-/// Dark top/bottom edges fading toward the brighter middle.
-class _DarkEdgeVignette extends StatelessWidget {
-  const _DarkEdgeVignette();
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withValues(alpha: 0.92),
-            Colors.black.withValues(alpha: 0.55),
-            Colors.transparent,
-            Colors.transparent,
-            Colors.black.withValues(alpha: 0.55),
-            Colors.black.withValues(alpha: 0.92),
-          ],
-          stops: const [0.0, 0.12, 0.32, 0.68, 0.88, 1.0],
-        ),
-      ),
-    );
-  }
-}
-
+/// Dark civic-style chrome for the floating top bar.
 class _LightningTopBar extends StatelessWidget {
-  const _LightningTopBar({required this.title, required this.onBack});
+  const _LightningTopBar({
+    required this.title,
+    required this.onBack,
+    this.groupCode,
+    this.onCopyCode,
+  });
 
   final String title;
   final VoidCallback onBack;
+  final String? groupCode;
+  final VoidCallback? onCopyCode;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.black.withValues(alpha: 0.72),
-            const Color(0xFF0B1224).withValues(alpha: 0.88),
-            Colors.black.withValues(alpha: 0.78),
-          ],
-        ),
-        border: Border.all(color: _kBolt.withValues(alpha: 0.28), width: 1.1),
+        color: _kInk,
+        border: Border.all(color: _kBolt.withValues(alpha: 0.22), width: 1.1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1330,18 +1217,70 @@ class _LightningTopBar extends StatelessWidget {
             icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _kBoltHot),
           ),
           Expanded(
-            child: Text(
-              title,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                fontSize: 14,
-              ),
-            ),
+            child: groupCode != null && groupCode!.isNotEmpty
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.6,
+                          fontSize: 10,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onCopyCode,
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    groupCode!,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _kBolt,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 2,
+                                      fontSize: 17,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Icon(Icons.copy_rounded,
+                                    size: 16,
+                                    color: _kBolt.withValues(alpha: 0.85)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                      fontSize: 14,
+                    ),
+                  ),
           ),
           const SizedBox(width: 48),
         ],
@@ -1372,28 +1311,20 @@ class _LightningHeroPanel extends StatelessWidget {
       builder: (context, _) {
         final g = 0.35 + pulse.value * 0.45;
         return CustomPaint(
-          painter: _LightningFramePainter(intensity: 0.55 + g * 0.35),
+          painter: _LightningFramePainter(intensity: 0.55 + g * 0.35, corners: false),
           child: Container(
             padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.55),
-                  Color.lerp(_kPanel, _kBolt, g * 0.12)!,
-                  _kPanel.withValues(alpha: 0.95),
-                ],
-              ),
+              color: _kInk,
               border: Border.all(
                 color: _kBolt.withValues(alpha: 0.35 + g * 0.3),
                 width: 1.3,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: _kBolt.withValues(alpha: 0.18 + g * 0.2),
-                  blurRadius: 28,
+                  color: _kBolt.withValues(alpha: 0.12 + g * 0.15),
+                  blurRadius: 24,
                 ),
               ],
             ),
@@ -1507,12 +1438,12 @@ class _LightningStatFrame extends StatelessWidget {
       builder: (context, _) {
         final g = pulse.value;
         return CustomPaint(
-          painter: _LightningFramePainter(intensity: 0.4 + g * 0.35),
+          painter: _LightningFramePainter(intensity: 0.4 + g * 0.35, corners: false),
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: Colors.black.withValues(alpha: 0.55),
+              color: _kInk,
               border: Border.all(color: _kBolt.withValues(alpha: 0.35)),
               boxShadow: [
                 BoxShadow(
@@ -1530,9 +1461,10 @@ class _LightningStatFrame extends StatelessWidget {
 }
 
 class _LightningFramePainter extends CustomPainter {
-  _LightningFramePainter({required this.intensity});
+  _LightningFramePainter({required this.intensity, this.corners = true});
 
   final double intensity;
+  final bool corners;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1541,13 +1473,14 @@ class _LightningFramePainter extends CustomPainter {
       const Radius.circular(18),
     );
     final paint = Paint()
-      ..color = _kBolt.withValues(alpha: 0.08 * intensity)
+      ..color = _kBolt.withValues(alpha: 0.06 * intensity)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+      ..strokeWidth = 2
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
     canvas.drawRRect(r, paint);
 
-    // Tiny corner bolts
+    if (!corners) return;
+
     void corner(Offset o, bool flipX, bool flipY) {
       final sx = flipX ? -1.0 : 1.0;
       final sy = flipY ? -1.0 : 1.0;
@@ -1574,7 +1507,7 @@ class _LightningFramePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _LightningFramePainter oldDelegate) =>
-      oldDelegate.intensity != intensity;
+      oldDelegate.intensity != intensity || oldDelegate.corners != corners;
 }
 
 class _LightningLedgerResult {
@@ -1587,6 +1520,141 @@ class _LightningLedgerResult {
   final String label;
   final double amount;
   final String note;
+}
+
+/// Group code: 3 uppercase letters then 1–5 digits.
+class _NgmyGroupCodeInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final raw = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (raw.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+    final letters = StringBuffer();
+    final digits = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      final ch = raw[i];
+      if (RegExp(r'[A-Z]').hasMatch(ch)) {
+        if (letters.length < 3 && digits.isEmpty) {
+          letters.write(ch);
+        }
+      } else if (RegExp(r'[0-9]').hasMatch(ch)) {
+        if (letters.length == 3 && digits.length < 5) {
+          digits.write(ch);
+        }
+      }
+    }
+    final out = '${letters.toString()}${digits.toString()}';
+    return TextEditingValue(
+      text: out,
+      selection: TextSelection.collapsed(offset: out.length),
+    );
+  }
+}
+
+Future<String?> _showNgmyLightningCreateGroupSheet(BuildContext context) {
+  final controller = TextEditingController();
+  var errorText = '';
+
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(ctx).bottom),
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return _LightningSheetShell(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _sheetHeader(
+                    icon: Icons.bolt_rounded,
+                    title: 'Create lightning group',
+                    subtitle:
+                        'Pick your group code: 3 letters + 1–5 numbers (e.g. ABC123).',
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    inputFormatters: [_NgmyGroupCodeInputFormatter()],
+                    textCapitalization: TextCapitalization.characters,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2.2,
+                      fontSize: 20,
+                    ),
+                    decoration: _lightningFieldDecoration(ngmyCivicUserGroupCodeHint())
+                        .copyWith(
+                      errorText: errorText.isEmpty ? null : errorText,
+                    ),
+                    onChanged: (_) {
+                      if (errorText.isNotEmpty) {
+                        setLocal(() => errorText = '');
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Letters auto-uppercase. Max 3 letters then up to 5 numbers.',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel',
+                              style: TextStyle(color: Colors.white54)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: () {
+                            final code = controller.text.trim().toUpperCase();
+                            if (!ngmyCivicUserGroupCodeIsValid(code)) {
+                              setLocal(() {
+                                errorText =
+                                    'Use exactly 3 letters + 1–5 numbers (e.g. ABC123).';
+                              });
+                              return;
+                            }
+                            Navigator.pop(ctx, code);
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _kBolt,
+                            foregroundColor: _kInk,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Text(
+                            'Create group',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    },
+  ).whenComplete(controller.dispose);
 }
 
 Future<String?> _showNgmyLightningTextSheet(
@@ -1682,7 +1750,6 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
 }) {
   final isContribution = kind == NgmyCivicUserGroupLedgerKind.contribution;
   final amountC = TextEditingController();
-  final noteC = TextEditingController();
   final labelC = TextEditingController();
   var selectedName = members.isNotEmpty ? members.first.name : '';
 
@@ -1781,12 +1848,6 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                     ),
                     decoration: _lightningFieldDecoration('Amount (\$)'),
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: noteC,
-                    style: const TextStyle(color: Colors.white70),
-                    decoration: _lightningFieldDecoration('Note (optional)'),
-                  ),
                   const SizedBox(height: 18),
                   Row(
                     children: [
@@ -1821,7 +1882,7 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                               _LightningLedgerResult(
                                 label: label,
                                 amount: amount,
-                                note: noteC.text.trim(),
+                                note: '',
                               ),
                             );
                           },
@@ -1850,7 +1911,6 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
     },
   ).whenComplete(() {
     amountC.dispose();
-    noteC.dispose();
     labelC.dispose();
   });
 }
@@ -1866,15 +1926,7 @@ class _LightningSheetShell extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(26),
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF000000),
-            Color(0xFF0B1224),
-            Color(0xFF020617),
-          ],
-        ),
+        color: _kInk,
         border: Border.all(color: _kBolt.withValues(alpha: 0.4), width: 1.3),
         boxShadow: [
           BoxShadow(
