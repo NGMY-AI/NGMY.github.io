@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260824224904';
+      var embedded = '20260825015120';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -731,7 +731,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260824224904";
+      var CURRENT = "20260825015120";
 
       function showError(msg) {
 
@@ -866,7 +866,7 @@
 
   <script>
     (function () {
-      var deployId = '20260824224904';
+      var deployId = '20260825015120';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -1188,6 +1188,36 @@
         window.addEventListener('flutter-first-frame', function () {
           clearTimeout(bootTimer);
           clearTimeout(bootstrapTimer);
+          try {
+            var path = location.pathname || '';
+            var search = location.search || '';
+            var hash = (location.hash || '').replace(/^#/, '');
+            var bioGuest =
+              /\/bio\/[^/?#]+/i.test(path) ||
+              /\/local-bio\/[^/?#]+/i.test(path) ||
+              /[?&]ngmy_bio=/i.test(search) ||
+              /[?&]ngmy_local_bio=/i.test(search) ||
+              /^\/?bio\//i.test(hash) ||
+              /^\/?local-bio\//i.test(hash);
+            if (bioGuest) {
+              // Keep the single "Loading NGMY" splash until Flutter finishes
+              // loading the bio — avoids a second "Opening bio…" screen.
+              window.__ngmyGuestSplashHeld = true;
+              window.__ngmyReleaseGuestSplash = function () {
+                window.__ngmyGuestSplashHeld = false;
+                window.__ngmyHideSplash && window.__ngmyHideSplash();
+              };
+              window.addEventListener('ngmy-guest-surface-ready', function () {
+                window.__ngmyReleaseGuestSplash && window.__ngmyReleaseGuestSplash();
+              }, { once: true });
+              setTimeout(function () {
+                if (window.__ngmyGuestSplashHeld) {
+                  window.__ngmyReleaseGuestSplash();
+                }
+              }, 20000);
+              return;
+            }
+          } catch (e) {}
           window.__ngmyHideSplash && window.__ngmyHideSplash();
         }, { once: true });
 
