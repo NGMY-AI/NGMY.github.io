@@ -2082,14 +2082,10 @@ class _NgmyGroupCodeInputFormatter extends TextInputFormatter {
     final digits = StringBuffer();
     for (var i = 0; i < raw.length; i++) {
       final ch = raw[i];
-      if (RegExp(r'[A-Z]').hasMatch(ch)) {
-        if (letters.length < 3 && digits.isEmpty) {
-          letters.write(ch);
-        }
-      } else if (RegExp(r'[0-9]').hasMatch(ch)) {
-        if (letters.length == 3 && digits.length < 5) {
-          digits.write(ch);
-        }
+      if (RegExp(r'[A-Z]').hasMatch(ch) && letters.length < 3) {
+        letters.write(ch);
+      } else if (RegExp(r'[0-9]').hasMatch(ch) && digits.length < 5) {
+        digits.write(ch);
       }
     }
     final out = '${letters.toString()}${digits.toString()}';
@@ -2148,8 +2144,8 @@ Future<String?> _showNgmyLightningCreateGroupSheet(BuildContext context) {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Letters auto-uppercase. Max 3 letters then up to 5 numbers.',
-                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                    'Type letters or numbers in any order — code becomes 3 letters then numbers (e.g. ABC123).',
+                    style: TextStyle(color: Colors.white38, fontSize: 11, height: 1.35),
                   ),
                   const SizedBox(height: 18),
                   Row(
@@ -3010,7 +3006,7 @@ class _MemberProfileSheetBody extends StatelessWidget {
             style: const TextStyle(color: Colors.white38),
           )
         else
-          ...filtered.map(_historyTile),
+          ...filtered.map((item) => _historyTile(context, item)),
         const SizedBox(height: 12),
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -3046,9 +3042,14 @@ class _MemberProfileSheetBody extends StatelessWidget {
     );
   }
 
-  Widget _historyTile(_MemberHistoryItem item) {
+  Widget _historyTile(BuildContext context, _MemberHistoryItem item) {
     if (item is _ContributionHistoryItem) {
       final e = item.entry;
+      final title = e.campaignId.isNotEmpty && e.note.isNotEmpty
+          ? e.note
+          : (group.helpPurpose.isNotEmpty && e.campaignId.isNotEmpty
+              ? group.helpPurpose
+              : e.label);
       return Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
@@ -3058,7 +3059,7 @@ class _MemberProfileSheetBody extends StatelessWidget {
           border: Border.all(color: _kBolt.withValues(alpha: 0.22)),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Icon(Icons.south_west_rounded, color: _kBolt, size: 18),
             const SizedBox(width: 10),
@@ -3067,26 +3068,31 @@ class _MemberProfileSheetBody extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    e.at.toLocal().toString().split('.').first,
-                    style: const TextStyle(color: Colors.white54, fontSize: 11),
-                  ),
-                  if (e.campaignId.isNotEmpty && e.note.isNotEmpty)
-                    Text(e.note,
-                        style: const TextStyle(color: Colors.white38, fontSize: 10))
-                  else if (group.helpPurpose.isNotEmpty &&
-                      e.campaignId.isNotEmpty)
-                    Text(
-                      group.helpPurpose,
-                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      height: 1.2,
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    e.at.toLocal().toString().split('.').first,
+                    style: const TextStyle(color: Colors.white38, fontSize: 10),
+                  ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Text(
               '\$${e.amount.toStringAsFixed(2)}',
               style: const TextStyle(
                 color: _kBolt,
                 fontWeight: FontWeight.w900,
+                fontSize: 14,
               ),
             ),
           ],
@@ -3106,7 +3112,7 @@ class _MemberProfileSheetBody extends StatelessWidget {
         ),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             missedItem.pending ? Icons.hourglass_top_rounded : Icons.close_rounded,
@@ -3119,13 +3125,21 @@ class _MemberProfileSheetBody extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
+                  missedItem.purpose,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
                   missedItem.pending
                       ? 'Active help round'
                       : missedItem.at.toLocal().toString().split('.').first,
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
-                ),
-                Text(
-                  missedItem.purpose,
                   style: const TextStyle(color: Colors.white38, fontSize: 10),
                 ),
               ],
@@ -3136,7 +3150,15 @@ class _MemberProfileSheetBody extends StatelessWidget {
               missedItem.entryId.isNotEmpty &&
               onClearMissed != null)
             TextButton(
-              onPressed: () => onClearMissed!(missedItem.entryId),
+              onPressed: () async {
+                final ok = await _showLightningClearMissedConfirmSheet(
+                  context,
+                  purpose: missedItem.purpose,
+                );
+                if (ok == true) {
+                  await onClearMissed!(missedItem.entryId);
+                }
+              },
               style: TextButton.styleFrom(
                 foregroundColor: _kHelpGreenHot,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -3161,6 +3183,100 @@ class _MemberProfileSheetBody extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<bool?> _showLightningClearMissedConfirmSheet(
+  BuildContext context, {
+  required String purpose,
+}) {
+  return showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+        child: _LightningSheetShell(
+          cornerBolts: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kHelpGreen.withValues(alpha: 0.14),
+                    border: Border.all(color: _kHelpGreen.withValues(alpha: 0.55)),
+                  ),
+                  child: const Icon(Icons.check_circle_outline_rounded, color: _kHelpGreen),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Clear missed contribution?',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                purpose,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: _kHelpGreenHot,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'This removes the missed mark for this member. Only clear if they paid or you confirmed the contribution.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Keep missed',
+                          style: TextStyle(color: Colors.white54)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kHelpGreen,
+                        foregroundColor: _kInk,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Yes, clear it',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 Future<bool?> _showLightningContributionVerifySheet(
