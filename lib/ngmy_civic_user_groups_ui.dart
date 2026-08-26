@@ -377,6 +377,26 @@ class _NgmyCivicUserGroupsHubScreenState
                   child: _LightningTopBar(
                     title: 'LIGHTNING GROUPS',
                     onBack: () => NgmyNavigator.pop(context),
+                    trailing: widget.isAdmin
+                        ? IconButton(
+                            tooltip: 'All groups (admin)',
+                            onPressed: () async {
+                              await NgmyNavigator.push(
+                                context,
+                                NgmyLightningAdminAllGroupsScreen(
+                                  userEmail: widget.userEmail,
+                                  userName: widget.userName,
+                                ),
+                              );
+                              await _reload();
+                            },
+                            icon: const Icon(
+                              Icons.admin_panel_settings_rounded,
+                              color: _kBoltHot,
+                              size: 22,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 Expanded(
@@ -498,6 +518,355 @@ class _NgmyCivicUserGroupsHubScreenState
         padding: const EdgeInsets.only(bottom: 12),
         child: Text(t, style: const TextStyle(color: Colors.white38, fontSize: 13)),
       );
+}
+
+/// App-admin only: browse, search, open, and delete every Lightning Group.
+class NgmyLightningAdminAllGroupsScreen extends StatefulWidget {
+  const NgmyLightningAdminAllGroupsScreen({
+    super.key,
+    required this.userEmail,
+    required this.userName,
+  });
+
+  final String userEmail;
+  final String userName;
+
+  @override
+  State<NgmyLightningAdminAllGroupsScreen> createState() =>
+      _NgmyLightningAdminAllGroupsScreenState();
+}
+
+class _NgmyLightningAdminAllGroupsScreenState
+    extends State<NgmyLightningAdminAllGroupsScreen>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final AnimationController _orbit;
+  final _searchCtrl = TextEditingController();
+  List<NgmyCivicUserGroup> _all = [];
+  bool _searchOpen = false;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _all = List<NgmyCivicUserGroup>.from(NgmyCivicUserGroupsStore.cachedGroups);
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _orbit = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _orbit.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _reload() async {
+    final all = await NgmyCivicUserGroupsStore.loadAll();
+    if (!mounted) return;
+    setState(() => _all = all);
+  }
+
+  List<NgmyCivicUserGroup> get _filtered {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return _all;
+    return _all.where((g) {
+      final hay = [
+        g.name,
+        g.inviteCode,
+        g.ownerName,
+        g.ownerEmail,
+        g.id,
+        ...g.members.map((m) => m.name),
+        ...g.members.map((m) => m.email),
+      ].join(' ').toLowerCase();
+      return hay.contains(q);
+    }).toList();
+  }
+
+  Future<void> _openGroup(NgmyCivicUserGroup g) async {
+    await NgmyNavigator.push(
+      context,
+      NgmyCivicUserGroupHomeScreen(
+        groupId: g.id,
+        userEmail: widget.userEmail,
+        userName: widget.userName,
+        isAdmin: true,
+      ),
+    );
+    await _reload();
+  }
+
+  Future<void> _deleteGroup(NgmyCivicUserGroup g) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kPanel,
+        title: const Text('Delete group?', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Permanently delete "${g.name.isEmpty ? g.inviteCode : g.name}" '
+          '(${g.inviteCode}) owned by ${g.ownerName}. This cannot be undone.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await NgmyCivicUserGroupsStore.deleteGroup(g.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deleted ${g.inviteCode}')),
+    );
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _filtered;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _kLightningStatusBar,
+      child: Scaffold(
+        backgroundColor: _kInk,
+        body: Stack(
+          children: [
+            AnimatedBuilder(
+              animation: Listenable.merge([_pulse, _orbit]),
+              builder: (context, _) => CustomPaint(
+                painter: _LightningAtmospherePainter(
+                  progress: 1,
+                  pulse: _pulse.value,
+                  orbit: _orbit.value,
+                ),
+                size: Size.infinite,
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                    child: _LightningTopBar(
+                      title: 'ALL GROUPS',
+                      onBack: () => NgmyNavigator.pop(context),
+                      trailing: IconButton(
+                        tooltip: _searchOpen ? 'Close search' : 'Search groups',
+                        onPressed: () {
+                          setState(() {
+                            _searchOpen = !_searchOpen;
+                            if (!_searchOpen) {
+                              _searchCtrl.clear();
+                              _query = '';
+                            }
+                          });
+                        },
+                        icon: Icon(
+                          _searchOpen
+                              ? Icons.close_rounded
+                              : Icons.search_rounded,
+                          color: _kBoltHot,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_searchOpen)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                      child: TextField(
+                        controller: _searchCtrl,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        cursorColor: _kBolt,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: 'Search name, code, owner…',
+                          hintStyle: const TextStyle(color: Colors.white38),
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: _kBolt,
+                            size: 18,
+                          ),
+                          filled: true,
+                          fillColor: _kPanel,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: _kBolt.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: _kBolt.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: _kBolt),
+                          ),
+                        ),
+                        onChanged: (v) => setState(() => _query = v),
+                      ),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+                    child: Text(
+                      '${list.length} group${list.length == 1 ? '' : 's'}'
+                      '${_query.trim().isEmpty ? '' : ' matching'}',
+                      style: TextStyle(
+                        color: _kBolt.withValues(alpha: 0.85),
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: list.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No groups found.',
+                              style: TextStyle(color: Colors.white38),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 36),
+                            itemCount: list.length,
+                            itemBuilder: (context, i) {
+                              final g = list[i];
+                              return _AdminGroupRow(
+                                group: g,
+                                onOpen: () => _openGroup(g),
+                                onDelete: () => _deleteGroup(g),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminGroupRow extends StatelessWidget {
+  const _AdminGroupRow({
+    required this.group,
+    required this.onOpen,
+    required this.onDelete,
+  });
+
+  final NgmyCivicUserGroup group;
+  final VoidCallback onOpen;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: _kPanel,
+              border: Border.all(color: _kBolt.withValues(alpha: 0.28)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _kBolt.withValues(alpha: 0.12),
+                    border: Border.all(color: _kBolt.withValues(alpha: 0.5)),
+                  ),
+                  child: const Icon(Icons.bolt_rounded, color: _kBolt, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group.inviteCode,
+                        style: const TextStyle(
+                          color: _kBolt,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.4,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Owner ${group.ownerName} · ${group.memberCount} people',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        group.ownerEmail,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Delete group',
+                  onPressed: onDelete,
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFF87171),
+                    size: 22,
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _GlowButton extends StatelessWidget {
@@ -957,6 +1326,8 @@ class _NgmyCivicUserGroupHomeScreenState
     await NgmyCivicUserGroupsStore.removeMember(
       groupId: _group!.id,
       memberEmail: email,
+      memberName: name,
+      removedByEmail: widget.userEmail,
     );
     await _reload();
   }
@@ -1309,8 +1680,13 @@ class _NgmyCivicUserGroupHomeScreenState
                   style: TextStyle(color: Colors.white38))
             else
               ...entries.map((e) {
+                final isRemoval =
+                    e.kind == NgmyCivicUserGroupLedgerKind.memberRemoved;
                 final inMoney =
                     e.kind == NgmyCivicUserGroupLedgerKind.contribution;
+                final accent = isRemoval
+                    ? const Color(0xFFF87171)
+                    : (inMoney ? _kBolt : Colors.orangeAccent);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(12),
@@ -1318,17 +1694,18 @@ class _NgmyCivicUserGroupHomeScreenState
                     color: _kPanel,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: (inMoney ? _kBolt : Colors.orangeAccent)
-                          .withValues(alpha: 0.25),
+                      color: accent.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        inMoney
-                            ? Icons.south_west_rounded
-                            : Icons.north_east_rounded,
-                        color: inMoney ? _kBolt : Colors.orangeAccent,
+                        isRemoval
+                            ? Icons.person_remove_alt_1_rounded
+                            : (inMoney
+                                ? Icons.south_west_rounded
+                                : Icons.north_east_rounded),
+                        color: accent,
                         size: 18,
                       ),
                       const SizedBox(width: 10),
@@ -1336,24 +1713,43 @@ class _NgmyCivicUserGroupHomeScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(e.label,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700)),
+                            Text(
+                              isRemoval
+                                  ? '${e.label} removed'
+                                  : e.label,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             if (e.note.isNotEmpty)
-                              Text(e.note,
-                                  style: const TextStyle(
-                                      color: Colors.white54, fontSize: 12)),
+                              Text(
+                                e.note,
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                      Text(
-                        '${inMoney ? '+' : '-'}\$${e.amount.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          color: inMoney ? _kBolt : Colors.orangeAccent,
-                          fontWeight: FontWeight.w900,
+                      if (isRemoval)
+                        Text(
+                          'Removed',
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                          ),
+                        )
+                      else
+                        Text(
+                          '${inMoney ? '+' : '-'}\$${e.amount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 );
@@ -1532,6 +1928,7 @@ class _LightningTopBar extends StatelessWidget {
     this.helpModeActive = false,
     this.helpPulse,
     this.onHelpTap,
+    this.trailing,
   });
 
   final String title;
@@ -1542,6 +1939,8 @@ class _LightningTopBar extends StatelessWidget {
   final bool helpModeActive;
   final Animation<double>? helpPulse;
   final VoidCallback? onHelpTap;
+  /// Optional trailing control (e.g. app-admin all-groups). Wins over help button.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1620,7 +2019,9 @@ class _LightningTopBar extends StatelessWidget {
                     ),
                   ),
           ),
-          if (showHelpButton)
+          if (trailing != null)
+            trailing!
+          else if (showHelpButton)
             _HelpModeTopButton(
               active: helpModeActive,
               pulse: helpPulse,

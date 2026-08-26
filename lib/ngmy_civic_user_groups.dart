@@ -93,7 +93,7 @@ class NgmyCivicUserGroupNote {
       );
 }
 
-enum NgmyCivicUserGroupLedgerKind { contribution, spending }
+enum NgmyCivicUserGroupLedgerKind { contribution, spending, memberRemoved }
 
 class NgmyCivicUserGroupLedgerEntry {
   NgmyCivicUserGroupLedgerEntry({
@@ -116,11 +116,32 @@ class NgmyCivicUserGroupLedgerEntry {
   final String byEmail;
   final String campaignId;
 
+  static String _kindToJson(NgmyCivicUserGroupLedgerKind kind) {
+    switch (kind) {
+      case NgmyCivicUserGroupLedgerKind.contribution:
+        return 'contribution';
+      case NgmyCivicUserGroupLedgerKind.spending:
+        return 'spending';
+      case NgmyCivicUserGroupLedgerKind.memberRemoved:
+        return 'member_removed';
+    }
+  }
+
+  static NgmyCivicUserGroupLedgerKind _kindFromJson(String raw) {
+    switch (raw.toLowerCase().trim()) {
+      case 'spending':
+        return NgmyCivicUserGroupLedgerKind.spending;
+      case 'member_removed':
+      case 'removed':
+        return NgmyCivicUserGroupLedgerKind.memberRemoved;
+      default:
+        return NgmyCivicUserGroupLedgerKind.contribution;
+    }
+  }
+
   Map<String, dynamic> toJson() => {
         'id': id,
-        'kind': kind == NgmyCivicUserGroupLedgerKind.contribution
-            ? 'contribution'
-            : 'spending',
+        'kind': _kindToJson(kind),
         'amount': amount,
         'label': label,
         'note': note,
@@ -130,12 +151,9 @@ class NgmyCivicUserGroupLedgerEntry {
       };
 
   factory NgmyCivicUserGroupLedgerEntry.fromJson(Map<String, dynamic> j) {
-    final k = (j['kind'] ?? '').toString().toLowerCase();
     return NgmyCivicUserGroupLedgerEntry(
       id: (j['id'] ?? '').toString(),
-      kind: k == 'spending'
-          ? NgmyCivicUserGroupLedgerKind.spending
-          : NgmyCivicUserGroupLedgerKind.contribution,
+      kind: _kindFromJson((j['kind'] ?? '').toString()),
       amount: (j['amount'] is num)
           ? (j['amount'] as num).toDouble()
           : double.tryParse('${j['amount']}') ?? 0,
@@ -686,12 +704,37 @@ abstract final class NgmyCivicUserGroupsStore {
   static Future<bool> removeMember({
     required String groupId,
     required String memberEmail,
+    String? memberName,
+    String? removedByEmail,
   }) async {
     final group = await findById(groupId);
     if (group == null) return false;
     final e = memberEmail.toLowerCase().trim();
     if (group.isOwner(e)) return false;
+    String display = (memberName ?? '').trim();
+    if (display.isEmpty) {
+      try {
+        display = group.members.firstWhere((m) => m.email == e).name.trim();
+      } catch (_) {
+        display = e.contains('@') ? e.split('@').first : e;
+      }
+    }
+    if (display.isEmpty) display = 'Member';
+    final before = group.members.length;
     group.members.removeWhere((m) => m.email == e);
+    if (group.members.length == before) return false;
+    group.ledger.insert(
+      0,
+      NgmyCivicUserGroupLedgerEntry(
+        id: _newId(),
+        kind: NgmyCivicUserGroupLedgerKind.memberRemoved,
+        amount: 0,
+        label: display,
+        note: 'Removed from group',
+        at: DateTime.now().toUtc(),
+        byEmail: (removedByEmail ?? '').toLowerCase().trim(),
+      ),
+    );
     await saveGroup(group);
     return true;
   }
