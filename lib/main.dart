@@ -228,6 +228,13 @@ Future<void> ngmyWriteUserLoggedOutFlag(bool loggedOut, [SharedPreferences? pref
   }
 }
 
+/// Stale `forceLogout` in prefs/cloud was kicking people to login on reopen.
+/// Always clear it when establishing a session so only a live admin kick applies.
+void ngmyClearStaleForceLogout(UserData? user) {
+  if (user == null) return;
+  user.forceLogout = false;
+}
+
 const _kNgmyDefaultThemeMode = ThemeMode.dark;
 
 ThemeMode _ngmyInitialThemeMode = _kNgmyDefaultThemeMode;
@@ -363,8 +370,16 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
 
     UserData? currentUser;
     final loggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
-    if (!loggedOut) {
-      final userJson = _ngmyPrefsJson(prefs, 'current_user');
+    final userJson = _ngmyPrefsJson(prefs, 'current_user');
+    final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+    // If the sticky logged-out flag is set but a session snapshot still exists,
+    // prefer restoring the session — the flag was often left behind by a stale
+    // forceLogout kick, not an intentional Profile → Log out.
+    final hasSessionSnapshot = userJson != null || lastEmail.isNotEmpty;
+    if (!loggedOut || hasSessionSnapshot) {
+      if (loggedOut && hasSessionSnapshot) {
+        await ngmyWriteUserLoggedOutFlag(false, prefs);
+      }
       if (userJson != null) {
         try {
           final map = jsonDecode(userJson);
@@ -375,14 +390,17 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
           }
         } catch (_) {}
       }
-      if (currentUser == null) {
-        final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
-        if (lastEmail.isNotEmpty) {
-          final index = users.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
-          if (index != -1) currentUser = users[index];
+      if (currentUser == null && lastEmail.isNotEmpty) {
+        final index = users.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
+        if (index != -1) {
+          currentUser = users[index];
+        } else {
+          // Keep a minimal session even if all_users failed to decode.
+          currentUser = UserData(email: lastEmail, username: lastEmail.split('@').first);
         }
       }
     }
+    ngmyClearStaleForceLogout(currentUser);
 
     for (final u in users) {
       ngmyReconcileUserAccountBalance(u, transactions);
@@ -412,6 +430,25 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     );
   } catch (e) {
     debugPrint('[ngmy] launch bootstrap: $e');
+    // Never wipe a good session on a partial prefs decode failure — try a
+    // minimal salvage so reopen still lands inside the app.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastEmail = (prefs.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+      final userJson = _ngmyPrefsJson(prefs, 'current_user');
+      UserData? salvage;
+      if (userJson != null) {
+        final map = jsonDecode(userJson);
+        if (map is Map<String, dynamic>) salvage = UserData.fromJson(map);
+      }
+      salvage ??= lastEmail.isEmpty
+          ? null
+          : UserData(email: lastEmail, username: lastEmail.split('@').first);
+      if (salvage != null) {
+        ngmyClearStaleForceLogout(salvage);
+        return NgmyLaunchBootstrap(themeMode: _kNgmyDefaultThemeMode, currentUser: salvage);
+      }
+    } catch (_) {}
     return NgmyLaunchBootstrap.empty;
   }
 }
@@ -8024,6 +8061,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   bool _backgroundSyncPaused = false;
   bool _userExplicitlyLoggedOut = false;
   bool _sessionBootstrapComplete = false;
+  /// When the signed-in session became live in this process (for ignoring stale forceLogout).
+  DateTime? _sessionBecameLiveAt;
   String _appShellSig = '';
   String _computeAppShellSig() {
     final annSig = _allAnnouncements.map((a) => '${a.id}:${a.message.length}').join('|');
@@ -8361,31 +8400,54 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _restoreSessionFromLocalCache({SharedPreferences? prefs}) async {
-    if (_currentUser != null || _userExplicitlyLoggedOut) return;
+    if (_currentUser != null || _userExplicitlyLoggedOut) {
+      ngmyClearStaleForceLogout(_currentUser);
+      return;
+    }
     final p = prefs ?? await SharedPreferences.getInstance();
-    if (p.getBool(kNgmyUserLoggedOutKey) == true) {
+    final loggedOutFlag = p.getBool(kNgmyUserLoggedOutKey) == true;
+    final userJson = _ngmyPrefsJson(p, 'current_user');
+    final lastEmail = (p.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
+    // Sticky logged-out flag with a surviving session snapshot is inconsistent —
+    // recover into the app instead of trapping on Auth forever.
+    if (loggedOutFlag && userJson == null && lastEmail.isEmpty) {
       _userExplicitlyLoggedOut = true;
       return;
     }
-    final userJson = _ngmyPrefsJson(p, 'current_user');
+    if (loggedOutFlag) {
+      await ngmyWriteUserLoggedOutFlag(false, p);
+      _userExplicitlyLoggedOut = false;
+    }
     if (userJson != null) {
       try {
         final map = jsonDecode(userJson);
         if (map is Map<String, dynamic>) {
           final localUser = UserData.fromJson(map);
+          ngmyClearStaleForceLogout(localUser);
           final index = _allUsers.indexWhere(
             (u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim(),
           );
-          _currentUser = index != -1 ? _allUsers[index] : localUser;
+          if (index != -1) {
+            ngmyClearStaleForceLogout(_allUsers[index]);
+            _currentUser = _allUsers[index];
+          } else {
+            _currentUser = localUser;
+          }
           if (mounted) setState(() {});
+          unawaited(_persistSessionImmediately());
           return;
         }
       } catch (_) {}
     }
-    final lastEmail = (p.getString('ngmy_last_session_email') ?? '').toLowerCase().trim();
     if (lastEmail.isEmpty) return;
     final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == lastEmail);
-    if (index == -1) return;
+    if (index == -1) {
+      _currentUser = UserData(email: lastEmail, username: lastEmail.split('@').first);
+      if (mounted) setState(() {});
+      unawaited(_persistSessionImmediately());
+      return;
+    }
+    ngmyClearStaleForceLogout(_allUsers[index]);
     _currentUser = _allUsers[index];
     if (mounted) setState(() {});
     unawaited(_persistSessionImmediately());
@@ -8599,11 +8661,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (index >= 0) {
       final local = _allUsers[index];
       local.passwordHash = passwordHash;
+      local.forceLogout = false;
       if (ngmyEmailIsAdmin(key)) local.isAdmin = true;
       try {
         final remote = await _fetchCloudUserRow(email);
         if (remote != null) {
           remote.passwordHash = passwordHash;
+          remote.forceLogout = false;
           if (ngmyEmailIsAdmin(key)) remote.isAdmin = true;
           _preserveLocalSessionState(local, remote);
           _mergeUserMediaProfileFields(local, remote);
@@ -8623,6 +8687,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (remote != null) {
           user = remote;
           user.passwordHash = passwordHash;
+          user.forceLogout = false;
         } else {
           user = UserData(
             email: email,
@@ -8668,12 +8733,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
     }
     if (!mounted) return;
+    _sessionBecameLiveAt = DateTime.now();
+    ngmyClearStaleForceLogout(_currentUser);
     setState(() {});
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
       await prefs.setString('ngmy_last_session_email', key);
       await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await ngmyWriteUserLoggedOutFlag(false, prefs);
     } catch (e) {
       debugPrint('[login] local session save: $e');
     }
@@ -9072,21 +9140,32 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _completeSessionBootstrap() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
-      if (_userExplicitlyLoggedOut) {
+      final flaggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
+      final hasSnapshot = _ngmyPrefsJson(prefs, 'current_user') != null ||
+          (prefs.getString('ngmy_last_session_email') ?? '').trim().isNotEmpty;
+      // Intentional logout clears the session snapshot. If the flag is set but
+      // a snapshot remains, recover — do not trap the user on Auth.
+      if (flaggedOut && !hasSnapshot && _currentUser == null) {
+        _userExplicitlyLoggedOut = true;
         try {
           if (supabase.auth.currentSession != null) await supabase.auth.signOut();
         } catch (_) {}
-        if (mounted && _currentUser != null) {
-          setState(() => _currentUser = null);
-        }
       } else {
-        await _restoreSessionFromLocalCache(prefs: prefs);
+        if (flaggedOut) {
+          await ngmyWriteUserLoggedOutFlag(false, prefs);
+        }
+        _userExplicitlyLoggedOut = false;
+        if (_currentUser == null) {
+          await _restoreSessionFromLocalCache(prefs: prefs);
+        }
         if (_currentUser == null) {
           await _tryRestoreSessionFromSupabaseAuth();
         }
+        ngmyClearStaleForceLogout(_currentUser);
         if (_currentUser != null) {
+          _sessionBecameLiveAt = DateTime.now();
           await _clearLoggedOutFlag();
+          unawaited(_persistSessionImmediately());
         }
       }
     } catch (e) {
@@ -9114,7 +9193,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _resetWalletLedgerSyncState();
     _themeMode = b.themeMode;
     _currentUser = b.currentUser;
+    ngmyClearStaleForceLogout(_currentUser);
     if (b.users.isNotEmpty) _allUsers = List<UserData>.from(b.users);
+    for (final u in _allUsers) {
+      ngmyClearStaleForceLogout(u);
+    }
     if (b.transactions.isNotEmpty) _allTransactions = List<AppTransaction>.from(b.transactions);
     _seedWithdrawalHoldTxnIds();
     if (b.media.isNotEmpty) _allMedia = List<MediaPost>.from(b.media);
@@ -9143,15 +9226,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   void _scheduleDeferredStartupRebuild() {
+    // Avoid a mid-session full-shell setState that feels like a random refresh.
+    // Shell signature changes still apply on the next natural navigation/rebuild.
     _startupRebuildDebounce?.cancel();
-    _startupRebuildDebounce = Timer(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
+    _startupRebuildDebounce = Timer(const Duration(milliseconds: 2500), () {
+      if (!mounted || _currentUser == null) return;
       final nextSig = _computeAppShellSig();
       if (nextSig == _appShellSig) return;
       _appShellSig = nextSig;
-      if (_currentUser != null) {
-      setState(() {});
-      }
     });
   }
 
@@ -11816,11 +11898,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == email) {
           if (updatedUser.forceLogout) {
+            // Live admin kick only — ignore if we just remounted / restored.
+            final shellAge = _sessionBecameLiveAt == null
+                ? Duration.zero
+                : DateTime.now().difference(_sessionBecameLiveAt!);
             updatedUser.forceLogout = false;
             final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
             if (uIdx >= 0) _allUsers[uIdx].forceLogout = false;
             unawaited(_pushUserToCloudFast(updatedUser));
-            unawaited(_performForceLogoutFromCloud(email));
+            if (shellAge > const Duration(seconds: 4)) {
+              unawaited(_performForceLogoutFromCloud(email));
+            }
           } else {
             final localCurrent = _currentUser!;
             _preserveLocalSessionState(localCurrent, updatedUser);
@@ -12051,6 +12139,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailKey);
         final local = idx >= 0 ? _allUsers[idx] : _currentUser!;
         cloudUser.passwordHash = _currentUser!.passwordHash;
+        cloudUser.forceLogout = false;
         if (ngmyEmailIsAdmin(emailKey)) cloudUser.isAdmin = true;
         _preserveLocalSessionState(local, cloudUser);
         _mergeUserMediaProfileFields(local, cloudUser);
@@ -12204,7 +12293,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       final prefs = await SharedPreferences.getInstance();
       await ngmyLoadAppLoginUserRegistry();
-      _userExplicitlyLoggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
+      final flaggedOut = prefs.getBool(kNgmyUserLoggedOutKey) == true;
+      final hasSnap = _ngmyPrefsJson(prefs, 'current_user') != null ||
+          (prefs.getString('ngmy_last_session_email') ?? '').trim().isNotEmpty ||
+          _currentUser != null;
+      if (flaggedOut && hasSnap) {
+        await ngmyWriteUserLoggedOutFlag(false, prefs);
+        _userExplicitlyLoggedOut = false;
+      } else {
+        _userExplicitlyLoggedOut = flaggedOut;
+      }
 
       String? safeGet(String key) => _ngmyPrefsJson(prefs, key);
 
@@ -12681,8 +12779,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             final map = jsonDecode(userJson);
             if (map is Map<String, dynamic>) {
               final localUser = UserData.fromJson(map);
+              ngmyClearStaleForceLogout(localUser);
               final index = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == localUser.email.toLowerCase().trim());
               if (index != -1) {
+                ngmyClearStaleForceLogout(_allUsers[index]);
                 _currentUser = _allUsers[index];
               } else {
                 _currentUser = localUser;
@@ -12690,8 +12790,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             }
           } catch (_) {}
         }
+        ngmyClearStaleForceLogout(_currentUser);
+        if (_currentUser != null) {
+          _sessionBecameLiveAt ??= DateTime.now();
+        }
       } else {
-        _currentUser = null;
+        // Only honor explicit logout when the session snapshot is gone.
+        final hasSnap = safeGet('current_user') != null ||
+            (prefs.getString('ngmy_last_session_email') ?? '').trim().isNotEmpty;
+        if (hasSnap) {
+          _userExplicitlyLoggedOut = false;
+          await ngmyWriteUserLoggedOutFlag(false, prefs);
+          await _restoreSessionFromLocalCache(prefs: prefs);
+        } else {
+          _currentUser = null;
+        }
       }
 
       _reconcileAllUserBalances();
@@ -15601,7 +15714,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
+      if (widget.user.forceLogout) {
+        // Ignore leftover forceLogout on cold open / remount. Only honor a live
+        // admin kick after the shell has been open for a few seconds.
+        final mountedAt = _mainShellMountedAt;
+        final liveKick = mountedAt != null &&
+            DateTime.now().difference(mountedAt) > const Duration(seconds: 4);
+        widget.user.forceLogout = false;
+        if (liveKick) {
+          widget.onDataChanged();
+          widget.onLogout();
+          return;
+        }
+        widget.onDataChanged();
+      }
       final userTx = _userClockInTransactions();
       // Overnight settle BEFORE midnight reset clears the session.
       final overnight = ngmyBuildOvernightClockInPayout(
