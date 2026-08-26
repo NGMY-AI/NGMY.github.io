@@ -5522,6 +5522,32 @@ void _ngmyApplyMidnightClockReset(UserData user) {
   }
 }
 
+/// If the user was still clocked in overnight without a noon payout, create the
+/// daily earnings txn so prior-day money stacks into balance instead of vanishing.
+AppTransaction? ngmyBuildOvernightClockInPayout({
+  required UserData user,
+  required List<AppTransaction> transactions,
+}) {
+  final now = DateTime.now();
+  if (!user.isClockedIn || user.clockInStartTime == null) return null;
+  if (_ngmySameCalendarDay(user.clockInStartTime!, now)) return null;
+  final earned = user.todayDailyGoal;
+  if (earned <= 0) return null;
+  if (_ngmyHasClockInPayoutForDay(user.email, transactions, user.clockInStartTime!)) {
+    return null;
+  }
+  return AppTransaction(
+    id: _ngmyClockInTransactionId(user.email, user.clockInStartTime!),
+    userEmail: user.email,
+    amount: earned,
+    type: TransactionType.reimbursement,
+    method: PaymentMethod.system,
+    sourceDetails: 'Clock-in daily earnings (overnight settle)',
+    status: TransactionStatus.approved,
+    timestamp: now,
+  );
+}
+
 double? _ngmyClockInPayoutAmountForDay(String email, List<AppTransaction> txs, DateTime day) {
   final id = _ngmyClockInTransactionId(email, day);
   final key = email.toLowerCase().trim();
@@ -13257,8 +13283,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = ngmyNormalizeEmail(t.userEmail);
                     final userIdx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == userKey);
                     if (userIdx != -1) {
-                      if (_ngmyIsClockInSessionStartTransaction(t) ||
-                          (t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) {
+                      if (_ngmyIsClockInSessionStartTransaction(t)) {
+                        _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
+                      } else if ((t.sourceDetails ?? '')
+                          .toLowerCase()
+                          .contains('clock-in daily earnings')) {
+                        // Stack earnings into the wallet (+=). Never skip credit —
+                        // skipping made each day's payout look like it replaced the balance.
+                        if (t.status == TransactionStatus.approved && t.amount > 0) {
+                          ngmyApplyApprovedTransactionToBalance(
+                            _allUsers[userIdx],
+                            t,
+                            playSound: false,
+                          );
+                        }
                         _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
                       } else if (t.status == TransactionStatus.approved) {
                         ngmyApplyApprovedTransactionToBalance(
@@ -13369,18 +13407,22 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                           targetUser.pendingInvestmentName = null;
                           targetUser.pendingInvestmentAmount = null;
                           targetUser.pendingInvestmentRoi = null;
-                          _allTransactions.add(
-                            AppTransaction(
-                              id: '${DateTime.now()}-invest',
-                              userEmail: t.userEmail,
-                              amount: t.amount,
-                              type: TransactionType.adminRemove,
-                              method: PaymentMethod.system,
-                              sourceDetails: 'Investment plan purchase/upgrade: $planName',
-                              status: TransactionStatus.approved,
-                              timestamp: DateTime.now(),
-                            ),
+                          final investDebit = AppTransaction(
+                            id: ngmyInvestPurchaseTxnId(t.userEmail, planName, planAmount),
+                            userEmail: t.userEmail,
+                            amount: t.amount,
+                            type: TransactionType.adminRemove,
+                            method: PaymentMethod.system,
+                            sourceDetails: 'Investment plan purchase/upgrade: $planName',
+                            status: TransactionStatus.approved,
+                            timestamp: DateTime.now(),
                           );
+                          if (!_allTransactions.any((x) => x.id == investDebit.id)) {
+                            _allTransactions.add(investDebit);
+                            unawaited(_pushTransactionToCloudReliable(investDebit));
+                            unawaited(_pushTransactionToCloudFast(investDebit));
+                            _markTransactionDirty(investDebit.id);
+                          }
                         }
                       }
                     } else {
@@ -15560,8 +15602,31 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) { widget.user.forceLogout = false; widget.onDataChanged(); widget.onLogout(); return; }
-      _ngmyApplyMidnightClockReset(widget.user);
       final userTx = _userClockInTransactions();
+      // Overnight settle BEFORE midnight reset clears the session.
+      final overnight = ngmyBuildOvernightClockInPayout(
+        user: widget.user,
+        transactions: userTx,
+      );
+      if (overnight != null) {
+        final earned = overnight.amount;
+        setState(() {
+          widget.user.totalProfit += earned;
+          if (widget.user.activeInvestment != null) {
+            widget.user.activeInvestment!.totalEarned += earned;
+            widget.user.activeInvestment!.daysClockedIn++;
+          }
+          widget.user.lastClockInEarningsDate = widget.user.clockInStartTime;
+          widget.user.todayClockInEarned = earned;
+          widget.user.isClockedIn = false;
+          widget.user.clockInStartTime = null;
+          widget.user.clockInPenaltyPercent = 0;
+        });
+        widget.onAddTransaction(overnight);
+        widget.onDataChanged();
+        return;
+      }
+      _ngmyApplyMidnightClockReset(widget.user);
       final wasClockedIn = widget.user.isClockedIn;
       _ngmyReconcileClockInSession(widget.user, userTx);
       if (!wasClockedIn && widget.user.isClockedIn) setState(() {});

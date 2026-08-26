@@ -80,6 +80,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   bool _investPurchaseInFlight = false;
   bool _loading = true;
   Timer? _balancePoll;
+  Timer? _earningsTick;
 
   /// One shared spendable balance for Growth Income AND the whole app.
   void _publishAppBalance(double balance, {required bool allowDecrease}) {
@@ -114,14 +115,81 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
       unawaited(_pullApprovedBalanceFromCloud());
     });
+    _earningsTick = Timer.periodic(const Duration(seconds: 2), (_) {
+      _tickLocalClockInEarnings();
+    });
   }
 
   @override
   void dispose() {
     _balancePoll?.cancel();
+    _earningsTick?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     NgmyFeatureSyncSession.leaveGrowthIncomeUser();
     super.dispose();
+  }
+
+  /// Same-day completion: when the local clock-in goal is reached, stack the
+  /// payout into balance immediately (not only on next-day rollover).
+  void _tickLocalClockInEarnings() {
+    final user = _user;
+    if (user == null || !mounted) return;
+    if (!user.isClockedIn || user.clockInStartTime == null) return;
+    final now = DateTime.now();
+    if (!NgmyLocalGrowthIncomeStore.sameCalendarDay(user.clockInStartTime, now)) {
+      final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, _transactions);
+      if (payoutAdded) {
+        setState(() {
+          _publishAppBalance(user.accountBalance, allowDecrease: false);
+        });
+        unawaited(_persist(bumpWalletRevision: true, syncBalance: true, allowDecrease: false));
+      }
+      return;
+    }
+    final goal = user.todayDailyGoal;
+    if (goal <= 0) return;
+    if (user.currentTodayEarnings < goal - 0.0001) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final payoutId =
+        'local_clockin_payout_${user.email}_${user.clockInStartTime!.millisecondsSinceEpoch}';
+    if (_transactions.any((t) => t.id == payoutId)) {
+      user.isClockedIn = false;
+      user.clockInStartTime = null;
+      user.clockInPenaltyPercent = 0;
+      return;
+    }
+    final earned = goal;
+    setState(() {
+      user.totalProfit += earned;
+      if (user.activeInvestment != null) {
+        user.activeInvestment!.totalEarned += earned;
+        user.activeInvestment!.daysClockedIn += 1;
+      }
+      user.isClockedIn = false;
+      user.clockInStartTime = null;
+      user.clockInPenaltyPercent = 0;
+      user.lastClockInDate = now;
+      user.lastClockInEarningsDate = now;
+      user.todayClockInEarned = earned;
+      if (widget.liveUser.activeInvestment != null && user.activeInvestment != null) {
+        widget.liveUser.activeInvestment!.totalEarned = user.activeInvestment!.totalEarned;
+        widget.liveUser.activeInvestment!.daysClockedIn = user.activeInvestment!.daysClockedIn;
+      }
+    });
+    _onAddTransaction(
+      AppTransaction(
+        id: payoutId,
+        userEmail: user.email,
+        amount: earned,
+        type: TransactionType.reimbursement,
+        method: PaymentMethod.system,
+        sourceDetails: 'Clock-in daily earnings (local)',
+        status: TransactionStatus.approved,
+        timestamp: now,
+      ),
+    );
   }
 
   @override
@@ -144,7 +212,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   }
 
   /// Pull the saved account balance from the database so admin-approved deposits appear.
-  /// Authority order: cloud / live session balance — never reinflate from stale GI prefs.
+  /// Authority order: never wipe stacked Growth Income earnings — cloud/live may only raise the balance.
   Future<void> _pullApprovedBalanceFromCloud() async {
     final user = _user;
     if (user == null) return;
@@ -161,10 +229,14 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       final cloud = row == null
           ? 0.0
           : ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
-      // Do NOT max() with local prefs balance — that undoes Store/game spends.
-      final best = math.max(cloud, widget.liveUser.accountBalance);
-      if ((best - user.accountBalance).abs() > 0.009) {
-        setState(() => _publishAppBalance(best, allowDecrease: best < user.accountBalance));
+      // Never replace a higher local balance with a lower cloud/live figure —
+      // that was wiping day-to-day stacked earnings (looking like "replace").
+      final best = math.max(
+        user.accountBalance,
+        math.max(cloud, widget.liveUser.accountBalance),
+      );
+      if (best > user.accountBalance + 0.009) {
+        setState(() => _publishAppBalance(best, allowDecrease: false));
       }
       // Always reconcile approved deposit history → balance (even if cloud still shows old amount).
       await _refreshDepositStatusesFromCloud();
@@ -286,14 +358,30 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final user = loaded.user;
     final transactions = List<AppTransaction>.from(loaded.transactions);
     var revision = loaded.walletStateRevision;
-    // App-wide spendable balance is the source of truth (never reinflate from GI prefs).
-    final seedBal = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    // Keep the higher of live wallet vs saved GI wallet so stacked earnings
+    // are not wiped when reopening Growth Income.
+    final liveBal = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    final prefsBal = user.accountBalance.clamp(0.0, double.infinity);
+    final seedBal = math.max(liveBal, prefsBal);
     user.accountBalance = seedBal;
     _user = user;
-    _publishAppBalance(seedBal, allowDecrease: true);
+    _publishAppBalance(seedBal, allowDecrease: seedBal < liveBal);
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
     if (payoutAdded) {
       _publishAppBalance(user.accountBalance, allowDecrease: false);
+    }
+
+    // Keep live app user investment in sync so daily clock-in outside GI works.
+    if (user.activeInvestment != null) {
+      final inv = user.activeInvestment!;
+      widget.liveUser.activeInvestment = ActiveInvestment(
+        name: inv.name,
+        amount: inv.amount,
+        dailyROI: inv.dailyROI,
+        purchaseDate: inv.purchaseDate,
+        daysClockedIn: inv.daysClockedIn,
+        totalEarned: inv.totalEarned,
+      );
     }
 
     // Admin "Send money now" credits — no QR scan required.
@@ -429,18 +517,31 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       return;
     }
     setState(() => _investPurchaseInFlight = true);
+    final purchased = ActiveInvestment(
+      name: name,
+      amount: price,
+      dailyROI: InvestmentPlan.fixedRoi,
+      purchaseDate: DateTime.now(),
+      daysClockedIn: 0,
+      totalEarned: 0.0,
+    );
     setState(() {
-      user.activeInvestment = ActiveInvestment(
-        name: name,
-        amount: price,
-        dailyROI: InvestmentPlan.fixedRoi,
-        purchaseDate: DateTime.now(),
-        daysClockedIn: 0,
-        totalEarned: 0.0,
-      );
+      user.activeInvestment = purchased;
       user.pendingInvestmentName = null;
       user.pendingInvestmentAmount = null;
       user.pendingInvestmentRoi = null;
+      // Mirror onto the live app user so MainScreen daily clock-in / crown paths work.
+      widget.liveUser.activeInvestment = ActiveInvestment(
+        name: purchased.name,
+        amount: purchased.amount,
+        dailyROI: purchased.dailyROI,
+        purchaseDate: purchased.purchaseDate,
+        daysClockedIn: purchased.daysClockedIn,
+        totalEarned: purchased.totalEarned,
+      );
+      widget.liveUser.pendingInvestmentName = null;
+      widget.liveUser.pendingInvestmentAmount = null;
+      widget.liveUser.pendingInvestmentRoi = null;
     });
     _onAddTransaction(AppTransaction(
       id: txnId,
