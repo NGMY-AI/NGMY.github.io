@@ -79,6 +79,129 @@ class NgmyCivicRegistryMembers {
     } catch (_) {}
   }
 
+  static List<Map<String, dynamic>> deceasedFrom(dynamic config) {
+    try {
+      final raw = (config as dynamic).civicRegistryDeceased;
+      if (raw is! List) return [];
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static void setDeceased(dynamic config, List<Map<String, dynamic>> deceased) {
+    try {
+      (config as dynamic).civicRegistryDeceased = deceased;
+    } catch (_) {}
+  }
+
+  static int deceasedCount(dynamic config) => deceasedFrom(config).length;
+
+  static bool isDeceased(dynamic config, {String email = '', String registryId = ''}) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    for (final row in deceasedFrom(config)) {
+      final e = emailKey((row['email'] ?? '').toString());
+      final id = (row['registryId'] ?? '').toString().trim().toUpperCase();
+      if (key.isNotEmpty && e == key) return true;
+      if (rid.isNotEmpty && id == rid) return true;
+    }
+    return false;
+  }
+
+  static Map<String, dynamic>? findDeceasedByEmail(dynamic config, String email) {
+    final key = emailKey(email);
+    if (key.isEmpty) return null;
+    for (final row in deceasedFrom(config)) {
+      if (emailKey((row['email'] ?? '').toString()) == key) {
+        return Map<String, dynamic>.from(row);
+      }
+    }
+    return null;
+  }
+
+  static Map<String, dynamic>? findDeceasedByRegistryId(dynamic config, String registryId) {
+    final rid = registryId.trim().toUpperCase();
+    if (rid.isEmpty) return null;
+    for (final row in deceasedFrom(config)) {
+      if ((row['registryId'] ?? '').toString().trim().toUpperCase() == rid) {
+        return Map<String, dynamic>.from(row);
+      }
+    }
+    return null;
+  }
+
+  /// Snapshot fields for search/display — prefers stored snapshot, falls back to row keys.
+  static Map<String, dynamic>? deceasedMemberSnapshot(Map<String, dynamic> row) {
+    final snapRaw = row['snapshot'];
+    if (snapRaw is Map) return Map<String, dynamic>.from(snapRaw);
+    final email = emailKey((row['email'] ?? '').toString());
+    if (email.isEmpty && (row['registryId'] ?? '').toString().trim().isEmpty) return null;
+    return Map<String, dynamic>.from(row);
+  }
+
+  static List<Map<String, dynamic>> deceasedSnapshotsForState(dynamic config, String state) {
+    final st = state.trim().toLowerCase();
+    if (st.isEmpty) return const [];
+    return deceasedFrom(config).where((row) {
+      final snap = deceasedMemberSnapshot(row);
+      final rowState = (snap?['state'] ?? row['state'] ?? '').toString().trim().toLowerCase();
+      return rowState == st;
+    }).map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Move a live member into the nationwide deceased roster (searchable, not active).
+  static bool markDeceased(
+    dynamic config, {
+    required String email,
+    String registryId = '',
+    String markedByEmail = '',
+    String markedByName = '',
+  }) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    Map<String, dynamic>? existing = key.isNotEmpty ? findByEmail(config, email) : null;
+    existing ??= rid.isNotEmpty ? findByRegistryId(config, rid) : null;
+    if (existing == null) return false;
+
+    final snapEmail = emailKey((existing['email'] ?? '').toString());
+    final snapRid = (existing['registryId'] ?? '').toString().trim().toUpperCase();
+    final state = (existing['state'] ?? '').toString();
+    final now = DateTime.now().toUtc();
+
+    final members = listFrom(config);
+    members.removeWhere((m) {
+      final e = emailKey((m['email'] ?? '').toString());
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (snapEmail.isNotEmpty && e == snapEmail) return true;
+      if (snapRid.isNotEmpty && id == snapRid) return true;
+      return false;
+    });
+    setList(config, members);
+
+    final next = deceasedFrom(config);
+    next.removeWhere((r) {
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      if (snapEmail.isNotEmpty && e == snapEmail) return true;
+      if (snapRid.isNotEmpty && id == snapRid) return true;
+      return false;
+    });
+    next.add({
+      'email': snapEmail.isNotEmpty ? snapEmail : key,
+      'registryId': snapRid.isNotEmpty ? snapRid : rid,
+      'state': state.trim(),
+      'deceasedAt': now.toIso8601String(),
+      'markedByEmail': emailKey(markedByEmail),
+      if (markedByName.trim().isNotEmpty) 'markedByName': markedByName.trim(),
+      'snapshot': Map<String, dynamic>.from(existing),
+    });
+    setDeceased(config, next);
+    _clearTombstone(config, snapEmail, registryId: snapRid);
+    clearSoftDeletesForActiveMembers(config);
+    return true;
+  }
+
   static void _clearTombstone(dynamic config, String email, {String registryId = ''}) {
     final key = emailKey(email);
     final rid = registryId.trim().toUpperCase();
@@ -1318,6 +1441,7 @@ class NgmyCivicRegistryMembers {
   static Map<String, dynamic> payload(dynamic config) => {
         'members': listFrom(config),
         'removed': removedFrom(config),
+        'deceased': deceasedFrom(config),
         'savedAt': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -1547,6 +1671,39 @@ class NgmyCivicRegistryMembers {
     setRemoved(config, tombstones.values.toList());
     clearSoftDeletesForActiveMembers(config);
 
+    // Merge deceased roster from every device — deceased members stay out of the live list.
+    final remoteDeceasedRaw = payload['deceased'] ?? payload['civicRegistryDeceased'];
+    final remoteDeceased = <Map<String, dynamic>>[];
+    if (remoteDeceasedRaw is List) {
+      for (final e in remoteDeceasedRaw) {
+        if (e is Map) remoteDeceased.add(Map<String, dynamic>.from(e));
+      }
+    }
+    final deceasedMerged = <String, Map<String, dynamic>>{};
+    for (final row in [...deceasedFrom(config), ...remoteDeceased]) {
+      final email = emailKey((row['email'] ?? '').toString());
+      final rid = (row['registryId'] ?? '').toString().trim().toUpperCase();
+      final key = email.isNotEmpty ? 'em:$email' : (rid.isNotEmpty ? 'id:$rid' : '');
+      if (key.isEmpty) continue;
+      final prev = deceasedMerged[key];
+      if (prev == null) {
+        deceasedMerged[key] = row;
+        continue;
+      }
+      final a = DateTime.tryParse((prev['deceasedAt'] ?? '').toString());
+      final b = DateTime.tryParse((row['deceasedAt'] ?? '').toString());
+      if (b != null && (a == null || b.isAfter(a))) deceasedMerged[key] = row;
+    }
+    setDeceased(config, deceasedMerged.values.toList());
+
+    bool isDeceasedRow(Map<String, dynamic> m) {
+      final email = emailKey((m['email'] ?? '').toString());
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (email.isNotEmpty && deceasedMerged.containsKey('em:$email')) return true;
+      if (rid.isNotEmpty && deceasedMerged.containsKey('id:$rid')) return true;
+      return false;
+    }
+
     bool isTombstoned(Map<String, dynamic> m) {
       final email = emailKey((m['email'] ?? '').toString());
       final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
@@ -1566,7 +1723,10 @@ class NgmyCivicRegistryMembers {
 
     final local = listFrom(config);
     if (local.isEmpty) {
-      setList(config, remoteMembers.where((m) => _mergeKey(m).isNotEmpty && !isTombstoned(m)).toList());
+      setList(
+        config,
+        remoteMembers.where((m) => _mergeKey(m).isNotEmpty && !isTombstoned(m) && !isDeceasedRow(m)).toList(),
+      );
       return;
     }
 
@@ -1576,6 +1736,7 @@ class NgmyCivicRegistryMembers {
       final key = _mergeKey(m);
       if (key.isEmpty) continue;
       if (isTombstoned(m)) continue;
+      if (isDeceasedRow(m)) continue;
       final prev = merged[key];
       merged[key] = prev == null ? m : _preferNewerMember(prev, m);
     }

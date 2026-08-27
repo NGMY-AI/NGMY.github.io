@@ -1728,6 +1728,8 @@ class AppConfig {
   List<Map<String, dynamic>> civicRegistryMembers;
   /// Tombstones so deletes sync to every registrar device.
   List<Map<String, dynamic>> civicRegistryRemoved;
+  /// Deceased members — searchable nationwide, excluded from active counts.
+  List<Map<String, dynamic>> civicRegistryDeceased;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
   double familyTreeCreateFee;
@@ -1861,6 +1863,7 @@ class AppConfig {
     List<Map<String, dynamic>>? civicRegistrarApplications,
     List<Map<String, dynamic>>? civicRegistryMembers,
     List<Map<String, dynamic>>? civicRegistryRemoved,
+    List<Map<String, dynamic>>? civicRegistryDeceased,
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -1941,6 +1944,7 @@ class AppConfig {
         civicRegistrarApplications = civicRegistrarApplications ?? const [],
         civicRegistryMembers = civicRegistryMembers ?? const [],
         civicRegistryRemoved = civicRegistryRemoved ?? const [],
+        civicRegistryDeceased = civicRegistryDeceased ?? const [],
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
         adminDeletedUserEmails = adminDeletedUserEmails ?? const [],
         adminUserAccountStatusByEmail = adminUserAccountStatusByEmail ?? const {},
@@ -2017,6 +2021,7 @@ class AppConfig {
     'civicRegistrarApplications': civicRegistrarApplications,
     'civicRegistryMembers': civicRegistryMembers,
     'civicRegistryRemoved': civicRegistryRemoved,
+    'civicRegistryDeceased': civicRegistryDeceased,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
@@ -2156,6 +2161,9 @@ class AppConfig {
     ),
     civicRegistryRemoved: List<Map<String, dynamic>>.from(
       (json['civicRegistryRemoved'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    civicRegistryDeceased: List<Map<String, dynamic>>.from(
+      (json['civicRegistryDeceased'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
@@ -2838,6 +2846,63 @@ List<UserData> _civicRegistryMembersForDisplay(AppConfig config, List<UserData> 
   NgmyCivicRegistryMembers.pruneIncompleteEnrollments(config);
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
   return NgmyCivicRegistryMembers.listFrom(config).map((m) => _civicMemberRecordToDisplayUser(m, allUsers)).toList();
+}
+
+UserData _civicDeceasedRecordToDisplayUser(Map<String, dynamic> deceasedRow, List<UserData> allUsers) {
+  final snap = NgmyCivicRegistryMembers.deceasedMemberSnapshot(deceasedRow) ?? deceasedRow;
+  return _civicMemberRecordToDisplayUser(snap, allUsers);
+}
+
+List<UserData> _civicDeceasedMembersForDisplay(AppConfig config, List<UserData> allUsers, {String? state}) {
+  final st = (state ?? '').trim().toLowerCase();
+  final rows = st.isEmpty
+      ? NgmyCivicRegistryMembers.deceasedFrom(config)
+      : NgmyCivicRegistryMembers.deceasedSnapshotsForState(config, state!);
+  return rows.map((r) => _civicDeceasedRecordToDisplayUser(r, allUsers)).toList();
+}
+
+Map<String, dynamic>? _civicMemberOrDeceasedRaw(AppConfig config, UserData u) {
+  final active = NgmyCivicRegistryMembers.findByEmail(config, u.email) ??
+      NgmyCivicRegistryMembers.findByRegistryId(config, u.registryId ?? '');
+  if (active != null) return active;
+  final deceased = NgmyCivicRegistryMembers.findDeceasedByEmail(config, u.email) ??
+      NgmyCivicRegistryMembers.findDeceasedByRegistryId(config, u.registryId ?? '');
+  if (deceased == null) return null;
+  return NgmyCivicRegistryMembers.deceasedMemberSnapshot(deceased);
+}
+
+bool _civicMemberIsDeceased(AppConfig config, UserData u) =>
+    NgmyCivicRegistryMembers.isDeceased(config, email: u.email, registryId: u.registryId ?? '');
+
+Set<String> _civicDeceasedContributorKeys(AppConfig config) {
+  final keys = <String>{};
+  for (final row in NgmyCivicRegistryMembers.deceasedFrom(config)) {
+    final email = NgmyCivicRegistryMembers.emailKey((row['email'] ?? '').toString());
+    if (email.isNotEmpty) keys.add('em:$email');
+    final rid = (row['registryId'] ?? '').toString().trim().toUpperCase();
+    if (rid.isNotEmpty) keys.add('rid:$rid');
+    final snap = NgmyCivicRegistryMembers.deceasedMemberSnapshot(row);
+    if (snap != null) {
+      final snapEmail = NgmyCivicRegistryMembers.emailKey((snap['email'] ?? '').toString());
+      if (snapEmail.isNotEmpty) keys.add('em:$snapEmail');
+      final snapRid = (snap['registryId'] ?? '').toString().trim().toUpperCase();
+      if (snapRid.isNotEmpty) keys.add('rid:$snapRid');
+      final linked = NgmyCivicRegistryMembers.emailKey((snap['linkedAppEmail'] ?? '').toString());
+      if (linked.isNotEmpty) keys.add('em:$linked');
+    }
+  }
+  return keys;
+}
+
+bool _civicContributionFromDeceased(AppTransaction t, Set<String> deceasedKeys, Map<String, dynamic> meta) {
+  if (deceasedKeys.isEmpty) return false;
+  final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+  if (txEmail.isNotEmpty && deceasedKeys.contains('em:$txEmail')) return true;
+  final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+  if (metaEmail.isNotEmpty && deceasedKeys.contains('em:$metaEmail')) return true;
+  final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+  if (metaRid.isNotEmpty && deceasedKeys.contains('rid:$metaRid')) return true;
+  return false;
 }
 
 void _syncCivicMemberRecordFromUser(AppConfig config, UserData u) {
@@ -10226,6 +10291,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
         if (next.civicRegistryRemoved.isEmpty && keepConfig.civicRegistryRemoved.isNotEmpty) {
           next.civicRegistryRemoved = keepConfig.civicRegistryRemoved;
+        }
+        if (next.civicRegistryDeceased.isEmpty && keepConfig.civicRegistryDeceased.isNotEmpty) {
+          next.civicRegistryDeceased = keepConfig.civicRegistryDeceased;
         }
         await ngmyHydrateCivicSelfEnrollmentFromAllBackups(next);
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
@@ -31083,14 +31151,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   List<UserData> _registryMembersMatchingSearch() {
     final q = _searchQuery.trim();
-    final pool = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+    final active = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
         .where((u) => u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase())
         .toList();
+    final deceased = _civicDeceasedMembersForDisplay(widget.config, widget.allUsers, state: _selectedState);
+    final pool = [...active, ...deceased];
     if (q.isEmpty) return pool;
 
     final scored = <({UserData u, double score})>[];
     for (final u in pool) {
-      final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      final raw = _civicMemberOrDeceasedRaw(widget.config, u);
       final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
       final score = _ngmyCivicMemberSearchScore(q, u, nicks);
       // Keep close name matches only (exact / prefix / 1–2 letter typos).
@@ -31946,6 +32016,81 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<bool> _markRegistryMemberDeceased(UserData member) async {
+    final confirm = await showNgmyLightConfirm(
+      context,
+      title: 'Mark member as deceased?',
+      message:
+          'This removes ${member.fullName ?? member.username} from active members and state counts. They stay searchable with limited public info. Their contributions will no longer count in nationwide totals.',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Mark deceased',
+      icon: Icons.person_off_rounded,
+      destructive: true,
+    );
+    if (confirm != true) return false;
+
+    final ok = NgmyCivicRegistryMembers.markDeceased(
+      widget.config,
+      email: member.email,
+      registryId: member.registryId ?? '',
+      markedByEmail: widget.user.email,
+      markedByName: (widget.user.fullName ?? widget.user.username).trim(),
+    );
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not mark member as deceased.')),
+        );
+      }
+      return false;
+    }
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
+    final registryId = (member.registryId ?? '').trim();
+    void clearActiveStanding(UserData u) {
+      u.isEnrolledInRegistry = false;
+      u.registryId = '';
+      u.helps = 0;
+      u.missed = 0;
+    }
+
+    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, false);
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey,
+    );
+    if (accountIdx >= 0) clearActiveStanding(widget.allUsers[accountIdx]);
+    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == emailKey ||
+        ((widget.user.registryId ?? '').trim().isNotEmpty && (widget.user.registryId ?? '').trim() == registryId)) {
+      clearActiveStanding(widget.user);
+    }
+
+    final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+      if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == emailKey) {
+        await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
+      }
+    } catch (_) {}
+    widget.onDataChanged();
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            membersCloudOk
+                ? '${member.fullName ?? member.username} marked deceased — moved to nationwide deceased count.'
+                : 'Marked deceased locally — will sync when online.',
+          ),
+          backgroundColor: membersCloudOk ? Colors.green : Colors.orange,
+        ),
+      );
+    }
+    return membersCloudOk;
+  }
+
   Future<bool> _removeRegistryMember(UserData member, {bool permanent = false}) async {
     final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final registryId = (member.registryId ?? '').trim();
@@ -32462,10 +32607,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   NgmyCivicNationwideStats _buildCivicNationwideStats() {
     final members = NgmyCivicRegistryMembers.listFrom(widget.config);
+    final deceasedKeys = _civicDeceasedContributorKeys(widget.config);
     final contribRows = <Map<String, dynamic>>[];
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       final meta = _decodeContributionMeta(t);
+      if (_civicContributionFromDeceased(t, deceasedKeys, meta)) continue;
       final targetState = _contributionReceiptState(t, meta).trim();
       if (targetState.isEmpty) continue;
       contribRows.add(<String, dynamic>{
@@ -32483,6 +32630,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       registeredMembers: members.length,
       allContributionRows: contribRows,
       allSpendingRows: spendingRows,
+      deceasedMembers: NgmyCivicRegistryMembers.deceasedCount(widget.config),
     );
   }
 
@@ -34992,7 +35140,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_refreshCivicHelpModeAndContributions().then((_) {
       if (mounted) setState(() {});
     }));
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+    final isDeceased = _civicMemberIsDeceased(widget.config, u);
+    final deceasedRow = isDeceased
+        ? (NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, u.email) ??
+            NgmyCivicRegistryMembers.findDeceasedByRegistryId(widget.config, u.registryId ?? ''))
+        : null;
+    final deceasedAtRaw = deceasedRow?['deceasedAt']?.toString() ?? '';
+    final deceasedAt = DateTime.tryParse(deceasedAtRaw);
     final displayName = NgmyCivicRegistryMembers.publicDisplayName(
       raw,
       fullName: u.fullName ?? '',
@@ -35006,6 +35161,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
     final openClaims = claims.where((t) => t.status == TransactionStatus.pending).length;
+    final familyRaw = raw?['familyMembers'];
+    final familyCount = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
+    final usernameLabel = u.username.trim().isNotEmpty ? u.username.trim() : displayName;
+    final cityLabel = (u.city ?? raw?['city'] ?? '').toString().trim();
 
     showDialog(
       context: context,
@@ -35025,7 +35184,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Full users information', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            isDeceased ? 'Deceased member record' : 'Member information',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: ink),
+                          ),
+                        ),
+                        if (isDeceased)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF64748B),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Deceased',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                            ),
+                          ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     Container(
                       width: double.infinity,
@@ -35038,45 +35218,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              Icon(Icons.badge_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Official Member Records',
-                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: ink),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: _statusColorForMissed(u.missed),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  _statusLabelForMissed(u.missed),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
                           Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
                           const SizedBox(height: 10),
-                          _recordRow('Registry ID', u.registryId ?? 'N/A', isDark),
+                          _recordRow('Username', usernameLabel.isEmpty ? 'N/A' : usernameLabel, isDark),
                           _recordDivider(isDark),
-                          _recordRow('Phone', u.phone.isEmpty ? 'N/A' : u.phone, isDark),
+                          _recordRow('City', cityLabel.isEmpty ? 'N/A' : cityLabel, isDark),
                           _recordDivider(isDark),
-                          _recordRow('State / City / Room', '${u.state} / ${u.city ?? 'N/A'} / ${u.room ?? 'N/A'}', isDark),
+                          _recordRow(
+                            'Family size',
+                            '$familyCount member${familyCount == 1 ? '' : 's'}',
+                            isDark,
+                          ),
+                          if (isDeceased) ...[
+                            _recordDivider(isDark),
+                            _recordRow('Date of birth', (u.dob ?? raw?['dob'] ?? 'N/A').toString(), isDark),
+                            _recordDivider(isDark),
+                            _recordRow(
+                              'Date of death',
+                              deceasedAt == null
+                                  ? 'N/A'
+                                  : '${deceasedAt.month}/${deceasedAt.day}/${deceasedAt.year}',
+                              isDark,
+                            ),
+                          ],
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    _familySizeInfoFrame(
-                      NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
-                          NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? ''),
-                      isDark,
                     ),
                     const SizedBox(height: 14),
                     Row(
@@ -37927,7 +38093,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _publicSearchMemberCard(UserData u, bool isDark) {
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+    final isDeceased = _civicMemberIsDeceased(widget.config, u);
     final displayName = NgmyCivicRegistryMembers.publicDisplayName(
       raw,
       fullName: u.fullName ?? '',
@@ -37942,9 +38109,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .take(2)
         .map((p) => p[0].toUpperCase())
         .join();
-    final statusLabel = _statusLabelForMissed(u.missed);
-    final statusColor = _statusColorForMissed(u.missed);
+    final statusLabel = isDeceased ? 'Deceased' : _statusLabelForMissed(u.missed);
+    final statusColor = isDeceased ? const Color(0xFF64748B) : _statusColorForMissed(u.missed);
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final canManage = _canUseRegistrarToolsHere();
 
     return Material(
       color: Colors.transparent,
@@ -37998,10 +38166,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: ink, letterSpacing: -0.2),
                           ),
-                          Text(
-                            u.registryId ?? 'PENDING ID',
-                            style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 11),
-                          ),
+                          if (canManage)
+                            Text(
+                              u.registryId ?? 'PENDING ID',
+                              style: TextStyle(color: isDark ? const Color(0xFF67E8F9) : const Color(0xFF0369A1), fontWeight: FontWeight.w800, fontSize: 11),
+                            )
+                          else if (u.username.trim().isNotEmpty)
+                            Text(
+                              u.username.trim(),
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black54, fontWeight: FontWeight.w600, fontSize: 11),
+                            ),
                         ],
                       ),
                     ),
@@ -38852,7 +39026,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       children: [
         Container(
           margin: const EdgeInsets.only(bottom: 15),
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.fromLTRB(20, manageActions ? 28 : 20, 20, 20),
           decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -38922,10 +39096,68 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ],
           ),
         ),
-        if (showFixDot)
+        if (manageActions)
+          Positioned(
+            top: 6,
+            left: 10,
+            child: Tooltip(
+              message: 'Add claim',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _showClaimDialog(u),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.35), blurRadius: 6),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (manageActions)
           Positioned(
             top: 6,
             right: 10,
+            child: Tooltip(
+              message: 'Mark deceased',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    await _markRegistryMemberDeceased(u);
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF475569) : const Color(0xFF64748B),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.person_off_rounded, size: 15, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        if (showFixDot)
+          Positioned(
+            top: 6,
+            right: 46,
             child: Container(
               width: 10,
               height: 10,

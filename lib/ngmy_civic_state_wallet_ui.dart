@@ -260,6 +260,30 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _NationwideCornerStat(
+                        tone: tone,
+                        label: 'Contributions',
+                        value: stats.totalContributions.toString(),
+                        icon: Icons.receipt_long_rounded,
+                        alignEnd: false,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _NationwideCornerStat(
+                        tone: tone,
+                        label: 'Deceased',
+                        value: stats.deceasedMembers.toString(),
+                        icon: Icons.person_off_rounded,
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
                 Container(
                   width: 44,
                   height: 44,
@@ -298,7 +322,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   label: 'Contributions kept',
                   value: _money(stats.contributionsKept),
                   icon: Icons.savings_rounded,
-                  hint: 'Money still in contribution cases. Removed, deleted, and reset funds are not counted.',
+                  hint: 'US-wide money still in contribution cases. Removed, deleted, reset, and deceased-member funds are not counted.',
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -2177,6 +2201,61 @@ class _BudgetStat extends StatelessWidget {
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: tone.primaryText)),
       ],
+    );
+  }
+}
+
+class _NationwideCornerStat extends StatelessWidget {
+  const _NationwideCornerStat({
+    required this.tone,
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.alignEnd,
+  });
+
+  final _WalletTone tone;
+  final String label;
+  final String value;
+  final IconData icon;
+  final bool alignEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: tone.fieldFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tone.fieldBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (!alignEnd) Icon(icon, size: 14, color: tone.secondaryText),
+              if (!alignEnd) const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: tone.secondaryText, fontSize: 10, fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (alignEnd) const SizedBox(width: 4),
+              if (alignEnd) Icon(icon, size: 14, color: tone.secondaryText),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18, height: 1.05),
+          ),
+        ],
+      ),
     );
   }
 }

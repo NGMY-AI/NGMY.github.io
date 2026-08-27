@@ -1056,14 +1056,22 @@ class NgmyCivicNationwideStats {
   const NgmyCivicNationwideStats({
     required this.registeredMembers,
     required this.contributionsKept,
+    required this.totalContributions,
+    required this.deceasedMembers,
   });
 
-  /// Enrolled civic registry members across all US states.
+  /// Enrolled civic registry members across all US states (active only).
   final int registeredMembers;
 
   /// Contribution-case money still held nationwide — excludes admin removals,
-  /// soft-resets, and deleted/pending-delete spend rows.
+  /// soft-resets, deleted/pending-delete spend rows, and deceased members.
   final double contributionsKept;
+
+  /// Approved contribution records nationwide (excludes deceased members).
+  final int totalContributions;
+
+  /// Members marked deceased nationwide.
+  final int deceasedMembers;
 }
 
 /// Each [allContributionRows] entry should include `state` (receipt state).
@@ -1072,6 +1080,7 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   required List<Map<String, dynamic>> allContributionRows,
   required List<Map<String, dynamic>> allSpendingRows,
   List<String> states = kNgmyUsStates,
+  int deceasedMembers = 0,
 }) {
   final byState = <String, List<Map<String, dynamic>>>{};
   for (final row in allContributionRows) {
@@ -1092,6 +1101,8 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   return NgmyCivicNationwideStats(
     registeredMembers: registeredMembers,
     contributionsKept: kept,
+    totalContributions: allContributionRows.length,
+    deceasedMembers: deceasedMembers,
   );
 }
 
