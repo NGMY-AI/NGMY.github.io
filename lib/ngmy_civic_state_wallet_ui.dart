@@ -55,6 +55,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     this.onAdminResetStateCase,
     this.onAdminRestoreStateCase,
     this.softResetForState,
+    this.nationwideStatsBuilder,
   });
 
   final String state;
@@ -105,6 +106,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   })? onAdminResetStateCase;
   final Future<void> Function(String state)? onAdminRestoreStateCase;
   final Map<String, dynamic>? Function(String state)? softResetForState;
+  final NgmyCivicNationwideStats Function()? nationwideStatsBuilder;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -225,6 +227,98 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     final core =
         '\$${whole.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')}.${cents.toString().padLeft(2, '0')}';
     return neg ? '-$core' : core;
+  }
+
+  Future<void> _showNationwideStatsDialog() async {
+    final builder = widget.nationwideStatsBuilder;
+    if (builder == null) return;
+    final stats = builder();
+    if (!mounted) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+            decoration: BoxDecoration(
+              color: tone.dialogBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: tone.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: tone.isDark ? 0.45 : 0.12),
+                  blurRadius: 28,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: tone.accent.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: tone.accent.withValues(alpha: 0.45)),
+                  ),
+                  child: Icon(Icons.public_rounded, color: tone.accent, size: 24),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'United States',
+                  style: TextStyle(
+                    color: tone.primaryText,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Civic Registry nationwide',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 18),
+                _NationwideStatTile(
+                  tone: tone,
+                  label: 'Registered members',
+                  value: stats.registeredMembers.toString(),
+                  icon: Icons.groups_rounded,
+                ),
+                const SizedBox(height: 10),
+                _NationwideStatTile(
+                  tone: tone,
+                  label: 'Contributions kept',
+                  value: _money(stats.contributionsKept),
+                  icon: Icons.savings_rounded,
+                  hint: 'Money still in contribution cases. Removed, deleted, and reset funds are not counted.',
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: tone.accent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   List<NgmyCivicWalletTxn> get _filteredRecent {
@@ -1672,7 +1766,37 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Contribution budget', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: tone.primaryText)),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Contribution budget',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  color: tone.primaryText,
+                                ),
+                              ),
+                            ),
+                            if (widget.nationwideStatsBuilder != null)
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _showNationwideStatsDialog,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.insights_rounded,
+                                      size: 17,
+                                      color: tone.accent.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         const SizedBox(height: 14),
                         Row(
                           children: [
@@ -2053,6 +2177,59 @@ class _BudgetStat extends StatelessWidget {
         const SizedBox(height: 2),
         Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: tone.primaryText)),
       ],
+    );
+  }
+}
+
+class _NationwideStatTile extends StatelessWidget {
+  const _NationwideStatTile({
+    required this.tone,
+    required this.label,
+    required this.value,
+    required this.icon,
+    this.hint,
+  });
+
+  final _WalletTone tone;
+  final String label;
+  final String value;
+  final IconData icon;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: tone.fieldFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tone.fieldBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: tone.accent),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: TextStyle(color: tone.secondaryText, fontSize: 11, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05),
+                ),
+                if (hint != null && hint!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(hint!, style: TextStyle(color: tone.secondaryText, fontSize: 10, height: 1.35)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

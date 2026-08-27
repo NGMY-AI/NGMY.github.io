@@ -9,6 +9,7 @@ import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_state_wallet_ui.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_state_picker.dart';
 
 export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity, NgmyCivicDobInputFormatter;
 export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
@@ -364,6 +365,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   })? onAdminResetStateCase,
   Future<void> Function(String state)? onAdminRestoreStateCase,
   Map<String, dynamic>? Function(String state)? softResetForState,
+  NgmyCivicNationwideStats Function()? nationwideStatsBuilder,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -404,6 +406,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       onAdminResetStateCase: onAdminResetStateCase,
       onAdminRestoreStateCase: onAdminRestoreStateCase,
       softResetForState: softResetForState,
+      nationwideStatsBuilder: nationwideStatsBuilder,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );
@@ -1045,6 +1048,50 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     categories: cats,
     recent: recent,
     spendings: spendings,
+  );
+}
+
+/// Nationwide Civic Registry + contribution-case totals (US only).
+class NgmyCivicNationwideStats {
+  const NgmyCivicNationwideStats({
+    required this.registeredMembers,
+    required this.contributionsKept,
+  });
+
+  /// Enrolled civic registry members across all US states.
+  final int registeredMembers;
+
+  /// Contribution-case money still held nationwide — excludes admin removals,
+  /// soft-resets, and deleted/pending-delete spend rows.
+  final double contributionsKept;
+}
+
+/// Each [allContributionRows] entry should include `state` (receipt state).
+NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
+  required int registeredMembers,
+  required List<Map<String, dynamic>> allContributionRows,
+  required List<Map<String, dynamic>> allSpendingRows,
+  List<String> states = kNgmyUsStates,
+}) {
+  final byState = <String, List<Map<String, dynamic>>>{};
+  for (final row in allContributionRows) {
+    final st = (row['state'] ?? '').toString().trim().toLowerCase();
+    if (st.isEmpty) continue;
+    byState.putIfAbsent(st, () => []).add(row);
+  }
+  var kept = 0.0;
+  for (final state in states) {
+    final st = state.trim().toLowerCase();
+    final snap = buildNgmyCivicWalletSnapshot(
+      state: state,
+      contributionRows: byState[st] ?? const [],
+      spendingRows: allSpendingRows,
+    );
+    kept += snap.available;
+  }
+  return NgmyCivicNationwideStats(
+    registeredMembers: registeredMembers,
+    contributionsKept: kept,
   );
 }
 

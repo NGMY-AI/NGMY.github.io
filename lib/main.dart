@@ -32460,6 +32460,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  NgmyCivicNationwideStats _buildCivicNationwideStats() {
+    final members = NgmyCivicRegistryMembers.listFrom(widget.config);
+    final contribRows = <Map<String, dynamic>>[];
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final meta = _decodeContributionMeta(t);
+      final targetState = _contributionReceiptState(t, meta).trim();
+      if (targetState.isEmpty) continue;
+      contribRows.add(<String, dynamic>{
+        'id': t.id,
+        'amount': t.amount,
+        'title': (meta['purpose'] ?? 'Contribution').toString(),
+        'at': t.timestamp.toUtc().toIso8601String(),
+        'state': targetState,
+      });
+    }
+    final spendingRows = widget.config.helpCampaignSpendings
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    return buildNgmyCivicNationwideStats(
+      registeredMembers: members.length,
+      allContributionRows: contribRows,
+      allSpendingRows: spendingRows,
+    );
+  }
+
   Future<void> _addCivicWalletSpending({
     required String state,
     required double amount,
@@ -32849,6 +32875,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onAdminResetStateCase: _adminResetStateCase,
         onAdminRestoreStateCase: _adminRestoreStateCase,
         softResetForState: _softResetForState,
+        nationwideStatsBuilder: _buildCivicNationwideStats,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
@@ -33000,6 +33027,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       onAdminResetStateCase: _adminResetStateCase,
       onAdminRestoreStateCase: _adminRestoreStateCase,
       softResetForState: _softResetForState,
+      nationwideStatsBuilder: _buildCivicNationwideStats,
     );
   }
 
