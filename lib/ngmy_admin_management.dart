@@ -36,6 +36,8 @@ const String _kNgmyCivicHelpModeSettingsKey = 'civic_help_mode_settings';
 const String _kNgmyCivicHelpModePrefsKey = 'ngmy_civic_help_mode_settings_v1';
 const String _kNgmyCivicReceiptRemovedSettingsKey = 'civic_contribution_receipt_removed';
 const String _kNgmyCivicReceiptRemovedPrefsKey = 'ngmy_civic_contribution_receipt_removed_v1';
+const String _kNgmyCivicDeletedContributionsSettingsKey = 'civic_deleted_contribution_ids';
+const String _kNgmyCivicDeletedContributionsPrefsKey = 'ngmy_civic_deleted_contribution_ids_v1';
 const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
@@ -1884,6 +1886,94 @@ Future<bool> ngmyPersistCivicContributionReceiptRemoved(AppConfig config, {Strin
     return await _upsertNgmySettingSafe(_kNgmyCivicReceiptRemovedSettingsKey, _civicReceiptRemovedPayload(config));
   } catch (e) {
     debugPrint('[civic receipt removed] cloud save: $e');
+    return false;
+  }
+}
+
+Map<String, dynamic> _civicDeletedContributionsPayload(AppConfig config) {
+  final ids = config.civicDeletedContributionIds
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toSet()
+      .toList()
+    ..sort();
+  return {
+    'ids': ids,
+    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+  };
+}
+
+void _applyCivicDeletedContributionsPayload(AppConfig config, Map<String, dynamic> payload) {
+  final incoming = _stringIdListFromPayload(payload['ids'] ?? payload['keys'] ?? payload['civicDeletedContributionIds']);
+  if (incoming.isEmpty && !payload.containsKey('ids') && !payload.containsKey('keys')) return;
+  config.civicDeletedContributionIds = List<String>.from(
+    NgmyCivicReadState.mergeSets(config.civicDeletedContributionIds, incoming),
+  );
+}
+
+Future<void> _persistCivicDeletedContributionsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCivicDeletedContributionsPrefsKey, jsonEncode(_civicDeletedContributionsPayload(config)));
+  } catch (e) {
+    debugPrint('[civic deleted contributions] local backup: $e');
+  }
+}
+
+Future<Set<String>> _fetchCivicDeletedContributionsFromCloud() async {
+  final row = await _fetchNgmySettingSafe(_kNgmyCivicDeletedContributionsSettingsKey);
+  if (row == null) return {};
+  return _stringIdListFromPayload(row['ids'] ?? row['keys']).toSet();
+}
+
+Future<void> ngmyHydrateCivicDeletedContributions(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicDeletedContributionsPrefsKey);
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) _applyCivicDeletedContributionsPayload(config, Map<String, dynamic>.from(decoded));
+    }
+  } catch (e) {
+    debugPrint('[civic deleted contributions] local hydrate: $e');
+  }
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    final cloud = await _fetchCivicDeletedContributionsFromCloud();
+    if (cloud.isEmpty) return;
+    config.civicDeletedContributionIds = List<String>.from(
+      NgmyCivicReadState.mergeSets(config.civicDeletedContributionIds, cloud),
+    );
+    await _persistCivicDeletedContributionsLocal(config);
+  } catch (e) {
+    debugPrint('[civic deleted contributions] cloud hydrate: $e');
+  }
+}
+
+/// Admin hard-delete tombstone — contribution ids stay gone across devices.
+Future<bool> ngmyPersistCivicDeletedContributions(AppConfig config, {Iterable<String> addedIds = const []}) async {
+  final next = {
+    ...config.civicDeletedContributionIds.map((e) => e.trim()).where((e) => e.isNotEmpty),
+    ...addedIds.map((e) => e.trim()).where((e) => e.isNotEmpty),
+  };
+  config.civicDeletedContributionIds = next.toList()..sort();
+  await _persistCivicDeletedContributionsLocal(config);
+  NgmyAdminLiveRefresh.notify();
+  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  if (!await ngmyCanReachCloud()) return false;
+  try {
+    final merged = {
+      ...await _fetchCivicDeletedContributionsFromCloud(),
+      ...config.civicDeletedContributionIds,
+    };
+    config.civicDeletedContributionIds = merged.toList()..sort();
+    await _persistCivicDeletedContributionsLocal(config);
+    return await _upsertNgmySettingSafe(
+      _kNgmyCivicDeletedContributionsSettingsKey,
+      _civicDeletedContributionsPayload(config),
+    );
+  } catch (e) {
+    debugPrint('[civic deleted contributions] cloud save: $e');
     return false;
   }
 }

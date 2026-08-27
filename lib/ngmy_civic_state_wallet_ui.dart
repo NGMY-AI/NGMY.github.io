@@ -318,15 +318,15 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               await refreshAfterChange();
                             },
                             icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                            label: const Text('Reset all'),
-                            style: TextButton.styleFrom(foregroundColor: Colors.orange.shade800),
+                            label: const Text('Delete all'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
                           ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
                       isAdmin
-                          ? 'Pick a state to reset that state only. Search to delete one by one.'
+                          ? 'Pick a state to delete that state’s contributions. Search to delete one by one.'
                           : 'Tap any row to review amount, date, and state.',
                       style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.35),
                     ),
@@ -448,19 +448,19 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFFF7ED).withValues(alpha: tone.isDark ? 0.14 : 1),
+                                  color: const Color(0xFFFEE2E2).withValues(alpha: tone.isDark ? 0.16 : 1),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.55)),
+                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.restart_alt_rounded, size: 15, color: Color(0xFFD97706)),
+                                    const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFDC2626)),
                                     const SizedBox(width: 5),
                                     Text(
-                                      'Reset $selectedState count',
+                                      'Delete all $selectedState',
                                       style: const TextStyle(
-                                        color: Color(0xFFD97706),
+                                        color: Color(0xFFDC2626),
                                         fontWeight: FontWeight.w800,
                                         fontSize: 11,
                                       ),

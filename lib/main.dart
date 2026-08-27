@@ -1072,6 +1072,19 @@ int _ngmyTransactionStatusRank(TransactionStatus status) {
 }
 
 AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction remote) {
+  // Civic contribution/claim rejects are terminal — never resurrect approved over rejected.
+  final civicType = local.type == TransactionType.contribution ||
+      remote.type == TransactionType.contribution ||
+      local.type == TransactionType.claim ||
+      remote.type == TransactionType.claim;
+  if (civicType) {
+    if (local.status == TransactionStatus.rejected && remote.status != TransactionStatus.rejected) {
+      return local;
+    }
+    if (remote.status == TransactionStatus.rejected && local.status != TransactionStatus.rejected) {
+      return remote;
+    }
+  }
   final localRank = _ngmyTransactionStatusRank(local.status);
   final remoteRank = _ngmyTransactionStatusRank(remote.status);
   late AppTransaction pick;
@@ -1694,6 +1707,8 @@ class AppConfig {
   List<String> dismissedContributionReceiptKeys;
   /// Shared tombstones — registrar receipt deletes sync to every user/device.
   List<String> contributionReceiptRemovedKeys;
+  /// Admin-deleted contribution transaction ids — never show again after delete.
+  List<String> civicDeletedContributionIds;
   List<Map<String, dynamic>> jobPosts;
   List<Map<String, dynamic>> jobWorkerApplications;
   List<Map<String, dynamic>> loanApplications;
@@ -1838,6 +1853,7 @@ class AppConfig {
     this.openedContributionReceiptKeys = const [],
     this.dismissedContributionReceiptKeys = const [],
     this.contributionReceiptRemovedKeys = const [],
+    this.civicDeletedContributionIds = const [],
     this.jobPosts = const [],
     this.jobWorkerApplications = const [],
     List<Map<String, dynamic>>? loanApplications,
@@ -1999,6 +2015,7 @@ class AppConfig {
     'openedContributionReceiptKeys': openedContributionReceiptKeys,
     'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys,
     'contributionReceiptRemovedKeys': contributionReceiptRemovedKeys,
+    'civicDeletedContributionIds': civicDeletedContributionIds,
     'jobPosts': jobPosts,
     'jobWorkerApplications': jobWorkerApplications,
     'loanApplications': loanApplications,
@@ -2128,6 +2145,7 @@ class AppConfig {
     openedContributionReceiptKeys: List<String>.from(json['openedContributionReceiptKeys'] ?? const []),
     dismissedContributionReceiptKeys: List<String>.from(json['dismissedContributionReceiptKeys'] ?? const []),
     contributionReceiptRemovedKeys: List<String>.from(json['contributionReceiptRemovedKeys'] ?? const []),
+    civicDeletedContributionIds: List<String>.from(json['civicDeletedContributionIds'] ?? const []),
     jobPosts: List<Map<String, dynamic>>.from((json['jobPosts'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     jobWorkerApplications: List<Map<String, dynamic>>.from((json['jobWorkerApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
     loanApplications: List<Map<String, dynamic>>.from((json['loanApplications'] ?? const []).map((e) => Map<String, dynamic>.from(e))),
@@ -3702,6 +3720,9 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   }
   next.contributionReceiptRemovedKeys = List<String>.from(
     NgmyCivicReadState.mergeSets(keep.contributionReceiptRemovedKeys, next.contributionReceiptRemovedKeys),
+  );
+  next.civicDeletedContributionIds = List<String>.from(
+    NgmyCivicReadState.mergeSets(keep.civicDeletedContributionIds, next.civicDeletedContributionIds),
   );
 
   if (record.containsKey('ngmyHelperDailyMessageLimit')) {
@@ -8698,6 +8719,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppBrandingFromAllBackups(_config);
     await ngmyHydrateCivicHelpModeFromAllBackups(_config);
     await ngmyHydrateCivicContributionReceiptRemoved(_config);
+    await ngmyHydrateCivicDeletedContributions(_config);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud());
@@ -10310,6 +10332,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await ngmyHydrateCivicRegistryMembersFromAllBackups(next, _allUsers);
         await ngmyHydrateCivicHelpModeFromAllBackups(next);
         await ngmyHydrateCivicContributionReceiptRemoved(next);
+        await ngmyHydrateCivicDeletedContributions(next);
         await ngmyHydrateCommunicatePaymentsFromAllBackups(next);
         await ngmyHydrateDocumentScanPaymentsFromAllBackups(next);
         await ngmyHydrateDocSharePaymentsFromAllBackups(next);
@@ -12360,6 +12383,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
       await ngmyHydrateCivicHelpModeFromAllBackups(_config);
       await ngmyHydrateCivicContributionReceiptRemoved(_config);
+      await ngmyHydrateCivicDeletedContributions(_config);
       await ngmyHydrateAppBrandingFromAllBackups(_config);
       if (mounted) _scheduleDeferredStartupRebuild();
     } catch (e) {
@@ -12453,6 +12477,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateCivicHelpModeFromAllBackups(_config);
           await ngmyHydrateCivicContributionReceiptRemoved(_config);
+          await ngmyHydrateCivicDeletedContributions(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
         } catch (_) {}
       }
@@ -12743,6 +12768,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
           await ngmyHydrateCivicHelpModeFromAllBackups(_config);
           await ngmyHydrateCivicContributionReceiptRemoved(_config);
+          await ngmyHydrateCivicDeletedContributions(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
           await ngmyApplyStoreSellAccessFromSettings(_config);
@@ -13466,6 +13492,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onDataChanged: _onDataChanged,
                 onReferralLinked: _onReferralLinked,
                 onAddTransaction: (t) {
+                  // Admin-deleted civic contributions must never be re-pushed / resurrected.
+                  if (t.type == TransactionType.contribution &&
+                      _config.civicDeletedContributionIds.contains(t.id.trim())) {
+                    _allTransactions.removeWhere((x) => x.id == t.id);
+                    unawaited(() async {
+                      try {
+                        if (await ngmyCanReachCloud()) {
+                          await Supabase.instance.client
+                              .from('transactions')
+                              .delete()
+                              .eq('id', t.id)
+                              .timeout(kNgmyCloudWriteTimeout);
+                        }
+                      } catch (_) {}
+                    }());
+                    return;
+                  }
                   final existingIdx = _allTransactions.indexWhere((x) => x.id == t.id);
                   final exists = existingIdx != -1;
                   UserData? syncedUser;
@@ -30558,26 +30601,36 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _refreshCivicHelpModeAndContributions() async {
     await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
+    await ngmyHydrateCivicDeletedContributions(widget.config);
     final results = await Future.wait([
       ngmyFetchApprovedContributionsFromCloud(),
       ngmyFetchCivicClaimsFromCloud(),
     ]);
     if (!mounted) return;
+    final deleted = widget.config.civicDeletedContributionIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
     setState(() {
-      _communityContributions = results[0];
+      _communityContributions = results[0].where((t) => !deleted.contains(t.id)).toList();
       _communityClaims = results[1];
     });
     // After a cloud hydrate, re-run lifecycle so a resurrected "active"
     // campaign that already has a closure stays off (and gets persisted).
     _queueHelpModeLifecycleMaintenance();
     unawaited(_pruneExpiredResolvedClaims());
+    // Re-delete any tombstoned rows that somehow still exist in cloud.
+    if (deleted.isNotEmpty && await ngmyCanReachCloud()) {
+      unawaited(_purgeTombstonedContributionsFromCloud(deleted));
+    }
   }
 
   void _onCivicLiveRefresh() {
     if (!mounted) return;
     unawaited(_refreshCivicMembersFromCloud());
     unawaited(_checkRegistryUnlock());
-    unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) {
+    unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) async {
+      await ngmyHydrateCivicDeletedContributions(widget.config);
       if (mounted) setState(() {});
     }));
   }
@@ -32664,35 +32717,63 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final isState = st.isNotEmpty;
     final confirm = await showNgmyLightConfirm(
       context,
-      title: isState ? 'Reset $st contribution count?' : 'Reset contribution counter?',
+      title: isState ? 'Delete all $st contributions?' : 'Delete all contributions?',
       message: isState
-          ? 'The contribution number for $st will start over at zero. Past $st contributions stay in the list — only that state’s counter resets.'
-          : 'The nationwide contribution number will start over at zero. All past contributions stay in the list when users tap Contributions — only the counter resets.',
+          ? 'This permanently deletes every contribution for $st right now. They will not come back. This cannot be undone.'
+          : 'This permanently deletes every contribution nationwide right now. They will not come back. This cannot be undone.',
       cancelLabel: 'Keep',
-      confirmLabel: isState ? 'Reset $st' : 'Reset counter',
-      icon: Icons.restart_alt_rounded,
+      confirmLabel: isState ? 'Delete $st' : 'Delete all',
+      icon: Icons.delete_forever_rounded,
       destructive: true,
     );
     if (confirm != true) return;
-    setState(() {
+
+    final targets = <AppTransaction>[];
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      if (t.id.trim().isEmpty) continue;
       if (isState) {
-        widget.config.civicContributionCountResetAtByState = {
-          ...widget.config.civicContributionCountResetAtByState,
-          st.toLowerCase(): DateTime.now().toUtc().toIso8601String(),
-        };
-      } else {
-        widget.config.civicNationwideContributionCountResetAt = DateTime.now().toUtc().toIso8601String();
+        final meta = _decodeContributionMeta(t);
+        final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
+        if (receiptState != st.toLowerCase()) continue;
+      }
+      targets.add(t);
+    }
+    if (targets.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isState ? 'No $st contributions to delete.' : 'No contributions to delete.')),
+        );
+      }
+      return;
+    }
+
+    final touchedMembers = <String, UserData>{};
+    setState(() {
+      for (final t in targets) {
+        final member = _memberForContributionTx(t);
+        _applyLocalContributionDeletion(t, member: member);
+        if (member != null) {
+          touchedMembers[NgmyCivicRegistryMembers.emailKey(member.email)] = member;
+        }
       }
     });
+
+    final ids = targets.map((t) => t.id.trim()).where((e) => e.isNotEmpty).toSet();
+    await ngmyPersistCivicDeletedContributions(widget.config, addedIds: ids);
+    await _purgeTombstonedContributionsFromCloud(ids);
+    for (final member in touchedMembers.values) {
+      await _persistMemberAfterContributionDelete(member);
+    }
     widget.onDataChanged();
-    await ngmyPersistCivicHelpModeSettings(widget.config);
     if (mounted) {
+      setState(() {});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isState
-                ? '$st contribution counter reset. New $st contributions will count from now.'
-                : 'Nationwide contribution counter reset. New contributions will count from now.',
+                ? 'Deleted ${ids.length} contribution(s) for $st permanently.'
+                : 'Deleted ${ids.length} contribution(s) nationwide permanently.',
           ),
         ),
       );
@@ -32709,52 +32790,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         break;
       }
     }
-    if (target == null) return false;
-
-    final meta = _decodeContributionMeta(target);
-    final memberEmail = NgmyCivicRegistryMembers.emailKey(
-      (meta['memberEmail'] ?? target.userEmail).toString(),
-    );
-    final registryId = (meta['registryId'] ?? '').toString().trim().toUpperCase();
-    UserData? member;
-    for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
-      if (memberEmail.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == memberEmail) {
-        member = u;
-        break;
-      }
-      if (registryId.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == registryId) {
-        member = u;
-        break;
-      }
+    if (target == null) {
+      // Already gone locally — still tombstone + cloud purge so it cannot return.
+      await ngmyPersistCivicDeletedContributions(widget.config, addedIds: [id]);
+      await _purgeTombstonedContributionsFromCloud({id});
+      return true;
     }
 
+    final member = _memberForContributionTx(target);
     setState(() {
-      target!.status = TransactionStatus.rejected;
-      if (member != null && member.helps > 0) member.helps -= 1;
-      _communityContributions = _communityContributions
-          .map((c) => c.id == target!.id ? target! : c)
-          .where((c) => c.status == TransactionStatus.approved)
-          .toList();
+      _applyLocalContributionDeletion(target!, member: member);
     });
-    widget.onAddTransaction(target);
+    await ngmyPersistCivicDeletedContributions(widget.config, addedIds: [id]);
+    await _purgeTombstonedContributionsFromCloud({id});
     if (member != null) {
-      unawaited(_persistCivicMemberActivity(member));
-      NgmyCivicRegistryMembers.syncFromFields(
-        widget.config,
-        email: member.email,
-        fullName: member.fullName ?? member.username,
-        dob: member.dob ?? '',
-        idType: member.idType ?? '',
-        homeAddress: member.homeAddress ?? '',
-        phone: member.phone,
-        city: member.city ?? '',
-        room: member.room ?? '',
-        state: member.state,
-        registryId: member.registryId ?? '',
-        helps: member.helps,
-        missed: member.missed,
-      );
-      unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+      await _persistMemberAfterContributionDelete(member);
     }
     widget.onDataChanged();
     return true;
@@ -34085,18 +34135,108 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<AppTransaction> _civicTransactionsForDisplay() {
+    final deleted = widget.config.civicDeletedContributionIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
     final byId = <String, AppTransaction>{};
     for (final t in widget.allTransactions) {
-      if (t.id.isNotEmpty) byId[t.id] = t;
+      if (t.id.isEmpty) continue;
+      if (t.type == TransactionType.contribution && deleted.contains(t.id)) continue;
+      byId[t.id] = t;
     }
     for (final t in _communityContributions) {
-      if (t.id.isNotEmpty) byId[t.id] = t;
+      if (t.id.isEmpty) continue;
+      if (deleted.contains(t.id)) continue;
+      final existing = byId[t.id];
+      // Never let a cloud-approved community row resurrect a local reject.
+      if (existing != null &&
+          existing.type == TransactionType.contribution &&
+          existing.status == TransactionStatus.rejected) {
+        continue;
+      }
+      byId[t.id] = existing == null ? t : _pickPreferredTransaction(existing, t);
     }
     for (final t in _communityClaims) {
-      if (t.id.isNotEmpty) byId[t.id] = t;
+      if (t.id.isEmpty) continue;
+      final existing = byId[t.id];
+      if (existing != null &&
+          existing.type == TransactionType.claim &&
+          existing.status == TransactionStatus.rejected) {
+        continue;
+      }
+      byId[t.id] = existing == null ? t : _pickPreferredTransaction(existing, t);
     }
     byId.removeWhere((_, t) => _isExpiredResolvedClaim(t));
     return byId.values.toList();
+  }
+
+  Future<void> _purgeTombstonedContributionsFromCloud(Set<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      const chunkSize = 50;
+      final list = ids.toList();
+      for (var i = 0; i < list.length; i += chunkSize) {
+        final chunk = list.sublist(i, math.min(i + chunkSize, list.length));
+        await Supabase.instance.client
+            .from('transactions')
+            .delete()
+            .inFilter('id', chunk)
+            .timeout(kNgmyCloudWriteTimeout);
+      }
+    } catch (e) {
+      debugPrint('[civic] purge tombstoned contributions: $e');
+    }
+  }
+
+  void _applyLocalContributionDeletion(AppTransaction target, {UserData? member}) {
+    final id = target.id.trim();
+    if (id.isEmpty) return;
+    if (!widget.config.civicDeletedContributionIds.contains(id)) {
+      widget.config.civicDeletedContributionIds = [...widget.config.civicDeletedContributionIds, id];
+    }
+    widget.allTransactions.removeWhere((t) => t.id == id);
+    _communityContributions.removeWhere((t) => t.id == id);
+    if (member != null && member.helps > 0) {
+      member.helps -= 1;
+    }
+  }
+
+  UserData? _memberForContributionTx(AppTransaction target) {
+    final meta = _decodeContributionMeta(target);
+    final memberEmail = NgmyCivicRegistryMembers.emailKey(
+      (meta['memberEmail'] ?? target.userEmail).toString(),
+    );
+    final registryId = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+    for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
+      if (memberEmail.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == memberEmail) {
+        return u;
+      }
+      if (registryId.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == registryId) {
+        return u;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _persistMemberAfterContributionDelete(UserData member) async {
+    unawaited(_persistCivicMemberActivity(member));
+    NgmyCivicRegistryMembers.syncFromFields(
+      widget.config,
+      email: member.email,
+      fullName: member.fullName ?? member.username,
+      dob: member.dob ?? '',
+      idType: member.idType ?? '',
+      homeAddress: member.homeAddress ?? '',
+      phone: member.phone,
+      city: member.city ?? '',
+      room: member.room ?? '',
+      state: member.state,
+      registryId: member.registryId ?? '',
+      helps: member.helps,
+      missed: member.missed,
+    );
+    unawaited(ngmyPersistCivicRegistryMembers(widget.config));
   }
 
   /// Actually deletes expired resolved claims (not just hides them) — from
