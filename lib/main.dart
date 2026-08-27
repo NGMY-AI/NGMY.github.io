@@ -32671,6 +32671,67 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  Future<bool> _adminDeleteNationwideContribution(String contributionId) async {
+    final id = contributionId.trim();
+    if (id.isEmpty) return false;
+    AppTransaction? target;
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.id == id && t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
+        target = t;
+        break;
+      }
+    }
+    if (target == null) return false;
+
+    final meta = _decodeContributionMeta(target);
+    final memberEmail = NgmyCivicRegistryMembers.emailKey(
+      (meta['memberEmail'] ?? target.userEmail).toString(),
+    );
+    final registryId = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+    UserData? member;
+    for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
+      if (memberEmail.isNotEmpty && NgmyCivicRegistryMembers.emailKey(u.email) == memberEmail) {
+        member = u;
+        break;
+      }
+      if (registryId.isNotEmpty && (u.registryId ?? '').trim().toUpperCase() == registryId) {
+        member = u;
+        break;
+      }
+    }
+
+    setState(() {
+      target!.status = TransactionStatus.rejected;
+      if (member != null && member.helps > 0) member.helps -= 1;
+      _communityContributions = _communityContributions
+          .map((c) => c.id == target!.id ? target! : c)
+          .where((c) => c.status == TransactionStatus.approved)
+          .toList();
+    });
+    widget.onAddTransaction(target);
+    if (member != null) {
+      unawaited(_persistCivicMemberActivity(member));
+      NgmyCivicRegistryMembers.syncFromFields(
+        widget.config,
+        email: member.email,
+        fullName: member.fullName ?? member.username,
+        dob: member.dob ?? '',
+        idType: member.idType ?? '',
+        homeAddress: member.homeAddress ?? '',
+        phone: member.phone,
+        city: member.city ?? '',
+        room: member.room ?? '',
+        state: member.state,
+        registryId: member.registryId ?? '',
+        helps: member.helps,
+        missed: member.missed,
+      );
+      unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+    }
+    widget.onDataChanged();
+    return true;
+  }
+
   Future<void> _addCivicWalletSpending({
     required String state,
     required double amount,
@@ -33062,6 +33123,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         softResetForState: _softResetForState,
         nationwideStatsBuilder: _buildCivicNationwideStats,
         onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
+        onAdminDeleteContribution: _isGlobalCivicRegistryAdmin() ? _adminDeleteNationwideContribution : null,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
@@ -33215,6 +33277,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       softResetForState: _softResetForState,
       nationwideStatsBuilder: _buildCivicNationwideStats,
       onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
+      onAdminDeleteContribution: _isGlobalCivicRegistryAdmin() ? _adminDeleteNationwideContribution : null,
     );
   }
 
