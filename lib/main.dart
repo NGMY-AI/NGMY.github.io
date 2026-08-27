@@ -32689,6 +32689,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'at': t.timestamp.toUtc().toIso8601String(),
         'state': targetState,
         'memberName': (meta['memberName'] ?? '').toString().trim(),
+        'campaignId': (meta['campaignId'] ?? '').toString().trim(),
+        'scopeType': (meta['scopeType'] ?? 'all').toString(),
+        'scopeValue': (meta['scopeValue'] ?? '').toString(),
       };
       allContribRows.add(row);
       final txAt = t.timestamp.toUtc();
@@ -37346,34 +37349,184 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
 
             Future<void> removeRecord(AppTransaction t) async {
-              final confirmed = await showDialog<bool>(
+              final isDarkConfirm = Theme.of(ctx).brightness == Brightness.dark;
+              final confirmed = await showGeneralDialog<bool>(
                 context: ctx,
-                builder: (dctx) => AlertDialog(
-                  title: const Text('Remove this money record?'),
-                  content: Text(
-                    'This removes the \$${formatCurrency(t.amount)} contribution recorded on '
-                    '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}. This cannot be undone.',
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('Cancel')),
-                    TextButton(
-                      onPressed: () => Navigator.pop(dctx, true),
-                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
+                barrierDismissible: true,
+                barrierLabel: 'Dismiss',
+                barrierColor: Colors.black.withValues(alpha: 0.45),
+                transitionDuration: const Duration(milliseconds: 320),
+                pageBuilder: (dctx, anim, secondary) => const SizedBox.shrink(),
+                transitionBuilder: (dctx, anim, secondary, child) {
+                  final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+                  return FadeTransition(
+                    opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
+                      child: Center(
+                        child: Material(
+                          color: Colors.transparent,
+                          child: Container(
+                            width: math.min(360, MediaQuery.sizeOf(dctx).width - 40),
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                            decoration: BoxDecoration(
+                              color: isDarkConfirm ? const Color(0xFF151C2C) : Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: isDarkConfirm ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: isDarkConfirm ? 0.4 : 0.12),
+                                  blurRadius: 28,
+                                  offset: const Offset(0, 12),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFFF87171), Color(0xFFDC2626)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFDC2626).withValues(alpha: 0.35),
+                                        blurRadius: 16,
+                                        offset: const Offset(0, 6),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Remove this money record?',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: isDarkConfirm ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                                  decoration: BoxDecoration(
+                                    color: isDarkConfirm ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isDarkConfirm ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        '\$${formatCurrency(t.amount)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 22,
+                                          color: isDarkConfirm ? const Color(0xFF86EFAC) : const Color(0xFF059669),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Recorded ${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDarkConfirm ? Colors.white60 : Colors.black54,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'This permanently removes the contribution from this member. It cannot be undone.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    height: 1.35,
+                                    color: isDarkConfirm ? Colors.white70 : Colors.black54,
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => Navigator.pop(dctx, false),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          foregroundColor: isDarkConfirm ? Colors.white70 : const Color(0xFF334155),
+                                          side: BorderSide(
+                                            color: isDarkConfirm ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                                          ),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        child: const Text('Keep', style: TextStyle(fontWeight: FontWeight.w800)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => Navigator.pop(dctx, true),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFFDC2626),
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        ),
+                                        child: const Text('Remove', style: TextStyle(fontWeight: FontWeight.w800)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ],
-                ),
+                  );
+                },
               );
               if (confirmed != true) return;
+              final id = t.id.trim();
               setState(() {
-                t.status = TransactionStatus.rejected;
-                if (u.helps > 0) u.helps -= 1;
-                _communityContributions = _communityContributions
-                    .map((c) => c.id == t.id ? t : c)
-                    .where((c) => c.status == TransactionStatus.approved)
-                    .toList();
+                _applyLocalContributionDeletion(t, member: u);
               });
-              widget.onAddTransaction(t);
+              if (id.isNotEmpty) {
+                await ngmyPersistCivicDeletedContributions(widget.config, addedIds: [id]);
+                await _purgeTombstonedContributionsFromCloud({id});
+              }
               unawaited(_persistCivicMemberActivity(u));
+              NgmyCivicRegistryMembers.syncFromFields(
+                widget.config,
+                email: u.email,
+                fullName: u.fullName ?? u.username,
+                dob: u.dob ?? '',
+                idType: u.idType ?? '',
+                homeAddress: u.homeAddress ?? '',
+                phone: u.phone,
+                city: u.city ?? '',
+                room: u.room ?? '',
+                state: u.state,
+                registryId: u.registryId ?? '',
+                helps: u.helps,
+                missed: u.missed,
+              );
+              unawaited(ngmyPersistCivicRegistryMembers(widget.config));
               widget.onDataChanged();
               records.removeWhere((r) => r.id == t.id);
               setDialogState(() {});

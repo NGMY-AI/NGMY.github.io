@@ -1055,23 +1055,40 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   );
 }
 
-/// One nationwide contribution row for drill-down lists.
-class NgmyCivicNationwideContributionRow {
-  const NgmyCivicNationwideContributionRow({
-    required this.id,
+/// One contributor inside a nationwide campaign group.
+class NgmyCivicNationwideContributor {
+  const NgmyCivicNationwideContributor({
+    required this.transactionId,
+    required this.memberName,
     required this.amount,
-    required this.title,
     required this.at,
-    required this.state,
-    this.memberName = '',
   });
 
-  final String id;
-  final double amount;
-  final String title;
-  final DateTime at;
-  final String state;
+  final String transactionId;
   final String memberName;
+  final double amount;
+  final DateTime at;
+}
+
+/// One help-mode activation / contribution campaign (not each person).
+class NgmyCivicNationwideCampaign {
+  const NgmyCivicNationwideCampaign({
+    required this.key,
+    required this.title,
+    required this.state,
+    required this.at,
+    required this.totalAmount,
+    required this.contributors,
+  });
+
+  final String key;
+  final String title;
+  final String state;
+  final DateTime at;
+  final double totalAmount;
+  final List<NgmyCivicNationwideContributor> contributors;
+
+  int get contributorCount => contributors.length;
 }
 
 /// Nationwide Civic Registry + contribution-case totals (US only).
@@ -1081,7 +1098,7 @@ class NgmyCivicNationwideStats {
     required this.contributionsKept,
     required this.totalContributions,
     required this.deceasedMembers,
-    required this.contributionRecords,
+    required this.contributionCampaigns,
   });
 
   /// Enrolled civic registry members across all US states (active only).
@@ -1091,17 +1108,17 @@ class NgmyCivicNationwideStats {
   /// soft-resets, deleted/pending-delete spend rows, and deceased members.
   final double contributionsKept;
 
-  /// Approved contribution records since the last admin counter reset (excludes deceased).
+  /// Help-mode activations / contribution campaigns counted (not each person).
   final int totalContributions;
 
   /// Members marked deceased nationwide.
   final int deceasedMembers;
 
-  /// All US contribution records for the public drill-down list (newest first).
-  final List<NgmyCivicNationwideContributionRow> contributionRecords;
+  /// Nationwide contribution campaigns for the drill-down list (newest first).
+  final List<NgmyCivicNationwideCampaign> contributionCampaigns;
 }
 
-/// Each contribution row should include `state` (receipt state) and `at` (ISO8601).
+/// Each contribution row should include `state`, `at`, `title`, and preferably `campaignId`.
 NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   required int registeredMembers,
   required List<Map<String, dynamic>> countedContributionRows,
@@ -1126,27 +1143,72 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
     );
     kept += snap.available;
   }
-  List<NgmyCivicNationwideContributionRow> mapRows(List<Map<String, dynamic>> rows) => rows
-      .map((row) {
-        final atRaw = (row['at'] ?? '').toString();
-        return NgmyCivicNationwideContributionRow(
-          id: (row['id'] ?? '').toString(),
-          amount: (row['amount'] as num?)?.toDouble() ?? 0,
-          title: (row['title'] ?? 'Contribution').toString(),
-          at: DateTime.tryParse(atRaw)?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0),
-          state: (row['state'] ?? '').toString(),
-          memberName: (row['memberName'] ?? '').toString(),
+
+  List<NgmyCivicNationwideCampaign> groupCampaigns(List<Map<String, dynamic>> rows) {
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      final state = (row['state'] ?? '').toString().trim();
+      final purpose = (row['title'] ?? 'Contribution').toString().trim();
+      final campaignId = (row['campaignId'] ?? '').toString().trim();
+      final scopeType = (row['scopeType'] ?? 'all').toString();
+      final scopeValue = (row['scopeValue'] ?? '').toString();
+      final key = campaignId.isNotEmpty
+          ? campaignId
+          : '$purpose|$scopeType|$scopeValue|$state';
+      groups.putIfAbsent(key, () => []).add(row);
+    }
+    final out = <NgmyCivicNationwideCampaign>[];
+    for (final entry in groups.entries) {
+      final items = entry.value;
+      var total = 0.0;
+      var newest = DateTime.fromMillisecondsSinceEpoch(0);
+      final contributors = <NgmyCivicNationwideContributor>[];
+      var title = 'Contribution';
+      var state = '';
+      for (final row in items) {
+        final amount = (row['amount'] as num?)?.toDouble() ?? 0;
+        total += amount;
+        final at = DateTime.tryParse((row['at'] ?? '').toString())?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        if (at.isAfter(newest)) newest = at;
+        final rowTitle = (row['title'] ?? '').toString().trim();
+        if (rowTitle.isNotEmpty) title = rowTitle;
+        final rowState = (row['state'] ?? '').toString().trim();
+        if (rowState.isNotEmpty) state = rowState;
+        contributors.add(
+          NgmyCivicNationwideContributor(
+            transactionId: (row['id'] ?? '').toString(),
+            memberName: (row['memberName'] ?? '').toString().trim(),
+            amount: amount,
+            at: at,
+          ),
         );
-      })
-      .toList()
-    ..sort((a, b) => b.at.compareTo(a.at));
+      }
+      contributors.sort((a, b) => b.at.compareTo(a.at));
+      out.add(
+        NgmyCivicNationwideCampaign(
+          key: entry.key,
+          title: title.isEmpty ? 'Contribution' : title,
+          state: state,
+          at: newest,
+          totalAmount: total,
+          contributors: contributors,
+        ),
+      );
+    }
+    out.sort((a, b) => b.at.compareTo(a.at));
+    return out;
+  }
+
+  final allCampaigns = groupCampaigns(allContributionRows);
+  final countedKeys = groupCampaigns(countedContributionRows).map((c) => c.key).toSet();
 
   return NgmyCivicNationwideStats(
     registeredMembers: registeredMembers,
     contributionsKept: kept,
-    totalContributions: countedContributionRows.length,
+    totalContributions: countedKeys.length,
     deceasedMembers: deceasedMembers,
-    contributionRecords: mapRows(allContributionRows),
+    contributionCampaigns: allCampaigns,
   );
 }
 
