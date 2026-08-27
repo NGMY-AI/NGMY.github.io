@@ -32720,33 +32720,263 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<bool> _confirmAdminDeleteAllContributionsTriple({String? state}) async {
+    final st = (state ?? '').trim();
+    final isState = st.isNotEmpty;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? Colors.white70 : Colors.black54;
+
+    Future<bool?> step({
+      required int stepNum,
+      required String title,
+      required String message,
+      required String confirmLabel,
+      bool requireTypeAllStates = false,
+    }) {
+      final typeC = TextEditingController();
+      return showGeneralDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        barrierLabel: 'Dismiss',
+        barrierColor: Colors.black.withValues(alpha: 0.55),
+        transitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (ctx, a, b) => const SizedBox.shrink(),
+        transitionBuilder: (ctx, anim, secondary, child) {
+          final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+              child: StatefulBuilder(
+                builder: (ctx, setLocal) {
+                  final typedOk = !requireTypeAllStates ||
+                      typeC.text.trim().toUpperCase() == 'ALL STATES';
+                  return Center(
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        width: math.min(400, MediaQuery.sizeOf(ctx).width - 36),
+                        margin: const EdgeInsets.symmetric(horizontal: 18),
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                        decoration: BoxDecoration(
+                          color: panel,
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.55), width: 1.4),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
+                              blurRadius: 28,
+                              offset: const Offset(0, 12),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDC2626),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    'STEP $stepNum OF 3',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.6),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 22),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            if (!isState) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                                ),
+                                child: const Text(
+                                  'ALL STATES',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFFB91C1C),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 22,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                            Text(title, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                            const SizedBox(height: 8),
+                            Text(message, style: TextStyle(color: mute, fontSize: 13, height: 1.4)),
+                            if (requireTypeAllStates) ...[
+                              const SizedBox(height: 14),
+                              Text(
+                                'Type ALL STATES to continue',
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 12),
+                              ),
+                              const SizedBox(height: 6),
+                              TextField(
+                                controller: typeC,
+                                autofocus: true,
+                                textCapitalization: TextCapitalization.characters,
+                                onChanged: (_) => setLocal(() {}),
+                                style: TextStyle(color: ink, fontWeight: FontWeight.w800, letterSpacing: 0.8),
+                                decoration: InputDecoration(
+                                  hintText: 'ALL STATES',
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  focusedBorder: const OutlineInputBorder(
+                                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                                    borderSide: BorderSide(color: Color(0xFFDC2626), width: 1.6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      foregroundColor: mute,
+                                      side: BorderSide(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w800)),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: typedOk ? () => Navigator.pop(ctx, true) : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                      disabledBackgroundColor: const Color(0xFFFECACA),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                    child: Text(confirmLabel, style: const TextStyle(fontWeight: FontWeight.w900)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ).whenComplete(typeC.dispose);
+    }
+
+    if (isState) {
+      final a = await step(
+        stepNum: 1,
+        title: 'Delete all $st contributions?',
+        message: 'This will permanently delete every contribution recorded for $st only. State Trust money is not touched.',
+        confirmLabel: 'Continue',
+      );
+      if (a != true) return false;
+      final b = await step(
+        stepNum: 2,
+        title: 'Confirm $st wipe',
+        message: 'Contribution case / available for $st will drop by these amounts. This cannot be undone.',
+        confirmLabel: 'Yes, continue',
+      );
+      if (b != true) return false;
+      final c = await step(
+        stepNum: 3,
+        title: 'Final confirmation',
+        message: 'Last step: permanently delete all $st contributions now?',
+        confirmLabel: 'Delete $st',
+      );
+      return c == true;
+    }
+
+    final a = await step(
+      stepNum: 1,
+      title: 'Delete contributions for ALL STATES?',
+      message:
+          'This is not one state. This removes every civic contribution across the entire United States Civic Registry. State Trust is not touched.',
+      confirmLabel: 'I understand',
+    );
+    if (a != true) return false;
+    final b = await step(
+      stepNum: 2,
+      title: 'Type ALL STATES',
+      message:
+          'To prove this is intentional, type ALL STATES below. Contribution case available amounts from these contributions will also be cleared.',
+      confirmLabel: 'Continue',
+      requireTypeAllStates: true,
+    );
+    if (b != true) return false;
+    final c = await step(
+      stepNum: 3,
+      title: 'Final confirmation — ALL STATES',
+      message:
+          'Last chance. This permanently deletes all contributions for ALL STATES and clears their contribution-case available totals. This cannot be undone.',
+      confirmLabel: 'Delete ALL STATES',
+    );
+    return c == true;
+  }
+
+  Future<void> _zeroContributionCaseAvailableAfterDeletes(Iterable<String> states) async {
+    final unique = <String>{};
+    for (final s in states) {
+      final st = s.trim();
+      if (st.isNotEmpty) unique.add(st);
+    }
+    for (final st in unique) {
+      // Rebuild after contribution txs were removed. Only cut leftover contribution-case
+      // available tied to collected — never reverse State Trust deposits/balances.
+      final snap = _buildCivicStateWalletSnapshot(st);
+      final leftover = math.min(snap.available, snap.collected);
+      if (leftover > 0.009) {
+        await _silentAdminRemoveAvailable(state: st, amount: leftover);
+      }
+    }
+  }
+
   Future<void> _adminResetNationwideContributionCount({String? state}) async {
     final st = (state ?? '').trim();
     final isState = st.isNotEmpty;
-    final confirm = await showNgmyLightConfirm(
-      context,
-      title: isState ? 'Delete all $st contributions?' : 'Delete all contributions?',
-      message: isState
-          ? 'This permanently deletes every contribution for $st right now. They will not come back. This cannot be undone.'
-          : 'This permanently deletes every contribution nationwide right now. They will not come back. This cannot be undone.',
-      cancelLabel: 'Keep',
-      confirmLabel: isState ? 'Delete $st' : 'Delete all',
-      icon: Icons.delete_forever_rounded,
-      destructive: true,
-    );
-    if (confirm != true) return;
+    final confirmed = await _confirmAdminDeleteAllContributionsTriple(state: isState ? st : null);
+    if (!confirmed) return;
 
     final targets = <AppTransaction>[];
+    final affectedStates = <String>{};
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       if (t.id.trim().isEmpty) continue;
+      final meta = _decodeContributionMeta(t);
+      final receiptState = _contributionReceiptState(t, meta).trim();
       if (isState) {
-        final meta = _decodeContributionMeta(t);
-        final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-        if (receiptState != st.toLowerCase()) continue;
+        if (receiptState.toLowerCase() != st.toLowerCase()) continue;
       }
       targets.add(t);
+      if (receiptState.isNotEmpty) affectedStates.add(receiptState);
     }
+    if (isState) affectedStates.add(st);
     if (targets.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -32773,6 +33003,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     for (final member in touchedMembers.values) {
       await _persistMemberAfterContributionDelete(member);
     }
+    // Drop contribution-case / available for affected states (same money as deleted contributions).
+    // State Trust ledgers are not modified.
+    await _zeroContributionCaseAvailableAfterDeletes(affectedStates);
     widget.onDataChanged();
     if (mounted) {
       setState(() {});
@@ -32780,8 +33013,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         SnackBar(
           content: Text(
             isState
-                ? 'Deleted ${ids.length} contribution(s) for $st permanently.'
-                : 'Deleted ${ids.length} contribution(s) nationwide permanently.',
+                ? 'Deleted ${ids.length} contribution(s) for $st. Contribution case available updated. State Trust unchanged.'
+                : 'Deleted ${ids.length} contribution(s) for ALL STATES. Contribution case available updated. State Trust unchanged.',
           ),
         ),
       );

@@ -577,16 +577,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17),
                           ),
                         ),
-                        if (widget.onAdminResetContributionCount != null && selectedState.trim().isEmpty)
-                          TextButton.icon(
-                            onPressed: () async {
-                              await widget.onAdminResetContributionCount!();
-                              await refreshAfterChange();
-                            },
-                            icon: const Icon(Icons.delete_forever_rounded, size: 16),
-                            label: const Text('Delete all'),
-                            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
-                          ),
                       ],
                     ),
                     const SizedBox(height: 6),
@@ -596,6 +586,54 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           : 'Each row is one activated help contribution. Tap to see who contributed.',
                       style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.35),
                     ),
+                    if (isAdmin &&
+                        widget.onAdminResetContributionCount != null &&
+                        selectedState.trim().isEmpty) ...[
+                      const SizedBox(height: 12),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () async {
+                            await widget.onAdminResetContributionCount!();
+                            await refreshAfterChange();
+                          },
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF2F2),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: const Color(0xFFDC2626), width: 2),
+                            ),
+                            child: const Column(
+                              children: [
+                                Text(
+                                  'ALL STATES',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFFB91C1C),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 20,
+                                    letterSpacing: 1.4,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Delete all contributions · 3 confirmations required',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFF991B1B),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     if (isAdmin) ...[
                       const SizedBox(height: 12),
                       TextField(
@@ -619,35 +657,37 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         ),
                       ),
                       if (selectedState.trim().isNotEmpty && widget.onAdminResetContributionCount != null) ...[
-                        const SizedBox(height: 8),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () async {
-                                await widget.onAdminResetContributionCount!(state: selectedState);
-                                await refreshAfterChange();
-                              },
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFEE2E2).withValues(alpha: tone.isDark ? 0.16 : 1),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.5)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.delete_forever_rounded, size: 15, color: Color(0xFFDC2626)),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      'Delete all $selectedState',
-                                      style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w800, fontSize: 11),
-                                    ),
-                                  ],
-                                ),
+                        const SizedBox(height: 10),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              await widget.onAdminResetContributionCount!(state: selectedState);
+                              await refreshAfterChange();
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEE2E2).withValues(alpha: tone.isDark ? 0.16 : 1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFDC2626), width: 1.6),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    'Delete all $selectedState',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(color: Color(0xFFB91C1C), fontWeight: FontWeight.w900, fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    '3 confirmations required · State Trust unchanged',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.w700, fontSize: 10),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
