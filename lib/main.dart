@@ -1732,6 +1732,8 @@ class AppConfig {
   List<Map<String, dynamic>> civicRegistryDeceased;
   /// When set, nationwide contribution counter only includes records after this UTC time.
   String civicNationwideContributionCountResetAt;
+  /// Per-state contribution counter resets (state key lowercase → UTC ISO timestamp).
+  Map<String, String> civicContributionCountResetAtByState;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
   double familyTreeCreateFee;
@@ -1867,6 +1869,7 @@ class AppConfig {
     List<Map<String, dynamic>>? civicRegistryRemoved,
     List<Map<String, dynamic>>? civicRegistryDeceased,
     this.civicNationwideContributionCountResetAt = '',
+    Map<String, String>? civicContributionCountResetAtByState,
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -1948,6 +1951,7 @@ class AppConfig {
         civicRegistryMembers = civicRegistryMembers ?? const [],
         civicRegistryRemoved = civicRegistryRemoved ?? const [],
         civicRegistryDeceased = civicRegistryDeceased ?? const [],
+        civicContributionCountResetAtByState = civicContributionCountResetAtByState ?? const {},
         storeSellAccessEmails = storeSellAccessEmails ?? const [],
         adminDeletedUserEmails = adminDeletedUserEmails ?? const [],
         adminUserAccountStatusByEmail = adminUserAccountStatusByEmail ?? const {},
@@ -2026,6 +2030,7 @@ class AppConfig {
     'civicRegistryRemoved': civicRegistryRemoved,
     'civicRegistryDeceased': civicRegistryDeceased,
     'civicNationwideContributionCountResetAt': civicNationwideContributionCountResetAt,
+    'civicContributionCountResetAtByState': civicContributionCountResetAtByState,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
@@ -2170,6 +2175,7 @@ class AppConfig {
       (json['civicRegistryDeceased'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
     civicNationwideContributionCountResetAt: (json['civicNationwideContributionCountResetAt'] ?? '').toString(),
+    civicContributionCountResetAtByState: _familyTreePhotoAccessFromJson(json['civicContributionCountResetAtByState']),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -32613,7 +32619,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   NgmyCivicNationwideStats _buildCivicNationwideStats() {
     final members = NgmyCivicRegistryMembers.listFrom(widget.config);
     final deceasedKeys = _civicDeceasedContributorKeys(widget.config);
-    final resetAt = DateTime.tryParse(widget.config.civicNationwideContributionCountResetAt.trim())?.toUtc();
+    final globalResetAt = DateTime.tryParse(widget.config.civicNationwideContributionCountResetAt.trim())?.toUtc();
+    final stateResets = widget.config.civicContributionCountResetAtByState;
     final allContribRows = <Map<String, dynamic>>[];
     final countedContribRows = <Map<String, dynamic>>[];
     for (final t in _civicTransactionsForDisplay()) {
@@ -32631,7 +32638,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'memberName': (meta['memberName'] ?? '').toString().trim(),
       };
       allContribRows.add(row);
-      if (resetAt == null || !t.timestamp.toUtc().isBefore(resetAt)) {
+      final txAt = t.timestamp.toUtc();
+      final stateResetRaw = stateResets[targetState.toLowerCase()] ?? '';
+      final stateResetAt = DateTime.tryParse(stateResetRaw.trim())?.toUtc();
+      final afterGlobal = globalResetAt == null || !txAt.isBefore(globalResetAt);
+      final afterState = stateResetAt == null || !txAt.isBefore(stateResetAt);
+      if (afterGlobal && afterState) {
         countedContribRows.add(row);
       }
     }
@@ -32647,26 +32659,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Future<void> _adminResetNationwideContributionCount() async {
+  Future<void> _adminResetNationwideContributionCount({String? state}) async {
+    final st = (state ?? '').trim();
+    final isState = st.isNotEmpty;
     final confirm = await showNgmyLightConfirm(
       context,
-      title: 'Reset contribution counter?',
-      message:
-          'The nationwide contribution number will start over at zero. All past contributions stay in the list when users tap Contributions — only the counter resets.',
+      title: isState ? 'Reset $st contribution count?' : 'Reset contribution counter?',
+      message: isState
+          ? 'The contribution number for $st will start over at zero. Past $st contributions stay in the list — only that state’s counter resets.'
+          : 'The nationwide contribution number will start over at zero. All past contributions stay in the list when users tap Contributions — only the counter resets.',
       cancelLabel: 'Keep',
-      confirmLabel: 'Reset counter',
+      confirmLabel: isState ? 'Reset $st' : 'Reset counter',
       icon: Icons.restart_alt_rounded,
       destructive: true,
     );
     if (confirm != true) return;
     setState(() {
-      widget.config.civicNationwideContributionCountResetAt = DateTime.now().toUtc().toIso8601String();
+      if (isState) {
+        widget.config.civicContributionCountResetAtByState = {
+          ...widget.config.civicContributionCountResetAtByState,
+          st.toLowerCase(): DateTime.now().toUtc().toIso8601String(),
+        };
+      } else {
+        widget.config.civicNationwideContributionCountResetAt = DateTime.now().toUtc().toIso8601String();
+      }
     });
     widget.onDataChanged();
     await ngmyPersistCivicHelpModeSettings(widget.config);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nationwide contribution counter reset. New contributions will count from now.')),
+        SnackBar(
+          content: Text(
+            isState
+                ? '$st contribution counter reset. New $st contributions will count from now.'
+                : 'Nationwide contribution counter reset. New contributions will count from now.',
+          ),
+        ),
       );
     }
   }

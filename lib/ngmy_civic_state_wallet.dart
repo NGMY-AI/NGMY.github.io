@@ -366,7 +366,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   Future<void> Function(String state)? onAdminRestoreStateCase,
   Map<String, dynamic>? Function(String state)? softResetForState,
   NgmyCivicNationwideStats Function()? nationwideStatsBuilder,
-  Future<void> Function()? onAdminResetContributionCount,
+  Future<void> Function({String? state})? onAdminResetContributionCount,
   Future<bool> Function(String contributionId)? onAdminDeleteContribution,
 }) async {
   if (!skipUnlockCodes) {
@@ -1111,7 +1111,7 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   int deceasedMembers = 0,
 }) {
   final byState = <String, List<Map<String, dynamic>>>{};
-  for (final row in countedContributionRows) {
+  for (final row in allContributionRows) {
     final st = (row['state'] ?? '').toString().trim().toLowerCase();
     if (st.isEmpty) continue;
     byState.putIfAbsent(st, () => []).add(row);

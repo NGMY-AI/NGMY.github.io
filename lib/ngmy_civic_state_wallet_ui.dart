@@ -110,7 +110,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final Future<void> Function(String state)? onAdminRestoreStateCase;
   final Map<String, dynamic>? Function(String state)? softResetForState;
   final NgmyCivicNationwideStats Function()? nationwideStatsBuilder;
-  final Future<void> Function()? onAdminResetContributionCount;
+  final Future<void> Function({String? state})? onAdminResetContributionCount;
   final Future<bool> Function(String contributionId)? onAdminDeleteContribution;
 
   @override
@@ -236,30 +236,35 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
 
   Future<void> _showNationwideContributionsDialog(NgmyCivicNationwideStats stats) async {
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
-    final isAdmin = widget.onAdminDeleteContribution != null;
+    final isAdmin = widget.onAdminDeleteContribution != null || widget.onAdminResetContributionCount != null;
     final searchC = TextEditingController();
     var records = List<NgmyCivicNationwideContributionRow>.from(stats.contributionRecords);
+    var selectedState = '';
+    final states = widget.allStates.isNotEmpty ? widget.allStates : const <String>[];
     await showDialog<void>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheet) {
             final query = searchC.text.trim().toLowerCase();
-            final filtered = query.isEmpty
-                ? records
-                : records.where((row) {
-                    final hay = [
-                      row.memberName,
-                      row.title,
-                      row.state,
-                      _money(row.amount),
-                      row.amount.toStringAsFixed(2),
-                      '${row.at.month}/${row.at.day}/${row.at.year}',
-                    ].join(' ').toLowerCase();
-                    return hay.contains(query);
-                  }).toList();
+            final stateKey = selectedState.trim().toLowerCase();
+            final filtered = records.where((row) {
+              if (stateKey.isNotEmpty && row.state.trim().toLowerCase() != stateKey) return false;
+              if (query.isEmpty) return true;
+              final hay = [
+                row.memberName,
+                row.title,
+                row.state,
+                _money(row.amount),
+                row.amount.toStringAsFixed(2),
+                '${row.at.month}/${row.at.day}/${row.at.year}',
+              ].join(' ').toLowerCase();
+              return hay.contains(query);
+            }).toList();
+            // Delete only while actively searching (and optionally filtered by state).
+            final showDeleteControls = isAdmin && query.isNotEmpty;
 
-            Future<void> refreshAfterDelete() async {
+            Future<void> refreshAfterChange() async {
               final builder = widget.nationwideStatsBuilder;
               if (builder == null) return;
               final refreshed = builder();
@@ -306,20 +311,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17),
                           ),
                         ),
-                        if (widget.onAdminResetContributionCount != null)
+                        if (widget.onAdminResetContributionCount != null && selectedState.trim().isEmpty)
                           TextButton.icon(
                             onPressed: () async {
                               await widget.onAdminResetContributionCount!();
-                              if (ctx.mounted) Navigator.pop(ctx);
-                              if (mounted) {
-                                final refreshed = widget.nationwideStatsBuilder?.call();
-                                if (refreshed != null) {
-                                  await _showNationwideContributionsDialog(refreshed);
-                                }
-                              }
+                              await refreshAfterChange();
                             },
                             icon: const Icon(Icons.restart_alt_rounded, size: 16),
-                            label: const Text('Reset count'),
+                            label: const Text('Reset all'),
                             style: TextButton.styleFrom(foregroundColor: Colors.orange.shade800),
                           ),
                       ],
@@ -327,7 +326,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     const SizedBox(height: 6),
                     Text(
                       isAdmin
-                          ? 'Search to find a record — delete appears only while searching.'
+                          ? 'Pick a state to reset that state only. Search to delete one by one.'
                           : 'Tap any row to review amount, date, and state.',
                       style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.35),
                     ),
@@ -338,9 +337,85 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         onChanged: (_) => setSheet(() {}),
                         style: TextStyle(color: tone.primaryText, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Search name, state, amount, date…',
+                          hintText: 'Search name, amount, date…',
                           hintStyle: TextStyle(color: tone.secondaryText, fontSize: 13),
                           prefixIcon: Icon(Icons.search_rounded, color: tone.accent, size: 20),
+                          suffixIcon: states.isEmpty
+                              ? null
+                              : Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: PopupMenuButton<String>(
+                                    tooltip: 'Filter by state',
+                                    padding: EdgeInsets.zero,
+                                    offset: const Offset(0, 36),
+                                    onSelected: (v) => setSheet(() => selectedState = v == '__all__' ? '' : v),
+                                    itemBuilder: (menuCtx) => [
+                                      PopupMenuItem(
+                                        value: '__all__',
+                                        child: Text(
+                                          'All states',
+                                          style: TextStyle(
+                                            fontWeight: selectedState.isEmpty ? FontWeight.w800 : FontWeight.w500,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                      const PopupMenuDivider(height: 8),
+                                      ...states.map(
+                                        (st) => PopupMenuItem(
+                                          value: st,
+                                          height: 36,
+                                          child: Text(
+                                            st,
+                                            style: TextStyle(
+                                              fontWeight: selectedState == st ? FontWeight.w800 : FontWeight.w500,
+                                              fontSize: 13,
+                                              color: selectedState == st ? tone.accent : null,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: selectedState.isEmpty
+                                            ? tone.fieldFill
+                                            : tone.accent.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: selectedState.isEmpty
+                                              ? tone.fieldBorder
+                                              : tone.accent.withValues(alpha: 0.45),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            selectedState.isEmpty
+                                                ? 'State'
+                                                : (selectedState.length <= 8
+                                                    ? selectedState
+                                                    : '${selectedState.substring(0, 6)}…'),
+                                            style: TextStyle(
+                                              color: selectedState.isEmpty ? tone.secondaryText : tone.accent,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Icon(
+                                            Icons.arrow_drop_down_rounded,
+                                            size: 16,
+                                            color: selectedState.isEmpty ? tone.secondaryText : tone.accent,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                           filled: true,
                           fillColor: tone.fieldFill,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -358,8 +433,47 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           ),
                         ),
                       ),
+                      if (selectedState.trim().isNotEmpty && widget.onAdminResetContributionCount != null) ...[
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () async {
+                                await widget.onAdminResetContributionCount!(state: selectedState);
+                                await refreshAfterChange();
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF7ED).withValues(alpha: tone.isDark ? 0.14 : 1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.55)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.restart_alt_rounded, size: 15, color: Color(0xFFD97706)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Reset $selectedState count',
+                                      style: const TextStyle(
+                                        color: Color(0xFFD97706),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
-                    if (query.isNotEmpty) ...[
+                    if (query.isNotEmpty || stateKey.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -370,7 +484,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
-                            '${filtered.length} match${filtered.length == 1 ? '' : 'es'}',
+                            [
+                              if (stateKey.isNotEmpty) selectedState,
+                              '${filtered.length} record${filtered.length == 1 ? '' : 's'}',
+                              if (query.isNotEmpty) 'matching search',
+                            ].join(' · '),
                             style: TextStyle(color: tone.accent, fontSize: 11, fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -381,7 +499,9 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       child: filtered.isEmpty
                           ? Center(
                               child: Text(
-                                query.isEmpty ? 'No contributions recorded yet.' : 'No contributions match your search.',
+                                query.isEmpty && stateKey.isEmpty
+                                    ? 'No contributions recorded yet.'
+                                    : 'No contributions match your filters.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: tone.secondaryText),
                               ),
@@ -393,7 +513,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                 final row = filtered[i];
                                 final dateLabel =
                                     '${row.at.month}/${row.at.day}/${row.at.year} · ${row.at.hour.toString().padLeft(2, '0')}:${row.at.minute.toString().padLeft(2, '0')}';
-                                final showDelete = isAdmin && query.isNotEmpty;
+                                final showDelete = showDeleteControls && widget.onAdminDeleteContribution != null;
                                 return Container(
                                   margin: const EdgeInsets.symmetric(vertical: 2),
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -452,7 +572,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                                 final ok = await widget.onAdminDeleteContribution!(row.id);
                                                 if (!ctx.mounted) return;
                                                 if (ok) {
-                                                  await refreshAfterDelete();
+                                                  await refreshAfterChange();
                                                   if (ctx.mounted) {
                                                     ScaffoldMessenger.of(ctx).showSnackBar(
                                                       const SnackBar(content: Text('Contribution deleted.')),
