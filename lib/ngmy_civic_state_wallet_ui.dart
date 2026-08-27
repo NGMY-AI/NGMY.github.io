@@ -56,6 +56,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     this.onAdminRestoreStateCase,
     this.softResetForState,
     this.nationwideStatsBuilder,
+    this.onAdminResetContributionCount,
   });
 
   final String state;
@@ -107,6 +108,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final Future<void> Function(String state)? onAdminRestoreStateCase;
   final Map<String, dynamic>? Function(String state)? softResetForState;
   final NgmyCivicNationwideStats Function()? nationwideStatsBuilder;
+  final Future<void> Function()? onAdminResetContributionCount;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -229,6 +231,105 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     return neg ? '-$core' : core;
   }
 
+  Future<void> _showNationwideContributionsDialog(NgmyCivicNationwideStats stats) async {
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 520),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+            decoration: BoxDecoration(
+              color: tone.dialogBg,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: tone.cardBorder),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.receipt_long_rounded, color: tone.accent, size: 22),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'All contributions',
+                        style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 17),
+                      ),
+                    ),
+                    if (widget.onAdminResetContributionCount != null)
+                      TextButton.icon(
+                        onPressed: () async {
+                          await widget.onAdminResetContributionCount!();
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (mounted) {
+                            final refreshed = widget.nationwideStatsBuilder?.call();
+                            if (refreshed != null) {
+                              await _showNationwideContributionsDialog(refreshed);
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.restart_alt_rounded, size: 16),
+                        label: const Text('Reset count'),
+                        style: TextButton.styleFrom(foregroundColor: Colors.orange.shade800),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Counter shows ${stats.totalContributions} since last reset. Tap any row for date and state.',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 11),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: stats.contributionRecords.isEmpty
+                      ? Center(
+                          child: Text('No contributions recorded yet.', style: TextStyle(color: tone.secondaryText)),
+                        )
+                      : ListView.separated(
+                          itemCount: stats.contributionRecords.length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: tone.fieldBorder),
+                          itemBuilder: (_, i) {
+                            final row = stats.contributionRecords[i];
+                            final dateLabel =
+                                '${row.at.month}/${row.at.day}/${row.at.year} · ${row.at.hour.toString().padLeft(2, '0')}:${row.at.minute.toString().padLeft(2, '0')}';
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.volunteer_activism_rounded, color: tone.accent, size: 20),
+                              title: Text(
+                                _money(row.amount),
+                                style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800, fontSize: 14),
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (row.memberName.trim().isNotEmpty) row.memberName.trim(),
+                                  row.title.trim(),
+                                  dateLabel,
+                                  row.state.trim(),
+                                ].where((s) => s.isNotEmpty).join(' · '),
+                                style: TextStyle(color: tone.secondaryText, fontSize: 11),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showNationwideStatsDialog() async {
     final builder = widget.nationwideStatsBuilder;
     if (builder == null) return;
@@ -269,6 +370,10 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         value: stats.totalContributions.toString(),
                         icon: Icons.receipt_long_rounded,
                         alignEnd: false,
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          await _showNationwideContributionsDialog(stats);
+                        },
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2212,6 +2317,7 @@ class _NationwideCornerStat extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.alignEnd,
+    this.onTap,
   });
 
   final _WalletTone tone;
@@ -2219,10 +2325,11 @@ class _NationwideCornerStat extends StatelessWidget {
   final String value;
   final IconData icon;
   final bool alignEnd;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final body = Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: tone.fieldFill,
@@ -2254,8 +2361,20 @@ class _NationwideCornerStat extends StatelessWidget {
             value,
             style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18, height: 1.05),
           ),
+          if (onTap != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Tap to view all',
+              style: TextStyle(color: tone.accent, fontSize: 9, fontWeight: FontWeight.w700),
+            ),
+          ],
         ],
       ),
+    );
+    if (onTap == null) return body;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: body),
     );
   }
 }

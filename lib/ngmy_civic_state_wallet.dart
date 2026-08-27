@@ -366,6 +366,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   Future<void> Function(String state)? onAdminRestoreStateCase,
   Map<String, dynamic>? Function(String state)? softResetForState,
   NgmyCivicNationwideStats Function()? nationwideStatsBuilder,
+  Future<void> Function()? onAdminResetContributionCount,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -407,6 +408,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       onAdminRestoreStateCase: onAdminRestoreStateCase,
       softResetForState: softResetForState,
       nationwideStatsBuilder: nationwideStatsBuilder,
+      onAdminResetContributionCount: onAdminResetContributionCount,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );
@@ -1051,6 +1053,25 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   );
 }
 
+/// One nationwide contribution row for drill-down lists.
+class NgmyCivicNationwideContributionRow {
+  const NgmyCivicNationwideContributionRow({
+    required this.id,
+    required this.amount,
+    required this.title,
+    required this.at,
+    required this.state,
+    this.memberName = '',
+  });
+
+  final String id;
+  final double amount;
+  final String title;
+  final DateTime at;
+  final String state;
+  final String memberName;
+}
+
 /// Nationwide Civic Registry + contribution-case totals (US only).
 class NgmyCivicNationwideStats {
   const NgmyCivicNationwideStats({
@@ -1058,6 +1079,7 @@ class NgmyCivicNationwideStats {
     required this.contributionsKept,
     required this.totalContributions,
     required this.deceasedMembers,
+    required this.contributionRecords,
   });
 
   /// Enrolled civic registry members across all US states (active only).
@@ -1067,23 +1089,27 @@ class NgmyCivicNationwideStats {
   /// soft-resets, deleted/pending-delete spend rows, and deceased members.
   final double contributionsKept;
 
-  /// Approved contribution records nationwide (excludes deceased members).
+  /// Approved contribution records since the last admin counter reset (excludes deceased).
   final int totalContributions;
 
   /// Members marked deceased nationwide.
   final int deceasedMembers;
+
+  /// All US contribution records for the public drill-down list (newest first).
+  final List<NgmyCivicNationwideContributionRow> contributionRecords;
 }
 
-/// Each [allContributionRows] entry should include `state` (receipt state).
+/// Each contribution row should include `state` (receipt state) and `at` (ISO8601).
 NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   required int registeredMembers,
+  required List<Map<String, dynamic>> countedContributionRows,
   required List<Map<String, dynamic>> allContributionRows,
   required List<Map<String, dynamic>> allSpendingRows,
   List<String> states = kNgmyUsStates,
   int deceasedMembers = 0,
 }) {
   final byState = <String, List<Map<String, dynamic>>>{};
-  for (final row in allContributionRows) {
+  for (final row in countedContributionRows) {
     final st = (row['state'] ?? '').toString().trim().toLowerCase();
     if (st.isEmpty) continue;
     byState.putIfAbsent(st, () => []).add(row);
@@ -1098,11 +1124,27 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
     );
     kept += snap.available;
   }
+  List<NgmyCivicNationwideContributionRow> mapRows(List<Map<String, dynamic>> rows) => rows
+      .map((row) {
+        final atRaw = (row['at'] ?? '').toString();
+        return NgmyCivicNationwideContributionRow(
+          id: (row['id'] ?? '').toString(),
+          amount: (row['amount'] as num?)?.toDouble() ?? 0,
+          title: (row['title'] ?? 'Contribution').toString(),
+          at: DateTime.tryParse(atRaw)?.toLocal() ?? DateTime.fromMillisecondsSinceEpoch(0),
+          state: (row['state'] ?? '').toString(),
+          memberName: (row['memberName'] ?? '').toString(),
+        );
+      })
+      .toList()
+    ..sort((a, b) => b.at.compareTo(a.at));
+
   return NgmyCivicNationwideStats(
     registeredMembers: registeredMembers,
     contributionsKept: kept,
-    totalContributions: allContributionRows.length,
+    totalContributions: countedContributionRows.length,
     deceasedMembers: deceasedMembers,
+    contributionRecords: mapRows(allContributionRows),
   );
 }
 

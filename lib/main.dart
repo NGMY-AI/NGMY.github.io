@@ -1730,6 +1730,8 @@ class AppConfig {
   List<Map<String, dynamic>> civicRegistryRemoved;
   /// Deceased members — searchable nationwide, excluded from active counts.
   List<Map<String, dynamic>> civicRegistryDeceased;
+  /// When set, nationwide contribution counter only includes records after this UTC time.
+  String civicNationwideContributionCountResetAt;
   /// When true, members see self-enroll on the Civic Registry header (admin toggle).
   bool civicSelfEnrollmentEnabled;
   double familyTreeCreateFee;
@@ -1864,6 +1866,7 @@ class AppConfig {
     List<Map<String, dynamic>>? civicRegistryMembers,
     List<Map<String, dynamic>>? civicRegistryRemoved,
     List<Map<String, dynamic>>? civicRegistryDeceased,
+    this.civicNationwideContributionCountResetAt = '',
     this.civicSelfEnrollmentEnabled = false,
     this.familyTreeCreateFee = NgmyFamilyTreePayments.defaultCreateFee,
     this.familyTreePhotoMonthlyFee = NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -2022,6 +2025,7 @@ class AppConfig {
     'civicRegistryMembers': civicRegistryMembers,
     'civicRegistryRemoved': civicRegistryRemoved,
     'civicRegistryDeceased': civicRegistryDeceased,
+    'civicNationwideContributionCountResetAt': civicNationwideContributionCountResetAt,
     'civicSelfEnrollmentEnabled': civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': familyTreePhotoMonthlyFee,
@@ -2165,6 +2169,7 @@ class AppConfig {
     civicRegistryDeceased: List<Map<String, dynamic>>.from(
       (json['civicRegistryDeceased'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
+    civicNationwideContributionCountResetAt: (json['civicNationwideContributionCountResetAt'] ?? '').toString(),
     civicSelfEnrollmentEnabled: json['civicSelfEnrollmentEnabled'] == true,
     familyTreeCreateFee: (json['familyTreeCreateFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultCreateFee,
     familyTreePhotoMonthlyFee: (json['familyTreePhotoMonthlyFee'] as num?)?.toDouble() ?? NgmyFamilyTreePayments.defaultPhotoMonthlyFee,
@@ -32608,30 +32613,62 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   NgmyCivicNationwideStats _buildCivicNationwideStats() {
     final members = NgmyCivicRegistryMembers.listFrom(widget.config);
     final deceasedKeys = _civicDeceasedContributorKeys(widget.config);
-    final contribRows = <Map<String, dynamic>>[];
+    final resetAt = DateTime.tryParse(widget.config.civicNationwideContributionCountResetAt.trim())?.toUtc();
+    final allContribRows = <Map<String, dynamic>>[];
+    final countedContribRows = <Map<String, dynamic>>[];
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       final meta = _decodeContributionMeta(t);
       if (_civicContributionFromDeceased(t, deceasedKeys, meta)) continue;
       final targetState = _contributionReceiptState(t, meta).trim();
       if (targetState.isEmpty) continue;
-      contribRows.add(<String, dynamic>{
+      final row = <String, dynamic>{
         'id': t.id,
         'amount': t.amount,
         'title': (meta['purpose'] ?? 'Contribution').toString(),
         'at': t.timestamp.toUtc().toIso8601String(),
         'state': targetState,
-      });
+        'memberName': (meta['memberName'] ?? '').toString().trim(),
+      };
+      allContribRows.add(row);
+      if (resetAt == null || !t.timestamp.toUtc().isBefore(resetAt)) {
+        countedContribRows.add(row);
+      }
     }
     final spendingRows = widget.config.helpCampaignSpendings
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
     return buildNgmyCivicNationwideStats(
       registeredMembers: members.length,
-      allContributionRows: contribRows,
+      countedContributionRows: countedContribRows,
+      allContributionRows: allContribRows,
       allSpendingRows: spendingRows,
       deceasedMembers: NgmyCivicRegistryMembers.deceasedCount(widget.config),
     );
+  }
+
+  Future<void> _adminResetNationwideContributionCount() async {
+    final confirm = await showNgmyLightConfirm(
+      context,
+      title: 'Reset contribution counter?',
+      message:
+          'The nationwide contribution number will start over at zero. All past contributions stay in the list when users tap Contributions — only the counter resets.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Reset counter',
+      icon: Icons.restart_alt_rounded,
+      destructive: true,
+    );
+    if (confirm != true) return;
+    setState(() {
+      widget.config.civicNationwideContributionCountResetAt = DateTime.now().toUtc().toIso8601String();
+    });
+    widget.onDataChanged();
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nationwide contribution counter reset. New contributions will count from now.')),
+      );
+    }
   }
 
   Future<void> _addCivicWalletSpending({
@@ -33024,6 +33061,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onAdminRestoreStateCase: _adminRestoreStateCase,
         softResetForState: _softResetForState,
         nationwideStatsBuilder: _buildCivicNationwideStats,
+        onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
@@ -33176,6 +33214,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       onAdminRestoreStateCase: _adminRestoreStateCase,
       softResetForState: _softResetForState,
       nationwideStatsBuilder: _buildCivicNationwideStats,
+      onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
     );
   }
 
@@ -36819,6 +36858,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -36828,16 +36868,45 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                       child: const Icon(Icons.report_gmailerrorred_rounded, color: Colors.white),
                     ),
-                    const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Add Claim Record', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
-                          Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Add Claim Record', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                            Text(
+                              u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email,
+                              style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                    if (_canUseRegistrarToolsHere() && !_civicMemberIsDeceased(widget.config, u))
+                      Tooltip(
+                        message: 'Mark member deceased',
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              Navigator.pop(ctx);
+                              await _markRegistryMemberDeceased(u);
+                            },
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF475569) : const Color(0xFF64748B),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.person_off_rounded, color: Colors.white, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -39026,7 +39095,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       children: [
         Container(
           margin: const EdgeInsets.only(bottom: 15),
-          padding: EdgeInsets.fromLTRB(20, manageActions ? 28 : 20, 20, 20),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)]),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -39096,68 +39165,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             ],
           ),
         ),
-        if (manageActions)
-          Positioned(
-            top: 6,
-            left: 10,
-            child: Tooltip(
-              message: 'Add claim',
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _showClaimDialog(u),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFD97706)]),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.35), blurRadius: 6),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        if (manageActions)
-          Positioned(
-            top: 6,
-            right: 10,
-            child: Tooltip(
-              message: 'Mark deceased',
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    await _markRegistryMemberDeceased(u);
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    width: 30,
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF475569) : const Color(0xFF64748B),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 6),
-                      ],
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.person_off_rounded, size: 15, color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
-          ),
         if (showFixDot)
           Positioned(
             top: 6,
-            right: 46,
+            right: 10,
             child: Container(
               width: 10,
               height: 10,
