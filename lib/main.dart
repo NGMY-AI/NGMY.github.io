@@ -33443,6 +33443,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         nationwideStatsBuilder: _buildCivicNationwideStats,
         onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
         onAdminDeleteContribution: _isGlobalCivicRegistryAdmin() ? _adminDeleteNationwideContribution : null,
+        onOpenNationwideDeceased: _showNationwideDeceasedMembersDialog,
       ),
       routeName: 'NgmyCivicStateWalletScreen',
     );
@@ -33597,6 +33598,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       nationwideStatsBuilder: _buildCivicNationwideStats,
       onAdminResetContributionCount: _isGlobalCivicRegistryAdmin() ? _adminResetNationwideContributionCount : null,
       onAdminDeleteContribution: _isGlobalCivicRegistryAdmin() ? _adminDeleteNationwideContribution : null,
+      onOpenNationwideDeceased: _showNationwideDeceasedMembersDialog,
     );
   }
 
@@ -35640,11 +35642,658 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showMemberProfile(UserData u) {
+    // Deceased records are always full information, view-only for everyone
+    // (including authorized registrars) — no edit / transfer / delete chrome.
+    if (_civicMemberIsDeceased(widget.config, u)) {
+      _showDeceasedReadOnlyFullProfile(u);
+      return;
+    }
     if (!_canUseRegistrarToolsHere()) {
       _showPublicMemberProfile(u);
       return;
     }
     _showRegistrarMemberProfile(u);
+  }
+
+  Future<void> _showNationwideDeceasedMembersDialog() async {
+    unawaited(_refreshCivicHelpModeAndContributions().then((_) {
+      if (mounted) setState(() {});
+    }));
+    final searchC = TextEditingController();
+    var selectedState = '';
+    final members = _civicDeceasedMembersForDisplay(widget.config, widget.allUsers);
+    members.sort((a, b) {
+      final an = (a.fullName ?? a.username).trim().toLowerCase();
+      final bn = (b.fullName ?? b.username).trim().toLowerCase();
+      return an.compareTo(bn);
+    });
+    final states = <String>{
+      for (final u in members)
+        if (u.state.trim().isNotEmpty) u.state.trim(),
+    }.toList()
+      ..sort();
+
+    if (!mounted) {
+      searchC.dispose();
+      return;
+    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? Colors.white70 : Colors.black54;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            final query = searchC.text.trim().toLowerCase();
+            final stateKey = selectedState.trim().toLowerCase();
+            final filtered = members.where((u) {
+              if (stateKey.isNotEmpty && u.state.trim().toLowerCase() != stateKey) return false;
+              if (query.isEmpty) return true;
+              final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+              final deceasedRow = NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, u.email) ??
+                  NgmyCivicRegistryMembers.findDeceasedByRegistryId(widget.config, u.registryId ?? '');
+              final hay = [
+                u.fullName ?? '',
+                u.username,
+                u.email,
+                u.state,
+                u.city ?? '',
+                u.registryId ?? '',
+                u.phone,
+                raw?['dob']?.toString() ?? '',
+                deceasedRow?['deceasedAt']?.toString() ?? '',
+              ].join(' ').toLowerCase();
+              return hay.contains(query);
+            }).toList();
+
+            return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              backgroundColor: panel,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440, maxHeight: 640),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF64748B).withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.person_off_rounded, color: Color(0xFF475569), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Deceased members',
+                              style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: Icon(Icons.close_rounded, color: mute),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'United States Civic Registry · tap anyone for full information (view only)',
+                        style: TextStyle(color: mute, fontSize: 11, height: 1.35),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: searchC,
+                        onChanged: (_) => setSheet(() {}),
+                        style: TextStyle(color: ink, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: 'Search name, state, city, registry ID…',
+                          hintStyle: TextStyle(color: mute, fontSize: 13),
+                          prefixIcon: Icon(Icons.search_rounded, color: mute, size: 20),
+                          suffixIcon: states.isEmpty
+                              ? null
+                              : PopupMenuButton<String>(
+                                  tooltip: 'Filter by state',
+                                  onSelected: (v) => setSheet(() => selectedState = v == '__all__' ? '' : v),
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                      value: '__all__',
+                                      child: Text(
+                                        'All states',
+                                        style: TextStyle(fontWeight: selectedState.isEmpty ? FontWeight.w800 : FontWeight.w500),
+                                      ),
+                                    ),
+                                    const PopupMenuDivider(height: 8),
+                                    ...states.map(
+                                      (st) => PopupMenuItem(
+                                        value: st,
+                                        child: Text(
+                                          st,
+                                          style: TextStyle(
+                                            fontWeight: selectedState == st ? FontWeight.w800 : FontWeight.w500,
+                                            color: selectedState == st ? const Color(0xFF475569) : null,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    child: Icon(
+                                      Icons.filter_list_rounded,
+                                      color: selectedState.isEmpty ? mute : const Color(0xFF475569),
+                                    ),
+                                  ),
+                                ),
+                          filled: true,
+                          fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                      ),
+                      if (selectedState.isNotEmpty || query.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          [
+                            if (selectedState.isNotEmpty) selectedState,
+                            '${filtered.length} deceased',
+                            if (query.isNotEmpty) 'matching search',
+                          ].join(' · '),
+                          style: TextStyle(color: mute, fontSize: 11, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? Center(
+                                child: Text(
+                                  members.isEmpty ? 'No deceased members yet.' : 'No matches.',
+                                  style: TextStyle(color: mute, fontWeight: FontWeight.w600),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, __) => const SizedBox(height: 8),
+                                itemBuilder: (_, i) {
+                                  final u = filtered[i];
+                                  final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+                                  final deceasedRow =
+                                      NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, u.email) ??
+                                          NgmyCivicRegistryMembers.findDeceasedByRegistryId(
+                                            widget.config,
+                                            u.registryId ?? '',
+                                          );
+                                  final deceasedAt = DateTime.tryParse((deceasedRow?['deceasedAt'] ?? '').toString());
+                                  final name = (u.fullName ?? u.username).trim().isEmpty
+                                      ? 'Member'
+                                      : (u.fullName ?? u.username).trim();
+                                  final place = [
+                                    if ((u.city ?? '').trim().isNotEmpty) u.city!.trim(),
+                                    if (u.state.trim().isNotEmpty) u.state.trim(),
+                                  ].join(', ');
+                                  final deathLabel = deceasedAt == null
+                                      ? ''
+                                      : 'Passed ${deceasedAt.month}/${deceasedAt.day}/${deceasedAt.year}';
+                                  return Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () => _showDeceasedReadOnlyFullProfile(u),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Container(
+                                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(14),
+                                          border: Border.all(
+                                            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 42,
+                                              height: 42,
+                                              alignment: Alignment.center,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: const Color(0xFF64748B).withValues(alpha: 0.18),
+                                              ),
+                                              child: const Icon(Icons.person_off_rounded, color: Color(0xFF475569), size: 20),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    name,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 14),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    [
+                                                      if (place.isNotEmpty) place,
+                                                      if ((u.registryId ?? '').trim().isNotEmpty) u.registryId!.trim(),
+                                                      if (deathLabel.isNotEmpty) deathLabel,
+                                                    ].where((e) => e.isNotEmpty).join(' · '),
+                                                    maxLines: 2,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(color: mute, fontSize: 11, height: 1.3),
+                                                  ),
+                                                  if (raw != null && (raw['helps'] is num || u.helps > 0)) ...[
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      '${u.helps} contribution${u.helps == 1 ? '' : 's'} on record',
+                                                      style: TextStyle(color: mute, fontSize: 10, fontWeight: FontWeight.w600),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                            Icon(Icons.chevron_right_rounded, color: mute),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchC.dispose();
+  }
+
+  /// Full civic registry information for a deceased member — view only for all users.
+  void _showDeceasedReadOnlyFullProfile(UserData u) {
+    unawaited(_refreshCivicHelpModeAndContributions().then((_) {
+      if (mounted) setState(() {});
+    }));
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+    final deceasedRow = NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, u.email) ??
+        NgmyCivicRegistryMembers.findDeceasedByRegistryId(widget.config, u.registryId ?? '');
+    final deceasedAt = DateTime.tryParse((deceasedRow?['deceasedAt'] ?? '').toString());
+    final emailKey = u.email.toLowerCase().trim();
+    final linkedEmail = NgmyCivicRegistryMembers.emailKey((raw?['linkedAppEmail'] ?? '').toString());
+    final contributions = _contributionsForMember(u);
+    final claims = _civicTransactionsForDisplay()
+        .where((t) {
+          if (t.type != TransactionType.claim || t.status == TransactionStatus.rejected) return false;
+          final te = t.userEmail.toLowerCase().trim();
+          if (emailKey.isNotEmpty && te == emailKey) return true;
+          if (linkedEmail.isNotEmpty && te == linkedEmail) return true;
+          return false;
+        })
+        .toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final openClaims = claims.where((c) => c.status == TransactionStatus.pending).length;
+    final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
+    final nicknames = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+    final fullName = (u.fullName ?? raw?['fullName'] ?? u.username).toString().trim();
+    final registryId = (u.registryId ?? raw?['registryId'] ?? '').toString().trim();
+    final dob = (u.dob ?? raw?['dob'] ?? 'N/A').toString();
+    final idType = (u.idType ?? raw?['idType'] ?? 'N/A').toString();
+    final state = (u.state.isNotEmpty ? u.state : (raw?['state'] ?? '')).toString();
+    final city = (u.city ?? raw?['city'] ?? 'N/A').toString();
+    final room = (u.room ?? raw?['room'] ?? 'N/A').toString();
+    final homeAddress = (u.homeAddress ?? raw?['homeAddress'] ?? 'N/A').toString();
+    final phone = u.phone.trim().isNotEmpty ? u.phone.trim() : (raw?['phone'] ?? 'N/A').toString();
+    final email = u.email.trim().isNotEmpty ? u.email.trim() : (raw?['email'] ?? 'N/A').toString();
+    final deathLabel = deceasedAt == null ? 'N/A' : '${deceasedAt.month}/${deceasedAt.day}/${deceasedAt.year}';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        Widget glassFrame({required Widget child}) => Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.05 : 0.03),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.10)),
+              ),
+              child: child,
+            );
+        Widget glassTile({required Widget child, bool last = false}) => Container(
+              margin: EdgeInsets.only(bottom: last ? 0 : 8),
+              decoration: BoxDecoration(
+                color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.055 : 0.045),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: (isDark ? Colors.white : Colors.black).withOpacity(0.08)),
+              ),
+              child: child,
+            );
+
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: SelectionContainer.disabled(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Deceased — Full Information',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 19,
+                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF64748B),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Deceased',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: 'Print full report',
+                          onPressed: () => _copyMemberReport(
+                            u,
+                            contributions: contributions,
+                            claims: claims,
+                            contributionTotal: contributionTotal,
+                            openClaims: openClaims,
+                          ),
+                          icon: const Icon(Icons.print_outlined),
+                          style: IconButton.styleFrom(
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                            foregroundColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'View only · transferred from United States Civic Registry',
+                      style: TextStyle(
+                        color: isDark ? Colors.white60 : Colors.black54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF8FAFF),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFD9E2F2)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.badge_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1E40AF)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Official Member Record',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark ? Colors.white : const Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE5E7EB)),
+                            ),
+                            child: Column(
+                              children: [
+                                _recordRow('Full Name', fullName.isEmpty ? 'N/A' : fullName, isDark),
+                                _recordDivider(isDark),
+                                _recordRow('Registry ID', registryId.isEmpty ? 'N/A' : registryId, isDark),
+                                _recordDivider(isDark),
+                                _recordRow('Date of Birth', dob.isEmpty ? 'N/A' : dob, isDark),
+                                _recordDivider(isDark),
+                                _recordRow('Date of Death', deathLabel, isDark),
+                                _recordDivider(isDark),
+                                _recordRow('ID Type', idType.isEmpty ? 'N/A' : idType, isDark),
+                                _recordDivider(isDark),
+                                _recordRow('State / City / Room', '$state / $city / $room', isDark),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _familySizeInfoFrame(raw, isDark),
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1A2233) : const Color(0xFFF0F9FF),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.contact_phone_outlined, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Contact Information',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              children: [
+                                _contactRow('Home Address', homeAddress.isEmpty ? 'N/A' : homeAddress, isDark),
+                                _contactDivider(isDark),
+                                _contactRow('Phone Number', phone.isEmpty ? 'N/A' : phone, isDark),
+                                _contactDivider(isDark),
+                                _contactRow('Email Address', email.isEmpty ? 'N/A' : email, isDark),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (nicknames.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1A2233) : const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFFDBA74)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Public nicknames',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              nicknames.join(' · '),
+                              style: TextStyle(color: isDark ? Colors.white70 : Colors.black87, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _statCard('Contributions', u.helps.toString(), Colors.green.shade50, Colors.green.shade800),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: _statCard(
+                            'Money Given',
+                            '\$${formatCurrency(contributionTotal)}',
+                            Colors.blue.shade50,
+                            Colors.blue.shade800,
+                            emphasize: true,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: _statCard('Open Claims', openClaims.toString(), Colors.red.shade50, Colors.red.shade800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    const Text('Contribution Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 8),
+                    glassFrame(
+                      child: contributions.isEmpty
+                          ? const Text('No contribution records on file.', style: TextStyle(color: Colors.grey))
+                          : Column(
+                              children: contributions.asMap().entries.map((entry) {
+                                final t = entry.value;
+                                return glassTile(
+                                  last: entry.key == contributions.length - 1,
+                                  child: ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                    title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    subtitle: Text(_txReadableDetails(t)),
+                                    trailing: Text(
+                                      '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 8),
+                    glassFrame(
+                      child: claims.isEmpty
+                          ? const Text('No claim records on file.', style: TextStyle(color: Colors.grey))
+                          : Column(
+                              children: claims.asMap().entries.map((entry) {
+                                final t = entry.value;
+                                return glassTile(
+                                  last: entry.key == claims.length - 1,
+                                  child: ListTile(
+                                    dense: true,
+                                    leading: Icon(
+                                      t.status == TransactionStatus.pending
+                                          ? Icons.warning_amber_rounded
+                                          : Icons.verified,
+                                      color: t.status == TransactionStatus.pending ? Colors.orange : Colors.green,
+                                    ),
+                                    title: Text(t.sourceDetails?.isNotEmpty == true ? t.sourceDetails! : 'Claim'),
+                                    subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
+                                    trailing: Text(
+                                      '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
+                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                    ),
+                    if (registryId.isNotEmpty && raw != null) ...[
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _showCivicIdCardForRecord(raw),
+                          icon: const Icon(Icons.badge_outlined),
+                          label: const Text('View Registry ID / Passport'),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showPublicMemberProfile(UserData u) {
@@ -36472,8 +37121,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     final total = contributionTotal ?? contrib.fold<double>(0.0, (sum, t) => sum + t.amount);
     final open = openClaims ?? claimList.where((c) => c.status == TransactionStatus.pending).length;
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
-        NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
     final passportGranted = raw != null && NgmyCivicRegistryMembers.passportGranted(raw);
     final familyRaw = raw?['familyMembers'];
     final familyTotal = familyRaw is num ? familyRaw.toInt() : int.tryParse('${familyRaw ?? ''}') ?? 1;
@@ -37565,8 +38213,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final rid = (u.registryId ?? '').trim().toUpperCase();
     final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
     if (emailKey.isNotEmpty && txEmail == emailKey) return true;
-    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
-        (rid.isNotEmpty ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid) : null);
+    // Include deceased snapshots so contribution history still resolves after
+    // the member is removed from the active civic registry roster.
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
     if (raw != null) {
       final regEmail = NgmyCivicRegistryMembers.emailKey((raw['email'] ?? '').toString());
       if (regEmail.isNotEmpty && txEmail == regEmail) return true;

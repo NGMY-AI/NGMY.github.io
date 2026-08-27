@@ -59,6 +59,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     this.nationwideStatsBuilder,
     this.onAdminResetContributionCount,
     this.onAdminDeleteContribution,
+    this.onOpenNationwideDeceased,
   });
 
   final String state;
@@ -112,6 +113,8 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final NgmyCivicNationwideStats Function()? nationwideStatsBuilder;
   final Future<void> Function({String? state})? onAdminResetContributionCount;
   final Future<bool> Function(String contributionId)? onAdminDeleteContribution;
+  /// Opens the nationwide deceased members list (full read-only records).
+  final Future<void> Function()? onOpenNationwideDeceased;
 
   @override
   State<NgmyCivicStateWalletScreen> createState() => _NgmyCivicStateWalletScreenState();
@@ -887,6 +890,12 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         value: stats.deceasedMembers.toString(),
                         icon: Icons.person_off_rounded,
                         alignEnd: true,
+                        onTap: widget.onOpenNationwideDeceased == null
+                            ? null
+                            : () async {
+                                Navigator.pop(ctx);
+                                await widget.onOpenNationwideDeceased!();
+                              },
                       ),
                     ),
                   ],

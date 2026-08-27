@@ -368,6 +368,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   NgmyCivicNationwideStats Function()? nationwideStatsBuilder,
   Future<void> Function({String? state})? onAdminResetContributionCount,
   Future<bool> Function(String contributionId)? onAdminDeleteContribution,
+  Future<void> Function()? onOpenNationwideDeceased,
 }) async {
   if (!skipUnlockCodes) {
     final unlocked = await NgmyNavigator.push<bool>(
@@ -411,6 +412,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       nationwideStatsBuilder: nationwideStatsBuilder,
       onAdminResetContributionCount: onAdminResetContributionCount,
       onAdminDeleteContribution: onAdminDeleteContribution,
+      onOpenNationwideDeceased: onOpenNationwideDeceased,
     ),
     routeName: 'NgmyCivicStateWalletScreen',
   );
