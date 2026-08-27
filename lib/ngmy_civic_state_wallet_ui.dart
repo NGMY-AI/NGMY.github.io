@@ -476,7 +476,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                           radius: 16,
                                           backgroundColor: tone.accent.withValues(alpha: 0.14),
                                           child: Text(
-                                            (p.memberName.trim().isNotEmpty ? p.memberName.trim()[0] : '?').toUpperCase(),
+                                            (() {
+                                              final name = p.memberName.trim();
+                                              if (name.isEmpty) return '?';
+                                              return name[0].toUpperCase();
+                                            })(),
                                             style: TextStyle(color: tone.accent, fontWeight: FontWeight.w900, fontSize: 12),
                                           ),
                                         ),
@@ -486,7 +490,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                p.memberName.trim().isEmpty ? 'Member' : p.memberName.trim(),
+                                                p.memberName.trim().isEmpty ? 'Contributor' : p.memberName.trim(),
                                                 style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800, fontSize: 13),
                                               ),
                                               Text(dateLabel, style: TextStyle(color: tone.secondaryText, fontSize: 11)),

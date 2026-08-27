@@ -32632,8 +32632,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   List<AppTransaction> _stateWalletContributionTx([String? forState]) {
     final viewerState = (forState ?? _selectedState).trim().toLowerCase();
+    final deleted = widget.config.civicDeletedContributionIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
     return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+      if (deleted.contains(t.id.trim())) return false;
       final meta = _decodeContributionMeta(t);
       final targetState = _contributionReceiptState(t, meta);
       if (viewerState.isEmpty || targetState.isEmpty) return false;
@@ -32688,7 +32693,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'title': (meta['purpose'] ?? 'Contribution').toString(),
         'at': t.timestamp.toUtc().toIso8601String(),
         'state': targetState,
-        'memberName': (meta['memberName'] ?? '').toString().trim(),
+        'memberName': _contributionMemberDisplayName(t),
         'campaignId': (meta['campaignId'] ?? '').toString().trim(),
         'scopeType': (meta['scopeType'] ?? 'all').toString(),
         'scopeValue': (meta['scopeValue'] ?? '').toString(),
@@ -36316,7 +36321,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final meta = _decodeContributionMeta(t);
     for (final key in ['memberName', 'fullName', 'name']) {
       final stored = (meta[key] ?? '').toString().trim();
-      if (stored.isNotEmpty && !stored.contains('@')) return stored;
+      if (stored.isNotEmpty && !stored.contains('@') && stored.toLowerCase() != 'user' && stored.toLowerCase() != 'member') {
+        return stored;
+      }
     }
 
     final email = NgmyCivicRegistryMembers.emailKey(
@@ -36330,8 +36337,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final registryName = (registry?['fullName'] ?? '').toString().trim();
     if (registryName.isNotEmpty) return registryName;
 
+    final deceased = email.isNotEmpty
+        ? NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, email)
+        : (rid.isNotEmpty ? NgmyCivicRegistryMembers.findDeceasedByRegistryId(widget.config, rid) : null);
+    final deceasedSnap = deceased == null ? null : NgmyCivicRegistryMembers.deceasedMemberSnapshot(deceased);
+    final deceasedName = (deceasedSnap?['fullName'] ?? deceased?['fullName'] ?? '').toString().trim();
+    if (deceasedName.isNotEmpty) return deceasedName;
+
     if (email.isNotEmpty) {
       for (final u in widget.allUsers) {
+        if (NgmyCivicRegistryMembers.emailKey(u.email) != email) continue;
+        final full = (u.fullName ?? '').trim();
+        if (full.isNotEmpty) return full;
+        final un = u.username.trim();
+        if (un.isNotEmpty && un != 'User' && !un.contains('@')) return un;
+      }
+      for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
         if (NgmyCivicRegistryMembers.emailKey(u.email) != email) continue;
         final full = (u.fullName ?? '').trim();
         if (full.isNotEmpty) return full;
@@ -36348,13 +36369,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         final un = u.username.trim();
         if (un.isNotEmpty && un != 'User' && !un.contains('@')) return un;
       }
+      for (final u in _civicRegistryMembersForDisplay(widget.config, widget.allUsers)) {
+        if ((u.registryId ?? '').trim().toUpperCase() != rid.toUpperCase()) continue;
+        final full = (u.fullName ?? '').trim();
+        if (full.isNotEmpty) return full;
+      }
     }
 
     if (email.contains('@')) {
       final local = email.split('@').first.trim();
-      if (local.isNotEmpty) return local;
+      if (local.isNotEmpty && !local.startsWith('civic.')) return local;
     }
-    return rid.isNotEmpty ? rid : 'Mwanachama';
+    return rid.isNotEmpty ? rid : 'Contributor';
   }
 
   List<UserData> _membersForReceiptMeta(Map<String, dynamic> meta) {
@@ -37503,7 +37529,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               );
               if (confirmed != true) return;
               final id = t.id.trim();
+              final removedAmount = t.amount;
+              final receiptState = _contributionReceiptState(t).trim();
               setState(() {
+                // Removes this amount from the contribution case collected total.
+                // State Trust transfers/deposits are separate spendings — never touched here.
                 _applyLocalContributionDeletion(t, member: u);
               });
               if (id.isNotEmpty) {
@@ -37530,6 +37560,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               widget.onDataChanged();
               records.removeWhere((r) => r.id == t.id);
               setDialogState(() {});
+              if (mounted) {
+                final caseLabel = receiptState.isNotEmpty ? receiptState : 'contribution case';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Removed \$${formatCurrency(removedAmount)} from $caseLabel. State Trust was not changed.',
+                    ),
+                  ),
+                );
+              }
               if (records.isEmpty && ctx.mounted) Navigator.pop(ctx);
             }
 
