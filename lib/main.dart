@@ -32434,14 +32434,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         timeStr: timeStr,
         rows: rosterRows,
       );
-      final opened = await ngmyInvoicePrintPdfDirect(pdfBytes, fileName);
+      final opened = await ngmyInvoicePrintPdfDirect(
+        pdfBytes,
+        fileName,
+        preferPrintDialog: true,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             opened
-                ? 'Roster PDF ready for $state (${members.length} members). Each page is a full framed table.'
-                : 'Could not open print sheet — try again.',
+                ? 'Roster PDF ready for $state (${members.length} members). If Print is blank on your phone, open Share and choose Print.'
+                : 'Could not open print — try again or use a desktop browser.',
           ),
           backgroundColor: opened ? Colors.green : Colors.orange,
           duration: const Duration(seconds: 6),

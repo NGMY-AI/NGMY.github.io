@@ -28,6 +28,8 @@ class NgmyAdvisorAppKnowledge {
     if (chatterIsBoss && isBossPersonalHelper) {
       buf
         ..writeln()
+        ..writeln(_civicRegistryPromotionTalkingPoints)
+        ..writeln()
         ..writeln(_ownerDeep)
         ..writeln()
         ..writeln(_liveStripeCatalog());
@@ -64,6 +66,16 @@ class NgmyAdvisorAppKnowledge {
         'the in-app paywall shows the live price — do not invent numbers. '
         'Never discuss admin emails, backend secrets, API keys, or how to bypass paywalls.';
   }
+
+  /// Boss personal helpers (Mariam + Suzana) — video scripts about Civic Registry promo.
+  static const String _civicRegistryPromotionTalkingPoints = '''
+CIVIC REGISTRY PROMO TALKING POINTS (for Boss video scripts — Mariam & Suzana):
+- WHAT IT IS: NGMY Civic Registry = community digital membership across US states — not a government ID, but OUR system for Congolese/African diaspora families to stay organized, counted, and helped together in America.
+- WHY IT MATTERS: scattered families, no central record, hard to coordinate help, contributions, or know who is in the community — Civic Registry fixes that with dignity.
+- KEY FEATURES TO MENTION IN VIDEOS: enroll members, state-based community, Authorized Registrars, help-mode contributions (community gives together), claims/support, family size on record, searchable roster, PIN-protected state cases, nationwide unity.
+- EMOTIONAL ANGLES THAT GO VIRAL: "finally we have our own system", mama counting her children, church/community leader enrolling families, young diaspora kid explaining app to parents, before/after chaos vs organized community, pride in African identity + practical American life.
+- CTA EXAMPLES: download NGMY at ngmy.org, open NGMY Hub → Civic Registry, enroll your family, tell your state registrar, join the next help round.
+- TONE: proud, warm, real — Congolese/Swahili/English as Boss prefers. Never sound like a scammy MLM ad.''';
 
   /// Compact member-facing guide for every advisor.
   static const String _userHowTo = '''

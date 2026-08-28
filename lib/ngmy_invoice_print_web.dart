@@ -17,6 +17,19 @@ String _safePdfName(String filename) {
   return safe.endsWith('.pdf') ? safe : '$safe.pdf';
 }
 
+Future<void> _invokePrint(dynamic win) async {
+  for (var i = 0; i < 4; i++) {
+    await Future<void>.delayed(Duration(milliseconds: 280 + i * 220));
+    try {
+      js_util.callMethod(win, 'focus', const []);
+    } catch (_) {}
+    try {
+      js_util.callMethod(win, 'print', const []);
+      return;
+    } catch (_) {}
+  }
+}
+
 Future<bool> _sharePdf(Uint8List bytes, String name) async {
   try {
     if (bytes.isEmpty) return false;
@@ -33,33 +46,30 @@ Future<bool> _sharePdf(Uint8List bytes, String name) async {
   }
 }
 
+/// Hidden iframe large enough for mobile browsers to render PDF pages before print.
 Future<bool> _printPdfInIframe(Uint8List pdfBytes) async {
+  if (pdfBytes.isEmpty) return false;
   final blob = html.Blob([pdfBytes], 'application/pdf');
   final url = html.Url.createObjectUrlFromBlob(blob);
+  final iframe = html.IFrameElement()
+    ..style.position = 'fixed'
+    ..style.left = '-10000px'
+    ..style.top = '0'
+    ..style.width = '900px'
+    ..style.height = '1200px'
+    ..style.border = '0'
+    ..style.opacity = '0'
+    ..style.pointerEvents = 'none'
+    ..setAttribute('aria-hidden', 'true')
+    ..src = url;
+  html.document.body?.append(iframe);
   try {
-    final iframe = html.IFrameElement()
-      ..style.position = 'fixed'
-      ..style.right = '0'
-      ..style.bottom = '0'
-      ..style.width = '0'
-      ..style.height = '0'
-      ..style.border = '0'
-      ..style.opacity = '0'
-      ..setAttribute('aria-hidden', 'true')
-      ..src = url;
-    html.document.body?.append(iframe);
-
     try {
-      await iframe.onLoad.first.timeout(const Duration(seconds: 6));
+      await iframe.onLoad.first.timeout(const Duration(seconds: 8));
     } catch (_) {}
     final win = iframe.contentWindow;
     if (win == null) return false;
-    try {
-      js_util.callMethod(win, 'focus', const []);
-    } catch (_) {}
-    try {
-      js_util.callMethod(win, 'print', const []);
-    } catch (_) {}
+    await _invokePrint(win);
     Timer(const Duration(minutes: 2), () {
       try {
         iframe.remove();
@@ -71,20 +81,57 @@ Future<bool> _printPdfInIframe(Uint8List pdfBytes) async {
     return true;
   } catch (_) {
     try {
+      iframe.remove();
+    } catch (_) {}
+    try {
       html.Url.revokeObjectUrl(url);
     } catch (_) {}
     return false;
   }
 }
 
-/// Opens print immediately: iOS share sheet (with Print) or browser print dialog.
-Future<bool> ngmyInvoicePrintPdfDirectImpl(Uint8List pdfBytes, String filename) async {
+Future<bool> _openPdfInNewTabAndPrint(Uint8List pdfBytes, String name) async {
+  if (pdfBytes.isEmpty) return false;
+  final blob = html.Blob([pdfBytes], 'application/pdf');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final opened = html.window.open(url, '_blank');
+  if (opened == null) {
+    html.Url.revokeObjectUrl(url);
+    return false;
+  }
+  Timer(const Duration(milliseconds: 1200), () {
+    unawaited(_invokePrint(opened));
+  });
+  Future<void>.delayed(const Duration(minutes: 5), () {
+    try {
+      html.Url.revokeObjectUrl(url);
+    } catch (_) {}
+  });
+  return true;
+}
+
+/// Opens print immediately: print dialog first when [preferPrintDialog], else share sheet (with Print) on iOS.
+Future<bool> ngmyInvoicePrintPdfDirectImpl(
+  Uint8List pdfBytes,
+  String filename, {
+  bool preferPrintDialog = false,
+}) async {
   if (pdfBytes.isEmpty) return false;
   final name = _safePdfName(filename);
 
-  if (await _sharePdf(pdfBytes, name)) return true;
+  if (preferPrintDialog) {
+    if (await _printPdfInIframe(pdfBytes)) return true;
+    if (await _openPdfInNewTabAndPrint(pdfBytes, name)) return true;
+    if (await _sharePdf(pdfBytes, name)) return true;
+    return false;
+  }
+
+  // Default: share sheet on Apple mobile (includes Print), then iframe print, then new tab.
+  if (_isAppleMobileBrowser() && await _sharePdf(pdfBytes, name)) return true;
 
   if (await _printPdfInIframe(pdfBytes)) return true;
+
+  if (await _openPdfInNewTabAndPrint(pdfBytes, name)) return true;
 
   final blob = html.Blob([pdfBytes], 'application/pdf');
   final url = html.Url.createObjectUrlFromBlob(blob);

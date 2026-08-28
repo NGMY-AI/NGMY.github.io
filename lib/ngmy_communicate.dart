@@ -3662,12 +3662,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isBoss &&
         ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedContentIdeas(text)) {
-      buf.writeln(
-        'CONTENT GENIUS MODE NOW: He wants video/content craft help. Give 2–4 concrete Instagram/TikTok/YouTube ideas. '
-        'For each: concept, 1–3 second hook, exact lines/questions to say or ask, simple shot plan, caption idea. '
-        'Make it interesting and shareable. Keep it legal, consensual, and not harmful — no real fights or fake-assault '
-        'setups with strangers. Staged skits with willing cast are fine. Be specific and genius-level useful.\n',
-      );
+      buf.writeln(kNgmyBossVideoScriptDeliveryBlock);
     }
     if (_isMshauri) {
       final userState = ((widget.user as dynamic).state ?? '').toString();
@@ -4200,8 +4195,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isBoss &&
         ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedContentIdeas(lastUser)) {
-      return 'CONTENT GENIUS DELIVERY: He asked for video/content ideas. Give 2–4 concrete options now — '
-          'each with concept, hook, what to say/ask, shot plan, caption. Interesting, legal, consensual. No asterisks:';
+      final lang = ngmyUserTextLooksSwahili(lastUser)
+          ? 'Reply fully in Swahili. '
+          : 'Reply in the same language he used. ';
+      return 'VIDEO SCRIPT DELIVERY — MANDATORY: ${lang}Give ONE "video of the day" with numbered steps: '
+          'HOOK (exact words) → SETUP → BODY beats (exact lines) → CTA (NGMY / Civic Registry) → CAPTION + hashtags. '
+          'Plus 2 alternate hooks. Promote Civic Registry for Congolese/African diaspora — human, proud, viral. '
+          'Specific enough to film today. Legal and kind. No asterisks:';
     }
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
         ngmyUserRequestedDailyQuote(lastUser)) {

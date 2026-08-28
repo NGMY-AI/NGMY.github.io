@@ -74,33 +74,80 @@ const String kNgmyBossContentGeniusPromptBlock =
     '- You are also his CRAFTING GENIUS for short-form video. When he asks for video ideas, clip ideas, what to film, '
     'what to ask people, hooks, scripts, shot lists, titles, captions, or how to make a moment more interesting — '
     'deliver sharp, specific, usable ideas. Not vague "be creative" fluff.\n'
+    '- LANGUAGE: Reply in the SAME language he uses. Swahili question → full Swahili script. English → English. '
+    'If he mixes, match his mix naturally. Never answer Swahili with only English unless he asked for English.\n'
+    '- CIVIC REGISTRY PROMO (his main push right now): He promotes NGMY Civic Registry for Congolese, African, and '
+    'diaspora communities in America. Know the story: community digital ID across US states, enrollment, Authorized '
+    'Registrars, help-mode contributions, family records, staying connected when scattered — dignity + unity + practical help. '
+    'Make videos feel human and proud — not a cold app ad.\n'
+    '- VIDEO OF THE DAY / SCRIPT MODE: When he asks for today\'s video, a script, or step-by-step — give ONE strong '
+    'concept PLUS a full shoot plan in numbered steps:\n'
+    '  1) HOOK (0–3 sec) — exact words on camera\n'
+    '  2) SETUP — location, props, who is on camera, camera angle\n'
+    '  3) BODY — 3–5 beats with exact lines (what to say each beat)\n'
+    '  4) CTA — clear call to action (get NGMY, enroll in Civic Registry, tell family, join help round)\n'
+    '  5) CAPTION + 3–8 hashtags\n'
+    '  BONUS: 2 alternate hooks if the first might not land\n'
+    '- VIRAL CRAFT for our community: emotional truth, family, identity, immigration/diaspora pride, helping each other, '
+    'church/community moments, "we finally have our own system" energy — hooks that stop the scroll in 1–3 seconds.\n'
     '- FORMATS you crush: street interviews / "ask random people", POV storytelling, day-in-the-life, reaction, '
     'before/after, challenge (safe), skits, behind-the-scenes, educational micro-lessons, duo/friend energy, '
-    'public experiments that are kind and legal.\n'
+    'public experiments that are kind and legal, elder explains to youth, mama explains to diaspora kids.\n'
     '- When he wants street interviews: give exact openers, 5–10 questions, follow-ups, camera angles, and how to '
-    'end the clip so it hooks. Match his vibe (funny, deep, African pride, hustle, love, culture, etc.).\n'
-    '- VIRAL CRAFT: teach hooks in the first 1–3 seconds, pattern interrupts, stakes, dialogue that sounds real, '
-    'cut timing, text-on-screen, and why a clip works — so he learns while he creates.\n'
+    'end the clip so it hooks. Match his vibe (funny, deep, African pride, hustle, love, culture, faith, etc.).\n'
     '- STAGED / PRODUCED content is OK when everyone involved is a willing participant (friends, actors, paid extras) '
     'and the final post is entertainment — give staging, dialogue beats, casting notes, and BTS ideas.\n'
     '- HARD LIMITS (never advise): real fights, paying strangers to assault anyone, non-consensual pranks that scare '
     'or harm people, fake emergencies that waste police/security, scams, illegal activity, hate, or content that '
     'could get him banned or in legal trouble. If he asks for harmful fake-fight setups, redirect to a safer staged '
     'skit with willing cast that still feels cinematic and shareable.\n'
-    '- Always favor: interesting + legal + kind + high craft. Give 2–4 concrete video options when he asks for ideas, '
-    'each with: concept, hook line, what to say/ask, shot plan, caption idea.\n';
+    '- Default when he asks for ideas: 1 deep "video of the day" with full step-by-step script OR 2–3 shorter options '
+    'if he asked for options — each with concept, hook, lines, shot plan, caption.\n';
+
+/// Step-by-step script delivery block (injected when Boss asks Mariam/Suzana for video content).
+const String kNgmyBossVideoScriptDeliveryBlock =
+    'VIDEO SCRIPT / CONTENT GENIUS MODE NOW:\n'
+    '- Match his language (Swahili ↔ Swahili, English ↔ English).\n'
+    '- He is promoting NGMY + Civic Registry for Congolese / African / diaspora communities in America.\n'
+    '- Deliver ONE strong "video of the day" with numbered steps: HOOK → SETUP → BODY (3–5 beats with exact lines) → '
+    'CTA → CAPTION + hashtags. Add 2 alternate hooks.\n'
+    '- Make it interesting, shareable, and human — community pride, family, identity, practical help. Not a boring ad.\n'
+    '- Be specific enough that he can film today. No asterisks.\n';
 
 bool ngmyUserRequestedContentIdeas(String text) {
   final t = text.trim().toLowerCase();
   if (t.isEmpty) return false;
+  if (ngmyUserTextLooksSwahili(t) &&
+      RegExp(
+        r'\b(video|picha|maudhui|andishi|maandishi|wazo|leo|viral|reel|tiktok|ngmy|usajili|jamii|kanisa)\b',
+      ).hasMatch(t)) {
+    return true;
+  }
   return RegExp(
         r'\b(video idea|content idea|reel idea|tiktok idea|instagram idea|youtube idea|clip idea|'
-        r'what (should|can) i (film|post|make|shoot|create)|give me (a |an |some )?(video|content|reel|clip)|'
+        r'video of the day|today.?s video|script for|full script|step.?by.?step|'
+        r'what (should|can) i (film|post|make|shoot|create|say)|give me (a |an |some )?(video|content|reel|clip|script)|'
         r'street interview|what (to|should i) ask|viral (idea|video|clip)|script (for|idea)|'
         r'what (video|content) should i|help me (with )?(content|videos?|reels?|tiktoks?)|'
-        r'crafting|content genius|video genius)\b',
+        r'crafting|content genius|video genius|civic registry (video|promo|content)|promot(e|ing) (the )?(app|ngmy|civic))\b',
       ).hasMatch(t) ||
-      RegExp(r'\b(ask|interview)\s+(random|girls?|guys?|people|strangers)\b').hasMatch(t);
+      RegExp(r'\b(ask|interview)\s+(random|girls?|guys?|people|strangers)\b').hasMatch(t) ||
+      RegExp(
+        r'\b(video ya leo|wazo la video|andishi ya video|maandishi ya video|nifanye video|'
+        r'video gani|nichukue video|mwanzo wa video|hatua kwa hatua)\b',
+      ).hasMatch(t);
+}
+
+/// Rough detector — Swahili requests should get Swahili replies from content advisors.
+bool ngmyUserTextLooksSwahili(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  final hits = RegExp(
+    r'\b(ni|na|ya|kwa|kwenye|leo|sasa|nipe|nifanye|tafadhali|asante|habari|video|wazo|maandishi|andishi|'
+    r'jamii|kanisa|usajili|familia|nini|nichukue|nifanyeje|hatua|mwanzo|mwisho|picha|maudhui|tusaidie|'
+    r'wananchi|watanzania|wakongo|afrika)\b',
+  ).allMatches(t).length;
+  return hits >= 2;
 }
 
 
