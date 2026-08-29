@@ -213,6 +213,81 @@ class NgmyCivicRegistryMembers {
     return true;
   }
 
+  /// Admin: move a deceased record back into the active civic registry (their prior state).
+  static bool restoreFromDeceased(
+    dynamic config, {
+    required String email,
+    String registryId = '',
+  }) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    Map<String, dynamic>? row = key.isNotEmpty ? findDeceasedByEmail(config, email) : null;
+    row ??= rid.isNotEmpty ? findDeceasedByRegistryId(config, rid) : null;
+    if (row == null) return false;
+
+    final snap = deceasedMemberSnapshot(row);
+    if (snap == null) return false;
+
+    final rowEmail = emailKey((row['email'] ?? '').toString());
+    final rowRid = (row['registryId'] ?? '').toString().trim().toUpperCase();
+
+    final nextDeceased = deceasedFrom(config)
+      ..removeWhere((r) {
+        final e = emailKey((r['email'] ?? '').toString());
+        final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+        if (rowEmail.isNotEmpty && e == rowEmail) return true;
+        if (rowRid.isNotEmpty && id == rowRid) return true;
+        return false;
+      });
+    setDeceased(config, nextDeceased);
+
+    final member = Map<String, dynamic>.from(snap);
+    final now = DateTime.now().toUtc().toIso8601String();
+    member['restoredAt'] = now;
+    member['updatedAt'] = now;
+    upsert(config, member);
+    return true;
+  }
+
+  /// Admin: permanently remove a deceased record from the nationwide deceased roster.
+  static bool deleteDeceasedRecord(
+    dynamic config, {
+    required String email,
+    String registryId = '',
+  }) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    Map<String, dynamic>? row = key.isNotEmpty ? findDeceasedByEmail(config, email) : null;
+    row ??= rid.isNotEmpty ? findDeceasedByRegistryId(config, rid) : null;
+    if (row == null) return false;
+
+    final snap = deceasedMemberSnapshot(row);
+    final rowEmail = emailKey((row['email'] ?? snap?['email'] ?? '').toString());
+    final rowRid = (row['registryId'] ?? snap?['registryId'] ?? '').toString().trim().toUpperCase();
+    final state = (snap?['state'] ?? row['state'] ?? '').toString();
+
+    final nextDeceased = deceasedFrom(config)
+      ..removeWhere((r) {
+        final e = emailKey((r['email'] ?? '').toString());
+        final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+        if (rowEmail.isNotEmpty && e == rowEmail) return true;
+        if (rowRid.isNotEmpty && id == rowRid) return true;
+        return false;
+      });
+    setDeceased(config, nextDeceased);
+
+    if (rowEmail.isNotEmpty || rowRid.isNotEmpty) {
+      _addTombstone(
+        config,
+        email: rowEmail,
+        registryId: rowRid,
+        state: state,
+        permanent: true,
+      );
+    }
+    return true;
+  }
+
   static void _clearTombstone(dynamic config, String email, {String registryId = ''}) {
     final key = emailKey(email);
     final rid = registryId.trim().toUpperCase();

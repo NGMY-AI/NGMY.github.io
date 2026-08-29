@@ -32155,6 +32155,134 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return membersCloudOk;
   }
 
+  Future<bool> _adminRestoreDeceasedMember(UserData member) async {
+    if (!widget.user.isAdmin) return false;
+    final name = (member.fullName ?? member.username).trim();
+    final state = member.state.trim().isNotEmpty ? member.state.trim() : 'their state';
+    final confirm = await showNgmyLightConfirm(
+      context,
+      title: 'Return to Civic Registry?',
+      message:
+          'Return $name to active members in $state? They will leave the deceased list and rejoin the civic registry.',
+      cancelLabel: 'Cancel',
+      confirmLabel: 'Return',
+      icon: Icons.replay_rounded,
+    );
+    if (confirm != true) return false;
+
+    final ok = NgmyCivicRegistryMembers.restoreFromDeceased(
+      widget.config,
+      email: member.email,
+      registryId: member.registryId ?? '',
+    );
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not restore this deceased member.')),
+        );
+      }
+      return false;
+    }
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
+    final registryId = (member.registryId ?? '').trim();
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, member.email) ??
+        (registryId.isNotEmpty ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, registryId) : null);
+    final rid = (raw?['registryId'] ?? registryId).toString().trim();
+
+    void restoreStanding(UserData u) {
+      u.isEnrolledInRegistry = true;
+      if (rid.isNotEmpty) u.registryId = rid;
+      if (raw != null) {
+        u.helps = raw['helps'] is num ? (raw['helps'] as num).toInt() : u.helps;
+        u.missed = raw['missed'] is num ? (raw['missed'] as num).toInt() : u.missed;
+        u.state = (raw['state'] ?? u.state).toString();
+      }
+    }
+
+    _setCivicEnrollmentFlagForAccount(widget.allUsers, member.email, true);
+    final accountIdx = widget.allUsers.indexWhere(
+      (u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey,
+    );
+    if (accountIdx >= 0) restoreStanding(widget.allUsers[accountIdx]);
+    if (NgmyCivicRegistryMembers.emailKey(widget.user.email) == emailKey) restoreStanding(widget.user);
+
+    final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+      await prefs.setString('all_users', jsonEncode(widget.allUsers.map((e) => e.toJson()).toList()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            membersCloudOk
+                ? '$name returned to active Civic Registry in $state.'
+                : 'Returned locally — will sync when online.',
+          ),
+          backgroundColor: membersCloudOk ? Colors.green : Colors.orange,
+        ),
+      );
+    }
+    return membersCloudOk;
+  }
+
+  Future<bool> _adminDeleteDeceasedRecord(UserData member) async {
+    if (!widget.user.isAdmin) return false;
+    final name = (member.fullName ?? member.username).trim();
+    final confirm = await showNgmyLightConfirm(
+      context,
+      title: 'Delete deceased record?',
+      message:
+          'Permanently delete $name from the deceased roster? This cannot be undone. They will not be in active members unless re-enrolled.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      icon: Icons.delete_forever_rounded,
+      destructive: true,
+    );
+    if (confirm != true) return false;
+
+    final ok = NgmyCivicRegistryMembers.deleteDeceasedRecord(
+      widget.config,
+      email: member.email,
+      registryId: member.registryId ?? '',
+    );
+    if (!ok) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not delete this deceased record.')),
+        );
+      }
+      return false;
+    }
+
+    final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    NgmyAdminLiveRefresh.notify();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (mounted) {
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            membersCloudOk
+                ? 'Deceased record for $name deleted permanently.'
+                : 'Deleted locally — will sync when online.',
+          ),
+          backgroundColor: membersCloudOk ? Colors.green : Colors.orange,
+        ),
+      );
+    }
+    return membersCloudOk;
+  }
+
   Future<bool> _removeRegistryMember(UserData member, {bool permanent = false}) async {
     final emailKey = NgmyCivicRegistryMembers.emailKey(member.email);
     final registryId = (member.registryId ?? '').trim();
@@ -36030,6 +36158,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
                           ),
                         ),
+                        if (widget.user.isAdmin) ...[
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: 'Return to Civic Registry',
+                            onPressed: () async {
+                              final ok = await _adminRestoreDeceasedMember(u);
+                              if (ok && ctx.mounted) Navigator.pop(ctx);
+                            },
+                            icon: const Icon(Icons.replay_rounded),
+                            style: IconButton.styleFrom(
+                              backgroundColor: isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7),
+                              foregroundColor: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete deceased record',
+                            onPressed: () async {
+                              final ok = await _adminDeleteDeceasedRecord(u);
+                              if (ok && ctx.mounted) Navigator.pop(ctx);
+                            },
+                            icon: const Icon(Icons.delete_forever_rounded),
+                            style: IconButton.styleFrom(
+                              backgroundColor: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2),
+                              foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         IconButton(
                           tooltip: 'Print full report',

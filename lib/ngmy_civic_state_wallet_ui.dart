@@ -953,22 +953,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 const SizedBox(height: 18),
                 _NationwideStatTile(
                   tone: tone,
-                  label: 'Registered members',
-                  value: stats.registeredMembers.toString(),
-                  icon: Icons.groups_rounded,
-                  hint: 'Active civic registry enrollments across all US states.',
-                ),
-                const SizedBox(height: 10),
-                _NationwideStatTile(
-                  tone: tone,
-                  label: 'Family members (total)',
-                  value: stats.totalFamilyMembers.toString(),
-                  icon: Icons.family_restroom_rounded,
-                  hint: 'Sum of family sizes on every enrolled member record nationwide.',
-                ),
-                const SizedBox(height: 10),
-                _NationwideStatTile(
-                  tone: tone,
                   label: 'Contributions kept',
                   value: _money(stats.contributionsKept),
                   icon: Icons.savings_rounded,
