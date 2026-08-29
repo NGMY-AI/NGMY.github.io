@@ -32717,6 +32717,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .toList();
     return buildNgmyCivicNationwideStats(
       registeredMembers: members.length,
+      totalFamilyMembers: NgmyCivicRegistryMembers.totalFamilyMembersFrom(widget.config),
       countedContributionRows: countedContribRows,
       allContributionRows: allContribRows,
       allSpendingRows: spendingRows,

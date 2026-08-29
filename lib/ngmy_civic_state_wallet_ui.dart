@@ -872,6 +872,30 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     Expanded(
                       child: _NationwideCornerStat(
                         tone: tone,
+                        label: 'Members',
+                        value: stats.registeredMembers.toString(),
+                        icon: Icons.groups_rounded,
+                        alignEnd: false,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _NationwideCornerStat(
+                        tone: tone,
+                        label: 'Family total',
+                        value: stats.totalFamilyMembers.toString(),
+                        icon: Icons.family_restroom_rounded,
+                        alignEnd: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _NationwideCornerStat(
+                        tone: tone,
                         label: 'Contributions',
                         value: stats.totalContributions.toString(),
                         icon: Icons.receipt_long_rounded,
@@ -932,6 +956,15 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   label: 'Registered members',
                   value: stats.registeredMembers.toString(),
                   icon: Icons.groups_rounded,
+                  hint: 'Active civic registry enrollments across all US states.',
+                ),
+                const SizedBox(height: 10),
+                _NationwideStatTile(
+                  tone: tone,
+                  label: 'Family members (total)',
+                  value: stats.totalFamilyMembers.toString(),
+                  icon: Icons.family_restroom_rounded,
+                  hint: 'Sum of family sizes on every enrolled member record nationwide.',
                 ),
                 const SizedBox(height: 10),
                 _NationwideStatTile(

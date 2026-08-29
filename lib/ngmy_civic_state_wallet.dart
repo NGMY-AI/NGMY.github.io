@@ -1097,6 +1097,7 @@ class NgmyCivicNationwideCampaign {
 class NgmyCivicNationwideStats {
   const NgmyCivicNationwideStats({
     required this.registeredMembers,
+    required this.totalFamilyMembers,
     required this.contributionsKept,
     required this.totalContributions,
     required this.deceasedMembers,
@@ -1105,6 +1106,9 @@ class NgmyCivicNationwideStats {
 
   /// Enrolled civic registry members across all US states (active only).
   final int registeredMembers;
+
+  /// Sum of family sizes recorded on each member (total people in all households).
+  final int totalFamilyMembers;
 
   /// Contribution-case money still held nationwide — excludes admin removals,
   /// soft-resets, deleted/pending-delete spend rows, and deceased members.
@@ -1123,6 +1127,7 @@ class NgmyCivicNationwideStats {
 /// Each contribution row should include `state`, `at`, `title`, and preferably `campaignId`.
 NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
   required int registeredMembers,
+  required int totalFamilyMembers,
   required List<Map<String, dynamic>> countedContributionRows,
   required List<Map<String, dynamic>> allContributionRows,
   required List<Map<String, dynamic>> allSpendingRows,
@@ -1207,6 +1212,7 @@ NgmyCivicNationwideStats buildNgmyCivicNationwideStats({
 
   return NgmyCivicNationwideStats(
     registeredMembers: registeredMembers,
+    totalFamilyMembers: totalFamilyMembers,
     contributionsKept: kept,
     totalContributions: countedKeys.length,
     deceasedMembers: deceasedMembers,

@@ -343,17 +343,24 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Andika ukubwa wa familia (1–99).');
       return;
     }
-    if (malesRaw.isNotEmpty && males < 0) {
-      _toast('Wanaume lazima iwe nambari (au uache wazi).');
+    if (malesRaw.isEmpty) {
+      _toast('Wanaume (M) wanahitajika — andika idadi.');
       return;
     }
-    if (femalesRaw.isNotEmpty && females < 0) {
-      _toast('Wanawake lazima iwe nambari (au uache wazi).');
+    if (femalesRaw.isEmpty) {
+      _toast('Wanawake (F) wanahitajika — andika idadi.');
       return;
     }
-    // Male/female split is optional. Only enforce the sum when both are provided.
-    if (malesRaw.isNotEmpty && femalesRaw.isNotEmpty && males + females != familyMembers) {
-      _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers), au uache wazi.');
+    if (males < 0) {
+      _toast('Wanaume lazima iwe nambari halali.');
+      return;
+    }
+    if (females < 0) {
+      _toast('Wanawake lazima iwe nambari halali.');
+      return;
+    }
+    if (males + females != familyMembers) {
+      _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
       return;
     }
     if (state.isEmpty) {
@@ -1045,7 +1052,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                         const SizedBox(height: 12),
                         _familySoftField(
                           controller: _familyMembersC,
-                          label: 'Jumla (idadi ya watu)',
+                          label: 'Jumla (idadi ya watu) *',
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Wanaume + wanawake lazima iwe sawa na jumla.',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.62),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 10),
                         Row(
@@ -1053,14 +1069,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyMalesC,
-                                label: 'Wanaume (M) — hiari',
+                                label: 'Wanaume (M) *',
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyFemalesC,
-                                label: 'Wanawake (F) — hiari',
+                                label: 'Wanawake (F) *',
                               ),
                             ),
                           ],

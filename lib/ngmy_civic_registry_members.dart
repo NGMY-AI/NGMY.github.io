@@ -97,6 +97,17 @@ class NgmyCivicRegistryMembers {
 
   static int deceasedCount(dynamic config) => deceasedFrom(config).length;
 
+  /// Sum of [familyMembers] across all active registry rows (household headcount totals).
+  static int totalFamilyMembersFrom(dynamic config) {
+    var total = 0;
+    for (final m in listFrom(config)) {
+      final raw = m['familyMembers'];
+      final n = raw is num ? raw.toInt() : int.tryParse('${raw ?? ''}') ?? 1;
+      total += n < 1 ? 1 : n;
+    }
+    return total;
+  }
+
   static bool isDeceased(dynamic config, {String email = '', String registryId = ''}) {
     final key = emailKey(email);
     final rid = registryId.trim().toUpperCase();
