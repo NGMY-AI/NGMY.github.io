@@ -868,6 +868,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _NationwideLiveCornerStat(
@@ -896,6 +897,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 ),
                 const SizedBox(height: 10),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: _NationwideLiveCornerStat(
@@ -2894,9 +2896,6 @@ class _NationwideLiveCornerStatState extends State<_NationwideLiveCornerStat>
 
   @override
   Widget build(BuildContext context) {
-    final cross = widget.alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final textAlign = widget.alignEnd ? TextAlign.right : TextAlign.left;
-
     Widget card = AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) {
@@ -2912,6 +2911,7 @@ class _NationwideLiveCornerStatState extends State<_NationwideLiveCornerStat>
             opacity: _entered ? 1 : 0,
             duration: const Duration(milliseconds: 320),
             child: Container(
+              height: 104,
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(14),
@@ -2948,66 +2948,45 @@ class _NationwideLiveCornerStatState extends State<_NationwideLiveCornerStat>
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: 8,
+                    left: widget.alignEnd ? null : 8,
+                    right: widget.alignEnd ? 8 : null,
+                    child: Transform.scale(
+                      scale: iconScale,
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: widget.accent.withValues(alpha: 0.5)),
+                        ),
+                        child: Icon(widget.icon, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                    padding: const EdgeInsets.fromLTRB(10, 38, 10, 10),
                     child: Column(
-                      crossAxisAlignment: cross,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!widget.alignEnd) ...[
-                              Transform.scale(
-                                scale: iconScale,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: widget.accent.withValues(alpha: 0.5)),
-                                  ),
-                                  child: Icon(widget.icon, size: 13, color: Colors.white),
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                            ],
-                            Flexible(
-                              child: Text(
-                                widget.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: textAlign,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.88),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ),
-                            if (widget.alignEnd) ...[
-                              const SizedBox(width: 5),
-                              Transform.scale(
-                                scale: iconScale,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: widget.accent.withValues(alpha: 0.5)),
-                                  ),
-                                  child: Icon(widget.icon, size: 13, color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ],
+                        Text(
+                          widget.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: widget.alignEnd ? TextAlign.right : TextAlign.left,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.88),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           widget.value,
-                          textAlign: textAlign,
+                          textAlign: widget.alignEnd ? TextAlign.right : TextAlign.left,
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w900,
@@ -3016,18 +2995,19 @@ class _NationwideLiveCornerStatState extends State<_NationwideLiveCornerStat>
                             letterSpacing: -0.4,
                           ),
                         ),
-                        if (widget.onTap != null) ...[
-                          const SizedBox(height: 2),
+                        const Spacer(),
+                        if (widget.onTap != null)
                           Text(
                             'Tap to view',
-                            textAlign: textAlign,
+                            textAlign: widget.alignEnd ? TextAlign.right : TextAlign.left,
                             style: TextStyle(
                               color: widget.accent.withValues(alpha: 0.95),
                               fontSize: 8,
                               fontWeight: FontWeight.w800,
                             ),
-                          ),
-                        ],
+                          )
+                        else
+                          const SizedBox(height: 12),
                       ],
                     ),
                   ),
