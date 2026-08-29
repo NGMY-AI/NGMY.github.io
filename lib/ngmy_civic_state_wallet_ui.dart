@@ -951,12 +951,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   style: TextStyle(color: tone.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 18),
-                _NationwideStatTile(
+                _NationwideContributionsKeptHero(
                   tone: tone,
-                  label: 'Contributions kept',
-                  value: _money(stats.contributionsKept),
-                  icon: Icons.savings_rounded,
-                  hint: 'US-wide money still in contribution cases. Removed, deleted, reset, and deceased-member funds are not counted.',
+                  amount: _money(stats.contributionsKept),
+                  hint:
+                      'US-wide money still in contribution cases. Removed, deleted, reset, and deceased-member funds are not counted.',
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
@@ -2956,6 +2955,206 @@ class _NationwideStatTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _NationwideContributionsKeptHero extends StatefulWidget {
+  const _NationwideContributionsKeptHero({
+    required this.tone,
+    required this.amount,
+    required this.hint,
+  });
+
+  final _WalletTone tone;
+  final String amount;
+  final String hint;
+
+  @override
+  State<_NationwideContributionsKeptHero> createState() => _NationwideContributionsKeptHeroState();
+}
+
+class _NationwideContributionsKeptHeroState extends State<_NationwideContributionsKeptHero>
+    with TickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final AnimationController _shimmer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
+      ..repeat(reverse: true);
+    _shimmer = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = widget.tone.isDark;
+    const emerald = Color(0xFF059669);
+    const deep = Color(0xFF064E3B);
+    const gold = Color(0xFFFBBF24);
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.88, end: 1),
+      duration: const Duration(milliseconds: 620),
+      curve: Curves.easeOutBack,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_pulse, _shimmer]),
+        builder: (context, _) {
+          final glow = 0.22 + (_pulse.value * 0.14);
+          final shimmerX = -1.2 + (_shimmer.value * 2.4);
+          return Container(
+            width: double.infinity,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [const Color(0xFF065F46), deep, const Color(0xFF022C22)]
+                    : [emerald, const Color(0xFF047857), deep],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: emerald.withValues(alpha: glow),
+                  blurRadius: 22 + (_pulse.value * 10),
+                  offset: const Offset(0, 10),
+                ),
+              ],
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Transform.translate(
+                    offset: Offset(shimmerX * 120, 0),
+                    child: Container(
+                      width: 90,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: 0.14),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Transform.scale(
+                            scale: 0.96 + (_pulse.value * 0.06),
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(11),
+                                border: Border.all(color: gold.withValues(alpha: 0.45)),
+                              ),
+                              child: const Icon(Icons.savings_rounded, color: Colors.white, size: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Contributions kept',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.92),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                                Text(
+                                  'Nationwide · contribution cases',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.68),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: gold.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: gold.withValues(alpha: 0.45)),
+                            ),
+                            child: const Text(
+                              'US',
+                              style: TextStyle(
+                                color: Color(0xFFFDE68A),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 9,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 780),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, t, _) => Transform.translate(
+                          offset: Offset(0, (1 - t) * 10),
+                          child: Opacity(
+                            opacity: t,
+                            child: Text(
+                              widget.amount,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 28,
+                                letterSpacing: -0.8,
+                                height: 1.05,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.hint,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.72),
+                          fontSize: 10,
+                          height: 1.35,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

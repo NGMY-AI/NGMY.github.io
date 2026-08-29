@@ -36125,6 +36125,31 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               child: child,
             );
 
+        Widget deceasedHeaderIcon({
+          required IconData icon,
+          required Color fg,
+          required Color bg,
+          required String tooltip,
+          required VoidCallback onPressed,
+        }) {
+          return Tooltip(
+            message: tooltip,
+            child: Material(
+              color: bg,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Icon(icon, size: 15, color: fg),
+                ),
+              ),
+            ),
+          );
+        }
+
         return Dialog(
           insetPadding: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -36140,54 +36165,57 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         Expanded(
                           child: Text(
                             'Deceased — Full Information',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontWeight: FontWeight.w900,
-                              fontSize: 19,
+                              fontSize: 15,
                               color: isDark ? Colors.white : const Color(0xFF0F172A),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
                             color: const Color(0xFF64748B),
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
                             'Deceased',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 9),
                           ),
                         ),
                         if (widget.user.isAdmin) ...[
                           const SizedBox(width: 4),
-                          IconButton(
+                          deceasedHeaderIcon(
                             tooltip: 'Return to Civic Registry',
+                            icon: Icons.replay_rounded,
+                            fg: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                            bg: isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7),
                             onPressed: () async {
                               final ok = await _adminRestoreDeceasedMember(u);
                               if (ok && ctx.mounted) Navigator.pop(ctx);
                             },
-                            icon: const Icon(Icons.replay_rounded),
-                            style: IconButton.styleFrom(
-                              backgroundColor: isDark ? const Color(0xFF14532D) : const Color(0xFFDCFCE7),
-                              foregroundColor: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
-                            ),
                           ),
-                          IconButton(
+                          const SizedBox(width: 4),
+                          deceasedHeaderIcon(
                             tooltip: 'Delete deceased record',
+                            icon: Icons.delete_forever_rounded,
+                            fg: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
+                            bg: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2),
                             onPressed: () async {
                               final ok = await _adminDeleteDeceasedRecord(u);
                               if (ok && ctx.mounted) Navigator.pop(ctx);
                             },
-                            icon: const Icon(Icons.delete_forever_rounded),
-                            style: IconButton.styleFrom(
-                              backgroundColor: isDark ? const Color(0xFF450A0A) : const Color(0xFFFEE2E2),
-                              foregroundColor: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
-                            ),
                           ),
                         ],
-                        const SizedBox(width: 6),
-                        IconButton(
+                        const SizedBox(width: 4),
+                        deceasedHeaderIcon(
                           tooltip: 'Print full report',
+                          icon: Icons.print_outlined,
+                          fg: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
+                          bg: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
                           onPressed: () => _copyMemberReport(
                             u,
                             contributions: contributions,
@@ -36195,20 +36223,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             contributionTotal: contributionTotal,
                             openClaims: openClaims,
                           ),
-                          icon: const Icon(Icons.print_outlined),
-                          style: IconButton.styleFrom(
-                            backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
-                            foregroundColor: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
-                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'View only · transferred from United States Civic Registry',
+                      'View only · United States Civic Registry',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: isDark ? Colors.white60 : Colors.black54,
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
