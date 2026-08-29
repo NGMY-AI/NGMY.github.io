@@ -870,22 +870,26 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 Row(
                   children: [
                     Expanded(
-                      child: _NationwideCornerStat(
-                        tone: tone,
+                      child: _NationwideLiveCornerStat(
                         label: 'Members',
                         value: stats.registeredMembers.toString(),
                         icon: Icons.groups_rounded,
                         alignEnd: false,
+                        gradient: const [Color(0xFF2563EB), Color(0xFF1D4ED8), Color(0xFF1E3A8A)],
+                        accent: const Color(0xFF93C5FD),
+                        enterDelay: Duration.zero,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _NationwideCornerStat(
-                        tone: tone,
+                      child: _NationwideLiveCornerStat(
                         label: 'Family total',
                         value: stats.totalFamilyMembers.toString(),
                         icon: Icons.family_restroom_rounded,
                         alignEnd: true,
+                        gradient: const [Color(0xFF7C3AED), Color(0xFF6D28D9), Color(0xFF5B21B6)],
+                        accent: const Color(0xFFC4B5FD),
+                        enterDelay: const Duration(milliseconds: 80),
                       ),
                     ),
                   ],
@@ -894,12 +898,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 Row(
                   children: [
                     Expanded(
-                      child: _NationwideCornerStat(
-                        tone: tone,
+                      child: _NationwideLiveCornerStat(
                         label: 'Contributions',
                         value: stats.totalContributions.toString(),
                         icon: Icons.receipt_long_rounded,
                         alignEnd: false,
+                        gradient: const [Color(0xFF0891B2), Color(0xFF0E7490), Color(0xFF155E75)],
+                        accent: const Color(0xFF67E8F9),
+                        enterDelay: const Duration(milliseconds: 160),
                         onTap: () async {
                           Navigator.pop(ctx);
                           await _showNationwideContributionsDialog(stats);
@@ -908,12 +914,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _NationwideCornerStat(
-                        tone: tone,
+                      child: _NationwideLiveCornerStat(
                         label: 'Deceased',
                         value: stats.deceasedMembers.toString(),
                         icon: Icons.person_off_rounded,
                         alignEnd: true,
+                        gradient: const [Color(0xFF64748B), Color(0xFF475569), Color(0xFF334155)],
+                        accent: const Color(0xFFCBD5E1),
+                        enterDelay: const Duration(milliseconds: 240),
                         onTap: widget.onOpenNationwideDeceased == null
                             ? null
                             : () async {
@@ -2838,124 +2846,203 @@ class _BudgetStat extends StatelessWidget {
   }
 }
 
-class _NationwideCornerStat extends StatelessWidget {
-  const _NationwideCornerStat({
-    required this.tone,
+class _NationwideLiveCornerStat extends StatefulWidget {
+  const _NationwideLiveCornerStat({
     required this.label,
     required this.value,
     required this.icon,
     required this.alignEnd,
+    required this.gradient,
+    required this.accent,
     this.onTap,
+    this.enterDelay = Duration.zero,
   });
 
-  final _WalletTone tone;
   final String label;
   final String value;
   final IconData icon;
   final bool alignEnd;
+  final List<Color> gradient;
+  final Color accent;
   final VoidCallback? onTap;
+  final Duration enterDelay;
 
   @override
-  Widget build(BuildContext context) {
-    final body = Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: tone.fieldFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: tone.fieldBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!alignEnd) Icon(icon, size: 14, color: tone.secondaryText),
-              if (!alignEnd) const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: tone.secondaryText, fontSize: 10, fontWeight: FontWeight.w700),
-                ),
-              ),
-              if (alignEnd) const SizedBox(width: 4),
-              if (alignEnd) Icon(icon, size: 14, color: tone.secondaryText),
-            ],
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18, height: 1.05),
-          ),
-          if (onTap != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              'Tap to view all',
-              style: TextStyle(color: tone.accent, fontSize: 9, fontWeight: FontWeight.w700),
-            ),
-          ],
-        ],
-      ),
-    );
-    if (onTap == null) return body;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: body),
-    );
-  }
+  State<_NationwideLiveCornerStat> createState() => _NationwideLiveCornerStatState();
 }
 
-class _NationwideStatTile extends StatelessWidget {
-  const _NationwideStatTile({
-    required this.tone,
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.hint,
-  });
+class _NationwideLiveCornerStatState extends State<_NationwideLiveCornerStat>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+  var _entered = false;
 
-  final _WalletTone tone;
-  final String label;
-  final String value;
-  final IconData icon;
-  final String? hint;
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200))
+      ..repeat(reverse: true);
+    Future<void>.delayed(widget.enterDelay, () {
+      if (mounted) setState(() => _entered = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: tone.fieldFill,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: tone.fieldBorder),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: tone.accent),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(color: tone.secondaryText, fontSize: 11, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 22, height: 1.05),
+    final cross = widget.alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final textAlign = widget.alignEnd ? TextAlign.right : TextAlign.left;
+
+    Widget card = AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, _) {
+        final glow = 0.18 + (_pulse.value * 0.12);
+        final iconScale = 0.94 + (_pulse.value * 0.06);
+        final shimmerX = -1.0 + ((_pulse.value + (widget.enterDelay.inMilliseconds / 3000)) % 1.0) * 2.2;
+
+        return AnimatedScale(
+          scale: _entered ? 1 : 0.9,
+          duration: const Duration(milliseconds: 420),
+          curve: Curves.easeOutBack,
+          child: AnimatedOpacity(
+            opacity: _entered ? 1 : 0,
+            duration: const Duration(milliseconds: 320),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: LinearGradient(
+                  begin: widget.alignEnd ? Alignment.topRight : Alignment.topLeft,
+                  end: widget.alignEnd ? Alignment.bottomLeft : Alignment.bottomRight,
+                  colors: widget.gradient,
                 ),
-                if (hint != null && hint!.trim().isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(hint!, style: TextStyle(color: tone.secondaryText, fontSize: 10, height: 1.35)),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.gradient.first.withValues(alpha: glow),
+                    blurRadius: 14 + (_pulse.value * 8),
+                    offset: const Offset(0, 6),
+                  ),
                 ],
-              ],
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Transform.translate(
+                      offset: Offset(shimmerX * 48, 0),
+                      child: Container(
+                        width: 36,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.transparent,
+                              Colors.white.withValues(alpha: 0.12),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+                    child: Column(
+                      crossAxisAlignment: cross,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!widget.alignEnd) ...[
+                              Transform.scale(
+                                scale: iconScale,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: widget.accent.withValues(alpha: 0.5)),
+                                  ),
+                                  child: Icon(widget.icon, size: 13, color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            Flexible(
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: textAlign,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.88),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                            if (widget.alignEnd) ...[
+                              const SizedBox(width: 5),
+                              Transform.scale(
+                                scale: iconScale,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: widget.accent.withValues(alpha: 0.5)),
+                                  ),
+                                  child: Icon(widget.icon, size: 13, color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.value,
+                          textAlign: textAlign,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 20,
+                            height: 1.05,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        if (widget.onTap != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Tap to view',
+                            textAlign: textAlign,
+                            style: TextStyle(
+                              color: widget.accent.withValues(alpha: 0.95),
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ],
-      ),
+        );
+      },
+    );
+
+    if (widget.onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: widget.onTap, borderRadius: BorderRadius.circular(14), child: card),
     );
   }
 }
