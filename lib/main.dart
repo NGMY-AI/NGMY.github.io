@@ -6666,6 +6666,43 @@ String _storeListingsSignature(List<Map<String, dynamic>> listings) {
   return parts.join(';;');
 }
 
+Map<String, dynamic> _storeListingPublicOnly(Map<String, dynamic> listing) {
+  final copy = Map<String, dynamic>.from(listing);
+  for (final k in [
+    'sellerEmail',
+    'sellerPhone',
+    'sellerName',
+    'location',
+    'sellerAddress',
+    'sellerZelleInfo',
+    'sellerCashAppTag',
+  ]) {
+    copy.remove(k);
+  }
+  return copy;
+}
+
+Map<String, dynamic> _mergeStoreListingPreservingLocalPii(
+  Map<String, dynamic> local,
+  Map<String, dynamic> remote,
+) {
+  final picked = _pickNewerListing(local, remote);
+  for (final f in [
+    'sellerEmail',
+    'sellerPhone',
+    'sellerName',
+    'location',
+    'sellerAddress',
+    'sellerZelleInfo',
+    'sellerCashAppTag',
+  ]) {
+    final pv = (picked[f] ?? '').toString().trim();
+    final lv = (local[f] ?? '').toString().trim();
+    if (pv.isEmpty && lv.isNotEmpty) picked[f] = local[f];
+  }
+  return picked;
+}
+
 Map<String, dynamic> _storeListingFromRow(Map<String, dynamic> row) {
   final data = row['data'];
   if (data is Map) return _normalizeStoreListing(Map<String, dynamic>.from(data));
@@ -6787,13 +6824,21 @@ Future<List<Map<String, dynamic>>> _fetchStoreListingsFromSupabase() async {
   Object? lastError;
   for (var attempt = 0; attempt < 3; attempt++) {
     try {
-      final rows = await Supabase.instance.client
-          .from('store_listings')
-          .select()
-          .order('updated_at', ascending: false);
+      dynamic rows;
+      try {
+        rows = await Supabase.instance.client
+            .from('store_listings_public')
+            .select()
+            .order('updated_at', ascending: false);
+      } catch (_) {
+        rows = await Supabase.instance.client
+            .from('store_listings')
+            .select()
+            .order('updated_at', ascending: false);
+      }
       if (rows is! List) return [];
       return rows
-          .map((e) => _storeListingFromRow(Map<String, dynamic>.from(e)))
+          .map((e) => _storeListingPublicOnly(_storeListingFromRow(Map<String, dynamic>.from(e))))
           .where((l) {
             final id = (l['id'] ?? '').toString();
             return id.isNotEmpty && !_isNgmySystemStoreListingId(id);
@@ -6815,7 +6860,12 @@ Future<List<Map<String, dynamic>>> _fetchStoreListingsFromSupabase() async {
 
 Future<List<Map<String, dynamic>>> _fetchStoreInquiriesFromSupabase() async {
   try {
-    final rows = await Supabase.instance.client.from('store_inquiries').select();
+    dynamic rows;
+    try {
+      rows = await Supabase.instance.client.from('store_inquiries_public').select();
+    } catch (_) {
+      rows = await Supabase.instance.client.from('store_inquiries').select();
+    }
     if (rows is! List) return [];
     return rows.map((e) => _storeInquiryFromRow(Map<String, dynamic>.from(e))).where((m) => (m['id'] ?? '').toString().isNotEmpty).toList();
   } catch (e) {
@@ -10352,7 +10402,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (id.isEmpty || _isNgmySystemStoreListingId(id)) continue;
       final existing = byId[id];
       final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
-      byId[id] = existing == null ? local : _pickNewerListing(existing, local);
+      byId[id] = existing == null ? local : _mergeStoreListingPreservingLocalPii(local, existing);
     }
     _config.storeListings = byId.values.toList();
   }

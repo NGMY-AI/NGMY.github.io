@@ -7,6 +7,7 @@ Future<Map<String, dynamic>?> ngmyPrivateListsFetch({required String email}) asy
     'email': email.trim().toLowerCase(),
   });
   if (data == null || data['ok'] != true) return null;
+  if (data['networkEmpty'] == true) return {'ok': true, 'networkEmpty': true};
   return data;
 }
 
@@ -56,6 +57,7 @@ Future<List<Map<String, dynamic>>> ngmyAdminUsersListFetch({required String emai
     'email': email.trim().toLowerCase(),
   });
   if (data == null || data['ok'] != true) return const [];
+  if (data['networkEmpty'] == true) return const [];
   final users = data['users'];
   if (users is! List) return const [];
   return users.map((e) => Map<String, dynamic>.from(e as Map)).toList();

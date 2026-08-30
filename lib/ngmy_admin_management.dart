@@ -276,7 +276,7 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
           NgmyFeatureSyncSession.adminDashboardActive || NgmyFeatureSyncSession.loansActive;
       if (!isAdmin || allowAdminBulkFetch) {
         final data = await ngmyPrivateListsFetch(email: email);
-        if (data != null) {
+        if (data != null && data['networkEmpty'] != true) {
           final mgmt = data['management'];
           if (mgmt is Map) {
             _applyManagementOperationalListsPayload(config, Map<String, dynamic>.from(mgmt));
@@ -1960,7 +1960,7 @@ Future<void> ngmyHydratePrivilegedCivicSettingsFromEdge(AppConfig config, {UserD
     return;
   }
   final data = await ngmyCivicAdminSettingsFetch(email: email);
-  if (data == null || data['ok'] != true) return;
+  if (data == null || data['ok'] != true || data['networkEmpty'] == true) return;
 
   final deleted = data['civicDeletedContributionIds'];
   if (deleted is List) {

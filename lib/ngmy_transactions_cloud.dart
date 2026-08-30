@@ -13,6 +13,7 @@ Future<List<Map<String, dynamic>>> ngmyTransactionsFetch({
     if (pendingWallet) 'pendingWallet': true,
   });
   if (data == null || data['ok'] != true) return const [];
+  if (data['networkEmpty'] == true) return const [];
   final rows = data['transactions'];
   if (rows is! List) return const [];
   return rows

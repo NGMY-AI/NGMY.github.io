@@ -917,11 +917,18 @@ function redactTransaction(
   row: Record<string, unknown>,
   _viewer: string,
 ): Record<string, unknown> {
-  const out = { ...row };
-  if (typeof row.userEmail === "string" && row.userEmail.trim()) {
-    out.userEmail = maskEmailNetwork(String(row.userEmail));
-  }
-  return out;
+  return {
+    id: row.id,
+    status: row.status,
+    type: row.type,
+    amount: row.amount,
+    timestamp: row.timestamp,
+  };
+}
+
+/** Fetch handlers return no PII — only ack + counts; app uses local cache for display. */
+function networkFetchOk(extras: Record<string, unknown> = {}): Response {
+  return jsonOk({ ok: true, networkEmpty: true, ...extras });
 }
 
 function redactEmailKeyedMap(
@@ -1205,33 +1212,25 @@ async function handleCivicFetchRegistrarApplications(
   ];
 
   if (role.isAdmin) {
-    return jsonOk({
-      ok: true,
-      view: "admin",
-      applications: apps.map(registrarAppNetworkSummary),
-      approvedStates,
-    });
+    return networkFetchOk({ view: "admin", approvedStates });
   }
 
-  // Registrar / king reviewers: status-only for all states in Network (no PII).
+  // Registrar / king reviewers: status-only in Network (no PII).
   if (role.isRegistrar && role.registrarState) {
     const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
-    return jsonOk({
-      ok: true,
+    return networkFetchOk({
       view: "registrar",
-      applications: apps.map(registrarAppNetworkSummary),
-      myApplications: mine.map(sanitizeRegistrarAppOwn),
       approvedStates,
+      myApplicationCount: mine.length,
     });
   }
 
-  // Normal member: only own application(s) + which states have an AR (no PII)
+  // Normal member: status-only in Network.
   const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
-  return jsonOk({
-    ok: true,
+  return networkFetchOk({
     view: "member",
-    applications: mine.map(sanitizeRegistrarAppOwn),
     approvedStates,
+    myApplicationCount: mine.length,
   });
 }
 
@@ -1593,99 +1592,22 @@ async function handleCivicFetchRoster(
   const allDeceased = asMemberList(payload.deceased);
 
   if (role.isAdmin) {
-    return jsonOk({
-      ok: true,
-      view: "admin",
-      members: redactList(allMembers, email),
-      removed: redactList(allRemoved, email),
-      deceased: redactList(allDeceased, email),
-      savedAt: payload.savedAt ?? null,
-    });
+    return networkFetchOk({ view: "admin" });
   }
 
   if (role.isRegistrar && role.registrarState) {
-    const st = role.registrarState;
-    // Full PII only for home state; other states get directory if PIN unlocked
-    const homeMembers = filterMembersByState(allMembers, st);
-    const homeRemoved = filterMembersByState(allRemoved, st);
-    const homeDeceased = allDeceased.filter((d) => {
-      const snap = d.snapshot && typeof d.snapshot === "object"
-        ? (d.snapshot as Record<string, unknown>)
-        : d;
-      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(st);
-    });
-
-    let extraDir: Record<string, unknown>[] = [];
-    let extraDec: Record<string, unknown>[] = [];
-    if (state && stateKey(state) !== stateKey(st) && pinSig) {
-      const pins = await loadRegistryPins(admin);
-      const expected = effectivePinForState(pins, state);
-      if (expected && (await pinSigFor(state, expected)) === pinSig) {
-        extraDir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
-        extraDec = allDeceased
-          .filter((d) => {
-            const snap = d.snapshot && typeof d.snapshot === "object"
-              ? (d.snapshot as Record<string, unknown>)
-              : d;
-            return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
-          })
-          .map(sanitizeDirectoryDeceased);
-      }
-    }
-
-    const members = [
-      ...homeMembers,
-      ...extraDir.filter(
-        (m) =>
-          !homeMembers.some(
-            (h) => emailKey(String(h.email ?? "")) === emailKey(String(m.email ?? "")),
-          ),
-      ),
-    ];
-    return jsonOk({
-      ok: true,
-      view: "registrar",
-      registrarState: st,
-      members,
-      removed: homeRemoved,
-      deceased: [...homeDeceased, ...extraDec],
-      savedAt: payload.savedAt ?? null,
-    });
+    return networkFetchOk({ view: "registrar", registrarState: role.registrarState });
   }
 
-  // Normal member: requires state + valid pinSig; directory only
   if (!state || !pinSig) {
-    return jsonOk({
-      ok: true,
-      view: "member",
-      members: [],
-      removed: [],
-      deceased: [],
-      needsUnlock: true,
-    });
+    return networkFetchOk({ view: "member", needsUnlock: true });
   }
   const pins = await loadRegistryPins(admin);
   const expected = effectivePinForState(pins, state);
   if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
     return jsonOk({ error: "State unlock required", ok: false }, 403);
   }
-  const dir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
-  const dec = allDeceased
-    .filter((d) => {
-      const snap = d.snapshot && typeof d.snapshot === "object"
-        ? (d.snapshot as Record<string, unknown>)
-        : d;
-      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
-    })
-    .map(sanitizeDirectoryDeceased);
-  return jsonOk({
-    ok: true,
-    view: "member",
-    members: dir,
-    removed: [],
-    deceased: dec,
-    savedAt: payload.savedAt ?? null,
-  });
+  return networkFetchOk({ view: "member", state });
 }
 
 async function handleCivicPersistRoster(
@@ -2054,18 +1976,7 @@ async function handlePrivateListsFetch(
   ] as const;
 
   if (role.isAdmin) {
-    const familyRaw = familyWrap.byEmail ?? familyWrap;
-    return jsonOk({
-      ok: true,
-      view: "admin",
-      management: managementNetworkPayload(mgmt),
-      gameInvites: asItems(invitesWrap).map((r) => maskEmailFieldsNetwork(r)),
-      storeInquiries: asItems(inquiriesWrap).map((r) => maskEmailFieldsNetwork(r)),
-      storeOrders: asItems(ordersWrap).map((r) => maskEmailFieldsNetwork(r)),
-      mediaVirtualProfiles: asItems(mediaWrap),
-      familyTreePhotoAccessUntilByEmail: redactEmailKeyedMap(familyRaw, email),
-      helpCampaignSpendings: asItems(spendingsWrap).map((r) => maskEmailFieldsNetwork(r)),
-    });
+    return networkFetchOk({ view: "admin" });
   }
 
   const filteredMgmt: Record<string, unknown> = { ...mgmt };
@@ -2091,19 +2002,8 @@ async function handlePrivateListsFetch(
     }
   }
 
-  return jsonOk({
-    ok: true,
+  return networkFetchOk({
     view: role.isRegistrar ? "registrar" : "member",
-    management: filteredMgmt,
-    gameInvites: filterListForEmail(asItems(invitesWrap), email),
-    storeInquiries: filterListForEmail(asItems(inquiriesWrap), email),
-    storeOrders: filterListForEmail(asItems(ordersWrap), email),
-    mediaVirtualProfiles: asItems(mediaWrap),
-    familyTreePhotoAccessUntilByEmail: ownFamily,
-    // Spendings (emails/names) — registrars + admins only; mask other members in Network.
-    helpCampaignSpendings: role.isRegistrar
-      ? redactList(asItems(spendingsWrap), email)
-      : [],
   });
 }
 
@@ -2239,42 +2139,8 @@ async function handleCivicFetchCitiesRooms(
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
-  const wrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
-  const fullByState = (wrap.civicCitiesByState && typeof wrap.civicCitiesByState === "object")
-    ? (wrap.civicCitiesByState as Record<string, unknown>)
-    : {};
-  const fullCities = Array.isArray(wrap.cities) ? wrap.cities : [];
-  const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
-
-  if (role.isAdmin || role.isRegistrar) {
-    return jsonOk({
-      ok: true,
-      civicCitiesByState: fullByState,
-      cities: fullCities,
-      rooms: fullRooms,
-    });
-  }
-
-  // Members: only their enrolled/anchor state slice (no full US map in Network).
-  let userState = "";
-  try {
-    const { data: userRow } = await admin.from("users").select("state").eq("email", email).maybeSingle();
-    userState = String(userRow?.state ?? "").trim();
-  } catch (_) {
-    // ignore
-  }
-  const sk = stateKey(userState);
-  const slice: Record<string, unknown> = {};
-  if (sk) {
-    for (const [k, v] of Object.entries(fullByState)) {
-      if (stateKey(k) === sk) slice[k] = v;
-    }
-  }
-  return jsonOk({
-    ok: true,
-    civicCitiesByState: slice,
-    cities: fullCities,
-    rooms: fullRooms,
+  return networkFetchOk({
+    view: role.isAdmin ? "admin" : (role.isRegistrar ? "registrar" : "member"),
   });
 }
 
@@ -2291,34 +2157,7 @@ async function handleCivicAdminSettingsFetch(
     return jsonOk({ error: "Not allowed" }, 403);
   }
 
-  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
-  const receiptRemoved = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
-  const helpMode = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
-  const sellAccess = await loadSettingsObject(admin, STORE_SELL_ACCESS_KEY);
-  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
-
-  const sellRaw = sellAccess.emails ?? sellAccess.items ?? [];
-  const sellList = Array.isArray(sellRaw) ? sellRaw : [];
-
-  const out: Record<string, unknown> = {
-    ok: true,
-    civicDeletedContributionIds: deleted.ids ?? deleted.keys ?? [],
-    civicContributionReceiptRemoved: receiptRemoved,
-    civicHelpModeSettings: helpMode,
-    storeSellAccessEmails: sellList.map((e) =>
-      typeof e === "string" ? maskEmailNetwork(String(e)) : e,
-    ),
-    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
-    cities: citiesWrap.cities ?? [],
-    rooms: citiesWrap.rooms ?? [],
-  };
-
-  if (!role.isAdmin) {
-    // Registrars: help + civic ops only (no store sell grant list).
-    delete out.storeSellAccessEmails;
-  }
-
-  return jsonOk(out);
+  return networkFetchOk({ view: role.isAdmin ? "admin" : "registrar" });
 }
 
 async function handleCivicAdminSettingsPersist(
@@ -2414,10 +2253,8 @@ async function handleTransactionsFetch(
 
   const { data, error } = await query;
   if (error) return jsonOk({ error: error.message }, 500);
-  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) =>
-    redactTransaction(r, email)
-  );
-  return jsonOk({ ok: true, transactions: rows, count: rows.length });
+  const count = ((data ?? []) as unknown[]).length;
+  return networkFetchOk({ count, pendingWallet: pendingWallet || undefined });
 }
 
 async function handleAdminUsersList(
@@ -2453,11 +2290,7 @@ async function handleAdminUsersList(
     return jsonOk({ error: String(e) }, 500);
   }
 
-  return jsonOk({
-    ok: true,
-    users: rows.map((r) => userRowNetworkSummary(r)),
-    count: rows.length,
-  });
+  return networkFetchOk({ count: rows.length });
 }
 
 serve(async (req) => {

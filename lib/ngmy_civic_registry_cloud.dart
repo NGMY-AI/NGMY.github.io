@@ -254,6 +254,7 @@ Future<List<Map<String, dynamic>>> ngmyCivicFetchRegistrarApplications({
     'email': email.trim().toLowerCase(),
   });
   if (data == null || data['ok'] != true) return const [];
+  if (data['networkEmpty'] == true) return const [];
   final raw = data['applications'];
   if (raw is! List) return const [];
   return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
