@@ -28,6 +28,7 @@ create policy "ngmy_settings_select_nonsensitive"
   using (
     key is distinct from 'civic_registry_members'
     and key is distinct from 'civic_state_registrar_subscriptions'
+    and key is distinct from 'civic_registry_pins'
   );
 
 create policy "ngmy_settings_insert_nonsensitive"
@@ -36,6 +37,7 @@ create policy "ngmy_settings_insert_nonsensitive"
   with check (
     key is distinct from 'civic_registry_members'
     and key is distinct from 'civic_state_registrar_subscriptions'
+    and key is distinct from 'civic_registry_pins'
   );
 
 create policy "ngmy_settings_update_nonsensitive"
@@ -44,10 +46,12 @@ create policy "ngmy_settings_update_nonsensitive"
   using (
     key is distinct from 'civic_registry_members'
     and key is distinct from 'civic_state_registrar_subscriptions'
+    and key is distinct from 'civic_registry_pins'
   )
   with check (
     key is distinct from 'civic_registry_members'
     and key is distinct from 'civic_state_registrar_subscriptions'
+    and key is distinct from 'civic_registry_pins'
   );
 
 create policy "ngmy_settings_delete_nonsensitive"
@@ -56,6 +60,7 @@ create policy "ngmy_settings_delete_nonsensitive"
   using (
     key is distinct from 'civic_registry_members'
     and key is distinct from 'civic_state_registrar_subscriptions'
+    and key is distinct from 'civic_registry_pins'
   );
 
 -- Clear any duplicate full roster copied onto public.config (if column exists)

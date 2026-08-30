@@ -670,6 +670,7 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
 // ─── Civic Registry (role-filtered; service role only touches the blob) ───
 
 const CIVIC_MEMBERS_KEY = "civic_registry_members";
+const CIVIC_PINS_KEY = "civic_registry_pins";
 
 type CivicRole = {
   email: string;
@@ -848,6 +849,33 @@ async function resolveCivicRole(
 async function loadRegistryPins(
   admin: NonNullable<ReturnType<typeof adminClient>>,
 ): Promise<{ global: string; byState: Record<string, string> }> {
+  // Prefer locked ngmy_settings row (not readable by anon after pin lock SQL).
+  try {
+    const { data: settingsRow } = await admin
+      .from("ngmy_settings")
+      .select("value")
+      .eq("key", CIVIC_PINS_KEY)
+      .maybeSingle();
+    const value = settingsRow?.value;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const v = value as Record<string, unknown>;
+      const global = String(v.global ?? "").trim();
+      const byState: Record<string, string> = {};
+      const raw = v.byState;
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+        for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
+          const pin = String(val ?? "").trim();
+          if (k.trim() && pin) byState[k.trim()] = pin;
+        }
+      }
+      if (global || Object.keys(byState).length > 0) {
+        return { global, byState };
+      }
+    }
+  } catch (_) {
+    // fall through to legacy config
+  }
+
   const { data } = await admin
     .from("config")
     .select("civicRegistryPin,civicRegistryPinsByState")
@@ -863,6 +891,34 @@ async function loadRegistryPins(
     }
   }
   return { global, byState };
+}
+
+async function saveRegistryPins(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  pins: { global: string; byState: Record<string, string> },
+): Promise<{ ok: boolean; error?: string }> {
+  const payload = {
+    global: pins.global,
+    byState: pins.byState,
+    savedAt: new Date().toISOString(),
+  };
+  const { error: settingsErr } = await admin.from("ngmy_settings").upsert(
+    {
+      key: CIVIC_PINS_KEY,
+      value: payload,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (settingsErr) return { ok: false, error: settingsErr.message };
+
+  // Keep config columns empty so public selects cannot leak PINs.
+  await admin.from("config").upsert({
+    id: "1",
+    civicRegistryPin: "",
+    civicRegistryPinsByState: {},
+  });
+  return { ok: true };
 }
 
 function effectivePinForState(
@@ -1443,12 +1499,11 @@ async function handleCivicSaveRegistryPins(
     nextByState[home] = pin;
   }
 
-  const { error } = await admin.from("config").upsert({
-    id: "1",
-    civicRegistryPin: nextGlobal,
-    civicRegistryPinsByState: nextByState,
+  const saved = await saveRegistryPins(admin, {
+    global: nextGlobal,
+    byState: nextByState,
   });
-  if (error) return jsonOk({ error: error.message }, 500);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
   return jsonOk({
     ok: true,
     global: role.isAdmin ? nextGlobal : "",
