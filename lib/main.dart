@@ -6699,6 +6699,10 @@ Map<String, dynamic> _mergeStoreListingPreservingLocalPii(
     'sellerAddress',
     'sellerZelleInfo',
     'sellerCashAppTag',
+    'locationHistory',
+    'buyerAddress',
+    'buyerPhone',
+    'buyerEmail',
   ]) {
     final pv = (picked[f] ?? '').toString().trim();
     final lv = (local[f] ?? '').toString().trim();
