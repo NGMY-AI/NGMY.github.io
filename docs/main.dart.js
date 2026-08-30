@@ -44217,7 +44217,7 @@ EA(a){var s=A.S(a).j("D<1,p>"),r=A.w(new A.D(a,new A.dRE(),s),s.j("a7.E"))
 B.f.fD(r)
 return B.f.b6(r,";;")},
 f3t(a){var s,r,q=A.Q(a,t.N,t.z)
-for(s=["sellerEmail","sellerPhone","sellerName","location","sellerAddress","sellerZelleInfo","sellerCashAppTag"],r=0;r<7;++r)q.S(0,s[r])
+for(s=["sellerEmail","sellerPhone","sellerName","location","sellerAddress","sellerZelleInfo","sellerCashAppTag","locationHistory","buyerAddress","buyerPhone","buyerEmail"],r=0;r<11;++r)q.S(0,s[r])
 return q},
 f00(a,b){var s,r,q,p,o,n,m=A.ewt(a,b)
 for(s=["sellerEmail","sellerPhone","sellerName","location","sellerAddress","sellerZelleInfo","sellerCashAppTag"],r=0;r<7;++r){q=s[r]
