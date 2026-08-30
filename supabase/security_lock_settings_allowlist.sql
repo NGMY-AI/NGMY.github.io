@@ -64,17 +64,6 @@ declare
   rooms jsonb := '[]'::jsonb;
   built jsonb;
 begin
-  foreach real_col in array array['civicCitiesByState', 'cities', 'rooms'] loop
-    begin
-      execute format(
-        'select coalesce(%I::jsonb, null) from public.config where id::text = ''1'' limit 1',
-        real_col
-      ) into null;
-    exception when others then
-      null;
-    end;
-  end loop;
-
   select c.column_name into real_col
   from information_schema.columns c
   where c.table_schema = 'public' and c.table_name = 'config'
