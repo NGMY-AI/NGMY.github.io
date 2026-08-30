@@ -140,6 +140,7 @@ import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_private_lists_cloud.dart';
+import 'ngmy_transactions_cloud.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
@@ -8290,30 +8291,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 10000}) async {
-    final transData = await supabase
-        .from('transactions')
-        .select()
-        .order('timestamp', ascending: false)
-        .limit(limit)
-        .timeout(kNgmyCloudLoadTimeout);
-    if (transData == null) return const [];
-    return (transData as List).map((e) => AppTransaction.fromJson(e)).toList();
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty || !ngmyEmailIsAdmin(email)) return const [];
+    try {
+      final rows = await ngmyTransactionsFetch(email: email, limit: limit);
+      return rows.map((e) => AppTransaction.fromJson(e)).toList();
+    } catch (e) {
+      debugPrint('[admin] transactions Edge fetch: $e');
+      return const [];
+    }
   }
 
   /// Pending deposits/withdrawals only — not capped by the general 10k history window.
   Future<List<AppTransaction>> _fetchAdminPendingWalletFromCloud({int limit = 500}) async {
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty || !ngmyEmailIsAdmin(email)) return const [];
     try {
-      final rows = await supabase
-          .from('transactions')
-          .select()
-          .eq('status', TransactionStatus.pending.index)
-          .inFilter('type', [TransactionType.deposit.index, TransactionType.withdrawal.index])
-          .order('timestamp', ascending: false)
-          .limit(limit)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (rows == null) return const [];
-      return (rows as List)
-          .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+      final rows = await ngmyTransactionsFetch(
+        email: email,
+        limit: limit,
+        pendingWallet: true,
+      );
+      return rows
+          .map((e) => AppTransaction.fromJson(e))
           .where((t) => t.status == TransactionStatus.pending && ngmyIsWalletDepositOrWithdraw(t))
           .toList();
     } catch (e) {
@@ -12629,10 +12629,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
 
         final List<AppTransaction> remoteTransactions;
-        if (NgmyCloudPolicy.persistTransactionsToCloud &&
-            (bootstrapAdmin || sessionEmail.isNotEmpty)) {
+        if (NgmyCloudPolicy.persistTransactionsToCloud && sessionEmail.isNotEmpty) {
           if (bootstrapAdmin) {
-            remoteTransactions = await _fetchAdminTransactionsFromCloud(limit: 10000);
+            // Admin wallet history loads only from Admin Dashboard / Growth Income — not at startup.
+            remoteTransactions = const [];
           } else {
             remoteTransactions = await _fetchCloudTransactionsForEmail(sessionEmail);
           }
@@ -12648,31 +12648,16 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               remoteTransactions,
               dirtyTransactionIds: _dirtyTransactionIds,
             );
-          } else {
+          } else if (remoteTransactions.isNotEmpty) {
             _allTransactions = _mergeTransactionsWithRemote(
               _allTransactions,
               remoteTransactions,
               walletDecisionLedger: _walletDecisionLedger,
             );
           }
-          if (bootstrapAdmin) {
-            await _flushLocalWalletDecisionsToCloud();
-            final again = await _fetchAdminTransactionsFromCloud(limit: 10000);
-            if (again.isNotEmpty) {
-              _allTransactions = _mergeTransactionsWithRemote(
-                _allTransactions,
-                again,
-                walletDecisionLedger: _walletDecisionLedger,
-              );
-            }
-            _applyWalletDecisionLedgerToTransactions();
-            _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
-            _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
-          } else {
-            _applyWalletDecisionLedgerToTransactions();
-          }
+          _applyWalletDecisionLedgerToTransactions();
         } else {
-          debugPrint('[admin] bootstrap transactions empty — keeping local wallet list');
+          debugPrint('[admin] bootstrap transactions skipped — keeping local wallet list');
           _applyWalletDecisionLedgerToTransactions();
         }
         _reconcileAllUserBalances(ledgerSettled: true);

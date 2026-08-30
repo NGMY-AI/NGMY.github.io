@@ -735,6 +735,10 @@ function redactEmailFields(
   row: Record<string, unknown>,
   viewer: string,
 ): Record<string, unknown> {
+  const ownerEmail = emailKey(
+    String(row.userEmail ?? row.email ?? row.applicantEmail ?? ""),
+  );
+  const isOther = ownerEmail !== "" && ownerEmail !== emailKey(viewer);
   const out = { ...row };
   for (const k of NETWORK_STRIP_KEYS) delete out[k];
   const emailFields = [
@@ -752,12 +756,10 @@ function redactEmailFields(
     "recordedByEmail",
   ];
   for (const f of emailFields) {
-    if (typeof out[f] === "string") {
-      out[f] = maskEmailValue(String(out[f]), viewer);
+    if (typeof row[f] === "string") {
+      out[f] = maskEmailValue(String(row[f]), viewer);
     }
   }
-  const rowEmail = emailKey(String(out.userEmail ?? out.email ?? ""));
-  const isOther = rowEmail && rowEmail !== emailKey(viewer);
   if (isOther) {
     for (const f of [
       "phone",
@@ -768,13 +770,37 @@ function redactEmailFields(
     ]) {
       if (out[f] != null) out[f] = "***";
     }
-    for (const f of ["state", "city", "fullName", "username"]) {
+    for (const f of [
+      "state",
+      "city",
+      "fullName",
+      "username",
+      "applicantName",
+      "experience",
+      "skills",
+      "availability",
+      "bio",
+      "notes",
+      "reason",
+    ]) {
       if (typeof out[f] === "string" && String(out[f]).trim()) out[f] = "***";
     }
     if (typeof out.fullLegalName === "string") {
       const parts = String(out.fullLegalName).trim().split(/\s+/);
       out.fullLegalName = parts.length > 0 ? `${parts[0]} ***` : "***";
     }
+  }
+  return out;
+}
+
+function redactTransaction(
+  row: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const out = { ...row };
+  const owner = emailKey(String(row.userEmail ?? ""));
+  if (owner && owner !== emailKey(viewer) && typeof row.userEmail === "string") {
+    out.userEmail = maskEmailValue(String(row.userEmail), viewer);
   }
   return out;
 }
@@ -2248,6 +2274,38 @@ async function handleCivicAdminSettingsPersist(
   return jsonOk({ error: "Unknown kind" }, 400);
 }
 
+async function handleTransactionsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const limit = Math.min(Math.max(Number(body.limit ?? 1000), 1), 10000);
+  const pendingWallet = body.pendingWallet === true;
+
+  let query = admin
+    .from("transactions")
+    .select("*")
+    .order("timestamp", { ascending: false })
+    .limit(limit);
+
+  if (!role.isAdmin) {
+    query = query.ilike("userEmail", email);
+  } else if (pendingWallet) {
+    query = query.eq("status", 0).in("type", [0, 1]);
+  }
+
+  const { data, error } = await query;
+  if (error) return jsonOk({ error: error.message }, 500);
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((r) =>
+    redactTransaction(r, email)
+  );
+  return jsonOk({ ok: true, transactions: rows, count: rows.length });
+}
+
 async function handleAdminUsersList(
   req: Request,
   body: Record<string, unknown>,
@@ -2388,6 +2446,9 @@ serve(async (req) => {
     }
     if (action === "adminUsersList") {
       return await handleAdminUsersList(req, body as Record<string, unknown>);
+    }
+    if (action === "transactionsFetch") {
+      return await handleTransactionsFetch(req, body as Record<string, unknown>);
     }
     if (action === "civicFetchCitiesRooms") {
       return await handleCivicFetchCitiesRooms(req, body as Record<string, unknown>);
