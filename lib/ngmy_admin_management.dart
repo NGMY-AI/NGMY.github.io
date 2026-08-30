@@ -162,9 +162,35 @@ Future<Map<String, dynamic>?> _loadManagementOperationalListsLocal() async {
 }
 
 Future<Map<String, dynamic>?> _fetchManagementOperationalListsCloud() async {
-  final remote = await _fetchNgmySettingSafe(_kNgmyManagementListsCloudKey);
-  if (remote == null || remote.isEmpty) return null;
-  return remote;
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return null;
+  final data = await ngmyPrivateListsFetch(email: email);
+  if (data == null) return null;
+  final mgmt = data['management'];
+  if (mgmt is Map) {
+    // Also absorb other private lists into config while we're here.
+    final invites = data['gameInvites'];
+    if (invites is List) {
+      // Applied by caller via _applyPrivateListsPayload when available.
+    }
+    return Map<String, dynamic>.from(mgmt);
+  }
+  return null;
+}
+
+Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) async {
+  await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
+  await _persistManagementOperationalListsLocal(config);
+  final payload = _managementOperationalListsPayload(config, forCloud: true);
+  final sigPayload = Map<String, dynamic>.from(payload)..remove('savedAt');
+  final sig = jsonEncode(sigPayload);
+  if (sig == _lastManagementOperationalListsCloudSig) return true;
+
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty || !await ngmyCanReachCloud()) return false;
+  final ok = await ngmyPrivateListsPersistManagement(email: email, management: payload);
+  if (ok) _lastManagementOperationalListsCloudSig = sig;
+  return ok;
 }
 
 void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynamic> payload) {
@@ -233,7 +259,7 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
   }
 }
 
-/// Merge authoritative ngmy_settings + device backups into [config] (never drops local rows).
+/// Merge authoritative private lists (Edge) + device backups into [config].
 Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   final local = await _loadManagementOperationalListsLocal();
   if (local != null) _applyManagementOperationalListsPayload(config, local);
@@ -243,23 +269,36 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   await NgmyLoanPaymentsStore.applyTo(config.loanApplications);
   await NgmyLoanPaymentsCloud.fetchAndApply(config.loanApplications);
   if (await ngmyCanReachCloud()) {
-    final cloud = await _fetchManagementOperationalListsCloud();
-    if (cloud != null) _applyManagementOperationalListsPayload(config, cloud);
-    try {
-      final row = await Supabase.instance.client
-          .from('config')
-          .select('loanApplications')
-          .eq('id', kNgmyConfigRowId)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row != null && row['loanApplications'] is List) {
-        final remoteLoans = _managementListFromPayload(row['loanApplications']);
-        if (remoteLoans.isNotEmpty) {
-          config.loanApplications = _mergeLoanApplicationsLists(config.loanApplications, remoteLoans);
+    final email = ngmyCurrentAuthEmail();
+    if (email.isNotEmpty) {
+      final data = await ngmyPrivateListsFetch(email: email);
+      if (data != null) {
+        final mgmt = data['management'];
+        if (mgmt is Map) {
+          _applyManagementOperationalListsPayload(config, Map<String, dynamic>.from(mgmt));
+        }
+        final invites = data['gameInvites'];
+        if (invites is List) {
+          config.gameInvites = mergeGameInvites(
+            config.gameInvites,
+            invites.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
+          );
+        }
+        final inquiries = data['storeInquiries'];
+        if (inquiries is List) {
+          config.storeInquiries = inquiries.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        final orders = data['storeOrders'];
+        if (orders is List) {
+          config.storeOrders = orders.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+        final family = data['familyTreePhotoAccessUntilByEmail'];
+        if (family is Map) {
+          config.familyTreePhotoAccessUntilByEmail = family.map(
+            (k, v) => MapEntry(k.toString(), v.toString()),
+          );
         }
       }
-    } catch (e) {
-      debugPrint('[admin mgmt] loanApplications column hydrate: $e');
     }
     await NgmyLoanPhotosStore.applyTo(config.loanApplications);
     await NgmyLoanStatusStore.applyTo(config.loanApplications);
@@ -284,17 +323,11 @@ Future<void> ngmyRefreshUserLoanApplications(AppConfig config) async {
 }
 
 Future<bool> _pushLoanApplicationsColumnOnly(AppConfig config) async {
-  try {
-    final loans = _loanApplicationsForCloudSync(config.loanApplications);
-    await Supabase.instance.client.from('config').upsert({
-      'id': kNgmyConfigRowId,
-      'loanApplications': loans,
-    }).timeout(kNgmyCloudWriteTimeout);
-    return true;
-  } catch (e) {
-    debugPrint('[loan] loanApplications column push: $e');
-    return await _upsertManagementListColumn('loanApplications', _loanApplicationsForCloudSync(config.loanApplications));
-  }
+  // Never write PII loan arrays to public config — Edge only.
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return false;
+  final payload = _managementOperationalListsPayload(config, forCloud: true);
+  return ngmyPrivateListsPersistManagement(email: email, management: payload);
 }
 
 /// User loan submit — upload to authoritative management lists so admin receives applications.
@@ -329,59 +362,6 @@ Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
     debugPrint('[admin mgmt] config column $column: $e');
     return false;
   }
-}
-
-Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) async {
-  await NgmyLoanStore.ensureAllCloudPhotoRefs(config.loanApplications);
-  await _persistManagementOperationalListsLocal(config);
-  final payload = _managementOperationalListsPayload(config, forCloud: true);
-  final sigPayload = Map<String, dynamic>.from(payload)..remove('savedAt');
-  final sig = jsonEncode(sigPayload);
-  if (sig == _lastManagementOperationalListsCloudSig) return true;
-
-  var settingsOk = false;
-  if (await ngmyCanReachCloud()) {
-    settingsOk = await _upsertNgmySettingSafe(_kNgmyManagementListsCloudKey, payload);
-  }
-
-  var configOk = false;
-  if (await ngmyCanReachCloud()) {
-    final client = Supabase.instance.client;
-    var row = Map<String, dynamic>.from(payload)..['id'] = kNgmyConfigRowId;
-    for (var i = 0; i < 12; i++) {
-      try {
-        await client.from('config').upsert(row);
-        configOk = true;
-        break;
-      } catch (e) {
-        final missing = _missingColumnFromPostgrestError(e);
-        if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
-          row = Map<String, dynamic>.from(row)..remove(missing);
-          if (row.length <= 1) break;
-          continue;
-        }
-        debugPrint('[admin mgmt] lists config upsert: $e');
-        break;
-      }
-    }
-    if (!configOk) {
-      for (final col in [
-        'jobWorkerApplications',
-        'jobPosts',
-        'loanApplications',
-        'helpHelperApplications',
-        'helpRequests',
-        'helpBusinesses',
-      ]) {
-        if (await _upsertManagementListColumn(col, payload[col])) {
-          configOk = true;
-        }
-      }
-    }
-  }
-
-  if (settingsOk || configOk) _lastManagementOperationalListsCloudSig = sig;
-  return settingsOk || configOk;
 }
 
 Future<bool> ngmyPersistStoreSellAccessAuthoritative(AppConfig config) async {

@@ -1683,6 +1683,278 @@ async function handleCivicSaveRegistryPins(
   });
 }
 
+// ─── Private config lists (loans, games, help, jobs, store) ───
+
+const MGMT_LISTS_KEY = "management_operational_lists";
+const GAME_INVITES_KEY = "game_invites";
+const STORE_INQUIRIES_KEY = "store_inquiries";
+const STORE_ORDERS_KEY = "store_orders";
+const MEDIA_VIRTUAL_KEY = "media_virtual_profiles";
+const FAMILY_PHOTO_ACCESS_KEY = "family_tree_photo_access";
+
+async function loadSettingsObject(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  key: string,
+): Promise<Record<string, unknown>> {
+  const { data } = await admin.from("ngmy_settings").select("value").eq("key", key).maybeSingle();
+  const value = data?.value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+async function saveSettingsObject(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  key: string,
+  value: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await admin.from("ngmy_settings").upsert(
+    {
+      key,
+      value: { ...value, savedAt: new Date().toISOString() },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+function rowTouchesEmail(row: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  const fields = [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+  ];
+  for (const f of fields) {
+    if (emailKey(String(row[f] ?? "")) === want) return true;
+  }
+  // nested maps keyed by email
+  for (const v of Object.values(row)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      for (const k of Object.keys(v as Record<string, unknown>)) {
+        if (emailKey(k) === want) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function filterListForEmail(
+  list: Record<string, unknown>[],
+  email: string,
+): Record<string, unknown>[] {
+  return list.filter((row) => rowTouchesEmail(row, email));
+}
+
+function asItems(value: Record<string, unknown>, wrapKey = "items"): Record<string, unknown>[] {
+  const raw = value[wrapKey] ?? value.applications ?? value.loanApplications;
+  return asMemberList(raw);
+}
+
+async function handlePrivateListsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+
+  const mgmt = await loadSettingsObject(admin, MGMT_LISTS_KEY);
+  const invitesWrap = await loadSettingsObject(admin, GAME_INVITES_KEY);
+  const inquiriesWrap = await loadSettingsObject(admin, STORE_INQUIRIES_KEY);
+  const ordersWrap = await loadSettingsObject(admin, STORE_ORDERS_KEY);
+  const mediaWrap = await loadSettingsObject(admin, MEDIA_VIRTUAL_KEY);
+  const familyWrap = await loadSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY);
+
+  const listFields = [
+    "loanApplications",
+    "jobWorkerApplications",
+    "jobPosts",
+    "helpHelperApplications",
+    "helpRequests",
+    "helpBusinesses",
+  ] as const;
+
+  if (role.isAdmin) {
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      management: mgmt,
+      gameInvites: asItems(invitesWrap),
+      storeInquiries: asItems(inquiriesWrap),
+      storeOrders: asItems(ordersWrap),
+      mediaVirtualProfiles: asItems(mediaWrap),
+      familyTreePhotoAccessUntilByEmail: familyWrap.byEmail ?? familyWrap,
+    });
+  }
+
+  const filteredMgmt: Record<string, unknown> = { ...mgmt };
+  for (const f of listFields) {
+    const list = asMemberList(mgmt[f]);
+    if (f === "jobPosts") {
+      // Job posts are marketplace listings — keep titles public to members; strip applicant blobs elsewhere.
+      filteredMgmt[f] = list;
+    } else {
+      filteredMgmt[f] = filterListForEmail(list, email);
+    }
+  }
+  // Admin-only maps
+  delete filteredMgmt.adminDeletedUserEmails;
+  delete filteredMgmt.adminUserAccountStatusByEmail;
+  delete filteredMgmt.adminUserCrownBadgeByEmail;
+
+  const familyMap = (familyWrap.byEmail && typeof familyWrap.byEmail === "object")
+    ? (familyWrap.byEmail as Record<string, unknown>)
+    : familyWrap;
+  const ownFamily: Record<string, unknown> = {};
+  if (familyMap && typeof familyMap === "object") {
+    for (const [k, v] of Object.entries(familyMap)) {
+      if (emailKey(k) === email) ownFamily[k] = v;
+    }
+  }
+
+  return jsonOk({
+    ok: true,
+    view: "member",
+    management: filteredMgmt,
+    gameInvites: filterListForEmail(asItems(invitesWrap), email),
+    storeInquiries: filterListForEmail(asItems(inquiriesWrap), email),
+    storeOrders: filterListForEmail(asItems(ordersWrap), email),
+    mediaVirtualProfiles: asItems(mediaWrap), // profiles are virtual characters; keep for app features
+    familyTreePhotoAccessUntilByEmail: ownFamily,
+  });
+}
+
+async function handlePrivateListsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const kind = String(body.kind ?? "management").trim(); // management | gameInvites | storeInquiries | storeOrders | familyPhotoAccess | mediaVirtualProfiles
+
+  if (kind === "management") {
+    const incoming = (body.management && typeof body.management === "object")
+      ? (body.management as Record<string, unknown>)
+      : {};
+    const current = await loadSettingsObject(admin, MGMT_LISTS_KEY);
+    if (role.isAdmin) {
+      const saved = await saveSettingsObject(admin, MGMT_LISTS_KEY, { ...current, ...incoming });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+      // Keep config columns empty
+      await admin.from("config").upsert({
+        id: "1",
+        loanApplications: [],
+        jobWorkerApplications: [],
+        jobPosts: incoming.jobPosts ?? current.jobPosts ?? [],
+        helpHelperApplications: [],
+        helpRequests: [],
+        helpBusinesses: [],
+      });
+      return jsonOk({ ok: true });
+    }
+    // Member: merge only own rows into each list
+    const next = { ...current };
+    for (const f of [
+      "loanApplications",
+      "jobWorkerApplications",
+      "helpHelperApplications",
+      "helpRequests",
+      "helpBusinesses",
+    ]) {
+      const cur = asMemberList(current[f]);
+      const others = cur.filter((r) => !rowTouchesEmail(r, email));
+      const mineIn = asMemberList(incoming[f]).filter((r) => rowTouchesEmail(r, email));
+      // Prefer incoming own rows; if empty keep existing own
+      const mineCur = cur.filter((r) => rowTouchesEmail(r, email));
+      next[f] = [...others, ...(mineIn.length > 0 ? mineIn : mineCur)];
+    }
+    if (Array.isArray(incoming.jobPosts)) next.jobPosts = incoming.jobPosts;
+    const saved = await saveSettingsObject(admin, MGMT_LISTS_KEY, next);
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    await admin.from("config").upsert({
+      id: "1",
+      loanApplications: [],
+      jobWorkerApplications: [],
+      helpHelperApplications: [],
+      helpRequests: [],
+      helpBusinesses: [],
+    });
+    return jsonOk({ ok: true });
+  }
+
+  const keyByKind: Record<string, string> = {
+    gameInvites: GAME_INVITES_KEY,
+    storeInquiries: STORE_INQUIRIES_KEY,
+    storeOrders: STORE_ORDERS_KEY,
+    mediaVirtualProfiles: MEDIA_VIRTUAL_KEY,
+    familyPhotoAccess: FAMILY_PHOTO_ACCESS_KEY,
+  };
+  const settingsKey = keyByKind[kind];
+  if (!settingsKey) return jsonOk({ error: "Unknown kind" }, 400);
+
+  if (kind === "familyPhotoAccess") {
+    const map = (body.byEmail && typeof body.byEmail === "object")
+      ? (body.byEmail as Record<string, unknown>)
+      : {};
+    const current = await loadSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY);
+    const curMap = (current.byEmail && typeof current.byEmail === "object")
+      ? { ...(current.byEmail as Record<string, unknown>) }
+      : {};
+    if (role.isAdmin) {
+      const saved = await saveSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY, { byEmail: map });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    } else {
+      // member may only set own key
+      if (map[email] != null) curMap[email] = map[email];
+      const saved = await saveSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY, { byEmail: curMap });
+      if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    }
+    await admin.from("config").upsert({ id: "1", familyTreePhotoAccessUntilByEmail: {} });
+    return jsonOk({ ok: true });
+  }
+
+  const items = asMemberList(body.items ?? body.list);
+  const current = await loadSettingsObject(admin, settingsKey);
+  const curItems = asItems(current);
+  let nextItems = curItems;
+  if (role.isAdmin) {
+    nextItems = items;
+  } else {
+    const others = curItems.filter((r) => !rowTouchesEmail(r, email));
+    const mineIn = items.filter((r) => rowTouchesEmail(r, email));
+    const mineCur = curItems.filter((r) => rowTouchesEmail(r, email));
+    nextItems = [...others, ...(mineIn.length > 0 ? mineIn : mineCur)];
+  }
+  const saved = await saveSettingsObject(admin, settingsKey, { items: nextItems });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  const wipe: Record<string, unknown> = { id: "1" };
+  if (kind === "gameInvites") wipe.gameInvites = [];
+  if (kind === "storeInquiries") wipe.storeInquiries = [];
+  if (kind === "storeOrders") wipe.storeOrders = [];
+  if (kind === "mediaVirtualProfiles") wipe.mediaVirtualProfiles = [];
+  await admin.from("config").upsert(wipe);
+  return jsonOk({ ok: true, count: nextItems.length });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1774,6 +2046,12 @@ serve(async (req) => {
     }
     if (action === "civicPersistRegistrarApplications") {
       return await handleCivicPersistRegistrarApplications(req, body as Record<string, unknown>);
+    }
+    if (action === "privateListsFetch") {
+      return await handlePrivateListsFetch(req, body as Record<string, unknown>);
+    }
+    if (action === "privateListsPersist") {
+      return await handlePrivateListsPersist(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

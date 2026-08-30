@@ -3,32 +3,34 @@
 class NgmySupabaseColumns {
   NgmySupabaseColumns._();
 
-  /// Periodic config poll (no API secret columns — those stay server-only).
+  /// Periodic config poll — no multi-user PII blobs (those load via Edge privateListsFetch).
   static const configPoll =
-      'id,ngmyChatClosed,investmentPlans,storeOrders,storeInquiries,storeListings,'
-      'helpHelperApplications,helpRequests,helpBusinesses,loanApplications,'
-      'ngmyPopups,ngmyVideoPopups,jobPosts,jobWorkerApplications,'
-      'gameInvites,civicSelfEnrollmentEnabled,'
+      'id,ngmyChatClosed,investmentPlans,storeListings,'
+      'ngmyPopups,ngmyVideoPopups,'
+      'civicSelfEnrollmentEnabled,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
       'helpScopeType,helpScopeValue,helpState,helpCampaignId,helpCampaignStartedAt,helpCampaignClosures,'
       'gameTimeLimits,diceSettings,'
-      'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl,'
+      'familyTreeCreateFee,familyTreePhotoMonthlyFee,logoUrl,'
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
   static const configBootstrapCore =
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,'
       'civicCitiesByState,cities,rooms,storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
-      'familyTreePhotoAccessUntilByEmail,'
-      'gameTimeLimits,diceSettings,gameInvites,officialCashApp,officialBitcoin,'
+      'gameTimeLimits,diceSettings,officialCashApp,officialBitcoin,'
       'loanPhone,loanHowItWorks,loanCompanyZelle';
 
   static const configBootstrapHeavy =
-      'storeListings,storeInquiries,storeOrders,helpHelperApplications,helpRequests,'
-      'helpBusinesses,loanApplications,ngmyPopups,ngmyVideoPopups,'
-      'jobPosts,jobWorkerApplications,gameInvites,mediaVirtualProfiles,mediaDeliveryQueue,'
+      'storeListings,ngmyPopups,ngmyVideoPopups,'
       'termsAndConditions,privacyPolicy';
+
+  /// Safe fallback when a column list fails — never select('*').
+  static const configSafeFallback =
+      'id,ngmyChatClosed,investmentPlans,civicSelfEnrollmentEnabled,storeListings,'
+      'ngmyPopups,ngmyVideoPopups,cities,rooms,civicCitiesByState,'
+      'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
   /// Deprecated: API keys must not be selected by clients.
   static const geminiOnly = 'id';

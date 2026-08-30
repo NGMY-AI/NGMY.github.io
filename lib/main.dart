@@ -139,6 +139,7 @@ import 'ngmy_civic_state_transfer_ui.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_cloud.dart';
+import 'ngmy_private_lists_cloud.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
@@ -3826,10 +3827,8 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
   _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
   var row = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
-    'storeInquiries': config.storeInquiries,
-    'storeOrders': config.storeOrders,
+    // PII lists (inquiries/orders/loans/games/…) — Edge privateLists only
     'storeListings': config.storeListings,
-    // civicRegistrarApplications + members + PINs: Edge only
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'cities': config.cities,
@@ -3839,7 +3838,6 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'ngmyVideoPopups': config.ngmyVideoPopups,
     'familyTreeCreateFee': config.familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
-    'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
   });
   final sig = jsonEncode(row);
   if (sig == _lastOperationalConfigCloudSig) return true;
@@ -7382,8 +7380,11 @@ String _geminiKeyFromMap(Map<String, dynamic> json) {
 /// Supabase config row id (TEXT column in NGMY — must be '1', not integer 1).
 const String kNgmyConfigRowId = '1';
 
-Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = '*'}) async {
+Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = NgmySupabaseColumns.configSafeFallback}) async {
   final client = Supabase.instance.client;
+  final safeCols = columns.trim().isEmpty || columns.trim() == '*'
+      ? NgmySupabaseColumns.configSafeFallback
+      : columns;
   Future<Map<String, dynamic>?> trySelect(String cols) async {
     for (final id in [kNgmyConfigRowId, 1]) {
       try {
@@ -7402,12 +7403,13 @@ Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = '*'}) async 
     return null;
   }
 
-  if (columns != '*') {
-    final partial = await trySelect(columns);
-    if (partial != null) return partial;
-    return trySelect('*');
+  final partial = await trySelect(safeCols);
+  if (partial != null) return partial;
+  // Never select('*') — that re-opens PII columns to every client.
+  if (safeCols != NgmySupabaseColumns.configSafeFallback) {
+    return trySelect(NgmySupabaseColumns.configSafeFallback);
   }
-  return trySelect('*');
+  return null;
 }
 
 dynamic _ngmyConfigRowIdValue(Map<String, dynamic>? row) {

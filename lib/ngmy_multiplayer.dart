@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_private_lists_cloud.dart';
 
 /// Brief pause after both players enter so neither starts early.
 const int kNgmyMpLobbyAlignMs = 500;
@@ -463,7 +466,24 @@ Future<bool> ngmyPublishGameInvites(
   bool preferCachedRemote = false,
 }) async {
   ngmyPruneStaleGameInvites(localInvites);
-  return true;
+  try {
+    final email = (() {
+      try {
+        return Supabase.instance.client.auth.currentUser?.email?.toLowerCase().trim() ?? '';
+      } catch (_) {
+        return '';
+      }
+    })();
+    if (email.isEmpty) return true;
+    return await ngmyPrivateListsPersistKind(
+      email: email,
+      kind: 'gameInvites',
+      items: localInvites.map((e) => Map<String, dynamic>.from(e)).toList(),
+    );
+  } catch (e) {
+    debugPrint('[game] publish invites: $e');
+    return false;
+  }
 }
 
 Future<bool> ngmyPublishInviteSession(List<Map<String, dynamic>> localInvites, String inviteId, Map<String, dynamic> sessionState) async {
