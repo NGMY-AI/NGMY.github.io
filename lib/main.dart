@@ -3880,7 +3880,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': config.familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
-    'familyTreePhotoAccessUntilByEmail': config.familyTreePhotoAccessUntilByEmail,
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'cities': config.cities,
     'rooms': config.rooms,
@@ -6432,11 +6431,13 @@ bool _storeInquiryThreadIsValid(Map<String, dynamic> m) {
 
 Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, {String? forceLocalOrderId}) async {
   try {
-    final client = Supabase.instance.client;
-    final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty || !await ngmyCanReachCloud()) return false;
     var remote = <Map<String, dynamic>>[];
-    if (cfg != null && cfg['storeOrders'] is List) {
-      remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
+    final edge = await ngmyPrivateListsFetch(email: email);
+    final edgeOrders = edge?['storeOrders'];
+    if (edgeOrders is List) {
+      remote = edgeOrders.map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
     }
     var merged = _mergeStoreOrdersLists(localOrders, remote);
     if (forceLocalOrderId != null && forceLocalOrderId.isNotEmpty) {
@@ -6457,8 +6458,7 @@ Future<bool> _pushStoreOrdersToSupabase(List<Map<String, dynamic>> localOrders, 
         }
       }
     }
-    await client.from('config').update({'storeOrders': merged}).eq('id', kNgmyConfigRowId);
-    return true;
+    return ngmyPrivateListsPersistKind(email: email, kind: 'storeOrders', items: merged);
   } catch (e) {
     debugPrint('[storeOrders] push error: $e');
     return false;
@@ -7380,34 +7380,81 @@ String _geminiKeyFromMap(Map<String, dynamic> json) {
 /// Supabase config row id (TEXT column in NGMY — must be '1', not integer 1).
 const String kNgmyConfigRowId = '1';
 
+/// Columns that PostgREST rejected (missing / permission). Avoids red retry storms.
+final Set<String> _ngmyConfigMissingColumns = {
+  ...NgmyCloudPolicy.lockedConfigColumns,
+};
+
+final Map<String, Future<Map<String, dynamic>?>> _ngmyConfigFetchInflight = {};
+
+String _ngmySanitizeConfigSelect(String columns) {
+  final parts = columns
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty && s != '*')
+      .where((s) => !_ngmyConfigMissingColumns.contains(s))
+      .where((s) => !_ngmyConfigMissingColumns.contains(s.toLowerCase()))
+      .toList();
+  if (parts.isEmpty) return 'id';
+  return parts.join(',');
+}
+
+String? _ngmyConfigColumnFault(Object error) {
+  final text = error.toString();
+  var m = RegExp("Could not find the '([^']+)' column").firstMatch(text);
+  if (m != null) return m.group(1);
+  m = RegExp(r'column "([^"]+)" does not exist', caseSensitive: false).firstMatch(text);
+  if (m != null) return m.group(1);
+  m = RegExp(r'permission denied for column (\w+)', caseSensitive: false).firstMatch(text);
+  if (m != null) return m.group(1);
+  return null;
+}
+
 Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = NgmySupabaseColumns.configSafeFallback}) async {
-  final client = Supabase.instance.client;
-  final safeCols = columns.trim().isEmpty || columns.trim() == '*'
+  final raw = columns.trim().isEmpty || columns.trim() == '*'
       ? NgmySupabaseColumns.configSafeFallback
       : columns;
-  Future<Map<String, dynamic>?> trySelect(String cols) async {
-    for (final id in [kNgmyConfigRowId, 1]) {
-      try {
-        final row = await client.from('config').select(cols).eq('id', id).maybeSingle();
-        if (row != null) return Map<String, dynamic>.from(row);
-      } catch (e) {
-        debugPrint('[config] fetch id=$id cols=$cols: $e');
-      }
-    }
+  final safeCols = _ngmySanitizeConfigSelect(raw);
+  final inflight = _ngmyConfigFetchInflight[safeCols];
+  if (inflight != null) return inflight;
+
+  final future = _fetchNgmyConfigRowUncached(safeCols);
+  _ngmyConfigFetchInflight[safeCols] = future;
+  try {
+    return await future;
+  } finally {
+    _ngmyConfigFetchInflight.remove(safeCols);
+  }
+}
+
+Future<Map<String, dynamic>?> _fetchNgmyConfigRowUncached(String cols) async {
+  final client = Supabase.instance.client;
+
+  Future<Map<String, dynamic>?> once(String selectCols) async {
     try {
-      final row = await client.from('config').select(cols).limit(1).maybeSingle();
+      final row = await client.from('config').select(selectCols).eq('id', kNgmyConfigRowId).maybeSingle();
       if (row != null) return Map<String, dynamic>.from(row);
     } catch (e) {
-      debugPrint('[config] fetch any row cols=$cols: $e');
+      final bad = _ngmyConfigColumnFault(e);
+      if (bad != null && bad.isNotEmpty) {
+        _ngmyConfigMissingColumns.add(bad);
+        final next = _ngmySanitizeConfigSelect(selectCols);
+        if (next != selectCols && next.isNotEmpty) {
+          return once(next);
+        }
+        return null;
+      }
+      debugPrint('[config] fetch: $e');
     }
     return null;
   }
 
-  final partial = await trySelect(safeCols);
+  final partial = await once(cols);
   if (partial != null) return partial;
   // Never select('*') — that re-opens PII columns to every client.
-  if (safeCols != NgmySupabaseColumns.configSafeFallback) {
-    return trySelect(NgmySupabaseColumns.configSafeFallback);
+  final fallback = _ngmySanitizeConfigSelect(NgmySupabaseColumns.configSafeFallback);
+  if (cols != fallback) {
+    return once(fallback);
   }
   return null;
 }
@@ -7470,17 +7517,10 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   final remotePrivacy = (remoteLegal['privacy'] ?? '').trim();
   row['gameTimeLimits'] = config.gameTimeLimits;
   row['diceSettings'] = config.diceSettings;
-  row['gameInvites'] = config.gameInvites;
-  row['civicRegistryPin'] = config.civicRegistryPin;
-  row['civicRegistryPinsByState'] = config.civicRegistryPinsByState;
-  if (isAdmin) {
-    _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
-    row['civicRegistrarApplications'] = config.civicRegistrarApplications;
-  } else {
-    row.remove('civicRegistrarApplications');
+  // PII / locked columns — Edge only (never write back onto public config).
+  for (final k in NgmyCloudPolicy.lockedConfigColumns) {
+    row.remove(k);
   }
-  row['jobPosts'] = config.jobPosts;
-  row['jobWorkerApplications'] = config.jobWorkerApplications;
   if (isAdmin) {
     row['termsAndConditions'] = config.termsAndConditions;
     row['privacyPolicy'] = config.privacyPolicy;
@@ -10171,7 +10211,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startGameSettingsRefreshLoop() {
     _gameSettingsRefreshTimer?.cancel();
     unawaited(_refreshGameCenterSettingsFromCloud());
-    _gameSettingsRefreshTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+    _gameSettingsRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (!mounted || _backgroundSyncPaused) return;
       unawaited(_refreshGameCenterSettingsFromCloud());
     });
@@ -10181,7 +10221,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _configRefreshTimer?.cancel();
     final isAdmin = _ngmySessionIsAdmin(_currentUser);
     // Fallback for non-admin users (no config/ngmy_settings realtime subscription).
-    _configRefreshTimer = Timer.periodic(Duration(minutes: isAdmin ? 8 : 3), (_) async {
+    // Keep this slow — frequent polls fill DevTools with hundreds of config GETs.
+    _configRefreshTimer = Timer.periodic(Duration(minutes: isAdmin ? 10 : 6), (_) async {
       if (_isSyncing || _backgroundSyncPaused) return;
       await _refreshLegalAndPlansFromCloud();
       await _reloadStoreFromSupabase();
@@ -10361,12 +10402,25 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final inquiriesBefore = _config.storeInquiries.length;
     final remoteListings = await _fetchStoreListingsFromSupabase();
     final remoteInquiries = await _fetchStoreInquiriesFromSupabase();
-    final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
-    final configInquiries = _storeInquiriesFromConfigMap(cfg);
     _mergeStoreListingsIntoConfig(remoteListings);
     _mergeStoreInquiriesIntoConfig(remoteInquiries);
-    if (configInquiries.isNotEmpty) {
-      _mergeStoreInquiriesIntoConfig(configInquiries);
+    // Locked config.storeInquiries — merge role-filtered Edge copy when signed in.
+    final email = ngmyCurrentAuthEmail();
+    if (email.isNotEmpty) {
+      final edge = await ngmyPrivateListsFetch(email: email);
+      final fromEdge = edge?['storeInquiries'];
+      if (fromEdge is List && fromEdge.isNotEmpty) {
+        _mergeStoreInquiriesIntoConfig(
+          fromEdge.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+        );
+      }
+      final edgeOrders = edge?['storeOrders'];
+      if (edgeOrders is List && edgeOrders.isNotEmpty) {
+        _config.storeOrders = _mergeStoreOrdersLists(
+          _config.storeOrders,
+          edgeOrders.map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList(),
+        );
+      }
     }
     _purgeExpiredSoldStoreListings();
     _purgeExpiredStorePaymentReceipts();
@@ -42295,7 +42349,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     _ensureStoreThreadsFromOrders();
   }
 
-  /// Pulls store message threads from Supabase table + config json (never wipes local until merged).
+  /// Pulls store message threads from table + Edge private lists (never wipes local until merged).
   Future<void> _refreshStoreMessagesFromCloud({bool silent = false}) async {
     try {
       final local = widget.config.storeInquiries
@@ -42303,10 +42357,16 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           .toList();
       final fromTable = await _fetchStoreInquiriesFromSupabase();
       var merged = _mergeStoreInquiriesLists(local, fromTable);
-      final cfg = await _fetchNgmyConfigRow(columns: 'storeInquiries');
-      final fromConfig = _storeInquiriesFromConfigMap(cfg);
-      if (fromConfig.isNotEmpty) {
-        merged = _mergeStoreInquiriesLists(merged, fromConfig);
+      final email = ngmyCurrentAuthEmail();
+      if (email.isNotEmpty) {
+        final edge = await ngmyPrivateListsFetch(email: email);
+        final fromEdge = edge?['storeInquiries'];
+        if (fromEdge is List && fromEdge.isNotEmpty) {
+          merged = _mergeStoreInquiriesLists(
+            merged,
+            fromEdge.map((e) => Map<String, dynamic>.from(e as Map)).toList(),
+          );
+        }
       }
       widget.config.storeInquiries = merged;
       final removedReceiptIds = ngmyPurgeExpiredStorePaymentReceipts(widget.config.storeInquiries);
@@ -42339,9 +42399,12 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       final prevOrders = widget.config.storeOrders
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
-      final cfg = await _fetchNgmyConfigRow(columns: 'storeOrders');
-      if (cfg == null || cfg['storeOrders'] is! List) return;
-      final remote = (cfg['storeOrders'] as List).map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
+      final email = ngmyCurrentAuthEmail();
+      if (email.isEmpty) return;
+      final edge = await ngmyPrivateListsFetch(email: email);
+      final raw = edge?['storeOrders'];
+      if (raw is! List) return;
+      final remote = raw.map((e) => _normalizeStoreOrder(Map<String, dynamic>.from(e as Map))).toList();
       widget.config.storeOrders = _mergeStoreOrdersLists(widget.config.storeOrders, remote);
       widget.config.storeOrders = _mutableStoreOrdersCopy(widget.config.storeOrders);
       ngmyOnStoreOrdersChanged?.call(prevOrders, widget.config.storeOrders);

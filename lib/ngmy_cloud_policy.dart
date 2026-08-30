@@ -7,24 +7,47 @@ class NgmyCloudPolicy {
   static const bool realtimeForRegularUsers = false;
   static const Set<String> adminRealtimeTables = {'config', 'store_listings'};
 
+  /// Public config columns only. Locked PII blobs load via Edge (privateLists / civic).
   static const Set<String> cloudConfigKeys = {
-    'civicRegistrarApplications',
-    'civicRegistryMembers',
-    'civicRegistryPin',
-    'civicRegistryPinsByState',
     'civicCitiesByState',
     'civicSelfEnrollmentEnabled',
     'cities',
     'rooms',
     'storeListings',
-    'storeOrders',
-    'storeInquiries',
     'storeSellAccessEmails',
     'ngmyPopups',
     'ngmyVideoPopups',
     'familyTreeCreateFee',
     'familyTreePhotoMonthlyFee',
+  };
+
+  /// Never select/upsert these on `config` from the client (revoked or Edge-only).
+  static const Set<String> lockedConfigColumns = {
+    'storeOrders',
+    'storeInquiries',
+    'loanApplications',
+    'gameInvites',
+    'jobWorkerApplications',
+    'jobPosts',
+    'helpHelperApplications',
+    'helpRequests',
+    'helpBusinesses',
+    'mediaVirtualProfiles',
     'familyTreePhotoAccessUntilByEmail',
+    'civicRegistrarApplications',
+    'civicRegistryMembers',
+    'civicRegistryPin',
+    'civicRegistryPinsByState',
+    'geminiApiKey',
+    'gemini_api_key',
+    'aiApiKey',
+    'ai_api_key',
+    'youtubeApiKey',
+    'youtube_api_key',
+    'elevenLabsApiKey',
+    'elevenlabs_api_key',
+    'resendApiKey',
+    'passwordHash',
   };
 
   static const Set<String> cloudUserKeys = {

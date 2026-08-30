@@ -3,14 +3,12 @@
 class NgmySupabaseColumns {
   NgmySupabaseColumns._();
 
-  /// Periodic config poll — no multi-user PII blobs (those load via Edge privateListsFetch).
+  /// Periodic config poll — public fields only (PII via Edge privateListsFetch).
   static const configPoll =
       'id,ngmyChatClosed,investmentPlans,storeListings,'
       'ngmyPopups,ngmyVideoPopups,'
       'civicSelfEnrollmentEnabled,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
-      'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
-      'helpScopeType,helpScopeValue,helpState,helpCampaignId,helpCampaignStartedAt,helpCampaignClosures,'
       'gameTimeLimits,diceSettings,'
       'familyTreeCreateFee,familyTreePhotoMonthlyFee,logoUrl,'
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
