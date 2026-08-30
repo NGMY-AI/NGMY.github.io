@@ -1712,9 +1712,24 @@ class NgmyCivicRegistryMembers {
   static Map<String, dynamic> _preferNewerMember(Map<String, dynamic> a, Map<String, dynamic> b) {
     final ta = _memberStamp(a);
     final tb = _memberStamp(b);
+    if (ta != null && tb != null && ta != tb) {
+      return tb.isAfter(ta) ? b : a;
+    }
+    final sa = _memberDetailScore(a);
+    final sb = _memberDetailScore(b);
+    if (sa != sb) return sb > sa ? b : a;
     if (tb == null) return a;
     if (ta == null) return b;
     return tb.isAfter(ta) ? b : a;
+  }
+
+  static int _memberDetailScore(Map<String, dynamic> m) {
+    var score = 0;
+    if ((m['phone'] ?? '').toString().trim().isNotEmpty) score += 2;
+    if ((m['homeAddress'] ?? '').toString().trim().isNotEmpty) score += 2;
+    if ((m['dob'] ?? '').toString().trim().isNotEmpty) score += 2;
+    if ((m['idPhoto'] ?? '').toString().trim().isNotEmpty) score += 1;
+    return score;
   }
 
   static void applyPayload(dynamic config, Map<String, dynamic> payload) {

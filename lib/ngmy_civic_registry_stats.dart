@@ -8,6 +8,77 @@ const int kNgmyMaxRegistrarsPerState = 5;
 class NgmyCivicRegistryStats {
   static const _citiesRoomsBackupKey = 'ngmy_civic_cities_rooms_backup';
 
+  static const Map<String, String> _usStateCodeByName = {
+    'alabama': 'AL',
+    'alaska': 'AK',
+    'arizona': 'AZ',
+    'arkansas': 'AR',
+    'california': 'CA',
+    'colorado': 'CO',
+    'connecticut': 'CT',
+    'delaware': 'DE',
+    'florida': 'FL',
+    'georgia': 'GA',
+    'hawaii': 'HI',
+    'idaho': 'ID',
+    'illinois': 'IL',
+    'indiana': 'IN',
+    'iowa': 'IA',
+    'kansas': 'KS',
+    'kentucky': 'KY',
+    'louisiana': 'LA',
+    'maine': 'ME',
+    'maryland': 'MD',
+    'massachusetts': 'MA',
+    'michigan': 'MI',
+    'minnesota': 'MN',
+    'mississippi': 'MS',
+    'missouri': 'MO',
+    'montana': 'MT',
+    'nebraska': 'NE',
+    'nevada': 'NV',
+    'new hampshire': 'NH',
+    'new jersey': 'NJ',
+    'new mexico': 'NM',
+    'new york': 'NY',
+    'north carolina': 'NC',
+    'north dakota': 'ND',
+    'ohio': 'OH',
+    'oklahoma': 'OK',
+    'oregon': 'OR',
+    'pennsylvania': 'PA',
+    'rhode island': 'RI',
+    'south carolina': 'SC',
+    'south dakota': 'SD',
+    'tennessee': 'TN',
+    'texas': 'TX',
+    'utah': 'UT',
+    'vermont': 'VT',
+    'virginia': 'VA',
+    'washington': 'WA',
+    'west virginia': 'WV',
+    'wisconsin': 'WI',
+    'wyoming': 'WY',
+    'district of columbia': 'DC',
+  };
+
+  /// Match "Georgia", "GA", etc. for roster / gate lookups.
+  static String canonicalStateKey(String state) {
+    final raw = state.trim().toLowerCase();
+    if (raw.isEmpty) return '';
+    if (_usStateCodeByName.containsKey(raw)) return raw;
+    for (final e in _usStateCodeByName.entries) {
+      if (raw == e.value.toLowerCase()) return e.key;
+    }
+    return raw;
+  }
+
+  static bool statesMatch(String a, String b) {
+    final ka = canonicalStateKey(a);
+    final kb = canonicalStateKey(b);
+    return ka.isNotEmpty && kb.isNotEmpty && ka == kb;
+  }
+
   static Future<void> saveCitiesRoomsLocalBackup({
     required Map<String, List<String>> civicCitiesByState,
     required List<String> rooms,
@@ -169,13 +240,13 @@ class NgmyCivicRegistryStats {
     required String state,
   }) {
     if (!isAuthorizedRegistrar) return false;
-    final st = state.trim().toLowerCase();
+    final st = NgmyCivicRegistryStats.canonicalStateKey(state);
     final key = _emailKey(email);
     for (final a in applications) {
       if ((a['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
       final status = (a['status'] ?? '').toString().toLowerCase();
       if (status != 'approved' && status != 'pending') continue;
-      if ((a['state'] ?? '').toString().trim().toLowerCase() == st) return true;
+      if (NgmyCivicRegistryStats.statesMatch((a['state'] ?? '').toString(), state)) return true;
     }
     // Home state from approved application — never treat a temporary
     // viewing state (user.state after a switch) as registrar assignment.
@@ -184,17 +255,16 @@ class NgmyCivicRegistryStats {
       userState: userState,
       applications: applications,
     );
-    return serving.trim().toLowerCase() == st;
+    return NgmyCivicRegistryStats.statesMatch(serving, state);
   }
 
   static List<Map<String, dynamic>> approvedApplicationsForState(
     List<Map<String, dynamic>> applications,
     String state,
   ) {
-    final st = state.trim().toLowerCase();
     return applications.where((a) {
       if ((a['status'] ?? '').toString().toLowerCase() != 'approved') return false;
-      return (a['state'] ?? '').toString().trim().toLowerCase() == st;
+      return NgmyCivicRegistryStats.statesMatch((a['state'] ?? '').toString(), state);
     }).map((e) => Map<String, dynamic>.from(e)).toList();
   }
 

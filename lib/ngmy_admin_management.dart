@@ -933,19 +933,20 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
       pinSig: resolvedPin,
     );
     if (row != null && row['networkEmpty'] != true && row['needsUnlock'] != true) {
-      final members = row['members'];
-      final removed = row['removed'];
-      final deceased = row['deceased'];
-      final hasPayload = members is List && members.isNotEmpty ||
-          removed is List && removed.isNotEmpty ||
-          deceased is List && deceased.isNotEmpty;
-      if (hasPayload) {
-        NgmyCivicRegistryMembers.replacePayload(config, {
-          'members': members is List ? members : const [],
-          'removed': removed is List ? removed : const [],
-          'deceased': deceased is List ? deceased : const [],
-        });
-        await NgmyCivicRegistryMembers.saveLocalBackup(config);
+      NgmyCivicRegistryMembers.applyPayload(config, {
+        'members': row['members'] ?? const [],
+        'removed': row['removed'] ?? const [],
+        'deceased': row['deceased'] ?? const [],
+      });
+      await NgmyCivicRegistryMembers.saveLocalBackup(config);
+      final isAdmin = ngmyEmailIsAdmin(email);
+      final isRegistrar = _registrarApplicationStatusForEmail(config, email) == 'approved';
+      if (isAdmin || isRegistrar) {
+        await ngmyPersistCivicRegistryMembers(
+          config,
+          requesterEmail: email,
+          state: resolvedState,
+        );
       }
     }
   }

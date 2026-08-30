@@ -1,6 +1,10 @@
 import 'package:flutter/services.dart';
 
+import 'ngmy_civic_registry_stats.dart';
+
 /// Shared Civic Registry identity matching (name / DOB / registry ID).
+import 'ngmy_civic_registry_stats.dart';
+
 class NgmyCivicWalletIdentity {
   static String normalizeName(String raw) =>
       raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
@@ -43,10 +47,8 @@ class NgmyCivicWalletIdentity {
   }) {
     final want = normalizeName(fullName);
     if (want.isEmpty) return null;
-    final st = state.trim().toLowerCase();
     for (final m in members) {
-      final ms = (m['state'] ?? '').toString().trim().toLowerCase();
-      if (st.isNotEmpty && ms.isNotEmpty && ms != st) continue;
+      if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) continue;
       if (normalizeName((m['fullName'] ?? '').toString()) == want) return m;
     }
     return null;

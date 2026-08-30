@@ -688,6 +688,80 @@ function stateKey(state: string): string {
   return state.trim().toLowerCase();
 }
 
+const US_STATE_PREFIX: Record<string, string> = {
+  alabama: "AL",
+  alaska: "AK",
+  arizona: "AZ",
+  arkansas: "AR",
+  california: "CA",
+  colorado: "CO",
+  connecticut: "CT",
+  delaware: "DE",
+  florida: "FL",
+  georgia: "GA",
+  hawaii: "HI",
+  idaho: "ID",
+  illinois: "IL",
+  indiana: "IN",
+  iowa: "IA",
+  kansas: "KS",
+  kentucky: "KY",
+  louisiana: "LA",
+  maine: "ME",
+  maryland: "MD",
+  massachusetts: "MA",
+  michigan: "MI",
+  minnesota: "MN",
+  mississippi: "MS",
+  missouri: "MO",
+  montana: "MT",
+  nebraska: "NE",
+  nevada: "NV",
+  "new hampshire": "NH",
+  "new jersey": "NJ",
+  "new mexico": "NM",
+  "new york": "NY",
+  "north carolina": "NC",
+  "north dakota": "ND",
+  ohio: "OH",
+  oklahoma: "OK",
+  oregon: "OR",
+  pennsylvania: "PA",
+  "rhode island": "RI",
+  "south carolina": "SC",
+  "south dakota": "SD",
+  tennessee: "TN",
+  texas: "TX",
+  utah: "UT",
+  vermont: "VT",
+  virginia: "VA",
+  washington: "WA",
+  "west virginia": "WV",
+  wisconsin: "WI",
+  wyoming: "WY",
+  "district of columbia": "DC",
+};
+
+/** Match "Georgia", "georgia", "GA", "ga" as the same state. */
+function canonicalStateKey(state: string): string {
+  const raw = stateKey(state);
+  if (!raw) return "";
+  if (US_STATE_PREFIX[raw]) return raw;
+  for (const [full, code] of Object.entries(US_STATE_PREFIX)) {
+    if (raw === code.toLowerCase()) return full;
+  }
+  return raw;
+}
+
+function displayStateName(state: string): string {
+  const canon = canonicalStateKey(state);
+  if (!canon) return state.trim();
+  return canon
+    .split(" ")
+    .map((w) => (w.isEmpty ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
 async function resolveJwtEmail(req: Request): Promise<string> {
   const auth = req.headers.get("Authorization") ?? "";
   const m = auth.match(/^Bearer\s+(.+)$/i);
@@ -1051,9 +1125,9 @@ function filterMembersByState(
   members: Record<string, unknown>[],
   state: string,
 ): Record<string, unknown>[] {
-  const sk = stateKey(state);
+  const sk = canonicalStateKey(state);
   if (!sk) return [];
-  return members.filter((m) => stateKey(String(m.state ?? "")) === sk);
+  return members.filter((m) => canonicalStateKey(String(m.state ?? "")) === sk);
 }
 
 async function resolveCivicRole(
@@ -1410,60 +1484,7 @@ function findDuplicateMember(
 }
 
 function stateCodePrefix(state: string): string {
-  const map: Record<string, string> = {
-    alabama: "AL",
-    alaska: "AK",
-    arizona: "AZ",
-    arkansas: "AR",
-    california: "CA",
-    colorado: "CO",
-    connecticut: "CT",
-    delaware: "DE",
-    florida: "FL",
-    georgia: "GA",
-    hawaii: "HI",
-    idaho: "ID",
-    illinois: "IL",
-    indiana: "IN",
-    iowa: "IA",
-    kansas: "KS",
-    kentucky: "KY",
-    louisiana: "LA",
-    maine: "ME",
-    maryland: "MD",
-    massachusetts: "MA",
-    michigan: "MI",
-    minnesota: "MN",
-    mississippi: "MS",
-    missouri: "MO",
-    montana: "MT",
-    nebraska: "NE",
-    nevada: "NV",
-    "new hampshire": "NH",
-    "new jersey": "NJ",
-    "new mexico": "NM",
-    "new york": "NY",
-    "north carolina": "NC",
-    "north dakota": "ND",
-    ohio: "OH",
-    oklahoma: "OK",
-    oregon: "OR",
-    pennsylvania: "PA",
-    "rhode island": "RI",
-    "south carolina": "SC",
-    "south dakota": "SD",
-    tennessee: "TN",
-    texas: "TX",
-    utah: "UT",
-    vermont: "VT",
-    virginia: "VA",
-    washington: "WA",
-    "west virginia": "WV",
-    wisconsin: "WI",
-    wyoming: "WY",
-    "district of columbia": "DC",
-  };
-  return map[stateKey(state)] ?? "XX";
+  return US_STATE_PREFIX[canonicalStateKey(state)] ?? "XX";
 }
 
 function generateRegistryId(state: string, existing: Set<string>): string {
@@ -1618,12 +1639,12 @@ async function handleCivicFetchRoster(
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(st);
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(st);
     });
 
     let extraDir: Record<string, unknown>[] = [];
     let extraDec: Record<string, unknown>[] = [];
-    if (state && stateKey(state) !== stateKey(st) && pinSig) {
+    if (state && canonicalStateKey(state) !== canonicalStateKey(st) && pinSig) {
       const pins = await loadRegistryPins(admin);
       const expected = effectivePinForState(pins, state);
       if (expected && (await pinSigFor(state, expected)) === pinSig) {
@@ -1633,7 +1654,7 @@ async function handleCivicFetchRoster(
             const snap = d.snapshot && typeof d.snapshot === "object"
               ? (d.snapshot as Record<string, unknown>)
               : d;
-            return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+            return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
           })
           .map(sanitizeDirectoryDeceased);
       }
@@ -1681,7 +1702,7 @@ async function handleCivicFetchRoster(
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
     })
     .map(sanitizeDirectoryDeceased);
   return jsonOk({
@@ -1725,28 +1746,28 @@ async function handleCivicPersistRoster(
     removed = incomingRemoved;
     deceased = incomingDeceased.length > 0 ? incomingDeceased : deceased;
   } else {
-    const sk = stateKey(scopeState);
+    const sk = canonicalStateKey(scopeState);
     if (!sk) return jsonOk({ error: "No registrar state" }, 403);
     // Drop existing home-state rows, then merge incoming for that state only
-    members = members.filter((m) => stateKey(String(m.state ?? "")) !== sk);
+    members = members.filter((m) => canonicalStateKey(String(m.state ?? "")) !== sk);
     for (const m of incomingMembers) {
-      if (stateKey(String(m.state ?? "")) === sk) members.push(m);
+      if (canonicalStateKey(String(m.state ?? "")) === sk) members.push(m);
     }
-    removed = removed.filter((m) => stateKey(String(m.state ?? "")) !== sk);
+    removed = removed.filter((m) => canonicalStateKey(String(m.state ?? "")) !== sk);
     for (const m of incomingRemoved) {
-      if (stateKey(String(m.state ?? "")) === sk) removed.push(m);
+      if (canonicalStateKey(String(m.state ?? "")) === sk) removed.push(m);
     }
     deceased = deceased.filter((d) => {
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      return stateKey(String(d.state ?? snap.state ?? "")) !== sk;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) !== sk;
     });
     for (const d of incomingDeceased) {
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      if (stateKey(String(d.state ?? snap.state ?? "")) === sk) deceased.push(d);
+      if (canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk) deceased.push(d);
     }
   }
 
@@ -1759,7 +1780,7 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const fullName = String(body.fullName ?? "").trim();
   const phone = String(body.phone ?? "").trim();
   const homeAddress = String(body.homeAddress ?? body.address ?? "").trim();
-  const state = String(body.state ?? "").trim();
+  const state = displayStateName(String(body.state ?? "").trim());
   const familyMembers = Number(body.familyMembers ?? 1) || 1;
   const familyMales = Number(body.familyMales ?? 0) || 0;
   const familyFemales = Number(body.familyFemales ?? 0) || 0;
@@ -2247,11 +2268,11 @@ async function handleCivicFetchCitiesRooms(
   } catch (_) {
     // ignore
   }
-  const sk = stateKey(userState);
+  const sk = canonicalStateKey(userState);
   const slice: Record<string, unknown> = {};
   if (sk) {
     for (const [k, v] of Object.entries(fullByState)) {
-      if (stateKey(k) === sk) slice[k] = v;
+      if (canonicalStateKey(k) === sk) slice[k] = v;
     }
   }
   return jsonOk({
