@@ -1,0 +1,21 @@
+-- NGMY Phase 2 scaffold — true per-user RLS (DO NOT run until login uses real Supabase Auth sessions).
+-- Today the app often uses anonymous Auth + custom password hashes, so auth.uid()-based
+-- policies would break the live app. After Wave 1–2 (API keys + passwordHash lockdown):
+--
+-- 1) Migrate password login to Supabase Auth (or link public.users.auth_user_id = auth.users.id).
+-- 2) Stop using signInAnonymously for data access.
+-- 3) Then replace open policies with something like:
+--
+--   drop policy if exists "users_read" on public.users;
+--   create policy "users_read_own" on public.users
+--     for select using (
+--       lower(email) = lower(coalesce(auth.jwt()->>'email', ''))
+--       or public.is_ngmy_admin()
+--     );
+--
+-- Admins must be enforced via a SECURITY DEFINER is_ngmy_admin() that reads an
+-- allowlist table writable only by service_role — never via a client-writable isAdmin column alone.
+--
+-- This file is intentionally a no-op documentation scaffold.
+
+select 'Run security_lock_api_keys.sql and security_lock_password_hash.sql first. Defer this file until auth migration.' as note;

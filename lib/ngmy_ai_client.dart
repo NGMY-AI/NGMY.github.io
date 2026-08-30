@@ -7,11 +7,18 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_memory.dart';
-import 'ngmy_supabase_columns.dart';
 
 /// Slug of the Supabase Edge Function that proxies AI calls. Update this if
 /// the function is ever recreated under a different name in the Dashboard.
 const String kNgmySupabaseAiFunction = 'bright-handler';
+
+/// Sentinel meaning "AI key lives on the server only — never fetch/send the real key".
+const String kNgmyServerManagedAiKey = '__NGMY_SERVER_MANAGED__';
+
+bool ngmyIsServerManagedAiKey(String? key) {
+  final k = (key ?? '').trim();
+  return k.isEmpty || k == kNgmyServerManagedAiKey;
+}
 
 /// Supported AI backends for NGMY Helper (auto-detected from key shape or prefix).
 enum NgmyAiProviderKind {
@@ -37,8 +44,11 @@ class NgmyAiCredentials {
 /// `compat:https://host/v1|sk-...` prefix.
 NgmyAiCredentials ngmyParseAiCredentials(String raw) {
   var key = raw.trim();
-  if (key.isEmpty) {
-    return const NgmyAiCredentials(provider: NgmyAiProviderKind.gemini, apiKey: '');
+  if (key.isEmpty || key == kNgmyServerManagedAiKey) {
+    return const NgmyAiCredentials(
+      provider: NgmyAiProviderKind.gemini,
+      apiKey: kNgmyServerManagedAiKey,
+    );
   }
 
   final lower = key.toLowerCase();
@@ -237,24 +247,18 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
   List<NgmyAiImagePart> images = const [],
   Duration budget = const Duration(seconds: 22),
 }) async {
-  if (creds.apiKey.isEmpty) {
-    return (text: null, error: 'No API key configured.');
-  }
   try {
     return await () async {
-      if (kIsWeb) {
-        final proxied = await _callAiViaSupabaseProxy(
-          apiKey: creds.apiKey,
-          prompt: prompt,
-          provider: creds.provider,
-          openAiBaseUrl: creds.openAiBaseUrl,
-          images: images,
-        );
-        if (proxied.text != null && proxied.text!.trim().isNotEmpty) return proxied;
-        // On web, if proxy failed with a network error, do not burn more time on direct CORS calls.
-        if (ngmyIsOfflineOrNetworkError(proxied.error ?? '')) {
-          return proxied;
-        }
+      final proxied = await _callAiViaSupabaseProxy(
+        prompt: prompt,
+        provider: creds.provider,
+        openAiBaseUrl: creds.openAiBaseUrl,
+        images: images,
+      );
+      if (proxied.text != null && proxied.text!.trim().isNotEmpty) return proxied;
+      if (ngmyIsServerManagedAiKey(creds.apiKey)) return proxied;
+      if (kIsWeb && ngmyIsOfflineOrNetworkError(proxied.error ?? '')) {
+        return proxied;
       }
       final gemini = await _callGeminiDirectCommunicate(
         creds.apiKey,
@@ -263,7 +267,7 @@ Future<({String? text, String? error})> ngmyAiGenerateCommunicateFast(
         timeout: const Duration(seconds: 18),
       );
       if (gemini.text != null && gemini.text!.trim().isNotEmpty) return gemini;
-      return gemini;
+      return (text: null, error: proxied.error ?? gemini.error);
     }().timeout(budget);
   } on TimeoutException {
     return (text: null, error: 'timeout');
@@ -331,10 +335,6 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
   NgmyAiCredentials creds,
   String prompt,
 ) async {
-  if (creds.apiKey.isEmpty) {
-    return (text: null, error: 'No API key configured.');
-  }
-
   // App Builder replies are a full multi-screen app as JSON — 2048 tokens
   // (the budget used for short chat replies elsewhere) cuts that off
   // mid-structure. Small text-only edits fit and succeed; full rebuilds get
@@ -344,6 +344,9 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
   const appBuilderMaxTokens = 8000;
 
   Future<({String? text, String? error})> runDirect() async {
+    if (ngmyIsServerManagedAiKey(creds.apiKey)) {
+      return (text: null, error: 'Direct AI disabled — server key only.');
+    }
     switch (creds.provider) {
       case NgmyAiProviderKind.gemini:
         final strong = await _callGeminiDirectAppBuilder(creds.apiKey, prompt);
@@ -364,20 +367,19 @@ Future<({String? text, String? error})> ngmyAiGenerateForAppBuilder(
     }
   }
 
-  if (kIsWeb) {
-    final proxied = await _callAiViaSupabaseProxy(
-      apiKey: creds.apiKey,
-      prompt: prompt,
-      provider: creds.provider,
-      openAiBaseUrl: creds.openAiBaseUrl,
-      mode: 'appBuilder',
-    );
-    if (proxied.text != null) return proxied;
-    final direct = await runDirect();
-    if (direct.text != null) return direct;
-    return (text: null, error: proxied.error ?? direct.error ?? 'AI request failed on web.');
+  final proxied = await _callAiViaSupabaseProxy(
+    prompt: prompt,
+    provider: creds.provider,
+    openAiBaseUrl: creds.openAiBaseUrl,
+    mode: 'appBuilder',
+  );
+  if (proxied.text != null) return proxied;
+  if (ngmyIsServerManagedAiKey(creds.apiKey)) {
+    return (text: null, error: proxied.error ?? 'AI request failed.');
   }
-  return runDirect();
+  final direct = await runDirect();
+  if (direct.text != null) return direct;
+  return (text: null, error: proxied.error ?? direct.error ?? 'AI request failed.');
 }
 
 Future<({String? text, String? error})> _callOpenAiDirect(
@@ -479,8 +481,8 @@ Future<({String? text, String? error})> _callAnthropicDirect(
 }
 
 /// Supabase Edge Function proxy (fixes browser CORS for PWA / phone web).
+/// Never sends the real API key — the Edge Function loads it from secrets / service role.
 Future<({String? text, String? error})> _callAiViaSupabaseProxy({
-  required String apiKey,
   required String prompt,
   required NgmyAiProviderKind provider,
   String? openAiBaseUrl,
@@ -491,7 +493,6 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
     final client = Supabase.instance.client;
     final body = <String, dynamic>{
       'provider': images.isNotEmpty ? NgmyAiProviderKind.gemini.name : provider.name,
-      'apiKey': apiKey,
       'prompt': prompt,
       if (mode != null && mode.isNotEmpty) 'mode': mode,
       if (openAiBaseUrl != null && openAiBaseUrl.isNotEmpty) 'openAiBaseUrl': openAiBaseUrl,
@@ -579,11 +580,10 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
   String prompt, {
   List<NgmyAiImagePart> images = const [],
 }) async {
-  if (creds.apiKey.isEmpty) {
-    return (text: null, error: 'No API key configured.');
-  }
-
   Future<({String? text, String? error})> runDirect() async {
+    if (ngmyIsServerManagedAiKey(creds.apiKey)) {
+      return (text: null, error: 'Direct AI disabled — server key only.');
+    }
     if (images.isNotEmpty) {
       return _callGeminiDirect(creds.apiKey, prompt, images: images);
     }
@@ -603,38 +603,24 @@ Future<({String? text, String? error})> ngmyAiGenerateWithCredentials(
     }
   }
 
-  if (kIsWeb) {
-    final proxied = await _callAiViaSupabaseProxy(
-      apiKey: creds.apiKey,
-      prompt: prompt,
-      provider: creds.provider,
-      openAiBaseUrl: creds.openAiBaseUrl,
-      images: images,
-    );
-    if (proxied.text != null) return proxied;
-    final direct = await runDirect();
-    if (direct.text != null) return direct;
+  // Always prefer the server proxy so the real API key never leaves Supabase.
+  final proxied = await _callAiViaSupabaseProxy(
+    prompt: prompt,
+    provider: creds.provider,
+    openAiBaseUrl: creds.openAiBaseUrl,
+    images: images,
+  );
+  if (proxied.text != null) return proxied;
+  if (ngmyIsServerManagedAiKey(creds.apiKey) || kIsWeb) {
     return (
       text: null,
-      error: proxied.error ?? direct.error ?? 'AI request failed on web.',
+      error: proxied.error ?? 'AI request failed.',
     );
   }
 
   final direct = await runDirect();
   if (direct.text != null) return direct;
-
-  if (images.isEmpty) {
-    if (creds.provider != NgmyAiProviderKind.gemini) {
-      final geminiTry = await _callGeminiDirect(creds.apiKey, prompt);
-      if (geminiTry.text != null) return geminiTry;
-    }
-    if (creds.provider != NgmyAiProviderKind.openai) {
-      final openTry = await _callOpenAiDirect(creds.apiKey, prompt);
-      if (openTry.text != null) return openTry;
-    }
-  }
-
-  return direct;
+  return (text: null, error: proxied.error ?? direct.error);
 }
 
 /// NGMY Helper + any feature that used Gemini-only chat.
@@ -645,7 +631,6 @@ Future<String?> ngmyAiGenerateReply(
   List<Map<String, dynamic>> memory = const [],
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
-  if (creds.apiKey.isEmpty) return null;
 
   final memoryBlock = memory.isNotEmpty
       ? '\n${NgmyAiMemoryStore.transcriptForPrompt(memory)}\n'
@@ -709,16 +694,16 @@ String ngmyAiHelperFailureMessage({
   required String apiKey,
   String? lastError,
 }) {
-  final creds = ngmyParseAiCredentials(apiKey);
-  if (creds.apiKey.isEmpty) {
-    return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Menus → NGMY AI → Save AI Settings, then reload the app.';
-  }
   final err = (lastError ?? '').trim();
   if (ngmyIsOfflineOrNetworkError(err)) {
     return kNgmyOfflineAiMessage;
   }
   if (err.contains('proxy not deployed') || err.contains('404')) {
     return 'Your API key is saved, but the web AI proxy is not deployed in Supabase yet. Admin: deploy the $kNgmySupabaseAiFunction Edge Function, then try again.';
+  }
+  if (err.toLowerCase().contains('not configured on the server') ||
+      err.toLowerCase().contains('no api key')) {
+    return 'NGMY Helper is not connected yet. An admin must save the AI API key in Management Menus → NGMY AI → Save AI Settings, then reload the app.';
   }
   // Never show "could not reach Google Gemini: HTTP 500" to users.
   if (err.isEmpty || ngmyIsTransientAiHttpError(err) || err.toLowerCase().contains('http ')) {
@@ -765,9 +750,7 @@ Future<({String? text, String? error})> ngmyAiGenerateWithRetry(
   return result;
 }
 
-const _kNgmyConfigRowId = '1';
-
-/// Reads AI key from any Supabase config row shape.
+/// Reads AI key from any Supabase config row shape (admin/legacy only — prefer server proxy).
 String ngmyGeminiKeyFromMap(Map<String, dynamic>? json) {
   if (json == null) return '';
   for (final field in ['aiApiKey', 'ai_api_key', 'geminiApiKey', 'gemini_api_key', 'geminiapikey']) {
@@ -777,62 +760,136 @@ String ngmyGeminiKeyFromMap(Map<String, dynamic>? json) {
   return '';
 }
 
-Future<Map<String, dynamic>?> _ngmyFetchConfigRowForGemini() async {
-  final client = Supabase.instance.client;
-  for (final id in [_kNgmyConfigRowId, 1]) {
-    try {
-      final row = await client
-          .from('config')
-          .select(NgmySupabaseColumns.geminiOnly)
-          .eq('id', id)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 15));
-      if (row != null) return Map<String, dynamic>.from(row);
-    } catch (e) {
-      debugPrint('[ngmy-ai] config fetch id=$id: $e');
-    }
-  }
+Future<Map<String, dynamic>?> _ngmyInvokeBrightHandler(Map<String, dynamic> body) async {
   try {
-    final row = await client.from('config').select(NgmySupabaseColumns.geminiOnly).limit(1).maybeSingle().timeout(const Duration(seconds: 15));
-    if (row != null) return Map<String, dynamic>.from(row);
+    final client = Supabase.instance.client;
+    try {
+      final res = await client.functions
+          .invoke(kNgmySupabaseAiFunction, body: body)
+          .timeout(const Duration(seconds: 20));
+      if (res.data is Map) return Map<String, dynamic>.from(res.data as Map);
+    } catch (e) {
+      debugPrint('[ngmy-ai] invoke $kNgmySupabaseAiFunction: $e');
+    }
+    final restUrl = client.rest.url;
+    final base = restUrl.contains('/rest/v1')
+        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
+        : restUrl;
+    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
+    final session = client.auth.currentSession;
+    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
+    final token = session?.accessToken ?? anonKey;
+    final response = await http
+        .post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+            if (anonKey.isNotEmpty) 'apikey': anonKey,
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (response.body.isEmpty) return null;
+    final data = jsonDecode(response.body);
+    if (data is Map) return Map<String, dynamic>.from(data);
   } catch (e) {
-    debugPrint('[ngmy-ai] config fetch fallback: $e');
+    debugPrint('[ngmy-ai] bright-handler HTTP: $e');
   }
   return null;
 }
 
-/// Pull the shared NGMY AI key from Supabase (all users).
-Future<String> ngmyFetchRemoteGeminiApiKey() async {
-  try {
-    return ngmyGeminiKeyFromMap(await _ngmyFetchConfigRowForGemini());
-  } catch (e) {
-    debugPrint('[ngmy-ai] fetch gemini key: $e');
-    return '';
+/// Asks the Edge Function whether a server-side AI key is configured (never returns the key).
+Future<bool> ngmyAiKeyConfiguredOnServer({int retries = 2}) async {
+  for (var attempt = 0; attempt < retries; attempt++) {
+    if (attempt > 0) await Future<void>.delayed(Duration(milliseconds: 300 * attempt));
+    final data = await _ngmyInvokeBrightHandler({'action': 'aiKeyConfigured'});
+    if (data != null && data['configured'] == true) return true;
   }
+  return false;
 }
 
-/// Local config first, then cloud — with retries for slow mobile networks.
+/// Admin-only: save AI key via Edge Function (service role). Never write key columns from the client.
+Future<bool> ngmyPersistAiApiKeyViaServer({
+  required String requesterEmail,
+  required String apiKey,
+}) async {
+  final email = requesterEmail.trim().toLowerCase();
+  final key = apiKey.trim();
+  if (email.isEmpty || key.isEmpty || key == kNgmyServerManagedAiKey) return false;
+  final data = await _ngmyInvokeBrightHandler({
+    'action': 'saveAiApiKey',
+    'requesterEmail': email,
+    'apiKey': key,
+  });
+  return data != null && data['ok'] == true;
+}
+
+/// Password login without downloading passwordHash to the browser.
+Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswordLoginViaServer({
+  required String email,
+  required String passwordHash,
+}) async {
+  final data = await _ngmyInvokeBrightHandler({
+    'action': 'verifyPasswordLogin',
+    'email': email.trim().toLowerCase(),
+    'passwordHash': passwordHash.trim(),
+  });
+  if (data == null) {
+    return (ok: false, error: 'Could not reach login server.', user: null);
+  }
+  if (data['ok'] == true) {
+    final user = data['user'];
+    return (
+      ok: true,
+      error: null,
+      user: user is Map ? Map<String, dynamic>.from(user) : null,
+    );
+  }
+  return (
+    ok: false,
+    error: data['error']?.toString() ?? 'Login failed',
+    user: null,
+  );
+}
+
+/// Never pulls the real Gemini key to the client. Returns a server-managed sentinel when configured.
+Future<String> ngmyFetchRemoteGeminiApiKey() async {
+  try {
+    if (await ngmyAiKeyConfiguredOnServer()) return kNgmyServerManagedAiKey;
+  } catch (e) {
+    debugPrint('[ngmy-ai] fetch gemini configured: $e');
+  }
+  return '';
+}
+
+/// Local admin paste (if any) or server-managed sentinel — never downloads the shared cloud key.
 Future<String> ngmyResolveGeminiApiKey({
   String localKey = '',
   dynamic config,
   int retries = 3,
 }) async {
   var key = localKey.trim();
-  if (key.isEmpty && config != null) {
+  if ((key.isEmpty || key == kNgmyServerManagedAiKey) && config != null) {
     try {
-      key = (config as dynamic).geminiApiKey?.toString().trim() ?? '';
+      final cfg = (config as dynamic).geminiApiKey?.toString().trim() ?? '';
+      if (cfg.isNotEmpty && cfg != kNgmyServerManagedAiKey) key = cfg;
     } catch (_) {}
   }
-  for (var attempt = 0; attempt < retries && key.isEmpty; attempt++) {
+  if (key.isNotEmpty && key != kNgmyServerManagedAiKey) return key;
+
+  for (var attempt = 0; attempt < retries; attempt++) {
     if (attempt > 0) await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
-    key = await ngmyFetchRemoteGeminiApiKey();
+    if (await ngmyAiKeyConfiguredOnServer()) {
+      if (config != null) {
+        try {
+          (config as dynamic).geminiApiKey = kNgmyServerManagedAiKey;
+        } catch (_) {}
+      }
+      return kNgmyServerManagedAiKey;
+    }
   }
-  if (key.isNotEmpty && config != null) {
-    try {
-      (config as dynamic).geminiApiKey = key;
-    } catch (_) {}
-  }
-  return key;
+  return '';
 }
 
 /// Free image fallback — works without an API key (romantic chat selfies, etc.).
@@ -882,7 +939,6 @@ bool ngmyPartnerImagePromptLooksAdult(String prompt) {
 
 /// Server-side image fetch via Supabase proxy (avoids browser CORS on ngmy.org).
 Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
-  required String apiKey,
   required String action,
   required String prompt,
   Uint8List? personBytes,
@@ -894,7 +950,6 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
     final client = Supabase.instance.client;
     final body = <String, dynamic>{
       'action': action,
-      'apiKey': apiKey.trim(),
       'prompt': prompt.trim(),
       'allowAdult': allowAdult,
       if (personBytes != null && personBytes.isNotEmpty)
@@ -1006,7 +1061,6 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
       );
       // Proxy works without a real Gemini key for pollinationsImage — always try.
       final viaProxy = await _callImageActionViaProxy(
-        apiKey: key.isNotEmpty ? key : 'pollinations',
         action: 'pollinationsImage',
         prompt: text,
         allowAdult: adultMode,
@@ -1096,7 +1150,6 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
         final remaining = effectiveBudget - DateTime.now().difference(started);
         final geminiCap = lookalikeFirst ? const Duration(seconds: 16) : const Duration(seconds: 12);
         final proxied = await _callGeminiOutfitViaProxy(
-          apiKey: key,
           personBytes: lookalikePortraitBytes!,
           personMime: lookalikeMime,
           prompt: lookalikePrompt,
@@ -1128,7 +1181,6 @@ Future<({Uint8List? bytes, String? error})> ngmyGenerateRomanticChatImage(
     if (!lookalikeFirst &&
         tryLookalike &&
         hasPortrait &&
-        key.isNotEmpty &&
         hasTime(fast ? const Duration(seconds: 4) : const Duration(seconds: 8))) {
       final geminiHit = await tryGeminiLookalike();
       if (geminiHit.bytes != null && geminiHit.bytes!.isNotEmpty) return geminiHit;
@@ -1419,7 +1471,6 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitDirect({
 }
 
 Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
-  required String apiKey,
   required Uint8List personBytes,
   required String personMime,
   required String prompt,
@@ -1428,7 +1479,6 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
     final client = Supabase.instance.client;
     final body = <String, dynamic>{
       'action': 'geminiVirtualOutfit',
-      'apiKey': apiKey.trim(),
       'prompt': prompt,
       'personOnly': true,
       'images': [
@@ -1513,10 +1563,7 @@ Future<({Uint8List? bytes, String? error})> ngmyAiVirtualOutfitTryOn({
   void Function(String status)? onStatus,
 }) async {
   final creds = ngmyParseAiCredentials(apiKey);
-  if (creds.apiKey.isEmpty) {
-    return (bytes: null, error: 'No AI API key configured. Admin → Management Menus → NGMY AI.');
-  }
-  if (creds.provider != NgmyAiProviderKind.gemini) {
+  if (creds.provider != NgmyAiProviderKind.gemini && !ngmyIsServerManagedAiKey(creds.apiKey)) {
     return (
       bytes: null,
       error: 'AI Outfit Studio needs a Google Gemini API key (AIza… or gemini: prefix).',
@@ -1526,39 +1573,35 @@ Future<({Uint8List? bytes, String? error})> ngmyAiVirtualOutfitTryOn({
   if (outfitBytes.length < 512) return (bytes: null, error: 'Outfit photo is too small or missing.');
 
   onStatus?.call('Studying your photo and outfit…');
-  final brief = await _ngmyOutfitVisionBrief(
-    apiKey: creds.apiKey,
-    personBytes: personBytes,
-    personMime: personMime,
-    outfitBytes: outfitBytes,
-    outfitMime: outfitMime,
-  );
+  String? brief;
+  if (!ngmyIsServerManagedAiKey(creds.apiKey)) {
+    brief = await _ngmyOutfitVisionBrief(
+      apiKey: creds.apiKey,
+      personBytes: personBytes,
+      personMime: personMime,
+      outfitBytes: outfitBytes,
+      outfitMime: outfitMime,
+    );
+  }
 
   final visionBrief = brief ??
       'Dress the person in the complete outfit from the reference — full replacement of all original clothing.';
   var prompt = ngmyBuildOutfitTryOnPrompt(visionBrief: visionBrief, styleNotes: styleNotes);
 
-  Future<({Uint8List? bytes, String? error})> runOnce(String p, {bool viaProxyFirst = kIsWeb}) async {
-    Future<({Uint8List? bytes, String? error})> direct() => _callGeminiOutfitDirect(
-          apiKey: creds.apiKey,
-          personBytes: personBytes,
-          personMime: personMime,
-          prompt: p,
-        );
-    Future<({Uint8List? bytes, String? error})> proxy() => _callGeminiOutfitViaProxy(
-          apiKey: creds.apiKey,
-          personBytes: personBytes,
-          personMime: personMime,
-          prompt: p,
-        );
-    if (viaProxyFirst) {
-      final proxied = await proxy();
-      if (proxied.bytes != null) return proxied;
-      return direct();
-    }
-    final d = await direct();
-    if (d.bytes != null) return d;
-    return proxy();
+  Future<({Uint8List? bytes, String? error})> runOnce(String p) async {
+    final proxied = await _callGeminiOutfitViaProxy(
+      personBytes: personBytes,
+      personMime: personMime,
+      prompt: p,
+    );
+    if (proxied.bytes != null) return proxied;
+    if (ngmyIsServerManagedAiKey(creds.apiKey) || kIsWeb) return proxied;
+    return _callGeminiOutfitDirect(
+      apiKey: creds.apiKey,
+      personBytes: personBytes,
+      personMime: personMime,
+      prompt: p,
+    );
   }
 
   onStatus?.call('Dressing you in the full outfit — pass 1…');

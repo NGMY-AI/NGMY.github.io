@@ -285,6 +285,134 @@ function adminClient() {
   });
 }
 
+function keyFromConfigRow(row: Record<string, unknown> | null): string {
+  if (!row) return "";
+  for (const field of ["aiApiKey", "ai_api_key", "geminiApiKey", "gemini_api_key"]) {
+    const v = String(row[field] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
+/** Server-only AI key: Edge secrets first, then service-role config. Never trust client body. */
+async function resolveServerAiApiKey(): Promise<string> {
+  for (const envName of ["NGMY_AI_API_KEY", "GEMINI_API_KEY", "AI_API_KEY"]) {
+    const v = String(Deno.env.get(envName) ?? "").trim();
+    if (v) return v;
+  }
+  const admin = adminClient();
+  if (!admin) return "";
+  for (const id of ["1", 1]) {
+    const { data } = await admin
+      .from("config")
+      .select("aiApiKey,ai_api_key,geminiApiKey,gemini_api_key")
+      .eq("id", id)
+      .maybeSingle();
+    const k = keyFromConfigRow(data as Record<string, unknown> | null);
+    if (k) return k;
+  }
+  const { data } = await admin
+    .from("config")
+    .select("aiApiKey,ai_api_key,geminiApiKey,gemini_api_key")
+    .limit(1)
+    .maybeSingle();
+  return keyFromConfigRow(data as Record<string, unknown> | null);
+}
+
+async function resolveServerElevenLabsKey(): Promise<string> {
+  const env = String(Deno.env.get("ELEVENLABS_API_KEY") ?? "").trim();
+  if (env) return env;
+  const admin = adminClient();
+  if (!admin) return "";
+  const { data } = await admin
+    .from("config")
+    .select("elevenLabsApiKey,elevenlabs_api_key")
+    .eq("id", "1")
+    .maybeSingle();
+  if (!data) return "";
+  return String(data.elevenLabsApiKey ?? data.elevenlabs_api_key ?? "").trim();
+}
+
+function jsonOk(payload: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function isNgmyAdminEmail(email: string): boolean {
+  return NGMY_ADMIN_EMAILS.has(email.trim().toLowerCase());
+}
+
+async function handleSaveAiApiKey(requesterEmail: string, apiKey: string): Promise<Response> {
+  if (!isNgmyAdminEmail(requesterEmail)) {
+    return jsonOk({ error: "Admin access required" }, 403);
+  }
+  const k = apiKey.trim();
+  if (!k) return jsonOk({ error: "apiKey is required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const { error } = await admin.from("config").upsert({
+    id: "1",
+    geminiApiKey: k,
+    gemini_api_key: k,
+    aiApiKey: k,
+    ai_api_key: k,
+  });
+  if (error) return jsonOk({ error: error.message }, 500);
+  return jsonOk({ ok: true, configured: true });
+}
+
+async function handleAiKeyConfigured(): Promise<Response> {
+  const key = await resolveServerAiApiKey();
+  return jsonOk({ configured: key.length > 0 });
+}
+
+async function handleVerifyPasswordLogin(email: string, passwordHash: string): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const key = email.trim().toLowerCase();
+  const hash = passwordHash.trim();
+  if (!key || !hash) return jsonOk({ ok: false, error: "Email and password required" }, 400);
+
+  let row: Record<string, unknown> | null = null;
+  const exact = await admin
+    .from("users")
+    .select("email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore")
+    .eq("email", key)
+    .maybeSingle();
+  if (exact.data) row = exact.data as Record<string, unknown>;
+  if (!row) {
+    const fuzzy = await admin
+      .from("users")
+      .select("email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore")
+      .ilike("email", key)
+      .maybeSingle();
+    if (fuzzy.data) row = fuzzy.data as Record<string, unknown>;
+  }
+  if (!row) return jsonOk({ ok: false, error: "Account not found" }, 404);
+
+  const dbHash = String(row.passwordHash ?? row.password_hash ?? "").trim();
+  if (!dbHash || dbHash !== hash) {
+    return jsonOk({ ok: false, error: "Wrong password" }, 401);
+  }
+
+  // Never return passwordHash to the client.
+  return jsonOk({
+    ok: true,
+    user: {
+      email: String(row.email ?? key),
+      username: String(row.username ?? ""),
+      phone: String(row.phone ?? ""),
+      isAdmin: Boolean(row.isAdmin),
+      status: String(row.status ?? "active"),
+      forceLogout: Boolean(row.forceLogout),
+      accountBalance: Number(row.accountBalance ?? 0),
+      canSellOnStore: Boolean(row.canSellOnStore),
+    },
+  });
+}
+
 async function userAccountExists(admin: ReturnType<typeof createClient>, email: string): Promise<boolean> {
   const { data } = await admin.from("users").select("email").ilike("email", email).maybeSingle();
   return data != null;
@@ -433,7 +561,8 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const action = String(body?.action ?? "chat").trim();
-    const apiKey = String(body?.apiKey ?? "").trim();
+    // Client-supplied apiKey is ignored for AI calls (security). Admin save/login use explicit fields.
+    const clientApiKeyIgnored = String(body?.apiKey ?? "").trim();
 
     if (action === "passwordResetSendOtp") {
       const email = String(body?.email ?? "").trim().toLowerCase();
@@ -458,13 +587,30 @@ serve(async (req) => {
       return await handlePasswordResetVerifyOtp(email, code);
     }
 
+    if (action === "saveAiApiKey") {
+      const requesterEmail = String(body?.requesterEmail ?? "").trim().toLowerCase();
+      const apiKey = String(body?.apiKey ?? "").trim();
+      return await handleSaveAiApiKey(requesterEmail, apiKey);
+    }
+
+    if (action === "aiKeyConfigured") {
+      return await handleAiKeyConfigured();
+    }
+
+    if (action === "verifyPasswordLogin") {
+      const email = String(body?.email ?? "").trim().toLowerCase();
+      const passwordHash = String(body?.passwordHash ?? "").trim();
+      return await handleVerifyPasswordLogin(email, passwordHash);
+    }
+
     if (action === "elevenlabsTts") {
       const text = String(body?.text ?? "").trim();
       const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
       const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
+      const apiKey = (await resolveServerElevenLabsKey()) || clientApiKeyIgnored;
       if (!apiKey || !text) {
         return new Response(
-          JSON.stringify({ error: "apiKey and text are required for TTS" }),
+          JSON.stringify({ error: "Voice API key not configured on server, and text is required" }),
           {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -485,7 +631,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const resendKey = String(body?.apiKey ?? Deno.env.get("RESEND_API_KEY") ?? "").trim();
+      const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? clientApiKeyIgnored ?? "").trim();
       const to = String(body?.to ?? "").trim();
       const subject = String(body?.subject ?? "Message from NGMY").trim();
       const html = String(body?.html ?? body?.body ?? "").trim();
@@ -494,7 +640,7 @@ serve(async (req) => {
       ).trim();
       if (!resendKey || !to || !html) {
         return new Response(
-          JSON.stringify({ error: "apiKey, to, and html/body are required for resendEmail" }),
+          JSON.stringify({ error: "Resend API key (server secret), to, and html/body are required" }),
           {
             status: 400,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -513,10 +659,11 @@ serve(async (req) => {
         ? body.images
         : [];
       const personOnly = Boolean(body?.personOnly);
+      const apiKey = await resolveServerAiApiKey();
       if (!apiKey || !outfitPrompt || images.length < 1) {
         return new Response(
           JSON.stringify({
-            error: "apiKey, prompt, and at least one image (person) are required",
+            error: "Server AI key, prompt, and at least one image (person) are required",
           }),
           {
             status: 400,
@@ -585,9 +732,14 @@ serve(async (req) => {
     // bigger output budget (and a stronger model) than a short chat reply.
     const appBuilder = String(body?.mode ?? "") === "appBuilder";
 
+    const apiKey = await resolveServerAiApiKey();
     if (!apiKey || !prompt) {
       return new Response(
-        JSON.stringify({ error: "apiKey and prompt are required" }),
+        JSON.stringify({
+          error: !apiKey
+            ? "AI API key is not configured on the server. Admin: set NGMY_AI_API_KEY secret or Save AI Settings."
+            : "prompt is required",
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

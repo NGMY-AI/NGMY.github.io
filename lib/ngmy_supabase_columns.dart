@@ -1,8 +1,9 @@
 /// Column lists for Supabase reads — smaller payloads, less cached egress.
+/// Secret columns (API keys, passwordHash) must never appear here.
 class NgmySupabaseColumns {
   NgmySupabaseColumns._();
 
-  /// Periodic config poll (no full legal blobs unless needed elsewhere).
+  /// Periodic config poll (no API secret columns — those stay server-only).
   static const configPoll =
       'id,ngmyChatClosed,investmentPlans,storeOrders,storeInquiries,storeListings,'
       'helpHelperApplications,helpRequests,helpBusinesses,loanApplications,'
@@ -11,7 +12,7 @@ class NgmySupabaseColumns {
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
       'helpScopeType,helpScopeValue,helpState,helpCampaignId,helpCampaignStartedAt,helpCampaignClosures,'
-      'geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,gameTimeLimits,diceSettings,'
+      'gameTimeLimits,diceSettings,'
       'familyTreeCreateFee,familyTreePhotoMonthlyFee,familyTreePhotoAccessUntilByEmail,logoUrl,'
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
@@ -19,7 +20,7 @@ class NgmySupabaseColumns {
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,civicRegistryPin,'
       'civicRegistryPinsByState,civicCitiesByState,cities,rooms,storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
-      'familyTreePhotoAccessUntilByEmail,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key,'
+      'familyTreePhotoAccessUntilByEmail,'
       'gameTimeLimits,diceSettings,gameInvites,officialCashApp,officialBitcoin,'
       'loanPhone,loanHowItWorks,loanCompanyZelle';
 
@@ -29,21 +30,22 @@ class NgmySupabaseColumns {
       'jobPosts,jobWorkerApplications,gameInvites,mediaVirtualProfiles,mediaDeliveryQueue,'
       'termsAndConditions,privacyPolicy';
 
-  static const geminiOnly = 'id,geminiApiKey,gemini_api_key,aiApiKey,ai_api_key';
+  /// Deprecated: API keys must not be selected by clients.
+  static const geminiOnly = 'id';
 
-  static const youtubeOnly = 'id,youtubeApiKey,youtube_api_key';
+  static const youtubeOnly = 'id';
 
-  /// Login probe — small payload, fast on slow networks.
+  /// Login probe — never includes passwordHash (verified server-side).
   static const userLogin =
-      'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,'
+      'email,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,'
       'state,civicRegistryStateSwitchesUsed,civicRegistryAnchorState';
 
   /// Optional — only when users.crownBadge column exists (see users_crown_badge_column.sql).
   static const userCrownBadge = 'crownBadge';
 
-  /// Admin Users tab — every NGMY account row (paginated).
+  /// Admin Users tab — every NGMY account row (paginated). Never select passwordHash.
   static const adminUsersList =
-      'email,username,phone,passwordHash,isAdmin,status,forceLogout,accountBalance,totalProfit,'
+      'email,username,phone,isAdmin,status,forceLogout,accountBalance,totalProfit,'
       'canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount,'
       'points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper';
 

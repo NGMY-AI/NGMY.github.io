@@ -104,7 +104,6 @@ Future<({String? text, String? error})> _callGeminiVisionDirect({
 
 /// Supabase Edge Function (same as NGMY Helper) — required for web/PWA CORS.
 Future<({String? text, String? error})> _callGeminiVisionViaProxy({
-  required String apiKey,
   required String prompt,
   required List<({Uint8List bytes, String mimeType})> images,
 }) async {
@@ -120,7 +119,6 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
         .toList();
     final body = <String, dynamic>{
       'provider': 'gemini',
-      'apiKey': apiKey.trim(),
       'prompt': prompt,
       'images': imagePayload,
     };
@@ -213,39 +211,40 @@ Future<({String? text, String? error})> geminiAnalyzeImages({
 }) async {
   if (images.isEmpty) return (text: null, error: 'No images to scan.');
   final creds = ngmyParseAiCredentials(apiKey);
-  if (creds.apiKey.isEmpty) return (text: null, error: 'No API key configured.');
 
-  if (creds.provider != NgmyAiProviderKind.gemini) {
+  if (!ngmyIsServerManagedAiKey(creds.apiKey) && creds.provider != NgmyAiProviderKind.gemini) {
     return (
       text: null,
       error: 'Document Scanner needs a Google Gemini API key (AIza… or gemini: prefix in Management Menus → NGMY AI).',
     );
   }
 
-  Future<({String? text, String? error})> runDirect() => _callGeminiVisionDirect(
-        apiKey: creds.apiKey,
-        prompt: prompt,
-        images: images,
-      );
-
-  if (kIsWeb) {
-    final proxied = await _callGeminiVisionViaProxy(
+  Future<({String? text, String? error})> runDirect() {
+    if (ngmyIsServerManagedAiKey(creds.apiKey)) {
+      return Future.value((text: null, error: 'Direct AI disabled — server key only.'));
+    }
+    return _callGeminiVisionDirect(
       apiKey: creds.apiKey,
       prompt: prompt,
       images: images,
     );
-    if (proxied.text != null) return proxied;
-    final direct = await runDirect();
-    if (direct.text != null) return direct;
+  }
+
+  final proxied = await _callGeminiVisionViaProxy(
+    prompt: prompt,
+    images: images,
+  );
+  if (proxied.text != null) return proxied;
+  if (ngmyIsServerManagedAiKey(creds.apiKey) || kIsWeb) {
     return (
       text: null,
-      error: proxied.error ?? direct.error ?? 'Document scan failed on web.',
+      error: proxied.error ?? 'Document scan failed.',
     );
   }
 
   final direct = await runDirect();
   if (direct.text != null) return direct;
-  return (text: null, error: direct.error ?? 'Could not reach Gemini.');
+  return (text: null, error: proxied.error ?? direct.error ?? 'Could not reach Gemini.');
 }
 
 String ngmyDocumentFollowUpPrompt({

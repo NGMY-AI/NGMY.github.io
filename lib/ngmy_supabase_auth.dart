@@ -43,10 +43,10 @@ Future<Map<String, dynamic>?> ngmyFetchUserLoginRow(
 
   const fallbacks = <String>[
     NgmySupabaseColumns.userLogin,
-    'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore',
-    'email,passwordHash,username,phone,isAdmin,status,forceLogout,accountBalance',
-    'email,passwordHash,username,phone,isAdmin,status,accountBalance',
-    'email,passwordHash',
+    'email,username,phone,isAdmin,status,forceLogout,accountBalance,canSellOnStore',
+    'email,username,phone,isAdmin,status,forceLogout,accountBalance',
+    'email,username,phone,isAdmin,status,accountBalance',
+    'email',
   ];
 
   Object? lastError;

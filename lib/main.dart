@@ -2118,10 +2118,17 @@ class AppConfig {
     privacyPolicy: json['privacyPolicy'] ?? kNgmyPrivacyPolicy,
     loanPhone: json['loanPhone'] ?? '706-623-7963',
     loanHowItWorks: json['loanHowItWorks'] ?? '1. Submit your loan application with collateral details\n2. Your application will be reviewed within a few hours\n3. If approved, the loan amount will be credited to your account\n4. Make payments over 2 months (total repayment: loan + 36% interest)\n5. Upon full repayment, your collateral is released',
-    geminiApiKey: _geminiKeyFromMap(json),
-    youtubeApiKey: (json['youtubeApiKey'] ?? json['youtube_api_key'] ?? '').toString().trim(),
-    elevenLabsApiKey: (json['elevenLabsApiKey'] ?? '').toString().trim(),
-    resendApiKey: (json['resendApiKey'] ?? '').toString().trim(),
+    geminiApiKey: (() {
+      final k = _geminiKeyFromMap(json);
+      // Never rehydrate a real cloud key from disk/network into the client.
+      if (k.startsWith('AIza') || k.startsWith('sk-') || k.startsWith('sk-ant-')) {
+        return kNgmyServerManagedAiKey;
+      }
+      return k;
+    })(),
+    youtubeApiKey: '',
+    elevenLabsApiKey: '',
+    resendApiKey: '',
     resendFromEmail: (json['resendFromEmail'] ?? 'NGMY <noreply@ngmy.org>').toString().trim(),
     logoUrl: json['logoUrl'] ?? 'https://i.ibb.co/LhbMvz9/ngmy-logo.png',
     cities: byState.isNotEmpty
@@ -7417,76 +7424,22 @@ String? _missingColumnFromError(Object error) {
 }
 
 Future<String> _fetchRemoteGeminiApiKey() async {
+  // Never download the real key — only whether the server has one.
   try {
-    final row = await _fetchNgmyConfigRow(columns: NgmySupabaseColumns.geminiOnly);
-    if (row == null) return '';
-    return _geminiKeyFromMap(row);
+    return await ngmyFetchRemoteGeminiApiKey();
   } catch (e) {
-    debugPrint('[config] fetch gemini key error: $e');
+    debugPrint('[config] fetch gemini configured error: $e');
     return '';
   }
 }
 
-Future<bool> _persistGeminiApiKeyToSupabase(String key) async {
+Future<bool> _persistGeminiApiKeyToSupabase(String key, {required String adminEmail}) async {
   final k = key.trim();
-  if (k.isEmpty) return false;
-  final client = Supabase.instance.client;
-
-  final existing = await _fetchNgmyConfigRow();
-  final idValue = _ngmyConfigRowIdValue(existing);
-  Map<String, dynamic> row = existing != null
-      ? Map<String, dynamic>.from(existing)
-      : <String, dynamic>{'id': idValue};
-  row['id'] = idValue;
-  row['geminiApiKey'] = k;
-  row['gemini_api_key'] = k;
-  row['aiApiKey'] = k;
-  row['ai_api_key'] = k;
-
-  var working = Map<String, dynamic>.from(row);
-  for (var attempt = 0; attempt < 16; attempt++) {
-    try {
-      await client.from('config').upsert(working);
-      final verify = await _fetchRemoteGeminiApiKey();
-      if (verify.isNotEmpty) {
-        debugPrint('[config] AI API key synced for all users.');
-        return true;
-      }
-    } catch (e) {
-      final missing = _missingColumnFromError(e);
-      if (missing != null && missing.isNotEmpty && working.containsKey(missing)) {
-        working = Map<String, dynamic>.from(working)..remove(missing);
-        continue;
-      }
-      debugPrint('[config] AI key upsert failed: $e');
-    }
-
-    for (final field in ['geminiApiKey', 'gemini_api_key', 'aiApiKey', 'ai_api_key']) {
-      if (!working.containsKey(field)) continue;
-      try {
-        await client.from('config').upsert({'id': idValue, field: k});
-        if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
-          debugPrint('[config] AI API key saved via $field.');
-          return true;
-        }
-      } catch (e) {
-        debugPrint('[config] AI key save via $field failed: $e');
-      }
-      try {
-        await client.from('config').update({field: k}).eq('id', idValue);
-        if ((await _fetchRemoteGeminiApiKey()).isNotEmpty) {
-          debugPrint('[config] AI API key updated via $field.');
-          return true;
-        }
-      } catch (e) {
-        debugPrint('[config] AI key update via $field failed: $e');
-      }
-    }
-    break;
-  }
-  return false;
+  if (k.isEmpty || k == kNgmyServerManagedAiKey) return false;
+  final ok = await ngmyPersistAiApiKeyViaServer(requesterEmail: adminEmail, apiKey: k);
+  if (ok) debugPrint('[config] AI API key saved via Edge Function (server-only).');
+  return ok;
 }
-
 Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   required AppConfig config,
   required bool isAdmin,
@@ -7494,23 +7447,21 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   await _mergeCivicRegistryPinsIntoConfig(config);
   final row = <String, dynamic>{'id': kNgmyConfigRowId, ...config.toJson()};
   final localKey = config.geminiApiKey.trim();
-  final remoteKey = await _fetchRemoteGeminiApiKey();
-  if (isAdmin && localKey.isNotEmpty) {
-    row['geminiApiKey'] = localKey;
-    row['gemini_api_key'] = localKey;
-    row['aiApiKey'] = localKey;
-    row['ai_api_key'] = localKey;
-  } else if (remoteKey.isNotEmpty) {
-    row['geminiApiKey'] = remoteKey;
-    row['gemini_api_key'] = remoteKey;
-    row['aiApiKey'] = remoteKey;
-    row['ai_api_key'] = remoteKey;
-    config.geminiApiKey = remoteKey;
-  } else {
-    row.remove('geminiApiKey');
-    row.remove('gemini_api_key');
-    row.remove('aiApiKey');
-    row.remove('ai_api_key');
+  // Never write or re-broadcast API key columns from the client.
+  row.remove('geminiApiKey');
+  row.remove('gemini_api_key');
+  row.remove('aiApiKey');
+  row.remove('ai_api_key');
+  row.remove('youtubeApiKey');
+  row.remove('youtube_api_key');
+  row.remove('elevenLabsApiKey');
+  row.remove('resendApiKey');
+  // Keep a server-managed sentinel in local config so features know AI is available.
+  final remoteConfigured = await _fetchRemoteGeminiApiKey();
+  if (remoteConfigured.isNotEmpty) {
+    config.geminiApiKey = kNgmyServerManagedAiKey;
+  } else if (localKey == kNgmyServerManagedAiKey) {
+    config.geminiApiKey = '';
   }
   final remoteLegal = await _fetchRemoteLegalContent();
   final remoteTerms = (remoteLegal['terms'] ?? '').trim();
@@ -8229,11 +8180,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
     const columnSets = <String?>[
-      null,
       NgmySupabaseColumns.adminUsersList,
       NgmySupabaseColumns.userLogin,
-      'email,username,phone,passwordHash,accountBalance,status,isAdmin',
-      'email,username,phone,passwordHash',
+      'email,username,phone,accountBalance,status,isAdmin',
+      'email,username,phone',
       'email',
     ];
     Object? lastError;
@@ -8819,16 +8769,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyIncomeSound.bindSession(key);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (_currentUser!.passwordHash.trim().isEmpty) {
-      try {
-        final cloud = await _fetchCloudUserRow(key);
-        if (cloud != null && cloud.passwordHash.trim().isNotEmpty) {
-          _currentUser!.passwordHash = cloud.passwordHash;
-          final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-          if (idx >= 0) _allUsers[idx].passwordHash = cloud.passwordHash;
-        }
-      } catch (e) {
-        debugPrint('[oauth] preserve cloud password hash: $e');
-      }
+      // passwordHash is never downloaded from the cloud (verified server-side on login).
     }
     if (!mounted) return;
     _sessionBecameLiveAt = DateTime.now();
@@ -10267,11 +10208,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyRemoteConfigMerge(next, cfgMap, keepConfig);
         _applyNgmyChatClosedFromRemote(next, cfgMap, localClosed: keepChatClosed);
         await _applyRemoteLegalToConfig(next, cfgMap, keep: keepConfig);
-        final remoteGemini = _geminiKeyFromMap(cfgMap);
-        if (remoteGemini.isNotEmpty) {
-          next.geminiApiKey = remoteGemini;
-        } else if (next.geminiApiKey.trim().isEmpty && keepGemini.isNotEmpty) {
+        final remoteGeminiConfigured = await _fetchRemoteGeminiApiKey();
+        if (remoteGeminiConfigured.isNotEmpty) {
+          next.geminiApiKey = kNgmyServerManagedAiKey;
+        } else if (keepGemini.isNotEmpty && keepGemini != kNgmyServerManagedAiKey) {
           next.geminiApiKey = keepGemini;
+        } else {
+          next.geminiApiKey = '';
         }
         if (next.storeListings.isEmpty && keepListings.isNotEmpty) next.storeListings = keepListings;
         if (next.storeInquiries.isEmpty && keepInquiries.isNotEmpty) {
@@ -11364,16 +11307,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyIncomeSound.bindSession(emailNorm);
     unawaited(NgmyIncomeSound.unlockForWebUserGesture());
     if (_currentUser != null && _currentUser!.passwordHash.trim().isEmpty) {
-      try {
-        final cloud = await _fetchCloudUserRow(emailNorm);
-        if (cloud != null && cloud.passwordHash.trim().isNotEmpty) {
-          _currentUser!.passwordHash = cloud.passwordHash;
-          final uIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
-          if (uIdx >= 0) _allUsers[uIdx].passwordHash = cloud.passwordHash;
-        }
-      } catch (e) {
-        debugPrint('[oauth] preserve cloud password hash: $e');
-      }
+      // passwordHash is never downloaded from the cloud (verified server-side on login).
     }
     await _saveData();
     await _persistSessionImmediately();
@@ -12812,11 +12746,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               localRegistrarApp,
             );
           }
-          final remoteGemini = _geminiKeyFromMap(cfgMap);
-          if (remoteGemini.isNotEmpty) {
-            _config.geminiApiKey = remoteGemini;
-          } else           if (_config.geminiApiKey.trim().isEmpty && localGeminiKey.isNotEmpty) {
+          final remoteGeminiConfigured = await _fetchRemoteGeminiApiKey();
+          if (remoteGeminiConfigured.isNotEmpty) {
+            _config.geminiApiKey = kNgmyServerManagedAiKey;
+          } else if (localGeminiKey.isNotEmpty && localGeminiKey != kNgmyServerManagedAiKey) {
             _config.geminiApiKey = localGeminiKey;
+          } else {
+            _config.geminiApiKey = '';
           }
           if (_config.investmentPlans.isNotEmpty) {
             _globalPlans = _investmentPlansFromMaps(_config.investmentPlans);
@@ -13933,27 +13869,22 @@ class _AuthScreenState extends State<AuthScreen> {
 
       try {
         await ngmyWaitForSupabaseReady();
-        final fresh = await ngmyFetchUserLoginRow(
-          Supabase.instance.client,
-          email,
+        final verified = await ngmyVerifyPasswordLoginViaServer(
+          email: email,
+          passwordHash: enteredHash,
         );
 
         if (!mounted) return;
 
-        if (fresh == null) {
+        if (verified.ok) {
+          await widget.onAuthComplete(email, '', '', enteredHash, true);
+        } else if ((verified.error ?? '').toLowerCase().contains('not found')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Account not found. Please Sign Up first.')),
           );
-          return;
-        }
-
-        final row = fresh;
-        final dbHash = (row['passwordHash'] ?? row['password_hash'] ?? '').toString();
-        if (dbHash.isNotEmpty && dbHash == enteredHash) {
-          await widget.onAuthComplete(email, '', '', enteredHash, true);
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Wrong password')),
+            SnackBar(content: Text(verified.error ?? 'Wrong password')),
           );
         }
       } catch (err) {
@@ -22865,7 +22796,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         isDark: isDark,
         config: widget.config,
         onDataChanged: widget.onDataChanged,
-        persistGeminiKey: _persistGeminiApiKeyToSupabase,
+        persistGeminiKey: (k) => _persistGeminiApiKeyToSupabase(k, adminEmail: widget.user.email),
         onPersistManagement: _persistManagementConfig,
         adminInputDecoration: _adminInputDecoration,
       ),
@@ -22891,7 +22822,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         onDeleteAnnouncement: widget.onDeleteAnnouncement,
         onClearAllAnnouncements: widget.onClearAllAnnouncements,
         onDataChanged: widget.onDataChanged,
-        persistGeminiKey: _persistGeminiApiKeyToSupabase,
+        persistGeminiKey: (k) => _persistGeminiApiKeyToSupabase(k, adminEmail: widget.user.email),
         onPersistManagement: _persistManagementConfig,
         adminInputDecoration: _adminInputDecoration,
       ),
@@ -25502,10 +25433,18 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
   @override
   void initState() {
     super.initState();
-    _apiC = TextEditingController(text: widget.config.geminiApiKey);
-    _youtubeC = TextEditingController(text: widget.config.youtubeApiKey);
-    _elevenLabsC = TextEditingController(text: widget.config.elevenLabsApiKey);
-    _resendC = TextEditingController(text: widget.config.resendApiKey);
+    final existingKey = widget.config.geminiApiKey.trim();
+    final showKey = existingKey.isNotEmpty &&
+            existingKey != kNgmyServerManagedAiKey &&
+            !existingKey.startsWith('AIza') &&
+            !existingKey.startsWith('sk-')
+        ? existingKey
+        : '';
+    // Never prefill the real cloud key into the text field.
+    _apiC = TextEditingController(text: showKey);
+    _youtubeC = TextEditingController(text: '');
+    _elevenLabsC = TextEditingController(text: '');
+    _resendC = TextEditingController(text: '');
     _resendFromC = TextEditingController(text: widget.config.resendFromEmail);
     _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
@@ -25563,10 +25502,19 @@ class _NgmyAiAdminSheetState extends State<_NgmyAiAdminSheet> {
             children: [
               Text('Detected provider: $provider', style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
-              if (key.isNotEmpty) ...[
-                const Text('Current key:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+              if (key.isNotEmpty && key != kNgmyServerManagedAiKey) ...[
+                const Text('Current key (local only — never shown from cloud):', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
                 const SizedBox(height: 4),
-                SelectableText(key, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                SelectableText(
+                  key.length > 12 ? '${key.substring(0, 6)}••••${key.substring(key.length - 4)}' : '••••••••',
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                const Text(
+                  'The live AI key is stored only on the NGMY server. Paste a new key here only when rotating it.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
                 const SizedBox(height: 12),
               ],
               const Text(
@@ -25968,7 +25916,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
     _titleC = TextEditingController();
     _msgC = TextEditingController();
     _attachImgC = TextEditingController();
-    _apiC = TextEditingController(text: widget.config.geminiApiKey);
+    _apiC = TextEditingController(text: '');
     _helperLimitC = TextEditingController(text: widget.config.ngmyHelperDailyMessageLimit.toString());
     _logoC = TextEditingController(text: widget.config.logoUrl);
     _adminNameC = TextEditingController(
@@ -28504,7 +28452,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       refreshApiKey: () async {
         final remote = await _fetchRemoteGeminiApiKey();
         if (remote.isNotEmpty && mounted) {
-          setState(() => widget.config.geminiApiKey = remote);
+          setState(() => widget.config.geminiApiKey = kNgmyServerManagedAiKey);
         }
         return widget.config.geminiApiKey.trim();
       },
@@ -28925,7 +28873,7 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
       refreshApiKey: () async {
         final remote = await _fetchRemoteGeminiApiKey();
         if (remote.isNotEmpty && mounted) {
-          setState(() => widget.config.geminiApiKey = remote);
+          setState(() => widget.config.geminiApiKey = kNgmyServerManagedAiKey);
         }
         return widget.config.geminiApiKey.trim();
       },
@@ -51252,7 +51200,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final remote = await _fetchRemoteGeminiApiKey();
     if (!mounted) return;
     if (remote.isNotEmpty && remote != widget.config.geminiApiKey.trim()) {
-      setState(() => widget.config.geminiApiKey = remote);
+      setState(() => widget.config.geminiApiKey = kNgmyServerManagedAiKey);
     }
   }
 

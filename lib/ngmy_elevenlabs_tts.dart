@@ -227,7 +227,6 @@ class NgmyElevenLabsTts {
       final client = Supabase.instance.client;
       final body = {
         'action': action,
-        'apiKey': apiKey,
         'text': text,
         'langCode': langCode,
         'voiceId': voiceForLang(langCode),
