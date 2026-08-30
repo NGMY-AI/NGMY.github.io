@@ -1012,7 +1012,7 @@ function asMemberList(raw: unknown): Record<string, unknown>[] {
 function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
   const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
   return {
-    email: String(m.email ?? ""),
+    email: maskEmailNetwork(String(m.email ?? "")),
     username: String(m.username ?? ""),
     fullName: String(m.fullName ?? ""),
     city: String(m.city ?? ""),
@@ -1039,7 +1039,7 @@ function sanitizeDirectoryDeceased(row: Record<string, unknown>): Record<string,
     ? sanitizeDirectoryMember(row.snapshot as Record<string, unknown>)
     : {};
   return {
-    email: String(row.email ?? snap.email ?? ""),
+    email: maskEmailNetwork(String(row.email ?? snap.email ?? "")),
     registryId: String(row.registryId ?? snap.registryId ?? ""),
     deceasedAt: row.deceasedAt,
     state: String(row.state ?? snap.state ?? ""),
@@ -1212,25 +1212,33 @@ async function handleCivicFetchRegistrarApplications(
   ];
 
   if (role.isAdmin) {
-    return networkFetchOk({ view: "admin", approvedStates });
-  }
-
-  // Registrar / king reviewers: status-only in Network (no PII).
-  if (role.isRegistrar && role.registrarState) {
-    const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
-    return networkFetchOk({
-      view: "registrar",
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      applications: apps.map(registrarAppNetworkSummary),
       approvedStates,
-      myApplicationCount: mine.length,
     });
   }
 
-  // Normal member: status-only in Network.
+  // Registrar / king reviewers: status-only for all states in Network (no PII).
+  if (role.isRegistrar && role.registrarState) {
+    const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+    return jsonOk({
+      ok: true,
+      view: "registrar",
+      applications: apps.map(registrarAppNetworkSummary),
+      myApplications: mine.map(sanitizeRegistrarAppOwn),
+      approvedStates,
+    });
+  }
+
+  // Normal member: only own application(s) + which states have an AR (no PII)
   const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
-  return networkFetchOk({
+  return jsonOk({
+    ok: true,
     view: "member",
+    applications: mine.map(sanitizeRegistrarAppOwn),
     approvedStates,
-    myApplicationCount: mine.length,
   });
 }
 
@@ -1592,22 +1600,98 @@ async function handleCivicFetchRoster(
   const allDeceased = asMemberList(payload.deceased);
 
   if (role.isAdmin) {
-    return networkFetchOk({ view: "admin" });
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      members: redactList(allMembers, email),
+      removed: redactList(allRemoved, email),
+      deceased: redactList(allDeceased, email),
+      savedAt: payload.savedAt ?? null,
+    });
   }
 
   if (role.isRegistrar && role.registrarState) {
-    return networkFetchOk({ view: "registrar", registrarState: role.registrarState });
+    const st = role.registrarState;
+    const homeMembers = filterMembersByState(allMembers, st);
+    const homeRemoved = filterMembersByState(allRemoved, st);
+    const homeDeceased = allDeceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(st);
+    });
+
+    let extraDir: Record<string, unknown>[] = [];
+    let extraDec: Record<string, unknown>[] = [];
+    if (state && stateKey(state) !== stateKey(st) && pinSig) {
+      const pins = await loadRegistryPins(admin);
+      const expected = effectivePinForState(pins, state);
+      if (expected && (await pinSigFor(state, expected)) === pinSig) {
+        extraDir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+        extraDec = allDeceased
+          .filter((d) => {
+            const snap = d.snapshot && typeof d.snapshot === "object"
+              ? (d.snapshot as Record<string, unknown>)
+              : d;
+            return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+          })
+          .map(sanitizeDirectoryDeceased);
+      }
+    }
+
+    const members = [
+      ...homeMembers,
+      ...extraDir.filter(
+        (m) =>
+          !homeMembers.some(
+            (h) => emailKey(String(h.email ?? "")) === emailKey(String(m.email ?? "")),
+          ),
+      ),
+    ];
+    return jsonOk({
+      ok: true,
+      view: "registrar",
+      registrarState: st,
+      members,
+      removed: homeRemoved,
+      deceased: [...homeDeceased, ...extraDec],
+      savedAt: payload.savedAt ?? null,
+    });
   }
 
+  // Normal member: requires state + valid pinSig; directory only
   if (!state || !pinSig) {
-    return networkFetchOk({ view: "member", needsUnlock: true });
+    return jsonOk({
+      ok: true,
+      view: "member",
+      members: [],
+      removed: [],
+      deceased: [],
+      needsUnlock: true,
+    });
   }
   const pins = await loadRegistryPins(admin);
   const expected = effectivePinForState(pins, state);
   if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
     return jsonOk({ error: "State unlock required", ok: false }, 403);
   }
-  return networkFetchOk({ view: "member", state });
+  const dir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+  const dec = allDeceased
+    .filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+    })
+    .map(sanitizeDirectoryDeceased);
+  return jsonOk({
+    ok: true,
+    view: "member",
+    members: dir,
+    removed: [],
+    deceased: dec,
+    savedAt: payload.savedAt ?? null,
+  });
 }
 
 async function handleCivicPersistRoster(
@@ -2139,8 +2223,72 @@ async function handleCivicFetchCitiesRooms(
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
-  return networkFetchOk({
-    view: role.isAdmin ? "admin" : (role.isRegistrar ? "registrar" : "member"),
+  const wrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+  const fullByState = (wrap.civicCitiesByState && typeof wrap.civicCitiesByState === "object")
+    ? (wrap.civicCitiesByState as Record<string, unknown>)
+    : {};
+  const fullCities = Array.isArray(wrap.cities) ? wrap.cities : [];
+  const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
+
+  if (role.isAdmin || role.isRegistrar) {
+    return jsonOk({
+      ok: true,
+      civicCitiesByState: fullByState,
+      cities: fullCities,
+      rooms: fullRooms,
+    });
+  }
+
+  // Members: only their enrolled/anchor state slice (no full US map in Network).
+  let userState = "";
+  try {
+    const { data: userRow } = await admin.from("users").select("state").eq("email", email).maybeSingle();
+    userState = String(userRow?.state ?? "").trim();
+  } catch (_) {
+    // ignore
+  }
+  const sk = stateKey(userState);
+  const slice: Record<string, unknown> = {};
+  if (sk) {
+    for (const [k, v] of Object.entries(fullByState)) {
+      if (stateKey(k) === sk) slice[k] = v;
+    }
+  }
+  return jsonOk({
+    ok: true,
+    civicCitiesByState: slice,
+    cities: fullCities,
+    rooms: fullRooms,
+  });
+}
+
+/** Guest self-enrollment page — cities/rooms + enrollment flag only (no roster PII). */
+async function handleCivicPublicCatalog(_body: Record<string, unknown>): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+  const se = await loadSettingsObject(admin, "civic_self_enrollment_settings");
+  let selfEnroll =
+    se.civicSelfEnrollmentEnabled === true ||
+    String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+  if (!selfEnroll) {
+    try {
+      const { data: cfg } = await admin
+        .from("config")
+        .select("civicSelfEnrollmentEnabled")
+        .eq("id", "1")
+        .maybeSingle();
+      selfEnroll = cfg?.civicSelfEnrollmentEnabled === true;
+    } catch (_) {
+      // ignore
+    }
+  }
+  return jsonOk({
+    ok: true,
+    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
+    cities: citiesWrap.cities ?? [],
+    rooms: citiesWrap.rooms ?? [],
+    civicSelfEnrollmentEnabled: selfEnroll,
   });
 }
 
@@ -2157,7 +2305,33 @@ async function handleCivicAdminSettingsFetch(
     return jsonOk({ error: "Not allowed" }, 403);
   }
 
-  return networkFetchOk({ view: role.isAdmin ? "admin" : "registrar" });
+  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
+  const receiptRemoved = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
+  const helpMode = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+  const sellAccess = await loadSettingsObject(admin, STORE_SELL_ACCESS_KEY);
+  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+
+  const sellRaw = sellAccess.emails ?? sellAccess.items ?? [];
+  const sellList = Array.isArray(sellRaw) ? sellRaw : [];
+
+  const out: Record<string, unknown> = {
+    ok: true,
+    civicDeletedContributionIds: deleted.ids ?? deleted.keys ?? [],
+    civicContributionReceiptRemoved: receiptRemoved,
+    civicHelpModeSettings: helpMode,
+    storeSellAccessEmails: sellList.map((e) =>
+      typeof e === "string" ? maskEmailNetwork(String(e)) : e,
+    ),
+    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
+    cities: citiesWrap.cities ?? [],
+    rooms: citiesWrap.rooms ?? [],
+  };
+
+  if (!role.isAdmin) {
+    delete out.storeSellAccessEmails;
+  }
+
+  return jsonOk(out);
 }
 
 async function handleCivicAdminSettingsPersist(
@@ -2372,6 +2546,9 @@ serve(async (req) => {
     }
     if (action === "civicGuestEnroll") {
       return await handleCivicGuestEnroll(body as Record<string, unknown>);
+    }
+    if (action === "civicPublicCatalog") {
+      return await handleCivicPublicCatalog(body as Record<string, unknown>);
     }
     if (action === "civicFetchRegistryPins") {
       return await handleCivicFetchRegistryPins(req, body as Record<string, unknown>);

@@ -195,6 +195,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Future<Map<String, dynamic>?> _fetchConfigCatalog() async {
     try {
+      final viaEdge = await ngmyCivicFetchPublicCatalog();
+      if (viaEdge != null && viaEdge['ok'] == true) return viaEdge;
+    } catch (e) {
+      debugPrint('[civic_guest] edge catalog: $e');
+    }
+    try {
       final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/config').replace(
         queryParameters: {
           'id': 'eq.1',

@@ -160,7 +160,13 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
     if (pinSig.isNotEmpty) 'pinSig': pinSig,
   });
   if (data == null || data['ok'] != true) return null;
+  if (data['networkEmpty'] == true || data['needsUnlock'] == true) return null;
   return data;
+}
+
+/// Guest self-enrollment — cities/rooms and enrollment flag (no auth).
+Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog() async {
+  return ngmyCivicInvokeAnon({'action': 'civicPublicCatalog'});
 }
 
 Future<bool> ngmyCivicPersistRoster({
@@ -256,8 +262,14 @@ Future<List<Map<String, dynamic>>> ngmyCivicFetchRegistrarApplications({
   if (data == null || data['ok'] != true) return const [];
   if (data['networkEmpty'] == true) return const [];
   final raw = data['applications'];
-  if (raw is! List) return const [];
-  return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  if (raw is List && raw.isNotEmpty) {
+    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+  final mine = data['myApplications'];
+  if (mine is List && mine.isNotEmpty) {
+    return mine.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+  return const [];
 }
 
 Future<bool> ngmyCivicPersistRegistrarApplications({
