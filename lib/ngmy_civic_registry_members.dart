@@ -1531,6 +1531,36 @@ class NgmyCivicRegistryMembers {
         'savedAt': DateTime.now().toUtc().toIso8601String(),
       };
 
+  /// Replace local roster with a role-filtered server payload (no merge with prior PII).
+  static void replacePayload(dynamic config, Map<String, dynamic> payload) {
+    final members = <Map<String, dynamic>>[];
+    final remote = payload['members'];
+    if (remote is List) {
+      for (final e in remote) {
+        if (e is Map) members.add(Map<String, dynamic>.from(e));
+      }
+    }
+    setList(config, members);
+
+    final removed = <Map<String, dynamic>>[];
+    final rem = payload['removed'] ?? payload['civicRegistryRemoved'];
+    if (rem is List) {
+      for (final e in rem) {
+        if (e is Map) removed.add(Map<String, dynamic>.from(e));
+      }
+    }
+    setRemoved(config, removed);
+
+    final deceased = <Map<String, dynamic>>[];
+    final dec = payload['deceased'];
+    if (dec is List) {
+      for (final e in dec) {
+        if (e is Map) deceased.add(Map<String, dynamic>.from(e));
+      }
+    }
+    setDeceased(config, deceased);
+  }
+
   /// Full backup envelope for download (includes helps/missed/passport so rankings restore).
   /// Always scoped to one state — files must not be restorable in another state.
   static Map<String, dynamic> backupEnvelope(dynamic config, {required String state}) {

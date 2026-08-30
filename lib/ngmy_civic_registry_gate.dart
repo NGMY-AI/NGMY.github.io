@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_civic_identity.dart';
+import 'ngmy_civic_registry_cloud.dart';
 
 const String _kUnlockPrefsKey = 'civic_registry_unlock_v2';
 
@@ -71,6 +72,45 @@ Future<void> _saveUnlockRoot(Map<String, dynamic> root) async {
   await prefs.remove('civic_registry_unlock');
 }
 
+Future<String?> civicRegistryStoredPinSig(String userEmail, {required String state}) async {
+  final email = userEmail.toLowerCase().trim();
+  final st = state.trim();
+  if (email.isEmpty || st.isEmpty) return null;
+  final root = await _loadUnlockRoot();
+  if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return null;
+  final states = root['states'];
+  if (states is! Map) return null;
+  final entry = states[st] ?? states[st.toLowerCase()];
+  if (entry is! Map) return null;
+  final sig = (entry['pinSig'] ?? '').toString().trim();
+  return sig.isEmpty ? null : sig;
+}
+
+Future<void> civicRegistrySaveServerUnlock(
+  String userEmail, {
+  required String state,
+  required String pinSig,
+  String registryId = '',
+}) async {
+  final email = userEmail.toLowerCase().trim();
+  final st = state.trim();
+  final sig = pinSig.trim();
+  if (email.isEmpty || st.isEmpty || sig.isEmpty) return;
+  final root = await _loadUnlockRoot();
+  if ((root['email'] ?? '').toString().toLowerCase().trim() != email) {
+    root['email'] = email;
+    root['states'] = <String, dynamic>{};
+  }
+  final states = Map<String, dynamic>.from((root['states'] as Map?) ?? {});
+  states[st] = {
+    'pinSig': sig,
+    'at': DateTime.now().toUtc().toIso8601String(),
+    if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
+  };
+  root['states'] = states;
+  await _saveUnlockRoot(root);
+}
+
 Future<bool> civicRegistryIsUnlocked(
   String userEmail, {
   required String state,
@@ -80,24 +120,22 @@ Future<bool> civicRegistryIsUnlocked(
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
   if (email.isEmpty || st.isEmpty) return false;
-  final expectedSig = civicRegistryPinSignature(globalPin: globalPin, pinsByState: pinsByState, state: st);
-  if (expectedSig.isEmpty) return false;
 
   final root = await _loadUnlockRoot();
   if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return false;
   final states = root['states'];
   if (states is! Map) return false;
-  final entry = states[st];
+  final entry = states[st] ?? states[st.toLowerCase()];
   if (entry is! Map) return false;
   final storedSig = (entry['pinSig'] ?? '').toString();
-  if (storedSig.isEmpty) {
-    // Legacy unlock without pinSig — accept once and upgrade storage.
-    await civicRegistrySaveUnlock(
-      userEmail,
-      state: st,
-      globalPin: globalPin,
-      pinsByState: pinsByState,
-    );
+  if (storedSig.isEmpty) return false;
+
+  // Server-issued pinSig (v1:…) — members no longer hold PINs locally.
+  if (storedSig.startsWith('v1:')) return true;
+
+  final expectedSig = civicRegistryPinSignature(globalPin: globalPin, pinsByState: pinsByState, state: st);
+  if (expectedSig.isEmpty) {
+    // No local PIN copy — treat a stored unlock as valid for this session.
     return true;
   }
   return storedSig == expectedSig;
@@ -178,6 +216,8 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   String? _error;
   bool _busy = false;
   Map<String, dynamic>? _matchedMember;
+  String? _serverPinSig;
+  String? _matchedMemberEmail;
 
   static const _redTop = Color(0xFFE53935);
   static const _redBottom = Color(0xFFB71C1C);
@@ -284,89 +324,226 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     }
 
     if (_step == 0) {
-      final expected = civicRegistryEffectivePin(
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      final localExpected = civicRegistryEffectivePin(
         globalPin: widget.globalPin,
         pinsByState: widget.pinsByState,
         state: _state,
       );
-      if (expected.isEmpty) {
-        setState(() => _error = 'Registry PIN not set yet. Contact your state registrar.');
+      if (localExpected.isNotEmpty && value == localExpected) {
+        final verified = await ngmyCivicVerifyStatePin(
+          email: widget.userEmail,
+          state: _state,
+          pin: value,
+        );
+        final pinSig = (verified.pinSig != null && verified.pinSig!.isNotEmpty)
+            ? verified.pinSig!
+            : 'v1:local';
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _serverPinSig = pinSig;
+          _error = null;
+          _step = 1;
+          _matchedMember = null;
+          _matchedMemberEmail = null;
+        });
         return;
       }
-      if (value != expected) {
-        setState(() => _error = 'Incorrect PIN for $_state.');
+      final verified = await ngmyCivicVerifyStatePin(
+        email: widget.userEmail,
+        state: _state,
+        pin: value,
+      );
+      if (!mounted) return;
+      if (!verified.ok || verified.pinSig == null || verified.pinSig!.isEmpty) {
+        setState(() {
+          _busy = false;
+          _error = verified.error ?? 'Incorrect PIN for $_state.';
+        });
         return;
       }
       setState(() {
+        _busy = false;
+        _serverPinSig = verified.pinSig;
         _error = null;
         _step = 1;
         _matchedMember = null;
+        _matchedMemberEmail = null;
       });
       return;
     }
 
-    if (_step == 1) {
-      final member = NgmyCivicWalletIdentity.findByName(
-        members: widget.members,
-        state: _state,
-        fullName: value,
-      );
+    final pinSig = (_serverPinSig ?? '').trim();
+    if (pinSig.isEmpty || pinSig == 'v1:local') {
+      if (_step == 1) {
+        final member = NgmyCivicWalletIdentity.findByName(
+          members: widget.members,
+          state: _state,
+          fullName: value,
+        );
+        if (member == null) {
+          setState(() => _error = 'That name is not registered in $_state.');
+          return;
+        }
+        setState(() {
+          _error = null;
+          _matchedMember = member;
+          _matchedMemberEmail = (member['email'] ?? '').toString();
+          _step = 2;
+        });
+        return;
+      }
+      if (_step == 2) {
+        final member = _matchedMember;
+        if (member == null) {
+          setState(() {
+            _error = 'Start over — name step was lost.';
+            _step = 1;
+          });
+          return;
+        }
+        if (!NgmyCivicWalletIdentity.dobMatches(member, value)) {
+          setState(() => _error = 'Date of birth does not match that registered name.');
+          return;
+        }
+        setState(() {
+          _error = null;
+          _step = 3;
+        });
+        return;
+      }
+      final member = _matchedMember;
       if (member == null) {
-        setState(() => _error = 'That name is not registered in $_state.');
+        setState(() {
+          _error = 'Start over — verification incomplete.';
+          _step = 1;
+        });
+        return;
+      }
+      if (!NgmyCivicWalletIdentity.idMatches(member, value)) {
+        setState(() => _error = 'Registry ID does not match that member.');
         return;
       }
       setState(() {
+        _busy = true;
         _error = null;
-        _matchedMember = member;
+      });
+      final rid = (member['registryId'] ?? '').toString();
+      await civicRegistrySaveUnlock(
+        widget.userEmail,
+        state: _state,
+        globalPin: widget.globalPin,
+        pinsByState: widget.pinsByState,
+        registryId: rid,
+      );
+      if (!mounted) return;
+      widget.onUnlocked(_state);
+      return;
+    }
+
+    if (_step == 1) {
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      final matched = await ngmyCivicGateMatchName(
+        email: widget.userEmail,
+        state: _state,
+        pinSig: pinSig,
+        fullName: value,
+      );
+      if (!mounted) return;
+      if (!matched.ok || (matched.memberEmail ?? '').isEmpty) {
+        setState(() {
+          _busy = false;
+          _error = matched.error ?? 'That name is not registered in $_state.';
+        });
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _matchedMemberEmail = matched.memberEmail;
+        _matchedMember = null;
+        _error = null;
         _step = 2;
       });
       return;
     }
 
     if (_step == 2) {
-      final member = _matchedMember;
-      if (member == null) {
+      final memberEmail = (_matchedMemberEmail ?? '').trim();
+      if (memberEmail.isEmpty) {
         setState(() {
           _error = 'Start over — name step was lost.';
           _step = 1;
         });
         return;
       }
-      if (!NgmyCivicWalletIdentity.dobMatches(member, value)) {
-        setState(() => _error = 'Date of birth does not match that registered name.');
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      final verified = await ngmyCivicGateVerifyIdentity(
+        email: widget.userEmail,
+        state: _state,
+        pinSig: pinSig,
+        memberEmail: memberEmail,
+        dob: value,
+        step: 'dob',
+      );
+      if (!mounted) return;
+      if (!verified.ok) {
+        setState(() {
+          _busy = false;
+          _error = verified.error ?? 'Date of birth does not match that registered name.';
+        });
         return;
       }
       setState(() {
+        _busy = false;
         _error = null;
         _step = 3;
       });
       return;
     }
 
-    final member = _matchedMember;
-    if (member == null) {
+    final memberEmail = (_matchedMemberEmail ?? '').trim();
+    if (memberEmail.isEmpty) {
       setState(() {
         _error = 'Start over — verification incomplete.';
         _step = 1;
       });
       return;
     }
-    if (!NgmyCivicWalletIdentity.idMatches(member, value)) {
-      setState(() => _error = 'Registry ID does not match that member.');
-      return;
-    }
-
     setState(() {
       _busy = true;
       _error = null;
     });
-    final rid = (member['registryId'] ?? '').toString();
-    await civicRegistrySaveUnlock(
+    final verified = await ngmyCivicGateVerifyIdentity(
+      email: widget.userEmail,
+      state: _state,
+      pinSig: pinSig,
+      memberEmail: memberEmail,
+      registryId: value,
+      step: 'id',
+    );
+    if (!mounted) return;
+    if (!verified.ok) {
+      setState(() {
+        _busy = false;
+        _error = verified.error ?? 'Registry ID does not match that member.';
+      });
+      return;
+    }
+    await civicRegistrySaveServerUnlock(
       widget.userEmail,
       state: _state,
-      globalPin: widget.globalPin,
-      pinsByState: widget.pinsByState,
-      registryId: rid,
+      pinSig: pinSig,
+      registryId: verified.registryId ?? value,
     );
     if (!mounted) return;
     widget.onUnlocked(_state);

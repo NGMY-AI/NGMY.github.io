@@ -8,7 +8,7 @@ class NgmySupabaseColumns {
       'id,ngmyChatClosed,investmentPlans,storeOrders,storeInquiries,storeListings,'
       'helpHelperApplications,helpRequests,helpBusinesses,loanApplications,'
       'civicRegistrarApplications,ngmyPopups,ngmyVideoPopups,jobPosts,jobWorkerApplications,'
-      'gameInvites,civicSelfEnrollmentEnabled,civicRegistryPin,civicRegistryPinsByState,'
+      'gameInvites,civicSelfEnrollmentEnabled,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
       'helpScopeType,helpScopeValue,helpState,helpCampaignId,helpCampaignStartedAt,helpCampaignClosures,'
@@ -17,8 +17,8 @@ class NgmySupabaseColumns {
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
   static const configBootstrapCore =
-      'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,civicRegistryPin,'
-      'civicRegistryPinsByState,civicCitiesByState,cities,rooms,storeSellAccessEmails,openedContributionReceiptKeys,'
+      'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,'
+      'civicCitiesByState,cities,rooms,storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
       'familyTreePhotoAccessUntilByEmail,'
       'gameTimeLimits,diceSettings,gameInvites,officialCashApp,officialBitcoin,'

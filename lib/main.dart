@@ -138,6 +138,7 @@ import 'ngmy_civic_registry_admin.dart';
 import 'ngmy_civic_state_transfer_ui.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
+import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
@@ -2610,12 +2611,13 @@ Future<List<Map<String, dynamic>>> _fetchRemoteCivicRegistrarApplications() asyn
 
 Future<({String global, Map<String, String> byState})> _fetchRemoteCivicRegistryPins() async {
   try {
-    final row = await _fetchNgmyConfigRow(columns: 'civicRegistryPin,civicRegistryPinsByState');
-    if (row == null) return (global: '', byState: <String, String>{});
-    return (
-      global: (row['civicRegistryPin'] ?? '').toString().trim(),
-      byState: _civicRegistryPinsFromJson(row['civicRegistryPinsByState']),
-    );
+    final email = ngmyCurrentAuthEmail();
+    if (email.isNotEmpty) {
+      final viaEdge = await ngmyCivicFetchRegistryPins(email: email);
+      if (viaEdge.global.isNotEmpty || viaEdge.byState.isNotEmpty) return viaEdge;
+    }
+    // Pins are no longer on public config selects — do not fall back to open REST.
+    return (global: '', byState: <String, String>{});
   } catch (e) {
     debugPrint('[config] fetch civic registry pins: $e');
     return (global: '', byState: <String, String>{});
@@ -3819,7 +3821,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'storeOrders': config.storeOrders,
     'storeListings': config.storeListings,
     'civicRegistrarApplications': config.civicRegistrarApplications,
-    'civicRegistryMembers': config.civicRegistryMembers,
+    // civicRegistryMembers lives only in ngmy_settings via Edge — never mirror to public config.
     'civicRegistryPin': config.civicRegistryPin,
     'civicRegistryPinsByState': config.civicRegistryPinsByState,
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
@@ -3884,7 +3886,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'cities': config.cities,
     'rooms': config.rooms,
-    'civicRegistryMembers': config.civicRegistryMembers,
     if (shouldWriteRegistrarApps) 'civicRegistrarApplications': registrarApps,
   });
   try {
@@ -30510,7 +30511,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.initState();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
-    unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers));
+    unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
+      widget.config,
+      widget.allUsers,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    ));
     _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
@@ -30743,6 +30749,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
+    unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
+      widget.config,
+      widget.allUsers,
+      requesterEmail: widget.user.email,
+      state: state,
+    ));
     widget.onDataChanged();
   }
 
@@ -35739,10 +35751,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showMemberProfile(UserData u) {
-    // Deceased records are always full information, view-only for everyone
-    // (including authorized registrars) — no edit / transfer / delete chrome.
+    // Deceased full profile is registrar / admin only — members get public directory view.
     if (_civicMemberIsDeceased(widget.config, u)) {
-      _showDeceasedReadOnlyFullProfile(u);
+      if (_canUseRegistrarToolsHere(u.state)) {
+        _showDeceasedReadOnlyFullProfile(u);
+      } else {
+        _showPublicMemberProfile(u);
+      }
       return;
     }
     if (!_canUseRegistrarToolsHere()) {
@@ -35945,7 +35960,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   return Material(
                                     color: Colors.transparent,
                                     child: InkWell(
-                                      onTap: () => _showDeceasedReadOnlyFullProfile(u),
+                                      onTap: () {
+                                        if (_canUseRegistrarToolsHere(u.state)) {
+                                          _showDeceasedReadOnlyFullProfile(u);
+                                        } else {
+                                          _showPublicMemberProfile(u);
+                                        }
+                                      },
                                       borderRadius: BorderRadius.circular(14),
                                       child: Container(
                                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),

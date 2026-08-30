@@ -927,12 +927,33 @@ Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
   return cloudOk;
 }
 
-Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(AppConfig config, List<UserData> allUsers) async {
+Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
+  AppConfig config,
+  List<UserData> allUsers, {
+  String? requesterEmail,
+  String? state,
+  String? pinSig,
+}) async {
   await NgmyCivicRegistryMembers.hydrateLocal(config);
-  if (await ngmyCanReachCloud()) {
-    final row = await _fetchNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey);
-    if (row != null && row.isNotEmpty) {
-      NgmyCivicRegistryMembers.applyPayload(config, row);
+  final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
+  if (email.isNotEmpty && await ngmyCanReachCloud()) {
+    final resolvedState = (state ?? '').trim();
+    var resolvedPin = (pinSig ?? '').trim();
+    if (resolvedPin.isEmpty && resolvedState.isNotEmpty) {
+      resolvedPin = (await civicRegistryStoredPinSig(email, state: resolvedState)) ?? '';
+    }
+    final row = await ngmyCivicFetchRoster(
+      email: email,
+      state: resolvedState,
+      pinSig: resolvedPin,
+    );
+    if (row != null) {
+      NgmyCivicRegistryMembers.replacePayload(config, {
+        'members': row['members'] ?? const [],
+        'removed': row['removed'] ?? const [],
+        'deceased': row['deceased'] ?? const [],
+      });
+      await NgmyCivicRegistryMembers.saveLocalBackup(config);
     }
   }
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
@@ -941,29 +962,29 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(AppConfig config, Lis
   final after = NgmyCivicRegistryMembers.listFrom(config).length;
   if (removed > 0 || after < before) {
     // Push cleaned roster so other devices stop re-merging the clones.
-    await ngmyPersistCivicRegistryMembers(config);
+    await ngmyPersistCivicRegistryMembers(config, requesterEmail: email);
   }
 }
 
-Future<bool> ngmyPersistCivicRegistryMembers(AppConfig config) async {
+Future<bool> ngmyPersistCivicRegistryMembers(
+  AppConfig config, {
+  String? requesterEmail,
+  String? state,
+}) async {
   // Deploy stamp: keep enroll + print roster fixes published to ngmy.org.
   ngmyAdminConfigMutationAt = DateTime.now();
   NgmyAdminLiveRefresh.notify();
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;
-  if (await ngmyCanReachCloud()) {
-    // Merge cloud first so a local enroll never overwrites members added by
-    // self-enrollment or another registrar on a different device.
-    final row = await _fetchNgmySettingSafe(NgmyCivicRegistryMembers.cloudSettingsKey);
-    if (row != null && row.isNotEmpty) {
-      NgmyCivicRegistryMembers.applyPayload(config, row);
-    }
+  final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
+  if (email.isNotEmpty && await ngmyCanReachCloud()) {
     // Never write soft-delete rows for people already back on the roster.
     NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
-    cloudOk = await _upsertNgmySettingSafe(
-      NgmyCivicRegistryMembers.cloudSettingsKey,
-      NgmyCivicRegistryMembers.payload(config),
+    cloudOk = await ngmyCivicPersistRoster(
+      email: email,
+      state: (state ?? '').trim(),
+      payload: NgmyCivicRegistryMembers.payload(config),
     );
   }
   await NgmyCivicRegistryMembers.saveLocalBackup(config);

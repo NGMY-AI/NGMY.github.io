@@ -38,12 +38,23 @@ supabase functions deploy bright-handler --project-ref gvufllqqxjnpicmkxzcg
 
 Do **not** run `security_rls_users_phase2.sql` yet (auth migration required).
 
-## 5. Hard-refresh the app
+## 5. Civic Registry privacy
+
+1. Redeploy **bright-handler** with the latest `ngmy-ai-chat/index.ts` (civic* actions).
+2. Run `supabase/security_lock_civic_registry.sql` in SQL Editor.
+3. Hard-refresh + log out / log in.
+
+Verify: anon `GET /rest/v1/ngmy_settings?key=eq.civic_registry_members` returns empty or is denied; members only receive directory fields via Edge.
+
+See also `CIVIC_REGISTRY_LOCK.md`.
+
+## 6. Hard-refresh the app
 
 Close/reopen the PWA or hard-refresh https://ngmy.org so clients stop using cached JS that fetched keys.
 
 ## Verify
 
-- Network tab → `/rest/v1/config` responses must **not** include `geminiApiKey` / `aiApiKey`.
+- Network tab → `/rest/v1/config` responses must **not** include `geminiApiKey` / `aiApiKey` / registry PINs.
 - Advisors / Helper still reply (proxy uses server secret).
 - Login still works (verifyPasswordLogin on the Edge Function).
+- Civic roster is not readable via anon REST.

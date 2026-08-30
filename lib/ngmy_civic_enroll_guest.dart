@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import 'ngmy_civic_enroll_link.dart';
+import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
@@ -251,15 +251,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _loadError = null;
     });
 
-    Map<String, dynamic>? membersPayload;
     Map<String, dynamic>? configRow;
     Map<String, dynamic>? settings;
 
     for (var attempt = 0; attempt < 5; attempt++) {
-      membersPayload ??= await ngmyFetchSettingsValueReliable(NgmyCivicRegistryMembers.cloudSettingsKey);
+      // Do not download civic_registry_members — roster is locked server-side.
       configRow ??= await _fetchConfigCatalog();
       settings ??= await ngmyFetchSettingsValueReliable(_kCivicSelfEnrollmentSettingsKey);
-      if (membersPayload != null || configRow != null || settings != null) break;
+      if (configRow != null || settings != null) break;
       if (attempt < 4) await Future<void>.delayed(Duration(milliseconds: 450 * (attempt + 1)));
     }
 
@@ -272,33 +271,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     if (configRow != null) _absorbCatalog(configRow);
     if (settings != null) _absorbCatalog(settings);
 
-    if (membersPayload != null) {
-      final raw = membersPayload['members'];
-      if (raw is List) {
-        _members = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-      }
-    }
-
     if (!mounted) return;
     setState(() => _loading = false);
-  }
-
-  String _generateRegistryId(String state) {
-    final prefix = NgmyCivicRegistryIdCard.stateCode(state);
-    final existing = _members
-        .map((m) => (m['registryId'] ?? '').toString().trim().toUpperCase())
-        .where((id) => id.isNotEmpty)
-        .toSet();
-    for (var i = 0; i < 5000; i++) {
-      final candidate = '$prefix${math.Random().nextInt(8999999) + 1000000}';
-      if (!existing.contains(candidate)) return candidate;
-    }
-    return '$prefix${DateTime.now().microsecondsSinceEpoch}';
-  }
-
-  String _guestEmailFromPhone(String phone) {
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    return 'civic.$digits@guest.ngmy';
   }
 
   Future<void> _submit() async {
@@ -368,77 +342,30 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       return;
     }
 
-    final email = _guestEmailFromPhone(phone);
-
     setState(() => _submitting = true);
     try {
-      final latest = await ngmyFetchSettingsValueReliable(NgmyCivicRegistryMembers.cloudSettingsKey) ?? {};
-      final remoteMembers = <Map<String, dynamic>>[];
-      final raw = latest['members'];
-      if (raw is List) {
-        for (final e in raw) {
-          if (e is Map) remoteMembers.add(Map<String, dynamic>.from(e));
+      final result = await ngmyCivicGuestEnroll({
+        'fullName': fullName,
+        'homeAddress': address,
+        'phone': phone,
+        'state': state,
+        'familyMembers': familyMembers,
+        'familyMales': males,
+        'familyFemales': females,
+        'registeredByToken': _registrarToken,
+      });
+      if (!result.ok) {
+        if (result.duplicate != null) {
+          final name = (result.duplicate!['fullName'] ?? '').toString().trim();
+          final id = (result.duplicate!['registryId'] ?? '').toString().trim();
+          final parts = <String>[if (name.isNotEmpty) name else 'Mwanachama'];
+          if (id.isNotEmpty) parts.add('ID $id');
+          _toast(
+            'Tayari umesajiliwa — jina, anwani, au simu inafanana (${parts.join(' · ')}). Mtu mmoja hawezi kujisajili mara mbili.',
+          );
+        } else {
+          _toast(result.error ?? 'Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
         }
-      }
-
-      final remoteRemoved = <Map<String, dynamic>>[];
-      final removedRaw = latest['removed'] ?? latest['civicRegistryRemoved'];
-      if (removedRaw is List) {
-        for (final e in removedRaw) {
-          if (e is Map) remoteRemoved.add(Map<String, dynamic>.from(e));
-        }
-      }
-      remoteRemoved.removeWhere(
-        (r) => NgmyCivicRegistryMembers.emailKey((r['email'] ?? '').toString()) == email,
-      );
-
-      final duplicate = NgmyCivicRegistryMembers.findDuplicateInRecords(
-        records: remoteMembers,
-        fullName: fullName,
-        homeAddress: address,
-        phone: phone,
-      );
-      if (duplicate != null) {
-        final name = (duplicate['fullName'] ?? '').toString().trim();
-        final id = (duplicate['registryId'] ?? '').toString().trim();
-        final parts = <String>[if (name.isNotEmpty) name else 'Mwanachama'];
-        if (id.isNotEmpty) parts.add('ID $id');
-        _toast(
-          'Tayari umesajiliwa — jina, anwani, au simu inafanana (${parts.join(' · ')}). Mtu mmoja hawezi kujisajili mara mbili.',
-        );
-        setState(() => _submitting = false);
-        return;
-      }
-
-      final registryId = _generateRegistryId(state);
-      final member = NgmyCivicRegistryMembers.buildRecord(
-        email: email,
-        fullName: fullName,
-        dob: '',
-        idType: '',
-        homeAddress: address,
-        phone: phone,
-        city: '',
-        room: '',
-        state: state,
-        registryId: registryId,
-        familyMembers: familyMembers,
-        familyMales: males,
-        familyFemales: females,
-        enrollmentSource: 'guest_self_enrollment',
-        registeredByToken: _registrarToken,
-      );
-      remoteMembers.add(member);
-
-      final payload = {
-        'members': remoteMembers,
-        'removed': remoteRemoved,
-        'savedAt': DateTime.now().toUtc().toIso8601String(),
-        'source': 'guest_self_enrollment',
-      };
-      final ok = await ngmyUpsertSettingsRowReliable(NgmyCivicRegistryMembers.cloudSettingsKey, payload);
-      if (!ok) {
-        _toast('Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
         setState(() => _submitting = false);
         return;
       }
@@ -447,8 +374,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       setState(() {
         _submitting = false;
         _done = true;
-        _registryId = registryId;
-        _members = remoteMembers;
+        _registryId = result.registryId ?? '';
+        _members = const [];
       });
     } catch (e) {
       debugPrint('[civic_guest] submit: $e');

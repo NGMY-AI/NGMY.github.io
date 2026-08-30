@@ -667,6 +667,737 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
   });
 }
 
+// ─── Civic Registry (role-filtered; service role only touches the blob) ───
+
+const CIVIC_MEMBERS_KEY = "civic_registry_members";
+
+type CivicRole = {
+  email: string;
+  isAdmin: boolean;
+  isRegistrar: boolean;
+  registrarState: string;
+};
+
+function emailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function stateKey(state: string): string {
+  return state.trim().toLowerCase();
+}
+
+async function resolveJwtEmail(req: Request): Promise<string> {
+  const auth = req.headers.get("Authorization") ?? "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  const token = (m?.[1] ?? "").trim();
+  if (!token || token === Deno.env.get("SUPABASE_ANON_KEY")) return "";
+  const admin = adminClient();
+  if (!admin) return "";
+  try {
+    const { data, error } = await admin.auth.getUser(token);
+    if (error || !data?.user) return "";
+    return emailKey(String(data.user.email ?? ""));
+  } catch (_) {
+    return "";
+  }
+}
+
+async function loadCivicPayload(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<Record<string, unknown>> {
+  const { data } = await admin
+    .from("ngmy_settings")
+    .select("value")
+    .eq("key", CIVIC_MEMBERS_KEY)
+    .maybeSingle();
+  const value = data?.value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return { members: [], removed: [], deceased: [] };
+}
+
+async function saveCivicPayload(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; error?: string }> {
+  const row = {
+    key: CIVIC_MEMBERS_KEY,
+    value: { ...payload, savedAt: new Date().toISOString() },
+    updated_at: new Date().toISOString(),
+  };
+  const { error } = await admin.from("ngmy_settings").upsert(row, { onConflict: "key" });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+function asMemberList(raw: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+    .map((e) => ({ ...(e as Record<string, unknown>) }));
+}
+
+function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
+  const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
+  return {
+    email: String(m.email ?? ""),
+    username: String(m.username ?? ""),
+    fullName: String(m.fullName ?? ""),
+    city: String(m.city ?? ""),
+    room: String(m.room ?? ""),
+    state: String(m.state ?? ""),
+    registryId: String(m.registryId ?? ""),
+    familyMembers: m.familyMembers ?? 1,
+    familyMales: m.familyMales,
+    familyFemales: m.familyFemales,
+    nicknames,
+    showNicknames: m.showNicknames === true,
+    helps: m.helps ?? 0,
+    missed: m.missed ?? 0,
+    contributionCount: m.contributionCount,
+    enrolledAt: m.enrolledAt,
+    updatedAt: m.updatedAt,
+    enrollmentSource: m.enrollmentSource,
+    // Public directory only — no address/phone/dob/idPhoto/idType
+  };
+}
+
+function sanitizeDirectoryDeceased(row: Record<string, unknown>): Record<string, unknown> {
+  const snap = row.snapshot && typeof row.snapshot === "object"
+    ? sanitizeDirectoryMember(row.snapshot as Record<string, unknown>)
+    : {};
+  return {
+    email: String(row.email ?? snap.email ?? ""),
+    registryId: String(row.registryId ?? snap.registryId ?? ""),
+    deceasedAt: row.deceasedAt,
+    state: String(row.state ?? snap.state ?? ""),
+    snapshot: snap,
+  };
+}
+
+function filterMembersByState(
+  members: Record<string, unknown>[],
+  state: string,
+): Record<string, unknown>[] {
+  const sk = stateKey(state);
+  if (!sk) return [];
+  return members.filter((m) => stateKey(String(m.state ?? "")) === sk);
+}
+
+async function resolveCivicRole(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  email: string,
+): Promise<CivicRole> {
+  const key = emailKey(email);
+  const role: CivicRole = {
+    email: key,
+    isAdmin: isNgmyAdminEmail(key),
+    isRegistrar: false,
+    registrarState: "",
+  };
+  if (!key) return role;
+
+  try {
+    const { data: userRow } = await admin
+      .from("users")
+      .select("email,isAdmin,isCivicRegistryAdmin,isCivicRegistryKing,state")
+      .eq("email", key)
+      .maybeSingle();
+    if (userRow) {
+      if (
+        userRow.isAdmin === true ||
+        userRow.isCivicRegistryAdmin === true ||
+        userRow.isCivicRegistryKing === true
+      ) {
+        role.isAdmin = true;
+      }
+    }
+  } catch (_) {
+    // columns may vary
+  }
+
+  try {
+    const { data: cfg } = await admin
+      .from("config")
+      .select("civicRegistrarApplications")
+      .eq("id", "1")
+      .maybeSingle();
+    const apps = cfg?.civicRegistrarApplications;
+    if (Array.isArray(apps)) {
+      let best: Record<string, unknown> | null = null;
+      for (const raw of apps) {
+        if (!raw || typeof raw !== "object") continue;
+        const a = raw as Record<string, unknown>;
+        if (emailKey(String(a.userEmail ?? "")) !== key) continue;
+        if (String(a.status ?? "").toLowerCase() !== "approved") continue;
+        best = a;
+      }
+      if (best) {
+        role.isRegistrar = true;
+        role.registrarState = String(best.state ?? "").trim();
+      }
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  return role;
+}
+
+async function loadRegistryPins(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<{ global: string; byState: Record<string, string> }> {
+  const { data } = await admin
+    .from("config")
+    .select("civicRegistryPin,civicRegistryPinsByState")
+    .eq("id", "1")
+    .maybeSingle();
+  const global = String(data?.civicRegistryPin ?? "").trim();
+  const byState: Record<string, string> = {};
+  const raw = data?.civicRegistryPinsByState;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      const pin = String(v ?? "").trim();
+      if (k.trim() && pin) byState[k.trim()] = pin;
+    }
+  }
+  return { global, byState };
+}
+
+function effectivePinForState(
+  pins: { global: string; byState: Record<string, string> },
+  state: string,
+): string {
+  const st = state.trim();
+  const per = (pins.byState[st] ?? "").trim();
+  if (per) return per;
+  // case-insensitive key match
+  const sk = stateKey(st);
+  for (const [k, v] of Object.entries(pins.byState)) {
+    if (stateKey(k) === sk && String(v).trim()) return String(v).trim();
+  }
+  return pins.global.trim();
+}
+
+async function pinSigFor(state: string, pin: string): Promise<string> {
+  const h = await sha256Hex(`${stateKey(state)}|${pin.trim()}`);
+  return `v1:${h}`;
+}
+
+function phoneDigits(phone: string): string {
+  let d = phone.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  return d.length >= 10 ? d.slice(-10) : d;
+}
+
+function normName(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normAddress(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function findDuplicateMember(
+  members: Record<string, unknown>[],
+  fullName: string,
+  homeAddress: string,
+  phone: string,
+): Record<string, unknown> | null {
+  const name = normName(fullName);
+  const addr = normAddress(homeAddress);
+  const ph = phoneDigits(phone);
+  for (const m of members) {
+    const mn = normName(String(m.fullName ?? ""));
+    const ma = normAddress(String(m.homeAddress ?? ""));
+    const mp = phoneDigits(String(m.phone ?? ""));
+    if (name && mn && name === mn) return m;
+    if (addr && ma && addr === ma && addr.length >= 8) return m;
+    if (ph.length >= 7 && mp.length >= 7 && ph === mp) return m;
+  }
+  return null;
+}
+
+function stateCodePrefix(state: string): string {
+  const map: Record<string, string> = {
+    alabama: "AL",
+    alaska: "AK",
+    arizona: "AZ",
+    arkansas: "AR",
+    california: "CA",
+    colorado: "CO",
+    connecticut: "CT",
+    delaware: "DE",
+    florida: "FL",
+    georgia: "GA",
+    hawaii: "HI",
+    idaho: "ID",
+    illinois: "IL",
+    indiana: "IN",
+    iowa: "IA",
+    kansas: "KS",
+    kentucky: "KY",
+    louisiana: "LA",
+    maine: "ME",
+    maryland: "MD",
+    massachusetts: "MA",
+    michigan: "MI",
+    minnesota: "MN",
+    mississippi: "MS",
+    missouri: "MO",
+    montana: "MT",
+    nebraska: "NE",
+    nevada: "NV",
+    "new hampshire": "NH",
+    "new jersey": "NJ",
+    "new mexico": "NM",
+    "new york": "NY",
+    "north carolina": "NC",
+    "north dakota": "ND",
+    ohio: "OH",
+    oklahoma: "OK",
+    oregon: "OR",
+    pennsylvania: "PA",
+    "rhode island": "RI",
+    "south carolina": "SC",
+    "south dakota": "SD",
+    tennessee: "TN",
+    texas: "TX",
+    utah: "UT",
+    vermont: "VT",
+    virginia: "VA",
+    washington: "WA",
+    "west virginia": "WV",
+    wisconsin: "WI",
+    wyoming: "WY",
+    "district of columbia": "DC",
+  };
+  return map[stateKey(state)] ?? "XX";
+}
+
+function generateRegistryId(state: string, existing: Set<string>): string {
+  const prefix = stateCodePrefix(state);
+  for (let i = 0; i < 5000; i++) {
+    const n = Math.floor(Math.random() * 8999999) + 1000000;
+    const candidate = `${prefix}${n}`;
+    if (!existing.has(candidate.toUpperCase())) return candidate;
+  }
+  return `${prefix}${Date.now()}`;
+}
+
+async function handleCivicVerifyStatePin(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const pin = String(body.pin ?? "").trim();
+  if (!state || !pin) return jsonOk({ error: "state and pin required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected) return jsonOk({ error: "Registry PIN not set yet for this state." }, 400);
+  if (pin !== expected) return jsonOk({ error: "Incorrect PIN", ok: false }, 403);
+  const pinSig = await pinSigFor(state, expected);
+  return jsonOk({ ok: true, pinSig, state });
+}
+
+async function handleCivicGateMatchName(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const fullName = String(body.fullName ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  if (!state || !fullName || !pinSig) {
+    return jsonOk({ error: "state, fullName, and pinSig required" }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "PIN session invalid" }, 403);
+  }
+  const payload = await loadCivicPayload(admin);
+  const members = filterMembersByState(asMemberList(payload.members), state);
+  const want = normName(fullName);
+  const match = members.find((m) => normName(String(m.fullName ?? "")) === want);
+  if (!match) return jsonOk({ error: "That name is not registered in this state." }, 404);
+  const matchToken = await sha256Hex(
+    `${email}|${stateKey(state)}|${emailKey(String(match.email ?? ""))}|${String(match.registryId ?? "")}|${pinSig}`,
+  );
+  // Stash match context in a short-lived settings row? Keep stateless: encode email+rid in token verify later by re-finding.
+  return jsonOk({
+    ok: true,
+    matchToken,
+    memberEmail: emailKey(String(match.email ?? "")),
+    registryIdHint: String(match.registryId ?? ""),
+  });
+}
+
+async function handleCivicGateVerifyIdentity(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  const memberEmail = emailKey(String(body.memberEmail ?? ""));
+  const dob = String(body.dob ?? "").trim();
+  const registryId = String(body.registryId ?? "").trim();
+  const step = String(body.step ?? "dob").trim(); // dob | id | both
+  if (!state || !pinSig || !memberEmail) {
+    return jsonOk({ error: "state, pinSig, and memberEmail required" }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "PIN session invalid" }, 403);
+  }
+  const payload = await loadCivicPayload(admin);
+  const members = filterMembersByState(asMemberList(payload.members), state);
+  const match = members.find((m) => emailKey(String(m.email ?? "")) === memberEmail);
+  if (!match) return jsonOk({ error: "Member not found" }, 404);
+
+  const normDob = (s: string) => s.replace(/[^\d]/g, "");
+  if (step === "dob" || step === "both") {
+    if (!dob) return jsonOk({ error: "dob required" }, 400);
+    const got = normDob(String(match.dob ?? ""));
+    const want = normDob(dob);
+    if (!got || !want || got !== want) {
+      return jsonOk({ error: "Date of birth does not match that registered name.", ok: false }, 403);
+    }
+    if (step === "dob") return jsonOk({ ok: true });
+  }
+  if (step === "id" || step === "both") {
+    if (!registryId) return jsonOk({ error: "registryId required" }, 400);
+    const got = String(match.registryId ?? "").trim().toUpperCase();
+    if (!got || got !== registryId.trim().toUpperCase()) {
+      return jsonOk({ error: "Registry ID does not match that member.", ok: false }, 403);
+    }
+  }
+  return jsonOk({
+    ok: true,
+    pinSig,
+    registryId: String(match.registryId ?? ""),
+    state,
+  });
+}
+
+async function handleCivicFetchRoster(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  const payload = await loadCivicPayload(admin);
+  const allMembers = asMemberList(payload.members);
+  const allRemoved = asMemberList(payload.removed);
+  const allDeceased = asMemberList(payload.deceased);
+
+  if (role.isAdmin) {
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      members: allMembers,
+      removed: allRemoved,
+      deceased: allDeceased,
+      savedAt: payload.savedAt ?? null,
+    });
+  }
+
+  if (role.isRegistrar && role.registrarState) {
+    const st = role.registrarState;
+    // Full PII only for home state; other states get directory if PIN unlocked
+    const homeMembers = filterMembersByState(allMembers, st);
+    const homeRemoved = filterMembersByState(allRemoved, st);
+    const homeDeceased = allDeceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(st);
+    });
+
+    let extraDir: Record<string, unknown>[] = [];
+    let extraDec: Record<string, unknown>[] = [];
+    if (state && stateKey(state) !== stateKey(st) && pinSig) {
+      const pins = await loadRegistryPins(admin);
+      const expected = effectivePinForState(pins, state);
+      if (expected && (await pinSigFor(state, expected)) === pinSig) {
+        extraDir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+        extraDec = allDeceased
+          .filter((d) => {
+            const snap = d.snapshot && typeof d.snapshot === "object"
+              ? (d.snapshot as Record<string, unknown>)
+              : d;
+            return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+          })
+          .map(sanitizeDirectoryDeceased);
+      }
+    }
+
+    const members = [
+      ...homeMembers,
+      ...extraDir.filter(
+        (m) =>
+          !homeMembers.some(
+            (h) => emailKey(String(h.email ?? "")) === emailKey(String(m.email ?? "")),
+          ),
+      ),
+    ];
+    return jsonOk({
+      ok: true,
+      view: "registrar",
+      registrarState: st,
+      members,
+      removed: homeRemoved,
+      deceased: [...homeDeceased, ...extraDec],
+      savedAt: payload.savedAt ?? null,
+    });
+  }
+
+  // Normal member: requires state + valid pinSig; directory only
+  if (!state || !pinSig) {
+    return jsonOk({
+      ok: true,
+      view: "member",
+      members: [],
+      removed: [],
+      deceased: [],
+      needsUnlock: true,
+    });
+  }
+  const pins = await loadRegistryPins(admin);
+  const expected = effectivePinForState(pins, state);
+  if (!expected || (await pinSigFor(state, expected)) !== pinSig) {
+    return jsonOk({ error: "State unlock required", ok: false }, 403);
+  }
+  const dir = filterMembersByState(allMembers, state).map(sanitizeDirectoryMember);
+  const dec = allDeceased
+    .filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return stateKey(String(d.state ?? snap.state ?? "")) === stateKey(state);
+    })
+    .map(sanitizeDirectoryDeceased);
+  return jsonOk({
+    ok: true,
+    view: "member",
+    members: dir,
+    removed: [],
+    deceased: dec,
+    savedAt: payload.savedAt ?? null,
+  });
+}
+
+async function handleCivicPersistRoster(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Registrar or admin required" }, 403);
+  }
+
+  const incomingMembers = asMemberList(body.members);
+  const incomingRemoved = asMemberList(body.removed);
+  const incomingDeceased = asMemberList(body.deceased);
+  const scopeState = role.isAdmin
+    ? String(body.state ?? "").trim()
+    : role.registrarState.trim();
+
+  const current = await loadCivicPayload(admin);
+  let members = asMemberList(current.members);
+  let removed = asMemberList(current.removed);
+  let deceased = asMemberList(current.deceased);
+
+  if (role.isAdmin && !scopeState) {
+    // Nationwide replace from admin client payload
+    members = incomingMembers;
+    removed = incomingRemoved;
+    deceased = incomingDeceased.length > 0 ? incomingDeceased : deceased;
+  } else {
+    const sk = stateKey(scopeState);
+    if (!sk) return jsonOk({ error: "No registrar state" }, 403);
+    // Drop existing home-state rows, then merge incoming for that state only
+    members = members.filter((m) => stateKey(String(m.state ?? "")) !== sk);
+    for (const m of incomingMembers) {
+      if (stateKey(String(m.state ?? "")) === sk) members.push(m);
+    }
+    removed = removed.filter((m) => stateKey(String(m.state ?? "")) !== sk);
+    for (const m of incomingRemoved) {
+      if (stateKey(String(m.state ?? "")) === sk) removed.push(m);
+    }
+    deceased = deceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return stateKey(String(d.state ?? snap.state ?? "")) !== sk;
+    });
+    for (const d of incomingDeceased) {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      if (stateKey(String(d.state ?? snap.state ?? "")) === sk) deceased.push(d);
+    }
+  }
+
+  const saved = await saveCivicPayload(admin, { members, removed, deceased });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, memberCount: members.length });
+}
+
+async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Response> {
+  const fullName = String(body.fullName ?? "").trim();
+  const phone = String(body.phone ?? "").trim();
+  const homeAddress = String(body.homeAddress ?? body.address ?? "").trim();
+  const state = String(body.state ?? "").trim();
+  const familyMembers = Number(body.familyMembers ?? 1) || 1;
+  const familyMales = Number(body.familyMales ?? 0) || 0;
+  const familyFemales = Number(body.familyFemales ?? 0) || 0;
+  const registrarToken = String(body.registeredByToken ?? body.registrarToken ?? "").trim();
+
+  if (!fullName || !phone || !homeAddress || !state) {
+    return jsonOk({ error: "fullName, phone, homeAddress, and state are required" }, 400);
+  }
+  if (familyMales + familyFemales !== familyMembers) {
+    return jsonOk({ error: "familyMales + familyFemales must equal familyMembers" }, 400);
+  }
+
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  // Self-enrollment must be enabled
+  try {
+    const { data: se } = await admin
+      .from("ngmy_settings")
+      .select("value")
+      .eq("key", "civic_self_enrollment_settings")
+      .maybeSingle();
+    const val = se?.value as Record<string, unknown> | null;
+    const on =
+      val?.civicSelfEnrollmentEnabled === true ||
+      String(val?.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+    if (!on) {
+      const { data: cfg } = await admin
+        .from("config")
+        .select("civicSelfEnrollmentEnabled")
+        .eq("id", "1")
+        .maybeSingle();
+      if (cfg?.civicSelfEnrollmentEnabled !== true) {
+        return jsonOk({ error: "Self-enrollment is not enabled" }, 403);
+      }
+    }
+  } catch (_) {
+    // continue if settings missing — still allow if config flag set
+  }
+
+  const payload = await loadCivicPayload(admin);
+  const members = asMemberList(payload.members);
+  const removed = asMemberList(payload.removed);
+  const deceased = asMemberList(payload.deceased);
+
+  const digits = phoneDigits(phone);
+  const guestEmail =
+    digits.length >= 7 ? `civic.${digits}@guest.ngmy` : `civic.${Date.now()}@guest.ngmy`;
+
+  const dup = findDuplicateMember(members, fullName, homeAddress, phone);
+  if (dup) {
+    return jsonOk({
+      error: "Already enrolled",
+      duplicate: {
+        fullName: String(dup.fullName ?? ""),
+        registryId: String(dup.registryId ?? ""),
+      },
+      ok: false,
+    }, 409);
+  }
+
+  const existingIds = new Set(
+    members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  const registryId = generateRegistryId(state, existingIds);
+  const now = new Date().toISOString();
+  const member = {
+    email: guestEmail,
+    fullName,
+    phone,
+    homeAddress,
+    state,
+    city: "",
+    room: "",
+    dob: "",
+    idType: "",
+    registryId,
+    familyMembers,
+    familyMales,
+    familyFemales,
+    enrollmentSource: "guest_self_enrollment",
+    registeredByToken: registrarToken,
+    enrolledAt: now,
+    updatedAt: now,
+  };
+  members.push(member);
+  const nextRemoved = removed.filter((r) => emailKey(String(r.email ?? "")) !== emailKey(guestEmail));
+
+  const saved = await saveCivicPayload(admin, {
+    members,
+    removed: nextRemoved,
+    deceased,
+    source: "guest_self_enrollment",
+  });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({
+    ok: true,
+    registryId,
+    email: guestEmail,
+    // Never return the full roster
+  });
+}
+
+async function handleCivicFetchRegistryPins(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+  const pins = await loadRegistryPins(admin);
+  if (role.isAdmin) {
+    return jsonOk({ ok: true, global: pins.global, byState: pins.byState });
+  }
+  // Registrar: only their home-state PIN
+  const st = role.registrarState;
+  const pin = effectivePinForState(pins, st);
+  const byState: Record<string, string> = {};
+  if (st && pin) byState[st] = pin;
+  return jsonOk({ ok: true, global: "", byState });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -725,6 +1456,30 @@ serve(async (req) => {
 
     if (action === "registerAppUser") {
       return await handleRegisterAppUser(body as Record<string, unknown>);
+    }
+
+    if (action === "civicVerifyStatePin") {
+      return await handleCivicVerifyStatePin(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGateMatchName") {
+      return await handleCivicGateMatchName(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGateVerifyIdentity") {
+      return await handleCivicGateVerifyIdentity(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchDirectory" || action === "civicFetchRoster" ||
+      action === "civicFetchRegistrarRoster" || action === "civicFetchAdminRoster") {
+      return await handleCivicFetchRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUpsertMember" || action === "civicRemoveMember" ||
+      action === "civicMarkDeceased" || action === "civicPersistRoster") {
+      return await handleCivicPersistRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicGuestEnroll") {
+      return await handleCivicGuestEnroll(body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRegistryPins") {
+      return await handleCivicFetchRegistryPins(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {
