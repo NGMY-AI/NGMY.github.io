@@ -8538,7 +8538,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _startAdminPendingTransactionPoll();
     }
     _startAdminOperationalRequestsPoll();
-    _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
     _startCurrentUserPullLoop();
     unawaited(_ensureCurrentUserRegisteredInCloud(force: true));
@@ -8652,6 +8651,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _applyBundledInvestmentPlansToConfig(_config);
     if (mounted) setState(() => _globalPlans = _bundledInvestmentPlans());
     await ngmyHydrateManagementListsFromAllBackups(_config);
+    final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
+    _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
     await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
     await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
     await ngmyHydrateMusicPaymentsFromAllBackups(_config);
@@ -8927,13 +8928,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _startConfigRefreshLoop();
     _startGameSettingsRefreshLoop();
     _startAdminOperationalRequestsPoll();
-    _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
     _startCurrentUserPullLoop();
-    if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminOperationalRequestsFromCloud());
-      unawaited(_refreshAdminUsersFromCloud());
-    }
     debugPrint('[sync] foreground resumed — realtime reconnected');
   }
 
@@ -8953,7 +8949,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _startUserTransactionSync();
     }
     _startAdminOperationalRequestsPoll();
-    _startAdminUsersPoll();
     _startCloudUserRowResyncLoop();
     _startCurrentUserPullLoop();
     if (_ngmySessionIsAdmin(_currentUser) && NgmyFeatureSyncSession.growthIncomeAdminActive) {
@@ -9317,6 +9312,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyFeatureSyncSession.onLeftGrowthIncomeUser = () {
       _userTxnSyncTimer?.cancel();
       _userTxnSyncTimer = null;
+    };
+    NgmyFeatureSyncSession.onEnteredAdminDashboard = () {
+      _startAdminUsersPoll();
+      _startAdminOperationalRequestsPoll();
+      unawaited(_refreshAdminUsersFromCloud());
+      unawaited(_refreshAdminOperationalRequestsFromCloud());
+    };
+    NgmyFeatureSyncSession.onLeftAdminDashboard = () {
+      _adminUsersPoll?.cancel();
+      _adminUsersPoll = null;
+      _adminOperationalRequestsPoll?.cancel();
+      _adminOperationalRequestsPoll = null;
     };
     _hydrateFromLaunchBootstrap(widget.launchBootstrap);
     unawaited(_completeSessionBootstrap());
@@ -9769,6 +9776,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminUsersPoll() {
     _adminUsersPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
+    if (!NgmyFeatureSyncSession.adminDashboardActive) return;
     unawaited(_refreshAdminUsersFromCloud());
     _adminUsersPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
@@ -9820,6 +9828,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startAdminOperationalRequestsPoll() {
     _adminOperationalRequestsPoll?.cancel();
     if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+    if (!NgmyFeatureSyncSession.adminDashboardActive) return;
     unawaited(_refreshAdminOperationalRequestsFromCloud());
     _adminOperationalRequestsPoll = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
@@ -12570,17 +12579,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
         if (bootstrapAdmin) {
           try {
-            final remote = await _fetchAllUsersFromCloud();
-            if (remote.isNotEmpty) {
-              _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
-              _reconcileAllUserBalances();
-              unawaited(ngmyRegisterReferralCodesForUsers(remote));
-            } else {
-              debugPrint('[admin] bootstrap users empty — keeping local cache');
-              _allUsers = localUsersBeforeFetch.values.toList();
-            }
+            // Keep local user cache at startup — full directory loads only in Admin Dashboard.
+            _allUsers = localUsersBeforeFetch.values.toList();
           } catch (e) {
-            debugPrint('[admin] bootstrap users fetch: $e');
+            debugPrint('[admin] bootstrap users cache: $e');
             _allUsers = localUsersBeforeFetch.values.toList();
           }
         } else if (sessionEmail.isNotEmpty) {
@@ -12699,8 +12701,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _config = next;
           await ngmyHydrateAppBrandingFromAllBackups(_config);
           await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-          await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: localCurrent);
-          await ngmyHydrateManagementListsFromAllBackups(_config);
+          if (!bootstrapAdmin) {
+            await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: localCurrent);
+            await ngmyHydrateManagementListsFromAllBackups(_config);
+          }
           await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
           if (bootstrapAdmin) {
             await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
@@ -12731,12 +12735,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             localRegistrarApps,
             _config.civicRegistrarApplications,
           );
-          final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
-          _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
-          _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
-            localRegistrarApps,
-            _config.civicRegistrarApplications,
-          );
+          if (!bootstrapAdmin) {
+            final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
+            _mergeRegistrarApplicationsIntoConfig(_config, remoteRegistrarApps);
+            _config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+              localRegistrarApps,
+              _config.civicRegistrarApplications,
+            );
+          }
           await _mergeCivicRegistryPinsIntoConfig(_config);
           if (sessionEmail.isNotEmpty) {
             await _mergeCivicCitiesAndRoomsIntoConfig(_config);
@@ -12817,9 +12823,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       debugPrint('[ngmy] cloud bootstrap: $e');
     }
     if (!mounted) return;
-    if (_ngmySessionIsAdmin(_currentUser)) {
-      unawaited(_refreshAdminDashboardFromCloud());
-    }
     _scheduleDeferredStartupRebuild();
   }
 
@@ -21184,6 +21187,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   @override
   void initState() {
     super.initState();
+    NgmyFeatureSyncSession.enterAdminDashboard();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     Future.microtask(() => unawaited(_pullAdminCloudData()));
     _adminRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
@@ -21193,6 +21197,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   void dispose() {
+    NgmyFeatureSyncSession.leaveAdminDashboard();
     NgmyAdminLiveRefresh.removeListener(_onAdminLiveRefresh);
     _adminRefreshTimer?.cancel();
     _search.dispose();

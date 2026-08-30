@@ -704,6 +704,123 @@ async function resolveJwtEmail(req: Request): Promise<string> {
   }
 }
 
+/** Privileged actions must use a real session JWT — never trust body.email alone. */
+async function requireJwtEmail(req: Request): Promise<string> {
+  return await resolveJwtEmail(req);
+}
+
+const NETWORK_STRIP_KEYS = new Set([
+  "passwordHash",
+  "password_hash",
+  "governmentID",
+  "GovernmentID",
+  "dateOfBirth",
+  "homeAddress",
+  "IDExpiration",
+  "ssn",
+  "socialSecurity",
+]);
+
+function maskEmailValue(raw: string, viewer: string): string {
+  const e = emailKey(raw);
+  const v = emailKey(viewer);
+  if (!e) return "";
+  if (e === v) return raw;
+  const at = e.indexOf("@");
+  if (at <= 0) return "***";
+  return `${e.slice(0, 1)}***${e.slice(at)}`;
+}
+
+function redactEmailFields(
+  row: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const out = { ...row };
+  for (const k of NETWORK_STRIP_KEYS) delete out[k];
+  const emailFields = [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+    "recordedByEmail",
+  ];
+  for (const f of emailFields) {
+    if (typeof out[f] === "string") {
+      out[f] = maskEmailValue(String(out[f]), viewer);
+    }
+  }
+  const rowEmail = emailKey(String(out.userEmail ?? out.email ?? ""));
+  const isOther = rowEmail && rowEmail !== emailKey(viewer);
+  if (isOther) {
+    for (const f of [
+      "phone",
+      "accountBalance",
+      "totalProfit",
+      "points",
+      "referralCount",
+    ]) {
+      if (out[f] != null) out[f] = "***";
+    }
+    for (const f of ["state", "city", "fullName", "username"]) {
+      if (typeof out[f] === "string" && String(out[f]).trim()) out[f] = "***";
+    }
+    if (typeof out.fullLegalName === "string") {
+      const parts = String(out.fullLegalName).trim().split(/\s+/);
+      out.fullLegalName = parts.length > 0 ? `${parts[0]} ***` : "***";
+    }
+  }
+  return out;
+}
+
+function redactEmailKeyedMap(
+  map: unknown,
+  viewer: string,
+): Record<string, unknown> {
+  if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
+    out[maskEmailValue(k, viewer)] = v;
+  }
+  return out;
+}
+
+function redactList(
+  list: Record<string, unknown>[],
+  viewer: string,
+): Record<string, unknown>[] {
+  return list.map((r) => redactEmailFields(r, viewer));
+}
+
+function redactManagement(
+  mgmt: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...mgmt };
+  for (const f of [
+    "loanApplications",
+    "jobWorkerApplications",
+    "jobPosts",
+    "helpHelperApplications",
+    "helpRequests",
+    "helpBusinesses",
+  ]) {
+    if (Array.isArray(out[f])) {
+      out[f] = redactList(asMemberList(out[f]), viewer);
+    }
+  }
+  delete out.adminDeletedUserEmails;
+  delete out.adminUserAccountStatusByEmail;
+  delete out.adminUserCrownBadgeByEmail;
+  return out;
+}
+
 async function loadCivicPayload(
   admin: NonNullable<ReturnType<typeof adminClient>>,
 ): Promise<Record<string, unknown>> {
@@ -926,7 +1043,7 @@ async function handleCivicFetchRegistrarApplications(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -946,7 +1063,7 @@ async function handleCivicFetchRegistrarApplications(
     return jsonOk({
       ok: true,
       view: "admin",
-      applications: apps,
+      applications: redactList(apps, email),
       approvedStates,
     });
   }
@@ -982,7 +1099,7 @@ async function handleCivicPersistRegistrarApplications(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1216,7 +1333,7 @@ async function handleCivicVerifyStatePin(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const state = String(body.state ?? "").trim();
   const pin = String(body.pin ?? "").trim();
@@ -1235,7 +1352,7 @@ async function handleCivicGateMatchName(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const state = String(body.state ?? "").trim();
   const fullName = String(body.fullName ?? "").trim();
@@ -1271,7 +1388,7 @@ async function handleCivicGateVerifyIdentity(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const state = String(body.state ?? "").trim();
   const pinSig = String(body.pinSig ?? "").trim();
@@ -1323,7 +1440,7 @@ async function handleCivicFetchRoster(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1339,9 +1456,9 @@ async function handleCivicFetchRoster(
     return jsonOk({
       ok: true,
       view: "admin",
-      members: allMembers,
-      removed: allRemoved,
-      deceased: allDeceased,
+      members: redactList(allMembers, email),
+      removed: redactList(allRemoved, email),
+      deceased: redactList(allDeceased, email),
       savedAt: payload.savedAt ?? null,
     });
   }
@@ -1435,7 +1552,7 @@ async function handleCivicPersistRoster(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1604,7 +1721,7 @@ async function handleCivicFetchRegistryPins(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1628,7 +1745,7 @@ async function handleCivicSaveRegistryPins(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1773,7 +1890,7 @@ async function handlePrivateListsFetch(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1797,16 +1914,17 @@ async function handlePrivateListsFetch(
   ] as const;
 
   if (role.isAdmin) {
+    const familyRaw = familyWrap.byEmail ?? familyWrap;
     return jsonOk({
       ok: true,
       view: "admin",
-      management: mgmt,
-      gameInvites: asItems(invitesWrap),
-      storeInquiries: asItems(inquiriesWrap),
-      storeOrders: asItems(ordersWrap),
+      management: redactManagement(mgmt, email),
+      gameInvites: redactList(asItems(invitesWrap), email),
+      storeInquiries: redactList(asItems(inquiriesWrap), email),
+      storeOrders: redactList(asItems(ordersWrap), email),
       mediaVirtualProfiles: asItems(mediaWrap),
-      familyTreePhotoAccessUntilByEmail: familyWrap.byEmail ?? familyWrap,
-      helpCampaignSpendings: asItems(spendingsWrap),
+      familyTreePhotoAccessUntilByEmail: redactEmailKeyedMap(familyRaw, email),
+      helpCampaignSpendings: redactList(asItems(spendingsWrap), email),
     });
   }
 
@@ -1842,8 +1960,10 @@ async function handlePrivateListsFetch(
     storeOrders: filterListForEmail(asItems(ordersWrap), email),
     mediaVirtualProfiles: asItems(mediaWrap),
     familyTreePhotoAccessUntilByEmail: ownFamily,
-    // Spendings (emails/names) — registrars + admins only
-    helpCampaignSpendings: role.isRegistrar ? asItems(spendingsWrap) : [],
+    // Spendings (emails/names) — registrars + admins only; mask other members in Network.
+    helpCampaignSpendings: role.isRegistrar
+      ? redactList(asItems(spendingsWrap), email)
+      : [],
   });
 }
 
@@ -1851,7 +1971,7 @@ async function handlePrivateListsPersist(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -1974,7 +2094,7 @@ async function handleCivicFetchCitiesRooms(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -2022,7 +2142,7 @@ async function handleCivicAdminSettingsFetch(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -2037,12 +2157,17 @@ async function handleCivicAdminSettingsFetch(
   const sellAccess = await loadSettingsObject(admin, STORE_SELL_ACCESS_KEY);
   const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
 
+  const sellRaw = sellAccess.emails ?? sellAccess.items ?? [];
+  const sellList = Array.isArray(sellRaw) ? sellRaw : [];
+
   const out: Record<string, unknown> = {
     ok: true,
     civicDeletedContributionIds: deleted.ids ?? deleted.keys ?? [],
     civicContributionReceiptRemoved: receiptRemoved,
     civicHelpModeSettings: helpMode,
-    storeSellAccessEmails: sellAccess.emails ?? sellAccess.items ?? [],
+    storeSellAccessEmails: sellList.map((e) =>
+      typeof e === "string" ? maskEmailValue(String(e), email) : e,
+    ),
     civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
     cities: citiesWrap.cities ?? [],
     rooms: citiesWrap.rooms ?? [],
@@ -2060,7 +2185,7 @@ async function handleCivicAdminSettingsPersist(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -2127,7 +2252,7 @@ async function handleAdminUsersList(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  const email = await requireJwtEmail(req);
   if (!email || !isNgmyAdminEmail(email)) {
     return jsonOk({ error: "Admin only" }, 403);
   }
@@ -2156,7 +2281,11 @@ async function handleAdminUsersList(
     return jsonOk({ error: String(e) }, 500);
   }
 
-  return jsonOk({ ok: true, users: rows, count: rows.length });
+  return jsonOk({
+    ok: true,
+    users: redactList(rows, email),
+    count: rows.length,
+  });
 }
 
 serve(async (req) => {

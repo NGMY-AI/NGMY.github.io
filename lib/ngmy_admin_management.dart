@@ -271,40 +271,45 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final email = ngmyCurrentAuthEmail();
     if (email.isNotEmpty) {
-      final data = await ngmyPrivateListsFetch(email: email);
-      if (data != null) {
-        final mgmt = data['management'];
-        if (mgmt is Map) {
-          _applyManagementOperationalListsPayload(config, Map<String, dynamic>.from(mgmt));
-        }
-        final invites = data['gameInvites'];
-        if (invites is List) {
-          config.gameInvites = mergeGameInvites(
-            config.gameInvites,
-            invites.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
-          );
-        }
-        final inquiries = data['storeInquiries'];
-        if (inquiries is List) {
-          config.storeInquiries = inquiries.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-        }
-        final orders = data['storeOrders'];
-        if (orders is List) {
-          config.storeOrders = orders.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-        }
-        final family = data['familyTreePhotoAccessUntilByEmail'];
-        if (family is Map) {
-          config.familyTreePhotoAccessUntilByEmail = family.map(
-            (k, v) => MapEntry(k.toString(), v.toString()),
-          );
-        }
-        final spendings = data['helpCampaignSpendings'];
-        if (spendings is List) {
-          final remote = spendings.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-          config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(
-            config.helpCampaignSpendings,
-            remote,
-          );
+      final isAdmin = ngmyEmailIsAdmin(email);
+      final allowAdminBulkFetch =
+          NgmyFeatureSyncSession.adminDashboardActive || NgmyFeatureSyncSession.loansActive;
+      if (!isAdmin || allowAdminBulkFetch) {
+        final data = await ngmyPrivateListsFetch(email: email);
+        if (data != null) {
+          final mgmt = data['management'];
+          if (mgmt is Map) {
+            _applyManagementOperationalListsPayload(config, Map<String, dynamic>.from(mgmt));
+          }
+          final invites = data['gameInvites'];
+          if (invites is List) {
+            config.gameInvites = mergeGameInvites(
+              config.gameInvites,
+              invites.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
+            );
+          }
+          final inquiries = data['storeInquiries'];
+          if (inquiries is List) {
+            config.storeInquiries = inquiries.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+          final orders = data['storeOrders'];
+          if (orders is List) {
+            config.storeOrders = orders.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          }
+          final family = data['familyTreePhotoAccessUntilByEmail'];
+          if (family is Map) {
+            config.familyTreePhotoAccessUntilByEmail = family.map(
+              (k, v) => MapEntry(k.toString(), v.toString()),
+            );
+          }
+          final spendings = data['helpCampaignSpendings'];
+          if (spendings is List) {
+            final remote = spendings.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+            config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(
+              config.helpCampaignSpendings,
+              remote,
+            );
+          }
         }
       }
     }
@@ -1948,6 +1953,10 @@ Future<void> ngmyHydratePrivilegedCivicSettingsFromEdge(AppConfig config, {UserD
   if (!isAdmin && !isRegistrar) {
     // Members: cities for own state only.
     await _mergeCivicCitiesAndRoomsIntoConfig(config);
+    return;
+  }
+  if (isAdmin && !NgmyFeatureSyncSession.adminDashboardActive) {
+    // Admin civic settings (emails, deleted ids) load only while Admin Dashboard is open.
     return;
   }
   final data = await ngmyCivicAdminSettingsFetch(email: email);

@@ -6,10 +6,12 @@ class NgmyFeatureSyncSession {
   static int _growthIncomeAdmin = 0;
   static int _growthIncomeUser = 0;
   static int _loans = 0;
+  static int _adminDashboard = 0;
 
   static bool get growthIncomeAdminActive => _growthIncomeAdmin > 0;
   static bool get growthIncomeUserActive => _growthIncomeUser > 0;
   static bool get loansActive => _loans > 0;
+  static bool get adminDashboardActive => _adminDashboard > 0;
   static bool get anyGrowthIncomeActive => growthIncomeAdminActive || growthIncomeUserActive;
 
   /// Wired by the app root to start scoped polls / refreshes.
@@ -17,6 +19,8 @@ class NgmyFeatureSyncSession {
   static void Function()? onLeftGrowthIncomeAdmin;
   static void Function()? onEnteredGrowthIncomeUser;
   static void Function()? onLeftGrowthIncomeUser;
+  static void Function()? onEnteredAdminDashboard;
+  static void Function()? onLeftAdminDashboard;
 
   static void enterGrowthIncomeAdmin() {
     _growthIncomeAdmin++;
@@ -43,5 +47,16 @@ class NgmyFeatureSyncSession {
   static void enterLoans() => _loans++;
   static void leaveLoans() {
     if (_loans > 0) _loans--;
+  }
+
+  static void enterAdminDashboard() {
+    _adminDashboard++;
+    if (_adminDashboard == 1) onEnteredAdminDashboard?.call();
+  }
+
+  static void leaveAdminDashboard() {
+    if (_adminDashboard <= 0) return;
+    _adminDashboard--;
+    if (_adminDashboard == 0) onLeftAdminDashboard?.call();
   }
 }
