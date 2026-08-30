@@ -414,8 +414,12 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
     }
 
     if (config != null) {
-      unawaited(ngmyHydrateCommunicateSettingsFromAllBackups(config));
-      unawaited(ngmyHydrateHelpCenterHubFromAllBackups(config));
+      unawaited(ngmyHydrateAppBrandingFromAllBackups(config));
+      unawaited(ngmyHydrateCivicSelfEnrollmentFromAllBackups(config));
+      if (currentUser != null && ngmyEmailIsAdmin(currentUser!.email)) {
+        unawaited(ngmyHydrateCommunicateSettingsFromAllBackups(config));
+        unawaited(ngmyHydrateHelpCenterHubFromAllBackups(config));
+      }
     } else {
       unawaited(NgmyCommunicateAvatarCache.hydrateRamFromDisk());
     }
@@ -2672,16 +2676,18 @@ Future<void> _mergeCivicRegistryPinsIntoConfig(AppConfig config) async {
 /// that gap — an addition can never be lost to a later write from a
 /// device that didn't know about it yet.
 Future<void> _mergeCivicCitiesAndRoomsIntoConfig(AppConfig config) async {
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return;
   try {
-    final row = await _fetchNgmyConfigRow(columns: 'civicCitiesByState,rooms');
-    if (row == null) return;
-    final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(row['civicCitiesByState']);
+    final data = await ngmyCivicFetchCitiesRooms(email: email);
+    if (data == null || data['ok'] != true) return;
+    final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(data['civicCitiesByState']);
     if (remoteByState.isNotEmpty) {
       config.civicCitiesByState =
           NgmyCivicRegistryStats.mergeCitiesByState(config.civicCitiesByState, remoteByState);
       config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
     }
-    final remoteRooms = row['rooms'];
+    final remoteRooms = data['rooms'];
     if (remoteRooms is List && remoteRooms.isNotEmpty) {
       config.rooms = NgmyCivicRegistryStats.mergeRooms(
         config.rooms,
@@ -2689,7 +2695,7 @@ Future<void> _mergeCivicCitiesAndRoomsIntoConfig(AppConfig config) async {
       );
     }
   } catch (e) {
-    debugPrint('[config] merge cities/rooms: $e');
+    debugPrint('[config] merge cities/rooms via Edge: $e');
   }
 }
 
@@ -2719,17 +2725,18 @@ Future<void> _persistCivicCitiesAndRoomsNow(AppConfig config) async {
     debugPrint('[config] civic cities/rooms local save: $e');
   }
   if (!await ngmyCanReachCloud()) return;
-  final client = Supabase.instance.client;
-  final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
-    'id': kNgmyConfigRowId,
-    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
-    'cities': config.cities,
-    'rooms': config.rooms,
-  });
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return;
   try {
-    await client.from('config').upsert(combined);
+    await ngmyCivicAdminSettingsPersist(
+      email: email,
+      kind: 'civicCitiesRooms',
+      civicCitiesByState: config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
+      cities: config.cities,
+      rooms: config.rooms,
+    );
   } catch (e) {
-    debugPrint('[config] civic cities/rooms upsert: $e');
+    debugPrint('[config] civic cities/rooms Edge persist: $e');
   }
 }
 
@@ -5340,7 +5347,9 @@ bool _isNgmySystemStoreListingId(String id) => id.startsWith('ngmy:system:');
 DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').toString());
 
 Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
-  if (!NgmyCloudPolicy.allowNgmySettingsKey(key)) return true;
+  final public = NgmyCloudPolicy.settingsKeyPublicReadable(key);
+  final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
+  if (!public && !admin) return false;
   final row = <String, dynamic>{
     'key': key,
     'value': value,
@@ -5375,6 +5384,10 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
 }
 
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
+  if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
+  }
   try {
     final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle().timeout(kNgmyCloudLoadTimeout);
     if (row == null) return null;
@@ -8656,9 +8669,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateWalletPaymentsFromAllBackups(_config);
     await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
     await ngmyHydrateAppBrandingFromAllBackups(_config);
-    await ngmyHydrateCivicHelpModeFromAllBackups(_config);
-    await ngmyHydrateCivicContributionReceiptRemoved(_config);
-    await ngmyHydrateCivicDeletedContributions(_config);
+    await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: _currentUser);
     await ngmyApplyStoreSellAccessFromSettings(_config);
     _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
     await _archiveAndPurgeOldApprovedWalletRequests(online: await ngmyCanReachCloud());
@@ -12686,29 +12697,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _applyRemoteConfigMerge(next, scopedCfg, localConfigSnapshot);
           _mergeOperationalManagementListsIntoConfig(next, localConfigSnapshot);
           _config = next;
-          await ngmyHydrateManagementListsFromAllBackups(_config);
-          await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
-          await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
-          await ngmyHydrateMusicPaymentsFromAllBackups(_config);
-    await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
-    await NgmyAppStudioAccess.hydrate(_config);
-    await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-    await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
-    await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
-    await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
-    await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
-    await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
-    await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
-    await ngmyHydrateHelpCenterHubFromAllBackups(_config);
-          await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
-          await ngmyHydrateWalletPaymentsFromAllBackups(_config);
-          await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
-          await ngmyHydrateCivicHelpModeFromAllBackups(_config);
-          await ngmyHydrateCivicContributionReceiptRemoved(_config);
-          await ngmyHydrateCivicDeletedContributions(_config);
           await ngmyHydrateAppBrandingFromAllBackups(_config);
+          await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
+          await ngmyHydratePrivilegedCivicSettingsFromEdge(_config, user: localCurrent);
+          await ngmyHydrateManagementListsFromAllBackups(_config);
+          await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+          if (bootstrapAdmin) {
+            await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
+            await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
+            await ngmyHydrateMusicPaymentsFromAllBackups(_config);
+            await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
+            await NgmyAppStudioAccess.hydrate(_config);
+            await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+            await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
+            await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
+            await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
+            await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
+            await ngmyHydrateHelpCenterHubFromAllBackups(_config);
+            await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
+            await ngmyHydrateWalletPaymentsFromAllBackups(_config);
+            await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
+            await ngmyApplyStoreSellAccessFromSettings(_config);
+          }
           _mergeOperationalManagementListsIntoConfig(_config, localConfigSnapshot);
-          await ngmyApplyStoreSellAccessFromSettings(_config);
           _applyStoreSellAccessEmailsToUsers(_config, _allUsers, currentUser: _currentUser);
           (_config as dynamic).mediaVirtualProfiles = NgmyVirtualMediaProfiles.ensure(
             cfgMap['mediaVirtualProfiles'] ?? (_config as dynamic).mediaVirtualProfiles,
@@ -12727,7 +12738,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             _config.civicRegistrarApplications,
           );
           await _mergeCivicRegistryPinsIntoConfig(_config);
-          await _mergeCivicCitiesAndRoomsIntoConfig(_config);
+          if (sessionEmail.isNotEmpty) {
+            await _mergeCivicCitiesAndRoomsIntoConfig(_config);
+          }
           await _hydrateCivicCitiesAndRoomsFromLocalBackup(_config);
           await ngmyApplyGameCenterSettingsBackup(
             apply: (limits, dice, invites) {

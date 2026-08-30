@@ -1692,6 +1692,11 @@ const STORE_ORDERS_KEY = "store_orders";
 const MEDIA_VIRTUAL_KEY = "media_virtual_profiles";
 const FAMILY_PHOTO_ACCESS_KEY = "family_tree_photo_access";
 const HELP_SPENDINGS_KEY = "civic_help_campaign_spendings";
+const CIVIC_CITIES_ROOMS_KEY = "civic_cities_rooms";
+const CIVIC_DELETED_CONTRIB_KEY = "civic_deleted_contribution_ids";
+const CIVIC_RECEIPT_REMOVED_KEY = "civic_contribution_receipt_removed";
+const CIVIC_HELP_MODE_KEY = "civic_help_mode_settings";
+const STORE_SELL_ACCESS_KEY = "store_sell_access_emails";
 
 async function loadSettingsObject(
   admin: NonNullable<ReturnType<typeof adminClient>>,
@@ -1965,6 +1970,159 @@ async function handlePrivateListsPersist(
   return jsonOk({ ok: true, count: nextItems.length });
 }
 
+async function handleCivicFetchCitiesRooms(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const wrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+  const fullByState = (wrap.civicCitiesByState && typeof wrap.civicCitiesByState === "object")
+    ? (wrap.civicCitiesByState as Record<string, unknown>)
+    : {};
+  const fullCities = Array.isArray(wrap.cities) ? wrap.cities : [];
+  const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
+
+  if (role.isAdmin || role.isRegistrar) {
+    return jsonOk({
+      ok: true,
+      civicCitiesByState: fullByState,
+      cities: fullCities,
+      rooms: fullRooms,
+    });
+  }
+
+  // Members: only their enrolled/anchor state slice (no full US map in Network).
+  let userState = "";
+  try {
+    const { data: userRow } = await admin.from("users").select("state").eq("email", email).maybeSingle();
+    userState = String(userRow?.state ?? "").trim();
+  } catch (_) {
+    // ignore
+  }
+  const sk = stateKey(userState);
+  const slice: Record<string, unknown> = {};
+  if (sk) {
+    for (const [k, v] of Object.entries(fullByState)) {
+      if (stateKey(k) === sk) slice[k] = v;
+    }
+  }
+  return jsonOk({
+    ok: true,
+    civicCitiesByState: slice,
+    cities: fullCities,
+    rooms: fullRooms,
+  });
+}
+
+async function handleCivicAdminSettingsFetch(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Not allowed" }, 403);
+  }
+
+  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
+  const receiptRemoved = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
+  const helpMode = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+  const sellAccess = await loadSettingsObject(admin, STORE_SELL_ACCESS_KEY);
+  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+
+  const out: Record<string, unknown> = {
+    ok: true,
+    civicDeletedContributionIds: deleted.ids ?? deleted.keys ?? [],
+    civicContributionReceiptRemoved: receiptRemoved,
+    civicHelpModeSettings: helpMode,
+    storeSellAccessEmails: sellAccess.emails ?? sellAccess.items ?? [],
+    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
+    cities: citiesWrap.cities ?? [],
+    rooms: citiesWrap.rooms ?? [],
+  };
+
+  if (!role.isAdmin) {
+    // Registrars: help + civic ops only (no store sell grant list).
+    delete out.storeSellAccessEmails;
+  }
+
+  return jsonOk(out);
+}
+
+async function handleCivicAdminSettingsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Not allowed" }, 403);
+  }
+
+  const kind = String(body.kind ?? "").trim();
+  if (kind === "civicDeletedContributionIds") {
+    const ids = body.ids ?? body.keys ?? [];
+    const saved = await saveSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY, {
+      ids: Array.isArray(ids) ? ids : [],
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicContributionReceiptRemoved") {
+    const payload = (body.payload && typeof body.payload === "object")
+      ? (body.payload as Record<string, unknown>)
+      : {};
+    const saved = await saveSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY, payload);
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelpModeSettings") {
+    const payload = (body.payload && typeof body.payload === "object")
+      ? (body.payload as Record<string, unknown>)
+      : {};
+    const cleaned = { ...payload };
+    delete cleaned.helpCampaignSpendings;
+    const saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, cleaned);
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "storeSellAccessEmails" && role.isAdmin) {
+    const emails = body.emails ?? body.items ?? [];
+    const saved = await saveSettingsObject(admin, STORE_SELL_ACCESS_KEY, {
+      emails: Array.isArray(emails) ? emails : [],
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicCitiesRooms" && (role.isAdmin || role.isRegistrar)) {
+    const saved = await saveSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY, {
+      civicCitiesByState: body.civicCitiesByState ?? {},
+      cities: body.cities ?? [],
+      rooms: body.rooms ?? [],
+    });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    await admin.from("config").upsert({
+      id: "1",
+      civicCitiesByState: {},
+      cities: [],
+      rooms: [],
+    });
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ error: "Unknown kind" }, 400);
+}
+
 async function handleAdminUsersList(
   req: Request,
   body: Record<string, unknown>,
@@ -2101,6 +2259,15 @@ serve(async (req) => {
     }
     if (action === "adminUsersList") {
       return await handleAdminUsersList(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchCitiesRooms") {
+      return await handleCivicFetchCitiesRooms(req, body as Record<string, unknown>);
+    }
+    if (action === "civicAdminSettingsFetch") {
+      return await handleCivicAdminSettingsFetch(req, body as Record<string, unknown>);
+    }
+    if (action === "civicAdminSettingsPersist") {
+      return await handleCivicAdminSettingsPersist(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

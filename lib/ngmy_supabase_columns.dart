@@ -15,7 +15,7 @@ class NgmySupabaseColumns {
 
   static const configBootstrapCore =
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,'
-      'civicCitiesByState,cities,rooms,storeSellAccessEmails,openedContributionReceiptKeys,'
+      'storeSellAccessEmails,openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
       'gameTimeLimits,diceSettings,officialCashApp,officialBitcoin,'
       'loanPhone,loanHowItWorks,loanCompanyZelle';
@@ -27,7 +27,7 @@ class NgmySupabaseColumns {
   /// Safe fallback when a column list fails — never select('*').
   static const configSafeFallback =
       'id,ngmyChatClosed,investmentPlans,civicSelfEnrollmentEnabled,storeListings,'
-      'ngmyPopups,ngmyVideoPopups,cities,rooms,civicCitiesByState,'
+      'ngmyPopups,ngmyVideoPopups,'
       'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
 
   /// Deprecated: API keys must not be selected by clients.

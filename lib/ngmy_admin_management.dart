@@ -1603,8 +1603,15 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {
     final payload = _civicHelpModeSettingsPayload(config);
-    cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
     final email = ngmyCurrentAuthEmail();
+    cloudOk = await ngmyCivicAdminSettingsPersist(
+      email: email,
+      kind: 'civicHelpModeSettings',
+      payload: payload,
+    );
+    if (!cloudOk) {
+      cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
+    }
     if (email.isNotEmpty) {
       final spendOk = await ngmyPrivateListsPersistHelpSpendings(
         email: email,
@@ -1841,9 +1848,13 @@ Future<void> _persistCivicReceiptRemovedLocal(AppConfig config) async {
 }
 
 Future<Set<String>> _fetchCivicReceiptRemovedFromCloud() async {
-  final row = await _fetchNgmySettingSafe(_kNgmyCivicReceiptRemovedSettingsKey);
-  if (row == null) return {};
-  return _stringIdListFromPayload(row['ids'] ?? row['keys']).toSet();
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return {};
+  final data = await ngmyCivicAdminSettingsFetch(email: email);
+  if (data == null) return {};
+  final payload = data['civicContributionReceiptRemoved'];
+  if (payload is! Map) return {};
+  return _stringIdListFromPayload(payload['ids'] ?? payload['keys']).toSet();
 }
 
 Future<void> ngmyHydrateCivicContributionReceiptRemoved(AppConfig config) async {
@@ -1887,7 +1898,11 @@ Future<bool> ngmyPersistCivicContributionReceiptRemoved(AppConfig config, {Strin
     };
     config.contributionReceiptRemovedKeys = merged.toList()..sort();
     await _persistCivicReceiptRemovedLocal(config);
-    return await _upsertNgmySettingSafe(_kNgmyCivicReceiptRemovedSettingsKey, _civicReceiptRemovedPayload(config));
+    return await ngmyCivicAdminSettingsPersist(
+      email: ngmyCurrentAuthEmail(),
+      kind: 'civicContributionReceiptRemoved',
+      payload: _civicReceiptRemovedPayload(config),
+    );
   } catch (e) {
     debugPrint('[civic receipt removed] cloud save: $e');
     return false;
@@ -1924,10 +1939,66 @@ Future<void> _persistCivicDeletedContributionsLocal(AppConfig config) async {
   }
 }
 
+/// One Edge round-trip for civic/admin settings (no emails in ngmy_settings REST).
+Future<void> ngmyHydratePrivilegedCivicSettingsFromEdge(AppConfig config, {UserData? user}) async {
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return;
+  final isAdmin = user?.isAdmin == true || ngmyEmailIsAdmin(email);
+  final isRegistrar = user?.isAuthorizedRegistrar == true;
+  if (!isAdmin && !isRegistrar) {
+    // Members: cities for own state only.
+    await _mergeCivicCitiesAndRoomsIntoConfig(config);
+    return;
+  }
+  final data = await ngmyCivicAdminSettingsFetch(email: email);
+  if (data == null || data['ok'] != true) return;
+
+  final deleted = data['civicDeletedContributionIds'];
+  if (deleted is List) {
+    config.civicDeletedContributionIds = List<String>.from(
+      NgmyCivicReadState.mergeSets(
+        config.civicDeletedContributionIds,
+        deleted.map((e) => e.toString()).where((e) => e.isNotEmpty),
+      ),
+    );
+  }
+  final receipt = data['civicContributionReceiptRemoved'];
+  if (receipt is Map) {
+    _applyCivicReceiptRemovedPayload(config, Map<String, dynamic>.from(receipt));
+  }
+  final help = data['civicHelpModeSettings'];
+  if (help is Map) {
+    _applyCivicHelpModeSettingsPayload(config, Map<String, dynamic>.from(help));
+  }
+  final sell = data['storeSellAccessEmails'];
+  if (sell is List && isAdmin) {
+    config.storeSellAccessEmails = sell.map((e) => e.toString().trim().toLowerCase()).where((e) => e.isNotEmpty).toList()
+      ..sort();
+  }
+  final byState = data['civicCitiesByState'];
+  if (byState is Map) {
+    final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(byState);
+    if (remoteByState.isNotEmpty) {
+      config.civicCitiesByState =
+          NgmyCivicRegistryStats.mergeCitiesByState(config.civicCitiesByState, remoteByState);
+      config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
+    }
+  }
+  final rooms = data['rooms'];
+  if (rooms is List && rooms.isNotEmpty) {
+    config.rooms = NgmyCivicRegistryStats.mergeRooms(
+      config.rooms,
+      rooms.map((e) => e.toString()).toList(),
+    );
+  }
+}
+
 Future<Set<String>> _fetchCivicDeletedContributionsFromCloud() async {
-  final row = await _fetchNgmySettingSafe(_kNgmyCivicDeletedContributionsSettingsKey);
-  if (row == null) return {};
-  return _stringIdListFromPayload(row['ids'] ?? row['keys']).toSet();
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return {};
+  final data = await ngmyCivicAdminSettingsFetch(email: email);
+  if (data == null) return {};
+  return _stringIdListFromPayload(data['civicDeletedContributionIds']).toSet();
 }
 
 Future<void> ngmyHydrateCivicDeletedContributions(AppConfig config) async {
@@ -1972,9 +2043,10 @@ Future<bool> ngmyPersistCivicDeletedContributions(AppConfig config, {Iterable<St
     };
     config.civicDeletedContributionIds = merged.toList()..sort();
     await _persistCivicDeletedContributionsLocal(config);
-    return await _upsertNgmySettingSafe(
-      _kNgmyCivicDeletedContributionsSettingsKey,
-      _civicDeletedContributionsPayload(config),
+    return await ngmyCivicAdminSettingsPersist(
+      email: ngmyCurrentAuthEmail(),
+      kind: 'civicDeletedContributionIds',
+      ids: config.civicDeletedContributionIds,
     );
   } catch (e) {
     debugPrint('[civic deleted contributions] cloud save: $e');

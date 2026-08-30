@@ -71,3 +71,42 @@ Future<bool> ngmyPrivateListsPersistHelpSpendings({
     items: items,
   );
 }
+
+Future<Map<String, dynamic>?> ngmyCivicFetchCitiesRooms({required String email}) async {
+  return ngmyCivicInvoke({
+    'action': 'civicFetchCitiesRooms',
+    'email': email.trim().toLowerCase(),
+  });
+}
+
+Future<Map<String, dynamic>?> ngmyCivicAdminSettingsFetch({required String email}) async {
+  return ngmyCivicInvoke({
+    'action': 'civicAdminSettingsFetch',
+    'email': email.trim().toLowerCase(),
+  });
+}
+
+Future<bool> ngmyCivicAdminSettingsPersist({
+  required String email,
+  required String kind,
+  Map<String, dynamic>? payload,
+  List<dynamic>? ids,
+  List<dynamic>? emails,
+  Map<String, dynamic>? civicCitiesByState,
+  List<dynamic>? cities,
+  List<dynamic>? rooms,
+}) async {
+  final body = <String, dynamic>{
+    'action': 'civicAdminSettingsPersist',
+    'email': email.trim().toLowerCase(),
+    'kind': kind,
+  };
+  if (payload != null) body['payload'] = payload;
+  if (ids != null) body['ids'] = ids;
+  if (emails != null) body['emails'] = emails;
+  if (civicCitiesByState != null) body['civicCitiesByState'] = civicCitiesByState;
+  if (cities != null) body['cities'] = cities;
+  if (rooms != null) body['rooms'] = rooms;
+  final data = await ngmyCivicInvoke(body);
+  return data != null && data['ok'] == true;
+}

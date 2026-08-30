@@ -9,10 +9,7 @@ class NgmyCloudPolicy {
 
   /// Public config columns only. Locked PII blobs load via Edge (privateLists / civic).
   static const Set<String> cloudConfigKeys = {
-    'civicCitiesByState',
     'civicSelfEnrollmentEnabled',
-    'cities',
-    'rooms',
     'storeListings',
     'storeSellAccessEmails',
     'ngmyPopups',
@@ -21,8 +18,11 @@ class NgmyCloudPolicy {
     'familyTreePhotoMonthlyFee',
   };
 
-  /// Never select/upsert these on `config` from the client (revoked or Edge-only).
+  /// Edge-only geography (civic_cities_rooms settings key).
   static const Set<String> lockedConfigColumns = {
+    'civicCitiesByState',
+    'cities',
+    'rooms',
     'storeOrders',
     'storeInquiries',
     'loanApplications',
@@ -74,19 +74,35 @@ class NgmyCloudPolicy {
   static const bool persistMediaPostsToCloud = false;
   static const bool persistAnnouncementsToCloud = false;
 
-    /// ngmy_settings keys this build may read/write (RLS still gates who can mutate).
-  static bool allowNgmySettingsKey(String key) {
+    /// ngmy_settings keys readable without admin JWT (matches SQL allowlist).
+  static bool settingsKeyPublicReadable(String key) {
     final k = key.trim();
     if (k.isEmpty) return false;
-    if (k == 'management_operational_lists') return true;
-    // Published menus / bios / essentials transfer codes
-    if (k == 'ngmy_menu_publish_registry' || k.startsWith('ngmy_menu_pub_')) return true;
-    if (k == 'ngmy_bio_publish_registry' || k.startsWith('ngmy_bio_pub_')) return true;
+    const exact = {
+      'ngmy_popups',
+      'ngmy_chat_closed',
+      'terms_and_conditions',
+      'privacy_policy',
+      'investment_plans',
+      'ngmy_app_branding',
+      'civic_self_enrollment_settings',
+      'home_vote_ad_campaign',
+      'ngmy_menu_publish_registry',
+      'ngmy_bio_publish_registry',
+      'ngmy_slides_transfer_qr_stashes_v1',
+    };
+    if (exact.contains(k)) return true;
+    if (k.startsWith('ngmy_menu_pub_')) return true;
+    if (k.startsWith('ngmy_bio_pub_')) return true;
+    if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
+    if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
     if (k.startsWith('ngmy_essentials_code_v1_')) return true;
-    // Admin + app settings (self-enrollment, payments, communicate, branding, …)
-    if (k.startsWith('ngmy_') || k.startsWith('civic_')) return true;
-    if (k.contains('settings') || k.contains('payment') || k.contains('branding')) return true;
-    if (k.contains('help') || k.contains('chat') || k.contains('popup') || k.contains('plans')) return true;
+    return false;
+  }
+
+  /// Client-side guard — public keys or admin JWT writes via Supabase client.
+  static bool allowNgmySettingsKey(String key) {
+    if (settingsKeyPublicReadable(key)) return true;
     return false;
   }
 
