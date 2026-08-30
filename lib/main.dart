@@ -13964,6 +13964,8 @@ class _AuthScreenState extends State<AuthScreen> {
       } finally {
         if (mounted) setState(() => _authBusy = false);
       }
+    }
+  }
 
   Widget _buildAuthModeSwitchGlassCard(bool isDark) {
     final isLoginMode = _isLogin;
