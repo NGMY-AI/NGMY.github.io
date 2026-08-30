@@ -2518,6 +2518,37 @@ Map<String, dynamic>? _jobWorkerApplicationForEmail(
   return best;
 }
 
+bool _ngmyValueLooksRedacted(dynamic v) {
+  if (v == null) return false;
+  final s = v.toString();
+  return s == '***' || s.contains('***@');
+}
+
+Map<String, dynamic> _mergeRegistrarRemotePreservingLocalPii(
+  Map<String, dynamic> local,
+  Map<String, dynamic> remote,
+) {
+  final picked = _pickRegistrarApplicationRow(local, remote);
+  const piiFields = [
+    'phone',
+    'fullName',
+    'username',
+    'applicantName',
+    'experience',
+    'userEmail',
+    'reviewedBy',
+    'revokedBy',
+  ];
+  for (final f in piiFields) {
+    if (_ngmyValueLooksRedacted(picked[f]) &&
+        local[f] != null &&
+        !_ngmyValueLooksRedacted(local[f])) {
+      picked[f] = local[f];
+    }
+  }
+  return picked;
+}
+
 List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
   List<Map<String, dynamic>> local,
   List<Map<String, dynamic>> remote,
@@ -2536,7 +2567,7 @@ List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
       byId[id] = r;
       continue;
     }
-    byId[id] = _pickRegistrarApplicationRow(existing, r);
+    byId[id] = _mergeRegistrarRemotePreservingLocalPii(existing, r);
   }
   final byEmail = <String, Map<String, dynamic>>{};
   final noEmail = <Map<String, dynamic>>[];
@@ -2547,7 +2578,7 @@ List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
       continue;
     }
     final existing = byEmail[email];
-    byEmail[email] = existing == null ? a : _pickRegistrarApplicationRow(existing, a);
+    byEmail[email] = existing == null ? a : _mergeRegistrarRemotePreservingLocalPii(existing, a);
   }
   return [...byEmail.values, ...noEmail]
     ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
@@ -9508,10 +9539,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           .eq('email', email)
           .maybeSingle()
           .timeout(kNgmyCloudLoadTimeout);
-      // Re-check any logged-in member with a registrar application so both
-      // revokes and restores take effect while the Civic Registry is open.
+      // Registrar status sync — only while Civic Registry is on screen (avoids bright-handler PII polls).
       final localRegistrarStatus = _registrarApplicationStatusForEmail(_config, email);
-      if (_currentUser!.isAuthorizedRegistrar || localRegistrarStatus != null) {
+      if ((_currentUser!.isAuthorizedRegistrar || localRegistrarStatus != null) &&
+          NgmyFeatureSyncSession.civicRegistryActive) {
         final remoteApps = await _fetchRemoteCivicRegistrarApplications();
         final remoteConfig = AppConfig();
         remoteConfig.civicRegistrarApplications = remoteApps;
@@ -30514,6 +30545,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   @override
   void initState() {
     super.initState();
+    NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
     unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
@@ -30612,6 +30644,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   @override
   void dispose() {
+    NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
     _searchController.dispose();

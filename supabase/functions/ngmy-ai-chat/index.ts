@@ -731,6 +731,126 @@ function maskEmailValue(raw: string, viewer: string): string {
   return `${e.slice(0, 1)}***${e.slice(at)}`;
 }
 
+/** Every bright-handler response masks emails — including the signed-in viewer. */
+function maskEmailNetwork(raw: string): string {
+  const e = emailKey(raw);
+  if (!e) return "";
+  const at = e.indexOf("@");
+  if (at <= 0) return "***";
+  return `${e.slice(0, 1)}***${e.slice(at)}`;
+}
+
+function maskEmailFieldsNetwork(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...row };
+  for (const f of [
+    "userEmail",
+    "email",
+    "fromEmail",
+    "toEmail",
+    "player1Email",
+    "player2Email",
+    "buyerEmail",
+    "sellerEmail",
+    "ownerEmail",
+    "applicantEmail",
+    "reviewedBy",
+    "revokedBy",
+    "recordedByEmail",
+  ]) {
+    if (typeof row[f] === "string") {
+      out[f] = maskEmailNetwork(String(row[f]));
+    }
+  }
+  return out;
+}
+
+function registrarAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    state: a.state,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
+    userEmail: a.userEmail ?? a.email ?? "",
+    reviewedBy: a.reviewedBy,
+    revokedBy: a.revokedBy,
+  });
+}
+
+function loanAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    amount: a.amount,
+    dueDate: a.dueDate,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    userEmail: a.userEmail ?? "",
+    reviewedBy: a.reviewedBy,
+  });
+}
+
+function jobAppNetworkSummary(
+  a: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    id: a.id,
+    status: a.status,
+    state: a.state,
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    userEmail: a.userEmail ?? "",
+    reviewedBy: a.reviewedBy,
+  });
+}
+
+function userRowNetworkSummary(
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  return maskEmailFieldsNetwork({
+    email: row.email ?? "",
+    username: "***",
+    status: row.status,
+    isAdmin: row.isAdmin,
+    isAuthorizedRegistrar: row.isAuthorizedRegistrar,
+    isApprovedWorker: row.isApprovedWorker,
+    isApprovedHelper: row.isApprovedHelper,
+    isEnrolledInRegistry: row.isEnrolledInRegistry,
+    forceLogout: row.forceLogout,
+    canSellOnStore: row.canSellOnStore,
+    profilePicturePath: row.profilePicturePath,
+  });
+}
+
+function managementNetworkPayload(
+  mgmt: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (Array.isArray(mgmt.loanApplications)) {
+    out.loanApplications = asMemberList(mgmt.loanApplications).map(loanAppNetworkSummary);
+  }
+  if (Array.isArray(mgmt.jobWorkerApplications)) {
+    out.jobWorkerApplications = asMemberList(mgmt.jobWorkerApplications).map(jobAppNetworkSummary);
+  }
+  if (Array.isArray(mgmt.jobPosts)) {
+    out.jobPosts = asMemberList(mgmt.jobPosts).map((r) => maskEmailFieldsNetwork(r));
+  }
+  for (const f of ["helpHelperApplications", "helpRequests", "helpBusinesses"] as const) {
+    if (Array.isArray(mgmt[f])) {
+      out[f] = asMemberList(mgmt[f]).map((r) => maskEmailFieldsNetwork(r));
+    }
+  }
+  return out;
+}
+
 function redactEmailFields(
   row: Record<string, unknown>,
   viewer: string,
@@ -795,24 +915,23 @@ function redactEmailFields(
 
 function redactTransaction(
   row: Record<string, unknown>,
-  viewer: string,
+  _viewer: string,
 ): Record<string, unknown> {
   const out = { ...row };
-  const owner = emailKey(String(row.userEmail ?? ""));
-  if (owner && owner !== emailKey(viewer) && typeof row.userEmail === "string") {
-    out.userEmail = maskEmailValue(String(row.userEmail), viewer);
+  if (typeof row.userEmail === "string" && row.userEmail.trim()) {
+    out.userEmail = maskEmailNetwork(String(row.userEmail));
   }
   return out;
 }
 
 function redactEmailKeyedMap(
   map: unknown,
-  viewer: string,
+  _viewer: string,
 ): Record<string, unknown> {
   if (!map || typeof map !== "object" || Array.isArray(map)) return {};
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
-    out[maskEmailValue(k, viewer)] = v;
+    out[maskEmailNetwork(k)] = v;
   }
   return out;
 }
@@ -1089,23 +1208,18 @@ async function handleCivicFetchRegistrarApplications(
     return jsonOk({
       ok: true,
       view: "admin",
-      applications: redactList(apps, email),
+      applications: apps.map(registrarAppNetworkSummary),
       approvedStates,
     });
   }
 
-  // Registrar / king reviewers: full apps for their home state only; others sanitized
+  // Registrar / king reviewers: status-only for all states in Network (no PII).
   if (role.isRegistrar && role.registrarState) {
-    const home = stateKey(role.registrarState);
-    const scoped = apps.map((a) => {
-      if (stateKey(String(a.state ?? "")) === home) return a;
-      return sanitizeRegistrarAppPublic(a);
-    });
     const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
     return jsonOk({
       ok: true,
       view: "registrar",
-      applications: scoped,
+      applications: apps.map(registrarAppNetworkSummary),
       myApplications: mine.map(sanitizeRegistrarAppOwn),
       approvedStates,
     });
@@ -1944,13 +2058,13 @@ async function handlePrivateListsFetch(
     return jsonOk({
       ok: true,
       view: "admin",
-      management: redactManagement(mgmt, email),
-      gameInvites: redactList(asItems(invitesWrap), email),
-      storeInquiries: redactList(asItems(inquiriesWrap), email),
-      storeOrders: redactList(asItems(ordersWrap), email),
+      management: managementNetworkPayload(mgmt),
+      gameInvites: asItems(invitesWrap).map((r) => maskEmailFieldsNetwork(r)),
+      storeInquiries: asItems(inquiriesWrap).map((r) => maskEmailFieldsNetwork(r)),
+      storeOrders: asItems(ordersWrap).map((r) => maskEmailFieldsNetwork(r)),
       mediaVirtualProfiles: asItems(mediaWrap),
       familyTreePhotoAccessUntilByEmail: redactEmailKeyedMap(familyRaw, email),
-      helpCampaignSpendings: redactList(asItems(spendingsWrap), email),
+      helpCampaignSpendings: asItems(spendingsWrap).map((r) => maskEmailFieldsNetwork(r)),
     });
   }
 
@@ -2192,7 +2306,7 @@ async function handleCivicAdminSettingsFetch(
     civicContributionReceiptRemoved: receiptRemoved,
     civicHelpModeSettings: helpMode,
     storeSellAccessEmails: sellList.map((e) =>
-      typeof e === "string" ? maskEmailValue(String(e), email) : e,
+      typeof e === "string" ? maskEmailNetwork(String(e)) : e,
     ),
     civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
     cities: citiesWrap.cities ?? [],
@@ -2341,7 +2455,7 @@ async function handleAdminUsersList(
 
   return jsonOk({
     ok: true,
-    users: redactList(rows, email),
+    users: rows.map((r) => userRowNetworkSummary(r)),
     count: rows.length,
   });
 }

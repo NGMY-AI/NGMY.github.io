@@ -7,7 +7,7 @@ import 'ngmy_supabase_config.dart';
 
 Future<bool> ngmyNativeReachabilityProbe(Duration timeout) async {
   try {
-    final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/users?select=email&limit=1');
+    final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/config?select=id&limit=1');
     final resp = await http
         .get(
           uri,

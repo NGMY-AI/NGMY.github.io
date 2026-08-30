@@ -7,11 +7,13 @@ class NgmyFeatureSyncSession {
   static int _growthIncomeUser = 0;
   static int _loans = 0;
   static int _adminDashboard = 0;
+  static int _civicRegistry = 0;
 
   static bool get growthIncomeAdminActive => _growthIncomeAdmin > 0;
   static bool get growthIncomeUserActive => _growthIncomeUser > 0;
   static bool get loansActive => _loans > 0;
   static bool get adminDashboardActive => _adminDashboard > 0;
+  static bool get civicRegistryActive => _civicRegistry > 0;
   static bool get anyGrowthIncomeActive => growthIncomeAdminActive || growthIncomeUserActive;
 
   /// Wired by the app root to start scoped polls / refreshes.
@@ -58,5 +60,13 @@ class NgmyFeatureSyncSession {
     if (_adminDashboard <= 0) return;
     _adminDashboard--;
     if (_adminDashboard == 0) onLeftAdminDashboard?.call();
+  }
+
+  static void enterCivicRegistry() {
+    _civicRegistry++;
+  }
+
+  static void leaveCivicRegistry() {
+    if (_civicRegistry > 0) _civicRegistry--;
   }
 }

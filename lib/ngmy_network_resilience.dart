@@ -47,10 +47,10 @@ Map<String, String> get _ngmySupabaseProbeHeaders => {
       'Authorization': 'Bearer $kNgmySupabaseAnonKey',
     };
 
-/// Authenticated read against Supabase — same check the app uses for real sync.
+/// Authenticated read against Supabase — public config row only (no user PII probe).
 Future<bool> _probeSupabaseRest() async {
   try {
-    final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/users?select=email&limit=1');
+    final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/config?select=id&limit=1');
     final resp = await http.get(uri, headers: _ngmySupabaseProbeHeaders).timeout(kNgmyReachabilityTimeout);
     if (resp.statusCode >= 200 && resp.statusCode < 500) return true;
     debugPrint('[ngmy] supabase probe status ${resp.statusCode}');
