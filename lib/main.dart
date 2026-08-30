@@ -2600,13 +2600,29 @@ List<Map<String, dynamic>> _civicRegistrarApplicationsFromConfigValue(dynamic ra
 
 Future<List<Map<String, dynamic>>> _fetchRemoteCivicRegistrarApplications() async {
   try {
-    final row = await _fetchNgmyConfigRow(columns: 'civicRegistrarApplications');
-    if (row == null) return const [];
-    return _civicRegistrarApplicationsFromConfigValue(row['civicRegistrarApplications']);
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty) return const [];
+    return await ngmyCivicFetchRegistrarApplications(email: email);
   } catch (e) {
     debugPrint('[config] fetch civicRegistrarApplications: $e');
     return const [];
   }
+}
+
+Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[registrar] local config save: $e');
+  }
+  await _persistManagementOperationalListsLocal(config);
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty || !await ngmyCanReachCloud()) return false;
+  return ngmyCivicPersistRegistrarApplications(
+    email: email,
+    applications: config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+  );
 }
 
 Future<({String global, Map<String, String> byState})> _fetchRemoteCivicRegistryPins() async {
@@ -2823,20 +2839,6 @@ void _mergeRegistrarApplicationsIntoConfig(AppConfig config, List<Map<String, dy
     config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     remote,
   );
-}
-
-Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('app_config', jsonEncode(config.toJson()));
-  } catch (e) {
-    debugPrint('[registrar] local config save: $e');
-  }
-  await _persistManagementOperationalListsLocal(config);
-  if (!await ngmyCanReachCloud()) return false;
-  _operationalConfigCloudDebounce?.cancel();
-  _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
-  return await _persistManagementOperationalListsAuthoritative(config);
 }
 
 Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
@@ -3827,8 +3829,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'storeInquiries': config.storeInquiries,
     'storeOrders': config.storeOrders,
     'storeListings': config.storeListings,
-    'civicRegistrarApplications': config.civicRegistrarApplications,
-    // civicRegistryMembers + PINs: Edge / service_role only — never mirror to public config writes.
+    // civicRegistrarApplications + members + PINs: Edge only
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'cities': config.cities,
@@ -3873,11 +3874,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   await _mergeCivicRegistryPinsIntoConfig(config);
   await _mergeCivicCitiesAndRoomsIntoConfig(config);
   final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
-  final localRegistrarBefore = config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
   _mergeRegistrarApplicationsIntoConfig(config, remoteRegistrarApps);
-  final registrarApps = config.civicRegistrarApplications;
-  final shouldWriteRegistrarApps =
-      registrarApps.isNotEmpty || remoteRegistrarApps.isNotEmpty || localRegistrarBefore.isNotEmpty;
   final client = Supabase.instance.client;
   final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
@@ -3889,7 +3886,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'cities': config.cities,
     'rooms': config.rooms,
-    if (shouldWriteRegistrarApps) 'civicRegistrarApplications': registrarApps,
   });
   try {
     await client.from('config').upsert(combined);

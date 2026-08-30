@@ -129,8 +129,7 @@ Map<String, dynamic> _managementOperationalListsPayload(AppConfig config, {bool 
     'helpHelperApplications': config.helpHelperApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     'helpRequests': config.helpRequests.map((e) => Map<String, dynamic>.from(e)).toList(),
     'helpBusinesses': config.helpBusinesses.map((e) => Map<String, dynamic>.from(e)).toList(),
-    'civicRegistrarApplications':
-        config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    // civicRegistrarApplications: Edge-only locked settings — never mirror here.
     'adminDeletedUserEmails': config.adminDeletedUserEmails,
     'adminUserAccountStatusByEmail': config.adminUserAccountStatusByEmail,
     'adminUserCrownBadgeByEmail': config.adminUserCrownBadgeByEmail,
@@ -193,13 +192,7 @@ void _applyManagementOperationalListsPayload(AppConfig config, Map<String, dynam
   if (helpBiz.isNotEmpty) {
     config.helpBusinesses = _mergeJobWorkerApplicationsLists(config.helpBusinesses, helpBiz);
   }
-  final registrarApps = _managementListFromPayload(payload['civicRegistrarApplications']);
-  if (registrarApps.isNotEmpty) {
-    config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
-      config.civicRegistrarApplications,
-      registrarApps,
-    );
-  }
+  // civicRegistrarApplications come from Edge — ignore if present in old blobs.
   final deleted = payload['adminDeletedUserEmails'];
   if (deleted is List) {
     final merged = <String>{
@@ -379,7 +372,6 @@ Future<bool> _persistManagementOperationalListsAuthoritative(AppConfig config) a
         'helpHelperApplications',
         'helpRequests',
         'helpBusinesses',
-        'civicRegistrarApplications',
       ]) {
         if (await _upsertManagementListColumn(col, payload[col])) {
           configOk = true;

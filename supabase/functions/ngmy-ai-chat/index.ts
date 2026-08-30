@@ -671,6 +671,7 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
 
 const CIVIC_MEMBERS_KEY = "civic_registry_members";
 const CIVIC_PINS_KEY = "civic_registry_pins";
+const CIVIC_REGISTRAR_APPS_KEY = "civic_registrar_applications";
 
 type CivicRole = {
   email: string;
@@ -819,6 +820,46 @@ async function resolveCivicRole(
   }
 
   try {
+    const apps = await loadRegistrarApplications(admin);
+    let best: Record<string, unknown> | null = null;
+    for (const a of apps) {
+      if (emailKey(String(a.userEmail ?? "")) !== key) continue;
+      if (String(a.status ?? "").toLowerCase() !== "approved") continue;
+      best = a;
+    }
+    if (best) {
+      role.isRegistrar = true;
+      role.registrarState = String(best.state ?? "").trim();
+    }
+  } catch (_) {
+    // ignore
+  }
+
+  return role;
+}
+
+async function loadRegistrarApplications(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<Record<string, unknown>[]> {
+  try {
+    const { data: settingsRow } = await admin
+      .from("ngmy_settings")
+      .select("value")
+      .eq("key", CIVIC_REGISTRAR_APPS_KEY)
+      .maybeSingle();
+    const value = settingsRow?.value;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const raw = (value as Record<string, unknown>).applications;
+      if (Array.isArray(raw)) {
+        return raw
+          .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+          .map((e) => ({ ...(e as Record<string, unknown>) }));
+      }
+    }
+  } catch (_) {
+    // fall through
+  }
+  try {
     const { data: cfg } = await admin
       .from("config")
       .select("civicRegistrarApplications")
@@ -826,24 +867,153 @@ async function resolveCivicRole(
       .maybeSingle();
     const apps = cfg?.civicRegistrarApplications;
     if (Array.isArray(apps)) {
-      let best: Record<string, unknown> | null = null;
-      for (const raw of apps) {
-        if (!raw || typeof raw !== "object") continue;
-        const a = raw as Record<string, unknown>;
-        if (emailKey(String(a.userEmail ?? "")) !== key) continue;
-        if (String(a.status ?? "").toLowerCase() !== "approved") continue;
-        best = a;
-      }
-      if (best) {
-        role.isRegistrar = true;
-        role.registrarState = String(best.state ?? "").trim();
-      }
+      return apps
+        .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+        .map((e) => ({ ...(e as Record<string, unknown>) }));
     }
   } catch (_) {
     // ignore
   }
+  return [];
+}
 
-  return role;
+async function saveRegistrarApplications(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  applications: Record<string, unknown>[],
+): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await admin.from("ngmy_settings").upsert(
+    {
+      key: CIVIC_REGISTRAR_APPS_KEY,
+      value: {
+        applications,
+        savedAt: new Date().toISOString(),
+      },
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { ok: false, error: error.message };
+  // Keep public config empty
+  await admin.from("config").upsert({
+    id: "1",
+    civicRegistrarApplications: [],
+  });
+  return { ok: true };
+}
+
+function sanitizeRegistrarAppPublic(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+  };
+}
+
+function sanitizeRegistrarAppOwn(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: a.id,
+    userEmail: String(a.userEmail ?? ""),
+    fullName: String(a.fullName ?? a.applicantName ?? ""),
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    // no phone / address of other people — own row only
+    phone: String(a.phone ?? ""),
+  };
+}
+
+async function handleCivicFetchRegistrarApplications(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const apps = await loadRegistrarApplications(admin);
+
+  const approvedStates = [
+    ...new Set(
+      apps
+        .filter((a) => String(a.status ?? "").toLowerCase() === "approved")
+        .map((a) => String(a.state ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (role.isAdmin) {
+    return jsonOk({
+      ok: true,
+      view: "admin",
+      applications: apps,
+      approvedStates,
+    });
+  }
+
+  // Registrar / king reviewers: full apps for their home state only; others sanitized
+  if (role.isRegistrar && role.registrarState) {
+    const home = stateKey(role.registrarState);
+    const scoped = apps.map((a) => {
+      if (stateKey(String(a.state ?? "")) === home) return a;
+      return sanitizeRegistrarAppPublic(a);
+    });
+    const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+    return jsonOk({
+      ok: true,
+      view: "registrar",
+      applications: scoped,
+      myApplications: mine.map(sanitizeRegistrarAppOwn),
+      approvedStates,
+    });
+  }
+
+  // Normal member: only own application(s) + which states have an AR (no PII)
+  const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+  return jsonOk({
+    ok: true,
+    view: "member",
+    applications: mine.map(sanitizeRegistrarAppOwn),
+    approvedStates,
+  });
+}
+
+async function handleCivicPersistRegistrarApplications(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const incoming = asMemberList(body.applications); // reuse list helper
+  const current = await loadRegistrarApplications(admin);
+
+  let next = current;
+  if (role.isAdmin) {
+    next = incoming.length > 0 ? incoming : current;
+    // If client sent full list, trust replace for admin
+    if (Array.isArray(body.applications)) next = incoming;
+  } else if (role.isRegistrar && role.registrarState) {
+    // Merge: keep other states unchanged; replace home-state rows from incoming home-state
+    const home = stateKey(role.registrarState);
+    const kept = current.filter((a) => stateKey(String(a.state ?? "")) !== home);
+    const homeIncoming = incoming.filter((a) => stateKey(String(a.state ?? "")) === home);
+    next = [...kept, ...homeIncoming];
+  } else {
+    // Member may only upsert their own pending application row(s)
+    const mineIncoming = incoming.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+    if (mineIncoming.length === 0) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+    const others = current.filter((a) => emailKey(String(a.userEmail ?? "")) !== email);
+    next = [...others, ...mineIncoming];
+  }
+
+  const saved = await saveRegistrarApplications(admin, next);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, count: next.length });
 }
 
 async function loadRegistryPins(
@@ -1598,6 +1768,12 @@ serve(async (req) => {
     }
     if (action === "civicSaveRegistryPins") {
       return await handleCivicSaveRegistryPins(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRegistrarApplications") {
+      return await handleCivicFetchRegistrarApplications(req, body as Record<string, unknown>);
+    }
+    if (action === "civicPersistRegistrarApplications") {
+      return await handleCivicPersistRegistrarApplications(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

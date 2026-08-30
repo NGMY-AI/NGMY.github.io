@@ -7,7 +7,7 @@ class NgmySupabaseColumns {
   static const configPoll =
       'id,ngmyChatClosed,investmentPlans,storeOrders,storeInquiries,storeListings,'
       'helpHelperApplications,helpRequests,helpBusinesses,loanApplications,'
-      'civicRegistrarApplications,ngmyPopups,ngmyVideoPopups,jobPosts,jobWorkerApplications,'
+      'ngmyPopups,ngmyVideoPopups,jobPosts,jobWorkerApplications,'
       'gameInvites,civicSelfEnrollmentEnabled,'
       'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
       'helpCampaignSpendings,helpModeActive,helpPurpose,helpCashApp,helpZelle,helpPhone,'
@@ -26,7 +26,7 @@ class NgmySupabaseColumns {
 
   static const configBootstrapHeavy =
       'storeListings,storeInquiries,storeOrders,helpHelperApplications,helpRequests,'
-      'helpBusinesses,loanApplications,civicRegistrarApplications,ngmyPopups,ngmyVideoPopups,'
+      'helpBusinesses,loanApplications,ngmyPopups,ngmyVideoPopups,'
       'jobPosts,jobWorkerApplications,gameInvites,mediaVirtualProfiles,mediaDeliveryQueue,'
       'termsAndConditions,privacyPolicy';
 

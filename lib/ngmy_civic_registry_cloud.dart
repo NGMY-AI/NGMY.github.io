@@ -245,3 +245,28 @@ Future<bool> ngmyCivicSaveRegistryPins({
   });
   return data != null && data['ok'] == true;
 }
+
+Future<List<Map<String, dynamic>>> ngmyCivicFetchRegistrarApplications({
+  required String email,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicFetchRegistrarApplications',
+    'email': email.trim().toLowerCase(),
+  });
+  if (data == null || data['ok'] != true) return const [];
+  final raw = data['applications'];
+  if (raw is! List) return const [];
+  return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+}
+
+Future<bool> ngmyCivicPersistRegistrarApplications({
+  required String email,
+  required List<Map<String, dynamic>> applications,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicPersistRegistrarApplications',
+    'email': email.trim().toLowerCase(),
+    'applications': applications,
+  });
+  return data != null && data['ok'] == true;
+}
