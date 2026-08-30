@@ -6676,6 +6676,10 @@ Map<String, dynamic> _storeListingPublicOnly(Map<String, dynamic> listing) {
     'sellerAddress',
     'sellerZelleInfo',
     'sellerCashAppTag',
+    'locationHistory',
+    'buyerAddress',
+    'buyerPhone',
+    'buyerEmail',
   ]) {
     copy.remove(k);
   }

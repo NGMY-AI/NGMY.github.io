@@ -14,7 +14,11 @@ as $$
     - 'location'
     - 'sellerAddress'
     - 'sellerZelleInfo'
-    - 'sellerCashAppTag';
+    - 'sellerCashAppTag'
+    - 'locationHistory'
+    - 'buyerAddress'
+    - 'buyerPhone'
+    - 'buyerEmail';
 $$;
 
 create or replace function public.ngmy_store_inquiry_public(d jsonb)
