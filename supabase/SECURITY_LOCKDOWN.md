@@ -41,10 +41,11 @@ Do **not** run `security_rls_users_phase2.sql` yet (auth migration required).
 ## 5. Civic Registry privacy
 
 1. Redeploy **bright-handler** with the latest `ngmy-ai-chat/index.ts` (civic* actions).
-2. Run `supabase/security_lock_civic_registry.sql` in SQL Editor.
-3. Hard-refresh + log out / log in.
+2. Run `supabase/security_lock_civic_registry.sql` in SQL Editor (roster blob).
+3. Run `supabase/security_lock_civic_pins.sql` in SQL Editor (PIN columns).
+4. Hard-refresh + log out / log in.
 
-Verify: anon `GET /rest/v1/ngmy_settings?key=eq.civic_registry_members` returns empty or is denied; members only receive directory fields via Edge.
+Verify: anon `GET` of `civic_registry_members` is empty; anon select of `civicRegistryPin` returns null/empty; members only receive directory fields via Edge.
 
 See also `CIVIC_REGISTRY_LOCK.md`.
 

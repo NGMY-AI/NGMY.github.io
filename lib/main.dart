@@ -2734,16 +2734,23 @@ Future<void> _persistCivicRegistryPins(
     globalPin: config.civicRegistryPin,
     pinsByState: config.civicRegistryPinsByState,
   );
-  await _mergeCivicRegistryPinsIntoConfig(config);
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('app_config', jsonEncode(config.toJson()));
   } catch (e) {
     debugPrint('[config] local civic pins save: $e');
   }
-  if (await ngmyCanReachCloud()) {
-    await _persistCriticalConfigFields(config);
-  }
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty || !await ngmyCanReachCloud()) return;
+  final ok = await ngmyCivicSaveRegistryPins(
+    email: email,
+    state: st,
+    pin: p,
+    globalPin: globalPin,
+  );
+  if (!ok) debugPrint('[config] civic pins Edge save failed');
+  // Refresh from server (role-filtered) so local matches what Edge stored.
+  await _mergeCivicRegistryPinsIntoConfig(config);
 }
 
 /// Civic Registry King — crowned by admin; may approve registrars and change states in their state.
@@ -3821,9 +3828,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
     'storeOrders': config.storeOrders,
     'storeListings': config.storeListings,
     'civicRegistrarApplications': config.civicRegistrarApplications,
-    // civicRegistryMembers lives only in ngmy_settings via Edge — never mirror to public config.
-    'civicRegistryPin': config.civicRegistryPin,
-    'civicRegistryPinsByState': config.civicRegistryPinsByState,
+    // civicRegistryMembers + PINs: Edge / service_role only — never mirror to public config writes.
     'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'cities': config.cities,
@@ -3876,8 +3881,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   final client = Supabase.instance.client;
   final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
-    'civicRegistryPin': config.civicRegistryPin,
-    'civicRegistryPinsByState': config.civicRegistryPinsByState,
     'storeSellAccessEmails': config.storeSellAccessEmails,
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': config.familyTreeCreateFee,

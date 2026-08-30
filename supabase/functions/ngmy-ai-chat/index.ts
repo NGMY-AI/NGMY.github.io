@@ -1398,6 +1398,66 @@ async function handleCivicFetchRegistryPins(
   return jsonOk({ ok: true, global: "", byState });
 }
 
+async function handleCivicSaveRegistryPins(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const current = await loadRegistryPins(admin);
+  let nextGlobal = current.global;
+  const nextByState: Record<string, string> = { ...current.byState };
+
+  const state = String(body.state ?? "").trim();
+  const pin = String(body.pin ?? "").trim();
+  const globalPinRaw = body.globalPin;
+  const globalPin = globalPinRaw == null ? null : String(globalPinRaw).trim();
+
+  if (role.isAdmin) {
+    if (globalPin != null && globalPin.length > 0) nextGlobal = globalPin;
+    if (state && pin) nextByState[state] = pin;
+    // Admin may replace full map when provided
+    const map = body.byState;
+    if (map && typeof map === "object" && !Array.isArray(map)) {
+      for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
+        const sk = String(k ?? "").trim();
+        const pv = String(v ?? "").trim();
+        if (sk && pv) nextByState[sk] = pv;
+      }
+    }
+  } else {
+    // Registrar: only home state PIN
+    const home = role.registrarState.trim();
+    if (!home) return jsonOk({ error: "No registrar state" }, 403);
+    if (state && stateKey(state) !== stateKey(home)) {
+      return jsonOk({ error: "Registrars can only set PIN for their home state" }, 403);
+    }
+    if (!pin) return jsonOk({ error: "pin required" }, 400);
+    nextByState[home] = pin;
+  }
+
+  const { error } = await admin.from("config").upsert({
+    id: "1",
+    civicRegistryPin: nextGlobal,
+    civicRegistryPinsByState: nextByState,
+  });
+  if (error) return jsonOk({ error: error.message }, 500);
+  return jsonOk({
+    ok: true,
+    global: role.isAdmin ? nextGlobal : "",
+    byState: role.isAdmin
+      ? nextByState
+      : { [role.registrarState]: nextByState[role.registrarState] ?? pin },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1480,6 +1540,9 @@ serve(async (req) => {
     }
     if (action === "civicFetchRegistryPins") {
       return await handleCivicFetchRegistryPins(req, body as Record<string, unknown>);
+    }
+    if (action === "civicSaveRegistryPins") {
+      return await handleCivicSaveRegistryPins(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

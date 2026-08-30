@@ -229,3 +229,19 @@ Future<({String global, Map<String, String> byState})> ngmyCivicFetchRegistryPin
   }
   return (global: (data['global'] ?? '').toString().trim(), byState: byState);
 }
+
+Future<bool> ngmyCivicSaveRegistryPins({
+  required String email,
+  String state = '',
+  String pin = '',
+  String? globalPin,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicSaveRegistryPins',
+    'email': email.trim().toLowerCase(),
+    if (state.trim().isNotEmpty) 'state': state.trim(),
+    if (pin.trim().isNotEmpty) 'pin': pin.trim(),
+    if (globalPin != null) 'globalPin': globalPin.trim(),
+  });
+  return data != null && data['ok'] == true;
+}
