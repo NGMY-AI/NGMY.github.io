@@ -294,7 +294,7 @@ function keyFromConfigRow(row: Record<string, unknown> | null): string {
   return "";
 }
 
-/** Server-only AI key: Edge secrets first, then service-role config. Never trust client body. */
+/** Server-only AI key: Edge secrets first, then private table, then service-role config. Never trust client body. */
 async function resolveServerAiApiKey(): Promise<string> {
   for (const envName of ["NGMY_AI_API_KEY", "GEMINI_API_KEY", "AI_API_KEY"]) {
     const v = String(Deno.env.get(envName) ?? "").trim();
@@ -302,6 +302,19 @@ async function resolveServerAiApiKey(): Promise<string> {
   }
   const admin = adminClient();
   if (!admin) return "";
+
+  try {
+    const { data: secretRow } = await admin
+      .from("ngmy_server_secrets")
+      .select("ai_api_key")
+      .eq("id", "1")
+      .maybeSingle();
+    const fromPrivate = String(secretRow?.ai_api_key ?? "").trim();
+    if (fromPrivate) return fromPrivate;
+  } catch (_) {
+    // table may not exist yet
+  }
+
   for (const id of ["1", 1]) {
     const { data } = await admin
       .from("config")
@@ -352,14 +365,32 @@ async function handleSaveAiApiKey(requesterEmail: string, apiKey: string): Promi
   if (!k) return jsonOk({ error: "apiKey is required" }, 400);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
-  const { error } = await admin.from("config").upsert({
+
+  // Store in private table; keep public config key columns empty.
+  const { error: privateErr } = await admin.from("ngmy_server_secrets").upsert({
     id: "1",
-    geminiApiKey: k,
-    gemini_api_key: k,
-    aiApiKey: k,
     ai_api_key: k,
+    updated_at: new Date().toISOString(),
   });
-  if (error) return jsonOk({ error: error.message }, 500);
+  if (privateErr) {
+    // Fall back to config only if private table missing; still blank client-readable risk until wipe SQL runs.
+    const { error } = await admin.from("config").upsert({
+      id: "1",
+      geminiApiKey: k,
+      gemini_api_key: k,
+      aiApiKey: k,
+      ai_api_key: k,
+    });
+    if (error) return jsonOk({ error: error.message }, 500);
+  } else {
+    await admin.from("config").upsert({
+      id: "1",
+      geminiApiKey: "",
+      gemini_api_key: "",
+      aiApiKey: "",
+      ai_api_key: "",
+    });
+  }
   return jsonOk({ ok: true, configured: true });
 }
 
