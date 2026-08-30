@@ -13932,24 +13932,38 @@ class _AuthScreenState extends State<AuthScreen> {
       setState(() => _authBusy = true);
       try {
         await ngmyWaitForSupabaseReady();
-        final existingCloud = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
+        final reg = await ngmyRegisterAppUserViaServer(
+          email: email,
+          passwordHash: _hashPassword(password),
+          username: username,
+          phone: phone,
+        );
         if (!mounted) return;
-        if (existingCloud != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('This email is already registered. Please log in instead.')),
-          );
-          setState(() => _isLogin = true);
+        if (!reg.ok) {
+          final err = (reg.error ?? '').toLowerCase();
+          if (err.contains('already')) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('This email is already registered. Please log in instead.')),
+            );
+            setState(() => _isLogin = true);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(reg.error ?? 'Could not create account. Try again.')),
+            );
+          }
           return;
         }
+        await widget.onAuthComplete(email, phone, username, _hashPassword(password), false);
       } catch (e) {
-        debugPrint('[signup] cloud duplicate check: $e');
+        debugPrint('[signup] register: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(ngmyAuthReachabilityMessage(e))),
+          );
+        }
       } finally {
         if (mounted) setState(() => _authBusy = false);
       }
-
-      widget.onAuthComplete(email, phone, username, _hashPassword(password), false);
-    }
-  }
 
   Widget _buildAuthModeSwitchGlassCard(bool isDark) {
     final isLoginMode = _isLogin;

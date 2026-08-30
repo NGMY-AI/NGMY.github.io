@@ -399,6 +399,49 @@ async function handleAiKeyConfigured(): Promise<Response> {
   return jsonOk({ configured: key.length > 0 });
 }
 
+async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: string): Promise<void> {
+  const { error } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    // Random password — NGMY uses custom passwordHash; session is issued via magic link.
+    password: `${crypto.randomUUID()}Aa1!`,
+    user_metadata: { ngmy_app: true },
+  });
+  if (!error) return;
+  const msg = String(error.message ?? "").toLowerCase();
+  if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) return;
+  // Soft-fail: generateLink may still work if the user already exists.
+  console.error("[ngmy-auth] createUser:", error.message);
+}
+
+/** Issue a real Supabase Auth session for this email (JWT includes email for RLS). */
+async function issueAuthSessionForEmail(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<{ access_token: string; refresh_token: string } | null> {
+  await ensureAuthUser(admin, email);
+  const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+  const hashed = String(linkData?.properties?.hashed_token ?? "").trim();
+  if (linkErr || !hashed) {
+    console.error("[ngmy-auth] generateLink:", linkErr?.message);
+    return null;
+  }
+  const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
+    token_hash: hashed,
+    type: "email",
+  });
+  const access = String(verified?.session?.access_token ?? "").trim();
+  const refresh = String(verified?.session?.refresh_token ?? "").trim();
+  if (verifyErr || !access || !refresh) {
+    console.error("[ngmy-auth] verifyOtp:", verifyErr?.message);
+    return null;
+  }
+  return { access_token: access, refresh_token: refresh };
+}
+
 async function handleVerifyPasswordLogin(email: string, passwordHash: string): Promise<Response> {
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -428,6 +471,8 @@ async function handleVerifyPasswordLogin(email: string, passwordHash: string): P
     return jsonOk({ ok: false, error: "Wrong password" }, 401);
   }
 
+  const session = await issueAuthSessionForEmail(admin, String(row.email ?? key));
+
   // Never return passwordHash to the client.
   return jsonOk({
     ok: true,
@@ -435,12 +480,56 @@ async function handleVerifyPasswordLogin(email: string, passwordHash: string): P
       email: String(row.email ?? key),
       username: String(row.username ?? ""),
       phone: String(row.phone ?? ""),
-      isAdmin: Boolean(row.isAdmin),
+      isAdmin: Boolean(row.isAdmin) || isNgmyAdminEmail(String(row.email ?? key)),
       status: String(row.status ?? "active"),
       forceLogout: Boolean(row.forceLogout),
       accountBalance: Number(row.accountBalance ?? 0),
       canSellOnStore: Boolean(row.canSellOnStore),
     },
+    session: session,
+  });
+}
+
+async function handleRegisterAppUser(body: Record<string, unknown>): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const passwordHash = String(body.passwordHash ?? "").trim();
+  const username = String(body.username ?? "").trim() || email.split("@")[0] || "User";
+  const phone = String(body.phone ?? "").trim();
+  if (!email.includes("@") || passwordHash.length < 8) {
+    return jsonOk({ error: "Valid email and password required" }, 400);
+  }
+
+  const exists = await userAccountExists(admin, email);
+  if (exists) return jsonOk({ error: "Account already exists. Please log in." }, 409);
+
+  const isAdmin = isNgmyAdminEmail(email);
+  const { error: upsertErr } = await admin.from("users").upsert({
+    email,
+    passwordHash,
+    username,
+    phone,
+    isAdmin,
+    status: "active",
+    accountBalance: 0,
+  }, { onConflict: "email" });
+  if (upsertErr) return jsonOk({ error: upsertErr.message }, 500);
+
+  const session = await issueAuthSessionForEmail(admin, email);
+  return jsonOk({
+    ok: true,
+    user: {
+      email,
+      username,
+      phone,
+      isAdmin,
+      status: "active",
+      forceLogout: false,
+      accountBalance: 0,
+      canSellOnStore: false,
+    },
+    session,
   });
 }
 
@@ -632,6 +721,10 @@ serve(async (req) => {
       const email = String(body?.email ?? "").trim().toLowerCase();
       const passwordHash = String(body?.passwordHash ?? "").trim();
       return await handleVerifyPasswordLogin(email, passwordHash);
+    }
+
+    if (action === "registerAppUser") {
+      return await handleRegisterAppUser(body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

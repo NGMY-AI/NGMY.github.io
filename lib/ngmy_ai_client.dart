@@ -826,6 +826,7 @@ Future<bool> ngmyPersistAiApiKeyViaServer({
 }
 
 /// Password login without downloading passwordHash to the browser.
+/// On success, establishes a real Supabase Auth session (required for RLS).
 Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswordLoginViaServer({
   required String email,
   required String passwordHash,
@@ -839,6 +840,7 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswor
     return (ok: false, error: 'Could not reach login server.', user: null);
   }
   if (data['ok'] == true) {
+    await ngmyApplyAuthSessionFromServer(data['session']);
     final user = data['user'];
     return (
       ok: true,
@@ -851,6 +853,59 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswor
     error: data['error']?.toString() ?? 'Login failed',
     user: null,
   );
+}
+
+/// Creates the cloud user row + Auth session for new signups (service role).
+Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyRegisterAppUserViaServer({
+  required String email,
+  required String passwordHash,
+  String username = '',
+  String phone = '',
+}) async {
+  final data = await _ngmyInvokeBrightHandler({
+    'action': 'registerAppUser',
+    'email': email.trim().toLowerCase(),
+    'passwordHash': passwordHash.trim(),
+    'username': username.trim(),
+    'phone': phone.trim(),
+  });
+  if (data == null) {
+    return (ok: false, error: 'Could not reach signup server.', user: null);
+  }
+  if (data['ok'] == true) {
+    await ngmyApplyAuthSessionFromServer(data['session']);
+    final user = data['user'];
+    return (
+      ok: true,
+      error: null,
+      user: user is Map ? Map<String, dynamic>.from(user) : null,
+    );
+  }
+  return (
+    ok: false,
+    error: data['error']?.toString() ?? 'Signup failed',
+    user: null,
+  );
+}
+
+/// Apply access/refresh tokens returned by bright-handler login/signup.
+Future<void> ngmyApplyAuthSessionFromServer(dynamic session) async {
+  if (session is! Map) return;
+  final refresh = session['refresh_token']?.toString().trim() ?? '';
+  final access = session['access_token']?.toString().trim() ?? '';
+  if (refresh.isEmpty) return;
+  try {
+    final client = Supabase.instance.client;
+    // Prefer refresh-token session restore (stores JWT with email claim for RLS).
+    await client.auth.setSession(refresh);
+    // Some runtimes need an explicit access token refresh check.
+    if (client.auth.currentSession == null && access.isNotEmpty) {
+      await client.auth.setSession(refresh);
+    }
+    debugPrint('[ngmy-auth] session established for ${client.auth.currentUser?.email}');
+  } catch (e) {
+    debugPrint('[ngmy-auth] setSession failed: $e');
+  }
 }
 
 /// Never pulls the real Gemini key to the client. Returns a server-managed sentinel when configured.
