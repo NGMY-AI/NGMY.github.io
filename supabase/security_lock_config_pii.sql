@@ -1,10 +1,11 @@
 -- NGMY — lock remaining config PII blobs (loans, games, help, jobs, store)
+-- Safe on DBs where some columns (e.g. storeInquiries) do not exist.
 -- Run in SQL Editor after redeploying bright-handler with privateLists* actions.
 
 alter table public.ngmy_settings enable row level security;
 alter table public.ngmy_settings force row level security;
 
--- Helper: copy one config jsonb column into a locked settings key (if empty/missing)
+-- Helper: only migrate if the config column exists
 create or replace function public._ngmy_migrate_config_json_to_settings(
   p_settings_key text,
   p_config_col text,
@@ -18,8 +19,16 @@ declare
   existing jsonb;
   wrapped jsonb;
 begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'config' and column_name = p_config_col
+  ) then
+    raise notice 'skip migrate missing column config.%', p_config_col;
+    return;
+  end if;
+
   execute format(
-    'select coalesce(%I, ''[]''::jsonb) from public.config where id::text = ''1'' limit 1',
+    'select coalesce(%I::jsonb, ''[]''::jsonb) from public.config where id::text = ''1'' limit 1',
     p_config_col
   ) into raw;
 
@@ -47,34 +56,79 @@ exception when others then
   raise notice 'migrate % -> %: %', p_config_col, p_settings_key, sqlerrm;
 end $$;
 
--- 1) Ensure management_operational_lists exists (may already); keep as-is content
--- If missing, build from config columns
+-- Wipe one config column if it exists (jsonb empty array, or {} for map-like cols)
+create or replace function public._ngmy_wipe_config_col(
+  p_config_col text,
+  p_empty text default '[]'
+) returns void
+language plpgsql
+security definer
+as $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'config' and column_name = p_config_col
+  ) then
+    raise notice 'skip wipe missing column config.%', p_config_col;
+    return;
+  end if;
+  execute format(
+    'update public.config set %I = %L::jsonb where true',
+    p_config_col,
+    p_empty
+  );
+exception when others then
+  -- column may be text not jsonb
+  begin
+    execute format(
+      'update public.config set %I = %L where true',
+      p_config_col,
+      p_empty
+    );
+  exception when others then
+    raise notice 'wipe %: %', p_config_col, sqlerrm;
+  end;
+end $$;
+
+-- 1) Ensure management_operational_lists exists
 do $$
 declare
   existing jsonb;
-  built jsonb;
+  built jsonb := '{}'::jsonb;
+  col text;
+  cols text[] := array[
+    'loanApplications','jobWorkerApplications','jobPosts',
+    'helpHelperApplications','helpRequests','helpBusinesses'
+  ];
+  raw jsonb;
 begin
   select value into existing from public.ngmy_settings where key = 'management_operational_lists';
-  if existing is null then
-    select jsonb_build_object(
-      'loanApplications', coalesce(c."loanApplications", '[]'::jsonb),
-      'jobWorkerApplications', coalesce(c."jobWorkerApplications", '[]'::jsonb),
-      'jobPosts', coalesce(c."jobPosts", '[]'::jsonb),
-      'helpHelperApplications', coalesce(c."helpHelperApplications", '[]'::jsonb),
-      'helpRequests', coalesce(c."helpRequests", '[]'::jsonb),
-      'helpBusinesses', coalesce(c."helpBusinesses", '[]'::jsonb),
-      'migratedAt', to_jsonb(now()::text)
-    )
-    into built
-    from public.config c
-    where c.id::text = '1'
-    limit 1;
-
-    if built is not null then
-      insert into public.ngmy_settings (key, value, updated_at)
-      values ('management_operational_lists', built, now());
-    end if;
+  if existing is not null then
+    return;
   end if;
+
+  foreach col in array cols loop
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'config' and column_name = col
+    ) then
+      begin
+        execute format(
+          'select coalesce(%I::jsonb, ''[]''::jsonb) from public.config where id::text = ''1'' limit 1',
+          col
+        ) into raw;
+        built := built || jsonb_build_object(col, coalesce(raw, '[]'::jsonb));
+      exception when others then
+        built := built || jsonb_build_object(col, '[]'::jsonb);
+      end;
+    else
+      built := built || jsonb_build_object(col, '[]'::jsonb);
+    end if;
+  end loop;
+
+  built := built || jsonb_build_object('migratedAt', to_jsonb(now()::text));
+  insert into public.ngmy_settings (key, value, updated_at)
+  values ('management_operational_lists', built, now());
 exception when others then
   raise notice 'mgmt migrate: %', sqlerrm;
 end $$;
@@ -85,20 +139,18 @@ select public._ngmy_migrate_config_json_to_settings('store_orders', 'storeOrders
 select public._ngmy_migrate_config_json_to_settings('media_virtual_profiles', 'mediaVirtualProfiles', 'items');
 select public._ngmy_migrate_config_json_to_settings('family_tree_photo_access', 'familyTreePhotoAccessUntilByEmail', 'byEmail');
 
--- 2) Wipe public config PII columns
-update public.config set
-  "loanApplications" = '[]'::jsonb,
-  "jobWorkerApplications" = '[]'::jsonb,
-  "jobPosts" = '[]'::jsonb,
-  "helpHelperApplications" = '[]'::jsonb,
-  "helpRequests" = '[]'::jsonb,
-  "helpBusinesses" = '[]'::jsonb,
-  "gameInvites" = '[]'::jsonb,
-  "storeInquiries" = '[]'::jsonb,
-  "storeOrders" = '[]'::jsonb,
-  "mediaVirtualProfiles" = '[]'::jsonb,
-  "familyTreePhotoAccessUntilByEmail" = '{}'::jsonb
-where true;
+-- 2) Wipe only columns that exist
+select public._ngmy_wipe_config_col('loanApplications', '[]');
+select public._ngmy_wipe_config_col('jobWorkerApplications', '[]');
+select public._ngmy_wipe_config_col('jobPosts', '[]');
+select public._ngmy_wipe_config_col('helpHelperApplications', '[]');
+select public._ngmy_wipe_config_col('helpRequests', '[]');
+select public._ngmy_wipe_config_col('helpBusinesses', '[]');
+select public._ngmy_wipe_config_col('gameInvites', '[]');
+select public._ngmy_wipe_config_col('storeInquiries', '[]');
+select public._ngmy_wipe_config_col('storeOrders', '[]');
+select public._ngmy_wipe_config_col('mediaVirtualProfiles', '[]');
+select public._ngmy_wipe_config_col('familyTreePhotoAccessUntilByEmail', '{}');
 
 -- 3) Recreate ngmy_settings policies with full deny list
 do $$
@@ -195,7 +247,7 @@ create policy "ngmy_settings_delete_nonsensitive"
     and key is distinct from 'ngmy_loan_payments_map_v1'
   );
 
--- 4) Best-effort column revoke
+-- 4) Best-effort column revoke (only if column exists)
 do $$
 declare
   col text;
@@ -207,23 +259,45 @@ declare
   ];
 begin
   foreach col in array cols loop
-    begin
-      execute format('revoke all (%I) on table public.config from anon, authenticated, public', col);
-    exception when others then
-      raise notice 'revoke %: %', col, sqlerrm;
-    end;
+    if exists (
+      select 1 from information_schema.columns
+      where table_schema = 'public' and table_name = 'config' and column_name = col
+    ) then
+      begin
+        execute format('revoke all (%I) on table public.config from anon, authenticated, public', col);
+      exception when others then
+        raise notice 'revoke %: %', col, sqlerrm;
+      end;
+    end if;
   end loop;
 end $$;
 
 drop function if exists public._ngmy_migrate_config_json_to_settings(text, text, text);
+drop function if exists public._ngmy_wipe_config_col(text, text);
 
--- Verify wipes
+-- Verify: which PII columns exist + are empty (missing columns show as null)
 select
-  jsonb_array_length(coalesce("loanApplications", '[]'::jsonb)) as loans,
-  jsonb_array_length(coalesce("gameInvites", '[]'::jsonb)) as invites,
-  jsonb_array_length(coalesce("storeInquiries", '[]'::jsonb)) as inquiries
-from public.config
-where id::text = '1';
+  case when exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='config' and column_name='loanApplications'
+  ) then (
+    select jsonb_array_length(coalesce("loanApplications"::jsonb, '[]'::jsonb))
+    from public.config where id::text = '1' limit 1
+  ) else null end as loans,
+  case when exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='config' and column_name='gameInvites'
+  ) then (
+    select jsonb_array_length(coalesce("gameInvites"::jsonb, '[]'::jsonb))
+    from public.config where id::text = '1' limit 1
+  ) else null end as invites,
+  case when exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='config' and column_name='storeInquiries'
+  ) then (
+    select jsonb_array_length(coalesce("storeInquiries"::jsonb, '[]'::jsonb))
+    from public.config where id::text = '1' limit 1
+  ) else null end as inquiries;
 
 select policyname, cmd
 from pg_policies
