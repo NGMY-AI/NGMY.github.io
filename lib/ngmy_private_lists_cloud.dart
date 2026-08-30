@@ -49,3 +49,25 @@ Future<bool> ngmyPrivateListsPersistFamilyAccess({
   });
   return data != null && data['ok'] == true;
 }
+
+Future<List<Map<String, dynamic>>> ngmyAdminUsersListFetch({required String email}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'adminUsersList',
+    'email': email.trim().toLowerCase(),
+  });
+  if (data == null || data['ok'] != true) return const [];
+  final users = data['users'];
+  if (users is! List) return const [];
+  return users.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+}
+
+Future<bool> ngmyPrivateListsPersistHelpSpendings({
+  required String email,
+  required List<Map<String, dynamic>> items,
+}) async {
+  return ngmyPrivateListsPersistKind(
+    email: email,
+    kind: 'helpCampaignSpendings',
+    items: items,
+  );
+}

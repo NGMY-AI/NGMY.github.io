@@ -1691,6 +1691,7 @@ const STORE_INQUIRIES_KEY = "store_inquiries";
 const STORE_ORDERS_KEY = "store_orders";
 const MEDIA_VIRTUAL_KEY = "media_virtual_profiles";
 const FAMILY_PHOTO_ACCESS_KEY = "family_tree_photo_access";
+const HELP_SPENDINGS_KEY = "civic_help_campaign_spendings";
 
 async function loadSettingsObject(
   admin: NonNullable<ReturnType<typeof adminClient>>,
@@ -1779,6 +1780,7 @@ async function handlePrivateListsFetch(
   const ordersWrap = await loadSettingsObject(admin, STORE_ORDERS_KEY);
   const mediaWrap = await loadSettingsObject(admin, MEDIA_VIRTUAL_KEY);
   const familyWrap = await loadSettingsObject(admin, FAMILY_PHOTO_ACCESS_KEY);
+  const spendingsWrap = await loadSettingsObject(admin, HELP_SPENDINGS_KEY);
 
   const listFields = [
     "loanApplications",
@@ -1799,6 +1801,7 @@ async function handlePrivateListsFetch(
       storeOrders: asItems(ordersWrap),
       mediaVirtualProfiles: asItems(mediaWrap),
       familyTreePhotoAccessUntilByEmail: familyWrap.byEmail ?? familyWrap,
+      helpCampaignSpendings: asItems(spendingsWrap),
     });
   }
 
@@ -1806,13 +1809,11 @@ async function handlePrivateListsFetch(
   for (const f of listFields) {
     const list = asMemberList(mgmt[f]);
     if (f === "jobPosts") {
-      // Job posts are marketplace listings — keep titles public to members; strip applicant blobs elsewhere.
       filteredMgmt[f] = list;
     } else {
       filteredMgmt[f] = filterListForEmail(list, email);
     }
   }
-  // Admin-only maps
   delete filteredMgmt.adminDeletedUserEmails;
   delete filteredMgmt.adminUserAccountStatusByEmail;
   delete filteredMgmt.adminUserCrownBadgeByEmail;
@@ -1829,13 +1830,15 @@ async function handlePrivateListsFetch(
 
   return jsonOk({
     ok: true,
-    view: "member",
+    view: role.isRegistrar ? "registrar" : "member",
     management: filteredMgmt,
     gameInvites: filterListForEmail(asItems(invitesWrap), email),
     storeInquiries: filterListForEmail(asItems(inquiriesWrap), email),
     storeOrders: filterListForEmail(asItems(ordersWrap), email),
-    mediaVirtualProfiles: asItems(mediaWrap), // profiles are virtual characters; keep for app features
+    mediaVirtualProfiles: asItems(mediaWrap),
     familyTreePhotoAccessUntilByEmail: ownFamily,
+    // Spendings (emails/names) — registrars + admins only
+    helpCampaignSpendings: role.isRegistrar ? asItems(spendingsWrap) : [],
   });
 }
 
@@ -1906,6 +1909,7 @@ async function handlePrivateListsPersist(
     storeOrders: STORE_ORDERS_KEY,
     mediaVirtualProfiles: MEDIA_VIRTUAL_KEY,
     familyPhotoAccess: FAMILY_PHOTO_ACCESS_KEY,
+    helpCampaignSpendings: HELP_SPENDINGS_KEY,
   };
   const settingsKey = keyByKind[kind];
   if (!settingsKey) return jsonOk({ error: "Unknown kind" }, 400);
@@ -1935,7 +1939,12 @@ async function handlePrivateListsPersist(
   const current = await loadSettingsObject(admin, settingsKey);
   const curItems = asItems(current);
   let nextItems = curItems;
-  if (role.isAdmin) {
+  if (kind === "helpCampaignSpendings") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Not allowed" }, 403);
+    }
+    nextItems = items;
+  } else if (role.isAdmin) {
     nextItems = items;
   } else {
     const others = curItems.filter((r) => !rowTouchesEmail(r, email));
@@ -1951,8 +1960,45 @@ async function handlePrivateListsPersist(
   if (kind === "storeInquiries") wipe.storeInquiries = [];
   if (kind === "storeOrders") wipe.storeOrders = [];
   if (kind === "mediaVirtualProfiles") wipe.mediaVirtualProfiles = [];
+  if (kind === "helpCampaignSpendings") wipe.helpCampaignSpendings = [];
   await admin.from("config").upsert(wipe);
   return jsonOk({ ok: true, count: nextItems.length });
+}
+
+async function handleAdminUsersList(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = (await resolveJwtEmail(req)) || emailKey(String(body.email ?? ""));
+  if (!email || !isNgmyAdminEmail(email)) {
+    return jsonOk({ error: "Admin only" }, 403);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const columns =
+    "email,username,phone,isAdmin,status,forceLogout,accountBalance,totalProfit," +
+    "canSellOnStore,freeTrialActive,freeTrialDailyAmount,profilePicturePath,referredByCode,referralCount," +
+    "points,mediaBio,isEnrolledInRegistry,fullName,state,isAuthorizedRegistrar,isApprovedWorker,isApprovedHelper";
+
+  let rows: Record<string, unknown>[] = [];
+  try {
+    const { data, error } = await admin.from("users").select(columns).order("email");
+    if (error) {
+      const { data: fallback, error: err2 } = await admin
+        .from("users")
+        .select("email,username,phone,accountBalance,status,isAdmin")
+        .order("email");
+      if (err2) return jsonOk({ error: err2.message }, 500);
+      rows = (fallback ?? []) as Record<string, unknown>[];
+    } else {
+      rows = (data ?? []) as Record<string, unknown>[];
+    }
+  } catch (e) {
+    return jsonOk({ error: String(e) }, 500);
+  }
+
+  return jsonOk({ ok: true, users: rows, count: rows.length });
 }
 
 serve(async (req) => {
@@ -2052,6 +2098,9 @@ serve(async (req) => {
     }
     if (action === "privateListsPersist") {
       return await handlePrivateListsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "adminUsersList") {
+      return await handleAdminUsersList(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {

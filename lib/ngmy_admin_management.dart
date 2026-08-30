@@ -298,6 +298,14 @@ Future<void> ngmyHydrateManagementListsFromAllBackups(AppConfig config) async {
             (k, v) => MapEntry(k.toString(), v.toString()),
           );
         }
+        final spendings = data['helpCampaignSpendings'];
+        if (spendings is List) {
+          final remote = spendings.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+          config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(
+            config.helpCampaignSpendings,
+            remote,
+          );
+        }
       }
     }
     await NgmyLoanPhotosStore.applyTo(config.loanApplications);
@@ -1482,7 +1490,7 @@ Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
       // full app config resync happened.
       'helpModeByState': config.helpModeByState,
       'helpCampaignClosures': config.helpCampaignClosures,
-      'helpCampaignSpendings': config.helpCampaignSpendings,
+      // helpCampaignSpendings — Edge-only (civic_help_campaign_spendings)
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -1553,12 +1561,7 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
         .toList();
     config.helpCampaignClosures = _mergeHelpCampaignClosuresLists(config.helpCampaignClosures, remote);
   }
-  if (payload.containsKey('helpCampaignSpendings') && payload['helpCampaignSpendings'] is List) {
-    final remote = (payload['helpCampaignSpendings'] as List)
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .toList();
-    config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(config.helpCampaignSpendings, remote);
-  }
+  // helpCampaignSpendings intentionally ignored here — loaded via Edge privateListsFetch.
 }
 
 Future<void> _persistCivicHelpModeSettingsLocal(AppConfig config) async {
@@ -1601,6 +1604,14 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final payload = _civicHelpModeSettingsPayload(config);
     cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
+    final email = ngmyCurrentAuthEmail();
+    if (email.isNotEmpty) {
+      final spendOk = await ngmyPrivateListsPersistHelpSpendings(
+        email: email,
+        items: config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
+      if (spendOk) cloudOk = true;
+    }
     try {
       var row = <String, dynamic>{
         'id': kNgmyConfigRowId,

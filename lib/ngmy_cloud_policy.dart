@@ -48,6 +48,7 @@ class NgmyCloudPolicy {
     'elevenlabs_api_key',
     'resendApiKey',
     'passwordHash',
+    'helpCampaignSpendings',
   };
 
   static const Set<String> cloudUserKeys = {

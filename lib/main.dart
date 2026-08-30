@@ -3153,11 +3153,8 @@ void _mergeOperationalManagementListsIntoConfig(AppConfig next, AppConfig keep) 
     next.helpBusinesses = _mergeJobWorkerApplicationsLists(keepHelpBiz, next.helpBusinesses);
   }
   final keepSpendings = keep.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList();
-  if (next.helpCampaignSpendings.isEmpty && keepSpendings.isNotEmpty) {
-    next.helpCampaignSpendings = keepSpendings;
-  } else if (keepSpendings.isNotEmpty || next.helpCampaignSpendings.isNotEmpty) {
-    next.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(keepSpendings, next.helpCampaignSpendings);
-  }
+  // Never accept helpCampaignSpendings from public config / open settings merges.
+  next.helpCampaignSpendings = keepSpendings;
 }
 
 List<Map<String, dynamic>> _mergeHelpCampaignSpendingsLists(
@@ -8221,40 +8218,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<List<UserData>> _fetchAllUsersFromCloud() async {
-    const columnSets = <String?>[
-      NgmySupabaseColumns.adminUsersList,
-      NgmySupabaseColumns.userLogin,
-      'email,username,phone,accountBalance,status,isAdmin',
-      'email,username,phone',
-      'email',
-    ];
-    Object? lastError;
-    for (final columns in columnSets) {
-      final all = <UserData>[];
-      try {
-        var from = 0;
-        const pageSize = 1000;
-        while (from < 50000) {
-          final to = from + pageSize - 1;
-          final page = await _fetchAllUsersFromCloudPage(from: from, to: to, columns: columns);
-          if (page.isEmpty) break;
-          all.addAll(page);
-          if (page.length < pageSize) break;
-          from += pageSize;
-        }
-        if (all.isNotEmpty) {
-          _registerCloudUsersAsAppLogins(all);
-          return all;
-        }
-      } catch (e) {
-        lastError = e;
-        debugPrint('[admin] users fetch columns=${columns ?? '*'}: $e');
-      }
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty || !ngmyEmailIsAdmin(email)) {
+      // Non-admins must never pull the full users directory.
+      return const [];
     }
-    if (lastError != null) {
-      debugPrint('[admin] users fetch failed: $lastError');
+    try {
+      final rows = await ngmyAdminUsersListFetch(email: email);
+      if (rows.isEmpty) return const [];
+      final all = rows.map((e) => UserData.fromJson(e)).toList();
+      _registerCloudUsersAsAppLogins(all);
+      return all;
+    } catch (e) {
+      debugPrint('[admin] users Edge fetch: $e');
+      return const [];
     }
-    return const [];
   }
 
   void _mergeUsersDiscoveredFromTransactions(List<UserData> users, List<AppTransaction> txns) {
@@ -8293,40 +8271,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Future<void> _discoverUsersFromCloudActivityIntoAllUsers() async {
-    final keys = <String>{for (final u in _allUsers) ngmyNormalizeEmail(u.email)};
-    final discovered = <String>[];
-
-    try {
-      final txEmails = await _fetchDistinctUserEmailsFromCloudTransactions();
-      discovered.addAll(txEmails);
-    } catch (e) {
-      debugPrint('[admin] discover users from cloud tx: $e');
-    }
-
-    try {
-      final mediaRows = await supabase
-          .from('media')
-          .select('userEmail')
-          .limit(5000)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (mediaRows != null) {
-        for (final raw in mediaRows as List) {
-          final key = ngmyNormalizeEmail((raw['userEmail'] ?? '').toString());
-          if (key.isNotEmpty) discovered.add(key);
-        }
-      }
-    } catch (e) {
-      debugPrint('[admin] discover users from media: $e');
-    }
-
-    for (final key in discovered) {
-      if (key.isEmpty || keys.contains(key) || ngmyIsAdminDeletedUser(_config, key)) continue;
-      final user = UserData(email: key, username: key.split('@').first, isAppLoginAccount: true);
-      _allUsers.add(user);
-      ngmyRegisterAppLoginUser(key);
-      keys.add(key);
-      unawaited(_safeUpsertUserRow(_userSignupRowForCloud(user)));
-    }
+    // Do not SELECT userEmail from transactions/media here — that re-leaks every
+    // account address into the browser Network tab. Admin directory comes from Edge.
+    return;
   }
 
   Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 10000}) async {
@@ -9812,7 +9759,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _adminUsersPoll?.cancel();
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     unawaited(_refreshAdminUsersFromCloud());
-    _adminUsersPoll = Timer.periodic(const Duration(seconds: 15), (_) {
+    _adminUsersPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       unawaited(_refreshAdminUsersFromCloud());
     });
