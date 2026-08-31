@@ -31803,8 +31803,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       SnackBar(
         content: Text(
           saved
-              ? 'Member enrolled and saved.'
-              : 'Member enrolled on this device. Will sync when online — run supabase/users_civic_enrollment_columns.sql if members vanish.',
+              ? 'Member enrolled and saved to database.'
+              : 'Member enrolled here, but cloud save failed — tap Sync in Registry Backup.',
         ),
         backgroundColor: saved ? Colors.green : Colors.orange,
       ),
@@ -31991,7 +31991,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     // Persist the updated registry row directly — do not rebuild from UserData (that was dropping edits).
     await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
-    final saved = await ngmyPersistCivicRegistryMembers(widget.config);
+    final saved = await ngmyPersistCivicRegistryMembers(
+      widget.config,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
@@ -32000,7 +32004,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } catch (e) {
       debugPrint('Member update local save failed: $e');
     }
-    if (await ngmyCanReachCloud() && accountIdx >= 0) {
+    if (accountIdx >= 0) {
       try {
         await Supabase.instance.client
             .from('users')
@@ -32014,7 +32018,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(saved ? 'Member profile updated.' : 'Member updated on this device. Will sync when online.'),
+        content: Text(
+          saved
+              ? 'Member profile updated and saved to database.'
+              : 'Member updated here, but cloud save failed — tap Sync in Registry Backup.',
+        ),
         backgroundColor: saved ? Colors.green : Colors.orange,
       ),
     );
@@ -32032,18 +32040,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       requesterEmail: widget.user.email,
       state: _selectedState,
     );
-    var userCloudOk = true;
     final accountIdx = widget.allUsers.indexWhere(
       (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
     );
-    if (await ngmyCanReachCloud() && accountIdx >= 0) {
+    if (accountIdx >= 0) {
       try {
         await Supabase.instance.client
             .from('users')
             .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
             .timeout(kNgmyCloudWriteTimeout);
       } catch (e) {
-        userCloudOk = false;
         debugPrint('Registry enrollment flag upsert failed: $e');
       }
     }
@@ -32058,7 +32064,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } catch (e) {
       debugPrint('Registry member local save failed: $e');
     }
-    return membersCloudOk && userCloudOk;
+    // Roster cloud save is what matters — user-flag upsert must not fake an "offline" failure.
+    return membersCloudOk;
   }
 
   Future<void> _transferCivicMemberFromProfile(UserData member) async {
@@ -34394,12 +34401,69 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  gridBox(
+                    icon: Icons.cloud_sync_rounded,
+                    accent: const Color(0xFF0EA5E9),
+                    title: 'Sync all members',
+                    delayMs: 240,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      unawaited(_syncAllCivicRegistryMembersToDatabase());
+                    },
+                  ),
                 ],
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Pull cloud roster, merge with this device, then push everyone to the database.
+  Future<void> _syncAllCivicRegistryMembersToDatabase() async {
+    if (!_canUseRegistrarToolsHere() && !_isGlobalCivicRegistryAdmin()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only an authorized registrar or admin can sync the registry.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Syncing Civic Registry with the database…'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(
+      widget.config,
+      widget.allUsers,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
+    final count = NgmyCivicRegistryMembers.listFrom(widget.config)
+        .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), _selectedState))
+        .length;
+    final saved = await ngmyPersistCivicRegistryMembers(
+      widget.config,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
+    if (!mounted) return;
+    setState(() {});
+    widget.onDataChanged();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Synced $_selectedState — $count member(s) saved in the database.'
+              : 'Could not sync to database. Sign in again and retry Sync.',
+        ),
+        backgroundColor: saved ? Colors.green : Colors.red,
+        duration: const Duration(seconds: 6),
+      ),
     );
   }
 

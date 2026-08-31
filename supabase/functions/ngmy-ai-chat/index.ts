@@ -1881,29 +1881,31 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
 
-  // Self-enrollment must be enabled
-  try {
-    const { data: se } = await admin
-      .from("ngmy_settings")
-      .select("value")
-      .eq("key", "civic_self_enrollment_settings")
-      .maybeSingle();
-    const val = se?.value as Record<string, unknown> | null;
-    const on =
-      val?.civicSelfEnrollmentEnabled === true ||
-      String(val?.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
-    if (!on) {
-      const { data: cfg } = await admin
-        .from("config")
-        .select("civicSelfEnrollmentEnabled")
-        .eq("id", "1")
+  // Self-enrollment must be enabled — registrar share links (?r=) always allowed.
+  if (!registrarToken) {
+    try {
+      const { data: se } = await admin
+        .from("ngmy_settings")
+        .select("value")
+        .eq("key", "civic_self_enrollment_settings")
         .maybeSingle();
-      if (cfg?.civicSelfEnrollmentEnabled !== true) {
-        return jsonOk({ error: "Self-enrollment is not enabled" }, 403);
+      const val = se?.value as Record<string, unknown> | null;
+      const on =
+        val?.civicSelfEnrollmentEnabled === true ||
+        String(val?.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+      if (!on) {
+        const { data: cfg } = await admin
+          .from("config")
+          .select("civicSelfEnrollmentEnabled")
+          .eq("id", "1")
+          .maybeSingle();
+        if (cfg?.civicSelfEnrollmentEnabled !== true) {
+          return jsonOk({ error: "Self-enrollment is not enabled" }, 403);
+        }
       }
+    } catch (_) {
+      // continue if settings missing — still allow if config flag set
     }
-  } catch (_) {
-    // continue if settings missing — still allow if config flag set
   }
 
   const payload = await loadCivicPayload(admin);

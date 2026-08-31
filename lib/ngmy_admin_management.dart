@@ -921,7 +921,8 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
 }) async {
   await NgmyCivicRegistryMembers.hydrateLocal(config);
   final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
-  if (email.isNotEmpty && await ngmyCanReachCloud()) {
+  // Always try cloud when signed in — reachability probe can false-negative on Wi‑Fi.
+  if (email.isNotEmpty) {
     final resolvedState = (state ?? '').trim();
     var resolvedPin = (pinSig ?? '').trim();
     if (resolvedPin.isEmpty && resolvedState.isNotEmpty) {
@@ -955,12 +956,12 @@ Future<bool> ngmyPersistCivicRegistryMembers(
 }) async {
   // Deploy stamp: keep enroll + print roster fixes published to ngmy.org.
   ngmyAdminConfigMutationAt = DateTime.now();
-  NgmyAdminLiveRefresh.notify();
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;
   final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
-  if (email.isNotEmpty && await ngmyCanReachCloud()) {
+  // Do not gate on ngmyCanReachCloud() — probe often false-negatives while Wi‑Fi works.
+  if (email.isNotEmpty) {
     // Never write soft-delete rows for people already back on the roster.
     NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
     cloudOk = await ngmyCivicPersistRoster(
@@ -970,6 +971,8 @@ Future<bool> ngmyPersistCivicRegistryMembers(
     );
   }
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
+  // Notify after save so listeners pull the updated cloud roster (not a mid-write race).
+  if (cloudOk) NgmyAdminLiveRefresh.notify();
   return cloudOk;
 }
 
