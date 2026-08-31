@@ -30606,23 +30606,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
-    unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
-      widget.config,
-      widget.allUsers,
-      requesterEmail: widget.user.email,
-      state: _selectedState,
-    ));
     _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _runHelpModeLifecycleMaintenance();
       final purged = NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
       if (purged > 0) {
         unawaited(ngmyPersistCivicRegistryMembers(widget.config));
         widget.onDataChanged();
       }
-      _checkRegistryUnlock();
+      await _mergeCivicRegistryPinsIntoConfig(widget.config);
+      await ngmyHydrateCivicRegistryMembersFromAllBackups(
+        widget.config,
+        widget.allUsers,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      );
+      if (!mounted) return;
+      setState(() {});
+      await _checkRegistryUnlock();
       unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
     });
@@ -32640,6 +32643,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         preferPrintDialog: true,
       );
       if (!mounted) return;
+      if (!opened) {
+        final downloaded = await ngmyInvoiceOpenPdfInBrowser(pdfBytes);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              downloaded
+                  ? 'Roster PDF opened in a new tab for $state (${members.length} members). Use Print or Save from your browser.'
+                  : 'Could not open print — allow pop-ups for ngmy.org and try again.',
+            ),
+            backgroundColor: downloaded ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

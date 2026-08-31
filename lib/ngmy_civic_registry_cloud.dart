@@ -54,8 +54,17 @@ Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
             body: jsonEncode(body),
           )
           .timeout(_kCivicCloudTimeout);
-      return _parseCivicResponseBody(response.body);
+      final parsed = _parseCivicResponseBody(response.body);
+      if (parsed != null) return parsed;
+      if (response.statusCode == 401) {
+        return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
+      }
+      return null;
     }
+
+    // Direct HTTP first — Flutter web invoke() often stalls; one 12s attempt beats two.
+    final httpResult = await postHttp();
+    if (httpResult != null) return httpResult;
 
     try {
       final res = await client.functions
@@ -63,10 +72,10 @@ Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
           .timeout(_kCivicCloudTimeout);
       if (res.data is Map) return Map<String, dynamic>.from(res.data as Map);
     } catch (e) {
-      debugPrint('[civic-cloud] invoke: $e');
+      debugPrint('[civic-cloud] invoke fallback: $e');
     }
 
-    return await postHttp();
+    return null;
   } catch (e) {
     debugPrint('[civic-cloud] HTTP: $e');
   }

@@ -1599,9 +1599,7 @@ class NgmyCivicRegistryMembers {
   }
 
   static bool backupStateMatches(String backupState, String currentState) {
-    final a = backupState.trim().toLowerCase();
-    final b = currentState.trim().toLowerCase();
-    return a.isNotEmpty && b.isNotEmpty && a == b;
+    return NgmyCivicRegistryStats.statesMatch(backupState, currentState);
   }
 
   static List<Map<String, dynamic>> membersFromBackupJson(String raw, {String? requireState}) {

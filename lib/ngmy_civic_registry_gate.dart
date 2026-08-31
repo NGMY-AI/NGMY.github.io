@@ -7,11 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_registry_cloud.dart';
+import 'ngmy_civic_registry_stats.dart';
 
 const String _kUnlockPrefsKey = 'civic_registry_unlock_v2';
 
 String civicRegistryPinForState(Map<String, String> pinsByState, String state) {
-  return (pinsByState[state.trim()] ?? '').trim();
+  final sk = NgmyCivicRegistryStats.canonicalStateKey(state);
+  if (sk.isEmpty) return '';
+  final direct = (pinsByState[state.trim()] ?? pinsByState[sk] ?? '').trim();
+  if (direct.isNotEmpty) return direct;
+  for (final e in pinsByState.entries) {
+    if (NgmyCivicRegistryStats.canonicalStateKey(e.key) == sk) {
+      return e.value.trim();
+    }
+  }
+  return '';
 }
 
 /// Per-state PIN first; optional global fallback when a state has no PIN set.

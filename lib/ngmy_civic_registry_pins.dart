@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_civic_registry_stats.dart';
+
 /// Per-state + optional global Civic Registry PIN helpers.
 class NgmyCivicRegistryPins {
   static const _localKey = 'ngmy_civic_registry_pins_backup';
@@ -23,10 +25,22 @@ class NgmyCivicRegistryPins {
     required String globalPin,
     required Map<String, String> pinsByState,
   }) {
-    final st = state.trim();
-    final perState = (pinsByState[st] ?? '').trim();
+    final perState = civicRegistryPinForState(pinsByState, state);
     if (perState.isNotEmpty) return perState;
     return globalPin.trim();
+  }
+
+  static String civicRegistryPinForState(Map<String, String> pinsByState, String state) {
+    final sk = NgmyCivicRegistryStats.canonicalStateKey(state);
+    if (sk.isEmpty) return '';
+    final direct = (pinsByState[state.trim()] ?? pinsByState[sk] ?? '').trim();
+    if (direct.isNotEmpty) return direct;
+    for (final e in pinsByState.entries) {
+      if (NgmyCivicRegistryStats.canonicalStateKey(e.key) == sk) {
+        return e.value.trim();
+      }
+    }
+    return '';
   }
 
   static Future<void> saveLocalBackup({
