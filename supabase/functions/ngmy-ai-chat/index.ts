@@ -1479,19 +1479,18 @@ function effectivePinForState(
   pins: { global: string; byState: Record<string, string> },
   state: string,
 ): string {
-  const st = state.trim();
-  const per = (pins.byState[st] ?? "").trim();
+  const sk = canonicalStateKey(state);
+  if (!sk) return pins.global.trim();
+  const per = (pins.byState[state.trim()] ?? pins.byState[sk] ?? "").trim();
   if (per) return per;
-  // case-insensitive key match
-  const sk = stateKey(st);
   for (const [k, v] of Object.entries(pins.byState)) {
-    if (stateKey(k) === sk && String(v).trim()) return String(v).trim();
+    if (canonicalStateKey(k) === sk && String(v).trim()) return String(v).trim();
   }
   return pins.global.trim();
 }
 
 async function pinSigFor(state: string, pin: string): Promise<string> {
-  const h = await sha256Hex(`${stateKey(state)}|${pin.trim()}`);
+  const h = await sha256Hex(`${canonicalStateKey(state)}|${pin.trim()}`);
   return `v1:${h}`;
 }
 

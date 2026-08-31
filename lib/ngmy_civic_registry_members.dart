@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_civic_registry_id_card.dart';
+import 'ngmy_civic_registry_stats.dart';
 
 /// Civic Registry members — isolated from general app user profiles.
 class NgmyCivicRegistryMembers {
@@ -1575,9 +1577,8 @@ class NgmyCivicRegistryMembers {
         'members': <Map<String, dynamic>>[],
       };
     }
-    final key = st.toLowerCase();
     final members = listFrom(config)
-        .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == key)
+        .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), st))
         .map((m) => Map<String, dynamic>.from(m)..['state'] = st)
         .toList();
     sortNewestEnrolledFirst(members);

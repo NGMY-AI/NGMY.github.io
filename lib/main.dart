@@ -32579,7 +32579,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final members = NgmyCivicRegistryMembers.listFrom(widget.config)
-        .where((m) => (m['state'] ?? '').toString().trim().toLowerCase() == state.toLowerCase())
+        .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state))
         .toList();
     NgmyCivicRegistryMembers.sortNewestEnrolledFirst(members);
     if (members.isEmpty) {
@@ -39667,14 +39667,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       requesterEmail: widget.user.email,
       state: _selectedState,
     );
-    // After pulling cloud roster into local, upload merged home-state rows back
-    // (server merge keeps self-enrollments + other devices' additions).
     if (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) {
-      await ngmyPersistCivicRegistryMembers(
+      unawaited(ngmyPersistCivicRegistryMembers(
         widget.config,
         requesterEmail: widget.user.email,
         state: _selectedState,
-      );
+      ));
     }
     if (!mounted) return;
     setState(() {});

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'ngmy_supabase_config.dart';
 
 const String _kCivicBrightHandler = 'bright-handler';
+const Duration _kCivicCloudTimeout = Duration(seconds: 12);
 
 String ngmyCurrentAuthEmail() {
   try {
@@ -16,40 +17,56 @@ String ngmyCurrentAuthEmail() {
   }
 }
 
+Map<String, dynamic>? _parseCivicResponseBody(String raw) {
+  if (raw.isEmpty) return null;
+  try {
+    final data = jsonDecode(raw);
+    if (data is Map) return Map<String, dynamic>.from(data);
+  } catch (_) {}
+  return null;
+}
+
 /// Shared Edge invoke for Civic Registry (role-filtered server APIs).
 Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
   try {
     final client = Supabase.instance.client;
+    final session = client.auth.currentSession;
+    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? kNgmySupabaseAnonKey;
+    final token = session?.accessToken ?? '';
+    if (token.isEmpty) {
+      return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
+    }
+
+    Future<Map<String, dynamic>?> postHttp() async {
+      final restUrl = client.rest.url;
+      final base = restUrl.contains('/rest/v1')
+          ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
+          : restUrl;
+      final url = '$base/functions/v1/$_kCivicBrightHandler';
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+              if (anonKey.isNotEmpty) 'apikey': anonKey,
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_kCivicCloudTimeout);
+      return _parseCivicResponseBody(response.body);
+    }
+
     try {
       final res = await client.functions
           .invoke(_kCivicBrightHandler, body: body)
-          .timeout(const Duration(seconds: 25));
+          .timeout(_kCivicCloudTimeout);
       if (res.data is Map) return Map<String, dynamic>.from(res.data as Map);
     } catch (e) {
       debugPrint('[civic-cloud] invoke: $e');
     }
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$_kCivicBrightHandler';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? kNgmySupabaseAnonKey;
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 25));
-    if (response.body.isEmpty) return null;
-    final data = jsonDecode(response.body);
-    if (data is Map) return Map<String, dynamic>.from(data);
+
+    return await postHttp();
   } catch (e) {
     debugPrint('[civic-cloud] HTTP: $e');
   }
@@ -70,14 +87,19 @@ Future<Map<String, dynamic>?> ngmyCivicInvokeAnon(Map<String, dynamic> body) asy
           },
           body: jsonEncode(body),
         )
-        .timeout(const Duration(seconds: 25));
-    if (response.body.isEmpty) return null;
-    final data = jsonDecode(response.body);
-    if (data is Map) return Map<String, dynamic>.from(data);
+        .timeout(_kCivicCloudTimeout);
+    return _parseCivicResponseBody(response.body);
   } catch (e) {
     debugPrint('[civic-cloud] anon HTTP: $e');
   }
   return null;
+}
+
+String _civicCloudError(Map<String, dynamic>? data, String fallback) {
+  if (data == null) return fallback;
+  final err = (data['error'] ?? data['message'] ?? '').toString().trim();
+  if (err.isNotEmpty) return err;
+  return fallback;
 }
 
 Future<({bool ok, String? pinSig, String? error})> ngmyCivicVerifyStatePin({
@@ -91,11 +113,17 @@ Future<({bool ok, String? pinSig, String? error})> ngmyCivicVerifyStatePin({
     'state': state.trim(),
     'pin': pin.trim(),
   });
-  if (data == null) return (ok: false, pinSig: null, error: 'Could not reach server');
+  if (data == null) {
+    return (ok: false, pinSig: null, error: 'Could not reach server. Check your connection and try again.');
+  }
   if (data['ok'] == true) {
     return (ok: true, pinSig: (data['pinSig'] ?? '').toString(), error: null);
   }
-  return (ok: false, pinSig: null, error: data['error']?.toString() ?? 'Incorrect PIN');
+  return (
+    ok: false,
+    pinSig: null,
+    error: _civicCloudError(data, 'Incorrect PIN'),
+  );
 }
 
 Future<({bool ok, String? memberEmail, String? error})> ngmyCivicGateMatchName({
@@ -111,11 +139,13 @@ Future<({bool ok, String? memberEmail, String? error})> ngmyCivicGateMatchName({
     'pinSig': pinSig,
     'fullName': fullName.trim(),
   });
-  if (data == null) return (ok: false, memberEmail: null, error: 'Could not reach server');
+  if (data == null) {
+    return (ok: false, memberEmail: null, error: 'Could not reach server. Check your connection and try again.');
+  }
   if (data['ok'] == true) {
     return (ok: true, memberEmail: (data['memberEmail'] ?? '').toString(), error: null);
   }
-  return (ok: false, memberEmail: null, error: data['error']?.toString() ?? 'Name not found');
+  return (ok: false, memberEmail: null, error: _civicCloudError(data, 'Name not found'));
 }
 
 Future<({bool ok, String? error, String? registryId})> ngmyCivicGateVerifyIdentity({
@@ -137,7 +167,9 @@ Future<({bool ok, String? error, String? registryId})> ngmyCivicGateVerifyIdenti
     'registryId': registryId,
     'step': step,
   });
-  if (data == null) return (ok: false, error: 'Could not reach server', registryId: null);
+  if (data == null) {
+    return (ok: false, error: 'Could not reach server. Check your connection and try again.', registryId: null);
+  }
   if (data['ok'] == true) {
     return (
       ok: true,
@@ -145,7 +177,7 @@ Future<({bool ok, String? error, String? registryId})> ngmyCivicGateVerifyIdenti
       registryId: (data['registryId'] ?? registryId).toString(),
     );
   }
-  return (ok: false, error: data['error']?.toString() ?? 'Verification failed', registryId: null);
+  return (ok: false, error: _civicCloudError(data, 'Verification failed'), registryId: null);
 }
 
 Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
@@ -208,7 +240,7 @@ Future<({bool ok, String? registryId, String? error, Map<String, dynamic>? dupli
   return (
     ok: false,
     registryId: null,
-    error: data['error']?.toString() ?? 'Enrollment failed',
+    error: _civicCloudError(data, 'Enrollment failed'),
     duplicate: dup,
   );
 }

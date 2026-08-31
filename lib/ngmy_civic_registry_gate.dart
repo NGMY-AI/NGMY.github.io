@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -334,46 +335,58 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
         state: _state,
       );
       if (localExpected.isNotEmpty && value == localExpected) {
-        final verified = await ngmyCivicVerifyStatePin(
-          email: widget.userEmail,
-          state: _state,
-          pin: value,
-        );
-        final pinSig = (verified.pinSig != null && verified.pinSig!.isNotEmpty)
-            ? verified.pinSig!
-            : 'v1:local';
         if (!mounted) return;
         setState(() {
           _busy = false;
-          _serverPinSig = pinSig;
+          _serverPinSig = 'v1:local';
           _error = null;
           _step = 1;
           _matchedMember = null;
           _matchedMemberEmail = null;
         });
+        // Upgrade to server pinSig in background when online (gate steps 2–3 need it).
+        unawaited(() async {
+          final verified = await ngmyCivicVerifyStatePin(
+            email: widget.userEmail,
+            state: _state,
+            pin: value,
+          );
+          if (!mounted) return;
+          if (verified.ok && (verified.pinSig ?? '').trim().isNotEmpty) {
+            setState(() => _serverPinSig = verified.pinSig);
+          }
+        }());
         return;
       }
-      final verified = await ngmyCivicVerifyStatePin(
-        email: widget.userEmail,
-        state: _state,
-        pin: value,
-      );
-      if (!mounted) return;
-      if (!verified.ok || verified.pinSig == null || verified.pinSig!.isEmpty) {
+      try {
+        final verified = await ngmyCivicVerifyStatePin(
+          email: widget.userEmail,
+          state: _state,
+          pin: value,
+        );
+        if (!mounted) return;
+        if (!verified.ok || verified.pinSig == null || verified.pinSig!.isEmpty) {
+          setState(() {
+            _busy = false;
+            _error = verified.error ?? 'Incorrect PIN for $_state.';
+          });
+          return;
+        }
         setState(() {
           _busy = false;
-          _error = verified.error ?? 'Incorrect PIN for $_state.';
+          _serverPinSig = verified.pinSig;
+          _error = null;
+          _step = 1;
+          _matchedMember = null;
+          _matchedMemberEmail = null;
         });
-        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = 'Could not verify PIN. Check your connection and try again.';
+        });
       }
-      setState(() {
-        _busy = false;
-        _serverPinSig = verified.pinSig;
-        _error = null;
-        _step = 1;
-        _matchedMember = null;
-        _matchedMemberEmail = null;
-      });
       return;
     }
 
