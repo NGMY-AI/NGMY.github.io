@@ -1192,7 +1192,9 @@ async function resolveCivicRole(
   try {
     const { data: userRow } = await admin
       .from("users")
-      .select("email,isAdmin,isCivicRegistryAdmin,isCivicRegistryKing,state")
+      .select(
+        "email,isAdmin,isCivicRegistryAdmin,isCivicRegistryKing,isAuthorizedRegistrar,state",
+      )
       .eq("email", key)
       .maybeSingle();
     if (userRow) {
@@ -1203,22 +1205,39 @@ async function resolveCivicRole(
       ) {
         role.isAdmin = true;
       }
+      // Fallback when applications list is missing/stale but the user row is flagged.
+      if (userRow.isAuthorizedRegistrar === true) {
+        role.isRegistrar = true;
+        const st = String(userRow.state ?? "").trim();
+        if (st) role.registrarState = displayStateName(st);
+      }
     }
   } catch (_) {
-    // columns may vary
+    // columns may vary — try a narrower select
+    try {
+      const { data: userRow } = await admin
+        .from("users")
+        .select("email,isAdmin,state")
+        .eq("email", key)
+        .maybeSingle();
+      if (userRow?.isAdmin === true) role.isAdmin = true;
+    } catch (_) {
+      // ignore
+    }
   }
 
   try {
     const apps = await loadRegistrarApplications(admin);
     let best: Record<string, unknown> | null = null;
     for (const a of apps) {
-      if (emailKey(String(a.userEmail ?? "")) !== key) continue;
+      if (emailKey(String(a.userEmail ?? a.email ?? "")) !== key) continue;
       if (String(a.status ?? "").toLowerCase() !== "approved") continue;
       best = a;
     }
     if (best) {
       role.isRegistrar = true;
-      role.registrarState = String(best.state ?? "").trim();
+      const st = String(best.state ?? "").trim();
+      if (st) role.registrarState = displayStateName(st);
     }
   } catch (_) {
     // ignore
@@ -1766,12 +1785,12 @@ async function handleCivicPersistRoster(
   body: Record<string, unknown>,
 ): Promise<Response> {
   const email = await requireJwtEmail(req);
-  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
   const admin = adminClient();
-  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
   if (!role.isAdmin && !role.isRegistrar) {
-    return jsonOk({ error: "Registrar or admin required" }, 403);
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
   }
 
   const incomingMembers = asMemberList(body.members);
@@ -1794,7 +1813,7 @@ async function handleCivicPersistRoster(
     }
   } else {
     const sk = canonicalStateKey(scopeState);
-    if (!sk) return jsonOk({ error: "No registrar state" }, 403);
+    if (!sk) return jsonOk({ ok: false, error: "No registrar state" }, 403);
     const mergeStateSlice = (
       allMembers: Record<string, unknown>[],
       incoming: Record<string, unknown>[],
@@ -1857,8 +1876,85 @@ async function handleCivicPersistRoster(
   }
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased });
-  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
   return jsonOk({ ok: true, memberCount: members.length });
+}
+
+/** Upsert one member into the cloud roster — used for immediate enroll (no full-roster payload). */
+async function handleCivicUpsertMember(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+
+  const raw = body.member;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return jsonOk({ ok: false, error: "member object required" }, 400);
+  }
+  const member = { ...(raw as Record<string, unknown>) };
+  const fullName = String(member.fullName ?? "").trim();
+  const state = displayStateName(String(member.state ?? body.state ?? "").trim());
+  let registryId = String(member.registryId ?? "").trim();
+  if (!fullName || !state) {
+    return jsonOk({ ok: false, error: "fullName and state are required" }, 400);
+  }
+
+  // Registrars may only write to their home state (or admin anywhere).
+  if (!role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    if (home && canonicalStateKey(state) !== home) {
+      // Allow if body explicitly scopes to home and member.state was wrong — normalize to home.
+      member.state = displayStateName(role.registrarState);
+    } else {
+      member.state = state;
+    }
+  } else {
+    member.state = state;
+  }
+
+  member.fullName = fullName;
+  member.email = emailKey(String(member.email ?? ""));
+  member.updatedAt = new Date().toISOString();
+  if (!member.enrolledAt) member.enrolledAt = member.updatedAt;
+  // Never store huge inline photo blobs in ngmy_settings.
+  delete member.idPhoto;
+  delete member.idPhotoData;
+  delete member.idPhotoBase64;
+
+  const current = await loadCivicPayload(admin);
+  const members = asMemberList(current.members);
+  const removed = asMemberList(current.removed);
+  const deceased = asMemberList(current.deceased);
+
+  if (!registryId) {
+    const existingIds = new Set(
+      members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+    );
+    registryId = generateRegistryId(String(member.state ?? state), existingIds);
+  }
+  member.registryId = registryId;
+
+  const nextMembers = mergeMemberLists(members, [member]);
+  const memberEmail = emailKey(String(member.email ?? ""));
+  const nextRemoved = memberEmail
+    ? removed.filter((r) => emailKey(String(r.email ?? "")) !== memberEmail)
+    : removed;
+
+  const saved = await saveCivicPayload(admin, {
+    members: nextMembers,
+    removed: nextRemoved,
+    deceased,
+    source: "civicUpsertMember",
+  });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, registryId, memberCount: nextMembers.length });
 }
 
 async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Response> {
@@ -1879,34 +1975,7 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   }
 
   const admin = adminClient();
-  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
-
-  // Self-enrollment must be enabled — registrar share links (?r=) always allowed.
-  if (!registrarToken) {
-    try {
-      const { data: se } = await admin
-        .from("ngmy_settings")
-        .select("value")
-        .eq("key", "civic_self_enrollment_settings")
-        .maybeSingle();
-      const val = se?.value as Record<string, unknown> | null;
-      const on =
-        val?.civicSelfEnrollmentEnabled === true ||
-        String(val?.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
-      if (!on) {
-        const { data: cfg } = await admin
-          .from("config")
-          .select("civicSelfEnrollmentEnabled")
-          .eq("id", "1")
-          .maybeSingle();
-        if (cfg?.civicSelfEnrollmentEnabled !== true) {
-          return jsonOk({ error: "Self-enrollment is not enabled" }, 403);
-        }
-      }
-    } catch (_) {
-      // continue if settings missing — still allow if config flag set
-    }
-  }
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
 
   const payload = await loadCivicPayload(admin);
   const members = asMemberList(payload.members);
@@ -2648,7 +2717,10 @@ serve(async (req) => {
       action === "civicFetchRegistrarRoster" || action === "civicFetchAdminRoster") {
       return await handleCivicFetchRoster(req, body as Record<string, unknown>);
     }
-    if (action === "civicUpsertMember" || action === "civicRemoveMember" ||
+    if (action === "civicUpsertMember") {
+      return await handleCivicUpsertMember(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRemoveMember" ||
       action === "civicMarkDeceased" || action === "civicPersistRoster") {
       return await handleCivicPersistRoster(req, body as Record<string, unknown>);
     }

@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'ngmy_supabase_config.dart';
 
 const String _kCivicBrightHandler = 'bright-handler';
-const Duration _kCivicCloudTimeout = Duration(seconds: 12);
+const Duration _kCivicCloudTimeout = Duration(seconds: 20);
 
 String ngmyCurrentAuthEmail() {
   try {
@@ -26,13 +26,34 @@ Map<String, dynamic>? _parseCivicResponseBody(String raw) {
   return null;
 }
 
+Future<String> _freshAccessToken() async {
+  try {
+    final client = Supabase.instance.client;
+    var session = client.auth.currentSession;
+    if (session == null) return '';
+    final expiresAt = session.expiresAt;
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    // Refresh if missing, expired, or within 90s of expiry.
+    if (expiresAt == null || expiresAt <= now + 90) {
+      try {
+        final refreshed = await client.auth.refreshSession();
+        session = refreshed.session ?? client.auth.currentSession;
+      } catch (e) {
+        debugPrint('[civic-cloud] refreshSession: $e');
+      }
+    }
+    return session?.accessToken ?? client.auth.currentSession?.accessToken ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
 /// Shared Edge invoke for Civic Registry (role-filtered server APIs).
 Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
   try {
     final client = Supabase.instance.client;
-    final session = client.auth.currentSession;
     final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? kNgmySupabaseAnonKey;
-    final token = session?.accessToken ?? '';
+    final token = await _freshAccessToken();
     if (token.isEmpty) {
       return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
     }
@@ -55,14 +76,30 @@ Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
           )
           .timeout(_kCivicCloudTimeout);
       final parsed = _parseCivicResponseBody(response.body);
-      if (parsed != null) return parsed;
+      if (parsed != null) {
+        // Ensure callers can detect auth failures even when body omits ok:false.
+        if (response.statusCode == 401 && parsed['ok'] != true) {
+          return {
+            ...parsed,
+            'ok': false,
+            'error': (parsed['error'] ?? 'Please sign in again to use Civic Registry.').toString(),
+          };
+        }
+        return parsed;
+      }
       if (response.statusCode == 401) {
         return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
+      }
+      if (response.statusCode >= 400) {
+        return {
+          'ok': false,
+          'error': 'Server error (${response.statusCode}). Try again.',
+        };
       }
       return null;
     }
 
-    // Direct HTTP first — Flutter web invoke() often stalls; one 12s attempt beats two.
+    // Direct HTTP first — Flutter web invoke() often stalls.
     final httpResult = await postHttp();
     if (httpResult != null) return httpResult;
 
@@ -75,11 +112,11 @@ Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
       debugPrint('[civic-cloud] invoke fallback: $e');
     }
 
-    return null;
+    return {'ok': false, 'error': 'Could not reach Civic Registry server.'};
   } catch (e) {
     debugPrint('[civic-cloud] HTTP: $e');
+    return {'ok': false, 'error': 'Could not reach Civic Registry server.'};
   }
-  return null;
 }
 
 /// Anonymous guest enroll (no JWT required).
@@ -97,11 +134,15 @@ Future<Map<String, dynamic>?> ngmyCivicInvokeAnon(Map<String, dynamic> body) asy
           body: jsonEncode(body),
         )
         .timeout(_kCivicCloudTimeout);
-    return _parseCivicResponseBody(response.body);
+    final parsed = _parseCivicResponseBody(response.body);
+    if (parsed != null) return parsed;
+    if (response.statusCode >= 400) {
+      return {'ok': false, 'error': 'Server error (${response.statusCode}). Try again.'};
+    }
   } catch (e) {
     debugPrint('[civic-cloud] anon HTTP: $e');
   }
-  return null;
+  return {'ok': false, 'error': 'Could not reach server'};
 }
 
 String _civicCloudError(Map<String, dynamic>? data, String fallback) {
@@ -109,6 +150,15 @@ String _civicCloudError(Map<String, dynamic>? data, String fallback) {
   final err = (data['error'] ?? data['message'] ?? '').toString().trim();
   if (err.isNotEmpty) return err;
   return fallback;
+}
+
+Map<String, dynamic> _slimMemberForCloud(Map<String, dynamic> member) {
+  final out = Map<String, dynamic>.from(member);
+  out.remove('idPhoto');
+  out.remove('idPhotoData');
+  out.remove('idPhotoBase64');
+  // Keep path only — never inline blobs.
+  return out;
 }
 
 Future<({bool ok, String? pinSig, String? error})> ngmyCivicVerifyStatePin({
@@ -210,48 +260,106 @@ Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog() async {
   return ngmyCivicInvokeAnon({'action': 'civicPublicCatalog'});
 }
 
-Future<bool> ngmyCivicPersistRoster({
+/// Immediate single-member save to database (registrar / admin enroll).
+Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
+  required String email,
+  required Map<String, dynamic> member,
+  String state = '',
+}) async {
+  final slim = _slimMemberForCloud(member);
+  Future<({bool ok, String? registryId, String? error})> once() async {
+    final data = await ngmyCivicInvoke({
+      'action': 'civicUpsertMember',
+      'email': email.trim().toLowerCase(),
+      'state': state.trim().isNotEmpty ? state.trim() : (slim['state'] ?? '').toString(),
+      'member': slim,
+    });
+    if (data == null) {
+      return (ok: false, registryId: null, error: 'Could not reach server.');
+    }
+    if (data['ok'] == true) {
+      return (
+        ok: true,
+        registryId: (data['registryId'] ?? slim['registryId'] ?? '').toString(),
+        error: null,
+      );
+    }
+    return (ok: false, registryId: null, error: _civicCloudError(data, 'Cloud save failed'));
+  }
+
+  var result = await once();
+  if (!result.ok) {
+    // One retry after forced session refresh.
+    try {
+      await Supabase.instance.client.auth.refreshSession();
+    } catch (_) {}
+    result = await once();
+  }
+  return result;
+}
+
+Future<({bool ok, String? error})> ngmyCivicPersistRoster({
   required String email,
   required Map<String, dynamic> payload,
   String state = '',
 }) async {
+  final membersRaw = payload['members'];
+  final members = membersRaw is List
+      ? membersRaw
+          .whereType<Map>()
+          .map((e) => _slimMemberForCloud(Map<String, dynamic>.from(e)))
+          .toList()
+      : <Map<String, dynamic>>[];
   final data = await ngmyCivicInvoke({
     'action': 'civicPersistRoster',
     'email': email.trim().toLowerCase(),
     'state': state.trim(),
-    'members': payload['members'] ?? const [],
+    'members': members,
     'removed': payload['removed'] ?? const [],
     'deceased': payload['deceased'] ?? const [],
   });
-  return data != null && data['ok'] == true;
+  if (data == null) {
+    return (ok: false, error: 'Could not reach server.');
+  }
+  if (data['ok'] == true) return (ok: true, error: null);
+  return (ok: false, error: _civicCloudError(data, 'Cloud save failed'));
 }
 
 Future<({bool ok, String? registryId, String? error, Map<String, dynamic>? duplicate})>
     ngmyCivicGuestEnroll(Map<String, dynamic> fields) async {
-  final data = await ngmyCivicInvokeAnon({
-    'action': 'civicGuestEnroll',
-    ...fields,
-  });
-  if (data == null) {
-    return (ok: false, registryId: null, error: 'Could not reach server', duplicate: null);
-  }
-  if (data['ok'] == true) {
+  Future<({bool ok, String? registryId, String? error, Map<String, dynamic>? duplicate})> once() async {
+    final data = await ngmyCivicInvokeAnon({
+      'action': 'civicGuestEnroll',
+      ...fields,
+    });
+    if (data == null) {
+      return (ok: false, registryId: null, error: 'Could not reach server', duplicate: null);
+    }
+    if (data['ok'] == true) {
+      return (
+        ok: true,
+        registryId: (data['registryId'] ?? '').toString(),
+        error: null,
+        duplicate: null,
+      );
+    }
+    Map<String, dynamic>? dup;
+    final raw = data['duplicate'];
+    if (raw is Map) dup = Map<String, dynamic>.from(raw);
     return (
-      ok: true,
-      registryId: (data['registryId'] ?? '').toString(),
-      error: null,
-      duplicate: null,
+      ok: false,
+      registryId: null,
+      error: _civicCloudError(data, 'Enrollment failed'),
+      duplicate: dup,
     );
   }
-  Map<String, dynamic>? dup;
-  final raw = data['duplicate'];
-  if (raw is Map) dup = Map<String, dynamic>.from(raw);
-  return (
-    ok: false,
-    registryId: null,
-    error: _civicCloudError(data, 'Enrollment failed'),
-    duplicate: dup,
-  );
+
+  var result = await once();
+  if (!result.ok && result.duplicate == null) {
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    result = await once();
+  }
+  return result;
 }
 
 Future<({String global, Map<String, String> byState})> ngmyCivicFetchRegistryPins({

@@ -964,11 +964,12 @@ Future<bool> ngmyPersistCivicRegistryMembers(
   if (email.isNotEmpty) {
     // Never write soft-delete rows for people already back on the roster.
     NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
-    cloudOk = await ngmyCivicPersistRoster(
+    final result = await ngmyCivicPersistRoster(
       email: email,
       state: (state ?? '').trim(),
       payload: NgmyCivicRegistryMembers.payload(config),
     );
+    cloudOk = result.ok;
   }
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
   // Notify after save so listeners pull the updated cloud roster (not a mid-write race).

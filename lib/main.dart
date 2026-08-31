@@ -31795,7 +31795,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     });
     final displayUser = _civicMemberRecordToDisplayUser(member, widget.allUsers);
-    final saved = await _persistRegistryMember(displayUser);
+    // Save this one member to the database immediately (do not wait on full-roster sync).
+    final upsert = await ngmyCivicUpsertMember(
+      email: widget.user.email,
+      member: Map<String, dynamic>.from(member),
+      state: _selectedState,
+    );
+    var saved = upsert.ok;
+    if (!saved) {
+      saved = await _persistRegistryMember(displayUser);
+    } else {
+      // Local prefs + background full sync
+      unawaited(_persistRegistryMember(displayUser));
+    }
     widget.onDataChanged();
     if (closeSelfSheet != null && closeSelfSheet.mounted) Navigator.pop(closeSelfSheet);
     if (!mounted) return;
@@ -31804,9 +31816,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         content: Text(
           saved
               ? 'Member enrolled and saved to database.'
-              : 'Member enrolled here, but cloud save failed — tap Sync in Registry Backup.',
+              : 'Could not save to database${upsert.error != null ? ': ${upsert.error}' : ''}. Sign in again and retry.',
         ),
-        backgroundColor: saved ? Colors.green : Colors.orange,
+        backgroundColor: saved ? Colors.green : Colors.red,
+        duration: Duration(seconds: saved ? 4 : 8),
       ),
     );
     if (targetUser != null) {
@@ -32035,11 +32048,41 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       widget.user.isEnrolledInRegistry = true;
     }
 
-    var membersCloudOk = await ngmyPersistCivicRegistryMembers(
-      widget.config,
-      requesterEmail: widget.user.email,
-      state: _selectedState,
-    );
+    // Prefer immediate single-member cloud upsert — more reliable than full-roster push.
+    final raw = NgmyCivicRegistryMembers.findByRegistryId(widget.config, member.registryId ?? '') ??
+        NgmyCivicRegistryMembers.findByEmail(widget.config, member.email);
+    var membersCloudOk = false;
+    String? cloudError;
+    if (raw != null) {
+      final upsert = await ngmyCivicUpsertMember(
+        email: widget.user.email,
+        member: raw,
+        state: _selectedState,
+      );
+      membersCloudOk = upsert.ok;
+      cloudError = upsert.error;
+    }
+    if (!membersCloudOk) {
+      membersCloudOk = await ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      );
+      if (!membersCloudOk && (cloudError == null || cloudError.isEmpty)) {
+        cloudError = 'Cloud roster save failed';
+      }
+    } else {
+      // Keep full backup in sync in the background — enroll already succeeded.
+      unawaited(ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      ));
+    }
+    if (!membersCloudOk) {
+      debugPrint('[civic] persist member failed: $cloudError');
+    }
+
     final accountIdx = widget.allUsers.indexWhere(
       (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
     );
@@ -32064,7 +32107,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } catch (e) {
       debugPrint('Registry member local save failed: $e');
     }
-    // Roster cloud save is what matters — user-flag upsert must not fake an "offline" failure.
     return membersCloudOk;
   }
 
