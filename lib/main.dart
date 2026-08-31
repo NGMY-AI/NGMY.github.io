@@ -30593,6 +30593,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   DateTime? _stateSwitchLockedUntil;
   Timer? _liveRefreshDebounce;
   bool _cloudHydrateInFlight = false;
+
+  final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
     'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
     'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
@@ -32647,6 +32649,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final fileName = 'ngmy-civic-roster-${state.replaceAll(RegExp(r'\s+'), '_')}-$stamp.pdf';
 
     try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Building roster PDF for $state (${members.length} members)…'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
       final pdfBytes = await ngmyBuildCivicRosterPdfBytes(
         state: state,
         titleLine1: "EMO'YA M'BEMBE",
@@ -32655,37 +32665,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         timeStr: timeStr,
         rows: rosterRows,
       );
-      final opened = await ngmyInvoicePrintPdfDirect(
-        pdfBytes,
-        fileName,
-        preferPrintDialog: true,
-      );
-      if (!mounted) return;
-      if (!opened) {
-        final downloaded = await ngmyInvoiceOpenPdfInBrowser(pdfBytes);
+      if (pdfBytes.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              downloaded
-                  ? 'Roster PDF opened in a new tab for $state (${members.length} members). Use Print or Save from your browser.'
-                  : 'Could not open print — allow pop-ups for ngmy.org and try again.',
-            ),
-            backgroundColor: downloaded ? Colors.green : Colors.orange,
-            duration: const Duration(seconds: 6),
+          const SnackBar(
+            content: Text('Could not build roster PDF — try again.'),
+            backgroundColor: Colors.red,
           ),
         );
         return;
       }
+      // Always download the file first — hidden iframe "print" often succeeds in code but shows nothing.
+      final downloadMsg = await downloadNgmyPdfBytes(pdfBytes, fileName);
+      final openedTab = await ngmyInvoiceOpenPdfInBrowser(pdfBytes);
+      if (!mounted) return;
+      final tabHint = openedTab
+          ? ' A preview also opened in a new tab — use Print there.'
+          : ' Allow pop-ups for ngmy.org if you want an in-browser preview.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            opened
-                ? 'Roster PDF ready for $state (${members.length} members). If Print is blank on your phone, open Share and choose Print.'
-                : 'Could not open print — try again or use a desktop browser.',
+            '$downloadMsg Open it from Downloads to print ($state · ${members.length} members).$tabHint',
           ),
-          backgroundColor: opened ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 6),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 8),
         ),
       );
     } catch (e) {

@@ -148,6 +148,22 @@ Future<bool> ngmyInvoicePrintPdfDirectImpl(
   return true;
 }
 
+Future<String> downloadNgmyPdfBytesImpl(Uint8List pdfBytes, String filename) async {
+  if (pdfBytes.isEmpty) return 'Could not create PDF — no data.';
+  final name = _safePdfName(filename);
+  final blob = html.Blob([pdfBytes], 'application/pdf');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final anchor = html.AnchorElement(href: url)
+    ..download = name
+    ..style.display = 'none';
+  html.document.body?.append(anchor);
+  anchor.click();
+  await Future<void>.delayed(const Duration(milliseconds: 180));
+  anchor.remove();
+  html.Url.revokeObjectUrl(url);
+  return 'Downloaded $name';
+}
+
 Future<bool> ngmyInvoiceOpenPdfInBrowserImpl(Uint8List pdfBytes) async {
   if (pdfBytes.isEmpty) return false;
   final blob = html.Blob([pdfBytes], 'application/pdf');

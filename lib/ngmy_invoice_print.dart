@@ -13,3 +13,7 @@ Future<bool> ngmyInvoicePrintPdfDirect(
 
 Future<bool> ngmyInvoiceOpenPdfInBrowser(Uint8List pdfBytes) =>
     ngmyInvoiceOpenPdfInBrowserImpl(pdfBytes);
+
+/// Saves a PDF to the browser Downloads folder (reliable on desktop and most phones).
+Future<String> downloadNgmyPdfBytes(Uint8List pdfBytes, String filename) =>
+    downloadNgmyPdfBytesImpl(pdfBytes, filename);
