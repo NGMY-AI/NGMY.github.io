@@ -1540,9 +1540,10 @@ function findDuplicateMember(
     const mn = normName(String(m.fullName ?? ""));
     const ma = normAddress(String(m.homeAddress ?? ""));
     const mp = phoneDigits(String(m.phone ?? ""));
-    if (name && mn && name === mn) return m;
-    if (addr && ma && addr === ma && addr.length >= 8) return m;
+    // Phone match alone is enough (same person).
     if (ph.length >= 7 && mp.length >= 7 && ph === mp) return m;
+    // Same name + same address (not name-only — that blocked real enrollments).
+    if (name && mn && name === mn && addr && ma && addr.length >= 8 && addr === ma) return m;
   }
   return null;
 }
@@ -1979,8 +1980,6 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
 
   const payload = await loadCivicPayload(admin);
   const members = asMemberList(payload.members);
-  const removed = asMemberList(payload.removed);
-  const deceased = asMemberList(payload.deceased);
 
   const digits = phoneDigits(phone);
   const guestEmail =
@@ -2003,10 +2002,10 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   );
   const registryId = generateRegistryId(state, existingIds);
   const now = new Date().toISOString();
-  const member = {
+  const member: Record<string, unknown> = {
     email: guestEmail,
     fullName,
-    phone,
+    phone: digits.length >= 7 ? digits : phone,
     homeAddress,
     state,
     city: "",
@@ -2022,21 +2021,41 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
     enrolledAt: now,
     updatedAt: now,
   };
-  members.push(member);
-  const nextRemoved = removed.filter((r) => emailKey(String(r.email ?? "")) !== emailKey(guestEmail));
+
+  // Re-load right before write so concurrent self-enrolls are not overwritten.
+  const latest = await loadCivicPayload(admin);
+  const latestMembers = asMemberList(latest.members);
+  const latestRemoved = asMemberList(latest.removed);
+  const latestDeceased = asMemberList(latest.deceased);
+  const dup2 = findDuplicateMember(latestMembers, fullName, homeAddress, phone);
+  if (dup2) {
+    return jsonOk({
+      error: "Already enrolled",
+      duplicate: {
+        fullName: String(dup2.fullName ?? ""),
+        registryId: String(dup2.registryId ?? ""),
+      },
+      ok: false,
+    }, 409);
+  }
+  const nextMembers = mergeMemberLists(latestMembers, [member]);
+  const nextRemoved = latestRemoved.filter(
+    (r) => emailKey(String(r.email ?? "")) !== emailKey(guestEmail),
+  );
 
   const saved = await saveCivicPayload(admin, {
-    members,
+    members: nextMembers,
     removed: nextRemoved,
-    deceased,
+    deceased: latestDeceased,
     source: "guest_self_enrollment",
   });
-  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
   return jsonOk({
     ok: true,
     registryId,
     email: guestEmail,
-    // Never return the full roster
+    state,
+    memberCount: nextMembers.length,
   });
 }
 

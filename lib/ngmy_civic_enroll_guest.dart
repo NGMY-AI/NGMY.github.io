@@ -367,7 +367,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           final parts = <String>[if (name.isNotEmpty) name else 'Mwanachama'];
           if (id.isNotEmpty) parts.add('ID $id');
           _toast(
-            'Tayari umesajiliwa — jina, anwani, au simu inafanana (${parts.join(' · ')}). Mtu mmoja hawezi kujisajili mara mbili.',
+            'Tayari umesajiliwa — jina + anwani, au simu inafanana (${parts.join(' · ')}).',
           );
         } else {
           _toast(result.error ?? 'Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
@@ -465,23 +465,23 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Widget _titleBadge(double pulse, double shimmer) {
     // Logo ring sits at the far end of the title bar; keep bar height the same.
-    const logoSize = 40.0;
+    const logoSize = 48.0;
     return Transform.scale(
-      scale: 1.0 + pulse * 0.015,
+      scale: 1.0 + pulse * 0.02,
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,
-              sigma: 12,
+              sigma: 14,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 6, 46, 6),
+                padding: const EdgeInsets.fromLTRB(14, 8, 52, 8),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   gradient: LinearGradient(
                     begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
                     end: Alignment(1.2 - shimmer * 2.4, 0.6),
@@ -493,10 +493,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   ),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.28 + pulse * 0.18),
-                    width: 1,
+                    width: 1.1,
                   ),
                   boxShadow: [
-                    BoxShadow(color: _kAccent.withValues(alpha: 0.14 + pulse * 0.1), blurRadius: 12, offset: const Offset(0, 4)),
+                    BoxShadow(color: _kAccent.withValues(alpha: 0.16 + pulse * 0.1), blurRadius: 14, offset: const Offset(0, 5)),
                   ],
                 ),
                 child: Text(
@@ -505,12 +505,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.5 + pulse * 0.2,
+                    letterSpacing: 0.6 + pulse * 0.25,
                     color: Colors.white,
                     shadows: [
-                      Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 8),
+                      Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.2), blurRadius: 9),
                     ],
                   ),
                 ),
@@ -583,13 +583,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Widget _glassField({required Widget child}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,
-              sigma: 8,
+              sigma: 10,
               child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             color: Colors.white.withValues(alpha: 0.05),
             border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
@@ -606,37 +606,35 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         color: Colors.white.withValues(alpha: 0.08),
         border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
       child: TextField(
         controller: controller,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         decoration: InputDecoration(
-          isDense: true,
           labelText: label,
-          labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 11),
-          floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 11),
+          labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 12),
+          floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 12),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           filled: false,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         ),
       ),
     );
   }
 
   InputDecoration _dec(String label) => InputDecoration(
-        isDense: true,
         labelText: label,
-        labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 12),
-        floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 12),
+        labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 13),
+        floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 13),
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       );
 
   Future<void> _pickState() async {
@@ -652,17 +650,17 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Widget _mottoBadge(double pulse, double shimmer) {
     return Transform.scale(
-      scale: 1.0 + pulse * 0.02,
+      scale: 1.0 + pulse * 0.025,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,
-              sigma: 10,
+              sigma: 12,
               child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               gradient: LinearGradient(
                 begin: Alignment(-1.0 + shimmer * 2.0, -0.3),
                 end: Alignment(1.0 - shimmer * 2.0, 0.5),
@@ -674,19 +672,26 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               ),
               border: Border.all(
                 color: Colors.white.withValues(alpha: 0.28 + pulse * 0.16),
-                width: 1,
+                width: 1.1,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: _kAccentSoft.withValues(alpha: 0.16 + pulse * 0.1),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
             child: Text(
               "EMO 'YA M'MBONDO · $_selectedState",
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.8 + pulse * 0.2,
+                letterSpacing: 0.9 + pulse * 0.3,
                 color: Colors.white,
                 shadows: [
-                  Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 8),
+                  Shadow(color: _kAccent.withValues(alpha: 0.35 + pulse * 0.15), blurRadius: 10),
                 ],
               ),
             ),
@@ -701,9 +706,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       onTap: _submitting ? null : _submit,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        height: 44,
+        height: 50,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(
             begin: Alignment(-1 + shimmer * 2, 0),
             end: Alignment(1 - shimmer * 2, 1),
@@ -714,9 +719,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           ),
           boxShadow: [
             BoxShadow(
-              color: _kGreen.withValues(alpha: 0.22 + pulse * 0.16),
-              blurRadius: 12 + pulse * 6,
-              offset: const Offset(0, 5),
+              color: _kGreen.withValues(alpha: 0.25 + pulse * 0.18),
+              blurRadius: 14 + pulse * 8,
+              offset: const Offset(0, 6),
             ),
           ],
           border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
@@ -724,13 +729,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         child: Center(
           child: _submitting
               ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white),
                 )
               : const Text(
                   'Kamilisha usajili',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.white, letterSpacing: 0.3),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white, letterSpacing: 0.35),
                 ),
         ),
       ),
@@ -904,8 +909,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                       const SizedBox(height: 10),
                       Text(
                         _registryId == null || _registryId!.isEmpty
-                            ? 'Maelezo yako sasa yamo katika Sajili ya Wananchi.'
-                            : 'Nambari ya sajili: $_registryId\nMaelezo yako sasa yamo katika Sajili ya Wananchi.',
+                            ? 'Maelezo yako yamehifadhiwa katika Sajili ya Wananchi.\nYour enrollment is saved in Civic Registry.'
+                            : 'Nambari ya sajili: $_registryId\nMaelezo yako yamehifadhiwa.\nYour enrollment is saved — Registry ID: $_registryId',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 15, height: 1.45, color: _kMuted),
                       ),
@@ -924,48 +929,48 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
               children: [
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 _glassField(
                   child: TextField(
                     controller: _nameC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
                     textCapitalization: TextCapitalization.words,
                     decoration: _dec('Jina kamili'),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _glassField(
                   child: TextField(
                     controller: _addressC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
                     decoration: _dec('Anwani ya nyumbani'),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _glassField(
                   child: TextField(
                     controller: _phoneC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: _dec('Simu'),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _glassField(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -973,44 +978,39 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                           'Ukubwa wa familia',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
+                        _familySoftField(
+                          controller: _familyMembersC,
+                          label: 'Jumla (idadi) *',
+                        ),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             Expanded(
-                              flex: 3,
-                              child: _familySoftField(
-                                controller: _familyMembersC,
-                                label: 'Jumla *',
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              flex: 2,
                               child: _familySoftField(
                                 controller: _familyMalesC,
-                                label: 'M *',
+                                label: 'Wanaume (M) *',
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             Expanded(
-                              flex: 2,
                               child: _familySoftField(
                                 controller: _familyFemalesC,
-                                label: 'F *',
+                                label: 'Wanawake (F) *',
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'M + F = jumla',
+                          'M + F lazima iwe sawa na jumla',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1018,11 +1018,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 _glassField(
                   child: InkWell(
                     onTap: _pickState,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     child: InputDecorator(
                       decoration: _dec('Jimbo'),
                       child: Row(
@@ -1030,16 +1030,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                           Expanded(
                             child: Text(
                               _selectedState,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                             ),
                           ),
-                          Icon(Icons.expand_more_rounded, size: 20, color: Colors.white.withValues(alpha: 0.55)),
+                          Icon(Icons.expand_more_rounded, size: 22, color: Colors.white.withValues(alpha: 0.55)),
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 18),
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _submitButton(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
