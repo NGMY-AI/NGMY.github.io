@@ -30591,8 +30591,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   List<AppTransaction> _communityClaims = [];
   /// Member state-switch cooldown after [NgmyCivicStateSwitches.maxSwitches] changes.
   DateTime? _stateSwitchLockedUntil;
-
-  final List<String> _usStates = [
+  Timer? _liveRefreshDebounce;
+  bool _cloudHydrateInFlight = false;
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
     'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland',
     'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey',
@@ -30606,34 +30606,43 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
-    _ensureUniqueRegistryIds();
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _runHelpModeLifecycleMaintenance();
-      final purged = NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
-      if (purged > 0) {
-        unawaited(ngmyPersistCivicRegistryMembers(widget.config));
-        widget.onDataChanged();
-      }
-      await _mergeCivicRegistryPinsIntoConfig(widget.config);
-      await ngmyHydrateCivicRegistryMembersFromAllBackups(
-        widget.config,
-        widget.allUsers,
-        requesterEmail: widget.user.email,
-        state: _selectedState,
-      );
+      // Fast path: local roster + unlock check — do not block UI on cloud.
+      await NgmyCivicRegistryMembers.hydrateLocal(widget.config);
+      if (!mounted) return;
+      await _checkRegistryUnlock();
       if (!mounted) return;
       setState(() {});
-      await _checkRegistryUnlock();
       unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
+      unawaited(_ensureUniqueRegistryIdsDeferred());
+      unawaited(_refreshCivicMembersFromCloud());
+      unawaited(_refreshCivicHelpModeAndContributions());
+      unawaited(() async {
+        await _mergeCivicRegistryPinsIntoConfig(widget.config);
+        if (mounted) setState(() {});
+      }());
     });
-    unawaited(_refreshCivicHelpModeAndContributions());
     _helpModePoll = Timer.periodic(const Duration(seconds: 75), (_) {
       if (!mounted) return;
       unawaited(_refreshCivicHelpModeAndContributions());
     });
+  }
+
+  Future<void> _ensureUniqueRegistryIdsDeferred() async {
+    _runHelpModeLifecycleMaintenance();
+    final purged = NgmyCivicRegistryMembers.purgeExpiredSoftDeletes(widget.config);
+    if (purged > 0) {
+      unawaited(ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      ));
+      widget.onDataChanged();
+    }
+    _ensureUniqueRegistryIds();
   }
 
   Future<void> _hydrateStateSwitchLock() async {
@@ -30695,18 +30704,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _onCivicLiveRefresh() {
     if (!mounted) return;
-    unawaited(_refreshCivicMembersFromCloud());
-    unawaited(_checkRegistryUnlock());
-    unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) async {
-      await ngmyHydrateCivicDeletedContributions(widget.config);
-      if (mounted) setState(() {});
-    }));
+    _liveRefreshDebounce?.cancel();
+    _liveRefreshDebounce = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      unawaited(_refreshCivicMembersFromCloud());
+      unawaited(_checkRegistryUnlock());
+      unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) async {
+        await ngmyHydrateCivicDeletedContributions(widget.config);
+        if (mounted) setState(() {});
+      }));
+    });
   }
 
   @override
   void dispose() {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
+    _liveRefreshDebounce?.cancel();
     NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
     _searchController.dispose();
     _enrollSearchC.dispose();
@@ -32011,7 +32025,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       widget.user.isEnrolledInRegistry = true;
     }
 
-    var membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    var membersCloudOk = await ngmyPersistCivicRegistryMembers(
+      widget.config,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
     var userCloudOk = true;
     final accountIdx = widget.allUsers.indexWhere(
       (u) => NgmyCivicRegistryMembers.emailKey(u.email) == NgmyCivicRegistryMembers.emailKey(member.email),
@@ -39308,7 +39326,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         globalPin: widget.config.civicRegistryPin,
         userEmail: widget.user.email,
         initialState: _selectedState,
-        members: NgmyCivicRegistryMembers.listFrom(widget.config),
+        members: NgmyCivicRegistryMembers.listFrom(widget.config)
+            .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), _selectedState))
+            .toList(),
         onBack: () => NgmyNavigator.pop(context),
         onUnlocked: _onRegistryUnlocked,
         // AR home / King / Admin never need PIN — picking home while on the
@@ -39680,22 +39700,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _refreshCivicMembersFromCloud() async {
-    await ngmyHydrateCivicRegistryMembersFromAllBackups(
-      widget.config,
-      widget.allUsers,
-      requesterEmail: widget.user.email,
-      state: _selectedState,
-    );
-    if (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) {
-      unawaited(ngmyPersistCivicRegistryMembers(
+    if (_cloudHydrateInFlight) return;
+    _cloudHydrateInFlight = true;
+    try {
+      await ngmyHydrateCivicRegistryMembersFromAllBackups(
         widget.config,
+        widget.allUsers,
         requesterEmail: widget.user.email,
         state: _selectedState,
-      ));
+      );
+      if (!mounted) return;
+      setState(() {});
+      widget.onDataChanged();
+    } finally {
+      _cloudHydrateInFlight = false;
     }
-    if (!mounted) return;
-    setState(() {});
-    widget.onDataChanged();
   }
 
   Widget _tabItem(int index, String label, IconData icon) {

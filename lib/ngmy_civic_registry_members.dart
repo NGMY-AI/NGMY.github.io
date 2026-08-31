@@ -1731,6 +1731,43 @@ class NgmyCivicRegistryMembers {
     return score;
   }
 
+  static bool _isSanitizedMemberRow(Map<String, dynamic> m) {
+    return (m['email'] ?? '').toString().contains('***');
+  }
+
+  static Map<String, dynamic> _mergeMemberRow(Map<String, dynamic> a, Map<String, dynamic> b) {
+    if (_isSanitizedMemberRow(b) && !_isSanitizedMemberRow(a)) {
+      final merged = Map<String, dynamic>.from(a);
+      for (final key in const [
+        'fullName',
+        'city',
+        'room',
+        'state',
+        'registryId',
+        'helps',
+        'missed',
+        'enrolledAt',
+        'updatedAt',
+        'enrollmentSource',
+        'familyMembers',
+        'familyMales',
+        'familyFemales',
+        'username',
+        'nicknames',
+        'showNicknames',
+        'contributionCount',
+      ]) {
+        final v = b[key];
+        if (v == null) continue;
+        if (v is String && v.trim().isEmpty) continue;
+        merged[key] = v;
+      }
+      return _preferNewerMember(a, merged);
+    }
+    if (_isSanitizedMemberRow(a) && !_isSanitizedMemberRow(b)) return b;
+    return _preferNewerMember(a, b);
+  }
+
   static void applyPayload(dynamic config, Map<String, dynamic> payload) {
     final remote = payload['members'];
     if (remote is! List) return;
@@ -1757,11 +1794,11 @@ class NgmyCivicRegistryMembers {
       final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
       if (email.isNotEmpty) {
         final prev = liveByEmail[email];
-        liveByEmail[email] = prev == null ? m : _preferNewerMember(prev, m);
+        liveByEmail[email] = prev == null ? m : _mergeMemberRow(prev, m);
       }
       if (rid.isNotEmpty) {
         final prev = liveByRid[rid];
-        liveByRid[rid] = prev == null ? m : _preferNewerMember(prev, m);
+        liveByRid[rid] = prev == null ? m : _mergeMemberRow(prev, m);
       }
     }
 
@@ -1868,12 +1905,10 @@ class NgmyCivicRegistryMembers {
       if (isTombstoned(m)) continue;
       if (isDeceasedRow(m)) continue;
       final prev = merged[key];
-      merged[key] = prev == null ? m : _preferNewerMember(prev, m);
+      merged[key] = prev == null ? m : _mergeMemberRow(prev, m);
     }
 
     setList(config, merged.values.toList());
-    // Collapse GE… / GA… twins (and any same-email clones) created by id-key merges.
-    normalizeRegistryIdsInPlace(config);
   }
 
   static Future<void> saveLocalBackup(dynamic config) async {

@@ -229,6 +229,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   Map<String, dynamic>? _matchedMember;
   String? _serverPinSig;
   String? _matchedMemberEmail;
+  String _enteredPin = '';
 
   static const _redTop = Color(0xFFE53935);
   static const _redBottom = Color(0xFFB71C1C);
@@ -344,6 +345,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
         pinsByState: widget.pinsByState,
         state: _state,
       );
+      _enteredPin = value;
       if (localExpected.isNotEmpty && value == localExpected) {
         if (!mounted) return;
         setState(() {
@@ -400,26 +402,89 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       return;
     }
 
-    final pinSig = (_serverPinSig ?? '').trim();
-    if (pinSig.isEmpty || pinSig == 'v1:local') {
-      if (_step == 1) {
-        final member = NgmyCivicWalletIdentity.findByName(
+    if (_step == 1) {
+      setState(() {
+        _busy = true;
+        _error = null;
+      });
+      try {
+        final localMember = NgmyCivicWalletIdentity.findByName(
           members: widget.members,
           state: _state,
           fullName: value,
         );
-        if (member == null) {
-          setState(() => _error = 'That name is not registered in $_state.');
+        if (localMember != null) {
+          if (!mounted) return;
+          setState(() {
+            _busy = false;
+            _error = null;
+            _matchedMember = localMember;
+            _matchedMemberEmail = (localMember['email'] ?? '').toString();
+            _step = 2;
+          });
+          return;
+        }
+
+        var pinSig = (_serverPinSig ?? '').trim();
+        if (pinSig.isEmpty || pinSig == 'v1:local') {
+          if (_enteredPin.isEmpty) {
+            setState(() {
+              _busy = false;
+              _error = 'Enter your state PIN again, then your name.';
+              _step = 0;
+            });
+            return;
+          }
+          final verified = await ngmyCivicVerifyStatePin(
+            email: widget.userEmail,
+            state: _state,
+            pin: _enteredPin,
+          );
+          if (!verified.ok || (verified.pinSig ?? '').isEmpty) {
+            if (!mounted) return;
+            setState(() {
+              _busy = false;
+              _error = verified.error ?? 'Could not verify PIN. Check connection and try again.';
+            });
+            return;
+          }
+          pinSig = verified.pinSig!;
+          _serverPinSig = pinSig;
+        }
+
+        final matched = await ngmyCivicGateMatchName(
+          email: widget.userEmail,
+          state: _state,
+          pinSig: pinSig,
+          fullName: value,
+        );
+        if (!mounted) return;
+        if (!matched.ok || (matched.memberEmail ?? '').isEmpty) {
+          setState(() {
+            _busy = false;
+            _error = matched.error ?? 'That name is not registered in $_state.';
+          });
           return;
         }
         setState(() {
+          _busy = false;
+          _matchedMemberEmail = matched.memberEmail;
+          _matchedMember = null;
           _error = null;
-          _matchedMember = member;
-          _matchedMemberEmail = (member['email'] ?? '').toString();
           _step = 2;
         });
-        return;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = 'Could not verify name. Check your connection and try again.';
+        });
       }
+      return;
+    }
+
+    final pinSig = (_serverPinSig ?? '').trim();
+    if (pinSig.isEmpty || pinSig == 'v1:local') {
       if (_step == 2) {
         final member = _matchedMember;
         if (member == null) {
@@ -465,35 +530,6 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       );
       if (!mounted) return;
       widget.onUnlocked(_state);
-      return;
-    }
-
-    if (_step == 1) {
-      setState(() {
-        _busy = true;
-        _error = null;
-      });
-      final matched = await ngmyCivicGateMatchName(
-        email: widget.userEmail,
-        state: _state,
-        pinSig: pinSig,
-        fullName: value,
-      );
-      if (!mounted) return;
-      if (!matched.ok || (matched.memberEmail ?? '').isEmpty) {
-        setState(() {
-          _busy = false;
-          _error = matched.error ?? 'That name is not registered in $_state.';
-        });
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _matchedMemberEmail = matched.memberEmail;
-        _matchedMember = null;
-        _error = null;
-        _step = 2;
-      });
       return;
     }
 

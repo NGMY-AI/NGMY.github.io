@@ -1795,17 +1795,31 @@ async function handleCivicPersistRoster(
   } else {
     const sk = canonicalStateKey(scopeState);
     if (!sk) return jsonOk({ error: "No registrar state" }, 403);
-    const otherStates = members.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) !== sk,
-    );
-    const homeExisting = members.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
-    );
-    const homeIncoming = incomingMembers.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
-    );
-    const homeMerged = mergeMemberLists(homeExisting, homeIncoming);
-    members = [...otherStates, ...homeMerged];
+    const mergeStateSlice = (
+      allMembers: Record<string, unknown>[],
+      incoming: Record<string, unknown>[],
+      stateKey: string,
+    ) => {
+      const other = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
+      );
+      const existing = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
+      const inc = incoming.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
+      return [...other, ...mergeMemberLists(existing, inc)];
+    };
+
+    members = mergeStateSlice(members, incomingMembers, sk);
+
+    // Registrar may enroll in another state they are viewing (body.state).
+    const bodyState = String(body.state ?? "").trim();
+    const bodySk = canonicalStateKey(bodyState);
+    if (bodySk && bodySk !== sk) {
+      members = mergeStateSlice(members, incomingMembers, bodySk);
+    }
 
     const otherRemoved = removed.filter(
       (m) => canonicalStateKey(String(m.state ?? "")) !== sk,

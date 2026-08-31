@@ -933,23 +933,19 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
       pinSig: resolvedPin,
     );
     if (row != null && row['networkEmpty'] != true && row['needsUnlock'] != true) {
-      NgmyCivicRegistryMembers.applyPayload(config, {
-        'members': row['members'] ?? const [],
-        'removed': row['removed'] ?? const [],
-        'deceased': row['deceased'] ?? const [],
-      });
-      await NgmyCivicRegistryMembers.saveLocalBackup(config);
-      NgmyAdminLiveRefresh.notify();
+      final view = (row['view'] ?? '').toString();
+      // Member-view rows are sanitized (masked email, no phone/dob) — never merge into config.
+      if (view == 'admin' || view == 'registrar') {
+        NgmyCivicRegistryMembers.applyPayload(config, {
+          'members': row['members'] ?? const [],
+          'removed': row['removed'] ?? const [],
+          'deceased': row['deceased'] ?? const [],
+        });
+        await NgmyCivicRegistryMembers.saveLocalBackup(config);
+      }
     }
   }
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
-  final before = NgmyCivicRegistryMembers.listFrom(config).length;
-  final removed = NgmyCivicRegistryMembers.normalizeRegistryIdsInPlace(config);
-  final after = NgmyCivicRegistryMembers.listFrom(config).length;
-  if (removed > 0 || after < before) {
-    await NgmyCivicRegistryMembers.saveLocalBackup(config);
-    NgmyAdminLiveRefresh.notify();
-  }
 }
 
 Future<bool> ngmyPersistCivicRegistryMembers(
@@ -974,7 +970,6 @@ Future<bool> ngmyPersistCivicRegistryMembers(
     );
   }
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
-  await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   return cloudOk;
 }
 
