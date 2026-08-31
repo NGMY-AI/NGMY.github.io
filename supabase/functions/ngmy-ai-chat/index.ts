@@ -1083,6 +1083,52 @@ function asMemberList(raw: unknown): Record<string, unknown>[] {
     .map((e) => ({ ...(e as Record<string, unknown>) }));
 }
 
+function memberRowKey(m: Record<string, unknown>): string {
+  const id = String(m.registryId ?? "").trim().toUpperCase();
+  if (id) return `id:${id}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em) return `em:${em}`;
+  return "";
+}
+
+function memberDetailScore(m: Record<string, unknown>): number {
+  let s = 0;
+  if (String(m.phone ?? "").trim()) s += 2;
+  if (String(m.homeAddress ?? "").trim()) s += 2;
+  if (String(m.dob ?? "").trim()) s += 2;
+  if (String(m.fullName ?? "").trim()) s += 1;
+  return s;
+}
+
+function preferMemberRow(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): Record<string, unknown> {
+  const ta = Date.parse(String(a.updatedAt ?? a.enrolledAt ?? "")) || 0;
+  const tb = Date.parse(String(b.updatedAt ?? b.enrolledAt ?? "")) || 0;
+  if (ta !== tb) return tb > ta ? b : a;
+  return memberDetailScore(b) > memberDetailScore(a) ? b : a;
+}
+
+/** Union roster rows — never drop cloud-only members when a device pushes stale local data. */
+function mergeMemberLists(
+  base: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const m of base) {
+    const k = memberRowKey(m);
+    if (k) byKey.set(k, m);
+  }
+  for (const m of incoming) {
+    const k = memberRowKey(m);
+    if (!k) continue;
+    const prev = byKey.get(k);
+    byKey.set(k, prev ? preferMemberRow(prev, m) : m);
+  }
+  return [...byKey.values()];
+}
+
 function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
   const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
   return {
@@ -1584,9 +1630,10 @@ async function handleCivicGateVerifyIdentity(
     if (!dob) return jsonOk({ error: "dob required" }, 400);
     const got = normDob(String(match.dob ?? ""));
     const want = normDob(dob);
-    if (!got || !want || got !== want) {
+    if (got && want && got !== want) {
       return jsonOk({ error: "Date of birth does not match that registered name.", ok: false }, 403);
     }
+    // Self-enrollment rows may have no DOB on file — registry ID step verifies them.
     if (step === "dob") return jsonOk({ ok: true });
   }
   if (step === "id" || step === "both") {
@@ -1741,34 +1788,59 @@ async function handleCivicPersistRoster(
   let deceased = asMemberList(current.deceased);
 
   if (role.isAdmin && !scopeState) {
-    // Nationwide replace from admin client payload
-    members = incomingMembers;
-    removed = incomingRemoved;
-    deceased = incomingDeceased.length > 0 ? incomingDeceased : deceased;
+    members = mergeMemberLists(members, incomingMembers);
+    removed = mergeMemberLists(removed, incomingRemoved);
+    if (incomingDeceased.length > 0) {
+      deceased = mergeMemberLists(deceased, incomingDeceased);
+    }
   } else {
     const sk = canonicalStateKey(scopeState);
     if (!sk) return jsonOk({ error: "No registrar state" }, 403);
-    // Drop existing home-state rows, then merge incoming for that state only
-    members = members.filter((m) => canonicalStateKey(String(m.state ?? "")) !== sk);
-    for (const m of incomingMembers) {
-      if (canonicalStateKey(String(m.state ?? "")) === sk) members.push(m);
-    }
-    removed = removed.filter((m) => canonicalStateKey(String(m.state ?? "")) !== sk);
-    for (const m of incomingRemoved) {
-      if (canonicalStateKey(String(m.state ?? "")) === sk) removed.push(m);
-    }
-    deceased = deceased.filter((d) => {
+    const otherStates = members.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) !== sk,
+    );
+    const homeExisting = members.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
+    );
+    const homeIncoming = incomingMembers.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
+    );
+    const homeMerged = mergeMemberLists(homeExisting, homeIncoming);
+    members = [...otherStates, ...homeMerged];
+
+    const otherRemoved = removed.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) !== sk,
+    );
+    const homeRemovedExisting = removed.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
+    );
+    const homeRemovedIncoming = incomingRemoved.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
+    );
+    removed = [...otherRemoved, ...mergeMemberLists(homeRemovedExisting, homeRemovedIncoming)];
+
+    const otherDeceased = deceased.filter((d) => {
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
       return canonicalStateKey(String(d.state ?? snap.state ?? "")) !== sk;
     });
-    for (const d of incomingDeceased) {
+    const homeDeceasedExisting = deceased.filter((d) => {
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      if (canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk) deceased.push(d);
-    }
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk;
+    });
+    const homeDeceasedIncoming = incomingDeceased.filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === sk;
+    });
+    deceased = [
+      ...otherDeceased,
+      ...mergeMemberLists(homeDeceasedExisting, homeDeceasedIncoming),
+    ];
   }
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased });

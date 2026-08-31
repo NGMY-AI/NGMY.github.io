@@ -39661,9 +39661,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _refreshCivicMembersFromCloud() async {
-    await ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers);
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(
+      widget.config,
+      widget.allUsers,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
+    // After pulling cloud roster into local, upload merged home-state rows back
+    // (server merge keeps self-enrollments + other devices' additions).
+    if (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) {
+      await ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      );
+    }
     if (!mounted) return;
     setState(() {});
+    widget.onDataChanged();
   }
 
   Widget _tabItem(int index, String label, IconData icon) {
@@ -40447,9 +40462,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Widget _membersSection(bool isDark) {
     final q = _searchQuery.trim();
     final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((u) {
-      final stateMatch = (u.state).trim().toLowerCase() == _selectedState.trim().toLowerCase();
-      final cityMatch = _selectedCity == 'All Cities' || (u.city ?? '').trim() == _selectedCity;
-      final roomMatch = _selectedRoom == 'All Rooms' || (u.room ?? '').trim() == _selectedRoom;
+      final stateMatch = NgmyCivicRegistryStats.statesMatch(u.state, _selectedState);
+      final cityMatch = _selectedCity == 'All Cities' ||
+          (u.city ?? '').trim().isEmpty ||
+          (u.city ?? '').trim() == _selectedCity;
+      final roomMatch = _selectedRoom == 'All Rooms' ||
+          (u.room ?? '').trim().isEmpty ||
+          (u.room ?? '').trim() == _selectedRoom;
       if (!stateMatch || !cityMatch || !roomMatch) return false;
       if (q.isEmpty) return true;
       final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);

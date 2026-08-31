@@ -939,15 +939,7 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
         'deceased': row['deceased'] ?? const [],
       });
       await NgmyCivicRegistryMembers.saveLocalBackup(config);
-      final isAdmin = ngmyEmailIsAdmin(email);
-      final isRegistrar = _registrarApplicationStatusForEmail(config, email) == 'approved';
-      if (isAdmin || isRegistrar) {
-        await ngmyPersistCivicRegistryMembers(
-          config,
-          requesterEmail: email,
-          state: resolvedState,
-        );
-      }
+      NgmyAdminLiveRefresh.notify();
     }
   }
   NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
@@ -955,8 +947,8 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
   final removed = NgmyCivicRegistryMembers.normalizeRegistryIdsInPlace(config);
   final after = NgmyCivicRegistryMembers.listFrom(config).length;
   if (removed > 0 || after < before) {
-    // Push cleaned roster so other devices stop re-merging the clones.
-    await ngmyPersistCivicRegistryMembers(config, requesterEmail: email);
+    await NgmyCivicRegistryMembers.saveLocalBackup(config);
+    NgmyAdminLiveRefresh.notify();
   }
 }
 
