@@ -2911,18 +2911,29 @@ bool _userIsCivicRegistryEnrolled(AppConfig config, UserData user) =>
 UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> allUsers) {
   final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
   final registryId = (m['registryId'] ?? '').toString().trim();
-  final fullName = (m['fullName'] ?? '').toString().trim();
   final idx = email.isEmpty
       ? -1
       : allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == email);
   final u = idx >= 0
       ? UserData.fromJson(allUsers[idx].toJson())
-      : UserData(
-          email: email,
-          username: fullName.isNotEmpty ? fullName : (registryId.isNotEmpty ? registryId : 'Member'),
-        );
+      : UserData(email: email, username: 'Member');
   u.isEnrolledInRegistry = true;
-  u.fullName = fullName.isNotEmpty ? fullName : (u.fullName ?? u.username);
+  final fromRecord = NgmyCivicRegistryMembers.resolvedDisplayName(m);
+  if (fromRecord != 'Member') {
+    u.fullName = fromRecord;
+  } else if (idx >= 0) {
+    final accountName = (u.fullName ?? u.username).trim();
+    final fromAccount = NgmyCivicRegistryMembers.resolvedDisplayName({
+      'fullName': accountName,
+      'username': accountName,
+    });
+    u.fullName = fromAccount != 'Member' ? fromAccount : 'Member';
+  } else {
+    u.fullName = 'Member';
+  }
+  if ((u.username).trim().isEmpty || u.username == 'Member') {
+    u.username = u.fullName ?? 'Member';
+  }
   u.dob = (m['dob'] ?? u.dob ?? '').toString();
   u.idType = (m['idType'] ?? u.idType ?? '').toString();
   u.registryId = registryId.isNotEmpty ? registryId : (u.registryId ?? '').toString();
@@ -39895,12 +39906,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (_cloudHydrateInFlight) return;
     _cloudHydrateInFlight = true;
     try {
+      NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
       await ngmyHydrateCivicRegistryMembersFromAllBackups(
         widget.config,
         widget.allUsers,
         requesterEmail: widget.user.email,
         state: _selectedState,
       );
+      NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
+      await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
       if (!mounted) return;
       setState(() {});
       widget.onDataChanged();
@@ -40924,7 +40938,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               Row(children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    Text(u.fullName ?? u.username, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                    Text(
+                      NgmyCivicRegistryMembers.resolvedDisplayName(raw ?? {'fullName': u.fullName, 'username': u.username}),
+                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                    ),
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

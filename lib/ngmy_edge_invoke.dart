@@ -63,15 +63,11 @@ const Set<String> kNgmyEdgeFetchAckOnlyActions = {
   'civicAdminSettingsFetch',
 };
 
-/// Web-only — roster/cities/pins leak PII in DevTools response bodies.
+/// Web-only — settings/pins that leak geography in DevTools response bodies.
+/// Roster fetches stay enabled so admin/registrar see real member names.
 const Set<String> kNgmyEdgeWebAckOnlyActions = {
-  'civicFetchRoster',
-  'civicFetchDirectory',
-  'civicFetchRegistrarRoster',
-  'civicFetchAdminRoster',
   'civicFetchCitiesRooms',
   'civicFetchRegistryPins',
-  'civicFetchRegistrarApplications',
 };
 
 /// Body keys duplicated by the signed-in JWT — never send on the wire.

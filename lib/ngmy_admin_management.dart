@@ -949,7 +949,6 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
           'removed': row['removed'] ?? const [],
           'deceased': row['deceased'] ?? const [],
         });
-        // Older edge builds redacted state to "***" — repair so Members shows everyone.
         NgmyCivicRegistryMembers.repairRedactedFields(
           config,
           fallbackState: resolvedState,

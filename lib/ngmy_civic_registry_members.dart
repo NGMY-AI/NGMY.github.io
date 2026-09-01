@@ -1806,7 +1806,26 @@ class NgmyCivicRegistryMembers {
     if (s.isEmpty) return true;
     if (s == '***') return true;
     if (s.contains('***')) return true;
+    // Partial masks like **1469040 or *3357039 (legacy network redaction).
+    if (RegExp(r'^\*+\d').hasMatch(s)) return true;
+    // Guest email local-part mistaken for a display name.
+    if (RegExp(r'^civic\.\d', caseSensitive: false).hasMatch(s)) return true;
     return false;
+  }
+
+  /// Best label for UI — never show masked ids or guest email tokens as a person's name.
+  static String resolvedDisplayName(Map<String, dynamic> m) {
+    if (showNicknamesPublicly(m)) {
+      final nicks = nicknamesOf(m);
+      if (nicks.isNotEmpty) {
+        return nicks.length == 1 ? nicks.first : nicks.join(' · ');
+      }
+    }
+    final fullName = (m['fullName'] ?? '').toString().trim();
+    if (!_isPlaceholderValue(fullName)) return fullName;
+    final username = (m['username'] ?? '').toString().trim();
+    if (!_isPlaceholderValue(username)) return username;
+    return 'Member';
   }
 
   /// True only for privacy-redacted cloud rows (not merely incomplete local rows).
@@ -1815,10 +1834,13 @@ class NgmyCivicRegistryMembers {
     final state = (m['state'] ?? '').toString().trim();
     final phone = (m['phone'] ?? '').toString().trim();
     final name = (m['fullName'] ?? '').toString().trim();
+    final rid = (m['registryId'] ?? '').toString().trim();
     if (email.contains('***')) return true;
     if (state == '***') return true;
     if (phone == '***') return true;
     if (name == '***') return true;
+    if (_isPlaceholderValue(name)) return true;
+    if (_isPlaceholderValue(rid)) return true;
     return false;
   }
 
@@ -1904,7 +1926,7 @@ class NgmyCivicRegistryMembers {
           changed = true;
         }
       }
-      for (final key in const ['fullName', 'city', 'room', 'phone', 'homeAddress', 'dob']) {
+      for (final key in const ['fullName', 'city', 'room', 'phone', 'homeAddress', 'dob', 'username', 'registryId']) {
         if (_isPlaceholderValue(m[key])) {
           m[key] = '';
           changed = true;
@@ -2054,10 +2076,15 @@ class NgmyCivicRegistryMembers {
 
     final local = listFrom(config);
     if (local.isEmpty) {
-      setList(
-        config,
-        remoteMembers.where((m) => _mergeKey(m).isNotEmpty && !isTombstoned(m) && !isDeceasedRow(m)).toList(),
-      );
+      final seed = remoteMembers.where((m) {
+        if (_mergeKey(m).isEmpty || isTombstoned(m) || isDeceasedRow(m)) return false;
+        // Never seed an empty local roster from privacy-redacted cloud rows.
+        if (_isSanitizedMemberRow(m) && _isPlaceholderValue(m['fullName'])) return false;
+        return true;
+      }).toList();
+      if (seed.isNotEmpty) {
+        setList(config, seed);
+      }
       clearSoftDeletesForActiveMembers(config);
       return;
     }

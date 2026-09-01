@@ -1734,12 +1734,12 @@ async function handleCivicFetchRoster(
   const allDeceased = asMemberList(payload.deceased);
 
   if (role.isAdmin) {
-    // Never ship roster PII in browser Network — app uses local civicRegistryMembers.
-    return networkFetchOk({
+    return jsonOk({
+      ok: true,
       view: "admin",
-      memberCount: allMembers.length,
-      removedCount: allRemoved.length,
-      deceasedCount: allDeceased.length,
+      members: civicRosterRowsForPrivileged(allMembers),
+      removed: civicRosterRowsForPrivileged(allRemoved),
+      deceased: civicRosterRowsForPrivileged(allDeceased),
       savedAt: payload.savedAt ?? null,
     });
   }
