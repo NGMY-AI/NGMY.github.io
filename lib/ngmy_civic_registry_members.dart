@@ -317,7 +317,7 @@ class NgmyCivicRegistryMembers {
     }
     final before = removedFrom(config);
     final next = before.where((r) {
-      if (r['permanent'] == true) return true;
+      // Live roster always wins — including over "permanent" tombstones after backup restore.
       final e = emailKey((r['email'] ?? '').toString());
       final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
       if (e.isNotEmpty && activeEmails.contains(e)) return false;
@@ -753,9 +753,14 @@ class NgmyCivicRegistryMembers {
     if (!fields.containsKey('showNicknames')) {
       next['showNicknames'] = keep['showNicknames'] == true;
     }
+    // Never blank out state on edit — empty state hides the member from the state list.
+    final stateNext = (next['state'] ?? '').toString().trim();
+    final stateKeep = (keep['state'] ?? '').toString().trim();
+    next['state'] = stateNext.isNotEmpty ? stateNext : stateKeep;
     next['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     members[idx] = next;
     setList(config, members);
+    _clearTombstone(config, newEmail, registryId: (next['registryId'] ?? '').toString());
     return next;
   }
 
@@ -1612,41 +1617,52 @@ class NgmyCivicRegistryMembers {
     }
     final list = map['members'] ?? map['civicRegistryMembers'];
     if (list is! List) return const [];
-    final want = (requireState ?? fileState).trim().toLowerCase();
+    final want = (requireState ?? fileState).trim();
     final members = list
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .where((m) {
           if (want.isEmpty) return false;
-          final ms = (m['state'] ?? fileState).toString().trim().toLowerCase();
-          return ms == want;
+          final ms = (m['state'] ?? fileState).toString().trim();
+          // Accept empty member.state (treat as file state) or Georgia/GA-style aliases.
+          if (ms.isEmpty) return true;
+          return NgmyCivicRegistryStats.statesMatch(ms, want) ||
+              NgmyCivicRegistryStats.statesMatch(ms, fileState);
         })
         .toList();
     sortNewestEnrolledFirst(members);
     return members;
   }
 
-  /// Smart restore: only add members that are not already enrolled (by email, registry ID, or identity).
-  /// Existing members are left untouched. Only members belonging to [requireState] are considered.
-  static ({int added, int skipped, List<Map<String, dynamic>> restored}) importMissingMembers(
+  /// Restore members from a state backup.
+  /// Existing rows are updated/repaired (especially wrong/empty [state]) — not skipped —
+  /// so a 57-member file can bring a 51-member Members screen back to 57.
+  static ({int added, int updated, int skipped, List<Map<String, dynamic>> restored}) importMissingMembers(
     dynamic config,
     List<Map<String, dynamic>> incoming, {
     required String requireState,
   }) {
-    var added = 0;
-    var skipped = 0;
+    final stateWanted = requireState.trim();
     final restored = <Map<String, dynamic>>[];
-    final stateKey = requireState.trim().toLowerCase();
-    if (stateKey.isEmpty) return (added: 0, skipped: incoming.length, restored: restored);
+    var added = 0;
+    var updated = 0;
+    var skipped = 0;
+    if (stateWanted.isEmpty) {
+      return (added: 0, updated: 0, skipped: incoming.length, restored: restored);
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
 
     for (final raw in incoming) {
       final memberState = (raw['state'] ?? requireState).toString().trim();
-      if (memberState.toLowerCase() != stateKey) {
+      if (memberState.isNotEmpty &&
+          !NgmyCivicRegistryStats.statesMatch(memberState, stateWanted) &&
+          !NgmyCivicRegistryStats.statesMatch(memberState, requireState)) {
         skipped++;
         continue;
       }
 
-      final email = emailKey((raw['email'] ?? '').toString());
+      final emailRaw = emailKey((raw['email'] ?? '').toString());
       final registryId = (raw['registryId'] ?? '').toString().trim();
       final fullName = (raw['fullName'] ?? '').toString();
       final phone = (raw['phone'] ?? '').toString();
@@ -1654,54 +1670,105 @@ class NgmyCivicRegistryMembers {
       final dob = (raw['dob'] ?? '').toString();
       final city = (raw['city'] ?? '').toString();
 
-      var key = email;
+      var key = emailRaw;
       if (key.isEmpty) {
         final digits = _phoneKey(phone);
         if (digits.length >= 7) {
           key = 'civic.$digits@guest.ngmy';
-        } else {
+        } else if (registryId.isEmpty) {
           skipped++;
           continue;
         }
       }
 
-      if (findByEmail(config, key) != null) {
-        skipped++;
-        continue;
-      }
-      if (registryId.isNotEmpty && findByRegistryId(config, registryId) != null) {
-        skipped++;
-        continue;
-      }
-      final dup = findDuplicateInRecords(
-        records: listFrom(config),
-        fullName: fullName,
-        dob: dob,
-        city: city,
-        homeAddress: address,
-        phone: phone,
-        excludeEmail: key,
-        excludeRegistryId: registryId,
-      );
-      if (dup != null) {
-        skipped++;
-        continue;
-      }
-
       final record = Map<String, dynamic>.from(raw)
-        ..['email'] = key
-        ..['state'] = requireState.trim();
+        ..['state'] = stateWanted
+        ..['updatedAt'] = now
+        ..['restoredAt'] = now;
+      if (key.isNotEmpty) record['email'] = key;
       if ((record['registryId'] ?? '').toString().trim().isEmpty && registryId.isNotEmpty) {
         record['registryId'] = registryId;
       }
+
+      // Soft-deleted / permanently tombstoned people in the backup must come back.
+      if (key.isNotEmpty || registryId.isNotEmpty) {
+        restoreSoftDeleted(config, email: key, registryId: registryId);
+        _clearTombstone(config, key, registryId: registryId);
+      }
+
+      final existing = (key.isNotEmpty ? findByEmail(config, key) : null) ??
+          (registryId.isNotEmpty ? findByRegistryId(config, registryId) : null) ??
+          findDuplicateInRecords(
+            records: listFrom(config),
+            fullName: fullName,
+            dob: dob,
+            city: city,
+            homeAddress: address,
+            phone: phone,
+            excludeEmail: key,
+            excludeRegistryId: registryId,
+          );
+
+      if (existing != null) {
+        final merged = Map<String, dynamic>.from(existing);
+        for (final e in record.entries) {
+          final v = e.value;
+          if (v == null) continue;
+          if (v is String && v.trim().isEmpty && e.key != 'city' && e.key != 'room') continue;
+          merged[e.key] = v;
+        }
+        merged['state'] = stateWanted;
+        if (key.isNotEmpty) merged['email'] = key;
+        merged['updatedAt'] = now;
+        merged['restoredAt'] = now;
+        if ((merged['registryId'] ?? '').toString().trim().isEmpty && registryId.isNotEmpty) {
+          merged['registryId'] = registryId;
+        }
+        // Mint an ID if a legacy row somehow lost it — otherwise Members prune drops them.
+        if ((merged['registryId'] ?? '').toString().trim().isEmpty) {
+          merged['registryId'] = mintRegistryId(config, stateWanted);
+        }
+
+        final origEmail = emailKey((existing['email'] ?? key).toString());
+        final rid = (merged['registryId'] ?? '').toString();
+        var saved = updateExisting(
+          config,
+          originalEmail: origEmail,
+          registryId: (existing['registryId'] ?? rid).toString(),
+          fields: merged,
+        );
+        if (saved == null) {
+          upsert(config, merged);
+          saved = findByRegistryId(config, rid) ?? findByEmail(config, origEmail) ?? merged;
+        }
+        _clearTombstone(config, emailKey((saved['email'] ?? '').toString()), registryId: rid);
+        updated++;
+        restored.add(Map<String, dynamic>.from(saved));
+        continue;
+      }
+
+      if ((record['registryId'] ?? '').toString().trim().isEmpty) {
+        record['registryId'] = mintRegistryId(config, stateWanted);
+      }
+      if ((record['email'] ?? '').toString().trim().isEmpty && key.isNotEmpty) {
+        record['email'] = key;
+      }
       upsert(config, record);
-      restored.add(Map<String, dynamic>.from(listFrom(config).firstWhere(
-        (m) => emailKey((m['email'] ?? '').toString()) == key,
-        orElse: () => record,
-      )));
+      _clearTombstone(
+        config,
+        emailKey((record['email'] ?? '').toString()),
+        registryId: (record['registryId'] ?? '').toString(),
+      );
+      restored.add(Map<String, dynamic>.from(
+        findByRegistryId(config, (record['registryId'] ?? '').toString()) ??
+            (key.isNotEmpty ? findByEmail(config, key) : null) ??
+            record,
+      ));
       added++;
     }
-    return (added: added, skipped: skipped, restored: restored);
+
+    clearSoftDeletesForActiveMembers(config);
+    return (added: added, updated: updated, skipped: skipped, restored: restored);
   }
 
   static DateTime? _memberStamp(Map<String, dynamic> m) {
@@ -1724,15 +1791,35 @@ class NgmyCivicRegistryMembers {
 
   static int _memberDetailScore(Map<String, dynamic> m) {
     var score = 0;
-    if ((m['phone'] ?? '').toString().trim().isNotEmpty) score += 2;
-    if ((m['homeAddress'] ?? '').toString().trim().isNotEmpty) score += 2;
-    if ((m['dob'] ?? '').toString().trim().isNotEmpty) score += 2;
+    if (!_isPlaceholderValue(m['phone'])) score += 2;
+    if (!_isPlaceholderValue(m['homeAddress'])) score += 2;
+    if (!_isPlaceholderValue(m['dob'])) score += 2;
+    if (!_isPlaceholderValue(m['fullName'])) score += 1;
+    if (!_isPlaceholderValue(m['state'])) score += 3;
+    if (!_isPlaceholderValue(m['email'])) score += 2;
     if ((m['idPhoto'] ?? '').toString().trim().isNotEmpty) score += 1;
     return score;
   }
 
+  static bool _isPlaceholderValue(dynamic v) {
+    final s = (v ?? '').toString().trim();
+    if (s.isEmpty) return true;
+    if (s == '***') return true;
+    if (s.contains('***')) return true;
+    return false;
+  }
+
+  /// True only for privacy-redacted cloud rows (not merely incomplete local rows).
   static bool _isSanitizedMemberRow(Map<String, dynamic> m) {
-    return (m['email'] ?? '').toString().contains('***');
+    final email = (m['email'] ?? '').toString();
+    final state = (m['state'] ?? '').toString().trim();
+    final phone = (m['phone'] ?? '').toString().trim();
+    final name = (m['fullName'] ?? '').toString().trim();
+    if (email.contains('***')) return true;
+    if (state == '***') return true;
+    if (phone == '***') return true;
+    if (name == '***') return true;
+    return false;
   }
 
   static Map<String, dynamic> _mergeMemberRow(Map<String, dynamic> a, Map<String, dynamic> b) {
@@ -1759,13 +1846,91 @@ class NgmyCivicRegistryMembers {
       ]) {
         final v = b[key];
         if (v == null) continue;
+        if (_isPlaceholderValue(v)) continue;
         if (v is String && v.trim().isEmpty) continue;
         merged[key] = v;
       }
-      return _preferNewerMember(a, merged);
+      return _keepCriticalMemberFields(_preferNewerMember(a, merged), a, b);
     }
-    if (_isSanitizedMemberRow(a) && !_isSanitizedMemberRow(b)) return b;
-    return _preferNewerMember(a, b);
+    if (_isSanitizedMemberRow(a) && !_isSanitizedMemberRow(b)) {
+      return _keepCriticalMemberFields(Map<String, dynamic>.from(b), a, b);
+    }
+    return _keepCriticalMemberFields(_preferNewerMember(a, b), a, b);
+  }
+
+  /// Never let a cloud merge wipe registryId / state / contact — that made members
+  /// vanish from Members after edit or after a partial roster hydrate.
+  static Map<String, dynamic> _keepCriticalMemberFields(
+    Map<String, dynamic> preferred,
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    final out = Map<String, dynamic>.from(preferred);
+    for (final key in const [
+      'registryId',
+      'state',
+      'email',
+      'phone',
+      'homeAddress',
+      'fullName',
+      'dob',
+      'city',
+      'room',
+      'enrolledAt',
+    ]) {
+      if (!_isPlaceholderValue(out[key])) continue;
+      if (!_isPlaceholderValue(a[key])) {
+        out[key] = a[key];
+      } else if (!_isPlaceholderValue(b[key])) {
+        out[key] = b[key];
+      }
+    }
+    return out;
+  }
+
+  /// Repair rows corrupted by older admin hydrates that wrote state/name as "***".
+  /// Returns how many rows were fixed. [fallbackState] is used when state is poisoned.
+  static int repairRedactedFields(dynamic config, {String fallbackState = ''}) {
+    final members = listFrom(config);
+    var fixed = 0;
+    final next = <Map<String, dynamic>>[];
+    for (final raw in members) {
+      final m = Map<String, dynamic>.from(raw);
+      var changed = false;
+      if (_isPlaceholderValue(m['state'])) {
+        final fb = fallbackState.trim();
+        if (fb.isNotEmpty) {
+          m['state'] = fb;
+          changed = true;
+        }
+      }
+      for (final key in const ['fullName', 'city', 'room', 'phone', 'homeAddress', 'dob']) {
+        if (_isPlaceholderValue(m[key])) {
+          m[key] = '';
+          changed = true;
+        }
+      }
+      if (_isPlaceholderValue(m['email'])) {
+        // Keep registryId-based identity; mint a stable guest email if needed.
+        final rid = (m['registryId'] ?? '').toString().trim();
+        final digits = _phoneKey((m['phone'] ?? '').toString());
+        if (digits.length >= 7) {
+          m['email'] = 'civic.$digits@guest.ngmy';
+          changed = true;
+        } else if (rid.isNotEmpty) {
+          m['email'] = 'civic.${rid.toLowerCase()}@guest.ngmy';
+          changed = true;
+        }
+      }
+      if (changed) {
+        m['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+        m['repairedRedactionAt'] = m['updatedAt'];
+        fixed++;
+      }
+      next.add(m);
+    }
+    if (fixed > 0) setList(config, next);
+    return fixed;
   }
 
   static void applyPayload(dynamic config, Map<String, dynamic> payload) {
@@ -1803,8 +1968,7 @@ class NgmyCivicRegistryMembers {
     }
 
     bool softDeleteSuperseded(Map<String, dynamic> tomb) {
-      if (tomb['permanent'] == true) return false;
-      if (tomb['softDelete'] != true) return false;
+      if (tomb['softDelete'] != true && tomb['permanent'] != true) return false;
       final email = emailKey((tomb['email'] ?? '').toString());
       final rid = (tomb['registryId'] ?? '').toString().trim().toUpperCase();
       final live = (email.isNotEmpty ? liveByEmail[email] : null) ??
@@ -1812,10 +1976,10 @@ class NgmyCivicRegistryMembers {
       if (live == null) return false;
       final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
       final updatedAt = _memberStamp(live);
-      // Restored member (or any newer roster row) wins over soft-delete tombstone.
+      // Restored member (or any newer roster row) wins over soft-delete / permanent tombstone.
+      if ((live['restoredAt'] ?? '').toString().trim().isNotEmpty) return true;
       if (removedAt == null) return true;
       if (updatedAt != null && !updatedAt.isBefore(removedAt)) return true;
-      if ((live['restoredAt'] ?? '').toString().trim().isNotEmpty) return true;
       return false;
     }
 
@@ -1894,6 +2058,7 @@ class NgmyCivicRegistryMembers {
         config,
         remoteMembers.where((m) => _mergeKey(m).isNotEmpty && !isTombstoned(m) && !isDeceasedRow(m)).toList(),
       );
+      clearSoftDeletesForActiveMembers(config);
       return;
     }
 
@@ -1909,6 +2074,7 @@ class NgmyCivicRegistryMembers {
     }
 
     setList(config, merged.values.toList());
+    clearSoftDeletesForActiveMembers(config);
   }
 
   static Future<void> saveLocalBackup(dynamic config) async {

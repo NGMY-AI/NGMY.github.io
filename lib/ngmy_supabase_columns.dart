@@ -3,22 +3,20 @@
 class NgmySupabaseColumns {
   NgmySupabaseColumns._();
 
-  /// Periodic config poll — public fields only (PII via Edge privateListsFetch).
+  /// Periodic config poll — public fields only (PII via Edge / local).
   static const configPoll =
       'id,ngmyChatClosed,investmentPlans,storeListings,'
       'ngmyPopups,ngmyVideoPopups,'
       'civicSelfEnrollmentEnabled,'
-      'openedContributionReceiptKeys,dismissedContributionReceiptKeys,storeSellAccessEmails,'
+      'openedContributionReceiptKeys,dismissedContributionReceiptKeys,'
       'gameTimeLimits,diceSettings,'
-      'familyTreeCreateFee,familyTreePhotoMonthlyFee,logoUrl,'
-      'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
+      'familyTreeCreateFee,familyTreePhotoMonthlyFee,logoUrl';
 
   static const configBootstrapCore =
       'id,investmentPlans,ngmyChatClosed,civicSelfEnrollmentEnabled,'
-      'storeSellAccessEmails,openedContributionReceiptKeys,'
+      'openedContributionReceiptKeys,'
       'dismissedContributionReceiptKeys,familyTreeCreateFee,familyTreePhotoMonthlyFee,'
-      'gameTimeLimits,diceSettings,officialCashApp,officialBitcoin,'
-      'loanPhone,loanHowItWorks,loanCompanyZelle';
+      'gameTimeLimits,diceSettings';
 
   static const configBootstrapHeavy =
       'storeListings,ngmyPopups,ngmyVideoPopups,'
@@ -27,8 +25,7 @@ class NgmySupabaseColumns {
   /// Safe fallback when a column list fails — never select('*').
   static const configSafeFallback =
       'id,ngmyChatClosed,investmentPlans,civicSelfEnrollmentEnabled,storeListings,'
-      'ngmyPopups,ngmyVideoPopups,'
-      'officialCashApp,officialBitcoin,loanPhone,loanHowItWorks,loanCompanyZelle';
+      'ngmyPopups,ngmyVideoPopups';
 
   /// Deprecated: API keys must not be selected by clients.
   static const geminiOnly = 'id';

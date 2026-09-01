@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_oauth_host_stub.dart' if (dart.library.html) 'ngmy_oauth_host_web.dart';
 import 'ngmy_oauth_nav_stub.dart' if (dart.library.html) 'ngmy_oauth_nav_web.dart';
 import 'ngmy_supabase_config.dart';
+import 'ngmy_web_rest_proxy.dart';
 
 /// Canonical production URLs — add both in Supabase Auth → Redirect URLs.
 const String kNgmyOAuthRedirectUrl = 'https://ngmy.org/';
@@ -127,6 +128,7 @@ Future<void> ngmyEnsureSupabaseAuthInitialized() async {
     await Supabase.initialize(
       url: kNgmySupabaseUrl,
       anonKey: kNgmySupabaseAnonKey,
+      httpClient: kIsWeb ? NgmyWebRestProxyClient() : null,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
         detectSessionInUri: true,

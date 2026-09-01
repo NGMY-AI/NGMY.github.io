@@ -810,21 +810,21 @@ Future<List<FamilyTree>> loadFamilyTrees(String userEmail) async {
     await _persistFamilyTreesLocally(userEmail, merged);
   }
   final ownedWritable = merged.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
-  if (ownedWritable.isNotEmpty && local.isNotEmpty && remote.isEmpty) {
+  // Always push owned trees after merge so phone B gets what phone A saved (and vice versa).
+  if (ownedWritable.isNotEmpty) {
     unawaited(_upsertFamilyTreesCloud(userEmail, ownedWritable));
   }
   return merged;
 }
 
-Future<void> saveFamilyTrees(
+Future<bool> saveFamilyTrees(
   String userEmail,
   List<FamilyTree> trees,
 ) async {
   await _persistFamilyTreesLocally(userEmail, trees);
   final writable = trees.where((t) => familyTreeCanWriteCloud(t, userEmail)).toList();
-  if (writable.isNotEmpty) {
-    await _upsertFamilyTreesCloud(userEmail, writable);
-  }
+  if (writable.isEmpty) return true;
+  return _upsertFamilyTreesCloud(userEmail, writable);
 }
 
 Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
@@ -858,7 +858,10 @@ Future<void> upsertFamilyTree(String userEmail, FamilyTree tree) async {
   }
   await _persistFamilyTreesLocally(userEmail, list);
   if (familyTreeCanWriteCloud(normalized, userEmail)) {
-    unawaited(_upsertFamilyTreeCloud(familyTreeOwnerEmail(normalized, userEmail), normalized));
+    final ok = await _upsertFamilyTreeCloud(familyTreeOwnerEmail(normalized, userEmail), normalized);
+    if (!ok) {
+      debugPrint('[family_trees] cloud save failed for ${normalized.id} — run supabase/family_trees_table.sql if table is missing');
+    }
   }
 }
 
@@ -1079,6 +1082,37 @@ Future<void> restoreFamilyTreeMerged(
 
 Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
   final now = DateTime.now().toUtc().toIso8601String();
+  final owner = _normalizedEmail(userEmail);
+  final membersJson = tree.members.map(familyMemberToCloudJson).toList();
+  return {
+    'id': tree.id,
+    'userEmail': owner,
+    'name': tree.name,
+    'code': tree.code,
+    'isPrivate': tree.isPrivate,
+    'collaboratorEmails': tree.collaboratorEmails,
+    'members': membersJson,
+    'visibleChildrenPerParent': tree.visibleChildrenPerParent,
+    'payload': {
+      'id': tree.id,
+      'name': tree.name,
+      'code': tree.code,
+      'isPrivate': tree.isPrivate,
+      'collaboratorEmails': tree.collaboratorEmails,
+      'members': membersJson,
+      'visibleChildrenPerParent': tree.visibleChildrenPerParent,
+      'ownerEmail': owner,
+      'createdAt': tree.createdAt.toUtc().toIso8601String(),
+      'updatedAt': now,
+    },
+    'createdAt': tree.createdAt.toUtc().toIso8601String(),
+    'updatedAt': now,
+  };
+}
+
+/// Core columns only — fallback when an older DB is missing optional columns.
+Map<String, dynamic> _familyTreeRowCompat(FamilyTree tree, String userEmail) {
+  final now = DateTime.now().toUtc().toIso8601String();
   return {
     'id': tree.id,
     'userEmail': _normalizedEmail(userEmail),
@@ -1087,15 +1121,29 @@ Map<String, dynamic> _familyTreeRow(FamilyTree tree, String userEmail) {
     'isPrivate': tree.isPrivate,
     'collaboratorEmails': tree.collaboratorEmails,
     'members': tree.members.map(familyMemberToCloudJson).toList(),
-    'visibleChildrenPerParent': tree.visibleChildrenPerParent,
     'createdAt': tree.createdAt.toUtc().toIso8601String(),
     'updatedAt': now,
   };
 }
 
 FamilyTree _familyTreeFromRow(Map<String, dynamic> row, String forUserEmail) {
-  final payload = Map<String, dynamic>.from(row);
-  if (payload['members'] is! List && row['data'] is Map) {
+  final payload = row['payload'];
+  if (payload is Map) {
+    final fromPayload = FamilyTree.fromJson(Map<String, dynamic>.from(payload));
+    if (fromPayload.id.isNotEmpty && fromPayload.members.isNotEmpty) {
+      final rowOwner = _normalizedEmail((row['userEmail'] ?? fromPayload.ownerEmail).toString());
+      final me = _normalizedEmail(forUserEmail);
+      final collabs = fromPayload.collaboratorEmails
+          .map(_normalizedEmail)
+          .where((e) => e.isNotEmpty)
+          .toList();
+      final role = me == rowOwner
+          ? FamilyTreeAccessRole.owner
+          : (collabs.contains(me) ? FamilyTreeAccessRole.editor : FamilyTreeAccessRole.viewer);
+      return fromPayload.copyWith(ownerEmail: rowOwner, localRole: role);
+    }
+  }
+  if (row['members'] is! List && row['data'] is Map) {
     return FamilyTree.fromJson(Map<String, dynamic>.from(row['data'] as Map));
   }
   final rawMembers = row['members'];
@@ -1130,11 +1178,18 @@ FamilyTree _familyTreeFromRow(Map<String, dynamic> row, String forUserEmail) {
 }
 
 bool _familyTreesTableMissing(Object error) {
-  return error.toString().contains("Could not find the table 'public.family_trees'");
+  final s = error.toString();
+  return s.contains("Could not find the table 'public.family_trees'") ||
+      s.contains('relation "public.family_trees" does not exist');
+}
+
+bool _familyTreesColumnMissing(Object error) {
+  final s = error.toString().toLowerCase();
+  return s.contains('column') && (s.contains('does not exist') || s.contains('schema cache'));
 }
 
 Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
-  if (!await ngmyCanReachCloud()) return null;
+  // Do not gate on reachability probe — false negatives left other phones empty.
   final email = _normalizedEmail(userEmail);
   if (email.isEmpty) return null;
   try {
@@ -1164,7 +1219,7 @@ Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
       debugPrint('[family_trees] public fetch: $e');
     }
     final byId = <String, Map<String, dynamic>>{};
-    for (final row in [...(ownedRows as List), ...(collabRows as List), ...(publicRows as List)]) {
+    for (final row in [...(ownedRows as List), ...collabRows, ...publicRows]) {
       if (row is Map) {
         final map = Map<String, dynamic>.from(row);
         final id = (map['id'] ?? '').toString();
@@ -1234,7 +1289,6 @@ Future<void> _persistFamilyTreesLocally(String userEmail, List<FamilyTree> trees
 }
 
 Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
-  if (!await ngmyCanReachCloud()) return false;
   try {
     await Supabase.instance.client
         .from('family_trees')
@@ -1244,15 +1298,27 @@ Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
   } catch (e) {
     if (_familyTreesTableMissing(e)) {
       debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
-    } else {
-      debugPrint('[family_trees] upsert error: $e');
+      return false;
     }
+    if (_familyTreesColumnMissing(e)) {
+      try {
+        await Supabase.instance.client
+            .from('family_trees')
+            .upsert(_familyTreeRowCompat(tree, userEmail))
+            .timeout(kNgmyCloudWriteTimeout);
+        return true;
+      } catch (e2) {
+        debugPrint('[family_trees] upsert compat error: $e2');
+        return false;
+      }
+    }
+    debugPrint('[family_trees] upsert error: $e');
     return false;
   }
 }
 
 Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) async {
-  if (trees.isEmpty || !await ngmyCanReachCloud()) return false;
+  if (trees.isEmpty) return false;
   try {
     final rows = trees
         .map((t) => _familyTreeRow(t, familyTreeOwnerEmail(t, userEmail)))
@@ -1262,15 +1328,27 @@ Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) a
   } catch (e) {
     if (_familyTreesTableMissing(e)) {
       debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
-    } else {
-      debugPrint('[family_trees] bulk upsert error: $e');
+      return false;
     }
+    if (_familyTreesColumnMissing(e)) {
+      try {
+        final rows = trees
+            .map((t) => _familyTreeRowCompat(t, familyTreeOwnerEmail(t, userEmail)))
+            .toList();
+        await Supabase.instance.client.from('family_trees').upsert(rows).timeout(kNgmyCloudWriteTimeout);
+        return true;
+      } catch (e2) {
+        debugPrint('[family_trees] bulk upsert compat error: $e2');
+        return false;
+      }
+    }
+    debugPrint('[family_trees] bulk upsert error: $e');
     return false;
   }
 }
 
 Future<void> _deleteFamilyTreeCloud(String treeId) async {
-  if (treeId.isEmpty || !await ngmyCanReachCloud()) return;
+  if (treeId.isEmpty) return;
   try {
     await Supabase.instance.client.from('family_trees').delete().eq('id', treeId);
   } catch (e) {

@@ -9,6 +9,111 @@ function ngmySwBasePath() {
 const SCOPE_PATH = ngmySwBasePath();
 const CACHE_NAME = CACHE_PREFIX + '__NGMY_DEPLOY_ID__';
 
+/** Same-origin proxy target — never appears in the browser as bright-handler. */
+const NGMY_EDGE_UPSTREAM =
+  'https://gvufllqqxjnpicmkxzcg.supabase.co/functions/v1/bright-handler';
+const NGMY_REST_UPSTREAM =
+  'https://gvufllqqxjnpicmkxzcg.supabase.co/rest/v1';
+const NGMY_SUPABASE_ANON =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM';
+
+/** ngmy_settings keys that must never download via REST (legacy rows may hold PII). */
+const NGMY_SENSITIVE_SETTINGS_KEYS = new Set([
+  'civic_self_enrollment_settings',
+  'civic_cities_rooms',
+  'civic_help_mode_settings',
+  'civic_deleted_contribution_ids',
+  'civic_contribution_receipt_removed',
+  'civic_registry_members',
+  'civic_registry_pins',
+  'civic_state_registrar_subscriptions',
+  'store_sell_access_emails',
+  'management_operational_lists',
+  'family_tree_photo_access',
+  'civic_help_campaign_spendings',
+  'game_invites',
+  'store_inquiries',
+  'store_orders',
+  'media_virtual_profiles',
+  'ngmy_family_tree_backup_codes_v1',
+  'ngmy_family_tree_qr_stashes_v1',
+]);
+
+function ngmyIsApiSyncPath(url) {
+  return url.pathname === '/api/sync' || url.pathname.endsWith('/api/sync');
+}
+
+function ngmyIsApiRestPath(url) {
+  return url.pathname.indexOf('/api/rest/v1') !== -1;
+}
+
+function ngmyRestUpstreamUrl(url) {
+  var idx = url.pathname.indexOf('/api/rest/v1');
+  var suffix = url.pathname.substring(idx + '/api/rest/v1'.length);
+  return NGMY_REST_UPSTREAM + suffix + url.search;
+}
+
+function ngmySensitiveSettingsKey(url) {
+  if (url.pathname.indexOf('ngmy_settings') === -1) return '';
+  var params = url.searchParams;
+  var raw = params.get('key') || '';
+  if (raw.indexOf('eq.') === 0) raw = raw.substring(3);
+  try {
+    raw = decodeURIComponent(raw);
+  } catch (_) {}
+  return raw.trim();
+}
+
+function ngmyBlockSensitiveSettingsGet(request, url) {
+  if (request.method !== 'GET') return null;
+  var key = ngmySensitiveSettingsKey(url);
+  if (!key) return null;
+  if (key.indexOf('civic_') === 0 || NGMY_SENSITIVE_SETTINGS_KEYS.has(key)) {
+    return new Response('[]', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  return null;
+}
+
+async function ngmyProxyApiSync(request) {
+  var headers = new Headers(request.headers);
+  if (!headers.get('apikey')) headers.set('apikey', NGMY_SUPABASE_ANON);
+  if (!headers.get('content-type')) headers.set('content-type', 'application/json');
+  var body = await request.text();
+  var res = await fetch(NGMY_EDGE_UPSTREAM, {
+    method: 'POST',
+    headers: headers,
+    body: body,
+  });
+  var text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+async function ngmyProxyApiRest(request) {
+  var url = new URL(request.url);
+  var blocked = ngmyBlockSensitiveSettingsGet(request, url);
+  if (blocked) return blocked;
+
+  var headers = new Headers(request.headers);
+  if (!headers.get('apikey')) headers.set('apikey', NGMY_SUPABASE_ANON);
+  var upstream = ngmyRestUpstreamUrl(url);
+  var init = {
+    method: request.method,
+    headers: headers,
+  };
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    init.body = await request.clone().arrayBuffer();
+  }
+  var res = await fetch(upstream, init);
+  return res;
+}
+
 const PRECACHE_URLS = __NGMY_PRECACHE_URLS__;
 
 const CRITICAL_OFFLINE_URLS = [
@@ -372,9 +477,22 @@ self.addEventListener('message', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  var url = new URL(event.request.url);
+
+  // POST /api/sync — same-origin proxy; DevTools never shows bright-handler.
+  if (event.request.method === 'POST' && url.origin === self.location.origin && ngmyIsApiSyncPath(url)) {
+    event.respondWith(ngmyProxyApiSync(event.request));
+    return;
+  }
+
+  // /api/rest/v1/* — same-origin PostgREST proxy (hides supabase.co URLs).
+  if (url.origin === self.location.origin && ngmyIsApiRestPath(url)) {
+    event.respondWith(ngmyProxyApiRest(event.request));
+    return;
+  }
+
   if (event.request.method !== 'GET') return;
 
-  const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
   if (!isInScope(url)) return;
 

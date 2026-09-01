@@ -2712,7 +2712,14 @@ Future<void> _mergeCivicCitiesAndRoomsIntoConfig(AppConfig config) async {
   if (email.isEmpty) return;
   try {
     final data = await ngmyCivicFetchCitiesRooms(email: email);
-    if (data == null || data['ok'] != true) return;
+    if (data == null || data['ok'] != true) {
+      await _hydrateCivicCitiesAndRoomsFromLocalBackup(config);
+      return;
+    }
+    if (data['networkEmpty'] == true) {
+      await _hydrateCivicCitiesAndRoomsFromLocalBackup(config);
+      return;
+    }
     final remoteByState = NgmyCivicRegistryStats.parseCivicCitiesByState(data['civicCitiesByState']);
     if (remoteByState.isNotEmpty) {
       config.civicCitiesByState =
@@ -2923,7 +2930,9 @@ UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> 
   u.phone = (m['phone'] ?? u.phone).toString();
   u.city = (m['city'] ?? '').toString();
   u.room = (m['room'] ?? '').toString();
-  u.state = (m['state'] ?? u.state).toString();
+  // Prefer non-empty registry state — empty string must not wipe a valid account state.
+  final memberState = (m['state'] ?? '').toString().trim();
+  u.state = memberState.isNotEmpty ? memberState : u.state;
   u.helps = m['helps'] is num ? (m['helps'] as num).toInt() : u.helps;
   u.missed = m['missed'] is num ? (m['missed'] as num).toInt() : u.missed;
   return u;
@@ -3863,13 +3872,9 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
   _mergeRegistrarApplicationsIntoConfig(config, await _fetchRemoteCivicRegistrarApplications());
   var row = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
-    // PII lists (inquiries/orders/loans/games/…) — Edge privateLists only
+    // PII lists (cities/emails/help) stay off public config — Edge / local only
     'storeListings': config.storeListings,
-    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
-    'cities': config.cities,
-    'rooms': config.rooms,
-    'storeSellAccessEmails': config.storeSellAccessEmails,
     'ngmyPopups': config.ngmyPopups,
     'ngmyVideoPopups': config.ngmyVideoPopups,
     'familyTreeCreateFee': config.familyTreeCreateFee,
@@ -5416,12 +5421,22 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
 }
 
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
+  // Never download civic geography / help / email blobs into the Network tab.
+  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) {
+    debugPrint('[ngmy_settings] blocked sensitive fetch: $key');
+    return null;
+  }
   if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
     final email = ngmyCurrentAuthEmail();
     if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
   }
   try {
-    final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle().timeout(kNgmyCloudLoadTimeout);
+    final row = await Supabase.instance.client
+        .from('ngmy_settings')
+        .select('value')
+        .eq('key', key)
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
     if (row == null) return null;
     final value = row['value'];
     if (value is Map) return Map<String, dynamic>.from(value);
@@ -8379,7 +8394,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return;
   }
 
-  Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 10000}) async {
+  Future<List<AppTransaction>> _fetchAdminTransactionsFromCloud({int limit = 0}) async {
     final email = ngmyCurrentAuthEmail();
     if (email.isEmpty || !ngmyEmailIsAdmin(email)) return const [];
     try {
@@ -8660,7 +8675,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
 
       final remoteTransactions = await _fetchAdminTransactionsFromCloud(
-        limit: lightweight ? 800 : 10000,
+        limit: lightweight ? 800 : 0,
       );
       if (remoteTransactions.isNotEmpty || !lightweight) {
         _allTransactions = _mergeTransactionsWithRemote(
@@ -9591,12 +9606,28 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final email = _currentUser!.email.trim();
       if (email.isEmpty) return;
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
-      final photoRow = await supabase
-          .from('users')
-          .select('profilePicturePath')
-          .eq('email', email)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
+      if (!kIsWeb) {
+        final photoRow = await supabase
+            .from('users')
+            .select('profilePicturePath')
+            .eq('email', email)
+            .maybeSingle()
+            .timeout(kNgmyCloudLoadTimeout);
+        if (photoRow != null && mounted) {
+          final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
+          if (_ngmyIsCloudProfilePhoto(cloudPhoto)) {
+            setState(() {
+              _currentUser!.profilePicturePath = cloudPhoto;
+              final key = email.toLowerCase().trim();
+              final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
+              if (idx >= 0) _allUsers[idx].profilePicturePath = cloudPhoto;
+            });
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
+            await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+          }
+        }
+      }
       // Registrar status sync — only while Civic Registry is on screen (avoids bright-handler PII polls).
       final localRegistrarStatus = _registrarApplicationStatusForEmail(_config, email);
       if ((_currentUser!.isAuthorizedRegistrar || localRegistrarStatus != null) &&
@@ -9621,18 +9652,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         }
       }
-      if (photoRow == null || !mounted) return;
-      final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
-      if (!_ngmyIsCloudProfilePhoto(cloudPhoto)) return;
-      setState(() {
-        _currentUser!.profilePicturePath = cloudPhoto;
-        final key = email.toLowerCase().trim();
-        final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
-        if (idx >= 0) _allUsers[idx].profilePicturePath = cloudPhoto;
-      });
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('current_user', jsonEncode(_currentUser!.toJson()));
-      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
     } catch (e) {
       debugPrint('[user] profile refresh from cloud: $e');
     }
@@ -9864,29 +9883,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startAdminUsersPoll() {
     _adminUsersPoll?.cancel();
-    if (!_ngmySessionIsAdmin(_currentUser)) return;
-    if (!NgmyFeatureSyncSession.adminDashboardActive) return;
-    unawaited(_refreshAdminUsersFromCloud());
-    _adminUsersPoll = Timer.periodic(const Duration(minutes: 2), (_) {
-      if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
-      unawaited(_refreshAdminUsersFromCloud());
-    });
+    // Admin directory uses local cache — server fetch is networkEmpty by design.
+    // No periodic Edge polls (they only filled DevTools with adminUsersList noise).
   }
 
   Future<void> _refreshAdminUsersFromCloud() async {
     if (!_ngmySessionIsAdmin(_currentUser)) return;
-    if (!await ngmyCanReachCloud()) return;
+    if (!NgmyFeatureSyncSession.adminDashboardActive) return;
+    // Skip Edge adminUsersList — ack-only on wire; roster comes from local prefs.
     final localUsersBeforeFetch = <String, UserData>{
       for (final u in _allUsers) u.email.toLowerCase().trim(): u,
     };
     try {
-      final remote = await _fetchAllUsersFromCloud();
-      if (remote.isNotEmpty) {
-        _allUsers = _mergeAllUsersWithRemote(localUsersBeforeFetch, remote);
-      } else {
-        _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, localUsersBeforeFetch.values.toList());
-      }
-      await _discoverUsersFromCloudActivityIntoAllUsers();
+      _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, localUsersBeforeFetch.values.toList());
       _mergeUsersDiscoveredFromTransactions(_allUsers, _allTransactions);
       _allUsers = ngmyApplyAdminAccountActionsToUsers(_config, _allUsers);
       ngmyHydrateAppLoginUserRegistry(_allUsers);
@@ -9895,7 +9904,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (mounted) setState(() {});
       NgmyAdminLiveRefresh.notify();
     } catch (e) {
-      debugPrint('[admin] users poll: $e');
+      debugPrint('[admin] users refresh: $e');
     }
   }
 
@@ -11891,7 +11900,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (key == _kNgmyCivicSelfEnrollmentSettingsKey) {
         final value = payload.newRecord['value'];
         if (value is Map) {
-          setState(() => NgmyCivicSelfEnrollment.applyPayload(_config, Map<String, dynamic>.from(value), force: true));
+          // Only apply the boolean — ignore any legacy cities/rooms in the realtime payload.
+          final flagOnly = <String, dynamic>{
+            'civicSelfEnrollmentEnabled': value['civicSelfEnrollmentEnabled'] == true,
+            if (value['savedAt'] != null) 'savedAt': value['savedAt'],
+          };
+          setState(() => NgmyCivicSelfEnrollment.applyPayload(_config, flagOnly, force: true));
           unawaited(NgmyCivicSelfEnrollment.saveLocalBackup(_config));
           unawaited(ngmyFlushCriticalConfigLocalAndCloud(_config, cloud: false));
           NgmyAdminLiveRefresh.notify();
@@ -12674,7 +12688,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             debugPrint('[admin] bootstrap users cache: $e');
             _allUsers = localUsersBeforeFetch.values.toList();
           }
-        } else if (sessionEmail.isNotEmpty) {
+        } else if (sessionEmail.isNotEmpty && !kIsWeb) {
           try {
             final row = await supabase
                 .from('users')
@@ -31591,7 +31605,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final femalesRaw = raw?['familyFemales'];
     final malesStr = malesRaw is num ? '${malesRaw.toInt()}' : (malesRaw?.toString() ?? '').trim();
     final femalesStr = femalesRaw is num ? '${femalesRaw.toInt()}' : (femalesRaw?.toString() ?? '').trim();
-    final state = (raw?['state'] ?? u.state).toString().trim();
+    final stateRaw = (raw?['state'] ?? u.state).toString().trim();
+    final state = (stateRaw == '***' || stateRaw.contains('***')) ? '' : stateRaw;
     final phoneDigits = (raw?['phone'] ?? u.phone).toString().replaceAll(RegExp(r'\D'), '');
     final registryId = (raw?['registryId'] ?? u.registryId ?? '').toString().trim();
 
@@ -31599,18 +31614,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _editingMemberOriginalEmail = NgmyCivicRegistryMembers.emailKey(
         (raw?['email'] ?? u.email).toString(),
       );
+      // Never load a redacted "***" email into the form.
+      final formEmail = (raw?['email'] ?? u.email).toString();
       _editingMemberRegistryId = registryId;
       _enrollmentFlags = ngmyReadProfileFlags(raw);
       if (state.isNotEmpty) _selectedState = state;
       _fullNameC.text = (raw?['fullName'] ?? u.fullName ?? u.username).toString();
+      if (_fullNameC.text.trim() == '***') {
+        _fullNameC.text = (u.fullName ?? u.username).toString();
+      }
       _dobC.text = (raw?['dob'] ?? u.dob ?? '').toString();
       _idTypeC.text = idTypes.contains(idType) ? idType : (idType.isEmpty ? 'National ID' : idType);
       if (!idTypes.contains(_idTypeC.text)) _idTypeC.text = 'National ID';
       _addressC.text = (raw?['homeAddress'] ?? u.homeAddress ?? '').toString();
       _phoneC.text = ngmyFormatPhoneDisplay(phoneDigits);
-      _emailC.text = (raw?['email'] ?? u.email).toString();
+      _emailC.text = formEmail.contains('***') ? '' : formEmail;
       _cityC.text = (raw?['city'] ?? u.city ?? '').toString();
+      if (_cityC.text.trim() == '***') _cityC.text = (u.city ?? '').toString();
       _roomC.text = (raw?['room'] ?? u.room ?? '').toString();
+      if (_roomC.text.trim() == '***') _roomC.text = (u.room ?? '').toString();
       _familyMembersC.text = familyStr;
       _familyMalesC.text = malesStr;
       _familyFemalesC.text = femalesStr;
@@ -31893,7 +31915,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         : (existingFemales is num
             ? existingFemales.toInt()
             : int.tryParse('${existingFemales ?? ''}') ?? 0);
-    final registryId = (existing['registryId'] ?? editingRegistryId).toString().trim();
+    final registryIdRaw = (existing['registryId'] ?? editingRegistryId).toString().trim();
+    final registryId = registryIdRaw.isNotEmpty
+        ? registryIdRaw
+        : NgmyCivicRegistryMembers.mintRegistryId(widget.config, _selectedState);
     final originalEmail = NgmyCivicRegistryMembers.emailKey((existing['email'] ?? editingEmail).toString());
 
     if (fullName.isEmpty || !RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
@@ -31952,20 +31977,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    final saveState = () {
+      final selected = _selectedState.trim();
+      if (selected.isNotEmpty && selected != '***') return selected;
+      final existingState = (existing['state'] ?? '').toString().trim();
+      if (existingState.isNotEmpty && existingState != '***') return existingState;
+      return selected;
+    }();
+    final saveEmail = () {
+      if (email.isNotEmpty && !email.contains('***')) return email;
+      final existingEmail = NgmyCivicRegistryMembers.emailKey((existing['email'] ?? '').toString());
+      if (existingEmail.isNotEmpty && !existingEmail.contains('***')) return existingEmail;
+      if (registryId.isNotEmpty) return 'civic.${registryId.toLowerCase()}@guest.ngmy';
+      return email;
+    }();
+    final saveName = fullName.trim() == '***'
+        ? (existing['fullName'] ?? fullName).toString()
+        : fullName;
+    final saveAddress = address.trim() == '***'
+        ? (existing['homeAddress'] ?? address).toString()
+        : address;
+    final savePhone = phone.contains('*')
+        ? (existing['phone'] ?? phone).toString().replaceAll(RegExp(r'\D'), '')
+        : phone;
+    final saveCity = cityFinal.trim() == '***' ? (existing['city'] ?? '').toString() : cityFinal;
+    final saveRoom = roomFinal.trim() == '***' ? (existing['room'] ?? '').toString() : roomFinal;
+
     final updated = NgmyCivicRegistryMembers.updateExisting(
       widget.config,
       originalEmail: originalEmail,
       registryId: registryId,
       fields: {
-        'email': email,
-        'fullName': fullName,
+        'email': saveEmail,
+        'fullName': saveName,
         'dob': dob,
         'idType': idType,
-        'homeAddress': address,
-        'phone': phone,
-        'city': cityFinal,
-        'room': roomFinal,
-        'state': _selectedState,
+        'homeAddress': saveAddress,
+        'phone': savePhone,
+        'city': saveCity,
+        'room': saveRoom,
+        'state': saveState,
+        'registryId': registryId,
         'familyMembers': familyMembers < 1 ? 1 : familyMembers,
         'familyMales': familyMales < 0 ? 0 : familyMales,
         'familyFemales': familyFemales < 0 ? 0 : familyFemales,
@@ -32004,11 +32056,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     // Persist the updated registry row directly — do not rebuild from UserData (that was dropping edits).
     await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
-    final saved = await ngmyPersistCivicRegistryMembers(
-      widget.config,
-      requesterEmail: widget.user.email,
+    // Immediate single-member cloud upsert so hydrate cannot wipe the edit with a stale roster.
+    final upsert = await ngmyCivicUpsertMember(
+      email: widget.user.email,
+      member: Map<String, dynamic>.from(updated),
       state: _selectedState,
     );
+    var saved = upsert.ok;
+    if (!saved) {
+      saved = await ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      );
+    } else {
+      // Background full sync after the member is safely in the database.
+      unawaited(ngmyPersistCivicRegistryMembers(
+        widget.config,
+        requesterEmail: widget.user.email,
+        state: _selectedState,
+      ));
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
@@ -32029,6 +32097,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     widget.onDataChanged();
     if (!mounted) return;
+    setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -32594,11 +32663,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
+    // Fix any rows previously corrupted by redacted cloud hydrates (state became "***").
+    NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: currentState);
+
     final result = NgmyCivicRegistryMembers.importMissingMembers(
       widget.config,
       incoming,
       requireState: currentState,
     );
+    NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: currentState);
     for (final m in result.restored) {
       final email = NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString());
       if (email.isEmpty) continue;
@@ -32621,7 +32694,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     }
 
-    final ok = await ngmyPersistCivicRegistryMembers(widget.config);
+    final ok = await ngmyPersistCivicRegistryMembers(
+      widget.config,
+      requesterEmail: widget.user.email,
+      state: currentState,
+    );
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
@@ -32630,15 +32707,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
     if (!mounted) return;
     setState(() {});
+    final showing = NgmyCivicRegistryMembers.listFrom(widget.config)
+        .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), currentState))
+        .length;
+    final repaired = result.added + result.updated;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          result.added < 1
-              ? 'No new $currentState members to restore — everyone in that file is already enrolled (${result.skipped} skipped).'
-              : 'Restored ${result.added} $currentState member(s)${result.skipped > 0 ? ', skipped ${result.skipped} already enrolled' : ''}. '
-                  'They are back in Members, Search, and Rankings.',
+          repaired < 1
+              ? 'Backup checked — all ${incoming.length} $currentState row(s) already match Members ($showing showing).'
+              : 'Restored $currentState: ${result.added} added, ${result.updated} updated'
+                  '${result.skipped > 0 ? ', ${result.skipped} skipped' : ''}. '
+                  'Now showing $showing member(s) in Members.',
         ),
-        backgroundColor: result.added > 0 ? (ok ? Colors.green : Colors.orange) : Colors.blueGrey,
+        backgroundColor: repaired > 0 ? (ok ? Colors.green : Colors.orange) : Colors.blueGrey,
+        duration: const Duration(seconds: 7),
       ),
     );
   }
@@ -40605,6 +40688,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _membersSection(bool isDark) {
+    // Repair any "***" state left by older admin hydrates before counting/filtering.
+    NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
     final q = _searchQuery.trim();
     final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((u) {
       final stateMatch = NgmyCivicRegistryStats.statesMatch(u.state, _selectedState);

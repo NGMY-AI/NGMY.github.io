@@ -97,6 +97,33 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
     });
   }
 
+  Future<void> _forceCloudSync() async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Syncing family trees with the database…'), duration: Duration(seconds: 2)),
+    );
+    final trees = await loadFamilyTrees(widget.userEmail);
+    final cloudOk = await saveFamilyTrees(widget.userEmail, trees);
+    final after = await loadFamilyTrees(widget.userEmail);
+    if (!mounted) return;
+    setState(() {
+      _trees = after;
+      _loading = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          cloudOk
+              ? 'Family trees synced — ${_trees.length} tree(s) on this phone and in the database.'
+              : 'Could not sync to database. Run supabase/family_trees_table.sql in Supabase, then try again.',
+        ),
+        backgroundColor: cloudOk ? Colors.green : Colors.orange,
+        duration: const Duration(seconds: 5),
+      ),
+    );
+    widget.onChanged();
+  }
+
   Future<void> _createTree() async {
     final result = await showCreateFamilyTreeDialog(context);
     if (result == null || !mounted) return;
@@ -175,7 +202,13 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
             const Spacer(),
             if (_trees.isNotEmpty)
               IconButton(
-                tooltip: 'Sync family trees',
+                tooltip: 'Sync family trees with database',
+                onPressed: () => unawaited(_forceCloudSync()),
+                icon: Icon(Icons.cloud_sync_rounded, color: WorksheetPalette.green),
+              ),
+            if (_trees.isNotEmpty)
+              IconButton(
+                tooltip: 'Transfer / backup file',
                 onPressed: _openSync,
                 icon: Icon(Icons.sync_rounded, color: WorksheetPalette.green),
               ),

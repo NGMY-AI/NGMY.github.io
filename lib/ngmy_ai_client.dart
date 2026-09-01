@@ -7,10 +7,10 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_memory.dart';
+import 'ngmy_edge_invoke.dart';
 
-/// Slug of the Supabase Edge Function that proxies AI calls. Update this if
-/// the function is ever recreated under a different name in the Dashboard.
-const String kNgmySupabaseAiFunction = 'bright-handler';
+/// Re-export for legacy error messages in sibling modules.
+export 'ngmy_edge_invoke.dart' show kNgmySupabaseAiFunction;
 
 /// Sentinel meaning "AI key lives on the server only — never fetch/send the real key".
 const String kNgmyServerManagedAiKey = '__NGMY_SERVER_MANAGED__';
@@ -490,8 +490,8 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
   String? mode,
 }) async {
   try {
-    final client = Supabase.instance.client;
     final body = <String, dynamic>{
+      'action': 'chat',
       'provider': images.isNotEmpty ? NgmyAiProviderKind.gemini.name : provider.name,
       'prompt': prompt,
       if (mode != null && mode.isNotEmpty) 'mode': mode,
@@ -505,56 +505,8 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
                 })
             .toList(),
     };
-
-    // Preferred: Supabase Functions client (handles auth headers).
-    try {
-      final res = await client.functions
-          .invoke(kNgmySupabaseAiFunction, body: body)
-          .timeout(const Duration(seconds: 20));
-      if (res.status == 200) {
-        final data = res.data;
-        if (data is Map) {
-          final text = data['text']?.toString();
-          if (text != null && text.trim().isNotEmpty) {
-            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-          }
-          final err = data['error']?.toString();
-          if (err != null && err.isNotEmpty) return (text: null, error: err);
-        }
-      } else if (res.status == 404) {
-        return (
-          text: null,
-          error: 'AI proxy not deployed yet. Admin: run supabase functions deploy $kNgmySupabaseAiFunction in Supabase.',
-        );
-      } else {
-        return (text: null, error: 'AI proxy HTTP ${res.status}');
-      }
-    } catch (e) {
-      debugPrint('[ngmy-ai] functions.invoke failed: $e');
-    }
-
-    // Fallback: raw HTTP to functions URL.
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 20));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+    final data = await ngmyEdgeInvoke(body);
+    if (data != null) {
       final text = data['text']?.toString();
       if (text != null && text.trim().isNotEmpty) {
         return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
@@ -562,13 +514,7 @@ Future<({String? text, String? error})> _callAiViaSupabaseProxy({
       final err = data['error']?.toString();
       if (err != null && err.isNotEmpty) return (text: null, error: err);
     }
-    if (response.statusCode == 404) {
-      return (
-        text: null,
-        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction Edge Function in Supabase Dashboard.',
-      );
-    }
-    return (text: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
+    return (text: null, error: 'AI proxy unavailable. Try again.');
   } catch (e) {
     debugPrint('[ngmy-ai] proxy error: $e');
     return (text: null, error: _extractApiErrorMessage(e));
@@ -761,42 +707,7 @@ String ngmyGeminiKeyFromMap(Map<String, dynamic>? json) {
 }
 
 Future<Map<String, dynamic>?> _ngmyInvokeBrightHandler(Map<String, dynamic> body) async {
-  try {
-    final client = Supabase.instance.client;
-    try {
-      final res = await client.functions
-          .invoke(kNgmySupabaseAiFunction, body: body)
-          .timeout(const Duration(seconds: 20));
-      if (res.data is Map) return Map<String, dynamic>.from(res.data as Map);
-    } catch (e) {
-      debugPrint('[ngmy-ai] invoke $kNgmySupabaseAiFunction: $e');
-    }
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 20));
-    if (response.body.isEmpty) return null;
-    final data = jsonDecode(response.body);
-    if (data is Map) return Map<String, dynamic>.from(data);
-  } catch (e) {
-    debugPrint('[ngmy-ai] bright-handler HTTP: $e');
-  }
-  return null;
+  return ngmyEdgeInvoke(body);
 }
 
 /// Asks the Edge Function whether a server-side AI key is configured (never returns the key).
@@ -1002,7 +913,6 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
   Duration timeout = const Duration(seconds: 18),
 }) async {
   try {
-    final client = Supabase.instance.client;
     final body = <String, dynamic>{
       'action': action,
       'prompt': prompt.trim(),
@@ -1014,55 +924,23 @@ Future<({Uint8List? bytes, String? error})> _callImageActionViaProxy({
       if (personBytes != null && personBytes.isNotEmpty) 'personOnly': true,
     };
 
-    Future<({Uint8List? bytes, String? error})> parse(dynamic data, int status) async {
-      if (status == 200 && data is Map) {
-        final b64 = data['imageBase64']?.toString();
-        if (b64 != null && b64.trim().isNotEmpty) {
-          return (bytes: base64Decode(b64.trim()), error: null);
-        }
+    Future<({Uint8List? bytes, String? error})> parse(Map<String, dynamic>? data) async {
+      if (data == null) return (bytes: null, error: 'AI image proxy unavailable.');
+      if (data['ok'] == false) {
         final err = data['error']?.toString();
         if (err != null && err.isNotEmpty) return (bytes: null, error: err);
       }
-      if (status == 404) {
-        return (bytes: null, error: 'AI image proxy not deployed.');
+      final b64 = data['imageBase64']?.toString();
+      if (b64 != null && b64.trim().isNotEmpty) {
+        return (bytes: base64Decode(b64.trim()), error: null);
       }
-      return (bytes: null, error: 'AI image proxy HTTP $status');
+      final err = data['error']?.toString();
+      if (err != null && err.isNotEmpty) return (bytes: null, error: err);
+      return (bytes: null, error: 'AI image proxy unavailable.');
     }
 
-    try {
-      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body).timeout(timeout);
-      final parsed = await parse(res.data, res.status);
-      if (parsed.bytes != null) return parsed;
-      if (res.status != 404 && (parsed.error ?? '').isNotEmpty && !parsed.error!.contains('HTTP')) {
-        // Keep trying other methods unless it's a hard miss.
-      }
-    } catch (e) {
-      debugPrint('[partner-img] functions.invoke $action: $e');
-    }
-
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(timeout);
-    if (response.statusCode == 200) {
-      return parse(jsonDecode(response.body), 200);
-    }
-    return parse(null, response.statusCode);
+    final data = await ngmyEdgeInvoke(body, timeout: timeout);
+    return parse(data);
   } catch (e) {
     return (bytes: null, error: _extractApiErrorMessage(e));
   }
@@ -1531,7 +1409,6 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
   required String prompt,
 }) async {
   try {
-    final client = Supabase.instance.client;
     final body = <String, dynamic>{
       'action': 'geminiVirtualOutfit',
       'prompt': prompt,
@@ -1541,53 +1418,8 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
       ],
     };
 
-    try {
-      final res = await client.functions
-          .invoke(kNgmySupabaseAiFunction, body: body)
-          .timeout(const Duration(seconds: 22));
-      if (res.status == 200) {
-        final data = res.data;
-        if (data is Map) {
-          final b64 = data['imageBase64']?.toString();
-          if (b64 != null && b64.trim().isNotEmpty) {
-            return (bytes: base64Decode(b64.trim()), error: null);
-          }
-          final err = data['error']?.toString();
-          if (err != null && err.isNotEmpty) return (bytes: null, error: err);
-        }
-      } else if (res.status == 404) {
-        return (
-          bytes: null,
-          error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase, then try again.',
-        );
-      } else {
-        return (bytes: null, error: 'AI proxy HTTP ${res.status}');
-      }
-    } catch (e) {
-      debugPrint('[outfit-ai] functions.invoke: $e');
-    }
-
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 22));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+    final data = await ngmyEdgeInvoke(body, timeout: const Duration(seconds: 22));
+    if (data != null) {
       final b64 = data['imageBase64']?.toString();
       if (b64 != null && b64.trim().isNotEmpty) {
         return (bytes: base64Decode(b64.trim()), error: null);
@@ -1595,13 +1427,7 @@ Future<({Uint8List? bytes, String? error})> _callGeminiOutfitViaProxy({
       final err = data['error']?.toString();
       if (err != null && err.isNotEmpty) return (bytes: null, error: err);
     }
-    if (response.statusCode == 404) {
-      return (
-        bytes: null,
-        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase Dashboard.',
-      );
-    }
-    return (bytes: null, error: _extractApiErrorMessage('HTTP ${response.statusCode}', body: response.body));
+    return (bytes: null, error: 'AI proxy unavailable.');
   } catch (e) {
     return (bytes: null, error: _extractApiErrorMessage(e));
   }

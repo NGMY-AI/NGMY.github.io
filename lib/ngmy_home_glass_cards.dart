@@ -8,6 +8,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
@@ -23,11 +24,17 @@ import 'ngmy_home_vote_ad_card.dart';
 import 'ngmy_home_vote_ads.dart';
 import 'ngmy_item_reminder_storage.dart';
 import 'ngmy_medicine_organizer.dart';
+import 'ngmy_network_resilience.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
 
-/// Local-only (device storage, no database) spending + notes cards for Home.
-/// Everything here lives in SharedPreferences, keyed per user email.
+/// Home spending + notes cards.
+/// All cards stay on-device. Up to [kNgmyHomeCloudCardSlots] can be explicitly
+/// **Saved** to Supabase `home_cards` so the same account sees them on other phones.
+/// Nothing is auto-promoted into the cloud when a saved card is removed.
+
+/// Max home cards stored in the database (user picks which ones via Save).
+const int kNgmyHomeCloudCardSlots = 5;
 
 // ?? Data models ????????????????????????????????????????????????????????????
 
@@ -235,7 +242,7 @@ class NgmyHomeNote {
       );
 }
 
-// ?? Local storage (SharedPreferences only ? nothing leaves the device) ?????
+// ?? Local storage + first-5 cloud sync ?????????????????????????????????????
 
 class NgmyHomeLocalStore {
   NgmyHomeLocalStore._();
@@ -255,7 +262,34 @@ class NgmyHomeLocalStore {
     }
   }
 
-  static Future<void> saveSpending(String email, List<NgmySpendingEntry> items) async {
+  static String _cloudIdsKey(String email) => 'ngmy_home_cloud_ids_v1_${email.toLowerCase().trim()}';
+
+  static Future<List<String>> loadCloudCardIds(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cloudIdsKey(email));
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw);
+      if (list is! List) return const [];
+      return list.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> saveCloudCardIds(String email, List<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    final clean = <String>[];
+    for (final id in ids) {
+      final t = id.trim();
+      if (t.isEmpty || clean.contains(t)) continue;
+      clean.add(t);
+      if (clean.length >= kNgmyHomeCloudCardSlots) break;
+    }
+    await prefs.setString(_cloudIdsKey(email), jsonEncode(clean));
+  }
+
+  static Future<void> saveSpending(String email, List<NgmySpendingEntry> items, {bool syncCloud = true}) async {
     final prefs = await SharedPreferences.getInstance();
     // Civic photos live in a dedicated local prefs key (`local:civic` token on the card).
     // Strip only giant inline data-URLs so the spending list itself stays small.
@@ -287,9 +321,28 @@ class NgmyHomeLocalStore {
           .toList();
       await prefs.setString(_spendingKey(email), jsonEncode(stripped.map((e) => e.toJson()).toList()));
     }
-    try {
-      await prefs.reload();
-    } catch (_) {}
+    if (syncCloud) {
+      // Refresh payloads for already-saved cloud cards only — never auto-add new ones.
+      unawaited(pushSavedHomeCardsToCloud(email, lean));
+    }
+  }
+
+  /// Pull explicitly saved cards from Supabase and merge into local (extra local cards kept).
+  /// Does not auto-upload local cards when the cloud row is empty.
+  static Future<List<NgmySpendingEntry>> loadSpendingMergedWithCloud(String email) async {
+    final local = await loadSpending(email);
+    final remote = await fetchHomeCardsFromCloud(email);
+    if (remote == null) return local;
+    if (remote.isEmpty) {
+      // Keep any local cloud-id list; do not invent a new set from "oldest" cards.
+      return local;
+    }
+    await saveCloudCardIds(email, remote.map((e) => e.id).toList());
+    final merged = mergeHomeCardsCloudIntoLocal(local: local, remote: remote);
+    if (!_spendingListsEqual(local, merged)) {
+      await saveSpending(email, merged, syncCloud: false);
+    }
+    return merged;
   }
 
   static Future<List<NgmyHomeNote>> loadNotes(String email) async {
@@ -384,6 +437,239 @@ class NgmyHomeLocalStore {
     final trimmed = ids.toList()..sort();
     await prefs.setString(_ackKey(email), jsonEncode(trimmed.take(200).toList()));
   }
+}
+
+bool _homeCardsTableMissing(Object error) {
+  final s = error.toString();
+  return s.contains("Could not find the table 'public.home_cards'") ||
+      s.contains('relation "public.home_cards" does not exist');
+}
+
+List<NgmySpendingEntry> _homeUserCards(List<NgmySpendingEntry> all) =>
+    all.where((e) => e.id != kNgmyHomeVoteAdCardId && !e.isVoteAd).toList();
+
+/// Cards the user explicitly Saved (by id list). Never auto-fills from "oldest".
+List<NgmySpendingEntry> selectHomeCardsForCloud(List<NgmySpendingEntry> all, List<String> syncedIds) {
+  if (syncedIds.isEmpty) return const [];
+  final byId = <String, NgmySpendingEntry>{
+    for (final e in _homeUserCards(all)) e.id: e,
+  };
+  final out = <NgmySpendingEntry>[];
+  for (final id in syncedIds) {
+    final e = byId[id];
+    if (e == null) continue;
+    out.add(e);
+    if (out.length >= kNgmyHomeCloudCardSlots) break;
+  }
+  return out;
+}
+
+NgmySpendingEntry _leanCardForCloud(NgmySpendingEntry e) {
+  var next = e;
+  if (e.imageBase64.length > 120000) {
+    next = next.copyWith(imageBase64: '');
+  }
+  if (!e.hasCivicId) return next;
+  try {
+    final map = jsonDecode(e.civicIdJson);
+    if (map is! Map) return next;
+    final m = Map<String, dynamic>.from(map);
+    final photo = (m['idPhotoPath'] ?? '').toString();
+    if (photo.startsWith('data:') || photo.length > 800 || ngmyIsCivicIdPhotoLocalToken(photo)) {
+      m['idPhotoPath'] = kNgmyCivicIdPhotoLocalToken;
+      next = next.copyWith(civicIdJson: jsonEncode(m));
+    }
+  } catch (_) {}
+  return next;
+}
+
+bool _spendingListsEqual(List<NgmySpendingEntry> a, List<NgmySpendingEntry> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].id != b[i].id) return false;
+    if (a[i].amount != b[i].amount) return false;
+    if (a[i].description != b[i].description) return false;
+    if (a[i].category != b[i].category) return false;
+    if (a[i].note != b[i].note) return false;
+    if (a[i].civicIdJson != b[i].civicIdJson) return false;
+    if (a[i].businessCardJson != b[i].businessCardJson) return false;
+    if (a[i].imageBase64.length != b[i].imageBase64.length) return false;
+  }
+  return true;
+}
+
+String homeCardsDeckFingerprint(List<NgmySpendingEntry> cards) {
+  final buf = StringBuffer();
+  for (final e in cards) {
+    buf
+      ..write(e.id)
+      ..write('|')
+      ..write(e.amount)
+      ..write('|')
+      ..write(e.description.hashCode)
+      ..write('|')
+      ..write(e.category)
+      ..write('|')
+      ..write(e.note.hashCode)
+      ..write('|')
+      ..write(e.hasCivicId)
+      ..write('|')
+      ..write(e.civicIdJson.hashCode)
+      ..write('|')
+      ..write(e.businessCardJson.hashCode)
+      ..write('|')
+      ..write(e.imageBase64.length)
+      ..write('|')
+      ..write(e.pinnedEssentialsKind)
+      ..write(';');
+  }
+  return buf.toString();
+}
+
+Future<List<NgmySpendingEntry>?> fetchHomeCardsFromCloud(String userEmail) async {
+  final email = userEmail.toLowerCase().trim();
+  if (email.isEmpty) return null;
+  try {
+    final row = await Supabase.instance.client
+        .from('home_cards')
+        .select('cards')
+        .eq('userEmail', email)
+        .maybeSingle()
+        .timeout(kNgmyCloudLoadTimeout);
+    if (row == null) return const [];
+    final raw = row['cards'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => NgmySpendingEntry.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.id.isNotEmpty)
+        .toList();
+  } catch (e) {
+    if (_homeCardsTableMissing(e)) {
+      debugPrint('[home_cards] table missing — run supabase/home_cards_table.sql');
+    } else {
+      debugPrint('[home_cards] fetch error: $e');
+    }
+    return null;
+  }
+}
+
+/// Writes exactly [syncedIds] (max 5) to the database — never invents extras.
+Future<bool> pushSavedHomeCardsToCloud(String userEmail, List<NgmySpendingEntry> allLocal) async {
+  final email = userEmail.toLowerCase().trim();
+  if (email.isEmpty) return false;
+  final ids = await NgmyHomeLocalStore.loadCloudCardIds(email);
+  // Drop ids that no longer exist locally (except we still allow remote-only until merge).
+  final existing = _homeUserCards(allLocal).map((e) => e.id).toSet();
+  final kept = ids.where(existing.contains).take(kNgmyHomeCloudCardSlots).toList();
+  if (kept.length != ids.length) {
+    await NgmyHomeLocalStore.saveCloudCardIds(email, kept);
+  }
+  final selected = selectHomeCardsForCloud(allLocal, kept).map(_leanCardForCloud).toList();
+  try {
+    await Supabase.instance.client.from('home_cards').upsert({
+      'userEmail': email,
+      'cards': selected.map((e) => e.toJson()).toList(),
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    }).timeout(kNgmyCloudWriteTimeout);
+    return true;
+  } catch (e) {
+    if (_homeCardsTableMissing(e)) {
+      debugPrint('[home_cards] table missing — run supabase/home_cards_table.sql');
+    } else {
+      debugPrint('[home_cards] upsert error: $e');
+    }
+    return false;
+  }
+}
+
+/// Explicitly Save one card to the account cloud set (max 5). Button label: "Save".
+Future<({bool ok, String message})> saveHomeCardToCloud({
+  required String userEmail,
+  required NgmySpendingEntry card,
+  required List<NgmySpendingEntry> allLocal,
+}) async {
+  if (card.id.isEmpty || card.isVoteAd) {
+    return (ok: false, message: 'This card cannot be saved.');
+  }
+  final ids = await NgmyHomeLocalStore.loadCloudCardIds(userEmail);
+  if (ids.contains(card.id)) {
+    final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
+    return (ok: ok, message: ok ? 'Saved.' : 'Could not reach the account. Try again.');
+  }
+  if (ids.length >= kNgmyHomeCloudCardSlots) {
+    return (
+      ok: false,
+      message: 'Only $kNgmyHomeCloudCardSlots cards can be saved. Remove one first, then Save.',
+    );
+  }
+  final next = [...ids, card.id];
+  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, next);
+  final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
+  if (!ok) {
+    await NgmyHomeLocalStore.saveCloudCardIds(userEmail, ids);
+    return (ok: false, message: 'Could not Save. Run home_cards SQL in Supabase if needed.');
+  }
+  return (ok: true, message: 'Saved — visible on your other phones.');
+}
+
+/// Remove a card from the account cloud set only (stays on this phone unless deleted).
+Future<({bool ok, String message})> removeHomeCardFromCloud({
+  required String userEmail,
+  required String cardId,
+  required List<NgmySpendingEntry> allLocal,
+}) async {
+  final ids = await NgmyHomeLocalStore.loadCloudCardIds(userEmail);
+  if (!ids.contains(cardId)) {
+    return (ok: true, message: 'Already removed.');
+  }
+  final next = ids.where((id) => id != cardId).toList();
+  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, next);
+  final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
+  if (!ok) {
+    await NgmyHomeLocalStore.saveCloudCardIds(userEmail, ids);
+    return (ok: false, message: 'Could not update account. Try again.');
+  }
+  return (ok: true, message: 'Removed from account. Still on this phone.');
+}
+
+List<NgmySpendingEntry> mergeHomeCardsCloudIntoLocal({
+  required List<NgmySpendingEntry> local,
+  required List<NgmySpendingEntry> remote,
+}) {
+  if (remote.isEmpty) return local;
+  final localUser = _homeUserCards(local);
+  final byId = <String, NgmySpendingEntry>{
+    for (final e in localUser) e.id: e,
+  };
+  for (final r in remote) {
+    if (r.id.isEmpty) continue;
+    final existing = byId[r.id];
+    if (existing == null) {
+      byId[r.id] = r;
+      continue;
+    }
+    byId[r.id] = existing.copyWith(
+      amount: r.amount,
+      description: r.description.isEmpty ? existing.description : r.description,
+      category: r.category.isEmpty ? existing.category : r.category,
+      date: r.date,
+      note: r.note,
+      imageBase64: existing.imageBase64.isNotEmpty ? existing.imageBase64 : r.imageBase64,
+      passwordEmail: existing.passwordEmail.isNotEmpty ? existing.passwordEmail : r.passwordEmail,
+      passwordSecret: existing.passwordSecret.isNotEmpty ? existing.passwordSecret : r.passwordSecret,
+      pinnedNoteText: r.pinnedNoteText.isEmpty ? existing.pinnedNoteText : r.pinnedNoteText,
+      pinnedAlarmText: r.pinnedAlarmText.isEmpty ? existing.pinnedAlarmText : r.pinnedAlarmText,
+      pinnedEssentialsKind: r.pinnedEssentialsKind.isEmpty ? existing.pinnedEssentialsKind : r.pinnedEssentialsKind,
+      businessCardJson: r.businessCardJson.isEmpty ? existing.businessCardJson : r.businessCardJson,
+      civicIdJson: r.civicIdJson.isEmpty ? existing.civicIdJson : r.civicIdJson,
+      cardTemplateId: r.cardTemplateId.isEmpty ? existing.cardTemplateId : r.cardTemplateId,
+      receiptItems: r.receiptItems.isEmpty ? existing.receiptItems : r.receiptItems,
+      receiptMerchant: r.receiptMerchant.isEmpty ? existing.receiptMerchant : r.receiptMerchant,
+    );
+  }
+  return byId.values.toList()..sort((a, b) => b.date.compareTo(a.date));
 }
 
 /// How auto-play advances the home card deck.
@@ -765,7 +1051,22 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
         oldWidget.pauseAutoPlay != widget.pauseAutoPlay) {
       _scheduleAuto();
     }
-    if (oldWidget.items.length == widget.items.length && identical(oldWidget.items, widget.items)) return;
+    if (identical(oldWidget.items, widget.items)) return;
+    final idOf = widget.itemId;
+    if (idOf != null && oldWidget.items.length == widget.items.length) {
+      var sameOrder = true;
+      for (var i = 0; i < widget.items.length; i++) {
+        if (idOf(oldWidget.items[i]) != idOf(widget.items[i])) {
+          sameOrder = false;
+          break;
+        }
+      }
+      if (sameOrder) {
+        // Soft update content without resetting slide animation (stops home "refresh" flicker).
+        _order = List<T>.of(widget.items);
+        return;
+      }
+    }
     final next = List<T>.of(widget.items);
     // Newly added cards are prepended by the panel ? keep that order so the new card is front.
     if (widget.items.length > oldWidget.items.length) {
@@ -778,7 +1079,6 @@ class _NgmyGlassCardStackState<T> extends State<NgmyGlassCardStack<T>> with Sing
       _scheduleAuto();
       return;
     }
-    final idOf = widget.itemId;
     Object? frontId;
     if (_order.isNotEmpty && idOf != null) frontId = idOf(_order.first);
     if (frontId != null && idOf != null) {
@@ -1146,6 +1446,7 @@ class NgmyFrostedCard extends StatelessWidget {
     this.accent = const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
     this.onDelete,
     this.onAdd,
+    this.onManageCloud,
     this.footer,
     this.isFront = true,
     this.showDateTab = true,
@@ -1159,6 +1460,8 @@ class NgmyFrostedCard extends StatelessWidget {
   final List<Color> accent;
   final VoidCallback? onDelete;
   final VoidCallback? onAdd;
+  /// Opens the Saved cards manager (max 5 across phones).
+  final VoidCallback? onManageCloud;
   final Widget? footer;
   final bool isFront;
   final bool showDateTab;
@@ -1236,7 +1539,7 @@ class NgmyFrostedCard extends StatelessWidget {
             top: 6,
             child: _WelcomeGlassFrame(greeting: 'Welcome back', handle: handle),
           ),
-        if (isFront && (showWelcome || onDelete != null || onAdd != null))
+        if (isFront && (showWelcome || onDelete != null || onAdd != null || onManageCloud != null))
           Positioned(
             right: 8,
             top: 6,
@@ -1248,8 +1551,11 @@ class NgmyFrostedCard extends StatelessWidget {
                   const SizedBox(height: 6),
                 ],
                 if (onDelete != null) _GlassIconButton(icon: Icons.close_rounded, onTap: onDelete!),
-                if (onDelete != null && onAdd != null) const SizedBox(height: 6),
+                if (onDelete != null && (onAdd != null || onManageCloud != null)) const SizedBox(height: 6),
                 if (onAdd != null) _GlassIconButton(icon: Icons.add_rounded, onTap: onAdd!, filled: true),
+                if (onAdd != null && onManageCloud != null) const SizedBox(height: 6),
+                if (onManageCloud != null)
+                  _GlassIconButton(icon: Icons.cloud_sync_rounded, onTap: onManageCloud!, filled: false),
               ],
             ),
           ),
@@ -1649,6 +1955,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   String? _frontSpendingId;
   String? _frontNoteId;
   Timer? _alarmPoll;
+  Timer? _loadDebounce;
   bool _alarmHold = false;
   String _alarmHoldTitle = '';
   String? _alarmHoldAckKey;
@@ -1656,14 +1963,19 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
   int _tapCount = 0;
   DateTime? _lastTapAt;
   String? _lastTapId;
+  String _deckFingerprint = '';
+  DateTime? _lastFullLoadAt;
+  DateTime? _lastVoteCloudAt;
+  int _loadGen = 0;
+  bool _cloudMergeDone = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     ngmyHomeCardsRevision.addListener(_onHomeRevision);
-    _load();
-    _alarmPoll = Timer.periodic(const Duration(seconds: 20), (_) => _checkDueAlarms());
+    _load(forceCloud: true);
+    _alarmPoll = Timer.periodic(const Duration(seconds: 45), (_) => _checkDueAlarms());
   }
 
   @override
@@ -1671,16 +1983,27 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     WidgetsBinding.instance.removeObserver(this);
     ngmyHomeCardsRevision.removeListener(_onHomeRevision);
     _alarmPoll?.cancel();
+    _loadDebounce?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _load();
+    if (state != AppLifecycleState.resumed) return;
+    final last = _lastFullLoadAt;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 45)) return;
+    _scheduleLoad(forceCloud: false);
   }
 
   void _onHomeRevision() {
-    if (mounted) _load();
+    _scheduleLoad(forceCloud: false);
+  }
+
+  void _scheduleLoad({required bool forceCloud}) {
+    _loadDebounce?.cancel();
+    _loadDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) unawaited(_load(forceCloud: forceCloud));
+    });
   }
 
   void _moveIdToFront<T>(List<T> list, Object Function(T) idOf, String? id) {
@@ -1729,7 +2052,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         next.add(e);
       }
     }
-    if (changed) await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+    if (changed) await NgmyHomeLocalStore.saveSpending(widget.userEmail, next, syncCloud: false);
     return next;
   }
 
@@ -1807,28 +2130,31 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
           return e;
         }
       }).toList();
-      await NgmyHomeLocalStore.saveSpending(widget.userEmail, leanForSave);
+      await NgmyHomeLocalStore.saveSpending(widget.userEmail, leanForSave, syncCloud: false);
     }
     return next;
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceCloud = false}) async {
+    final gen = ++_loadGen;
     // Fast path: paint local cards immediately — never wait on cloud / hydrations.
     final s0 = await NgmyHomeLocalStore.loadSpending(widget.userEmail);
     final deck = await NgmyHomeLocalStore.loadDeckPrefs(widget.userEmail);
     final acks = await NgmyHomeLocalStore.loadAlarmAcks(widget.userEmail);
     await NgmyHomeVoteAdStore.load(forceCloud: false);
+    if (!mounted || gen != _loadGen) return;
     final fast = _mergeHomeVoteAd(s0, NgmyHomeVoteAdStore.current);
-    if (!mounted) return;
     _applyHomeDeck(fast, deck: deck, acks: acks);
-    // Background: hydrate civic IDs, sync business cards, refresh vote ad from cloud.
-    unawaited(_enrichHomeCardsInBackground());
+    _lastFullLoadAt = DateTime.now();
+    // Background: hydrate civic IDs, sync business cards, optional vote/cloud merge.
+    unawaited(_enrichHomeCardsInBackground(gen: gen, forceCloud: forceCloud || !_cloudMergeDone));
   }
 
   void _applyHomeDeck(
     List<NgmySpendingEntry> spending, {
     required ({bool autoPlay, NgmyHomeCardSlideStyle style, String? frontSpendingId, String? frontNoteId}) deck,
     required Set<String> acks,
+    bool force = false,
   }) {
     final s = List<NgmySpendingEntry>.from(spending);
     s.sort((a, b) {
@@ -1840,26 +2166,48 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         ? kNgmyHomeVoteAdCardId
         : deck.frontSpendingId;
     _moveIdToFront(s, (e) => e.id, preferFront);
+    final nextFront = preferFront ?? (s.isNotEmpty ? s.first.id : null);
+    final fp = homeCardsDeckFingerprint(s);
+    final sameDeck = !force &&
+        fp == _deckFingerprint &&
+        deck.autoPlay == _autoPlay &&
+        deck.style == _slideStyle &&
+        nextFront == _frontSpendingId &&
+        deck.frontNoteId == _frontNoteId;
+    if (sameDeck && _loaded) return;
     setState(() {
       _spending = s;
       _autoPlay = deck.autoPlay;
       _slideStyle = deck.style;
-      _frontSpendingId = preferFront ?? (s.isNotEmpty ? s.first.id : null);
+      _frontSpendingId = nextFront;
       _frontNoteId = deck.frontNoteId;
       _alarmAcks = acks;
       _loaded = true;
+      _deckFingerprint = fp;
     });
     _checkDueAlarms();
   }
 
-  Future<void> _enrichHomeCardsInBackground() async {
+  Future<void> _enrichHomeCardsInBackground({required int gen, required bool forceCloud}) async {
     try {
-      final base = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+      var base = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+      if (forceCloud) {
+        base = await NgmyHomeLocalStore.loadSpendingMergedWithCloud(widget.userEmail);
+        _cloudMergeDone = true;
+      }
+      if (!mounted || gen != _loadGen) return;
       final s1 = await _syncBusinessCardSnapshots(base);
+      if (!mounted || gen != _loadGen) return;
       final s2 = await _hydrateCivicIdCards(s1);
-      await NgmyHomeVoteAdStore.refreshFromCloud();
+      if (!mounted || gen != _loadGen) return;
+      final voteStale = _lastVoteCloudAt == null ||
+          DateTime.now().difference(_lastVoteCloudAt!) > const Duration(minutes: 5);
+      if (forceCloud || voteStale) {
+        await NgmyHomeVoteAdStore.refreshFromCloud();
+        _lastVoteCloudAt = DateTime.now();
+      }
+      if (!mounted || gen != _loadGen) return;
       final merged = _mergeHomeVoteAd(s2, NgmyHomeVoteAdStore.current);
-      if (!mounted) return;
       final deck = (
         autoPlay: _autoPlay,
         style: _slideStyle,
@@ -1893,12 +2241,21 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     final nextStyle = style ?? _slideStyle;
     final nextSpend = frontSpendingId ?? _frontSpendingId;
     final nextNote = frontNoteId ?? _frontNoteId;
-    setState(() {
+    final unchanged =
+        nextAuto == _autoPlay && nextStyle == _slideStyle && nextSpend == _frontSpendingId && nextNote == _frontNoteId;
+    if (!unchanged && mounted) {
+      setState(() {
+        _autoPlay = nextAuto;
+        _slideStyle = nextStyle;
+        _frontSpendingId = nextSpend;
+        _frontNoteId = nextNote;
+      });
+    } else {
       _autoPlay = nextAuto;
       _slideStyle = nextStyle;
       _frontSpendingId = nextSpend;
       _frontNoteId = nextNote;
-    });
+    }
     await NgmyHomeLocalStore.saveDeckPrefs(
       widget.userEmail,
       autoPlay: nextAuto,
@@ -1930,10 +2287,43 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       _noteFaceIds.remove(id);
     });
     final persist = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId).toList();
+    // If this card was Saved to the account, drop it from cloud — do not auto-add another.
+    final cloudIds = await NgmyHomeLocalStore.loadCloudCardIds(widget.userEmail);
+    if (cloudIds.contains(id)) {
+      await NgmyHomeLocalStore.saveCloudCardIds(
+        widget.userEmail,
+        cloudIds.where((e) => e != id).toList(),
+      );
+    }
     await NgmyHomeLocalStore.saveSpending(widget.userEmail, persist);
     if (_frontSpendingId == id) {
       await _setDeckPrefs(frontSpendingId: _spending.isNotEmpty ? _spending.first.id : '');
     }
+  }
+
+  Future<void> _openCloudCardsManager() async {
+    final local = _spending.where((e) => e.id != kNgmyHomeVoteAdCardId && !e.isVoteAd).toList();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _NgmyHomeCloudCardsSheet(
+        userEmail: widget.userEmail,
+        displayName: widget.displayName,
+        profilePicturePath: widget.profilePicturePath,
+        civicIdRecord: widget.civicIdRecord,
+        cards: local,
+        onChanged: (next) async {
+          final withVote = _mergeHomeVoteAd(next, NgmyHomeVoteAdStore.current);
+          if (!mounted) return;
+          setState(() => _spending = withVote);
+          _deckFingerprint = '';
+        },
+      ),
+    );
+    if (!mounted) return;
+    _scheduleLoad(forceCloud: true);
   }
 
   bool _registerTripleTapFast(String id) {
@@ -2382,6 +2772,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         expandFace: true,
         accent: const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
         onAdd: _openAddSheet,
+        onManageCloud: _openCloudCardsManager,
         child: NgmyHomeInstallGuideCard(isDark: isDark),
       ),
     );
@@ -2440,6 +2831,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                   welcomeName: isFront && !isCivic && !isVoteAd ? name : null,
                   onDelete: isFront && !isCivic && !isVoteAd ? () => _deleteSpending(entry.id) : null,
                   onAdd: isFront && !isCivic ? _openAddSheet : null,
+                  onManageCloud: isFront && !isVoteAd ? _openCloudCardsManager : null,
                   footer: isFront && !entry.hideModePill ? _modePillFor(entry) : null,
                   fillBleed: showNoteFace ||
                       isVoteAd ||
@@ -4158,6 +4550,318 @@ class _SpendingNoteCardBody extends StatelessWidget {
                 ),
               ),
       ),
+    );
+  }
+}
+
+// ?? Saved cards manager (max 5 across phones) ?????????????????????????????
+
+class _NgmyHomeCloudCardsSheet extends StatefulWidget {
+  const _NgmyHomeCloudCardsSheet({
+    required this.userEmail,
+    required this.cards,
+    required this.onChanged,
+    this.displayName,
+    this.profilePicturePath,
+    this.civicIdRecord,
+  });
+
+  final String userEmail;
+  final String? displayName;
+  final String? profilePicturePath;
+  final Map<String, dynamic>? civicIdRecord;
+  final List<NgmySpendingEntry> cards;
+  final Future<void> Function(List<NgmySpendingEntry> next) onChanged;
+
+  @override
+  State<_NgmyHomeCloudCardsSheet> createState() => _NgmyHomeCloudCardsSheetState();
+}
+
+class _NgmyHomeCloudCardsSheetState extends State<_NgmyHomeCloudCardsSheet> {
+  late List<NgmySpendingEntry> _all;
+  List<String> _savedIds = [];
+  bool _busy = false;
+  String? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _all = List<NgmySpendingEntry>.from(widget.cards);
+    unawaited(_reloadIds());
+  }
+
+  Future<void> _reloadIds() async {
+    final ids = await NgmyHomeLocalStore.loadCloudCardIds(widget.userEmail);
+    if (!mounted) return;
+    setState(() => _savedIds = ids);
+  }
+
+  List<NgmySpendingEntry> get _savedCards {
+    final byId = {for (final e in _all) e.id: e};
+    return [
+      for (final id in _savedIds)
+        if (byId[id] != null) byId[id]!,
+    ];
+  }
+
+  List<NgmySpendingEntry> get _localOnly {
+    final saved = _savedIds.toSet();
+    final list = _all.where((e) => !saved.contains(e.id)).toList()
+      ..sort((a, b) {
+        // Civic ID first so it's easy to Save when they already have it.
+        if (a.hasCivicId && !b.hasCivicId) return -1;
+        if (b.hasCivicId && !a.hasCivicId) return 1;
+        return b.date.compareTo(a.date);
+      });
+    return list;
+  }
+
+  String _labelFor(NgmySpendingEntry e) {
+    if (e.hasCivicId) return 'Civic Registry ID';
+    if (e.hasBusinessCard) return e.description.trim().isEmpty ? 'Business card' : e.description.trim();
+    if (e.isPassword) return e.description.trim().isEmpty ? 'Password' : e.description.trim();
+    if (e.hasPinnedEssentials) {
+      final k = e.pinnedEssentialsKind.trim();
+      return k.isEmpty ? 'Essentials' : k;
+    }
+    if (e.hasImage) return e.description.trim().isEmpty ? 'Photo card' : e.description.trim();
+    final d = e.description.trim();
+    if (d.isNotEmpty) return d;
+    if (e.amount > 0) return '\$${e.amount.toStringAsFixed(2)} · ${e.category}';
+    return e.category.isEmpty ? 'Card' : e.category;
+  }
+
+  Future<void> _save(NgmySpendingEntry card) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    final result = await saveHomeCardToCloud(
+      userEmail: widget.userEmail,
+      card: card,
+      allLocal: _all,
+    );
+    await _reloadIds();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _status = result.message;
+    });
+    await widget.onChanged(_all);
+  }
+
+  Future<void> _removeSaved(String id) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _status = null;
+    });
+    final result = await removeHomeCardFromCloud(
+      userEmail: widget.userEmail,
+      cardId: id,
+      allLocal: _all,
+    );
+    await _reloadIds();
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      _status = result.message;
+    });
+    await widget.onChanged(_all);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final saved = _savedCards;
+    final local = _localOnly;
+    final name = (widget.displayName ?? '').trim();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.88,
+      minChildSize: 0.5,
+      maxChildSize: 0.96,
+      expand: false,
+      builder: (ctx, scroll) {
+        return Container(
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF0B1220) : const Color(0xFFF8FAFC),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: dark ? Colors.white24 : Colors.black26,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Saved cards',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: dark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${saved.length}/$kNgmyHomeCloudCardSlots saved · same account on every phone. '
+                'Swipe the stack, remove one to free a slot, then Save another. '
+                'Deleting with X on Home does not auto-save the next card.',
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.35,
+                  color: dark ? Colors.white70 : const Color(0xFF475569),
+                ),
+              ),
+              if (_status != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _status!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: dark ? const Color(0xFF86EFAC) : const Color(0xFF166534),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                'On your account',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: dark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (saved.isEmpty)
+                Container(
+                  height: 120,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: dark ? Colors.white12 : const Color(0xFFCBD5E1)),
+                  ),
+                  child: Text(
+                    'No cards saved yet. Save up to $kNgmyHomeCloudCardSlots below.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
+                  ),
+                )
+              else
+                NgmyGlassCardStack<NgmySpendingEntry>(
+                  height: 252,
+                  items: saved,
+                  itemId: (e) => e.id,
+                  autoPlay: false,
+                  slideStyle: NgmyHomeCardSlideStyle.slideLeft,
+                  emptyBuilder: (_) => const SizedBox.shrink(),
+                  cardBuilder: (c, entry, {required isFront, required revealDates}) {
+                    return NgmyFrostedCard(
+                      dateLabel: ngmyHomeDateTabLabel(entry.date),
+                      isFront: isFront,
+                      showDateTab: revealDates,
+                      welcomeName: isFront && !entry.hasCivicId ? (name.isEmpty ? null : name) : null,
+                      onDelete: isFront ? () => unawaited(_removeSaved(entry.id)) : null,
+                      fillBleed: entry.hasCivicId ||
+                          entry.hasBusinessCard ||
+                          entry.hasImage ||
+                          entry.showsCreditFace ||
+                          (entry.hasPinnedEssentials && entry.amount <= 0),
+                      accent: entry.hasCivicId
+                          ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
+                          : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+                      child: _SpendingCardContent(
+                        entry: entry,
+                        totalSpent: 0,
+                        userEmail: widget.userEmail,
+                        liveCivicRecord: widget.civicIdRecord,
+                        profilePicturePath: widget.profilePicturePath,
+                      ),
+                    );
+                  },
+                ),
+              if (saved.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Swipe to browse · tap X to remove from account (keeps card on this phone)',
+                  style: TextStyle(fontSize: 12, color: dark ? Colors.white54 : const Color(0xFF64748B)),
+                ),
+              ],
+              const SizedBox(height: 22),
+              Text(
+                'On this phone only',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: dark ? Colors.white : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (local.isEmpty)
+                Text(
+                  saved.length >= kNgmyHomeCloudCardSlots
+                      ? 'All local cards are already saved, or remove one above to Save another.'
+                      : 'No other local cards.',
+                  style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
+                )
+              else
+                ...local.map((e) {
+                  final full = saved.length >= kNgmyHomeCloudCardSlots;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Material(
+                      color: dark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: ListTile(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        title: Text(
+                          _labelFor(e),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: dark ? Colors.white : const Color(0xFF0F172A),
+                          ),
+                        ),
+                        subtitle: Text(
+                          e.hasCivicId ? 'Civic Registry ID' : e.category,
+                          style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
+                        ),
+                        trailing: TextButton(
+                          onPressed: _busy || full ? null : () => unawaited(_save(e)),
+                          child: Text(
+                            'Save',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: full
+                                  ? (dark ? Colors.white38 : Colors.black38)
+                                  : (dark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              if (_busy) ...[
+                const SizedBox(height: 12),
+                const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

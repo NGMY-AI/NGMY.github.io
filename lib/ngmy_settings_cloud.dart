@@ -4,10 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_cloud_policy.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_oauth.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_config.dart';
+import 'ngmy_web_rest_proxy.dart';
 
 Map<String, String> get _ngmySettingsRestHeaders => {
       'apikey': kNgmySupabaseAnonKey,
@@ -15,7 +17,7 @@ Map<String, String> get _ngmySettingsRestHeaders => {
     };
 
 Uri ngmySettingsRestRowUri(String key, {String select = 'value'}) {
-  return Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings').replace(
+  return ngmySupabaseRestUri('/ngmy_settings').replace(
     queryParameters: {
       'key': 'eq.$key',
       'select': select,
@@ -24,10 +26,15 @@ Uri ngmySettingsRestRowUri(String key, {String select = 'value'}) {
 }
 
 /// Anonymous REST read — works for guest links without Supabase init.
+/// Sensitive civic/PII keys are blocked so they never appear in DevTools Network.
 Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaRest(
   String key, {
   Duration timeout = const Duration(seconds: 8),
 }) async {
+  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) {
+    debugPrint('[ngmy_settings] blocked sensitive REST GET: $key');
+    return null;
+  }
   try {
     final resp = await http.get(ngmySettingsRestRowUri(key), headers: _ngmySettingsRestHeaders).timeout(timeout);
     if (resp.statusCode != 200) {
@@ -56,6 +63,9 @@ Future<({bool reachable, Map<String, dynamic>? value})> ngmyFetchSettingsRowStat
   String key, {
   Duration timeout = const Duration(seconds: 8),
 }) async {
+  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) {
+    return (reachable: true, value: null);
+  }
   try {
     final resp = await http.get(ngmySettingsRestRowUri(key), headers: _ngmySettingsRestHeaders).timeout(timeout);
     if (resp.statusCode != 200) {
@@ -79,6 +89,10 @@ Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaClient(
   String key, {
   Duration timeout = const Duration(seconds: 8),
 }) async {
+  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) {
+    debugPrint('[ngmy_settings] blocked sensitive client GET: $key');
+    return null;
+  }
   try {
     await ngmyEnsureSupabaseAuthInitialized();
     await ngmyWaitForSupabaseReady(timeout: timeout);
@@ -99,7 +113,7 @@ Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaClient(
 }
 
 Future<bool> _restPostRow(String key, Map<String, dynamic> value, String updatedAt) async {
-  final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings');
+  final uri = ngmySupabaseRestUri('/ngmy_settings');
   final resp = await http
       .post(
         uri,
@@ -143,7 +157,7 @@ Future<bool> ngmyDeleteSettingsKeyReliable(String key) async {
 
   var ok = false;
   try {
-    final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings').replace(
+    final uri = ngmySupabaseRestUri('/ngmy_settings').replace(
       queryParameters: {'key': 'eq.$k'},
     );
     final resp = await http
@@ -201,6 +215,9 @@ Future<bool> ngmyUpsertSettingsRowReliable(
 
   if (!ok) return false;
 
+  // Sensitive keys are not re-fetched over the public Network tab.
+  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) return true;
+
   for (var attempt = 0; attempt < 4; attempt++) {
     final verify = await ngmyFetchSettingsValueViaRest(key);
     if (verify != null) return true;
@@ -221,7 +238,7 @@ Future<bool> ngmyUpsertSettingsBatchReliable(
 
   var ok = false;
   try {
-    final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/ngmy_settings');
+    final uri = ngmySupabaseRestUri('/ngmy_settings');
     final resp = await http
         .post(
           uri,
@@ -248,6 +265,7 @@ Future<bool> ngmyUpsertSettingsBatchReliable(
   }
 
   for (final row in rows) {
+    if (NgmyCloudPolicy.settingsKeyNetworkSensitive(row.key)) continue;
     var verified = false;
     for (var attempt = 0; attempt < 4; attempt++) {
       final v = await ngmyFetchSettingsValueViaRest(row.key);

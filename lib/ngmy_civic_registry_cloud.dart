@@ -1,12 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_supabase_config.dart';
+import 'ngmy_edge_invoke.dart';
 
-const String _kCivicBrightHandler = 'bright-handler';
 const Duration _kCivicCloudTimeout = Duration(seconds: 20);
 
 String ngmyCurrentAuthEmail() {
@@ -17,132 +15,14 @@ String ngmyCurrentAuthEmail() {
   }
 }
 
-Map<String, dynamic>? _parseCivicResponseBody(String raw) {
-  if (raw.isEmpty) return null;
-  try {
-    final data = jsonDecode(raw);
-    if (data is Map) return Map<String, dynamic>.from(data);
-  } catch (_) {}
-  return null;
-}
-
-Future<String> _freshAccessToken() async {
-  try {
-    final client = Supabase.instance.client;
-    var session = client.auth.currentSession;
-    if (session == null) return '';
-    final expiresAt = session.expiresAt;
-    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-    // Refresh if missing, expired, or within 90s of expiry.
-    if (expiresAt == null || expiresAt <= now + 90) {
-      try {
-        final refreshed = await client.auth.refreshSession();
-        session = refreshed.session ?? client.auth.currentSession;
-      } catch (e) {
-        debugPrint('[civic-cloud] refreshSession: $e');
-      }
-    }
-    return session?.accessToken ?? client.auth.currentSession?.accessToken ?? '';
-  } catch (_) {
-    return '';
-  }
-}
-
 /// Shared Edge invoke for Civic Registry (role-filtered server APIs).
 Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
-  try {
-    final client = Supabase.instance.client;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? kNgmySupabaseAnonKey;
-    final token = await _freshAccessToken();
-    if (token.isEmpty) {
-      return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
-    }
-
-    Future<Map<String, dynamic>?> postHttp() async {
-      final restUrl = client.rest.url;
-      final base = restUrl.contains('/rest/v1')
-          ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-          : restUrl;
-      final url = '$base/functions/v1/$_kCivicBrightHandler';
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              if (anonKey.isNotEmpty) 'apikey': anonKey,
-            },
-            body: jsonEncode(body),
-          )
-          .timeout(_kCivicCloudTimeout);
-      final parsed = _parseCivicResponseBody(response.body);
-      if (parsed != null) {
-        // Ensure callers can detect auth failures even when body omits ok:false.
-        if (response.statusCode == 401 && parsed['ok'] != true) {
-          return {
-            ...parsed,
-            'ok': false,
-            'error': (parsed['error'] ?? 'Please sign in again to use Civic Registry.').toString(),
-          };
-        }
-        return parsed;
-      }
-      if (response.statusCode == 401) {
-        return {'ok': false, 'error': 'Please sign in again to use Civic Registry.'};
-      }
-      if (response.statusCode >= 400) {
-        return {
-          'ok': false,
-          'error': 'Server error (${response.statusCode}). Try again.',
-        };
-      }
-      return null;
-    }
-
-    // Direct HTTP first — Flutter web invoke() often stalls.
-    final httpResult = await postHttp();
-    if (httpResult != null) return httpResult;
-
-    try {
-      final res = await client.functions
-          .invoke(_kCivicBrightHandler, body: body)
-          .timeout(_kCivicCloudTimeout);
-      if (res.data is Map) return Map<String, dynamic>.from(res.data as Map);
-    } catch (e) {
-      debugPrint('[civic-cloud] invoke fallback: $e');
-    }
-
-    return {'ok': false, 'error': 'Could not reach Civic Registry server.'};
-  } catch (e) {
-    debugPrint('[civic-cloud] HTTP: $e');
-    return {'ok': false, 'error': 'Could not reach Civic Registry server.'};
-  }
+  return ngmyEdgeInvoke(body, timeout: _kCivicCloudTimeout);
 }
 
 /// Anonymous guest enroll (no JWT required).
 Future<Map<String, dynamic>?> ngmyCivicInvokeAnon(Map<String, dynamic> body) async {
-  try {
-    final url = '${kNgmySupabaseUrl.trim()}/functions/v1/$_kCivicBrightHandler';
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $kNgmySupabaseAnonKey',
-            'apikey': kNgmySupabaseAnonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(_kCivicCloudTimeout);
-    final parsed = _parseCivicResponseBody(response.body);
-    if (parsed != null) return parsed;
-    if (response.statusCode >= 400) {
-      return {'ok': false, 'error': 'Server error (${response.statusCode}). Try again.'};
-    }
-  } catch (e) {
-    debugPrint('[civic-cloud] anon HTTP: $e');
-  }
-  return {'ok': false, 'error': 'Could not reach server'};
+  return ngmyEdgeInvoke(body, anonymous: true, timeout: _kCivicCloudTimeout);
 }
 
 String _civicCloudError(Map<String, dynamic>? data, String fallback) {
@@ -256,8 +136,12 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
 }
 
 /// Guest self-enrollment — cities/rooms and enrollment flag (no auth).
-Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog() async {
-  return ngmyCivicInvokeAnon({'action': 'civicPublicCatalog'});
+/// Pass [state] so Network only receives that state's cities (not the full US map).
+Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog({String state = ''}) async {
+  return ngmyCivicInvokeAnon({
+    'action': 'civicPublicCatalog',
+    if (state.trim().isNotEmpty) 'state': state.trim(),
+  });
 }
 
 /// Immediate single-member save to database (registrar / admin enroll).

@@ -1,26 +1,18 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_platform_graphics.dart';
-import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-
 import 'ngmy_civic_enroll_link.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_id_card.dart';
-import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_network_resilience.dart';
-import 'ngmy_settings_cloud.dart';
 import 'ngmy_state_picker.dart';
-import 'ngmy_supabase_config.dart';
 import 'ngmy_web_status_bar.dart';
 
-const _kCivicSelfEnrollmentSettingsKey = 'civic_self_enrollment_settings';
 /// Match main app dark chrome (`0xFF121212`) so status/nav bars do not clash.
 const _kBg = Color(0xFF121212);
 const _kAccent = Color(0xFF22D3EE);
@@ -195,37 +187,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Future<Map<String, dynamic>?> _fetchConfigCatalog() async {
     try {
-      final viaEdge = await ngmyCivicFetchPublicCatalog();
+      // Edge only — never pull cities/rooms via public config/settings REST (DevTools leak).
+      final viaEdge = await ngmyCivicFetchPublicCatalog(state: _selectedState);
       if (viaEdge != null && viaEdge['ok'] == true) return viaEdge;
     } catch (e) {
       debugPrint('[civic_guest] edge catalog: $e');
     }
-    try {
-      final uri = Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1/config').replace(
-        queryParameters: {
-          'id': 'eq.1',
-          'select': 'cities,rooms,civicCitiesByState,civicSelfEnrollmentEnabled',
-        },
-      );
-      final resp = await http
-          .get(
-            uri,
-            headers: {
-              'apikey': kNgmySupabaseAnonKey,
-              'Authorization': 'Bearer $kNgmySupabaseAnonKey',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
-      if (resp.statusCode != 200) return null;
-      final decoded = jsonDecode(resp.body);
-      if (decoded is! List || decoded.isEmpty) return null;
-      final row = decoded.first;
-      if (row is! Map) return null;
-      return Map<String, dynamic>.from(row);
-    } catch (e) {
-      debugPrint('[civic_guest] config fetch: $e');
-      return null;
-    }
+    return null;
   }
 
   void _absorbCatalog(Map<String, dynamic> source) {
@@ -258,13 +226,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     });
 
     Map<String, dynamic>? configRow;
-    Map<String, dynamic>? settings;
 
     for (var attempt = 0; attempt < 5; attempt++) {
-      // Do not download civic_registry_members — roster is locked server-side.
+      // Do not download civic_registry_members or public settings REST — roster/PII locked.
       configRow ??= await _fetchConfigCatalog();
-      settings ??= await ngmyFetchSettingsValueReliable(_kCivicSelfEnrollmentSettingsKey);
-      if (configRow != null || settings != null) break;
+      if (configRow != null) break;
       if (attempt < 4) await Future<void>.delayed(Duration(milliseconds: 450 * (attempt + 1)));
     }
 
@@ -275,7 +241,6 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _members = const [];
 
     if (configRow != null) _absorbCatalog(configRow);
-    if (settings != null) _absorbCatalog(settings);
 
     if (!mounted) return;
     setState(() => _loading = false);

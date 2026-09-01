@@ -1,63 +1,24 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_ai_client.dart';
+import 'ngmy_edge_invoke.dart';
 import 'ngmy_supabase_auth.dart';
-import 'ngmy_supabase_config.dart';
 
 enum NgmyPasswordResetOtpMethod { supabase, resend }
-
-/// Password reset runs while logged out — always use the anon key, never a stale user JWT.
-String _resolveAnonKey(SupabaseClient client) {
-  final fromClient = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-  if (fromClient.isNotEmpty) return fromClient;
-  return kNgmySupabaseAnonKey;
-}
-
-Map<String, String> _anonAuthHeaders(SupabaseClient client) {
-  final anonKey = _resolveAnonKey(client);
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer $anonKey',
-    'apikey': anonKey,
-  };
-}
-
-String _functionUrl(SupabaseClient client) {
-  final restUrl = client.rest.url;
-  final base = restUrl.contains('/rest/v1') ? restUrl.substring(0, restUrl.indexOf('/rest/v1')) : restUrl;
-  return '$base/functions/v1/$kNgmySupabaseAiFunction';
-}
 
 Future<({bool ok, Map<String, dynamic>? data, String? error})> _invokePasswordResetProxy(
   Map<String, dynamic> body,
 ) async {
   await ngmyWaitForSupabaseReady();
-  final client = Supabase.instance.client;
-  final headers = _anonAuthHeaders(client);
-
   try {
-    final res = await client.functions.invoke(
-      kNgmySupabaseAiFunction,
-      body: body,
-      headers: headers,
-    );
-    return _parseProxyMap(res.status, res.data);
+    final data = await ngmyEdgeInvoke(body, anonymous: true, timeout: const Duration(seconds: 35));
+    if (data == null) {
+      return (ok: false, data: null, error: ngmyAuthReachabilityMessage('Could not reach server'));
+    }
+    return _parseProxyMap(data['ok'] == true ? 200 : 400, data);
   } catch (e) {
-    debugPrint('[pw_reset] functions.invoke: $e');
-  }
-
-  try {
-    final response = await http
-        .post(Uri.parse(_functionUrl(client)), headers: headers, body: jsonEncode(body))
-        .timeout(const Duration(seconds: 35));
-    final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
-    return _parseProxyMap(response.statusCode, decoded);
-  } catch (e) {
-    debugPrint('[pw_reset] http: $e');
+    debugPrint('[pw_reset] edge: $e');
     return (ok: false, data: null, error: ngmyAuthReachabilityMessage(e));
   }
 }

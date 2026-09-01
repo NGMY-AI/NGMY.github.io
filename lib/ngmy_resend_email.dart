@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_ai_client.dart';
+import 'ngmy_edge_invoke.dart';
 
 /// Resend.com email delivery for admin-only NGMY Helper commands.
 class NgmyResendEmail {
@@ -173,33 +173,11 @@ class NgmyResendEmail {
     };
 
     try {
-      final client = Supabase.instance.client;
-      try {
-        final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
-        return _parseProxyResponse(res.status, res.data);
-      } catch (e) {
-        debugPrint('[resend] functions.invoke failed: $e');
+      final data = await ngmyEdgeInvoke(body, timeout: const Duration(seconds: 35));
+      if (data != null) {
+        return _parseProxyResponse(data['ok'] == true ? 200 : 400, data);
       }
-
-      final restUrl = client.rest.url;
-      final base = restUrl.contains('/rest/v1') ? restUrl.substring(0, restUrl.indexOf('/rest/v1')) : restUrl;
-      final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-      final session = client.auth.currentSession;
-      final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-      final token = session?.accessToken ?? anonKey;
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              if (anonKey.isNotEmpty) 'apikey': anonKey,
-            },
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 35));
-      final decoded = response.body.isNotEmpty ? jsonDecode(response.body) : <String, dynamic>{};
-      return _parseProxyResponse(response.statusCode, decoded);
+      return (ok: false, messageId: null, error: 'Email proxy unavailable.');
     } catch (e) {
       return (ok: false, messageId: null, error: _friendlyError(e.toString()));
     }

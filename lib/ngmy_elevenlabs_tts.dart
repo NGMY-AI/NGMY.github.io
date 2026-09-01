@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_edge_invoke.dart';
 
 /// ElevenLabs text-to-speech for translated chat messages (English / Swahili).
 class NgmyElevenLabsTts {
@@ -221,47 +222,25 @@ class NgmyElevenLabsTts {
     required String text,
     required String langCode,
     required String modelId,
-    String action = 'tts',
+    String action = 'elevenlabsTts',
   }) async {
     try {
-      final client = Supabase.instance.client;
       final body = {
-        'action': action,
+        'action': 'elevenlabsTts',
         'text': text,
         'langCode': langCode,
         'voiceId': voiceForLang(langCode),
         'modelId': modelId,
       };
-
-      try {
-        final res = await client.functions.invoke(functionName, body: body);
-        final parsed = _parseProxyResponse(res.status, res.data);
+      final data = await ngmyEdgeInvoke(body, timeout: const Duration(seconds: 45));
+      if (data != null) {
+        final parsed = _parseProxyResponse(data['ok'] != false ? 200 : 400, data);
         if (parsed.bytes != null) return parsed;
-        if (res.status != 404) return parsed;
-      } catch (e) {
-        debugPrint('[elevenlabs] $functionName invoke: $e');
+        if (parsed.error != null && !parsed.error!.contains('404')) return parsed;
       }
-
-      final restUrl = client.rest.url;
-      final base = restUrl.contains('/rest/v1') ? restUrl.substring(0, restUrl.indexOf('/rest/v1')) : restUrl;
-      final url = '$base/functions/v1/$functionName';
-      final session = client.auth.currentSession;
-      final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-      final token = session?.accessToken ?? anonKey;
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': 'Bearer $token',
-              if (anonKey.isNotEmpty) 'apikey': anonKey,
-            },
-            body: jsonEncode(body),
-          )
-          .timeout(const Duration(seconds: 45));
-      return _parseProxyHttp(response.statusCode, response.body);
+      return (bytes: null, error: 'Voice proxy unavailable.');
     } catch (e) {
-      debugPrint('[elevenlabs] $functionName fetch: $e');
+      debugPrint('[elevenlabs] fetch: $e');
       return (bytes: null, error: e.toString());
     }
   }

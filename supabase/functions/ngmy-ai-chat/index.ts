@@ -1083,20 +1083,30 @@ function asMemberList(raw: unknown): Record<string, unknown>[] {
     .map((e) => ({ ...(e as Record<string, unknown>) }));
 }
 
+function isRedactedCivicValue(v: unknown): boolean {
+  const s = String(v ?? "").trim();
+  if (!s) return true;
+  if (s === "***") return true;
+  if (s.includes("***")) return true;
+  return false;
+}
+
 function memberRowKey(m: Record<string, unknown>): string {
   const id = String(m.registryId ?? "").trim().toUpperCase();
   if (id) return `id:${id}`;
   const em = emailKey(String(m.email ?? ""));
-  if (em) return `em:${em}`;
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
   return "";
 }
 
 function memberDetailScore(m: Record<string, unknown>): number {
   let s = 0;
-  if (String(m.phone ?? "").trim()) s += 2;
-  if (String(m.homeAddress ?? "").trim()) s += 2;
-  if (String(m.dob ?? "").trim()) s += 2;
-  if (String(m.fullName ?? "").trim()) s += 1;
+  if (!isRedactedCivicValue(m.phone)) s += 2;
+  if (!isRedactedCivicValue(m.homeAddress)) s += 2;
+  if (!isRedactedCivicValue(m.dob)) s += 2;
+  if (!isRedactedCivicValue(m.fullName)) s += 1;
+  if (!isRedactedCivicValue(m.state)) s += 3;
+  if (!isRedactedCivicValue(m.email)) s += 2;
   return s;
 }
 
@@ -1106,8 +1116,27 @@ function preferMemberRow(
 ): Record<string, unknown> {
   const ta = Date.parse(String(a.updatedAt ?? a.enrolledAt ?? "")) || 0;
   const tb = Date.parse(String(b.updatedAt ?? b.enrolledAt ?? "")) || 0;
-  if (ta !== tb) return tb > ta ? b : a;
-  return memberDetailScore(b) > memberDetailScore(a) ? b : a;
+  let preferred = ta !== tb
+    ? (tb > ta ? b : a)
+    : (memberDetailScore(b) > memberDetailScore(a) ? b : a);
+  const other = preferred === a ? b : a;
+  preferred = { ...preferred };
+  for (const key of [
+    "registryId",
+    "state",
+    "email",
+    "phone",
+    "homeAddress",
+    "fullName",
+    "dob",
+    "city",
+    "room",
+  ]) {
+    if (isRedactedCivicValue(preferred[key]) && !isRedactedCivicValue(other[key])) {
+      preferred[key] = other[key];
+    }
+  }
+  return preferred;
 }
 
 /** Union roster rows — never drop cloud-only members when a device pushes stale local data. */
@@ -1670,6 +1699,24 @@ async function handleCivicGateVerifyIdentity(
   });
 }
 
+function stripSecretsFromCivicRow(
+  m: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...m };
+  for (const k of NETWORK_STRIP_KEYS) delete out[k];
+  // Keep operational PII for admin/registrar tools — never store/send huge photos.
+  delete out.idPhoto;
+  delete out.idPhotoData;
+  delete out.idPhotoBase64;
+  return out;
+}
+
+function civicRosterRowsForPrivileged(
+  list: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  return list.map(stripSecretsFromCivicRow);
+}
+
 async function handleCivicFetchRoster(
   req: Request,
   body: Record<string, unknown>,
@@ -1687,12 +1734,12 @@ async function handleCivicFetchRoster(
   const allDeceased = asMemberList(payload.deceased);
 
   if (role.isAdmin) {
-    return jsonOk({
-      ok: true,
+    // Never ship roster PII in browser Network — app uses local civicRegistryMembers.
+    return networkFetchOk({
       view: "admin",
-      members: redactList(allMembers, email),
-      removed: redactList(allRemoved, email),
-      deceased: redactList(allDeceased, email),
+      memberCount: allMembers.length,
+      removedCount: allRemoved.length,
+      deceasedCount: allDeceased.length,
       savedAt: payload.savedAt ?? null,
     });
   }
@@ -1727,7 +1774,7 @@ async function handleCivicFetchRoster(
     }
 
     const members = [
-      ...homeMembers,
+      ...civicRosterRowsForPrivileged(homeMembers),
       ...extraDir.filter(
         (m) =>
           !homeMembers.some(
@@ -1740,8 +1787,11 @@ async function handleCivicFetchRoster(
       view: "registrar",
       registrarState: st,
       members,
-      removed: homeRemoved,
-      deceased: [...homeDeceased, ...extraDec],
+      removed: civicRosterRowsForPrivileged(homeRemoved),
+      deceased: [
+        ...civicRosterRowsForPrivileged(homeDeceased),
+        ...extraDec,
+      ],
       savedAt: payload.savedAt ?? null,
     });
   }
@@ -1944,9 +1994,14 @@ async function handleCivicUpsertMember(
 
   const nextMembers = mergeMemberLists(members, [member]);
   const memberEmail = emailKey(String(member.email ?? ""));
-  const nextRemoved = memberEmail
-    ? removed.filter((r) => emailKey(String(r.email ?? "")) !== memberEmail)
-    : removed;
+  const memberRid = String(member.registryId ?? "").trim().toUpperCase();
+  const nextRemoved = removed.filter((r) => {
+    const re = emailKey(String(r.email ?? ""));
+    const rid = String(r.registryId ?? "").trim().toUpperCase();
+    if (memberEmail && re === memberEmail) return false;
+    if (memberRid && rid === memberRid) return false;
+    return true;
+  });
 
   const saved = await saveCivicPayload(admin, {
     members: nextMembers,
@@ -2427,11 +2482,11 @@ async function handleCivicFetchCitiesRooms(
   const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
 
   if (role.isAdmin || role.isRegistrar) {
-    return jsonOk({
-      ok: true,
-      civicCitiesByState: fullByState,
-      cities: fullCities,
-      rooms: fullRooms,
+    // Geography stays in local backup — never the full map in Network tab.
+    return networkFetchOk({
+      stateCount: Object.keys(fullByState).length,
+      cityCount: fullCities.length,
+      roomCount: fullRooms.length,
     });
   }
 
@@ -2458,8 +2513,8 @@ async function handleCivicFetchCitiesRooms(
   });
 }
 
-/** Guest self-enrollment page — cities/rooms + enrollment flag only (no roster PII). */
-async function handleCivicPublicCatalog(_body: Record<string, unknown>): Promise<Response> {
+/** Guest self-enrollment page — cities/rooms for one state + flag (no roster PII). */
+async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<Response> {
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
@@ -2479,11 +2534,31 @@ async function handleCivicPublicCatalog(_body: Record<string, unknown>): Promise
       // ignore
     }
   }
+
+  const fullByState = (citiesWrap.civicCitiesByState && typeof citiesWrap.civicCitiesByState === "object")
+    ? (citiesWrap.civicCitiesByState as Record<string, unknown>)
+    : {};
+  const fullRooms = Array.isArray(citiesWrap.rooms) ? citiesWrap.rooms : [];
+  const wantState = String(body.state ?? "").trim();
+  const sk = canonicalStateKey(wantState);
+
+  // Only one state's cities on the wire — never the full US map in Network.
+  const slice: Record<string, unknown> = {};
+  let citiesForState: unknown[] = [];
+  if (sk) {
+    for (const [k, v] of Object.entries(fullByState)) {
+      if (canonicalStateKey(k) === sk) {
+        slice[k] = v;
+        if (Array.isArray(v)) citiesForState = v;
+      }
+    }
+  }
+
   return jsonOk({
     ok: true,
-    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
-    cities: citiesWrap.cities ?? [],
-    rooms: citiesWrap.rooms ?? [],
+    civicCitiesByState: slice,
+    cities: citiesForState,
+    rooms: fullRooms,
     civicSelfEnrollmentEnabled: selfEnroll,
   });
 }
@@ -2501,33 +2576,11 @@ async function handleCivicAdminSettingsFetch(
     return jsonOk({ error: "Not allowed" }, 403);
   }
 
-  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
-  const receiptRemoved = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
-  const helpMode = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
-  const sellAccess = await loadSettingsObject(admin, STORE_SELL_ACCESS_KEY);
-  const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
-
-  const sellRaw = sellAccess.emails ?? sellAccess.items ?? [];
-  const sellList = Array.isArray(sellRaw) ? sellRaw : [];
-
-  const out: Record<string, unknown> = {
-    ok: true,
-    civicDeletedContributionIds: deleted.ids ?? deleted.keys ?? [],
-    civicContributionReceiptRemoved: receiptRemoved,
-    civicHelpModeSettings: helpMode,
-    storeSellAccessEmails: sellList.map((e) =>
-      typeof e === "string" ? maskEmailNetwork(String(e)) : e,
-    ),
-    civicCitiesByState: citiesWrap.civicCitiesByState ?? {},
-    cities: citiesWrap.cities ?? [],
-    rooms: citiesWrap.rooms ?? [],
-  };
-
-  if (!role.isAdmin) {
-    delete out.storeSellAccessEmails;
-  }
-
-  return jsonOk(out);
+  // Never put emails, phones, Zelle, CashApp, or deleted-contribution IDs on the
+  // wire (browser Network tab). App keeps working from local prefs/cache.
+  return networkFetchOk({
+    view: role.isAdmin ? "admin" : "registrar",
+  });
 }
 
 async function handleCivicAdminSettingsPersist(
@@ -2606,8 +2659,11 @@ async function handleTransactionsFetch(
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
-  const limit = Math.min(Math.max(Number(body.limit ?? 1000), 1), 10000);
   const pendingWallet = body.pendingWallet === true;
+  const rawLimit = Number(body.limit ?? 0);
+  const limit = role.isAdmin
+    ? (rawLimit > 0 ? Math.max(rawLimit, 1) : 500000)
+    : Math.min(Math.max(rawLimit > 0 ? rawLimit : 1000, 1), 10000);
 
   let query = admin
     .from("transactions")
@@ -2676,7 +2732,42 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const action = String(body?.action ?? "chat").trim();
+    const wireCode = String(body?.a ?? "").trim();
+    const WIRE_TO_ACTION: Record<string, string> = {
+      u1: "adminUsersList",
+      p1: "privateListsFetch",
+      p2: "privateListsPersist",
+      t1: "transactionsFetch",
+      c1: "civicVerifyStatePin",
+      c2: "civicGateMatchName",
+      c3: "civicGateVerifyIdentity",
+      c4: "civicFetchRoster",
+      c5: "civicUpsertMember",
+      c6: "civicRemoveMember",
+      c7: "civicMarkDeceased",
+      c8: "civicPersistRoster",
+      c9: "civicGuestEnroll",
+      ca: "civicPublicCatalog",
+      cb: "civicFetchRegistryPins",
+      cc: "civicSaveRegistryPins",
+      cd: "civicFetchRegistrarApplications",
+      ce: "civicPersistRegistrarApplications",
+      cf: "civicFetchCitiesRooms",
+      cg: "civicAdminSettingsFetch",
+      ch: "civicAdminSettingsPersist",
+      a1: "aiKeyConfigured",
+      a2: "saveAiApiKey",
+      a3: "verifyPasswordLogin",
+      a4: "registerAppUser",
+      a5: "passwordResetSendOtp",
+      a6: "passwordResetVerifyOtp",
+      v1: "elevenlabsTts",
+      m1: "resendEmail",
+      i1: "geminiVirtualOutfit",
+      i2: "pollinationsImage",
+      z0: "chat",
+    };
+    const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
     // Client-supplied apiKey is ignored for AI calls (security). Admin save/login use explicit fields.
     const clientApiKeyIgnored = String(body?.apiKey ?? "").trim();
 
@@ -2704,7 +2795,9 @@ serve(async (req) => {
     }
 
     if (action === "saveAiApiKey") {
-      const requesterEmail = String(body?.requesterEmail ?? "").trim().toLowerCase();
+      const requesterEmail =
+        (await requireJwtEmail(req)) ||
+        String(body?.requesterEmail ?? "").trim().toLowerCase();
       const apiKey = String(body?.apiKey ?? "").trim();
       return await handleSaveAiApiKey(requesterEmail, apiKey);
     }
@@ -2804,7 +2897,9 @@ serve(async (req) => {
     }
 
     if (action === "resendEmail") {
-      const requesterEmail = String(body?.requesterEmail ?? "").trim().toLowerCase();
+      const requesterEmail =
+        (await requireJwtEmail(req)) ||
+        String(body?.requesterEmail ?? "").trim().toLowerCase();
       if (!requesterEmail || !NGMY_ADMIN_EMAILS.has(requesterEmail)) {
         return new Response(JSON.stringify({ error: "Admin access required for email send" }), {
           status: 403,

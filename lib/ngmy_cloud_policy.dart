@@ -11,7 +11,6 @@ class NgmyCloudPolicy {
   static const Set<String> cloudConfigKeys = {
     'civicSelfEnrollmentEnabled',
     'storeListings',
-    'storeSellAccessEmails',
     'ngmyPopups',
     'ngmyVideoPopups',
     'familyTreeCreateFee',
@@ -25,6 +24,7 @@ class NgmyCloudPolicy {
     'rooms',
     'storeOrders',
     'storeInquiries',
+    'storeSellAccessEmails',
     'loanApplications',
     'gameInvites',
     'jobWorkerApplications',
@@ -38,6 +38,13 @@ class NgmyCloudPolicy {
     'civicRegistryMembers',
     'civicRegistryPin',
     'civicRegistryPinsByState',
+    'helpPhone',
+    'helpZelle',
+    'helpCashApp',
+    'helpModeByState',
+    'civicHelpModeSettings',
+    'civicDeletedContributionIds',
+    'civicContributionReceiptRemoved',
     'geminiApiKey',
     'gemini_api_key',
     'aiApiKey',
@@ -75,9 +82,12 @@ class NgmyCloudPolicy {
   static const bool persistAnnouncementsToCloud = false;
 
     /// ngmy_settings keys readable without admin JWT (matches SQL allowlist).
+  /// Never put civic geography, help contacts, or contribution PII here — those
+  /// leak in the browser Network tab via anon REST.
   static bool settingsKeyPublicReadable(String key) {
     final k = key.trim();
     if (k.isEmpty) return false;
+    if (settingsKeyNetworkSensitive(k)) return false;
     const exact = {
       'ngmy_popups',
       'ngmy_chat_closed',
@@ -85,7 +95,6 @@ class NgmyCloudPolicy {
       'privacy_policy',
       'investment_plans',
       'ngmy_app_branding',
-      'civic_self_enrollment_settings',
       'home_vote_ad_campaign',
       'ngmy_menu_publish_registry',
       'ngmy_bio_publish_registry',
@@ -97,6 +106,37 @@ class NgmyCloudPolicy {
     if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
     if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
     if (k.startsWith('ngmy_essentials_code_v1_')) return true;
+    return false;
+  }
+
+  /// Keys that must never be downloaded via public REST (visible in DevTools).
+  /// Load through Edge (role-filtered / networkEmpty) or local prefs only.
+  static bool settingsKeyNetworkSensitive(String key) {
+    final k = key.trim();
+    if (k.isEmpty) return false;
+    const exact = {
+      'civic_self_enrollment_settings',
+      'civic_cities_rooms',
+      'civic_help_mode_settings',
+      'civic_deleted_contribution_ids',
+      'civic_contribution_receipt_removed',
+      'civic_registry_members',
+      'civic_registry_pins',
+      'civic_state_registrar_subscriptions',
+      'store_sell_access_emails',
+      'management_operational_lists',
+      'family_tree_photo_access',
+      'civic_help_campaign_spendings',
+      'game_invites',
+      'store_inquiries',
+      'store_orders',
+      'media_virtual_profiles',
+      'ngmy_family_tree_backup_codes_v1',
+      'ngmy_family_tree_qr_stashes_v1',
+    };
+    if (exact.contains(k)) return true;
+    if (k.startsWith('civic_')) return true;
+    if (k.contains('email') || k.contains('phone') || k.contains('password')) return true;
     return false;
   }
 

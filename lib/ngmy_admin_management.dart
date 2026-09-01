@@ -872,14 +872,27 @@ Future<bool> ngmyPersistTranslatePaymentSettings(AppConfig config) async {
 Future<void> ngmyHydrateCivicSelfEnrollmentFromAllBackups(AppConfig config) async {
   final local = await NgmyCivicSelfEnrollment.loadLocalPayload();
   await NgmyCivicSelfEnrollment.hydrateLocal(config);
-  if (await ngmyCanReachCloud()) {
-    final row = await _fetchNgmySettingSafe(_kNgmyCivicSelfEnrollmentSettingsKey);
-    if (row != null && row.isNotEmpty) {
-      NgmyCivicSelfEnrollment.applyCloudOverLocal(config, row, local);
-      // Keep local prefs aligned with the resolved value.
+  // Do NOT fetch civic_self_enrollment_settings over REST — that row historically
+  // contained cities/rooms and showed them in DevTools. Flag comes from config column.
+  if (!await ngmyCanReachCloud()) return;
+  try {
+    final cfg = await _fetchNgmyConfigRow(columns: 'civicSelfEnrollmentEnabled');
+    if (cfg != null && cfg.containsKey('civicSelfEnrollmentEnabled')) {
+      final cloud = <String, dynamic>{
+        'civicSelfEnrollmentEnabled': cfg['civicSelfEnrollmentEnabled'] == true,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      };
+      NgmyCivicSelfEnrollment.applyCloudOverLocal(config, cloud, local);
       await NgmyCivicSelfEnrollment.saveLocalBackup(config);
     }
+  } catch (e) {
+    debugPrint('[civic self enrollment] hydrate from config: $e');
   }
+  // Write-only scrub: replace any legacy cities/rooms blob with flag-only (no GET).
+  unawaited(ngmyUpsertSettingsRowReliable(
+    _kNgmyCivicSelfEnrollmentSettingsKey,
+    NgmyCivicSelfEnrollment.payload(config),
+  ));
 }
 
 Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
@@ -897,15 +910,9 @@ Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
     }
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
     await _persistOperationalConfigToCloud(config);
-    // Verify the public flag guests will read.
+    // Verify write succeeded without re-downloading the sensitive settings blob.
     if (cloudOk) {
-      final verify = await ngmyFetchSettingsValueViaRest(_kNgmyCivicSelfEnrollmentSettingsKey);
-      final on = verify != null &&
-          (verify['civicSelfEnrollmentEnabled'] == true ||
-              verify['civicSelfEnrollmentEnabled']?.toString().toLowerCase() == 'true');
-      if (config.civicSelfEnrollmentEnabled && !on) {
-        cloudOk = await ngmyUpsertSettingsRowReliable(_kNgmyCivicSelfEnrollmentSettingsKey, payload);
-      }
+      // Guests read enrollment via Edge civicPublicCatalog — not public REST.
     }
   }
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
@@ -942,6 +949,11 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
           'removed': row['removed'] ?? const [],
           'deceased': row['deceased'] ?? const [],
         });
+        // Older edge builds redacted state to "***" — repair so Members shows everyone.
+        NgmyCivicRegistryMembers.repairRedactedFields(
+          config,
+          fallbackState: resolvedState,
+        );
         await NgmyCivicRegistryMembers.saveLocalBackup(config);
       }
     }
