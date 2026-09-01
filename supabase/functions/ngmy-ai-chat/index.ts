@@ -1703,8 +1703,10 @@ function stripSecretsFromCivicRow(
   m: Record<string, unknown>,
 ): Record<string, unknown> {
   const out = { ...m };
-  for (const k of NETWORK_STRIP_KEYS) delete out[k];
-  // Keep operational PII for admin/registrar tools — never store/send huge photos.
+  // Keep homeAddress/dob for registrar roster tools — only strip true secrets.
+  for (const k of ["passwordHash", "password_hash", "governmentID", "GovernmentID", "ssn", "socialSecurity"]) {
+    delete out[k];
+  }
   delete out.idPhoto;
   delete out.idPhotoData;
   delete out.idPhotoBase64;
@@ -2033,9 +2035,18 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const admin = adminClient();
   if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
 
+  const linkToken = String(body.linkToken ?? body.t ?? "").trim();
+  const linkOk = await validateStateEnrollmentLink(admin, state, linkToken);
+  if (!linkOk) {
+    return jsonOk({
+      ok: false,
+      error: "This enrollment link is no longer valid. Ask your Authorized Registrar for the current link.",
+    }, 403);
+  }
+
   // Honor admin self-enrollment toggle unless this is a registrar-attributed link.
   if (!registrarToken) {
-    const se = await loadSettingsObject(admin, "civic_self_enrollment_settings");
+    const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
     let selfEnroll =
       se.civicSelfEnrollmentEnabled === true ||
       String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
@@ -2245,6 +2256,185 @@ const CIVIC_DELETED_CONTRIB_KEY = "civic_deleted_contribution_ids";
 const CIVIC_RECEIPT_REMOVED_KEY = "civic_contribution_receipt_removed";
 const CIVIC_HELP_MODE_KEY = "civic_help_mode_settings";
 const STORE_SELL_ACCESS_KEY = "store_sell_access_emails";
+const CIVIC_SELF_ENROLL_SETTINGS_KEY = "civic_self_enrollment_settings";
+
+function randomEnrollmentLinkToken(): string {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36])
+    .join("");
+}
+
+function stateEnrollmentLinksMap(
+  se: Record<string, unknown>,
+): Record<string, Record<string, unknown>> {
+  const raw = se.stateEnrollmentLinks;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      out[k] = v as Record<string, unknown>;
+    }
+  }
+  return out;
+}
+
+async function stateEnrollmentTokenIssued(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  state: string,
+): Promise<boolean> {
+  const sk = canonicalStateKey(state);
+  if (!sk) return false;
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  const links = stateEnrollmentLinksMap(se);
+  const token = String(links[sk]?.token ?? "").trim();
+  return token.length > 0;
+}
+
+async function validateStateEnrollmentLink(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  state: string,
+  token: string,
+): Promise<boolean> {
+  const sk = canonicalStateKey(state);
+  const t = token.trim().toLowerCase();
+  if (!sk) return false;
+  const issued = await stateEnrollmentTokenIssued(admin, state);
+  if (!issued) return true;
+  if (!t) return false;
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  const links = stateEnrollmentLinksMap(se);
+  const expected = String(links[sk]?.token ?? "").trim().toLowerCase();
+  return expected.length > 0 && expected === t;
+}
+
+async function ensureStateEnrollmentLink(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  state: string,
+  { rotate = false } = {},
+): Promise<string> {
+  const sk = canonicalStateKey(state);
+  if (!sk) return "";
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
+  const links = stateEnrollmentLinksMap(se);
+  const prev = links[sk];
+  const prevToken = String(prev?.token ?? "").trim();
+  if (!rotate && prevToken) return prevToken;
+  const token = randomEnrollmentLinkToken();
+  links[sk] = { token, issuedAt: new Date().toISOString() };
+  await saveSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY, {
+    ...se,
+    stateEnrollmentLinks: links,
+  });
+  return token;
+}
+
+async function handleCivicFetchEnrollmentLink(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+  const state = displayStateName(
+    String(body.state ?? (role.isRegistrar ? role.registrarState : "")).trim(),
+  );
+  if (!state) return jsonOk({ ok: false, error: "State required" }, 400);
+  if (role.isRegistrar && !role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    const want = canonicalStateKey(state);
+    if (home && want && home !== want) {
+      return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
+    }
+  }
+  const token = await ensureStateEnrollmentLink(admin, state, { rotate: false });
+  const registrarToken = role.isRegistrar
+    ? String(body.registrarToken ?? "").trim()
+    : "";
+  const stateCode = stateCodeFromName(state);
+  const params = ["civic=enroll", `s=${stateCode}`, `t=${token}`];
+  if (registrarToken) params.push(`r=${registrarToken}`);
+  else if (role.isRegistrar) {
+    params.push(`r=${registrarLinkTokenFromEmail(email)}`);
+  }
+  return jsonOk({
+    ok: true,
+    state,
+    linkToken: token,
+    url: `https://ngmy.org/?${params.join("&")}`,
+  });
+}
+
+function registrarLinkTokenFromEmail(email: string): string {
+  const bytes = new TextEncoder().encode(emailKey(email));
+  let hash = 0x811c9dc5;
+  for (const b of bytes) {
+    hash ^= b;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function stateCodeFromName(state: string): string {
+  const sk = canonicalStateKey(state);
+  const codes: Record<string, string> = {
+    alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+    colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA",
+    hawaii: "HI", idaho: "ID", illinois: "IL", indiana: "IN", iowa: "IA",
+    kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD",
+    massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS",
+    missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV",
+    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+    "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK",
+    oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+    virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI",
+    wyoming: "WY",
+  };
+  return codes[sk] ?? state.slice(0, 2).toUpperCase();
+}
+
+async function handleCivicRegenerateEnrollmentLink(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ ok: false, error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ ok: false, error: "Registrar or admin required" }, 403);
+  }
+  const state = displayStateName(
+    String(body.state ?? (role.isRegistrar ? role.registrarState : "")).trim(),
+  );
+  if (!state) return jsonOk({ ok: false, error: "State required" }, 400);
+  if (role.isRegistrar && !role.isAdmin) {
+    const home = canonicalStateKey(role.registrarState);
+    const want = canonicalStateKey(state);
+    if (home && want && home !== want) {
+      return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
+    }
+  }
+  const token = await ensureStateEnrollmentLink(admin, state, { rotate: true });
+  const stateCode = stateCodeFromName(state);
+  const params = ["civic=enroll", `s=${stateCode}`, `t=${token}`];
+  if (role.isRegistrar) params.push(`r=${registrarLinkTokenFromEmail(email)}`);
+  return jsonOk({
+    ok: true,
+    state,
+    linkToken: token,
+    url: `https://ngmy.org/?${params.join("&")}`,
+    rotated: true,
+  });
+}
 
 async function loadSettingsObject(
   admin: NonNullable<ReturnType<typeof adminClient>>,
@@ -2552,7 +2742,7 @@ async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const citiesWrap = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
-  const se = await loadSettingsObject(admin, "civic_self_enrollment_settings");
+  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
   let selfEnroll =
     se.civicSelfEnrollmentEnabled === true ||
     String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
@@ -2575,6 +2765,10 @@ async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<
   const fullRooms = Array.isArray(citiesWrap.rooms) ? citiesWrap.rooms : [];
   const wantState = String(body.state ?? "").trim();
   const sk = canonicalStateKey(wantState);
+  const linkToken = String(body.linkToken ?? body.t ?? "").trim();
+  const linkValid = wantState
+    ? await validateStateEnrollmentLink(admin, wantState, linkToken)
+    : true;
 
   // Only one state's cities on the wire — never the full US map in Network.
   const slice: Record<string, unknown> = {};
@@ -2593,7 +2787,8 @@ async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<
     civicCitiesByState: slice,
     cities: citiesForState,
     rooms: fullRooms,
-    civicSelfEnrollmentEnabled: selfEnroll,
+    civicSelfEnrollmentEnabled: selfEnroll && linkValid,
+    enrollmentLinkValid: linkValid,
   });
 }
 
@@ -2789,6 +2984,8 @@ serve(async (req) => {
       cf: "civicFetchCitiesRooms",
       cg: "civicAdminSettingsFetch",
       ch: "civicAdminSettingsPersist",
+      ci: "civicFetchEnrollmentLink",
+      cj: "civicRegenerateEnrollmentLink",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -2875,6 +3072,12 @@ serve(async (req) => {
     }
     if (action === "civicPublicCatalog") {
       return await handleCivicPublicCatalog(body as Record<string, unknown>);
+    }
+    if (action === "civicFetchEnrollmentLink") {
+      return await handleCivicFetchEnrollmentLink(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRegenerateEnrollmentLink") {
+      return await handleCivicRegenerateEnrollmentLink(req, body as Record<string, unknown>);
     }
     if (action === "civicFetchRegistryPins") {
       return await handleCivicFetchRegistryPins(req, body as Record<string, unknown>);

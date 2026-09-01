@@ -109,6 +109,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   // has no cities configured yet.
   bool _stateLockedFromLink = false;
   String _registrarToken = '';
+  String _stateLinkToken = '';
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
@@ -132,6 +133,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _selectedState = linkedState ?? 'Georgia';
     _stateLockedFromLink = linkedState != null;
     _registrarToken = _registrarFromLaunchUrl();
+    _stateLinkToken = _stateLinkTokenFromLaunchUrl();
     unawaited(_load());
   }
 
@@ -180,6 +182,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
   }
 
+  String _stateLinkTokenFromLaunchUrl() {
+    try {
+      return (Uri.base.queryParameters['t'] ?? '').trim().toLowerCase();
+    } catch (_) {
+      return '';
+    }
+  }
+
   List<String> _citiesForState() => NgmyCivicRegistryStats.citiesForState(
         civicCitiesByState: _citiesByState,
         legacyCities: _legacyCities,
@@ -189,7 +199,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   Future<Map<String, dynamic>?> _fetchConfigCatalog() async {
     try {
       // Edge only — never pull cities/rooms via public config/settings REST (DevTools leak).
-      final viaEdge = await ngmyCivicFetchPublicCatalog(state: _selectedState);
+      final viaEdge = await ngmyCivicFetchPublicCatalog(
+        state: _selectedState,
+        linkToken: _stateLinkToken,
+      );
       if (viaEdge != null && viaEdge['ok'] == true) return viaEdge;
     } catch (e) {
       debugPrint('[civic_guest] edge catalog: $e');
@@ -332,6 +345,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         'familyMales': males,
         'familyFemales': females,
         'registeredByToken': _registrarToken,
+        if (_stateLinkToken.isNotEmpty) 'linkToken': _stateLinkToken,
       });
       if (!result.ok) {
         if (result.duplicate != null) {

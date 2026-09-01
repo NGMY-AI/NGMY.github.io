@@ -22681,12 +22681,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   subtitle: const Text('Your own link — members who self-enroll through it are attributed to you'),
                   trailing: const Icon(Icons.copy_rounded, color: Color(0xFF6200EE)),
                   onTap: () async {
-                    final link = ngmyCivicSelfEnrollmentShareUrl(state: widget.user.state, registrarEmail: widget.user.email);
+                    final fetched = await ngmyCivicFetchEnrollmentLink(
+                      email: widget.user.email,
+                      state: widget.user.state,
+                    );
+                    final link = fetched.ok && fetched.url.isNotEmpty
+                        ? fetched.url
+                        : ngmyCivicSelfEnrollmentShareUrl(
+                            state: widget.user.state,
+                            registrarEmail: widget.user.email,
+                            stateLinkToken: fetched.linkToken,
+                          );
                     await Clipboard.setData(ClipboardData(text: link));
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Enrollment link copied:\n$link'),
+                        content: Text('Enrollment link copied for ${widget.user.state}'),
                         backgroundColor: const Color(0xFF059669),
                       ),
                     );
@@ -30779,13 +30789,44 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.dispose();
   }
 
-  Future<void> _copyCivicEnrollShareLink() async {
-    final link = ngmyCivicSelfEnrollmentShareUrl(state: _selectedState, registrarEmail: widget.user.email);
+  Future<void> _copyCivicEnrollShareLink({bool regenerate = false}) async {
+    final fetched = regenerate
+        ? await ngmyCivicRegenerateEnrollmentLink(
+            email: widget.user.email,
+            state: _selectedState,
+          )
+        : await ngmyCivicFetchEnrollmentLink(
+            email: widget.user.email,
+            state: _selectedState,
+          );
+    var link = fetched.ok && fetched.url.isNotEmpty
+        ? fetched.url
+        : ngmyCivicSelfEnrollmentShareUrl(
+            state: _selectedState,
+            registrarEmail: widget.user.email,
+            stateLinkToken: fetched.linkToken,
+          );
+    if (kIsWeb) {
+      try {
+        final origin = Uri.base.origin;
+        if (origin.isNotEmpty && fetched.linkToken.isNotEmpty) {
+          final params = <String>['civic=enroll'];
+          params.add('s=${NgmyCivicRegistryIdCard.stateCode(_selectedState)}');
+          params.add('t=${fetched.linkToken}');
+          params.add('r=${NgmyCivicRegistryMembers.registrarLinkToken(widget.user.email)}');
+          link = '$origin/?${params.join('&')}';
+        }
+      } catch (_) {}
+    }
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Your enrollment link for $_selectedState copied — members who use it are attributed to you'),
+        content: Text(
+          regenerate
+              ? 'New enrollment link for $_selectedState copied — older links no longer work'
+              : 'Enrollment link for $_selectedState copied — share this one link only',
+        ),
         backgroundColor: const Color(0xFF059669),
       ),
     );
@@ -39611,10 +39652,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ),
                   if (_canUseRegistrarToolsHere())
                     SelectionContainer.disabled(
-                      child: IconButton(
-                        onPressed: _copyCivicEnrollShareLink,
-                        icon: const Icon(Icons.link_rounded, color: Colors.white, size: 26),
-                        tooltip: 'Copy enrollment link to send to users',
+                      child: GestureDetector(
+                        onLongPress: () async {
+                          final ok = await showNgmyLightConfirm(
+                            context,
+                            title: 'Create new enrollment link?',
+                            message:
+                                'This replaces the current $_selectedState self-enrollment link. Anyone using an older link will not be able to enroll.',
+                            cancelLabel: 'Keep current link',
+                            confirmLabel: 'New link',
+                            icon: Icons.link_off_rounded,
+                            destructive: true,
+                          );
+                          if (ok == true) unawaited(_copyCivicEnrollShareLink(regenerate: true));
+                        },
+                        child: IconButton(
+                          onPressed: _copyCivicEnrollShareLink,
+                          icon: const Icon(Icons.link_rounded, color: Colors.white, size: 26),
+                          tooltip: 'Copy enrollment link (hold for new link)',
+                        ),
                       ),
                     ),
                 ],
@@ -40553,13 +40609,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No members in the current view.')));
       return;
     }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final amountC = TextEditingController();
     final deleteCountC = TextEditingController();
     final searchC = TextEditingController();
-    final result = await showDialog<Map<String, dynamic>>(
+    var membersExpanded = false;
+    var clearExpanded = false;
+    var removeExpanded = false;
+
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) {
+        builder: (ctx, setSheet) {
           List<UserData> matchesForQuery(String query) {
             final q = query.trim().toLowerCase();
             if (q.isEmpty) return List<UserData>.from(visibleMembers);
@@ -40578,6 +40641,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           final maxMissed = withMissed.isEmpty
               ? 0
               : withMissed.map((m) => m.missed).reduce((a, b) => a > b ? a : b);
+          final sheetBg = isDark ? const Color(0xFF1A1A1A) : Colors.white;
+          final border = isDark ? Colors.white12 : Colors.black12;
 
           Future<void> deleteOne(UserData m) async {
             final name = m.fullName ?? m.username;
@@ -40600,164 +40665,280 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             Navigator.pop(ctx, {'action': 'delete', 'members': [m]});
           }
 
-          return AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.cleaning_services, color: Colors.red, size: 22),
-                SizedBox(width: 8),
-                Expanded(child: Text('Clear Missed & Remove')),
-              ],
-            ),
-            content: SizedBox(
-              width: 460,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: searchC,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        labelText: 'Search by name, ID, or email',
-                        hintText: 'e.g. Member',
-                        prefixIcon: const Icon(Icons.search, size: 20),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        isDense: true,
-                      ),
-                      onChanged: (_) => setDialog(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      query.isEmpty
-                          ? '${searchResults.length} member(s) in current view'
-                          : '${searchResults.length} match(es) for "$query"',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: searchResults.isEmpty
-                          ? const Padding(
-                              padding: EdgeInsets.all(24),
-                              child: Center(child: Text('No matches', style: TextStyle(color: Colors.grey))),
-                            )
-                          : ListView.separated(
-                              shrinkWrap: true,
-                              itemCount: searchResults.length,
-                              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
-                              itemBuilder: (_, i) {
-                                final m = searchResults[i];
-                                final label = m.fullName ?? m.username;
-                                return ListTile(
-                                  dense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                                  title: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                  subtitle: Text(
-                                    '${m.missed} missed · ${(m.registryId ?? '').trim().isEmpty ? m.email : m.registryId}',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                                    tooltip: 'Remove member',
-                                    onPressed: () => deleteOne(m),
-                                  ),
-                                );
-                              },
+          Widget sectionShell({
+            required String title,
+            required IconData icon,
+            required Color accent,
+            required bool expanded,
+            required VoidCallback onToggle,
+            required Widget child,
+            String? subtitle,
+          }) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF242424) : const Color(0xFFF8F7FC),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: border),
+              ),
+              child: Column(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: onToggle,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text('Clear missed count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-                    const SizedBox(height: 6),
-                    if (withMissed.isEmpty)
-                      Text(
-                        'No matches have a missed count.',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                      )
-                    else ...[
-                      Text(
-                        '${withMissed.length} match(es) with missed (highest: $maxMissed).',
-                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                            child: Icon(icon, size: 18, color: accent),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                                if (subtitle != null)
+                                  Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              ],
+                            ),
+                          ),
+                          Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: Colors.grey),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: amountC,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: InputDecoration(
-                          labelText: 'How many missed to clear',
-                          hintText: 'e.g. 1',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          isDense: true,
+                    ),
+                  ),
+                  if (expanded)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                      child: child,
+                    ),
+                ],
+              ),
+            );
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
+              decoration: BoxDecoration(
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 24, offset: const Offset(0, -4))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFDC2626)]),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.cleaning_services_rounded, color: Colors.white, size: 22),
                         ),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    Text('Remove members', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Delete the first N matches from your search (use trash on one row to remove just that person).',
-                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Clear & Remove', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                              Text('Search members, then clear missed or remove', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            ],
+                          ),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: deleteCountC,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      controller: searchC,
+                      onChanged: (_) => setSheet(() {}),
                       decoration: InputDecoration(
-                        labelText: 'How many matches to remove',
-                        hintText: searchResults.isEmpty ? '0' : '1–${searchResults.length}',
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        isDense: true,
+                        hintText: 'Search name, ID, or email…',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      child: Column(
+                        children: [
+                          sectionShell(
+                            title: 'Matching members',
+                            subtitle: query.isEmpty
+                                ? '${searchResults.length} in current view'
+                                : '${searchResults.length} match(es) for "$query"',
+                            icon: Icons.people_outline_rounded,
+                            accent: const Color(0xFF6200EE),
+                            expanded: membersExpanded,
+                            onToggle: () => setSheet(() => membersExpanded = !membersExpanded),
+                            child: searchResults.isEmpty
+                                ? const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Text('No matches', style: TextStyle(color: Colors.grey)),
+                                  )
+                                : ConstrainedBox(
+                                    constraints: const BoxConstraints(maxHeight: 200),
+                                    child: ListView.separated(
+                                      shrinkWrap: true,
+                                      itemCount: searchResults.length,
+                                      separatorBuilder: (_, __) => Divider(height: 1, color: border),
+                                      itemBuilder: (_, i) {
+                                        final m = searchResults[i];
+                                        final label = m.fullName ?? m.username;
+                                        return ListTile(
+                                          dense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                          title: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                          subtitle: Text(
+                                            '${m.missed} missed · ${(m.registryId ?? '').trim().isEmpty ? m.email : m.registryId}',
+                                            style: const TextStyle(fontSize: 11),
+                                          ),
+                                          trailing: IconButton(
+                                            icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                                            onPressed: () => deleteOne(m),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                          ),
+                          sectionShell(
+                            title: 'Clear missed',
+                            subtitle: withMissed.isEmpty ? 'No matches have missed' : 'Up to $maxMissed missed · ${withMissed.length} member(s)',
+                            icon: Icons.exposure_neg_1_rounded,
+                            accent: Colors.orange.shade700,
+                            expanded: clearExpanded,
+                            onToggle: () => setSheet(() => clearExpanded = !clearExpanded),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextField(
+                                  controller: amountC,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  decoration: InputDecoration(
+                                    labelText: 'How many to subtract',
+                                    hintText: 'e.g. 1',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    isDense: true,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                FilledButton(
+                                  onPressed: withMissed.isEmpty
+                                      ? null
+                                      : () {
+                                          final n = int.tryParse(amountC.text.trim()) ?? 0;
+                                          if (n <= 0) {
+                                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                              const SnackBar(content: Text('Enter how many missed to clear.')),
+                                            );
+                                            return;
+                                          }
+                                          Navigator.pop(ctx, {'action': 'clear', 'amount': n, 'members': withMissed});
+                                        },
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.orange.shade700,
+                                    minimumSize: const Size(double.infinity, 44),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: const Text('Clear missed for matches'),
+                                ),
+                              ],
+                            ),
+                          ),
+                          sectionShell(
+                            title: 'Remove members',
+                            subtitle: 'Delete first N search matches',
+                            icon: Icons.person_remove_alt_1_rounded,
+                            accent: Colors.red.shade600,
+                            expanded: removeExpanded,
+                            onToggle: () => setSheet(() => removeExpanded = !removeExpanded),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                TextField(
+                                  controller: deleteCountC,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                                  decoration: InputDecoration(
+                                    labelText: 'How many to remove',
+                                    hintText: searchResults.isEmpty ? '0' : '1–${searchResults.length}',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    isDense: true,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                FilledButton.icon(
+                                  onPressed: searchResults.isEmpty
+                                      ? null
+                                      : () {
+                                          final n = int.tryParse(deleteCountC.text.trim()) ?? 0;
+                                          if (n <= 0 || n > searchResults.length) {
+                                            ScaffoldMessenger.of(ctx).showSnackBar(
+                                              SnackBar(content: Text('Enter 1–${searchResults.length} to remove.')),
+                                            );
+                                            return;
+                                          }
+                                          Navigator.pop(ctx, {
+                                            'action': 'delete',
+                                            'members': searchResults.take(n).toList(),
+                                          });
+                                        },
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                                  label: const Text('Remove matches'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.red.shade600,
+                                    minimumSize: const Size(double.infinity, 44),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              if (withMissed.isNotEmpty)
-                OutlinedButton(
-                  onPressed: () {
-                    final n = int.tryParse(amountC.text.trim()) ?? 0;
-                    if (n <= 0) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
-                      return;
-                    }
-                    Navigator.pop(ctx, {'action': 'clear', 'amount': n, 'members': withMissed});
-                  },
-                  child: const Text('Clear missed'),
-                ),
-              FilledButton.icon(
-                onPressed: searchResults.isEmpty
-                    ? null
-                    : () {
-                        final n = int.tryParse(deleteCountC.text.trim()) ?? 0;
-                        if (n <= 0 || n > searchResults.length) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(content: Text('Enter 1–${searchResults.length} to remove.')),
-                          );
-                          return;
-                        }
-                        Navigator.pop(ctx, {
-                          'action': 'delete',
-                          'members': searchResults.take(n).toList(),
-                        });
-                      },
-                icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('Remove matches'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.red),
-              ),
-            ],
           );
         },
       ),
     );
+    amountC.dispose();
+    deleteCountC.dispose();
+    searchC.dispose();
     if (result == null || !mounted) return;
     final action = (result['action'] ?? '').toString();
     if (action == 'clear') {
@@ -41060,6 +41241,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
               _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
               _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
+              if (manageActions && ((raw?['homeAddress'] ?? u.homeAddress ?? '').toString().trim().isNotEmpty))
+                _memberInfo(
+                  Icons.home_outlined,
+                  (raw?['homeAddress'] ?? u.homeAddress ?? '').toString().trim(),
+                  Colors.blueGrey,
+                ),
               _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
               _memberInfo(
                 Icons.family_restroom_rounded,

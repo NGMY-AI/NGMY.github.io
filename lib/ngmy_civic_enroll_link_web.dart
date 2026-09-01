@@ -7,11 +7,17 @@ bool ngmyPendingCivicSelfEnrollmentOpen = false;
 
 /// Short link, no long names/emails: 2-letter state code + a compact
 /// token derived from the registrar's email (see registrarLinkToken).
-String ngmyCivicSelfEnrollmentShareUrl({String? state, String? registrarEmail}) {
+String ngmyCivicSelfEnrollmentShareUrl({
+  String? state,
+  String? registrarEmail,
+  String? stateLinkToken,
+}) {
   final st = (state ?? '').trim();
   final reg = (registrarEmail ?? '').trim();
+  final linkT = (stateLinkToken ?? '').trim();
   final params = <String>['civic=enroll'];
   if (st.isNotEmpty) params.add('s=${NgmyCivicRegistryIdCard.stateCode(st)}');
+  if (linkT.isNotEmpty) params.add('t=$linkT');
   if (reg.isNotEmpty) params.add('r=${NgmyCivicRegistryMembers.registrarLinkToken(reg)}');
   final query = params.join('&');
   try {

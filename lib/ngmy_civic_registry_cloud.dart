@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_edge_invoke.dart';
+import 'ngmy_civic_registry_members.dart';
 
 const Duration _kCivicCloudTimeout = Duration(seconds: 20);
 
@@ -137,11 +138,72 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
 
 /// Guest self-enrollment — cities/rooms and enrollment flag (no auth).
 /// Pass [state] so Network only receives that state's cities (not the full US map).
-Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog({String state = ''}) async {
+Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog({
+  String state = '',
+  String linkToken = '',
+}) async {
   return ngmyCivicInvokeAnon({
     'action': 'civicPublicCatalog',
     if (state.trim().isNotEmpty) 'state': state.trim(),
+    if (linkToken.trim().isNotEmpty) 'linkToken': linkToken.trim(),
   });
+}
+
+Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicFetchEnrollmentLink({
+  required String email,
+  required String state,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicFetchEnrollmentLink',
+    'email': email.trim().toLowerCase(),
+    'state': state.trim(),
+    'registrarToken': NgmyCivicRegistryMembers.registrarLinkToken(email),
+  });
+  if (data == null) {
+    return (ok: false, url: '', linkToken: '', error: 'Could not reach server.');
+  }
+  if (data['ok'] == true) {
+    return (
+      ok: true,
+      url: (data['url'] ?? '').toString(),
+      linkToken: (data['linkToken'] ?? '').toString(),
+      error: null,
+    );
+  }
+  return (
+    ok: false,
+    url: '',
+    linkToken: '',
+    error: _civicCloudError(data, 'Could not load enrollment link'),
+  );
+}
+
+Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicRegenerateEnrollmentLink({
+  required String email,
+  required String state,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicRegenerateEnrollmentLink',
+    'email': email.trim().toLowerCase(),
+    'state': state.trim(),
+  });
+  if (data == null) {
+    return (ok: false, url: '', linkToken: '', error: 'Could not reach server.');
+  }
+  if (data['ok'] == true) {
+    return (
+      ok: true,
+      url: (data['url'] ?? '').toString(),
+      linkToken: (data['linkToken'] ?? '').toString(),
+      error: null,
+    );
+  }
+  return (
+    ok: false,
+    url: '',
+    linkToken: '',
+    error: _civicCloudError(data, 'Could not regenerate enrollment link'),
+  );
 }
 
 /// Immediate single-member save to database (registrar / admin enroll).
