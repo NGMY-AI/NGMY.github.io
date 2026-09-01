@@ -30638,8 +30638,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Fast path: local roster + unlock check — do not block UI on cloud.
-      await NgmyCivicRegistryMembers.hydrateLocal(widget.config);
+      // Cloud roster is authoritative when online; local prefs are offline fallback only.
+      await _refreshCivicMembersFromCloud();
       if (!mounted) return;
       await _checkRegistryUnlock();
       if (!mounted) return;
@@ -30647,7 +30647,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
       unawaited(_ensureUniqueRegistryIdsDeferred());
-      unawaited(_refreshCivicMembersFromCloud());
       unawaited(_refreshCivicHelpModeAndContributions());
       unawaited(() async {
         await _mergeCivicRegistryPinsIntoConfig(widget.config);
@@ -30658,8 +30657,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!mounted) return;
       unawaited(_refreshCivicHelpModeAndContributions());
     });
-    _membersCloudPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+    _membersCloudPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _activeTab != 2) return;
+      if (_lastRosterMutationAt != null &&
+          DateTime.now().difference(_lastRosterMutationAt!) < const Duration(seconds: 30)) {
+        return;
+      }
       unawaited(_refreshCivicMembersFromCloud());
     });
   }
@@ -39912,14 +39915,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (_cloudHydrateInFlight) return;
     _cloudHydrateInFlight = true;
     try {
-      NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
       await ngmyHydrateCivicRegistryMembersFromAllBackups(
         widget.config,
         widget.allUsers,
         requesterEmail: widget.user.email,
         state: _selectedState,
       );
-      NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
       await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
       if (!mounted) return;
       setState(() {});
@@ -40801,8 +40802,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Widget _membersSection(bool isDark) {
-    // Repair any "***" state left by older admin hydrates before counting/filtering.
-    NgmyCivicRegistryMembers.repairRedactedFields(widget.config, fallbackState: _selectedState);
     final q = _searchQuery.trim();
     final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((u) {
       final stateMatch = NgmyCivicRegistryStats.statesMatch(u.state, _selectedState);

@@ -926,8 +926,8 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
   String? state,
   String? pinSig,
 }) async {
-  await NgmyCivicRegistryMembers.hydrateLocal(config);
   final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
+  var cloudHydrated = false;
   // Always try cloud when signed in — reachability probe can false-negative on Wi‑Fi.
   if (email.isNotEmpty) {
     final resolvedState = (state ?? '').trim();
@@ -944,20 +944,26 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
       final view = (row['view'] ?? '').toString();
       // Member-view rows are sanitized (masked email, no phone/dob) — never merge into config.
       if (view == 'admin' || view == 'registrar') {
-        NgmyCivicRegistryMembers.applyPayload(config, {
-          'members': row['members'] ?? const [],
-          'removed': row['removed'] ?? const [],
-          'deceased': row['deceased'] ?? const [],
-        });
-        NgmyCivicRegistryMembers.repairRedactedFields(
+        final scope = view == 'registrar'
+            ? (row['registrarState'] ?? resolvedState).toString()
+            : '';
+        NgmyCivicRegistryMembers.adoptCloudPayload(
           config,
-          fallbackState: resolvedState,
+          {
+            'members': row['members'] ?? const [],
+            'removed': row['removed'] ?? const [],
+            'deceased': row['deceased'] ?? const [],
+          },
+          scopeState: scope,
         );
         await NgmyCivicRegistryMembers.saveLocalBackup(config);
+        cloudHydrated = true;
       }
     }
   }
-  NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
+  if (!cloudHydrated) {
+    await NgmyCivicRegistryMembers.hydrateLocal(config);
+  }
 }
 
 Future<bool> ngmyPersistCivicRegistryMembers(
@@ -979,7 +985,9 @@ Future<bool> ngmyPersistCivicRegistryMembers(
     final result = await ngmyCivicPersistRoster(
       email: email,
       state: (state ?? '').trim(),
-      payload: NgmyCivicRegistryMembers.payload(config),
+      payload: (state ?? '').trim().isEmpty
+          ? NgmyCivicRegistryMembers.payload(config)
+          : NgmyCivicRegistryMembers.payloadForState(config, state: state!.trim()),
     );
     cloudOk = result.ok;
   }

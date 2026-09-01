@@ -1596,6 +1596,31 @@ class NgmyCivicRegistryMembers {
     };
   }
 
+  /// Cloud persist for a single state — never upload other states' rows by accident.
+  static Map<String, dynamic> payloadForState(dynamic config, {required String state}) {
+    pruneIncompleteEnrollments(config);
+    final st = state.trim();
+    if (st.isEmpty) return payload(config);
+    bool inState(Map<String, dynamic> m) =>
+        NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), st);
+    bool removedInState(Map<String, dynamic> r) {
+      final snap = r['snapshot'];
+      final s = (r['state'] ?? (snap is Map ? snap['state'] : '') ?? '').toString();
+      return NgmyCivicRegistryStats.statesMatch(s, st);
+    }
+    bool deceasedInState(Map<String, dynamic> d) {
+      final snap = d['snapshot'];
+      final s = (d['state'] ?? (snap is Map ? snap['state'] : '') ?? '').toString();
+      return NgmyCivicRegistryStats.statesMatch(s, st);
+    }
+    return {
+      'members': listFrom(config).where(inState).toList(),
+      'removed': removedFrom(config).where(removedInState).toList(),
+      'deceased': deceasedFrom(config).where(deceasedInState).toList(),
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
+
   /// Replace local roster with a role-filtered server payload (no merge with prior PII).
   static void replacePayload(dynamic config, Map<String, dynamic> payload) {
     final members = <Map<String, dynamic>>[];
@@ -1624,6 +1649,113 @@ class NgmyCivicRegistryMembers {
       }
     }
     setDeceased(config, deceased);
+  }
+
+  /// Replace one state's roster slice from cloud — keeps other states on device.
+  static void replacePayloadScoped(dynamic config, Map<String, dynamic> payload, {required String scopeState}) {
+    final st = scopeState.trim();
+    if (st.isEmpty) {
+      replacePayload(config, payload);
+      return;
+    }
+    bool inScope(Map<String, dynamic> m) =>
+        NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), st);
+    bool rowInScope(Map<String, dynamic> r) {
+      final snap = r['snapshot'];
+      final s = (r['state'] ?? (snap is Map ? snap['state'] : '') ?? '').toString();
+      return NgmyCivicRegistryStats.statesMatch(s, st);
+    }
+
+    final remoteMembers = <Map<String, dynamic>>[];
+    final remote = payload['members'];
+    if (remote is List) {
+      for (final e in remote) {
+        if (e is Map) remoteMembers.add(Map<String, dynamic>.from(e));
+      }
+    }
+    final keptMembers = listFrom(config).where((m) => !inScope(m)).toList();
+    final incomingMembers = remoteMembers.where(inScope).toList();
+    setList(config, [...keptMembers, ...incomingMembers]);
+
+    final remoteRemoved = <Map<String, dynamic>>[];
+    final rem = payload['removed'] ?? payload['civicRegistryRemoved'];
+    if (rem is List) {
+      for (final e in rem) {
+        if (e is Map) remoteRemoved.add(Map<String, dynamic>.from(e));
+      }
+    }
+    final keptRemoved = removedFrom(config).where((r) => !rowInScope(r)).toList();
+    final incomingRemoved = remoteRemoved.where(rowInScope).toList();
+    setRemoved(config, [...keptRemoved, ...incomingRemoved]);
+
+    final remoteDeceased = <Map<String, dynamic>>[];
+    final dec = payload['deceased'];
+    if (dec is List) {
+      for (final e in dec) {
+        if (e is Map) remoteDeceased.add(Map<String, dynamic>.from(e));
+      }
+    }
+    final keptDeceased = deceasedFrom(config).where((d) => !rowInScope(d)).toList();
+    final incomingDeceased = remoteDeceased.where(rowInScope).toList();
+    setDeceased(config, [...keptDeceased, ...incomingDeceased]);
+  }
+
+  /// Authoritative cloud hydrate — replace (not merge) and keep good local PII when cloud row is redacted.
+  static void adoptCloudPayload(
+    dynamic config,
+    Map<String, dynamic> payload, {
+    String scopeState = '',
+  }) {
+    final priorByKey = <String, Map<String, dynamic>>{};
+    for (final m in listFrom(config)) {
+      final k = _mergeKey(m);
+      if (k.isNotEmpty) priorByKey[k] = m;
+    }
+    // Also index by numeric registry digits for masked-id twins.
+    final priorByDigits = <String, Map<String, dynamic>>{};
+    for (final m in listFrom(config)) {
+      final digits = _digitsOfRegistryId((m['registryId'] ?? '').toString());
+      if (digits.length >= 5) priorByDigits[digits] = m;
+    }
+
+    final st = scopeState.trim();
+    if (st.isEmpty) {
+      replacePayload(config, payload);
+    } else {
+      replacePayloadScoped(config, payload, scopeState: st);
+    }
+
+    final next = <Map<String, dynamic>>[];
+    for (final raw in listFrom(config)) {
+      final m = Map<String, dynamic>.from(raw);
+      Map<String, dynamic>? prev = priorByKey[_mergeKey(m)];
+      if (prev == null) {
+        final digits = _digitsOfRegistryId((m['registryId'] ?? '').toString());
+        if (digits.length >= 5) prev = priorByDigits[digits];
+      }
+      if (prev != null) {
+        for (final field in const [
+          'fullName',
+          'username',
+          'registryId',
+          'phone',
+          'city',
+          'room',
+          'homeAddress',
+          'dob',
+          'idType',
+        ]) {
+          if (_isPlaceholderValue(m[field]) && !_isPlaceholderValue(prev[field])) {
+            m[field] = prev[field];
+          }
+        }
+      }
+      next.add(m);
+    }
+    setList(config, next);
+    dedupeMembers(config);
+    pruneIncompleteEnrollments(config);
+    clearSoftDeletesForActiveMembers(config);
   }
 
   /// Full backup envelope for download (includes helps/missed/passport so rankings restore).
@@ -2190,7 +2322,11 @@ class NgmyCivicRegistryMembers {
       final raw = prefs.getString(_prefsKey);
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
-      if (decoded is Map) applyPayload(config, Map<String, dynamic>.from(decoded));
+      if (decoded is Map) {
+        replacePayload(config, Map<String, dynamic>.from(decoded));
+        dedupeMembers(config);
+        pruneIncompleteEnrollments(config);
+      }
     } catch (_) {}
   }
 }
