@@ -94,6 +94,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   bool _loading = true;
   bool _submitting = false;
   bool _done = false;
+  bool _selfEnrollOpen = true;
   String? _loadError;
   String? _registryId;
 
@@ -197,6 +198,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }
 
   void _absorbCatalog(Map<String, dynamic> source) {
+    if (source.containsKey('civicSelfEnrollmentEnabled')) {
+      _selfEnrollOpen = source['civicSelfEnrollmentEnabled'] == true;
+    }
     final cities = source['cities'];
     if (cities is List && cities.isNotEmpty) {
       _legacyCities = cities.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
@@ -310,6 +314,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
     if (state.isEmpty) {
       _toast('Jimbo linahitajika.');
+      return;
+    }
+    if (!_selfEnrollOpen && _registrarToken.isEmpty) {
+      _toast('Usajili wa kujisajili umefungwa kwa sasa. / Self-enrollment is closed.');
       return;
     }
 

@@ -1801,9 +1801,15 @@ class NgmyCivicRegistryMembers {
     return score;
   }
 
+  static bool _isValidRegistryId(String s) {
+    final t = s.trim().toUpperCase();
+    return RegExp(r'^[A-Z]{2}\d{6,}$').hasMatch(t);
+  }
+
   static bool _isPlaceholderValue(dynamic v) {
     final s = (v ?? '').toString().trim();
     if (s.isEmpty) return true;
+    if (_isValidRegistryId(s)) return false;
     if (s == '***') return true;
     if (s.contains('***')) return true;
     // Partial masks like **1469040 or *3357039 (legacy network redaction).
@@ -1845,6 +1851,15 @@ class NgmyCivicRegistryMembers {
   }
 
   static Map<String, dynamic> _mergeMemberRow(Map<String, dynamic> a, Map<String, dynamic> b) {
+    // Guest self-enrollment rows from cloud must win over stale local placeholders.
+    final aGuest = (a['enrollmentSource'] ?? '').toString() == 'guest_self_enrollment';
+    final bGuest = (b['enrollmentSource'] ?? '').toString() == 'guest_self_enrollment';
+    if (bGuest && !aGuest && _isPlaceholderValue(a['fullName']) && !_isPlaceholderValue(b['fullName'])) {
+      return _keepCriticalMemberFields(Map<String, dynamic>.from(b), a, b);
+    }
+    if (aGuest && !bGuest && _isPlaceholderValue(b['fullName']) && !_isPlaceholderValue(a['fullName'])) {
+      return _keepCriticalMemberFields(Map<String, dynamic>.from(a), a, b);
+    }
     if (_isSanitizedMemberRow(b) && !_isSanitizedMemberRow(a)) {
       final merged = Map<String, dynamic>.from(a);
       for (final key in const [
@@ -1926,7 +1941,7 @@ class NgmyCivicRegistryMembers {
           changed = true;
         }
       }
-      for (final key in const ['fullName', 'city', 'room', 'phone', 'homeAddress', 'dob', 'username', 'registryId']) {
+      for (final key in const ['fullName', 'city', 'room', 'phone', 'homeAddress', 'dob', 'username']) {
         if (_isPlaceholderValue(m[key])) {
           m[key] = '';
           changed = true;

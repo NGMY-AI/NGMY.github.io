@@ -220,9 +220,18 @@ Future<({bool ok, String? registryId, String? error, Map<String, dynamic>? dupli
       return (ok: false, registryId: null, error: 'Could not reach server', duplicate: null);
     }
     if (data['ok'] == true) {
+      final rid = (data['registryId'] ?? '').toString().trim();
+      if (rid.isEmpty) {
+        return (
+          ok: false,
+          registryId: null,
+          error: 'Enrollment did not return a Registry ID. Please try again.',
+          duplicate: null,
+        );
+      }
       return (
         ok: true,
-        registryId: (data['registryId'] ?? '').toString(),
+        registryId: rid,
         error: null,
         duplicate: null,
       );

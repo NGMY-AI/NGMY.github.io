@@ -2033,6 +2033,29 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const admin = adminClient();
   if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
 
+  // Honor admin self-enrollment toggle unless this is a registrar-attributed link.
+  if (!registrarToken) {
+    const se = await loadSettingsObject(admin, "civic_self_enrollment_settings");
+    let selfEnroll =
+      se.civicSelfEnrollmentEnabled === true ||
+      String(se.civicSelfEnrollmentEnabled ?? "").toLowerCase() === "true";
+    if (!selfEnroll) {
+      try {
+        const { data: cfg } = await admin
+          .from("config")
+          .select("civicSelfEnrollmentEnabled")
+          .eq("id", "1")
+          .maybeSingle();
+        selfEnroll = cfg?.civicSelfEnrollmentEnabled === true;
+      } catch (_) {
+        // ignore
+      }
+    }
+    if (!selfEnroll) {
+      return jsonOk({ ok: false, error: "Self-enrollment is closed right now." }, 403);
+    }
+  }
+
   const payload = await loadCivicPayload(admin);
   const members = asMemberList(payload.members);
 
@@ -2105,12 +2128,23 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
     source: "guest_self_enrollment",
   });
   if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+
+  // Verify the row actually landed — never tell the guest "enrolled" on a failed write.
+  const verify = await loadCivicPayload(admin);
+  const verifyMembers = asMemberList(verify.members);
+  const savedRow = verifyMembers.find(
+    (m) => String(m.registryId ?? "").trim().toUpperCase() === registryId.toUpperCase(),
+  );
+  if (!savedRow) {
+    return jsonOk({ ok: false, error: "Enrollment could not be verified. Please try again." }, 500);
+  }
+
   return jsonOk({
     ok: true,
     registryId,
     email: guestEmail,
     state,
-    memberCount: nextMembers.length,
+    memberCount: verifyMembers.length,
   });
 }
 

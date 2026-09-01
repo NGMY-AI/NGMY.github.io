@@ -30612,6 +30612,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Map<String, dynamic>? _localRegistrarBackup;
   bool _maintenanceQueued = false;
   Timer? _helpModePoll;
+  Timer? _membersCloudPoll;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
   /// Member state-switch cooldown after [NgmyCivicStateSwitches.maxSwitches] changes.
@@ -30655,6 +30656,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _helpModePoll = Timer.periodic(const Duration(seconds: 75), (_) {
       if (!mounted) return;
       unawaited(_refreshCivicHelpModeAndContributions());
+    });
+    _membersCloudPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (!mounted || _activeTab != 2) return;
+      unawaited(_refreshCivicMembersFromCloud());
     });
   }
 
@@ -30747,6 +30752,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void dispose() {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
+    _membersCloudPoll?.cancel();
     _liveRefreshDebounce?.cancel();
     NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
     _searchController.dispose();
