@@ -1503,17 +1503,72 @@ class NgmyCivicRegistryMembers {
     return before - members.length;
   }
 
+  /// Auto-created roster ghosts (empty/masked name, no registrar or self-enroll trail).
+  static bool isPhantomMemberRow(Map<String, dynamic> m) {
+    final rid = (m['registryId'] ?? '').toString().trim();
+    if (rid.isEmpty) return true;
+
+    final source = (m['enrollmentSource'] ?? m['source'] ?? '').toString().trim();
+    final display = resolvedDisplayName(m);
+    final hasRealName = display != 'Member';
+
+    if (source == 'guest_self_enrollment' || source == 'registrar') {
+      return !hasRealName;
+    }
+
+    if (!hasRealName) return true;
+
+    if (source.isEmpty) {
+      final phone = _phoneKey((m['phone'] ?? '').toString());
+      final addr = (m['homeAddress'] ?? '').toString().trim();
+      final dob = (m['dob'] ?? '').toString().trim();
+      if (phone.length < 7 && addr.isEmpty && dob.isEmpty) return true;
+    }
+
+    return false;
+  }
+
+  /// Remove phantom rows and optionally clear stale [isEnrolledInRegistry] flags.
+  static int purgePhantomMembers(dynamic config, {List<dynamic>? allUsers}) {
+    final members = listFrom(config);
+    final before = members.length;
+    final removedEmails = <String>{};
+    members.removeWhere((m) {
+      if (!isPhantomMemberRow(m)) return false;
+      final email = emailKey((m['email'] ?? '').toString());
+      if (email.isNotEmpty) removedEmails.add(email);
+      return true;
+    });
+    if (members.length == before) return 0;
+    setList(config, members);
+    if (allUsers != null) {
+      for (final u in allUsers) {
+        final email = emailKey((u as dynamic).email.toString());
+        if (removedEmails.contains(email)) {
+          (u as dynamic).isEnrolledInRegistry = false;
+          (u as dynamic).registryId = '';
+        }
+      }
+    }
+    debugPrint('[civic] purged ${before - members.length} phantom member row(s)');
+    return before - members.length;
+  }
+
   static void migrateFromLegacyUsers(dynamic config, List<dynamic> allUsers) {
     var changed = false;
     for (final u in allUsers) {
       if ((u as dynamic).isEnrolledInRegistry != true) continue;
       final email = emailKey((u as dynamic).email.toString());
       if (email.isEmpty || findByEmail(config, email) != null) continue;
+      final rid = ((u as dynamic).registryId?.toString() ?? '').trim();
+      if (rid.isEmpty) continue;
+      final fullName = ((u as dynamic).fullName?.toString() ?? (u as dynamic).username.toString()).trim();
+      if (fullName.isEmpty || _isPlaceholderValue(fullName)) continue;
       upsert(
         config,
         buildRecord(
           email: email,
-          fullName: (u as dynamic).fullName?.toString() ?? (u as dynamic).username.toString(),
+          fullName: fullName,
           dob: (u as dynamic).dob?.toString() ?? '',
           idType: (u as dynamic).idType?.toString() ?? '',
           homeAddress: (u as dynamic).homeAddress?.toString() ?? '',
@@ -1521,7 +1576,7 @@ class NgmyCivicRegistryMembers {
           city: (u as dynamic).city?.toString() ?? '',
           room: (u as dynamic).room?.toString() ?? '',
           state: (u as dynamic).state.toString(),
-          registryId: (u as dynamic).registryId?.toString() ?? '',
+          registryId: rid,
           helps: (u as dynamic).helps as int? ?? 0,
           missed: (u as dynamic).missed as int? ?? 0,
         ),
@@ -1531,12 +1586,15 @@ class NgmyCivicRegistryMembers {
     if (changed) debugPrint('[civic] migrated legacy enrolled users into civicRegistryMembers');
   }
 
-  static Map<String, dynamic> payload(dynamic config) => {
-        'members': listFrom(config),
-        'removed': removedFrom(config),
-        'deceased': deceasedFrom(config),
-        'savedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+  static Map<String, dynamic> payload(dynamic config) {
+    pruneIncompleteEnrollments(config);
+    return {
+      'members': listFrom(config),
+      'removed': removedFrom(config),
+      'deceased': deceasedFrom(config),
+      'savedAt': DateTime.now().toUtc().toIso8601String(),
+    };
+  }
 
   /// Replace local roster with a role-filtered server payload (no merge with prior PII).
   static void replacePayload(dynamic config, Map<String, dynamic> payload) {

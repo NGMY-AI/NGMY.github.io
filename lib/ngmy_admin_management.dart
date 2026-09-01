@@ -967,6 +967,7 @@ Future<bool> ngmyPersistCivicRegistryMembers(
 }) async {
   // Deploy stamp: keep enroll + print roster fixes published to ngmy.org.
   ngmyAdminConfigMutationAt = DateTime.now();
+  NgmyCivicRegistryMembers.pruneIncompleteEnrollments(config);
   await NgmyCivicRegistryMembers.saveLocalBackup(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;

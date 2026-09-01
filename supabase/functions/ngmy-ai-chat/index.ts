@@ -1857,7 +1857,7 @@ async function handleCivicPersistRoster(
   let deceased = asMemberList(current.deceased);
 
   if (role.isAdmin && !scopeState) {
-    members = mergeMemberLists(members, incomingMembers);
+    members = mergeMemberLists([], incomingMembers);
     removed = mergeMemberLists(removed, incomingRemoved);
     if (incomingDeceased.length > 0) {
       deceased = mergeMemberLists(deceased, incomingDeceased);
@@ -1873,13 +1873,13 @@ async function handleCivicPersistRoster(
       const other = allMembers.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
       );
-      const existing = allMembers.filter(
-        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
-      );
       const inc = incoming.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
       );
-      return [...other, ...mergeMemberLists(existing, inc)];
+      // Incoming roster is authoritative for this state — merging with the
+      // old slice kept deleted members on the server and they reappeared
+      // after every cloud refresh.
+      return [...other, ...mergeMemberLists([], inc)];
     };
 
     members = mergeStateSlice(members, incomingMembers, sk);

@@ -2950,9 +2950,9 @@ UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> 
 }
 
 List<UserData> _civicRegistryMembersForDisplay(AppConfig config, List<UserData> allUsers) {
-  NgmyCivicRegistryMembers.pruneIncompleteEnrollments(config);
-  NgmyCivicRegistryMembers.migrateFromLegacyUsers(config, allUsers);
-  return NgmyCivicRegistryMembers.listFrom(config).map((m) => _civicMemberRecordToDisplayUser(m, allUsers)).toList();
+  return NgmyCivicRegistryMembers.listFrom(config)
+      .map((m) => _civicMemberRecordToDisplayUser(m, allUsers))
+      .toList();
 }
 
 UserData _civicDeceasedRecordToDisplayUser(Map<String, dynamic> deceasedRow, List<UserData> allUsers) {
@@ -30619,6 +30619,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   DateTime? _stateSwitchLockedUntil;
   Timer? _liveRefreshDebounce;
   bool _cloudHydrateInFlight = false;
+  DateTime? _lastRosterMutationAt;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -30736,6 +30737,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _onCivicLiveRefresh() {
     if (!mounted) return;
+    if (_lastRosterMutationAt != null &&
+        DateTime.now().difference(_lastRosterMutationAt!) < const Duration(seconds: 10)) {
+      return;
+    }
     _liveRefreshDebounce?.cancel();
     _liveRefreshDebounce = Timer(const Duration(milliseconds: 900), () {
       if (!mounted) return;
@@ -31551,23 +31556,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
     }
 
-    // Fill blank IDs only (still in place — no new rows).
-    final seen = <String>{};
-    var mintedBlank = false;
-    final members = NgmyCivicRegistryMembers.listFrom(widget.config);
-    for (var i = 0; i < members.length; i++) {
-      var id = (members[i]['registryId'] ?? '').toString().trim();
-      final state = (members[i]['state'] ?? _selectedState).toString();
-      if (id.isEmpty) {
-        id = _generateUniqueRegistryId(state);
-        members[i] = Map<String, dynamic>.from(members[i])..['registryId'] = id;
-        mintedBlank = true;
-      }
-      seen.add(id);
-    }
-    if (mintedBlank) NgmyCivicRegistryMembers.setList(widget.config, members);
-
-    if (removed > 0 || syncedUsers || mintedBlank || before != after.length) {
+    if (removed > 0 || syncedUsers || before != after.length) {
       unawaited(NgmyCivicRegistryMembers.saveLocalBackup(widget.config));
       unawaited(ngmyPersistCivicRegistryMembers(widget.config));
       widget.onDataChanged();
@@ -32556,7 +32545,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       clearCivicFields(widget.user);
     }
 
-    final membersCloudOk = await ngmyPersistCivicRegistryMembers(widget.config);
+    final membersCloudOk = await ngmyPersistCivicRegistryMembers(
+      widget.config,
+      requesterEmail: widget.user.email,
+      state: _selectedState,
+    );
+    _lastRosterMutationAt = DateTime.now();
     NgmyAdminLiveRefresh.notify();
     var userCloudOk = true;
     if (await ngmyCanReachCloud() && accountIdx >= 0) {
@@ -34758,6 +34752,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final alreadyMarked = <String>{};
     for (final m in members ?? _membersInCurrentHelpScope()) {
+      final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email) ??
+          (((m.registryId ?? '').trim().isNotEmpty)
+              ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, m.registryId!)
+              : null);
+      if (raw == null) continue;
+      if (NgmyCivicRegistryMembers.resolvedDisplayName(raw) == 'Member') continue;
       final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
       final ridKey = 'rid:${(m.registryId ?? '').trim().toUpperCase()}';
       final key = emailKey.isNotEmpty ? emailKey : ridKey;
@@ -40546,165 +40546,258 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
   }
 
-  /// The "Clear Missed" pill above the member list had no onTap at all —
-  /// tapping it did nothing. Asks how many missed to subtract (not an
-  /// unconditional reset to 0) from every member currently visible under
-  /// the active city/room/search filters.
+  /// Clear missed counts and/or permanently remove members matching a search.
   Future<void> _confirmClearMissed(List<UserData> visibleMembers) async {
-    final withMissed = visibleMembers.where((m) => m.missed > 0).toList();
-    if (withMissed.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No members here have a missed count to clear.')));
+    if (visibleMembers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No members in the current view.')));
       return;
     }
-    final maxMissed = withMissed.map((m) => m.missed).reduce((a, b) => a > b ? a : b);
     final amountC = TextEditingController();
+    final deleteCountC = TextEditingController();
     final searchC = TextEditingController();
-    // Default target is everybody shown (matches the old behavior); the
-    // registrar can switch to "One person" and search/pick a single member
-    // instead of clearing the whole visible list.
-    UserData? selectedMember;
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
-          final query = searchC.text.trim().toLowerCase();
-          final searchResults = query.isEmpty
-              ? withMissed
-              : withMissed.where((m) {
-                  final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email);
-                  final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
-                  return _ngmyCivicMemberSearchScore(query, m, nicks) >= 0.75 ||
-                      m.email.toLowerCase().contains(query);
-                }).toList();
+          List<UserData> matchesForQuery(String query) {
+            final q = query.trim().toLowerCase();
+            if (q.isEmpty) return List<UserData>.from(visibleMembers);
+            return visibleMembers.where((m) {
+              final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email);
+              final nicks = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
+              return _ngmyCivicMemberSearchScore(q, m, nicks) >= 0.75 ||
+                  m.email.toLowerCase().contains(q) ||
+                  (m.registryId ?? '').toLowerCase().contains(q);
+            }).toList();
+          }
+
+          final query = searchC.text.trim();
+          final searchResults = matchesForQuery(query);
+          final withMissed = searchResults.where((m) => m.missed > 0).toList();
+          final maxMissed = withMissed.isEmpty
+              ? 0
+              : withMissed.map((m) => m.missed).reduce((a, b) => a > b ? a : b);
+
+          Future<void> deleteOne(UserData m) async {
+            final name = m.fullName ?? m.username;
+            final ok = await showDialog<bool>(
+              context: ctx,
+              builder: (dCtx) => AlertDialog(
+                title: const Text('Remove member?'),
+                content: Text('Permanently remove $name from the registry?'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(dCtx, false), child: const Text('Cancel')),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dCtx, true),
+                    style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('Remove'),
+                  ),
+                ],
+              ),
+            );
+            if (ok != true || !ctx.mounted) return;
+            Navigator.pop(ctx, {'action': 'delete', 'members': [m]});
+          }
+
           return AlertDialog(
-            title: const Text('Clear Missed'),
+            title: const Row(
+              children: [
+                Icon(Icons.cleaning_services, color: Colors.red, size: 22),
+                SizedBox(width: 8),
+                Expanded(child: Text('Clear Missed & Remove')),
+              ],
+            ),
             content: SizedBox(
-              width: 420,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    selectedMember == null
-                        ? '${withMissed.length} member(s) shown in $_selectedState have a missed count (highest: $maxMissed).'
-                        : 'Clearing missed for ${selectedMember!.fullName ?? selectedMember!.username} only (currently ${selectedMember!.missed} missed).',
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ChoiceChip(
-                          label: const Text('Everybody'),
-                          selected: selectedMember == null,
-                          onSelected: (_) => setDialog(() => selectedMember = null),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ChoiceChip(
-                          label: const Text('One person'),
-                          selected: selectedMember != null,
-                          onSelected: (_) => setDialog(() {
-                            selectedMember ??= withMissed.first;
-                          }),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (selectedMember != null) ...[
-                    const SizedBox(height: 12),
+              width: 460,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     TextField(
                       controller: searchC,
                       autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Search by name or email',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: 'Search by name, ID, or email',
+                        hintText: 'e.g. Member',
+                        prefixIcon: const Icon(Icons.search, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
                       ),
                       onChanged: (_) => setDialog(() {}),
                     ),
                     const SizedBox(height: 8),
-                    SizedBox(
-                      height: 160,
+                    Text(
+                      query.isEmpty
+                          ? '${searchResults.length} member(s) in current view'
+                          : '${searchResults.length} match(es) for "$query"',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      constraints: const BoxConstraints(maxHeight: 220),
                       child: searchResults.isEmpty
-                          ? const Center(child: Text('No matches', style: TextStyle(color: Colors.grey)))
-                          : ListView.builder(
+                          ? const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: Center(child: Text('No matches', style: TextStyle(color: Colors.grey))),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
                               itemCount: searchResults.length,
+                              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
                               itemBuilder: (_, i) {
                                 final m = searchResults[i];
-                                final isSelected = m.email.toLowerCase().trim() == selectedMember?.email.toLowerCase().trim();
+                                final label = m.fullName ?? m.username;
                                 return ListTile(
                                   dense: true,
-                                  selected: isSelected,
-                                  title: Text(m.fullName ?? m.username),
-                                  subtitle: Text('${m.missed} missed'),
-                                  onTap: () => setDialog(() => selectedMember = m),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                                  title: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  subtitle: Text(
+                                    '${m.missed} missed · ${(m.registryId ?? '').trim().isEmpty ? m.email : m.registryId}',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                                    tooltip: 'Remove member',
+                                    onPressed: () => deleteOne(m),
+                                  ),
                                 );
                               },
                             ),
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: amountC,
-                    autofocus: selectedMember == null,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: const InputDecoration(
-                      labelText: 'How many missed to clear',
-                      hintText: 'e.g. 1',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 16),
+                    Text('Clear missed count', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+                    const SizedBox(height: 6),
+                    if (withMissed.isEmpty)
+                      Text(
+                        'No matches have a missed count.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      )
+                    else ...[
+                      Text(
+                        '${withMissed.length} match(es) with missed (highest: $maxMissed).',
+                        style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: amountC,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: InputDecoration(
+                          labelText: 'How many missed to clear',
+                          hintText: 'e.g. 1',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          isDense: true,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    Text('Remove members', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Delete the first N matches from your search (use trash on one row to remove just that person).',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    selectedMember == null
-                        ? 'Subtracts this many from every shown member\'s missed count (never below 0).'
-                        : 'Subtracts this many from just this member\'s missed count (never below 0).',
-                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: deleteCountC,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: InputDecoration(
+                        labelText: 'How many matches to remove',
+                        hintText: searchResults.isEmpty ? '0' : '1–${searchResults.length}',
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-              FilledButton(
-                onPressed: () {
-                  final n = int.tryParse(amountC.text.trim()) ?? 0;
-                  if (n <= 0) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
-                    return;
-                  }
-                  Navigator.pop(ctx, {'amount': n, 'member': selectedMember});
-                },
+              if (withMissed.isNotEmpty)
+                OutlinedButton(
+                  onPressed: () {
+                    final n = int.tryParse(amountC.text.trim()) ?? 0;
+                    if (n <= 0) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter how many missed to clear.')));
+                      return;
+                    }
+                    Navigator.pop(ctx, {'action': 'clear', 'amount': n, 'members': withMissed});
+                  },
+                  child: const Text('Clear missed'),
+                ),
+              FilledButton.icon(
+                onPressed: searchResults.isEmpty
+                    ? null
+                    : () {
+                        final n = int.tryParse(deleteCountC.text.trim()) ?? 0;
+                        if (n <= 0 || n > searchResults.length) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(content: Text('Enter 1–${searchResults.length} to remove.')),
+                          );
+                          return;
+                        }
+                        Navigator.pop(ctx, {
+                          'action': 'delete',
+                          'members': searchResults.take(n).toList(),
+                        });
+                      },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Remove matches'),
                 style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Clear'),
               ),
             ],
           );
         },
       ),
     );
-    if (result == null) return;
-    final amount = result['amount'] as int;
-    final UserData? target = result['member'] as UserData?;
-    final targets = target == null ? withMissed : [target];
-    setState(() {
+    if (result == null || !mounted) return;
+    final action = (result['action'] ?? '').toString();
+    if (action == 'clear') {
+      final amount = result['amount'] as int;
+      final targets = (result['members'] as List<UserData>?) ?? const <UserData>[];
+      if (targets.isEmpty) return;
+      setState(() {
+        for (final m in targets) {
+          m.missed = (m.missed - amount).clamp(0, 1 << 30);
+        }
+      });
       for (final m in targets) {
-        m.missed = (m.missed - amount).clamp(0, 1 << 30);
+        unawaited(_persistCivicMemberActivity(m));
       }
-    });
-    for (final m in targets) {
-      unawaited(_persistCivicMemberActivity(m));
+      widget.onDataChanged();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cleared $amount missed from ${targets.length} member(s).')),
+      );
+      return;
     }
-    widget.onDataChanged();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(
-        target == null
-            ? 'Cleared $amount missed from ${targets.length} member(s).'
-            : 'Cleared $amount missed from ${target.fullName ?? target.username}.',
-      ),
-    ));
+    if (action == 'delete') {
+      final targets = (result['members'] as List<UserData>?) ?? const <UserData>[];
+      if (targets.isEmpty) return;
+      var removed = 0;
+      for (final m in targets) {
+        final ok = await _removeRegistryMember(m, permanent: true);
+        if (ok) removed++;
+      }
+      if (!mounted) return;
+      setState(() {});
+      widget.onDataChanged();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(removed == targets.length
+              ? 'Removed ${targets.length} member(s).'
+              : 'Removed $removed of ${targets.length} member(s). Retry if some remain.'),
+          backgroundColor: removed == targets.length ? Colors.green : Colors.orange,
+        ),
+      );
+    }
   }
 
   Widget _membersSection(bool isDark) {
@@ -40812,7 +40905,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ],
 
         const SizedBox(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canUseRegistrarToolsHere()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.brush, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear Missed', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canUseRegistrarToolsHere()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.cleaning_services, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear & Remove', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
