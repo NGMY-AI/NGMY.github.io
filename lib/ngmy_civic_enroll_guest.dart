@@ -109,7 +109,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   // has no cities configured yet.
   bool _stateLockedFromLink = false;
   String _registrarToken = '';
-  String _stateLinkToken = '';
+  int _linkVersion = 0;
+  String _legacyLinkToken = '';
   final _nameC = TextEditingController();
   final _addressC = TextEditingController();
   final _phoneC = TextEditingController();
@@ -133,7 +134,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _selectedState = linkedState ?? 'Georgia';
     _stateLockedFromLink = linkedState != null;
     _registrarToken = _registrarFromLaunchUrl();
-    _stateLinkToken = _stateLinkTokenFromLaunchUrl();
+    _linkVersion = _linkVersionFromLaunchUrl();
+    _legacyLinkToken = _legacyLinkTokenFromLaunchUrl();
     unawaited(_load());
   }
 
@@ -151,11 +153,15 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     super.dispose();
   }
 
-  /// Reads `?s=GA` (current short form) or `?state=Georgia` (older,
-  /// longer links already shared before the short form shipped) — matches
-  /// against either the state's full name or its 2-letter code.
+  /// Reads `/enroll/georgia`, `?s=GA`, or `?state=Georgia`.
   String? _stateFromLaunchUrl() {
     try {
+      final path = Uri.base.path;
+      final pathMatch = RegExp(r'/enroll/([^/?#]+)', caseSensitive: false).firstMatch(path);
+      if (pathMatch != null) {
+        final fromPath = NgmyCivicRegistryStats.stateFromEnrollSlug(pathMatch.group(1)!);
+        if (fromPath != null) return fromPath;
+      }
       final raw = (Uri.base.queryParameters['s'] ?? Uri.base.queryParameters['state'])?.trim();
       if (raw != null && raw.isNotEmpty) {
         for (final s in _kUsStates) {
@@ -182,7 +188,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     }
   }
 
-  String _stateLinkTokenFromLaunchUrl() {
+  int _linkVersionFromLaunchUrl() {
+    try {
+      final raw = Uri.base.queryParameters['k'] ?? Uri.base.queryParameters['linkVersion'];
+      return int.tryParse((raw ?? '').trim()) ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _legacyLinkTokenFromLaunchUrl() {
     try {
       return (Uri.base.queryParameters['t'] ?? '').trim().toLowerCase();
     } catch (_) {
@@ -201,7 +216,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       // Edge only — never pull cities/rooms via public config/settings REST (DevTools leak).
       final viaEdge = await ngmyCivicFetchPublicCatalog(
         state: _selectedState,
-        linkToken: _stateLinkToken,
+        linkVersion: _linkVersion,
+        linkToken: _legacyLinkToken,
       );
       if (viaEdge != null && viaEdge['ok'] == true) return viaEdge;
     } catch (e) {
@@ -345,7 +361,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         'familyMales': males,
         'familyFemales': females,
         'registeredByToken': _registrarToken,
-        if (_stateLinkToken.isNotEmpty) 'linkToken': _stateLinkToken,
+        if (_linkVersion > 0) 'k': _linkVersion,
+        if (_legacyLinkToken.isNotEmpty) 'linkToken': _legacyLinkToken,
       });
       if (!result.ok) {
         if (result.duplicate != null) {

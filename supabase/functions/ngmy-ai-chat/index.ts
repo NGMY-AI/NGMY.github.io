@@ -2036,7 +2036,8 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
 
   const linkToken = String(body.linkToken ?? body.t ?? "").trim();
-  const linkOk = await validateStateEnrollmentLink(admin, state, linkToken);
+  const linkVersion = Number(body.k ?? body.linkVersion ?? 0) || 0;
+  const linkOk = await validateStateEnrollmentLink(admin, state, linkToken, linkVersion);
   if (!linkOk) {
     return jsonOk({
       ok: false,
@@ -2258,12 +2259,24 @@ const CIVIC_HELP_MODE_KEY = "civic_help_mode_settings";
 const STORE_SELL_ACCESS_KEY = "store_sell_access_emails";
 const CIVIC_SELF_ENROLL_SETTINGS_KEY = "civic_self_enrollment_settings";
 
-function randomEnrollmentLinkToken(): string {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes)
-    .map((b) => "abcdefghijklmnopqrstuvwxyz0123456789"[b % 36])
-    .join("");
+function stateEnrollSlug(state: string): string {
+  const sk = canonicalStateKey(state);
+  if (!sk) return "";
+  return sk.replace(/\s+/g, "-");
+}
+
+function buildEnrollmentShareUrl(
+  state: string,
+  registrarToken: string,
+  version: number,
+): string {
+  const slug = stateEnrollSlug(state);
+  if (!slug) return "https://ngmy.org/";
+  const base = `https://ngmy.org/enroll/${encodeURIComponent(slug)}`;
+  const params: string[] = [];
+  if (registrarToken) params.push(`r=${registrarToken}`);
+  if (version > 1) params.push(`k=${version}`);
+  return params.length ? `${base}?${params.join("&")}` : base;
 }
 
 function stateEnrollmentLinksMap(
@@ -2280,54 +2293,61 @@ function stateEnrollmentLinksMap(
   return out;
 }
 
-async function stateEnrollmentTokenIssued(
-  admin: NonNullable<ReturnType<typeof adminClient>>,
-  state: string,
-): Promise<boolean> {
-  const sk = canonicalStateKey(state);
-  if (!sk) return false;
-  const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
-  const links = stateEnrollmentLinksMap(se);
-  const token = String(links[sk]?.token ?? "").trim();
-  return token.length > 0;
-}
-
 async function validateStateEnrollmentLink(
   admin: NonNullable<ReturnType<typeof adminClient>>,
   state: string,
   token: string,
+  version = 0,
 ): Promise<boolean> {
   const sk = canonicalStateKey(state);
   const t = token.trim().toLowerCase();
   if (!sk) return false;
-  const issued = await stateEnrollmentTokenIssued(admin, state);
-  if (!issued) return true;
-  if (!t) return false;
   const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
   const links = stateEnrollmentLinksMap(se);
-  const expected = String(links[sk]?.token ?? "").trim().toLowerCase();
-  return expected.length > 0 && expected === t;
+  const entry = links[sk];
+  if (!entry) return true;
+
+  let expectedVersion = Number(entry.version ?? 0) || 0;
+  const legacyToken = String(entry.token ?? "").trim().toLowerCase();
+  if (!expectedVersion && legacyToken) expectedVersion = 1;
+
+  if (expectedVersion > 1) {
+    const gotVersion = version > 0 ? version : 1;
+    return gotVersion === expectedVersion;
+  }
+
+  if (legacyToken && t) return t === legacyToken;
+
+  if (expectedVersion === 1) {
+    const gotVersion = version > 0 ? version : 1;
+    return gotVersion === 1;
+  }
+
+  return true;
 }
 
 async function ensureStateEnrollmentLink(
   admin: NonNullable<ReturnType<typeof adminClient>>,
   state: string,
   { rotate = false } = {},
-): Promise<string> {
+): Promise<number> {
   const sk = canonicalStateKey(state);
-  if (!sk) return "";
+  if (!sk) return 1;
   const se = await loadSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY);
   const links = stateEnrollmentLinksMap(se);
   const prev = links[sk];
-  const prevToken = String(prev?.token ?? "").trim();
-  if (!rotate && prevToken) return prevToken;
-  const token = randomEnrollmentLinkToken();
-  links[sk] = { token, issuedAt: new Date().toISOString() };
+  let current = Number(prev?.version ?? 0) || 0;
+  if (!current && String(prev?.token ?? "").trim()) current = 1;
+
+  if (!rotate) return current > 0 ? current : 1;
+
+  const next = (current > 0 ? current : 1) + 1;
+  links[sk] = { version: next, issuedAt: new Date().toISOString() };
   await saveSettingsObject(admin, CIVIC_SELF_ENROLL_SETTINGS_KEY, {
     ...se,
     stateEnrollmentLinks: links,
   });
-  return token;
+  return next;
 }
 
 async function handleCivicFetchEnrollmentLink(
@@ -2353,21 +2373,17 @@ async function handleCivicFetchEnrollmentLink(
       return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
     }
   }
-  const token = await ensureStateEnrollmentLink(admin, state, { rotate: false });
+  const version = await ensureStateEnrollmentLink(admin, state, { rotate: false });
   const registrarToken = role.isRegistrar
     ? String(body.registrarToken ?? "").trim()
     : "";
-  const stateCode = stateCodeFromName(state);
-  const params = ["civic=enroll", `s=${stateCode}`, `t=${token}`];
-  if (registrarToken) params.push(`r=${registrarToken}`);
-  else if (role.isRegistrar) {
-    params.push(`r=${registrarLinkTokenFromEmail(email)}`);
-  }
+  const rTok = registrarToken || (role.isRegistrar ? registrarLinkTokenFromEmail(email) : "");
   return jsonOk({
     ok: true,
     state,
-    linkToken: token,
-    url: `https://ngmy.org/?${params.join("&")}`,
+    linkVersion: version,
+    linkToken: "",
+    url: buildEnrollmentShareUrl(state, rTok, version),
   });
 }
 
@@ -2423,15 +2439,14 @@ async function handleCivicRegenerateEnrollmentLink(
       return jsonOk({ ok: false, error: "Not authorized for that state" }, 403);
     }
   }
-  const token = await ensureStateEnrollmentLink(admin, state, { rotate: true });
-  const stateCode = stateCodeFromName(state);
-  const params = ["civic=enroll", `s=${stateCode}`, `t=${token}`];
-  if (role.isRegistrar) params.push(`r=${registrarLinkTokenFromEmail(email)}`);
+  const version = await ensureStateEnrollmentLink(admin, state, { rotate: true });
+  const rTok = role.isRegistrar ? registrarLinkTokenFromEmail(email) : "";
   return jsonOk({
     ok: true,
     state,
-    linkToken: token,
-    url: `https://ngmy.org/?${params.join("&")}`,
+    linkVersion: version,
+    linkToken: "",
+    url: buildEnrollmentShareUrl(state, rTok, version),
     rotated: true,
   });
 }
@@ -2766,8 +2781,9 @@ async function handleCivicPublicCatalog(body: Record<string, unknown>): Promise<
   const wantState = String(body.state ?? "").trim();
   const sk = canonicalStateKey(wantState);
   const linkToken = String(body.linkToken ?? body.t ?? "").trim();
+  const linkVersion = Number(body.k ?? body.linkVersion ?? 0) || 0;
   const linkValid = wantState
-    ? await validateStateEnrollmentLink(admin, wantState, linkToken)
+    ? await validateStateEnrollmentLink(admin, wantState, linkToken, linkVersion)
     : true;
 
   // Only one state's cities on the wire — never the full US map in Network.

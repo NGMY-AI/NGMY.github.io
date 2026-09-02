@@ -22690,7 +22690,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                         : ngmyCivicSelfEnrollmentShareUrl(
                             state: widget.user.state,
                             registrarEmail: widget.user.email,
-                            stateLinkToken: fetched.linkToken,
+                            linkVersion: fetched.linkVersion,
                           );
                     await Clipboard.setData(ClipboardData(text: link));
                     if (!context.mounted) return;
@@ -30799,25 +30799,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             email: widget.user.email,
             state: _selectedState,
           );
-    var link = fetched.ok && fetched.url.isNotEmpty
+    final link = fetched.ok && fetched.url.isNotEmpty
         ? fetched.url
         : ngmyCivicSelfEnrollmentShareUrl(
             state: _selectedState,
             registrarEmail: widget.user.email,
-            stateLinkToken: fetched.linkToken,
+            linkVersion: fetched.linkVersion,
           );
-    if (kIsWeb) {
-      try {
-        final origin = Uri.base.origin;
-        if (origin.isNotEmpty && fetched.linkToken.isNotEmpty) {
-          final params = <String>['civic=enroll'];
-          params.add('s=${NgmyCivicRegistryIdCard.stateCode(_selectedState)}');
-          params.add('t=${fetched.linkToken}');
-          params.add('r=${NgmyCivicRegistryMembers.registrarLinkToken(widget.user.email)}');
-          link = '$origin/?${params.join('&')}';
-        }
-      } catch (_) {}
-    }
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

@@ -141,15 +141,17 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
 Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog({
   String state = '',
   String linkToken = '',
+  int linkVersion = 0,
 }) async {
   return ngmyCivicInvokeAnon({
     'action': 'civicPublicCatalog',
     if (state.trim().isNotEmpty) 'state': state.trim(),
     if (linkToken.trim().isNotEmpty) 'linkToken': linkToken.trim(),
+    if (linkVersion > 0) 'k': linkVersion,
   });
 }
 
-Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicFetchEnrollmentLink({
+Future<({bool ok, String url, String linkToken, int linkVersion, String? error})> ngmyCivicFetchEnrollmentLink({
   required String email,
   required String state,
 }) async {
@@ -160,13 +162,15 @@ Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicFetchE
     'registrarToken': NgmyCivicRegistryMembers.registrarLinkToken(email),
   });
   if (data == null) {
-    return (ok: false, url: '', linkToken: '', error: 'Could not reach server.');
+    return (ok: false, url: '', linkToken: '', linkVersion: 0, error: 'Could not reach server.');
   }
   if (data['ok'] == true) {
+    final version = int.tryParse('${data['linkVersion'] ?? data['version'] ?? ''}') ?? 1;
     return (
       ok: true,
       url: (data['url'] ?? '').toString(),
       linkToken: (data['linkToken'] ?? '').toString(),
+      linkVersion: version,
       error: null,
     );
   }
@@ -174,11 +178,12 @@ Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicFetchE
     ok: false,
     url: '',
     linkToken: '',
+    linkVersion: 0,
     error: _civicCloudError(data, 'Could not load enrollment link'),
   );
 }
 
-Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicRegenerateEnrollmentLink({
+Future<({bool ok, String url, String linkToken, int linkVersion, String? error})> ngmyCivicRegenerateEnrollmentLink({
   required String email,
   required String state,
 }) async {
@@ -188,13 +193,15 @@ Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicRegene
     'state': state.trim(),
   });
   if (data == null) {
-    return (ok: false, url: '', linkToken: '', error: 'Could not reach server.');
+    return (ok: false, url: '', linkToken: '', linkVersion: 0, error: 'Could not reach server.');
   }
   if (data['ok'] == true) {
+    final version = int.tryParse('${data['linkVersion'] ?? data['version'] ?? ''}') ?? 1;
     return (
       ok: true,
       url: (data['url'] ?? '').toString(),
       linkToken: (data['linkToken'] ?? '').toString(),
+      linkVersion: version,
       error: null,
     );
   }
@@ -202,6 +209,7 @@ Future<({bool ok, String url, String linkToken, String? error})> ngmyCivicRegene
     ok: false,
     url: '',
     linkToken: '',
+    linkVersion: 0,
     error: _civicCloudError(data, 'Could not regenerate enrollment link'),
   );
 }

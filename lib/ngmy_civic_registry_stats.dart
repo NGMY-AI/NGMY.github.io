@@ -62,6 +62,32 @@ class NgmyCivicRegistryStats {
     'district of columbia': 'DC',
   };
 
+  /// Lowercase hyphen slug for self-enrollment URLs (`/enroll/georgia`, `/enroll/new-york`).
+  static String enrollStateSlug(String state) {
+    final sk = canonicalStateKey(state);
+    if (sk.isEmpty) return '';
+    return sk.replaceAll(' ', '-');
+  }
+
+  /// Resolve a URL slug back to a display state name (`georgia` → `Georgia`).
+  static String? stateFromEnrollSlug(String slug) {
+    final raw = slug.trim().toLowerCase();
+    if (raw.isEmpty) return null;
+    final key = raw.replaceAll('-', ' ');
+    if (_usStateCodeByName.containsKey(key)) return _displayStateNameFromKey(key);
+    for (final e in _usStateCodeByName.entries) {
+      if (e.value.toLowerCase() == key) return _displayStateNameFromKey(e.key);
+    }
+    return null;
+  }
+
+  static String _displayStateNameFromKey(String key) {
+    return key
+        .split(' ')
+        .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+        .join(' ');
+  }
+
   /// Match "Georgia", "GA", etc. for roster / gate lookups.
   static String canonicalStateKey(String state) {
     final raw = state.trim().toLowerCase();
