@@ -469,7 +469,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Widget _titleBadge(double pulse, double shimmer) {
     // Logo ring sits at the far end of the title bar; keep bar height the same.
-    const logoSize = 48.0;
+    const logoSize = 72.0;
     return Transform.scale(
       scale: 1.0 + pulse * 0.02,
       child: Stack(
@@ -477,15 +477,15 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         alignment: Alignment.center,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(18),
             child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,
               sigma: 14,
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 8, 52, 8),
+                padding: const EdgeInsets.fromLTRB(16, 12, 78, 12),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                   gradient: LinearGradient(
                     begin: Alignment(-1.2 + shimmer * 2.4, -0.4),
                     end: Alignment(1.2 - shimmer * 2.4, 0.6),
@@ -509,7 +509,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.6 + pulse * 0.25,
                     color: Colors.white,
@@ -547,7 +547,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   ),
                 ],
               ),
-              padding: const EdgeInsets.all(2.4),
+              padding: const EdgeInsets.all(3),
               child: Container(
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
@@ -555,10 +555,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Transform.scale(
-                  // Medium-strong zoom so letters stay readable in the circle.
-                  scale: 1.22,
+                  scale: 1.28,
                   child: Padding(
-                    padding: const EdgeInsets.all(1.5),
+                    padding: const EdgeInsets.all(2),
                     child: Image.asset(
                       'assets/images/ngmy_logo.png',
                       fit: BoxFit.contain,
@@ -587,13 +586,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Widget _glassField({required Widget child}) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: ngmyClipBackdrop(
               borderRadius: BorderRadius.zero,
               sigma: 10,
               child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             color: Colors.white.withValues(alpha: 0.05),
             border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           ),
@@ -610,24 +609,24 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   }) {
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         color: Colors.white.withValues(alpha: 0.08),
         border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
       child: TextField(
         controller: controller,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 12),
-          floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 12),
+          labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 13),
+          floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 13),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
           filled: false,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         ),
       ),
     );
@@ -635,10 +634,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   InputDecoration _dec(String label) => InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 13),
-        floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 13),
+        labelStyle: const TextStyle(color: _kMuted, fontWeight: FontWeight.w600, fontSize: 14),
+        floatingLabelStyle: const TextStyle(color: _kAccent, fontWeight: FontWeight.w700, fontSize: 14),
         border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       );
 
   Future<void> _pickState() async {
@@ -662,7 +661,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
               sigma: 12,
               child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               gradient: LinearGradient(
@@ -933,48 +932,48 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
               children: [
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _titleBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 18),
                 _glassField(
                   child: TextField(
                     controller: _nameC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     textCapitalization: TextCapitalization.words,
                     decoration: _dec('Jina kamili'),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _glassField(
                   child: TextField(
                     controller: _addressC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     decoration: _dec('Anwani ya nyumbani'),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _glassField(
                   child: TextField(
                     controller: _phoneC,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     keyboardType: TextInputType.phone,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     decoration: _dec('Simu'),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _glassField(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -982,11 +981,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                           'Ukubwa wa familia',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),
-                            fontSize: 12,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         _familySoftField(
                           controller: _familyMembersC,
                           label: 'Jumla (idadi) *',
@@ -1022,11 +1021,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 12),
                 _glassField(
                   child: InkWell(
                     onTap: _pickState,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                     child: InputDecorator(
                       decoration: _dec('Jimbo'),
                       child: Row(
@@ -1034,7 +1033,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                           Expanded(
                             child: Text(
                               _selectedState,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
                             ),
                           ),
                           Icon(Icons.expand_more_rounded, size: 22, color: Colors.white.withValues(alpha: 0.55)),

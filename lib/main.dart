@@ -30648,6 +30648,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _cloudHydrateInFlight = false;
   DateTime? _lastRosterMutationAt;
   bool _copyingEnrollLink = false;
+  String? _lastHelpsReconcileState;
+  DateTime? _lastHelpsReconcileAt;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -34735,6 +34737,56 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         duration: const Duration(seconds: 6),
       ),
     );
+  }
+
+  /// Approved money records for this member — rankings only count real contributions.
+  int _recordedContributionCountForMember(UserData u, {String? forState}) {
+    final st = (forState ?? _selectedState).trim().toLowerCase();
+    return _contributionsForMember(u).where((t) {
+      final meta = _decodeContributionMeta(t);
+      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
+      if (st.isNotEmpty && receiptState.isNotEmpty && receiptState != st) return false;
+      return true;
+    }).length;
+  }
+
+  Future<void> _reconcileHelpsForState(String state) async {
+    final st = state.trim();
+    if (st.isEmpty || !_canUseRegistrarToolsHere(st)) return;
+    final now = DateTime.now();
+    if (_lastHelpsReconcileState == st &&
+        _lastHelpsReconcileAt != null &&
+        now.difference(_lastHelpsReconcileAt!) < const Duration(seconds: 45)) {
+      return;
+    }
+    var changed = false;
+    final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, st))
+        .toList();
+    for (final u in enrolled) {
+      final recorded = _recordedContributionCountForMember(u, forState: st);
+      if (u.helps == recorded) continue;
+      u.helps = recorded;
+      _syncCivicMemberRecordFromUser(widget.config, u);
+      final key = NgmyCivicRegistryMembers.emailKey(u.email);
+      if (key.isNotEmpty) {
+        final idx = widget.allUsers.indexWhere(
+          (x) => NgmyCivicRegistryMembers.emailKey(x.email) == key,
+        );
+        if (idx >= 0) widget.allUsers[idx].helps = recorded;
+      }
+      changed = true;
+    }
+    _lastHelpsReconcileState = st;
+    _lastHelpsReconcileAt = now;
+    if (!changed) return;
+    await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+    if (mounted) setState(() {});
   }
 
   Future<void> _persistCivicMemberActivity(UserData member) async {
@@ -40116,6 +40168,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onTap: () {
           setState(() => _activeTab = index);
           if (index == 2) unawaited(_refreshCivicMembersFromCloud());
+          if (index == 3) unawaited(_reconcileHelpsForState(_selectedState));
         },
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -41829,19 +41882,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return stats;
   }
 
-  int _compareTopHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats) {
+  int _compareTopHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats, String state) {
     final sa = _speedStatsForMember(a, stats);
     final sb = _speedStatsForMember(b, stats);
     final firsts = sb.firsts.compareTo(sa.firsts);
     if (firsts != 0) return firsts;
     final speed = sb.speedPoints.compareTo(sa.speedPoints);
     if (speed != 0) return speed;
-    final helps = b.helps.compareTo(a.helps);
+    final helps = _recordedContributionCountForMember(b, forState: state)
+        .compareTo(_recordedContributionCountForMember(a, forState: state));
     if (helps != 0) return helps;
     return a.missed.compareTo(b.missed);
   }
 
-  int _compareLeastHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats) {
+  int _compareLeastHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats, String state) {
     final sa = _speedStatsForMember(a, stats);
     final sb = _speedStatsForMember(b, stats);
     final lasts = sb.lasts.compareTo(sa.lasts);
@@ -41850,23 +41904,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (firsts != 0) return firsts;
     final speed = sa.speedPoints.compareTo(sb.speedPoints);
     if (speed != 0) return speed;
-    final helps = a.helps.compareTo(b.helps);
+    final helps = _recordedContributionCountForMember(a, forState: state)
+        .compareTo(_recordedContributionCountForMember(b, forState: state));
     if (helps != 0) return helps;
     return b.missed.compareTo(a.missed);
   }
 
   Widget _rankingsSection(bool isDark) {
     final st = _selectedState.trim();
+    if (_canUseRegistrarToolsHere(st)) {
+      unawaited(_reconcileHelpsForState(st));
+    }
     final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
         .where((u) => u.state.trim().toLowerCase() == st.toLowerCase())
         .toList();
 
     final speed = _helperSpeedStatsForState(st);
-    final topHelpers = enrolled.where((u) => u.helps > 0).toList()
-      ..sort((a, b) => _compareTopHelpers(a, b, speed));
+    final topHelpers = enrolled.where((u) => _recordedContributionCountForMember(u, forState: st) > 0).toList()
+      ..sort((a, b) => _compareTopHelpers(a, b, speed, st));
     final leastHelpers = enrolled.where((u) => u.missed > 0).toList()
-      ..sort((a, b) => _compareLeastHelpers(a, b, speed));
-    final nonHelpers = enrolled.where((u) => u.helps == 0).toList()..sort((a, b) => b.missed.compareTo(a.missed));
+      ..sort((a, b) => _compareLeastHelpers(a, b, speed, st));
+    final nonHelpers = enrolled.where((u) => _recordedContributionCountForMember(u, forState: st) == 0).toList()
+      ..sort((a, b) => b.missed.compareTo(a.missed));
 
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final muted = isDark ? Colors.white54 : Colors.black54;
@@ -41945,7 +42004,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (topHelpers.isEmpty)
           _rankingsEmptyBox('No data yet for $st.', isDark)
         else
-          ...topHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFE8F5E9), Colors.green, isDark)),
+          ...topHelpers.asMap().entries.map(
+                (e) => _civicRankCard(
+                  e.key + 1,
+                  e.value,
+                  const Color(0xFFE8F5E9),
+                  Colors.green,
+                  isDark,
+                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                ),
+              ),
 
         const SizedBox(height: 22),
         _rankingsCategoryHeader(
@@ -41963,7 +42031,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (leastHelpers.isEmpty)
           _rankingsEmptyBox('No least helpers listed for $st.', isDark)
         else
-          ...leastHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFFFF3E0), Colors.orange, isDark)),
+          ...leastHelpers.asMap().entries.map(
+                (e) => _civicRankCard(
+                  e.key + 1,
+                  e.value,
+                  const Color(0xFFFFF3E0),
+                  Colors.orange,
+                  isDark,
+                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                ),
+              ),
 
         const SizedBox(height: 22),
         _rankingsCategoryHeader(
@@ -41981,7 +42058,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (nonHelpers.isEmpty)
           _rankingsEmptyBox('Everyone in $st is helping!', isDark)
         else
-          ...nonHelpers.asMap().entries.map((e) => _civicRankCard(e.key + 1, e.value, const Color(0xFFFFEBEE), Colors.red, isDark)),
+          ...nonHelpers.asMap().entries.map(
+                (e) => _civicRankCard(
+                  e.key + 1,
+                  e.value,
+                  const Color(0xFFFFEBEE),
+                  Colors.red,
+                  isDark,
+                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                ),
+              ),
 
         const SizedBox(height: 20),
         if (_canChangeCivicState()) ...[
@@ -42074,9 +42160,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Widget _civicRankCard(int rank, UserData u, Color bg, Color accent, bool isDark) {
+  Widget _civicRankCard(int rank, UserData u, Color bg, Color accent, bool isDark, {int? helps}) {
     final name = (u.fullName ?? u.username).trim();
     final id = (u.registryId ?? '—').trim();
+    final helpCount = helps ?? u.helps;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -42105,7 +42192,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('${u.helps} helps', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.green)),
+              Text('$helpCount helps', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.green)),
               Text('${u.missed} missed', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red)),
             ],
           ),
