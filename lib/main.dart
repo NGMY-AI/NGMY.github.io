@@ -34741,13 +34741,45 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   /// Approved money records for this member — rankings only count real contributions.
   int _recordedContributionCountForMember(UserData u, {String? forState}) {
-    final st = (forState ?? _selectedState).trim().toLowerCase();
+    final st = (forState ?? _selectedState).trim();
     return _contributionsForMember(u).where((t) {
       final meta = _decodeContributionMeta(t);
-      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-      if (st.isNotEmpty && receiptState.isNotEmpty && receiptState != st) return false;
-      return true;
+      return _contributionMatchesState(t, meta, st);
     }).length;
+  }
+
+  bool _contributionMatchesState(AppTransaction t, Map<String, dynamic> meta, String state) {
+    final receiptState = _contributionReceiptState(t, meta).trim();
+    if (receiptState.isEmpty) return true;
+    return NgmyCivicRegistryStats.statesMatch(receiptState, state);
+  }
+
+  bool _memberCountsAsTopHelper(UserData u, String state) {
+    if (u.helps > 0) return true;
+    return _recordedContributionCountForMember(u, forState: state) > 0;
+  }
+
+  /// Earliest contribution time for rankings — active help campaign when on, else any in state.
+  DateTime? _rankingContributionTime(UserData u, String state) {
+    final st = state.trim();
+    final campaignId = widget.config.helpActiveFor(st) ? _activeHelpCampaignId(st).trim() : '';
+    final startedRaw = widget.config.helpCampaignStartedAtFor(st).trim();
+    final startedAt = DateTime.tryParse(startedRaw);
+    DateTime? earliest;
+    for (final t in _contributionsForMember(u)) {
+      final meta = _decodeContributionMeta(t);
+      if (!_contributionMatchesState(t, meta, st)) continue;
+      if (campaignId.isNotEmpty) {
+        final cid = (meta['campaignId'] ?? '').toString().trim();
+        if (cid.isNotEmpty) {
+          if (cid != campaignId) continue;
+        } else if (startedAt != null && t.timestamp.isBefore(startedAt)) {
+          continue;
+        }
+      }
+      if (earliest == null || t.timestamp.isBefore(earliest)) earliest = t.timestamp;
+    }
+    return earliest;
   }
 
   Future<void> _reconcileHelpsForState(String state) async {
@@ -34765,8 +34797,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .toList();
     for (final u in enrolled) {
       final recorded = _recordedContributionCountForMember(u, forState: st);
-      if (u.helps == recorded) continue;
-      u.helps = recorded;
+      final next = recorded > u.helps ? recorded : u.helps;
+      if (u.helps == next) continue;
+      u.helps = next;
       _syncCivicMemberRecordFromUser(widget.config, u);
       final key = NgmyCivicRegistryMembers.emailKey(u.email);
       if (key.isNotEmpty) {
@@ -35209,7 +35242,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // contribution receipts.
       final targetState = _contributionReceiptState(t, meta);
       if (viewerState.isEmpty || targetState.isEmpty) return false;
-      if (targetState.toLowerCase() != viewerState) return false;
+      if (!NgmyCivicRegistryStats.statesMatch(targetState, _selectedState)) return false;
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -38955,6 +38988,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
     if (rid.isNotEmpty && metaRid == rid) return true;
+    if (rid.isNotEmpty && txEmail.isEmpty && metaRid.isEmpty) {
+      // Legacy rows: match by registry id stored only on the member record.
+      final rawRid = (raw?['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rawRid.isNotEmpty && rawRid == rid) return true;
+    }
     return false;
   }
 
@@ -41851,8 +41889,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       final meta = _decodeContributionMeta(t);
-      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-      if (st.isNotEmpty && receiptState.isNotEmpty && receiptState != st) continue;
+      final receiptState = _contributionReceiptState(t, meta).trim();
+      if (st.isNotEmpty && receiptState.isNotEmpty && !NgmyCivicRegistryStats.statesMatch(receiptState, st)) continue;
       final campaignId = (meta['campaignId'] ?? '').toString().trim();
       final campaignKey = campaignId.isNotEmpty
           ? campaignId
@@ -41882,15 +41920,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return stats;
   }
 
-  int _compareTopHelpers(UserData a, UserData b, Map<String, _NgmyHelperSpeedStats> stats, String state) {
-    final sa = _speedStatsForMember(a, stats);
-    final sb = _speedStatsForMember(b, stats);
-    final firsts = sb.firsts.compareTo(sa.firsts);
-    if (firsts != 0) return firsts;
-    final speed = sb.speedPoints.compareTo(sa.speedPoints);
-    if (speed != 0) return speed;
-    final helps = _recordedContributionCountForMember(b, forState: state)
-        .compareTo(_recordedContributionCountForMember(a, forState: state));
+  int _compareTopHelpers(UserData a, UserData b, String state) {
+    final ta = _rankingContributionTime(a, state);
+    final tb = _rankingContributionTime(b, state);
+    if (ta != null && tb != null) return ta.compareTo(tb);
+    if (ta != null) return -1;
+    if (tb != null) return 1;
+    final helps = b.helps.compareTo(a.helps);
     if (helps != 0) return helps;
     return a.missed.compareTo(b.missed);
   }
@@ -41916,15 +41952,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_reconcileHelpsForState(st));
     }
     final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
-        .where((u) => u.state.trim().toLowerCase() == st.toLowerCase())
+        .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, st))
         .toList();
 
     final speed = _helperSpeedStatsForState(st);
-    final topHelpers = enrolled.where((u) => _recordedContributionCountForMember(u, forState: st) > 0).toList()
-      ..sort((a, b) => _compareTopHelpers(a, b, speed, st));
+    final topHelpers = enrolled.where((u) => _memberCountsAsTopHelper(u, st)).toList()
+      ..sort((a, b) => _compareTopHelpers(a, b, st));
     final leastHelpers = enrolled.where((u) => u.missed > 0).toList()
       ..sort((a, b) => _compareLeastHelpers(a, b, speed, st));
-    final nonHelpers = enrolled.where((u) => _recordedContributionCountForMember(u, forState: st) == 0).toList()
+    final nonHelpers = enrolled.where((u) => !_memberCountsAsTopHelper(u, st)).toList()
       ..sort((a, b) => b.missed.compareTo(a.missed));
 
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -42011,7 +42047,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const Color(0xFFE8F5E9),
                   Colors.green,
                   isDark,
-                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                  helps: e.value.helps,
                 ),
               ),
 
@@ -42038,7 +42074,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const Color(0xFFFFF3E0),
                   Colors.orange,
                   isDark,
-                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                  helps: e.value.helps,
                 ),
               ),
 
@@ -42065,7 +42101,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const Color(0xFFFFEBEE),
                   Colors.red,
                   isDark,
-                  helps: _recordedContributionCountForMember(e.value, forState: st),
+                  helps: e.value.helps,
                 ),
               ),
 
