@@ -30751,6 +30751,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
+    // Seed in-memory civic contributions immediately so Contribution Receipts
+    // are not empty while async local/cloud hydration runs (e.g. right after
+    // help mode deactivation or app reopen).
+    _communityContributions = widget.allTransactions
+        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .toList();
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
     unawaited(() async {
@@ -30760,18 +30766,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           .toSet();
       final localBackup = await ngmyHydrateCivicContributionsLocal(deletedIds: deleted);
       if (!mounted) return;
-      if (localBackup.isNotEmpty) {
-        setState(() {
-          _communityContributions = _mergeCivicCloudTransactions(
-            const [],
-            prior: localBackup,
-            local: widget.allTransactions.where(
-              (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
-            ),
-            deleted: deleted,
-          );
-        });
-      }
+      setState(() {
+        _communityContributions = _mergeCivicCloudTransactions(
+          const [],
+          prior: [
+            ..._communityContributions,
+            ...localBackup,
+          ],
+          local: widget.allTransactions.where(
+            (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+          ),
+          deleted: deleted,
+        );
+      });
     }());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Cloud roster is authoritative when online; local prefs are offline fallback only.
