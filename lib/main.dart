@@ -33040,7 +33040,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final cid = (meta['campaignId'] ?? '').toString().trim();
       final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-      if (stateKey.isNotEmpty && receiptState.isNotEmpty && receiptState != stateKey) continue;
+      if (stateKey.isNotEmpty && receiptState.isNotEmpty && !NgmyCivicRegistryStats.statesMatch(receiptState, stateKey)) continue;
 
       // Only the current campaign — never match older campaigns by purpose/scope fallback.
       final matchesThisCampaign = cid.isNotEmpty
@@ -33154,7 +33154,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<AppTransaction> _stateWalletContributionTx([String? forState]) {
-    final viewerState = (forState ?? _selectedState).trim().toLowerCase();
+    final viewerState = (forState ?? _selectedState).trim();
     final deleted = widget.config.civicDeletedContributionIds
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
@@ -33165,7 +33165,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final targetState = _contributionReceiptState(t, meta);
       if (viewerState.isEmpty || targetState.isEmpty) return false;
-      return targetState.toLowerCase() == viewerState;
+      return NgmyCivicRegistryStats.statesMatch(targetState, viewerState);
     }).toList();
   }
 
@@ -33495,7 +33495,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final receiptState = _contributionReceiptState(t, meta).trim();
       if (isState) {
-        if (receiptState.toLowerCase() != st.toLowerCase()) continue;
+        if (!NgmyCivicRegistryStats.statesMatch(receiptState, st)) continue;
       }
       targets.add(t);
       if (receiptState.isNotEmpty) affectedStates.add(receiptState);
@@ -34754,6 +34754,49 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return NgmyCivicRegistryStats.statesMatch(receiptState, state);
   }
 
+  bool _txBelongsToHelpCampaign(
+    AppTransaction t,
+    String campaignId,
+    DateTime? campaignStartedAt,
+    String state,
+  ) {
+    if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+    final meta = _decodeContributionMeta(t);
+    if (!_contributionMatchesState(t, meta, state)) return false;
+    final normalizedCampaignId = campaignId.trim();
+    final cid = (meta['campaignId'] ?? '').toString().trim();
+    if (normalizedCampaignId.isNotEmpty && cid == normalizedCampaignId) return true;
+    final fallbackId =
+        '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${_contributionReceiptState(t, meta)}';
+    if (normalizedCampaignId.isNotEmpty && fallbackId == normalizedCampaignId) return true;
+    if (campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt)) return true;
+    return false;
+  }
+
+  bool _memberContributedToCampaign(
+    UserData m,
+    String campaignId, {
+    DateTime? campaignStartedAt,
+    String? campaignState,
+  }) {
+    final st = (campaignState ?? _selectedState).trim();
+    for (final t in _contributionsForMember(m)) {
+      if (_txBelongsToHelpCampaign(t, campaignId, campaignStartedAt, st)) return true;
+    }
+    final emailKey = NgmyCivicRegistryMembers.emailKey(m.email);
+    final rid = (m.registryId ?? '').trim().toUpperCase();
+    for (final t in _civicTransactionsForDisplay()) {
+      if (!_txBelongsToHelpCampaign(t, campaignId, campaignStartedAt, st)) continue;
+      final meta = _decodeContributionMeta(t);
+      final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
+      final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+      final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+      if (emailKey.isNotEmpty && (metaEmail == emailKey || txEmail == emailKey)) return true;
+      if (rid.isNotEmpty && (metaRid == rid || t.id.toUpperCase().contains(rid))) return true;
+    }
+    return false;
+  }
+
   bool _memberCountsAsTopHelper(UserData u, String state) {
     if (u.helps > 0) return true;
     return _recordedContributionCountForMember(u, forState: state) > 0;
@@ -34925,10 +34968,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     // is why the Deactivate button (which always operates on
     // _selectedState) passes forState explicitly instead of relying on
     // this default.
-    final campaignState = (forState ?? _helpModeState()).trim().toLowerCase();
+    final campaignState = (forState ?? _helpModeState()).trim();
     return _civicRegistryMembersForDisplay(widget.config, widget.allUsers).where((m) {
       if (!_memberMatchesHelpScope(m, forState: forState)) return false;
-      return m.state.trim().isEmpty || m.state.trim().toLowerCase() == campaignState;
+      return m.state.trim().isEmpty || NgmyCivicRegistryStats.statesMatch(m.state, campaignState);
     }).toList();
   }
 
@@ -34963,31 +35006,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       debugPrint('[help mode] campaign $normalizedCampaignId already closed — skipping duplicate missed marking');
       return;
     }
-    final stateKey = (campaignState ?? _selectedState).trim().toLowerCase();
+    final stateKey = (campaignState ?? _selectedState).trim();
     // Anyone who put money / was recorded for THIS campaign must never be
     // marked missed. Match by campaignId, fallback purpose key, OR time
     // window in the same state — never require all three. Identity is
     // email OR registryId (Money stamps both).
     final contributorKeys = <String>{};
+    final totals = _contributionTotalsForCampaign(
+      state: stateKey,
+      campaignId: normalizedCampaignId,
+      campaignStartedAt: campaignStartedAt,
+    );
+    contributorKeys.addAll(totals.keys);
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      if (!_txBelongsToHelpCampaign(t, normalizedCampaignId, campaignStartedAt, stateKey)) continue;
       final meta = _decodeContributionMeta(t);
-      final cid = (meta['campaignId'] ?? '').toString().trim();
-      final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-      final fallbackId =
-          '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|${_contributionReceiptState(t, meta)}';
-      final matchesCampaignId =
-          normalizedCampaignId.isNotEmpty && (cid == normalizedCampaignId || fallbackId == normalizedCampaignId);
-      final matchesTimeWindow =
-          campaignStartedAt != null && !t.timestamp.isBefore(campaignStartedAt);
-      final matchesState = stateKey.isEmpty ||
-          receiptState.isEmpty ||
-          receiptState == stateKey;
-      // campaignId OR (time window in this state). Do not drop a paid
-      // member because a campaignId string drifted slightly.
-      final isForThisCampaign =
-          matchesCampaignId || (matchesTimeWindow && matchesState);
-      if (!isForThisCampaign) continue;
       final emailKey = NgmyCivicRegistryMembers.emailKey(t.userEmail);
       if (emailKey.isNotEmpty) contributorKeys.add(emailKey);
       final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
@@ -34996,7 +35030,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (rid.isNotEmpty) contributorKeys.add('rid:$rid');
     }
     final alreadyMarked = <String>{};
-    for (final m in members ?? _membersInCurrentHelpScope()) {
+    for (final m in members ?? _membersInCurrentHelpScope(forState: campaignState)) {
       final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, m.email) ??
           (((m.registryId ?? '').trim().isNotEmpty)
               ? NgmyCivicRegistryMembers.findByRegistryId(widget.config, m.registryId!)
@@ -35008,7 +35042,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final key = emailKey.isNotEmpty ? emailKey : ridKey;
       if (key == 'rid:' || !alreadyMarked.add(key)) continue;
       final contributed = (emailKey.isNotEmpty && contributorKeys.contains(emailKey)) ||
-          (ridKey != 'rid:' && contributorKeys.contains(ridKey));
+          (ridKey != 'rid:' && contributorKeys.contains(ridKey)) ||
+          _memberContributedToCampaign(
+            m,
+            normalizedCampaignId,
+            campaignStartedAt: campaignStartedAt,
+            campaignState: stateKey,
+          ) ||
+          (totals.containsKey(emailKey) && totals[emailKey]! > 0) ||
+          (ridKey != 'rid:' && totals.containsKey(ridKey) && totals[ridKey]! > 0);
       if (contributed) continue; // recorded money → never missed for this campaign
       m.missed += 1;
       unawaited(_persistCivicMemberActivity(m));
@@ -35229,7 +35271,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<AppTransaction> _visibleContributionTx() {
-    final viewerState = _selectedState.trim().toLowerCase();
     return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
       final meta = _decodeContributionMeta(t);
@@ -35241,8 +35282,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // versa). Changing state is the only way to see another state's
       // contribution receipts.
       final targetState = _contributionReceiptState(t, meta);
-      if (viewerState.isEmpty || targetState.isEmpty) return false;
+      if (_selectedState.trim().isEmpty || targetState.isEmpty) return false;
       if (!NgmyCivicRegistryStats.statesMatch(targetState, _selectedState)) return false;
+      if (_canUseRegistrarToolsHere()) return true;
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -35979,14 +36021,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     } catch (_) {}
                                   }
                                   setState(() {
-                                    // Deactivating is the actual button the user pressed —
-                                    // it must always happen and must go first. Bookkeeping
-                                    // (missed counts, campaign-closed history) is best-effort;
-                                    // if either throws, State.setState never reaches
-                                    // markNeedsBuild and the whole deactivation silently
-                                    // fails to render or persist, which is exactly the "I
-                                    // clicked Deactivate and nothing happened" report.
-                                    widget.config.deactivateHelpCampaign(_selectedState);
+                                    // Missed first, then close — same order as the
+                                    // 2-month auto-expiry path. Contributors are
+                                    // snapshotted above while help is still active.
                                     try {
                                       _markMissedForNonContributorsInCampaign(
                                         activeCampaignId,
@@ -36002,6 +36039,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     } catch (e) {
                                       debugPrint('[help mode] mark campaign closed: $e');
                                     }
+                                    widget.config.deactivateHelpCampaign(_selectedState);
                                   });
                                   // Close and reflect the deactivation immediately — the
                                   // local data is already updated above. Waiting on this
@@ -38934,8 +38972,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   /// Money records for a member — same set as Contribution Records in View.
   List<AppTransaction> _contributionsForMember(UserData u) {
-    return _civicTransactionsForDisplay().where((t) => _contributionBelongsToMember(t, u)).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final seen = <String>{};
+    final out = <AppTransaction>[];
+    void add(AppTransaction t) {
+      final id = t.id.trim();
+      if (id.isEmpty || !seen.add(id)) return;
+      out.add(t);
+    }
+
+    for (final t in _civicTransactionsForDisplay()) {
+      if (_contributionBelongsToMember(t, u)) add(t);
+    }
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(u.email);
+    final rid = (u.registryId ?? '').trim().toUpperCase();
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final id = t.id;
+      if (emailKey.isNotEmpty && id.toLowerCase().startsWith('contrib_${emailKey}_')) add(t);
+      if (rid.isNotEmpty && id.toUpperCase().contains('CONTRIB_${rid}_')) add(t);
+      final meta = _decodeContributionMeta(t);
+      final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rid.isNotEmpty && metaRid == rid) add(t);
+    }
+
+    out.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return out;
   }
 
   /// The member's contribution for the *currently active* help campaign only.
@@ -38957,8 +39019,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // Legacy rows without campaignId: treat as this campaign only if they
       // were recorded after the current campaign started.
       if (cid.isEmpty && startedAt != null && !t.timestamp.isBefore(startedAt)) {
-        final receiptState = _contributionReceiptState(t, meta).trim().toLowerCase();
-        if (receiptState.isEmpty || receiptState == state.toLowerCase()) return t;
+        final receiptState = _contributionReceiptState(t, meta).trim();
+        if (receiptState.isEmpty || NgmyCivicRegistryStats.statesMatch(receiptState, state)) return t;
       }
     }
     return null;
@@ -38988,15 +39050,115 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     final metaRid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
     if (rid.isNotEmpty && metaRid == rid) return true;
-    if (rid.isNotEmpty && txEmail.isEmpty && metaRid.isEmpty) {
-      // Legacy rows: match by registry id stored only on the member record.
-      final rawRid = (raw?['registryId'] ?? '').toString().trim().toUpperCase();
-      if (rawRid.isNotEmpty && rawRid == rid) return true;
-    }
+    if (rid.isNotEmpty && t.id.toUpperCase().contains(rid)) return true;
     return false;
   }
 
   List<AppTransaction> _moneyRecordsForMember(UserData u) => _contributionsForMember(u);
+
+  /// When helps were recorded but the linked money row is missing (sync lag or
+  /// legacy data), still let a registrar undo the help credit safely.
+  Future<void> _showOrphanedHelpCreditDialog(UserData u) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final confirmed = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (ctx, a, b) => const SizedBox.shrink(),
+      transitionBuilder: (ctx, anim, secondary, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: math.min(360, MediaQuery.sizeOf(ctx).width - 40),
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF151C2C) : Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Remove help credit?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        '${u.fullName ?? u.username} shows ${u.helps} help${u.helps == 1 ? '' : 's'} on file but no linked money record was found. '
+                        'Remove one help credit from this member?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, height: 1.35, color: isDark ? Colors.white70 : Colors.black54),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Keep', style: TextStyle(fontWeight: FontWeight.w800)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFDC2626),
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Text('Remove 1 help', style: TextStyle(fontWeight: FontWeight.w800)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      if (u.helps > 0) u.helps -= 1;
+    });
+    await _persistCivicMemberActivity(u);
+    NgmyCivicRegistryMembers.syncFromFields(
+      widget.config,
+      email: u.email,
+      fullName: u.fullName ?? u.username,
+      dob: u.dob ?? '',
+      idType: u.idType ?? '',
+      homeAddress: u.homeAddress ?? '',
+      phone: u.phone,
+      city: u.city ?? '',
+      room: u.room ?? '',
+      state: u.state,
+      registryId: u.registryId ?? '',
+      helps: u.helps,
+      missed: u.missed,
+    );
+    unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+    widget.onDataChanged();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Removed 1 help credit for ${u.fullName ?? u.username}.')),
+    );
+  }
 
   /// Lets a registrar remove a money/contribution record that was recorded
   /// by mistake — available while help mode is on or off. Mirrors the claim
@@ -39004,6 +39166,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   /// helps is decremented to undo the add; missed is never touched here.
   void _showMoneyRecordsManageDialog(UserData u) {
     final records = _moneyRecordsForMember(u);
+    if (records.isEmpty && u.helps > 0) {
+      _showOrphanedHelpCreditDialog(u);
+      return;
+    }
     if (records.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No money records to remove.')));
       return;
@@ -41298,6 +41464,65 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Builder(builder: (context) {
+          final nationwide = _buildCivicNationwideStats();
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1D4ED8), Color(0xFF2563EB), Color(0xFF3B82F6)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'United States Civic Registry',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Members', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700)),
+                          Text(
+                            '${nationwide.registeredMembers}',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const Text('Family total', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700)),
+                          Text(
+                            '${nationwide.totalFamilyMembers}',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$_selectedState view below · ${members.length} member(s) in current filters',
+                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 16),
         Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$_selectedState Community', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), Text('Only members registered in $_selectedState are shown', style: const TextStyle(fontSize: 10, color: Colors.blueGrey))])),
         const SizedBox(height: 20),
 
@@ -41458,6 +41683,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           );
         },
       );
+      return;
+    }
+    if (records.isEmpty && u.helps > 0) {
+      _showOrphanedHelpCreditDialog(u);
+      return;
+    }
+    if (records.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No money records to remove.')));
       return;
     }
     _showMoneyRecordsManageDialog(u);
