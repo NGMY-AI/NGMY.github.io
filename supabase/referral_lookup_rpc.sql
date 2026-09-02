@@ -1,11 +1,6 @@
--- Optional: server-side referral lookup (run once in Supabase SQL Editor).
--- The app also uses ngmy_settings keys ngmy_refcode_REFXXXXXX for fast lookup.
-
-alter table public.users add column if not exists "referralCode" text default '';
-
-create index if not exists users_referral_code_idx on public.users ("referralCode");
-
--- Ensure all users are readable for referral resolution (if not already applied):
-alter table if exists public.users enable row level security;
-drop policy if exists "users_read" on public.users;
-create policy "users_read" on public.users for select using (true);
+-- SUPERSEDED — do not run this file.
+-- This used to reopen `users` with `create policy "users_read" ... using (true)`,
+-- which is why raw REST reads of `users` were fully public in production.
+-- Referral lookup is now served by the narrow, security-definer RPC in
+-- referral_lookup_rpc_v2.sql (public.ngmy_lookup_referrer), which returns only
+-- the single matching row's non-sensitive columns instead of opening the table.

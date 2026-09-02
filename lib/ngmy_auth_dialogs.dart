@@ -150,7 +150,7 @@ Future<void> showNgmyForgotPasswordDialog(
   BuildContext context, {
   required String initialEmail,
   required Iterable<String> knownEmails,
-  required Future<bool> Function(String email, String passwordHash) onResetPasswordByEmail,
+  required Future<bool> Function(String email, String passwordHash, String? resetToken) onResetPasswordByEmail,
 }) {
   return showDialog<void>(
     context: context,
@@ -172,7 +172,7 @@ class _NgmyForgotPasswordDialog extends StatefulWidget {
 
   final String initialEmail;
   final Iterable<String> knownEmails;
-  final Future<bool> Function(String email, String passwordHash) onResetPasswordByEmail;
+  final Future<bool> Function(String email, String passwordHash, String? resetToken) onResetPasswordByEmail;
 
   @override
   State<_NgmyForgotPasswordDialog> createState() => _NgmyForgotPasswordDialogState();
@@ -187,6 +187,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
   int _step = 1;
   bool _loading = false;
   NgmyPasswordResetOtpMethod? _otpMethod;
+  String? _resetToken;
 
   @override
   void initState() {
@@ -272,18 +273,19 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
   }
 
-  Future<bool> _verifyCode(String email, String code) async {
+  Future<void> _verifyCode(String email, String code) async {
     if (_otpMethod == NgmyPasswordResetOtpMethod.resend) {
       final result = await ngmyPasswordResetVerifyResendOtp(email, code);
       if (!result.ok) throw Exception(result.error ?? 'Incorrect or expired code.');
-      return true;
+      _resetToken = result.resetToken;
+      return;
     }
     await Supabase.instance.client.auth.verifyOTP(
       email: email,
       token: code.trim(),
       type: OtpType.email,
     );
-    return true;
+    _resetToken = null;
   }
 
   Future<void> _updatePassword() async {
@@ -307,7 +309,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     try {
       await ngmyWaitForSupabaseReady();
       await _verifyCode(email, code);
-      final ok = await widget.onResetPasswordByEmail(email, hashPassword(pw));
+      final ok = await widget.onResetPasswordByEmail(email, hashPassword(pw), _resetToken);
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(

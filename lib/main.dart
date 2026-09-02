@@ -60,6 +60,7 @@ import 'ngmy_game_result_popup.dart';
 import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
+import 'ngmy_password_reset_otp.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_health.dart';
@@ -1211,7 +1212,7 @@ const int kNgmyWalletHistoryDisplayMax = 500;
 const int kNgmyHelpCampaignMaxMonths = 2;
 
 /// After a campaign is closed, contribution receipts stay visible this long.
-const int kNgmyContributionReceiptAfterCloseDays = 5;
+const int kNgmyContributionReceiptAfterCloseDays = 30;
 
 /// True when [startedAt] has reached the 2-month help-campaign limit.
 bool ngmyHelpCampaignReachedMaxDuration(DateTime startedAt, [DateTime? now]) {
@@ -8174,6 +8175,33 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
   }
 }
 
+void ngmyMergeApprovedContributionsIntoAllTransactions(
+  List<AppTransaction> all,
+  Iterable<AppTransaction> contributions,
+) {
+  final byId = <String, AppTransaction>{for (final t in all) if (t.id.isNotEmpty) t.id: t};
+  for (final t in contributions) {
+    if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+    if (t.id.isEmpty) continue;
+    final existing = byId[t.id];
+    byId[t.id] = existing == null ? t : _pickPreferredTransaction(existing, t);
+  }
+  all
+    ..clear()
+    ..addAll(byId.values)
+    ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+}
+
+Future<void> ngmyPersistAllCivicContributionsFromTransactions(
+  List<AppTransaction> all, {
+  Iterable<String> deletedIds = const [],
+}) {
+  return ngmyPersistCivicContributionsLocal(
+    all.where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved),
+    deletedIds: deletedIds,
+  );
+}
+
 Future<List<AppTransaction>> ngmyFetchCivicClaimsFromCloud() async {
   if (!await ngmyCanReachCloud()) return [];
   try {
@@ -9184,6 +9212,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final remote = byId.values.toList();
       if (!mounted) return;
       await _refreshWalletDecisionLedger();
+      var localContribs = const <AppTransaction>[];
+      try {
+        localContribs = await ngmyHydrateCivicContributionsLocal(
+          deletedIds: _config.civicDeletedContributionIds,
+        );
+      } catch (e) {
+        debugPrint('[user] civic contributions local merge: $e');
+      }
+      if (!mounted) return;
       setState(() {
         if (!_ngmySessionIsAdmin(_currentUser)) {
           _allTransactions = ngmyReplaceUserTransactionsFromCloud(
@@ -9203,6 +9240,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             remote,
             walletDecisionLedger: _walletDecisionLedger,
           );
+        }
+        if (localContribs.isNotEmpty) {
+          ngmyMergeApprovedContributionsIntoAllTransactions(_allTransactions, localContribs);
         }
         _applyWalletDecisionLedgerToTransactions();
         _seedWithdrawalHoldTxnIds();
@@ -12774,6 +12814,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           debugPrint('[admin] bootstrap transactions skipped — keeping local wallet list');
           _applyWalletDecisionLedgerToTransactions();
         }
+        try {
+          final cloudContribs = await _fetchCloudApprovedContributions();
+          if (cloudContribs.isNotEmpty) {
+            ngmyMergeApprovedContributionsIntoAllTransactions(_allTransactions, cloudContribs);
+          }
+        } catch (e) {
+          debugPrint('[bootstrap] civic contributions cloud merge: $e');
+        }
+        try {
+          final localContribs = await ngmyHydrateCivicContributionsLocal(
+            deletedIds: _config.civicDeletedContributionIds,
+          );
+          if (localContribs.isNotEmpty) {
+            ngmyMergeApprovedContributionsIntoAllTransactions(_allTransactions, localContribs);
+          }
+        } catch (e) {
+          debugPrint('[bootstrap] civic contributions local merge: $e');
+        }
         _reconcileAllUserBalances(ledgerSettled: true);
 
         final localStoreListings = List<Map<String, dynamic>>.from(_config.storeListings.map((e) => Map<String, dynamic>.from(e)));
@@ -13429,33 +13487,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 config: _config,
                 onGoogleLogin: (emailHint) => _startOAuthSignIn(OAuthProvider.google, emailHint: emailHint),
                 onGithubLogin: (emailHint) => _startOAuthSignIn(OAuthProvider.github, emailHint: emailHint),
-                onResetPasswordByEmail: (email, newHash) async {
+                onResetPasswordByEmail: (email, newHash, resetToken) async {
                   final emailNorm = email.toLowerCase().trim();
                   debugPrint('[ResetPW] Starting reset for $emailNorm');
                   _isSyncing = true;
 
                   try {
                     await ngmyWaitForSupabaseReady();
-                    var result = await supabase
-                        .from('users')
-                        .update({'passwordHash': newHash})
-                        .eq('email', emailNorm)
-                        .select();
-
-                    if (result.isEmpty) {
-                      result = await supabase
-                          .from('users')
-                          .update({'passwordHash': newHash})
-                          .ilike('email', emailNorm)
-                          .select();
-                    }
-
-                    if (result.isEmpty) {
-                      await supabase.from('users').upsert({
-                        'email': emailNorm,
-                        'passwordHash': newHash,
-                        'username': emailNorm.split('@').first,
-                      }, onConflict: 'email');
+                    final result = await ngmyPasswordResetComplete(emailNorm, newHash, resetToken: resetToken);
+                    if (!result.ok) {
+                      debugPrint('[ResetPW] failed: ${result.error}');
+                      _isSyncing = false;
+                      return false;
                     }
 
                     final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == emailNorm);
@@ -13626,6 +13669,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     ngmyNotifyBalanceChanged();
                   }
                   unawaited(_persistLocalOnly());
+                  if (t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
+                    unawaited(ngmyPersistAllCivicContributionsFromTransactions(
+                      _allTransactions,
+                      deletedIds: _config.civicDeletedContributionIds,
+                    ));
+                    NgmyAdminLiveRefresh.notify();
+                    NgmyCivicWalletRefresh.notify();
+                  }
                   } else {
                     // Update an existing row in place (status flips, contribution
                     // amount/note edits, etc.). Replace the list entry so final
@@ -13634,6 +13685,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     unawaited(_pushTransactionToCloudReliable(t));
                     unawaited(_pushTransactionToCloudFast(t));
                     _markTransactionDirty(t.id);
+                    if (t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
+                      unawaited(ngmyPersistAllCivicContributionsFromTransactions(
+                        _allTransactions,
+                        deletedIds: _config.civicDeletedContributionIds,
+                      ));
+                      NgmyAdminLiveRefresh.notify();
+                      NgmyCivicWalletRefresh.notify();
+                    }
+                    unawaited(_persistLocalOnly());
                     if (mounted) setState(() {});
                   }
                   if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
@@ -13929,7 +13989,7 @@ class AuthScreen extends StatefulWidget {
   final Future<void> Function(String, String, String, String, bool) onAuthComplete;
   final Future<String?> Function(String emailHint) onGoogleLogin;
   final Future<String?> Function(String emailHint) onGithubLogin;
-  final Future<bool> Function(String email, String newPasswordHash) onResetPasswordByEmail;
+  final Future<bool> Function(String email, String newPasswordHash, String? resetToken) onResetPasswordByEmail;
   const AuthScreen({super.key, required this.onAuthComplete, required this.allUsers, required this.onGoogleLogin, required this.onGithubLogin, required this.onResetPasswordByEmail, required this.config});
   @override State<AuthScreen> createState() => _AuthScreenState();
 }
@@ -30745,7 +30805,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
-    final priorContributions = List<AppTransaction>.from(_communityContributions);
+    final localBackup = await ngmyHydrateCivicContributionsLocal(
+      deletedIds: widget.config.civicDeletedContributionIds,
+    );
+    final priorContributions = [
+      ...List<AppTransaction>.from(_communityContributions),
+      ...localBackup,
+    ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
     final results = await Future.wait([
       ngmyFetchApprovedContributionsFromCloud(),
@@ -30774,6 +30840,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         deleted: const {},
       );
     });
+    unawaited(ngmyPersistAllCivicContributionsFromTransactions(
+      widget.allTransactions,
+      deletedIds: widget.config.civicDeletedContributionIds,
+    ));
     // After a cloud hydrate, re-run lifecycle so a resurrected "active"
     // campaign that already has a closure stays off (and gets persisted).
     _queueHelpModeLifecycleMaintenance();
@@ -31636,7 +31706,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     if (widget.config.helpCampaignClosures.isNotEmpty) {
       // Closures stay forever — they are the missed-count idempotency key.
-      // Only dismiss old receipts once a campaign has been closed long enough.
+      // Only dismiss old receipts once a campaign has been closed for a month.
       for (final c in widget.config.helpCampaignClosures) {
         final campaignId = (c['campaignId'] ?? '').toString().trim();
         final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
@@ -33196,14 +33266,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'at': t.timestamp.toUtc().toIso8601String(),
       };
     }).toList();
-    final want = state.toLowerCase();
     final spendingRows = widget.config.helpCampaignSpendings
         .map((e) => Map<String, dynamic>.from(e))
         .where((e) {
-          final st = (e['state'] ?? '').toString().trim().toLowerCase();
-          if (want.isEmpty) return true;
+          final st = (e['state'] ?? '').toString().trim();
+          if (state.isEmpty) return true;
           if (st.isEmpty) return true;
-          return st == want;
+          return NgmyCivicRegistryStats.statesMatch(st, state);
         })
         .toList();
     return buildNgmyCivicWalletSnapshot(
@@ -38775,6 +38844,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 ];
                               });
                               unawaited(_persistCivicMemberActivity(u));
+                              unawaited(ngmyPersistAllCivicContributionsFromTransactions(
+                                widget.allTransactions,
+                                deletedIds: widget.config.civicDeletedContributionIds,
+                              ));
+                              NgmyCivicWalletRefresh.notify();
+                              NgmyAdminLiveRefresh.notify();
                               widget.onDataChanged();
                               Navigator.pop(ctx);
                               if (mounted) {
@@ -47988,8 +48063,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (idx >= 0) return idx;
     try {
       if (!await ngmyCanReachCloud()) return -1;
+      // Counterparty (seller/buyer), not the current session's own row — only
+      // pull the narrow contact-info view, not their full profile.
       final row = await Supabase.instance.client
-          .from('users')
+          .from('users_store_contact')
           .select()
           .eq('email', key)
           .maybeSingle()

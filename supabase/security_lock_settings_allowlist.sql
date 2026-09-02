@@ -49,7 +49,8 @@ as $$
   or p_key like 'ngmy_bio_pub_%'
   or p_key like 'ngmy_doc_share_code_v2_%'
   or p_key like 'ngmy_doc_share_stash_v2_%'
-  or p_key like 'ngmy_essentials_code_v1_%';
+  or p_key like 'ngmy_essentials_code_v1_%'
+  or p_key like 'ngmy_refcode_%';
 $$;
 
 revoke all on function public.ngmy_settings_public_readable(text) from public;

@@ -50,6 +50,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'registerAppUser': 'a4',
   'passwordResetSendOtp': 'a5',
   'passwordResetVerifyOtp': 'a6',
+  'passwordResetComplete': 'a7',
   'elevenlabsTts': 'v1',
   'resendEmail': 'm1',
   'geminiVirtualOutfit': 'i1',

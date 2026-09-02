@@ -140,6 +140,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _snap = widget.snapshotBuilder();
     _searchC.addListener(() => setState(() {}));
     _ensureCountdownTicker();
+    NgmyCivicWalletRefresh.addListener(_reload);
     _livePoll = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       _reload();
@@ -148,6 +149,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
 
   @override
   void dispose() {
+    NgmyCivicWalletRefresh.removeListener(_reload);
     _editTapReset?.cancel();
     _countdownTick?.cancel();
     _livePoll?.cancel();

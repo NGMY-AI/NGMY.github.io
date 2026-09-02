@@ -38,6 +38,7 @@ const String _kNgmyCivicReceiptRemovedSettingsKey = 'civic_contribution_receipt_
 const String _kNgmyCivicReceiptRemovedPrefsKey = 'ngmy_civic_contribution_receipt_removed_v1';
 const String _kNgmyCivicDeletedContributionsSettingsKey = 'civic_deleted_contribution_ids';
 const String _kNgmyCivicDeletedContributionsPrefsKey = 'ngmy_civic_deleted_contribution_ids_v1';
+const String _kNgmyCivicContributionsLocalPrefsKey = 'ngmy_civic_contributions_local_v1';
 const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
 Future<Set<String>> _fetchDeletedMediaIdsFromCloud() async {
@@ -2080,5 +2081,48 @@ Future<bool> ngmyPersistCivicDeletedContributions(AppConfig config, {Iterable<St
   } catch (e) {
     debugPrint('[civic deleted contributions] cloud save: $e');
     return false;
+  }
+}
+
+/// Offline-safe backup of approved civic contributions — survives app restarts
+/// even when cloud sync is slow or the row only lived in memory briefly.
+Future<void> ngmyPersistCivicContributionsLocal(
+  Iterable<AppTransaction> contributions, {
+  Iterable<String> deletedIds = const [],
+}) async {
+  try {
+    final deleted = deletedIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    final byId = <String, Map<String, dynamic>>{};
+    for (final t in contributions) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      final id = t.id.trim();
+      if (id.isEmpty || deleted.contains(id)) continue;
+      byId[id] = t.toJson();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCivicContributionsLocalPrefsKey, jsonEncode(byId.values.toList()));
+  } catch (e) {
+    debugPrint('[civic contributions local] persist: $e');
+  }
+}
+
+Future<List<AppTransaction>> ngmyHydrateCivicContributionsLocal({
+  Iterable<String> deletedIds = const [],
+}) async {
+  try {
+    final deleted = deletedIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicContributionsLocalPrefsKey);
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    return decoded
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
+        .where((t) => !deleted.contains(t.id.trim()))
+        .toList();
+  } catch (e) {
+    debugPrint('[civic contributions local] hydrate: $e');
+    return const [];
   }
 }

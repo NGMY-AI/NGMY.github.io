@@ -166,41 +166,17 @@ Future<Map<String, dynamic>?> _ngmyLookupReferrerUserRowImpl(
 
   try {
     final client = Supabase.instance.client;
-    try {
-      final byColumn = await client
-          .from('users')
-          .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
-          .eq('referralCode', normalized)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (byColumn != null) {
-        final row = Map<String, dynamic>.from(byColumn);
-        if ((row['email'] ?? '').toString().trim().isNotEmpty) {
-          unawaited(ngmyRegisterReferralCodesForUser(row));
-          return row;
-        }
+    // Server-side RPC (security definer) — returns only the single matching
+    // row, so this works even after `users` is locked to own-row-or-admin.
+    final rpcResult = await client
+        .rpc('ngmy_lookup_referrer', params: {'p_code': normalized})
+        .timeout(kNgmyCloudLoadTimeout);
+    if (rpcResult is List && rpcResult.isNotEmpty) {
+      final row = Map<String, dynamic>.from(rpcResult.first as Map);
+      if ((row['email'] ?? '').toString().trim().isNotEmpty) {
+        unawaited(ngmyRegisterReferralCodesForUser(row));
+        return row;
       }
-    } catch (e) {
-      debugPrint('[referral] referralCode column lookup skipped: $e');
-    }
-
-    const pageSize = 500;
-    for (var from = 0; from < 20000; from += pageSize) {
-      final rows = await client
-          .from('users')
-          .select('email, username, fullName, referralCount, points, referredByCode, referralCode')
-          .order('email')
-          .range(from, from + pageSize - 1)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (rows.isEmpty) break;
-      for (final raw in rows) {
-        final row = Map<String, dynamic>.from(raw);
-        if (_rowMatchesReferralCode(row, normalized)) {
-          unawaited(ngmyRegisterReferralCodesForUser(row));
-          return row;
-        }
-      }
-      if (rows.length < pageSize) break;
     }
   } catch (e) {
     debugPrint('[referral] cloud lookup: $e');

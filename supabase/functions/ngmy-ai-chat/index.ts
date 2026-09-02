@@ -661,7 +661,80 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
     });
   }
 
+  // Code confirmed — issue a short-lived reset token instead of deleting the row.
+  // The client has no Supabase Auth session on this path (unlike the verifyOTP
+  // path), so it can't authenticate the password write via JWT; this token lets
+  // passwordResetComplete authorize it server-side instead.
+  const resetToken = crypto.randomUUID();
+  const resetTokenHash = await sha256Hex(`${resetToken}:${email}:${pepper}`);
+  const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  await admin
+    .from("ngmy_password_reset_otp")
+    .update({
+      code_hash: "",
+      reset_token_hash: resetTokenHash,
+      reset_token_expires_at: resetTokenExpiresAt,
+    })
+    .eq("email", email);
+
+  return new Response(JSON.stringify({ ok: true, resetToken }), {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+async function handlePasswordResetComplete(
+  jwtEmail: string,
+  email: string,
+  newHash: string,
+  resetToken: string,
+): Promise<Response> {
+  const admin = adminClient();
+  if (!admin) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Authorized either by a real Supabase Auth session for this email (verifyOTP
+  // path already established one) or by the short-lived reset token from the
+  // resend/OTP-code path above.
+  let authorized = jwtEmail !== "" && jwtEmail.toLowerCase().trim() === email;
+
+  if (!authorized && resetToken) {
+    const { data: row } = await admin
+      .from("ngmy_password_reset_otp")
+      .select("reset_token_hash,reset_token_expires_at")
+      .eq("email", email)
+      .maybeSingle();
+    if (row?.reset_token_hash) {
+      const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+      const tokenHash = await sha256Hex(`${resetToken}:${email}:${pepper}`);
+      const expiresAt = new Date(String(row.reset_token_expires_at ?? 0)).getTime();
+      authorized = tokenHash === row.reset_token_hash && !!expiresAt && Date.now() <= expiresAt;
+    }
+  }
+
+  if (!authorized) {
+    return new Response(JSON.stringify({ error: "Reset session expired. Request a new code." }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  let result = await admin.from("users").update({ passwordHash: newHash }).eq("email", email).select();
+  if (!result.data || result.data.length === 0) {
+    result = await admin.from("users").update({ passwordHash: newHash }).ilike("email", email).select();
+  }
+  if (!result.data || result.data.length === 0) {
+    await admin.from("users").upsert(
+      { email, passwordHash: newHash, username: email.split("@")[0] },
+      { onConflict: "email" },
+    );
+  }
+
   await admin.from("ngmy_password_reset_otp").delete().eq("email", email);
+
   return new Response(JSON.stringify({ ok: true }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -3008,6 +3081,7 @@ serve(async (req) => {
       a4: "registerAppUser",
       a5: "passwordResetSendOtp",
       a6: "passwordResetVerifyOtp",
+      a7: "passwordResetComplete",
       v1: "elevenlabsTts",
       m1: "resendEmail",
       i1: "geminiVirtualOutfit",
@@ -3039,6 +3113,20 @@ serve(async (req) => {
         });
       }
       return await handlePasswordResetVerifyOtp(email, code);
+    }
+
+    if (action === "passwordResetComplete") {
+      const jwtEmailForReset = (await requireJwtEmail(req)).toLowerCase().trim();
+      const email = (String(body?.email ?? "").trim().toLowerCase()) || jwtEmailForReset;
+      const newHash = String(body?.newPasswordHash ?? "").trim();
+      const resetToken = String(body?.resetToken ?? "").trim();
+      if (!email || !newHash) {
+        return new Response(JSON.stringify({ error: "Email and new password required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return await handlePasswordResetComplete(jwtEmailForReset, email, newHash, resetToken);
     }
 
     if (action === "saveAiApiKey") {

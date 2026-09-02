@@ -14,6 +14,23 @@ import 'ngmy_state_picker.dart';
 export 'ngmy_civic_identity.dart' show NgmyCivicWalletIdentity, NgmyCivicDobInputFormatter;
 export 'ngmy_civic_state_wallet_ui.dart' show NgmyCivicStateWalletScreen;
 
+/// Notifies open State Wallet screens to reload contribution-case totals immediately.
+class NgmyCivicWalletRefresh {
+  NgmyCivicWalletRefresh._();
+  static final Set<VoidCallback> _listeners = {};
+
+  static void addListener(VoidCallback listener) => _listeners.add(listener);
+  static void removeListener(VoidCallback listener) => _listeners.remove(listener);
+
+  static void notify() {
+    for (final listener in _listeners.toList()) {
+      try {
+        listener();
+      } catch (_) {}
+    }
+  }
+}
+
 /// Compact Registry Backup pin - thin animated outline, no thick white plate.
 class NgmyCivicBackupPinButton extends StatefulWidget {
   const NgmyCivicBackupPinButton({
