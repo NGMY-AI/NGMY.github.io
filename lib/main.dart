@@ -30753,6 +30753,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _selectedState = widget.user.state;
     unawaited(_hydrateReceiptReadState());
     unawaited(_hydrateRegistrarApplication());
+    unawaited(() async {
+      final deleted = widget.config.civicDeletedContributionIds
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      final localBackup = await ngmyHydrateCivicContributionsLocal(deletedIds: deleted);
+      if (!mounted) return;
+      if (localBackup.isNotEmpty) {
+        setState(() {
+          _communityContributions = _mergeCivicCloudTransactions(
+            const [],
+            prior: localBackup,
+            local: widget.allTransactions.where(
+              (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+            ),
+            deleted: deleted,
+          );
+        });
+      }
+    }());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Cloud roster is authoritative when online; local prefs are offline fallback only.
       await _refreshCivicMembersFromCloud();
@@ -30837,6 +30857,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final priorContributions = [
       ...List<AppTransaction>.from(_communityContributions),
       ...localBackup,
+      ...widget.allTransactions.where(
+        (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+      ),
     ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
     final results = await Future.wait([
@@ -30866,10 +30889,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         deleted: const {},
       );
     });
-    unawaited(ngmyPersistAllCivicContributionsFromTransactions(
-      widget.allTransactions,
-      deletedIds: widget.config.civicDeletedContributionIds,
-    ));
+    unawaited(_persistCivicContributionsBackup());
     // After a cloud hydrate, re-run lifecycle so a resurrected "active"
     // campaign that already has a closure stays off (and gets persisted).
     _queueHelpModeLifecycleMaintenance();
@@ -31630,9 +31650,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (campaignId.trim().isEmpty) return;
     final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
     final idx = closures.indexWhere((e) => (e['campaignId'] ?? '').toString() == campaignId);
+    final visibleUntil = closedAt.add(const Duration(days: kNgmyContributionReceiptAfterCloseDays));
+    final contributionTxIds = _visibleContributionTx()
+        .where((t) {
+          final meta = _decodeContributionMeta(t);
+          final cid = (meta['campaignId'] ?? '').toString().trim();
+          if (cid.isNotEmpty) return cid == campaignId.trim();
+          return _contributionReceiptGroupKey(t, meta) == campaignId.trim();
+        })
+        .map((t) => t.id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
     final record = <String, dynamic>{
       'campaignId': campaignId,
       'closedAt': closedAt.toUtc().toIso8601String(),
+      'receiptVisibleUntil': visibleUntil.toUtc().toIso8601String(),
+      if (contributionTxIds.isNotEmpty) 'contributionTxIds': contributionTxIds,
       if ((state ?? '').trim().isNotEmpty) 'state': state!.trim(),
     };
     if (idx >= 0) {
@@ -31641,6 +31675,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       closures.add(record);
     }
     widget.config.helpCampaignClosures = closures;
+  }
+
+  Future<void> _persistCivicContributionsBackup() async {
+    final deleted = widget.config.civicDeletedContributionIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final rows = _civicTransactionsForDisplay().where(
+      (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+    );
+    await ngmyPersistCivicContributionsLocal(rows, deletedIds: deleted);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
   }
 
   void _runHelpModeLifecycleMaintenance() {
@@ -31732,32 +31781,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     if (widget.config.helpCampaignClosures.isNotEmpty) {
       // Closures stay forever — they are the missed-count idempotency key.
-      // Only dismiss old receipts once a campaign has been closed for a month.
-      for (final c in widget.config.helpCampaignClosures) {
-        final campaignId = (c['campaignId'] ?? '').toString().trim();
-        final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
-        if (campaignId.isEmpty || closedAtRaw.isEmpty) continue;
-        DateTime? closedAt;
-        try {
-          closedAt = DateTime.parse(closedAtRaw).toLocal();
-        } catch (_) {}
-        if (closedAt == null) continue;
-        if (now.difference(closedAt) < const Duration(days: kNgmyContributionReceiptAfterCloseDays)) {
-          continue;
-        }
-        _dismissedReceiptKeys.add(campaignId);
-        if (!widget.config.dismissedContributionReceiptKeys.contains(campaignId)) {
-          widget.config.dismissedContributionReceiptKeys = [
-            ...widget.config.dismissedContributionReceiptKeys,
-            campaignId,
-          ];
-          changed = true;
-        }
-      }
+      // Receipt visibility is driven by receiptVisibleUntil / closedAt in
+      // _contributionReceiptExpired — do not push campaign ids into dismissed
+      // lists here or receipts vanish immediately after deactivation.
     }
 
     if (changed) {
       unawaited(_persistReceiptReadState());
+      unawaited(_persistCivicContributionsBackup());
       widget.onDataChanged();
       if (mounted) setState(() {});
     }
@@ -34766,41 +34797,72 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: gridBox(
-                          icon: Icons.pin_rounded,
-                          accent: const Color(0xFF7C3AED),
-                          title: 'PIN',
-                          delayMs: 180,
-                          onTap: () {
-                            Navigator.pop(ctx);
-                            if (!canPin) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Only registry kings or admins can set the PIN.')),
-                              );
-                              return;
-                            }
-                            _openCivicRegistryPinSheet(
-                              context,
-                              config: widget.config,
-                              reviewer: widget.user,
-                              onDataChanged: widget.onDataChanged,
-                              initialState: _selectedState,
-                            );
-                          },
+                        child: Stack(
+                          children: [
+                            gridBox(
+                              icon: Icons.pin_rounded,
+                              accent: const Color(0xFF7C3AED),
+                              title: 'PIN',
+                              delayMs: 180,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                if (!canPin) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Only registry kings or admins can set the PIN.')),
+                                  );
+                                  return;
+                                }
+                                _openCivicRegistryPinSheet(
+                                  context,
+                                  config: widget.config,
+                                  reviewer: widget.user,
+                                  onDataChanged: widget.onDataChanged,
+                                  initialState: _selectedState,
+                                );
+                              },
+                            ),
+                            // Tiny corner button — was a full-width tile, too big.
+                            Positioned(
+                              right: 6,
+                              bottom: 6,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  customBorder: const CircleBorder(),
+                                  onTap: () {
+                                    Navigator.pop(ctx);
+                                    unawaited(_syncAllCivicRegistryMembersToDatabase());
+                                  },
+                                  child: Tooltip(
+                                    message: 'Sync all members',
+                                    child: Container(
+                                      width: 22,
+                                      height: 22,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: const Color(0xFF0EA5E9),
+                                        border: Border.all(
+                                          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                          width: 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.25),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(Icons.cloud_sync_rounded, size: 12, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 10),
-                  gridBox(
-                    icon: Icons.cloud_sync_rounded,
-                    accent: const Color(0xFF0EA5E9),
-                    title: 'Sync all members',
-                    delayMs: 240,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      unawaited(_syncAllCivicRegistryMembersToDatabase());
-                    },
                   ),
                 ],
               ),
@@ -35408,9 +35470,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _contributionReceiptHidden(String receiptKey, Map<String, dynamic> meta) {
-    if (_dismissedReceiptKeys.contains(receiptKey)) return true;
-    if (widget.config.dismissedContributionReceiptKeys.contains(receiptKey)) return true;
+    // Only admin-removed keys or the 30-day post-deactivation window may hide
+    // a receipt from the list. "Dismissed/opened" keys are for unread badges
+    // only — using them here made receipts vanish after help mode toggles.
     if (widget.config.contributionReceiptRemovedKeys.contains(receiptKey)) return true;
+    final campaignId = (meta['campaignId'] ?? '').toString().trim();
+    if (campaignId.isNotEmpty && widget.config.contributionReceiptRemovedKeys.contains(campaignId)) {
+      return true;
+    }
     final stampedState = (meta['state'] ?? _contributionReceiptStateFromMetaOnly(meta)).trim();
     if (stampedState.isNotEmpty && widget.config.helpActiveFor(stampedState)) return false;
     return _contributionReceiptExpired(receiptKey, meta);
@@ -35471,11 +35538,46 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
 
+  DateTime? _contributionReceiptVisibleUntil(String receiptKey, Map<String, dynamic> meta) {
+    final campaignId = (meta['campaignId'] ?? '').toString().trim();
+    final keys = <String>{
+      if (campaignId.isNotEmpty) campaignId,
+      receiptKey.trim(),
+    };
+    for (final c in widget.config.helpCampaignClosures) {
+      final cid = (c['campaignId'] ?? '').toString().trim();
+      if (cid.isEmpty || !keys.contains(cid)) continue;
+      final untilRaw = (c['receiptVisibleUntil'] ?? '').toString().trim();
+      if (untilRaw.isNotEmpty) {
+        try {
+          return DateTime.parse(untilRaw).toLocal();
+        } catch (_) {}
+      }
+      final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
+      if (closedAtRaw.isEmpty) continue;
+      try {
+        final closedAt = DateTime.parse(closedAtRaw).toLocal();
+        return closedAt.add(const Duration(days: kNgmyContributionReceiptAfterCloseDays));
+      } catch (_) {}
+    }
+    return null;
+  }
+
   DateTime? _contributionCampaignClosedAt(String receiptKey, Map<String, dynamic> meta) {
     final campaignId = (meta['campaignId'] ?? '').toString().trim();
-    final lookup = campaignId.isNotEmpty ? campaignId : receiptKey;
+    final receiptState = _contributionReceiptStateFromMetaOnly(meta);
+    final purpose = (meta['purpose'] ?? 'Campaign').toString().trim();
+    final scopeType = (meta['scopeType'] ?? 'all').toString();
+    final scopeValue = (meta['scopeValue'] ?? '').toString();
+    final fallbackKey = '$purpose|$scopeType|$scopeValue|$receiptState';
+    final keys = <String>{
+      if (campaignId.isNotEmpty) campaignId,
+      receiptKey.trim(),
+      if (fallbackKey.trim().isNotEmpty) fallbackKey,
+    };
     for (final c in widget.config.helpCampaignClosures) {
-      if ((c['campaignId'] ?? '').toString().trim() != lookup) continue;
+      final cid = (c['campaignId'] ?? '').toString().trim();
+      if (cid.isEmpty || !keys.contains(cid)) continue;
       final closedAtRaw = (c['closedAt'] ?? '').toString().trim();
       if (closedAtRaw.isEmpty) continue;
       try {
@@ -35486,6 +35588,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   bool _contributionReceiptExpired(String receiptKey, Map<String, dynamic> meta) {
+    final visibleUntil = _contributionReceiptVisibleUntil(receiptKey, meta);
+    if (visibleUntil != null) {
+      return DateTime.now().isAfter(visibleUntil);
+    }
     final closedAt = _contributionCampaignClosedAt(receiptKey, meta);
     if (closedAt == null) return false;
     return DateTime.now().difference(closedAt) >=
@@ -36217,6 +36323,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     }
                                     widget.config.deactivateHelpCampaign(_selectedState);
                                   });
+                                  unawaited(_persistCivicContributionsBackup());
                                   // Close and reflect the deactivation immediately — the
                                   // local data is already updated above. Waiting on this
                                   // awaited cloud sync before closing meant a slow/stalled
@@ -38873,10 +38980,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 ];
                               });
                               unawaited(_persistCivicMemberActivity(u));
-                              unawaited(ngmyPersistAllCivicContributionsFromTransactions(
-                                widget.allTransactions,
-                                deletedIds: widget.config.civicDeletedContributionIds,
-                              ));
+                              unawaited(_persistCivicContributionsBackup());
                               NgmyCivicWalletRefresh.notify();
                               NgmyAdminLiveRefresh.notify();
                               widget.onDataChanged();
