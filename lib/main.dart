@@ -1557,11 +1557,12 @@ Future<bool> _patchTransactionStatusInCloud(AppTransaction t) async {
   ];
   for (final patch in patches) {
     try {
-      await Supabase.instance.client
-          .from('transactions')
-          .update(patch)
-          .eq('id', t.id)
-          .timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelayUpdate(
+        'transactions',
+        patch,
+        eq: {'id': t.id},
+        timeout: kNgmyCloudWriteTimeout,
+      );
       if (await _verifyTransactionStatusInCloud(t)) return true;
     } catch (e) {
       debugPrint('[txn] status patch: $e');
@@ -1572,13 +1573,15 @@ Future<bool> _patchTransactionStatusInCloud(AppTransaction t) async {
 
 Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
   try {
-    final row = await Supabase.instance.client
-        .from('transactions')
-        .select('status')
-        .eq('id', t.id)
-        .maybeSingle()
-        .timeout(kNgmyCloudWriteTimeout);
-    if (row == null) return false;
+    final rows = await ngmyDbRelaySelect(
+      'transactions',
+      cols: 'status',
+      eq: {'id': t.id},
+      single: true,
+      timeout: kNgmyCloudWriteTimeout,
+    );
+    if (rows.isEmpty) return false;
+    final row = rows.first;
     final remote = row['status'];
     final remoteIdx = remote is num ? remote.toInt() : int.tryParse(remote?.toString() ?? '');
     if (remoteIdx == t.status.index) return true;
@@ -1618,7 +1621,7 @@ Future<bool> _safeUpsertTransactionRows(
   var working = rows.map((e) => Map<String, dynamic>.from(e)).toList();
   for (var i = 0; i < 12; i++) {
     try {
-      await Supabase.instance.client.from('transactions').upsert(working).timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelayUpsert('transactions', working, timeout: kNgmyCloudWriteTimeout);
       if (requireStatus && working.every((r) => !r.containsKey('status'))) {
         debugPrint('[transactions] upsert rejected: status column missing in Supabase schema');
         return false;
@@ -1654,7 +1657,7 @@ Future<bool> _safeUpsertUserRow(Map<String, dynamic> row) async {
       // onConflict, PostgREST's default upsert targets the primary key,
       // tries to INSERT a brand-new row, and silently fails on the email
       // unique-constraint violation, so existing rows never actually update.
-      await Supabase.instance.client.from('users').upsert(working, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelayUpsert('users', [working], onConflict: 'email', timeout: kNgmyCloudWriteTimeout);
       return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e) ?? _missingColumnFromError(e);
@@ -3979,10 +3982,7 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   if (!await ngmyCanReachCloud()) return;
   try {
     final row = await _transactionRowForCloudPrepared(t);
-    await Supabase.instance.client
-        .from('transactions')
-        .upsert(row)
-        .timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert('transactions', [row], timeout: kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[txn] fast upsert: $e');
   }
@@ -4018,13 +4018,15 @@ Future<void> _hydrateUserCrownBadgeFromCloud(UserData u) async {
   final email = u.email.trim();
   if (email.isEmpty) return;
   try {
-    final row = await Supabase.instance.client
-        .from('users')
-        .select(NgmySupabaseColumns.userCrownBadge)
-        .eq('email', email)
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    if (row == null) return;
+    final rows = await ngmyDbRelaySelect(
+      'users',
+      cols: NgmySupabaseColumns.userCrownBadge,
+      eq: {'email': email},
+      single: true,
+      timeout: kNgmyCloudLoadTimeout,
+    );
+    if (rows.isEmpty) return;
+    final row = rows.first;
     final crown = (row[NgmySupabaseColumns.userCrownBadge] ?? '').toString().trim().toLowerCase();
     if (crown == 'king' || crown == 'queen') {
       u.crownBadge = crown;
@@ -4045,7 +4047,7 @@ Future<bool> _deleteUserFromCloud(String email) async {
   final key = email.trim();
   if (key.isEmpty || !await ngmyCanReachCloud()) return false;
   try {
-    await Supabase.instance.client.from('users').delete().eq('email', key).timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayDelete('users', eq: {'email': key}, timeout: kNgmyCloudWriteTimeout);
     return true;
   } catch (e) {
     debugPrint('[admin] delete user cloud: $e');
@@ -4829,20 +4831,9 @@ Future<UserData?> _fetchCloudUserRow(String email) async {
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty || !await ngmyCanReachCloud()) return null;
   try {
-    var row = await Supabase.instance.client
-        .from('users')
-        .select()
-        .eq('email', key)
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    row ??= await Supabase.instance.client
-        .from('users')
-        .select()
-        .ilike('email', key)
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    if (row == null) return null;
-    return UserData.fromJson(Map<String, dynamic>.from(row));
+    final rows = await ngmyDbRelaySelect('users', eq: {'email': key}, single: true, timeout: kNgmyCloudLoadTimeout);
+    if (rows.isEmpty) return null;
+    return UserData.fromJson(rows.first);
   } catch (e) {
     debugPrint('[user] full row fetch: $e');
     try {
@@ -4879,13 +4870,15 @@ Future<bool> _pushUserBalanceToCloud(
     final hasLedgerHistory = ledgerTransactions != null &&
         ledgerTransactions.any((t) => ngmyNormalizeEmail(t.userEmail) == ngmyNormalizeEmail(email));
     if (!allowDecrease && !hasLedgerHistory) {
-      final row = await Supabase.instance.client
-          .from('users')
-          .select('accountBalance')
-          .eq('email', email)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row != null) {
+      final rows = await ngmyDbRelaySelect(
+        'users',
+        cols: 'accountBalance',
+        eq: {'email': email},
+        single: true,
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (rows.isNotEmpty) {
+        final row = rows.first;
         final cloud = (row['accountBalance'] ?? 0.0).toDouble();
         if (cloud > local + 0.01) {
           u.accountBalance = cloud;
@@ -4893,10 +4886,14 @@ Future<bool> _pushUserBalanceToCloud(
         }
       }
     }
-    await Supabase.instance.client.from('users').upsert({
-      'email': email,
-      'accountBalance': local,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {'email': email, 'accountBalance': local},
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
     return true;
   } catch (e) {
     debugPrint('[user] balance upsert: $e');
@@ -4909,11 +4906,18 @@ Future<void> _pushUserContributionReceiptReads(UserData u) async {
   final email = u.email.trim();
   if (email.isEmpty) return;
   try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': email,
-      'openedContributionReceiptKeys': u.openedContributionReceiptKeys,
-      'dismissedContributionReceiptKeys': u.dismissedContributionReceiptKeys,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {
+          'email': email,
+          'openedContributionReceiptKeys': u.openedContributionReceiptKeys,
+          'dismissedContributionReceiptKeys': u.dismissedContributionReceiptKeys,
+        },
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
   } catch (e) {
     debugPrint('[user] contribution receipt reads upsert: $e');
   }
@@ -4924,11 +4928,14 @@ Future<void> _pushUserCanSellOnStore(UserData u) async {
   final email = u.email.trim();
   if (email.isEmpty) return;
   try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': email,
-      'canSellOnStore': u.canSellOnStore,
-      'can_sell_on_store': u.canSellOnStore,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {'email': email, 'canSellOnStore': u.canSellOnStore, 'can_sell_on_store': u.canSellOnStore},
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
   } catch (e) {
     debugPrint('[user] canSellOnStore upsert: $e');
   }
@@ -4937,11 +4944,14 @@ Future<void> _pushUserCanSellOnStore(UserData u) async {
 Future<void> _pushUserFreeTrialToCloud(UserData u) async {
   if (!await ngmyCanReachCloud()) return;
   try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': u.email,
-      'freeTrialActive': u.freeTrialActive,
-      'freeTrialDailyAmount': u.freeTrialDailyAmount,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {'email': u.email, 'freeTrialActive': u.freeTrialActive, 'freeTrialDailyAmount': u.freeTrialDailyAmount},
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
   } catch (e) {
     debugPrint('[user] trial upsert: $e');
   }
@@ -4959,11 +4969,14 @@ Future<bool> _upsertUserReadAnnouncements(UserData u) async {
   final email = u.email.toLowerCase().trim();
   if (email.isEmpty) return false;
   try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': u.email,
-      'username': u.username,
-      'readAnnouncementIds': u.readAnnouncementIds,
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {'email': u.email, 'username': u.username, 'readAnnouncementIds': u.readAnnouncementIds},
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
     return true;
   } catch (e) {
     debugPrint('[user read announcements] upsert: $e');
@@ -4976,15 +4989,22 @@ Future<bool> _upsertUserMediaSocialFields(UserData u) async {
   final email = u.email.toLowerCase().trim();
   if (email.isEmpty) return false;
   try {
-    await Supabase.instance.client.from('users').upsert({
-      'email': u.email,
-      'username': u.username,
-      'mediaFollowers': u.mediaFollowers,
-      'mediaFollowing': u.mediaFollowing,
-      'mediaBio': u.mediaBio ?? '',
-      'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
-      'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
-    }, onConflict: 'email').timeout(kNgmyCloudWriteTimeout);
+    await ngmyDbRelayUpsert(
+      'users',
+      [
+        {
+          'email': u.email,
+          'username': u.username,
+          'mediaFollowers': u.mediaFollowers,
+          'mediaFollowing': u.mediaFollowing,
+          'mediaBio': u.mediaBio ?? '',
+          'mediaHighlights': u.mediaHighlights.map((e) => Map<String, dynamic>.from(e)).toList(),
+          'mediaStories': u.mediaStories.map((e) => Map<String, dynamic>.from(e)).toList(),
+        },
+      ],
+      onConflict: 'email',
+      timeout: kNgmyCloudWriteTimeout,
+    );
     return true;
   } catch (e) {
     debugPrint('[user media social] upsert: $e');
@@ -8145,17 +8165,19 @@ String? ngmyApplyReferralCodeToUser({
 Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
   if (!await ngmyCanReachCloud()) return [];
   try {
-    final transData = await Supabase.instance.client
-        .from('transactions')
-        .select()
-        .eq('type', TransactionType.contribution.index)
-        .eq('status', TransactionStatus.approved.index)
-        .order('timestamp', ascending: false)
-        .limit(400)
-        .timeout(kNgmyCloudLoadTimeout);
-    if (transData == null) return [];
-    return (transData as List)
-        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+    final transData = await ngmyDbRelaySelect(
+      'transactions',
+      eq: {
+        'type': TransactionType.contribution.index,
+        'status': TransactionStatus.approved.index,
+      },
+      orderBy: 'timestamp',
+      orderAscending: false,
+      limit: 400,
+      timeout: kNgmyCloudLoadTimeout,
+    );
+    return transData
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e)))
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .toList();
   } catch (e) {
@@ -8194,16 +8216,16 @@ Future<void> ngmyPersistAllCivicContributionsFromTransactions(
 Future<List<AppTransaction>> ngmyFetchCivicClaimsFromCloud() async {
   if (!await ngmyCanReachCloud()) return [];
   try {
-    final transData = await Supabase.instance.client
-        .from('transactions')
-        .select()
-        .eq('type', TransactionType.claim.index)
-        .order('timestamp', ascending: false)
-        .limit(400)
-        .timeout(kNgmyCloudLoadTimeout);
-    if (transData == null) return [];
-    return (transData as List)
-        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+    final transData = await ngmyDbRelaySelect(
+      'transactions',
+      eq: {'type': TransactionType.claim.index},
+      orderBy: 'timestamp',
+      orderAscending: false,
+      limit: 400,
+      timeout: kNgmyCloudLoadTimeout,
+    );
+    return transData
+        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e)))
         .where((t) => t.type == TransactionType.claim)
         .toList();
   } catch (e) {
@@ -8399,13 +8421,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     const pageSize = 1000;
     while (from < 100000) {
       final to = from + pageSize - 1;
-      final rows = await supabase
-          .from('transactions')
-          .select('userEmail')
-          .order('timestamp', ascending: false)
-          .range(from, to)
-          .timeout(kNgmyCloudLoadTimeout);
-      if (rows == null || (rows as List).isEmpty) break;
+      final rows = await ngmyDbRelaySelect(
+        'transactions',
+        cols: 'userEmail',
+        orderBy: 'timestamp',
+        orderAscending: false,
+        range: (from, to),
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (rows.isEmpty) break;
       for (final raw in rows) {
         final key = ngmyNormalizeEmail((raw['userEmail'] ?? '').toString());
         if (key.isNotEmpty) emails.add(key);
@@ -8941,10 +8965,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       if (rows.isEmpty) return;
       final canWriteTrial = invitee.isAdmin;
-      await Supabase.instance.client.from('users').upsert(rows.map((r) {
-        final u = UserData.fromJson(r);
-        return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
-      }).toList(), onConflict: 'email');
+      await ngmyDbRelayUpsert(
+        'users',
+        rows.map((r) {
+          final u = UserData.fromJson(r);
+          return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
+        }).toList(),
+        onConflict: 'email',
+      );
     } catch (e) {
       debugPrint('[referral] cloud sync: $e');
     }
@@ -9145,28 +9173,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     var offset = 0;
     while (offset < kNgmyUserTxnFetchMax) {
       final limit = math.min(pageSize, kNgmyUserTxnFetchMax - offset);
-      dynamic transData;
+      List<Map<String, dynamic>> transData;
       try {
-        transData = await supabase
-            .from('transactions')
-            .select()
-            .ilike('userEmail', key)
-            .order('timestamp', ascending: false)
-            .range(offset, offset + limit - 1)
-            .timeout(kNgmyCloudLoadTimeout);
+        transData = await ngmyDbRelaySelect(
+          'transactions',
+          ilike: {'userEmail': key},
+          orderBy: 'timestamp',
+          orderAscending: false,
+          range: (offset, offset + limit - 1),
+          timeout: kNgmyCloudLoadTimeout,
+        );
       } catch (e) {
         debugPrint('[user] txn ilike fetch: $e');
-        transData = await supabase
-            .from('transactions')
-            .select()
-            .eq('userEmail', raw)
-            .order('timestamp', ascending: false)
-            .range(offset, offset + limit - 1)
-            .timeout(kNgmyCloudLoadTimeout);
+        transData = await ngmyDbRelaySelect(
+          'transactions',
+          eq: {'userEmail': raw},
+          orderBy: 'timestamp',
+          orderAscending: false,
+          range: (offset, offset + limit - 1),
+          timeout: kNgmyCloudLoadTimeout,
+        );
       }
-      if (transData == null) break;
-      final batch = (transData as List)
-          .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+      final batch = transData
+          .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e)))
           .where((t) => ngmyNormalizeEmail(t.userEmail) == key)
           .toList();
       all.addAll(batch);
@@ -9647,13 +9676,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (email.isEmpty) return;
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
       if (!kIsWeb) {
-        final photoRow = await supabase
-            .from('users')
-            .select('profilePicturePath')
-            .eq('email', email)
-            .maybeSingle()
-            .timeout(kNgmyCloudLoadTimeout);
-        if (photoRow != null && mounted) {
+        final photoRows = await ngmyDbRelaySelect(
+          'users',
+          cols: 'profilePicturePath',
+          eq: {'email': email},
+          single: true,
+          timeout: kNgmyCloudLoadTimeout,
+        );
+        if (photoRows.isNotEmpty && mounted) {
+          final photoRow = photoRows.first;
           final cloudPhoto = (photoRow['profilePicturePath'] ?? '').toString().trim();
           if (_ngmyIsCloudProfilePhoto(cloudPhoto)) {
             setState(() {
@@ -10635,9 +10666,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final email = _currentUser?.email.toLowerCase().trim() ?? '';
     if (email.isEmpty) return;
     try {
-      final row = await supabase.from('users').select().eq('email', email).maybeSingle();
-      if (row == null || !mounted) return;
-      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+      final rows = await ngmyDbRelaySelect('users', eq: {'email': email}, single: true);
+      if (rows.isEmpty || !mounted) return;
+      final remote = UserData.fromJson(rows.first);
       setState(() {
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
         if (idx == -1) {
@@ -12730,12 +12761,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         } else if (sessionEmail.isNotEmpty && !kIsWeb) {
           try {
-            final row = await supabase
-                .from('users')
-                .select('email,profilePicturePath')
-                .eq('email', sessionEmail)
-                .maybeSingle();
-            if (row != null) {
+            final rows = await ngmyDbRelaySelect(
+              'users',
+              cols: 'email,profilePicturePath',
+              eq: {'email': sessionEmail},
+              single: true,
+            );
+            if (rows.isNotEmpty) {
+              final row = rows.first;
               final photo = (row['profilePicturePath'] ?? '').toString().trim();
               if (photo.isNotEmpty) {
                 final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == sessionEmail);
@@ -13167,7 +13200,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       const chunkSize = 50;
       for (var i = 0; i < ids.length; i += chunkSize) {
         final chunk = ids.sublist(i, math.min(i + chunkSize, ids.length));
-        await supabase.from('transactions').delete().inFilter('id', chunk).timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayDelete('transactions', inFilter: {'id': chunk}, timeout: kNgmyCloudWriteTimeout);
       }
     } catch (e) {
       debugPrint('[transactions] delete old approved receipts error: $e');
@@ -13585,11 +13618,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     unawaited(() async {
                       try {
                         if (await ngmyCanReachCloud()) {
-                          await Supabase.instance.client
-                              .from('transactions')
-                              .delete()
-                              .eq('id', t.id)
-                              .timeout(kNgmyCloudWriteTimeout);
+                          await ngmyDbRelayDelete(
+                            'transactions',
+                            eq: {'id': t.id},
+                            timeout: kNgmyCloudWriteTimeout,
+                          );
                         }
                       } catch (_) {}
                     }());
@@ -16383,14 +16416,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     final email = widget.user.email.trim();
     if (email.isEmpty) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('users')
-          .select('phone')
-          .eq('email', email)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final phone = (row['phone'] ?? '').toString().trim();
+      final rows = await ngmyDbRelaySelect(
+        'users',
+        cols: 'phone',
+        eq: {'email': email},
+        single: true,
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (rows.isEmpty) return null;
+      final phone = (rows.first['phone'] ?? '').toString().trim();
       if (!ngmyUserPhoneOnFile(phone)) return null;
       final key = email.toLowerCase().trim();
       widget.user.phone = phone;
@@ -22972,20 +23006,21 @@ class _AdminDashboardState extends State<AdminDashboard> {
       final idx = widget.allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey);
       if (idx >= 0) {
         try {
-          await Supabase.instance.client
-              .from('users')
-              .upsert(
-                {
-                  'email': widget.allUsers[idx].email.trim().toLowerCase(),
-                  'state': target,
-                  'city': '',
-                  'room': '',
-                  'registryId': widget.allUsers[idx].registryId,
-                  'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
-                },
-                onConflict: 'email',
-              )
-              .timeout(kNgmyCloudWriteTimeout);
+          await ngmyDbRelayUpsert(
+            'users',
+            [
+              {
+                'email': widget.allUsers[idx].email.trim().toLowerCase(),
+                'state': target,
+                'city': '',
+                'room': '',
+                'registryId': widget.allUsers[idx].registryId,
+                'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
+              },
+            ],
+            onConflict: 'email',
+            timeout: kNgmyCloudWriteTimeout,
+          );
         } catch (_) {}
       }
     }
@@ -26776,14 +26811,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final email = widget.user.email.trim();
     if (email.isEmpty) return;
     try {
-      final row = await Supabase.instance.client
-          .from('users')
-          .select('profilePicturePath')
-          .eq('email', email)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null || !mounted) return;
-      final remote = (row['profilePicturePath'] ?? '').toString().trim();
+      final rows = await ngmyDbRelaySelect(
+        'users',
+        cols: 'profilePicturePath',
+        eq: {'email': email},
+        single: true,
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (rows.isEmpty || !mounted) return;
+      final remote = (rows.first['profilePicturePath'] ?? '').toString().trim();
       if (!_ngmyIsCloudProfilePhoto(remote)) return;
       final local = (widget.user.profilePicturePath ?? '').trim();
       if (local == remote) return;
@@ -27129,14 +27165,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (rows.isNotEmpty) {
           final canWriteTrial = widget.user.isAdmin;
           unawaited(
-            Supabase.instance.client
-                .from('users')
-                .upsert(rows.map((r) {
-                  final u = UserData.fromJson(r);
-                  return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
-                }).toList(), onConflict: 'email')
-                .timeout(kNgmyCloudWriteTimeout)
-                .catchError((_) {}),
+            ngmyDbRelayUpsert(
+              'users',
+              rows.map((r) {
+                final u = UserData.fromJson(r);
+                return _userRowForBulkSync(u, includeFreeTrial: canWriteTrial);
+              }).toList(),
+              onConflict: 'email',
+              timeout: kNgmyCloudWriteTimeout,
+            ).catchError((_) => false),
           );
         }
       } catch (_) {}
@@ -32304,10 +32341,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
     if (accountIdx >= 0) {
       try {
-        await Supabase.instance.client
-            .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
-            .timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayUpsert(
+          'users',
+          [_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx])],
+          onConflict: 'email',
+          timeout: kNgmyCloudWriteTimeout,
+        );
       } catch (e) {
         debugPrint('Member update enrollment flag upsert failed: $e');
       }
@@ -32374,10 +32413,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     if (accountIdx >= 0) {
       try {
-        await Supabase.instance.client
-            .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
-            .timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayUpsert(
+          'users',
+          [_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx])],
+          onConflict: 'email',
+          timeout: kNgmyCloudWriteTimeout,
+        );
       } catch (e) {
         debugPrint('Registry enrollment flag upsert failed: $e');
       }
@@ -32477,20 +32518,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final idx = widget.allUsers.indexWhere((u) => NgmyCivicRegistryMembers.emailKey(u.email) == emailKey);
       if (idx >= 0) {
         try {
-          await Supabase.instance.client
-              .from('users')
-              .upsert(
-                {
-                  'email': widget.allUsers[idx].email.trim().toLowerCase(),
-                  'state': picked,
-                  'city': '',
-                  'room': '',
-                  'registryId': widget.allUsers[idx].registryId,
-                  'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
-                },
-                onConflict: 'email',
-              )
-              .timeout(kNgmyCloudWriteTimeout);
+          await ngmyDbRelayUpsert(
+            'users',
+            [
+              {
+                'email': widget.allUsers[idx].email.trim().toLowerCase(),
+                'state': picked,
+                'city': '',
+                'room': '',
+                'registryId': widget.allUsers[idx].registryId,
+                'civicRegistryAnchorState': widget.allUsers[idx].civicRegistryAnchorState,
+              },
+            ],
+            onConflict: 'email',
+            timeout: kNgmyCloudWriteTimeout,
+          );
         } catch (_) {}
       }
     }
@@ -32766,10 +32808,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     var userCloudOk = true;
     if (await ngmyCanReachCloud() && accountIdx >= 0) {
       try {
-        await Supabase.instance.client
-            .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
-            .timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayUpsert(
+          'users',
+          [_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx])],
+          onConflict: 'email',
+          timeout: kNgmyCloudWriteTimeout,
+        );
       } catch (e) {
         userCloudOk = false;
       }
@@ -35233,11 +35277,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final list = ids.toList();
       for (var i = 0; i < list.length; i += chunkSize) {
         final chunk = list.sublist(i, math.min(i + chunkSize, list.length));
-        await Supabase.instance.client
-            .from('transactions')
-            .delete()
-            .inFilter('id', chunk)
-            .timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayDelete('transactions', inFilter: {'id': chunk}, timeout: kNgmyCloudWriteTimeout);
       }
     } catch (e) {
       debugPrint('[civic] purge tombstoned contributions: $e');
@@ -35316,7 +35356,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final ids = expiredIds.toList();
       for (var i = 0; i < ids.length; i += chunkSize) {
         final chunk = ids.sublist(i, math.min(i + chunkSize, ids.length));
-        await Supabase.instance.client.from('transactions').delete().inFilter('id', chunk).timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayDelete('transactions', inFilter: {'id': chunk}, timeout: kNgmyCloudWriteTimeout);
       }
     } catch (e) {
       debugPrint('[civic claims] prune expired: $e');
@@ -39875,10 +39915,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     if (await ngmyCanReachCloud() && accountIdx >= 0) {
       try {
-        await Supabase.instance.client
-            .from('users')
-            .upsert(_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx]), onConflict: 'email')
-            .timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelayUpsert(
+          'users',
+          [_userRowForRegistryEnrollmentFlag(widget.allUsers[accountIdx])],
+          onConflict: 'email',
+          timeout: kNgmyCloudWriteTimeout,
+        );
       } catch (e) {
         debugPrint('Passport grant enrollment flag upsert failed: $e');
       }

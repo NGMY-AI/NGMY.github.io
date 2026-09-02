@@ -37,6 +37,8 @@ const Map<String, String> kNgmyRelayTableCodes = {
   'family_trees': 'f',
   'home_cards': 'h',
   'ngmy_stripe_access': 'x',
+  'users': 'u',
+  'transactions': 't',
 };
 
 const Map<String, String> kNgmySettingsKeyCodes = {
@@ -322,6 +324,12 @@ Future<List<Map<String, dynamic>>> ngmyDbRelaySelect(
   String cols = '*',
   Map<String, dynamic>? eq,
   Map<String, dynamic>? contains,
+  Map<String, List<dynamic>>? inFilter,
+  Map<String, String>? ilike,
+  String? orderBy,
+  bool orderAscending = true,
+  int? limit,
+  (int, int)? range,
   bool single = false,
   Duration timeout = kNgmyCloudLoadTimeout,
 }) async {
@@ -336,6 +344,11 @@ Future<List<Map<String, dynamic>>> ngmyDbRelaySelect(
         'cols': cols,
         if (eq != null && eq.isNotEmpty) 'eq': eq,
         if (contains != null && contains.isNotEmpty) 'contains': contains,
+        if (inFilter != null && inFilter.isNotEmpty) 'in': inFilter,
+        if (ilike != null && ilike.isNotEmpty) 'ilike': ilike,
+        if (orderBy != null) 'order': {'col': orderBy, 'ascending': orderAscending},
+        if (limit != null) 'limit': limit,
+        if (range != null) 'range': [range.$1, range.$2],
         'single': single,
       },
       anonymous: !_ngmyHasSession,
@@ -377,23 +390,57 @@ Future<bool> ngmyDbRelayUpsert(
   return true;
 }
 
-/// Generic relayed delete for a non-`ngmy_settings` table. [eq] must be
-/// non-empty — the server refuses an unscoped delete. Throws on failure.
+/// Generic relayed delete for a non-`ngmy_settings` table. Either [eq] or
+/// [inFilter] must be non-empty — the server refuses an unscoped delete.
+/// Throws on failure.
 Future<bool> ngmyDbRelayDelete(
   String table, {
-  required Map<String, dynamic> eq,
+  Map<String, dynamic>? eq,
+  Map<String, List<dynamic>>? inFilter,
   Duration timeout = kNgmyCloudWriteTimeout,
 }) async {
   final tableCode = kNgmyRelayTableCodes[table];
   if (tableCode == null) throw NgmyDbRelayException('Unknown relay table: $table');
-  if (eq.isEmpty) return false;
+  final hasEq = eq != null && eq.isNotEmpty;
+  final hasIn = inFilter != null && inFilter.isNotEmpty;
+  if (!hasEq && !hasIn) return false;
   _checkOk(
     await ngmyEdgeInvoke(
       {
         'action': 'dbRelay',
         'op': 'd',
         't': tableCode,
+        if (hasEq) 'eq': eq,
+        if (hasIn) 'in': inFilter,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
+  );
+  return true;
+}
+
+/// Generic relayed partial column update for a non-`ngmy_settings` table
+/// (unlike [ngmyDbRelayUpsert], this does not require a full row / onConflict
+/// key — it patches only the given columns on rows matching [eq]). [eq] must
+/// be non-empty — the server refuses an unscoped update. Throws on failure.
+Future<bool> ngmyDbRelayUpdate(
+  String table,
+  Map<String, dynamic> patch, {
+  required Map<String, dynamic> eq,
+  Duration timeout = kNgmyCloudWriteTimeout,
+}) async {
+  final tableCode = kNgmyRelayTableCodes[table];
+  if (tableCode == null) throw NgmyDbRelayException('Unknown relay table: $table');
+  if (eq.isEmpty || patch.isEmpty) return false;
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'u',
+        't': tableCode,
         'eq': eq,
+        'patch': patch,
       },
       anonymous: !_ngmyHasSession,
       timeout: timeout,

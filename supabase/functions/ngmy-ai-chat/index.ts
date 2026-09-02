@@ -753,6 +753,8 @@ const RELAY_TABLE_CODES: Record<string, string> = {
   f: "family_trees",
   h: "home_cards",
   x: "ngmy_stripe_access",
+  u: "users",
+  t: "transactions",
 };
 
 // One code per static ngmy_settings key. Add new keys here (and in
@@ -871,6 +873,8 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
 
   const op = String(body.op ?? "s");
 
+  const inFilter = body.in as Record<string, unknown[]> | undefined;
+
   if (op === "s") {
     let q = client.from(table).select(String(body.cols ?? "*"));
     for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
@@ -878,6 +882,18 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     if (contains) {
       for (const [k, v] of Object.entries(contains)) q = q.contains(k, v as never);
     }
+    if (inFilter) {
+      for (const [k, v] of Object.entries(inFilter)) q = q.in(k, (v as unknown[]) ?? []);
+    }
+    const ilike = body.ilike as Record<string, unknown> | undefined;
+    if (ilike) {
+      for (const [k, v] of Object.entries(ilike)) q = q.ilike(k, String(v));
+    }
+    const order = body.order as { col?: string; ascending?: boolean } | undefined;
+    if (order?.col) q = q.order(order.col, { ascending: order.ascending !== false });
+    if (typeof body.limit === "number") q = q.limit(body.limit);
+    const range = body.range as [number, number] | undefined;
+    if (Array.isArray(range) && range.length === 2) q = q.range(range[0], range[1]);
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
     return jsonOk({ ok: true, data: result.data });
@@ -898,10 +914,24 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     return jsonOk({ ok: true });
   }
 
+  if (op === "u") {
+    if (Object.keys(eq).length === 0) return jsonOk({ error: "Refusing unscoped update" }, 400);
+    const patch = (body.patch as Record<string, unknown>) ?? {};
+    if (Object.keys(patch).length === 0) return jsonOk({ error: "No patch fields" }, 400);
+    let q = client.from(table).update(patch);
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    const { error } = await q;
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
   if (op === "d") {
-    if (Object.keys(eq).length === 0) return jsonOk({ error: "Refusing unscoped delete" }, 400);
+    if (Object.keys(eq).length === 0 && !inFilter) return jsonOk({ error: "Refusing unscoped delete" }, 400);
     let q = client.from(table).delete();
     for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    if (inFilter) {
+      for (const [k, v] of Object.entries(inFilter)) q = q.in(k, (v as unknown[]) ?? []);
+    }
     const { error } = await q;
     if (error) return jsonOk({ error: error.message }, 400);
     return jsonOk({ ok: true });

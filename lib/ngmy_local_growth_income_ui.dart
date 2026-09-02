@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_feature_sync_session.dart';
@@ -219,16 +220,17 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final email = ngmyNormalizeEmail(widget.liveUser.email);
     if (email.isEmpty) return;
     try {
-      final row = await Supabase.instance.client
-          .from('users')
-          .select('accountBalance')
-          .eq('email', email)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
+      final rows = await ngmyDbRelaySelect(
+        'users',
+        cols: 'accountBalance',
+        eq: {'email': email},
+        single: true,
+        timeout: kNgmyCloudLoadTimeout,
+      );
       if (!mounted) return;
-      final cloud = row == null
+      final cloud = rows.isEmpty
           ? 0.0
-          : ((row['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
+          : ((rows.first['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
       // Never replace a higher local balance with a lower cloud/live figure —
       // that was wiping day-to-day stacked earnings (looking like "replace").
       final best = math.max(
@@ -301,15 +303,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     if (pending.isNotEmpty) {
       try {
         final ids = pending.map((t) => t.id).toList();
-        final rows = await Supabase.instance.client
-            .from('transactions')
-            .select('id,status')
-            .inFilter('id', ids)
-            .timeout(kNgmyCloudLoadTimeout);
+        final rows = await ngmyDbRelaySelect(
+          'transactions',
+          cols: 'id,status',
+          inFilter: {'id': ids},
+          timeout: kNgmyCloudLoadTimeout,
+        );
         if (!mounted) return;
         var changed = false;
-        for (final row in (rows as List)) {
-          final map = Map<String, dynamic>.from(row as Map);
+        for (final row in rows) {
+          final map = row;
           final id = (map['id'] ?? '').toString();
           final statusIdx = (map['status'] as num?)?.toInt() ?? 0;
           if (id.isEmpty) continue;

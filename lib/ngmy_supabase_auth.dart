@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_supabase_columns.dart';
 import 'ngmy_supabase_config.dart';
 
@@ -52,20 +53,24 @@ Future<Map<String, dynamic>?> ngmyFetchUserLoginRow(
   Object? lastError;
   for (final columns in fallbacks) {
     try {
-      var row = await client
-          .from('users')
-          .select(columns)
-          .eq('email', key)
-          .maybeSingle()
-          .timeout(timeout);
-      row ??= await client
-          .from('users')
-          .select(columns)
-          .ilike('email', key)
-          .maybeSingle()
-          .timeout(timeout);
-      if (row == null) return null;
-      return Map<String, dynamic>.from(row);
+      var rows = await ngmyDbRelaySelect(
+        'users',
+        cols: columns,
+        eq: {'email': key},
+        single: true,
+        timeout: timeout,
+      );
+      if (rows.isEmpty) {
+        rows = await ngmyDbRelaySelect(
+          'users',
+          cols: columns,
+          ilike: {'email': key},
+          single: true,
+          timeout: timeout,
+        );
+      }
+      if (rows.isEmpty) return null;
+      return rows.first;
     } catch (e) {
       lastError = e;
       if (!_ngmyErrorIsMissingColumn(e)) rethrow;
