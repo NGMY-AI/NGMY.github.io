@@ -122,7 +122,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
 
 class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen> {
   late NgmyCivicWalletSnapshot _snap;
-  int _range = 2;
+  int _range = 0;
   bool _searchOpen = false;
   final _searchC = TextEditingController();
   DateTimeRange? _dateFilter;
