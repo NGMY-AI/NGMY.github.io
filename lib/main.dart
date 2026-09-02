@@ -30745,6 +30745,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
+    final priorContributions = List<AppTransaction>.from(_communityContributions);
+    final priorClaims = List<AppTransaction>.from(_communityClaims);
     final results = await Future.wait([
       ngmyFetchApprovedContributionsFromCloud(),
       ngmyFetchCivicClaimsFromCloud(),
@@ -30754,9 +30756,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toSet();
+    final localContributions = widget.allTransactions.where(
+      (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+    );
+    final localClaims = widget.allTransactions.where((t) => t.type == TransactionType.claim);
     setState(() {
-      _communityContributions = results[0].where((t) => !deleted.contains(t.id)).toList();
-      _communityClaims = results[1];
+      _communityContributions = _mergeCivicCloudTransactions(
+        results[0],
+        prior: priorContributions,
+        local: localContributions,
+        deleted: deleted,
+      );
+      _communityClaims = _mergeCivicCloudTransactions(
+        results[1],
+        prior: priorClaims,
+        local: localClaims,
+        deleted: const {},
+      );
     });
     // After a cloud hydrate, re-run lifecycle so a resurrected "active"
     // campaign that already has a closure stays off (and gets persisted).
@@ -35249,6 +35265,62 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  List<AppTransaction> _mergeCivicCloudTransactions(
+    List<AppTransaction> cloud, {
+    required List<AppTransaction> prior,
+    required Iterable<AppTransaction> local,
+    required Set<String> deleted,
+  }) {
+    final byId = <String, AppTransaction>{};
+    for (final t in cloud) {
+      if (t.id.trim().isEmpty || deleted.contains(t.id.trim())) continue;
+      byId[t.id] = t;
+    }
+    for (final t in prior) {
+      if (t.id.trim().isEmpty || deleted.contains(t.id.trim())) continue;
+      final existing = byId[t.id];
+      byId[t.id] = existing == null ? t : _pickPreferredTransaction(t, existing);
+    }
+    for (final t in local) {
+      if (t.id.trim().isEmpty || deleted.contains(t.id.trim())) continue;
+      final existing = byId[t.id];
+      byId[t.id] = existing == null ? t : _pickPreferredTransaction(t, existing);
+    }
+    return byId.values.toList()..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  String _contributionReceiptGroupKey(AppTransaction t, [Map<String, dynamic>? meta]) {
+    final decoded = meta ?? _decodeContributionMeta(t);
+    final campaignId = (decoded['campaignId'] ?? '').toString().trim();
+    if (campaignId.isNotEmpty) return campaignId;
+    final receiptState = _contributionReceiptState(t, decoded);
+    final purpose = (decoded['purpose'] ?? 'Campaign').toString().trim();
+    final scopeType = (decoded['scopeType'] ?? 'all').toString();
+    final scopeValue = (decoded['scopeValue'] ?? '').toString();
+    return '$purpose|$scopeType|$scopeValue|$receiptState';
+  }
+
+  String _contributionContributorKey(AppTransaction t) {
+    final meta = _decodeContributionMeta(t);
+    final email = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? t.userEmail).toString());
+    final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
+    if (email.isNotEmpty) return 'e:$email';
+    if (rid.isNotEmpty) return 'rid:$rid';
+    return 'tx:${t.id}';
+  }
+
+  bool _contributionReceiptHidden(String receiptKey, Map<String, dynamic> meta) {
+    if (_dismissedReceiptKeys.contains(receiptKey)) return true;
+    if (widget.config.dismissedContributionReceiptKeys.contains(receiptKey)) return true;
+    if (widget.config.contributionReceiptRemovedKeys.contains(receiptKey)) return true;
+    final stampedState = (meta['state'] ?? _contributionReceiptStateFromMetaOnly(meta)).trim();
+    if (stampedState.isNotEmpty && widget.config.helpActiveFor(stampedState)) return false;
+    return _contributionReceiptExpired(receiptKey, meta);
+  }
+
+  String _contributionReceiptStateFromMetaOnly(Map<String, dynamic> meta) =>
+      (meta['state'] ?? '').toString().trim();
+
   /// Resolves which Civic Registry state owns a contribution receipt.
   /// Prefer the stamped campaign state; fall back to the contributor's
   /// enrolled member record / account so older rows without a stamp still
@@ -35257,6 +35329,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final decoded = meta ?? _decodeContributionMeta(t);
     final stamped = (decoded['state'] ?? '').toString().trim();
     if (stamped.isNotEmpty) return stamped;
+    final rid = (decoded['registryId'] ?? '').toString().trim();
+    if (rid.isNotEmpty) {
+      final member = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+      final memberState = (member?['state'] ?? '').toString().trim();
+      if (memberState.isNotEmpty) return memberState;
+    }
     final email = t.userEmail.trim();
     if (email.isNotEmpty) {
       final member = NgmyCivicRegistryMembers.findByEmail(widget.config, email);
@@ -35276,14 +35354,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final meta = _decodeContributionMeta(t);
       final scopeType = (meta['scopeType'] ?? 'all').toString();
       final scopeValue = (meta['scopeValue'] ?? '').toString();
-      // Every viewer — member, registrar, King, or Admin — only sees the
-      // receipts for the Civic state they are currently viewing. Help-mode
-      // deactivate must not open Alabama receipts to Georgia (or vice
-      // versa). Changing state is the only way to see another state's
-      // contribution receipts.
       final targetState = _contributionReceiptState(t, meta);
-      if (_selectedState.trim().isEmpty || targetState.isEmpty) return false;
-      if (!NgmyCivicRegistryStats.statesMatch(targetState, _selectedState)) return false;
+      final metaState = _contributionReceiptStateFromMetaOnly(meta);
+      final stateForFilter = targetState.isNotEmpty ? targetState : metaState;
+      if (_selectedState.trim().isEmpty) return false;
+      if (stateForFilter.isNotEmpty) {
+        if (!NgmyCivicRegistryStats.statesMatch(stateForFilter, _selectedState)) return false;
+      } else {
+        final rid = (meta['registryId'] ?? '').toString().trim();
+        if (rid.isEmpty) return false;
+        final member = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+        final memberState = (member?['state'] ?? '').toString().trim();
+        if (memberState.isEmpty || !NgmyCivicRegistryStats.statesMatch(memberState, _selectedState)) return false;
+      }
       if (_canUseRegistrarToolsHere()) return true;
       return _audienceMatchForViewer(scopeType, scopeValue);
     }).toList()
@@ -35750,13 +35833,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final groups = <String, List<AppTransaction>>{};
     for (final t in txs) {
       final meta = _decodeContributionMeta(t);
-      final receiptState = _contributionReceiptState(t, meta);
-      final key = (meta['campaignId'] ?? '${meta['purpose'] ?? 'Campaign'}|${meta['scopeType'] ?? 'all'}|${meta['scopeValue'] ?? ''}|$receiptState')
-          .toString();
-      if (_dismissedReceiptKeys.contains(key)) continue;
-      if (widget.config.dismissedContributionReceiptKeys.contains(key)) continue;
-      if (widget.config.contributionReceiptRemovedKeys.contains(key)) continue;
-      if (_contributionReceiptExpired(key, meta)) continue;
+      final key = _contributionReceiptGroupKey(t, meta);
+      if (_contributionReceiptHidden(key, meta)) continue;
       if (unreadOnly && _openedReceiptKeys.contains(key)) continue;
       groups.putIfAbsent(key, () => []).add(t);
     }
@@ -36684,19 +36762,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final deceasedRow = NgmyCivicRegistryMembers.findDeceasedByEmail(widget.config, u.email) ??
         NgmyCivicRegistryMembers.findDeceasedByRegistryId(widget.config, u.registryId ?? '');
     final deceasedAt = DateTime.tryParse((deceasedRow?['deceasedAt'] ?? '').toString());
-    final emailKey = u.email.toLowerCase().trim();
-    final linkedEmail = NgmyCivicRegistryMembers.emailKey((raw?['linkedAppEmail'] ?? '').toString());
     final contributions = _contributionsForMember(u);
-    final claims = _civicTransactionsForDisplay()
-        .where((t) {
-          if (t.type != TransactionType.claim || t.status == TransactionStatus.rejected) return false;
-          final te = t.userEmail.toLowerCase().trim();
-          if (emailKey.isNotEmpty && te == emailKey) return true;
-          if (linkedEmail.isNotEmpty && te == linkedEmail) return true;
-          return false;
-        })
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final claims = _claimsForMember(u);
     final openClaims = claims.where((c) => c.status == TransactionStatus.pending).length;
     final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
     final nicknames = raw == null ? const <String>[] : NgmyCivicRegistryMembers.nicknamesOf(raw);
@@ -37110,10 +37177,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     final emailKey = u.email.toLowerCase().trim();
     final contributions = _contributionsForMember(u);
-    final claims = _civicTransactionsForDisplay()
-        .where((t) => t.userEmail.toLowerCase().trim() == emailKey && t.type == TransactionType.claim)
-        .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final claims = _claimsForMember(u);
     final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
     final openClaims = claims.where((t) => t.status == TransactionStatus.pending).length;
     final familyRaw = raw?['familyMembers'];
@@ -37273,7 +37337,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   void _showRegistrarMemberProfile(UserData u) {
-    final emailKey = u.email.toLowerCase().trim();
     showDialog(
       context: context,
       builder: (ctx) {
@@ -37316,13 +37379,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // excluded so a deleted claim actually disappears instead of
             // lingering as "Resolved claim".
             final contributions = _contributionsForMember(u);
-            final claims = _civicTransactionsForDisplay()
-                .where((t) =>
-                    t.userEmail.toLowerCase().trim() == emailKey &&
-                    t.type == TransactionType.claim &&
-                    t.status != TransactionStatus.rejected)
-                .toList()
-              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            final claims = _claimsForMember(u);
             final openClaims = claims.where((c) => c.status == TransactionStatus.pending).toList();
             final contributionTotal = contributions.fold<double>(0.0, (sum, t) => sum + t.amount);
             void deleteClaim(AppTransaction t) {
@@ -37907,13 +37964,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     int? openClaims,
   }) {
     final contrib = contributions ??
-        widget.allTransactions
-            .where((t) => t.userEmail == u.email && t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-            .toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    final claimList = claims ??
-        widget.allTransactions.where((t) => t.userEmail == u.email && t.type == TransactionType.claim).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        _contributionsForMember(u);
+    final claimList = claims ?? _claimsForMember(u);
     final total = contributionTotal ?? contrib.fold<double>(0.0, (sum, t) => sum + t.amount);
     final open = openClaims ?? claimList.where((c) => c.status == TransactionStatus.pending).length;
     final raw = _civicMemberOrDeceasedRaw(widget.config, u);
@@ -38214,8 +38266,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           final selected = selectedKey != null ? (groups[selectedKey] ?? <AppTransaction>[]) : <AppTransaction>[];
           final first = selected.isNotEmpty ? selected.first : null;
           final total = selected.fold<double>(0.0, (s, t) => s + t.amount);
-          final contributors = selected.map((e) => e.userEmail).toSet().length;
+          final contributors = selected.map(_contributionContributorKey).toSet().length;
           final meta = first != null ? _decodeContributionMeta(first) : <String, dynamic>{};
+          final receiptState = first != null ? _contributionReceiptState(first, meta) : _selectedState;
 
           void goBack() {
             if (selectedKey != null) {
@@ -38295,8 +38348,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             final seed = txs.first;
                             final m = _decodeContributionMeta(seed);
                             final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
-                            final c = txs.map((e) => e.userEmail).toSet().length;
-                            final receiptState = (m['state'] ?? widget.user.state).toString();
+                            final c = txs.map(_contributionContributorKey).toSet().length;
+                            final receiptState = _contributionReceiptState(seed, m);
                             final canDelete = _canDeleteReceiptForState(receiptState);
                             final title = (m['purpose'] ?? 'Contribution Campaign').toString();
                             return Stack(
@@ -38409,7 +38462,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     (meta['purpose'] ?? 'Contribution Campaign').toString(),
                                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: strongText),
                                   ),
-                                  Text('State: ${meta['state'] ?? widget.user.state}', style: TextStyle(color: softText)),
+                                  Text('State: ${receiptState.isNotEmpty ? receiptState : _selectedState}', style: TextStyle(color: softText)),
+                                  if ((meta['scopeType'] ?? 'all').toString() != 'all')
+                                    Text(
+                                      'Scope: ${meta['scopeType']}: ${meta['scopeValue']}',
+                                      style: TextStyle(color: softText),
+                                    ),
                                   Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
                                   const SizedBox(height: 12),
                                   Row(
@@ -38442,18 +38500,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                           )
                                         else
                                           ...selected.map(
-                                            (t) => ListTile(
-                                              dense: true,
-                                              leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                              title: Text(
-                                                _contributionMemberDisplayName(t),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(color: strongText),
-                                              ),
-                                              subtitle: Text(_txReadableDetails(t), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: softText)),
-                                              trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                            ),
+                                            (t) {
+                                              final rowMeta = _decodeContributionMeta(t);
+                                              return ListTile(
+                                                dense: true,
+                                                leading: const Icon(Icons.volunteer_activism, color: Colors.green),
+                                                title: Text(
+                                                  _contributionMemberDisplayName(t),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(color: strongText),
+                                                ),
+                                                subtitle: Text(
+                                                  [
+                                                    _txReadableDetails(t),
+                                                    if ((rowMeta['registryId'] ?? '').toString().trim().isNotEmpty)
+                                                      'ID: ${rowMeta['registryId']}',
+                                                  ].join(' · '),
+                                                  maxLines: 3,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(color: softText),
+                                                ),
+                                                trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
+                                              );
+                                            },
                                           ),
                                       ],
                                     ),
@@ -38886,18 +38956,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           }
                           submitted = true;
                           final now = DateTime.now();
-                          widget.onAddTransaction(
-                            AppTransaction(
-                              id: 'claim_${u.email}_$now',
-                              userEmail: u.email,
-                              amount: 0,
-                              type: TransactionType.claim,
-                              method: PaymentMethod.system,
-                              sourceDetails: text,
-                              status: TransactionStatus.pending,
-                              timestamp: now,
-                            ),
+                          final memberEmail = NgmyCivicRegistryMembers.emailKey(u.email);
+                          final memberRid = (u.registryId ?? '').trim().toUpperCase();
+                          final stableKey = memberEmail.isNotEmpty ? memberEmail : memberRid;
+                          final tx = AppTransaction(
+                            id: 'claim_${stableKey}_${now.microsecondsSinceEpoch}',
+                            userEmail: memberEmail.isNotEmpty ? u.email : (u.email.trim().isNotEmpty ? u.email : stableKey),
+                            amount: 0,
+                            type: TransactionType.claim,
+                            method: PaymentMethod.system,
+                            sourceDetails: text,
+                            status: TransactionStatus.pending,
+                            timestamp: now,
                           );
+                          widget.onAddTransaction(tx);
+                          setState(() {
+                            _communityClaims = [
+                              ..._communityClaims.where((t) => t.id != tx.id),
+                              tx,
+                            ];
+                          });
                           // A claim is not the same thing as missing a contribution —
                           // it shouldn't add to the member's missed count.
                           widget.onDataChanged();
@@ -38996,6 +39074,43 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (rid.isNotEmpty && metaRid == rid) add(t);
     }
 
+    out.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return out;
+  }
+
+  List<AppTransaction> _claimsForMember(UserData u) {
+    final seen = <String>{};
+    final out = <AppTransaction>[];
+    void add(AppTransaction t) {
+      if (t.type != TransactionType.claim || t.status == TransactionStatus.rejected) return;
+      final id = t.id.trim();
+      if (id.isEmpty || !seen.add(id)) return;
+      out.add(t);
+    }
+
+    final emailKey = NgmyCivicRegistryMembers.emailKey(u.email);
+    final rid = (u.registryId ?? '').trim().toUpperCase();
+    final raw = _civicMemberOrDeceasedRaw(widget.config, u);
+    final linkedEmail = NgmyCivicRegistryMembers.emailKey((raw?['linkedAppEmail'] ?? '').toString());
+    final regEmail = raw == null ? '' : NgmyCivicRegistryMembers.emailKey((raw['email'] ?? '').toString());
+
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.claim || t.status == TransactionStatus.rejected) continue;
+      final txEmail = NgmyCivicRegistryMembers.emailKey(t.userEmail);
+      if (emailKey.isNotEmpty && txEmail == emailKey) {
+        add(t);
+        continue;
+      }
+      if (linkedEmail.isNotEmpty && txEmail == linkedEmail) {
+        add(t);
+        continue;
+      }
+      if (regEmail.isNotEmpty && txEmail == regEmail) {
+        add(t);
+        continue;
+      }
+      if (rid.isNotEmpty && t.id.toUpperCase().contains('CLAIM_${rid}_')) add(t);
+    }
     out.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return out;
   }
@@ -41464,65 +41579,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Builder(builder: (context) {
-          final nationwide = _buildCivicNationwideStats();
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1D4ED8), Color(0xFF2563EB), Color(0xFF3B82F6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'United States Civic Registry',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Members', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700)),
-                          Text(
-                            '${nationwide.registeredMembers}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text('Family total', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.w700)),
-                          Text(
-                            '${nationwide.totalFamilyMembers}',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '$_selectedState view below · ${members.length} member(s) in current filters',
-                  style: const TextStyle(color: Colors.white70, fontSize: 10),
-                ),
-              ],
-            ),
-          );
-        }),
-        const SizedBox(height: 16),
         Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: Colors.blue.withOpacity(0.05), borderRadius: BorderRadius.circular(15)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('$_selectedState Community', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)), Text('Only members registered in $_selectedState are shown', style: const TextStyle(fontSize: 10, color: Colors.blueGrey))])),
         const SizedBox(height: 20),
 
