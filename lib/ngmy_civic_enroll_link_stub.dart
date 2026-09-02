@@ -1,7 +1,20 @@
+import 'package:flutter/services.dart';
+
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_registry_stats.dart';
 
 bool ngmyPendingCivicSelfEnrollmentOpen = false;
+
+Future<bool> ngmyCopyTextToClipboard(String text) async {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+  try {
+    await Clipboard.setData(ClipboardData(text: trimmed));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
 
 /// Short path link: `https://ngmy.org/enroll/georgia` or `…/enroll/georgia?r=…&k=2`.
 String ngmyCivicSelfEnrollmentShareUrl({

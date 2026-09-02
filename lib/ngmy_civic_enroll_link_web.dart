@@ -5,6 +5,31 @@ import 'ngmy_civic_registry_stats.dart';
 
 bool ngmyPendingCivicSelfEnrollmentOpen = false;
 
+/// Copy on web — call synchronously from a tap handler when possible.
+Future<bool> ngmyCopyTextToClipboard(String text) async {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return false;
+  try {
+    final api = html.window.navigator.clipboard;
+    if (api != null) {
+      await api.writeText(trimmed);
+      return true;
+    }
+  } catch (_) {}
+  try {
+    final ta = html.TextAreaElement()
+      ..value = trimmed
+      ..style.position = 'fixed'
+      ..style.left = '-9999px';
+    html.document.body?.append(ta);
+    ta.select();
+    final ok = html.document.execCommand('copy');
+    ta.remove();
+    if (ok) return true;
+  } catch (_) {}
+  return false;
+}
+
 /// Short path link: `https://ngmy.org/enroll/georgia` or `…/enroll/georgia?r=…&k=2`.
 String ngmyCivicSelfEnrollmentShareUrl({
   String? state,

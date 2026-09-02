@@ -22681,25 +22681,42 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   subtitle: const Text('Your own link — members who self-enroll through it are attributed to you'),
                   trailing: const Icon(Icons.copy_rounded, color: Color(0xFF6200EE)),
                   onTap: () async {
-                    final fetched = await ngmyCivicFetchEnrollmentLink(
-                      email: widget.user.email,
-                      state: widget.user.state,
+                    final state = widget.user.state.trim().isNotEmpty ? widget.user.state.trim() : 'Georgia';
+                    final quickLink = ngmyCivicSelfEnrollmentShareUrl(
+                      state: state,
+                      registrarEmail: widget.user.email,
                     );
-                    final link = fetched.ok && fetched.url.isNotEmpty
-                        ? fetched.url
-                        : ngmyCivicSelfEnrollmentShareUrl(
-                            state: widget.user.state,
-                            registrarEmail: widget.user.email,
-                            linkVersion: fetched.linkVersion,
-                          );
-                    await Clipboard.setData(ClipboardData(text: link));
+                    final copied = await ngmyCopyTextToClipboard(quickLink);
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Enrollment link copied for ${widget.user.state}'),
-                        backgroundColor: const Color(0xFF059669),
-                      ),
-                    );
+                    final messenger = ScaffoldMessenger.maybeOf(context);
+                    if (messenger == null) return;
+                    messenger.hideCurrentSnackBar();
+                    if (copied) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Enrollment link copied for $state'),
+                          backgroundColor: const Color(0xFF059669),
+                        ),
+                      );
+                    } else {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Could not copy — try again or copy: $quickLink'),
+                          backgroundColor: Colors.red.shade700,
+                        ),
+                      );
+                    }
+                    unawaited(() async {
+                      try {
+                        final fetched = await ngmyCivicFetchEnrollmentLink(
+                          email: widget.user.email,
+                          state: state,
+                        ).timeout(const Duration(seconds: 8));
+                        if (fetched.ok && fetched.url.isNotEmpty && fetched.url != quickLink) {
+                          await ngmyCopyTextToClipboard(fetched.url);
+                        }
+                      } catch (_) {}
+                    }());
                   },
                 ),
               ListTile(
@@ -30630,6 +30647,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Timer? _liveRefreshDebounce;
   bool _cloudHydrateInFlight = false;
   DateTime? _lastRosterMutationAt;
+  bool _copyingEnrollLink = false;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -30789,35 +30807,119 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     super.dispose();
   }
 
-  Future<void> _copyCivicEnrollShareLink({bool regenerate = false}) async {
-    final fetched = regenerate
-        ? await ngmyCivicRegenerateEnrollmentLink(
-            email: widget.user.email,
-            state: _selectedState,
-          )
-        : await ngmyCivicFetchEnrollmentLink(
-            email: widget.user.email,
-            state: _selectedState,
-          );
-    final link = fetched.ok && fetched.url.isNotEmpty
-        ? fetched.url
-        : ngmyCivicSelfEnrollmentShareUrl(
-            state: _selectedState,
-            registrarEmail: widget.user.email,
-            linkVersion: fetched.linkVersion,
-          );
-    await Clipboard.setData(ClipboardData(text: link));
+  String _enrollShareStateName() {
+    final picked = _selectedState.trim();
+    if (picked.isNotEmpty) return picked;
+    final home = widget.user.state.trim();
+    if (home.isNotEmpty) return home;
+    return 'Georgia';
+  }
+
+  void _showEnrollmentLinkSnack({
+    required bool copied,
+    required String state,
+    bool regenerate = false,
+    String? error,
+  }) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          regenerate
-              ? 'New enrollment link for $_selectedState copied — older links no longer work'
-              : 'Enrollment link for $_selectedState copied — share this one link only',
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.hideCurrentSnackBar();
+    if (copied) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            regenerate
+                ? 'New enrollment link for $state copied — older links no longer work'
+                : 'Enrollment link for $state copied — paste and share it',
+          ),
+          backgroundColor: const Color(0xFF059669),
+          duration: const Duration(seconds: 4),
         ),
-        backgroundColor: const Color(0xFF059669),
+      );
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(error ?? 'Could not copy link. Try again or long-press the link icon.'),
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 5),
       ),
     );
+  }
+
+  Future<void> _copyCivicEnrollShareLink({bool regenerate = false}) async {
+    if (_copyingEnrollLink) return;
+    final state = _enrollShareStateName();
+    if (state.trim().isEmpty) {
+      _showEnrollmentLinkSnack(copied: false, state: state, error: 'Pick a state first, then copy the link.');
+      return;
+    }
+
+    if (regenerate) {
+      setState(() => _copyingEnrollLink = true);
+      try {
+        final fetched = await ngmyCivicRegenerateEnrollmentLink(
+          email: widget.user.email,
+          state: state,
+        );
+        final link = fetched.ok && fetched.url.isNotEmpty
+            ? fetched.url
+            : ngmyCivicSelfEnrollmentShareUrl(
+                state: state,
+                registrarEmail: widget.user.email,
+                linkVersion: fetched.linkVersion,
+              );
+        final copied = await ngmyCopyTextToClipboard(link);
+        if (!mounted) return;
+        _showEnrollmentLinkSnack(
+          copied: copied,
+          state: state,
+          regenerate: true,
+          error: fetched.error ?? (copied ? null : 'Clipboard blocked — copy manually: $link'),
+        );
+      } catch (e) {
+        debugPrint('[civic] regenerate enroll link: $e');
+        if (!mounted) return;
+        _showEnrollmentLinkSnack(
+          copied: false,
+          state: state,
+          regenerate: true,
+          error: 'Could not create a new link. Check your connection and try again.',
+        );
+      } finally {
+        if (mounted) setState(() => _copyingEnrollLink = false);
+      }
+      return;
+    }
+
+    // Copy immediately while the browser still treats this tap as a user gesture.
+    final quickLink = ngmyCivicSelfEnrollmentShareUrl(
+      state: state,
+      registrarEmail: widget.user.email,
+    );
+    final copied = await ngmyCopyTextToClipboard(quickLink);
+    if (!mounted) return;
+    _showEnrollmentLinkSnack(
+      copied: copied,
+      state: state,
+      error: copied ? null : 'Clipboard blocked — copy manually: $quickLink',
+    );
+
+    // Refresh from server in the background (adds k= when the link was rotated).
+    unawaited(() async {
+      try {
+        final fetched = await ngmyCivicFetchEnrollmentLink(
+          email: widget.user.email,
+          state: state,
+        ).timeout(const Duration(seconds: 8));
+        if (!fetched.ok || fetched.url.isEmpty) return;
+        if (fetched.url == quickLink) return;
+        await ngmyCopyTextToClipboard(fetched.url);
+      } catch (e) {
+        debugPrint('[civic] fetch enroll link: $e');
+      }
+    }());
   }
 
   @override
@@ -39655,9 +39757,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           if (ok == true) unawaited(_copyCivicEnrollShareLink(regenerate: true));
                         },
                         child: IconButton(
-                          onPressed: _copyCivicEnrollShareLink,
-                          icon: const Icon(Icons.link_rounded, color: Colors.white, size: 26),
-                          tooltip: 'Copy enrollment link (hold for new link)',
+                          onPressed: _copyingEnrollLink ? null : () => unawaited(_copyCivicEnrollShareLink()),
+                          icon: _copyingEnrollLink
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.link_rounded, color: Colors.white, size: 26),
+                          tooltip: _copyingEnrollLink ? 'Creating link…' : 'Copy enrollment link (hold for new link)',
                         ),
                       ),
                     ),
