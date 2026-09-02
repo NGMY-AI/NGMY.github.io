@@ -34746,6 +34746,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } catch (_) {}
   }
 
+  Future<void> _resetHelpsMissedForMembers(List<UserData> targets) async {
+    if (targets.isEmpty) return;
+    setState(() {
+      for (final m in targets) {
+        m.helps = 0;
+        m.missed = 0;
+        _syncCivicMemberRecordFromUser(widget.config, m);
+        final key = NgmyCivicRegistryMembers.emailKey(m.email);
+        if (key.isEmpty) continue;
+        final idx = widget.allUsers.indexWhere(
+          (u) => NgmyCivicRegistryMembers.emailKey(u.email) == key,
+        );
+        if (idx >= 0) {
+          widget.allUsers[idx].helps = 0;
+          widget.allUsers[idx].missed = 0;
+        }
+      }
+    });
+    await ngmyPersistCivicRegistryMembers(widget.config);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+    } catch (_) {}
+    widget.onDataChanged();
+  }
+
   void _showStatePicker() {
     unawaited(() async {
       final picked = await showNgmyStatePickerSheet(
@@ -40712,6 +40738,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     var membersExpanded = false;
     var clearExpanded = false;
     var removeExpanded = false;
+    var resetExpanded = false;
 
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -40859,7 +40886,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text('Clear & Remove', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                              Text('Search members, then clear missed or remove', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                              Text('Search, reset stats, clear missed, or remove', style: TextStyle(fontSize: 12, color: Colors.grey)),
                             ],
                           ),
                         ),
@@ -40926,6 +40953,51 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       },
                                     ),
                                   ),
+                          ),
+                          sectionShell(
+                            title: 'Start over (zero)',
+                            subtitle: searchResults.isEmpty
+                                ? 'No members in view'
+                                : 'Set helps & missed to 0 for ${searchResults.length} member(s)',
+                            icon: Icons.restart_alt_rounded,
+                            accent: const Color(0xFF059669),
+                            expanded: resetExpanded,
+                            onToggle: () => setSheet(() => resetExpanded = !resetExpanded),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(
+                                  'Everyone in the current view (${_selectedState.trim().isEmpty ? 'this state' : _selectedState}) will show 0 helps and 0 missed. Contribution history stays — use Money to adjust individual helps.',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.35),
+                                ),
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: searchResults.isEmpty
+                                      ? null
+                                      : () async {
+                                          final ok = await showNgmyLightConfirm(
+                                            ctx,
+                                            title: 'Reset helps & missed to zero?',
+                                            message:
+                                                'This sets helps and missed to 0 for ${searchResults.length} member(s) in the current view. Status badges will show CLEAN again.',
+                                            cancelLabel: 'Cancel',
+                                            confirmLabel: 'Reset to zero',
+                                            icon: Icons.restart_alt_rounded,
+                                            destructive: true,
+                                          );
+                                          if (ok != true || !ctx.mounted) return;
+                                          Navigator.pop(ctx, {'action': 'reset', 'members': searchResults});
+                                        },
+                                  icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                                  label: const Text('Reset helps & missed to zero'),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF059669),
+                                    minimumSize: const Size(double.infinity, 44),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           sectionShell(
                             title: 'Clear missed',
@@ -41037,6 +41109,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     searchC.dispose();
     if (result == null || !mounted) return;
     final action = (result['action'] ?? '').toString();
+    if (action == 'reset') {
+      final targets = (result['members'] as List<UserData>?) ?? const <UserData>[];
+      if (targets.isEmpty) return;
+      await _resetHelpsMissedForMembers(targets);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reset helps & missed to 0 for ${targets.length} member(s) in $_selectedState.'),
+          backgroundColor: const Color(0xFF059669),
+        ),
+      );
+      return;
+    }
     if (action == 'clear') {
       final amount = result['amount'] as int;
       final targets = (result['members'] as List<UserData>?) ?? const <UserData>[];
@@ -41300,6 +41385,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ? '$familyCount family · $males M / $females F'
         : '$familyCount family member${familyCount == 1 ? '' : 's'}';
     final showFixDot = manageActions && ngmyMemberHasProfileFlags(raw);
+    final homeAddress = (raw?['homeAddress'] ?? u.homeAddress ?? '').toString().trim();
+    final room = (u.room ?? '').trim();
+    final showAddress = manageActions && homeAddress.isNotEmpty;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -41335,14 +41423,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ]),
               const SizedBox(height: 15),
               _memberInfo(Icons.location_on, u.city ?? 'Not specified', Colors.redAccent),
-              _memberInfo(Icons.home_work_rounded, u.room ?? 'No room assigned', Colors.orange),
+              if (showAddress)
+                _memberInfo(Icons.home_work_rounded, homeAddress, Colors.orange)
+              else
+                _memberInfo(Icons.home_work_rounded, room.isEmpty ? 'No room assigned' : room, Colors.orange),
+              if (showAddress && room.isNotEmpty)
+                _memberInfo(Icons.meeting_room_rounded, room, Colors.amber.shade700),
               _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
-              if (manageActions && ((raw?['homeAddress'] ?? u.homeAddress ?? '').toString().trim().isNotEmpty))
-                _memberInfo(
-                  Icons.home_outlined,
-                  (raw?['homeAddress'] ?? u.homeAddress ?? '').toString().trim(),
-                  Colors.blueGrey,
-                ),
               _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
               _memberInfo(
                 Icons.family_restroom_rounded,
