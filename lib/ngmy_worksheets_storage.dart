@@ -4,8 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
 import 'ngmy_worksheet_builtin_thumbnails.dart';
@@ -1183,48 +1183,32 @@ bool _familyTreesTableMissing(Object error) {
       s.contains('relation "public.family_trees" does not exist');
 }
 
-bool _familyTreesColumnMissing(Object error) {
-  final s = error.toString().toLowerCase();
-  return s.contains('column') && (s.contains('does not exist') || s.contains('schema cache'));
-}
-
 Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
   // Do not gate on reachability probe — false negatives left other phones empty.
   final email = _normalizedEmail(userEmail);
   if (email.isEmpty) return null;
   try {
-    final ownedRows = await Supabase.instance.client
-        .from('family_trees')
-        .select()
-        .eq('userEmail', email)
-        .timeout(kNgmyCloudLoadTimeout);
-    List<dynamic> collabRows = const [];
+    final ownedRows = await ngmyDbRelaySelect('family_trees', eq: {'userEmail': email}, timeout: kNgmyCloudLoadTimeout);
+    List<Map<String, dynamic>> collabRows = const [];
     try {
-      collabRows = await Supabase.instance.client
-          .from('family_trees')
-          .select()
-          .contains('collaboratorEmails', [email])
-          .timeout(kNgmyCloudLoadTimeout);
+      collabRows = await ngmyDbRelaySelect(
+        'family_trees',
+        contains: {'collaboratorEmails': [email]},
+        timeout: kNgmyCloudLoadTimeout,
+      );
     } catch (e) {
       debugPrint('[family_trees] collaborator fetch: $e');
     }
-    List<dynamic> publicRows = const [];
+    List<Map<String, dynamic>> publicRows = const [];
     try {
-      publicRows = await Supabase.instance.client
-          .from('family_trees')
-          .select()
-          .eq('isPrivate', false)
-          .timeout(kNgmyCloudLoadTimeout);
+      publicRows = await ngmyDbRelaySelect('family_trees', eq: {'isPrivate': false}, timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[family_trees] public fetch: $e');
     }
     final byId = <String, Map<String, dynamic>>{};
-    for (final row in [...(ownedRows as List), ...collabRows, ...publicRows]) {
-      if (row is Map) {
-        final map = Map<String, dynamic>.from(row);
-        final id = (map['id'] ?? '').toString();
-        if (id.isNotEmpty) byId[id] = map;
-      }
+    for (final row in [...ownedRows, ...collabRows, ...publicRows]) {
+      final id = (row['id'] ?? '').toString();
+      if (id.isNotEmpty) byId[id] = row;
     }
     return byId.values
         .map((e) => _familyTreeFromRow(e, email))
@@ -1290,28 +1274,11 @@ Future<void> _persistFamilyTreesLocally(String userEmail, List<FamilyTree> trees
 
 Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
   try {
-    await Supabase.instance.client
-        .from('family_trees')
-        .upsert(_familyTreeRow(tree, userEmail))
-        .timeout(kNgmyCloudWriteTimeout);
-    return true;
+    final ok = await ngmyDbRelayUpsert('family_trees', [_familyTreeRow(tree, userEmail)]);
+    if (ok) return true;
+    // Fall back to the older row shape in case the schema hasn't been migrated yet.
+    return await ngmyDbRelayUpsert('family_trees', [_familyTreeRowCompat(tree, userEmail)]);
   } catch (e) {
-    if (_familyTreesTableMissing(e)) {
-      debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
-      return false;
-    }
-    if (_familyTreesColumnMissing(e)) {
-      try {
-        await Supabase.instance.client
-            .from('family_trees')
-            .upsert(_familyTreeRowCompat(tree, userEmail))
-            .timeout(kNgmyCloudWriteTimeout);
-        return true;
-      } catch (e2) {
-        debugPrint('[family_trees] upsert compat error: $e2');
-        return false;
-      }
-    }
     debugPrint('[family_trees] upsert error: $e');
     return false;
   }
@@ -1320,28 +1287,12 @@ Future<bool> _upsertFamilyTreeCloud(String userEmail, FamilyTree tree) async {
 Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) async {
   if (trees.isEmpty) return false;
   try {
-    final rows = trees
-        .map((t) => _familyTreeRow(t, familyTreeOwnerEmail(t, userEmail)))
-        .toList();
-    await Supabase.instance.client.from('family_trees').upsert(rows).timeout(kNgmyCloudWriteTimeout);
-    return true;
+    final rows = trees.map((t) => _familyTreeRow(t, familyTreeOwnerEmail(t, userEmail))).toList();
+    final ok = await ngmyDbRelayUpsert('family_trees', rows);
+    if (ok) return true;
+    final compatRows = trees.map((t) => _familyTreeRowCompat(t, familyTreeOwnerEmail(t, userEmail))).toList();
+    return await ngmyDbRelayUpsert('family_trees', compatRows);
   } catch (e) {
-    if (_familyTreesTableMissing(e)) {
-      debugPrint('[family_trees] table missing — run supabase/family_trees_table.sql');
-      return false;
-    }
-    if (_familyTreesColumnMissing(e)) {
-      try {
-        final rows = trees
-            .map((t) => _familyTreeRowCompat(t, familyTreeOwnerEmail(t, userEmail)))
-            .toList();
-        await Supabase.instance.client.from('family_trees').upsert(rows).timeout(kNgmyCloudWriteTimeout);
-        return true;
-      } catch (e2) {
-        debugPrint('[family_trees] bulk upsert compat error: $e2');
-        return false;
-      }
-    }
     debugPrint('[family_trees] bulk upsert error: $e');
     return false;
   }
@@ -1350,7 +1301,7 @@ Future<bool> _upsertFamilyTreesCloud(String userEmail, List<FamilyTree> trees) a
 Future<void> _deleteFamilyTreeCloud(String treeId) async {
   if (treeId.isEmpty) return;
   try {
-    await Supabase.instance.client.from('family_trees').delete().eq('id', treeId);
+    await ngmyDbRelayDelete('family_trees', eq: {'id': treeId});
   } catch (e) {
     debugPrint('[family_trees] delete error: $e');
   }

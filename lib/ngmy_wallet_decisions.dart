@@ -2,7 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_db_relay.dart';
 
 /// Durable admin approve/reject on deposits & withdrawals (local + Supabase).
 class NgmyWalletDecisionLedger {
@@ -46,15 +47,9 @@ class NgmyWalletDecisionLedger {
 
   static Future<Map<String, int>> loadFromCloud() async {
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _cloudSettingsKey)
-          .maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
-      return _parseStatusMap(Map<String, dynamic>.from(value));
+      final value = await ngmyDbRelaySettingsFetch(_cloudSettingsKey);
+      if (value == null) return {};
+      return _parseStatusMap(value);
     } catch (e) {
       debugPrint('[wallet-ledger] cloud load: $e');
       return {};
@@ -112,16 +107,10 @@ class NgmyWalletDecisionLedger {
 
   static Future<Map<String, DateTime>> loadDecisionTimesFromCloud() async {
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _cloudSettingsKey)
-          .maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_cloudSettingsKey);
+      if (value == null) return {};
       final out = <String, DateTime>{};
-      for (final entry in Map<String, dynamic>.from(value).entries) {
+      for (final entry in value.entries) {
         final id = entry.key.trim();
         if (id.isEmpty) continue;
         final raw = entry.value;
@@ -193,27 +182,15 @@ class NgmyWalletDecisionLedger {
     final ids = transactionIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
     if (ids.isEmpty) return;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _cloudSettingsKey)
-          .maybeSingle();
-      if (row == null) return;
-      final value = row['value'];
-      if (value is! Map) return;
+      final value = await ngmyDbRelaySettingsFetch(_cloudSettingsKey);
+      if (value == null) return;
       final next = Map<String, dynamic>.from(value);
       var changed = false;
       for (final id in ids) {
         if (next.remove(id) != null) changed = true;
       }
       if (!changed) return;
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _cloudSettingsKey,
-          'value': next,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ]);
+      await ngmyDbRelaySettingsUpsert(_cloudSettingsKey, next);
     } catch (e) {
       debugPrint('[wallet-ledger] cloud remove: $e');
     }
@@ -229,15 +206,9 @@ class NgmyWalletDecisionLedger {
     final id = transactionId.trim();
     if (id.isEmpty || statusIndex <= 0 || statusIndex > 2) return false;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _cloudSettingsKey)
-          .maybeSingle();
+      final existing = await ngmyDbRelaySettingsFetch(_cloudSettingsKey);
       final value = <String, dynamic>{};
-      if (row != null && row['value'] is Map) {
-        value.addAll(Map<String, dynamic>.from(row['value'] as Map));
-      }
+      if (existing != null) value.addAll(existing);
       value[id] = {
         'status': statusIndex,
         'userEmail': userEmail ?? '',
@@ -245,14 +216,7 @@ class NgmyWalletDecisionLedger {
         'type': typeIndex,
         'at': DateTime.now().toUtc().toIso8601String(),
       };
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _cloudSettingsKey,
-          'value': value,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ]);
-      return true;
+      return await ngmyDbRelaySettingsUpsert(_cloudSettingsKey, value);
     } catch (e) {
       debugPrint('[wallet-ledger] cloud record: $e');
       return false;

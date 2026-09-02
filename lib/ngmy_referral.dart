@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 const Duration kNgmyReferralLookupTimeout = Duration(seconds: 25);
@@ -239,19 +240,15 @@ Future<void> ngmyRegisterReferralCodesForUser(dynamic user) async {
   final email = (value['email'] ?? '').toString().trim();
   if (email.isEmpty) return;
   try {
-    final client = Supabase.instance.client;
-    final rows = <Map<String, dynamic>>[];
     for (final code in ngmyReferralCodesForEmail(email)) {
       final normalized = ngmyNormalizeReferralCode(code);
       if (normalized.isEmpty) continue;
-      rows.add({
-        'key': _referralIndexKey(normalized),
-        'value': {...value, 'referralCode': normalized},
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
+      await ngmyDbRelaySettingsUpsert(
+        _referralIndexKey(normalized),
+        {...value, 'referralCode': normalized},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     }
-    if (rows.isEmpty) return;
-    await client.from('ngmy_settings').upsert(rows, onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
   } catch (e) {
     debugPrint('[referral] register index: $e');
   }

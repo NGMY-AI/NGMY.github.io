@@ -8,7 +8,6 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_business_card_models.dart';
 import 'ngmy_business_card_renderer.dart';
@@ -16,6 +15,7 @@ import 'ngmy_business_card_storage.dart';
 import 'ngmy_civic_id_photo.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
@@ -531,14 +531,15 @@ Future<List<NgmySpendingEntry>?> fetchHomeCardsFromCloud(String userEmail) async
   final email = userEmail.toLowerCase().trim();
   if (email.isEmpty) return null;
   try {
-    final row = await Supabase.instance.client
-        .from('home_cards')
-        .select('cards')
-        .eq('userEmail', email)
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    if (row == null) return const [];
-    final raw = row['cards'];
+    final rows = await ngmyDbRelaySelect(
+      'home_cards',
+      cols: 'cards',
+      eq: {'userEmail': email},
+      single: true,
+      timeout: kNgmyCloudLoadTimeout,
+    );
+    if (rows.isEmpty) return const [];
+    final raw = rows.first['cards'];
     if (raw is! List) return const [];
     return raw
         .whereType<Map>()
@@ -568,11 +569,19 @@ Future<bool> pushSavedHomeCardsToCloud(String userEmail, List<NgmySpendingEntry>
   }
   final selected = selectHomeCardsForCloud(allLocal, kept).map(_leanCardForCloud).toList();
   try {
-    await Supabase.instance.client.from('home_cards').upsert({
-      'userEmail': email,
-      'cards': selected.map((e) => e.toJson()).toList(),
-      'updatedAt': DateTime.now().toUtc().toIso8601String(),
-    }).timeout(kNgmyCloudWriteTimeout);
+    final ok = await ngmyDbRelayUpsert(
+      'home_cards',
+      [
+        {
+          'userEmail': email,
+          'cards': selected.map((e) => e.toJson()).toList(),
+          'updatedAt': DateTime.now().toUtc().toIso8601String(),
+        },
+      ],
+      onConflict: 'userEmail',
+      timeout: kNgmyCloudWriteTimeout,
+    );
+    if (!ok) throw Exception('relay upsert failed');
     return true;
   } catch (e) {
     if (_homeCardsTableMissing(e)) {

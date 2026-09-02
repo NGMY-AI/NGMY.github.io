@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_loan_phone.dart';
@@ -142,15 +143,10 @@ class NgmyLoanStatusCloud {
   static Future<void> pushFromApps(List<Map<String, dynamic>> apps) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      final row = {
-        'key': _settingsKey,
-        'value': {
-          'statuses': statusMapFromApps(apps),
-          'savedAt': DateTime.now().toUtc().toIso8601String(),
-        },
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      };
-      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_settingsKey, {
+        'statuses': statusMapFromApps(apps),
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[loan status cloud] push: $e');
     }
@@ -159,10 +155,8 @@ class NgmyLoanStatusCloud {
   static Future<void> fetchAndApply(List<Map<String, dynamic>> apps) async {
     if (!await ngmyCanReachCloud() || apps.isEmpty) return;
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row == null) return;
-      final value = row['value'];
-      if (value is! Map) return;
+      final value = await ngmyDbRelaySettingsFetch(_settingsKey);
+      if (value == null) return;
       final statuses = value['statuses'];
       if (statuses is Map) {
         applyStatusMap(apps, Map<String, dynamic>.from(statuses));
@@ -325,25 +319,19 @@ class NgmyLoanPaymentsCloud {
       final payments = paymentsFromLoan(loan);
       if (payments.isEmpty) return;
       Map<String, dynamic> existing = {};
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row != null) {
-        final value = row['value'];
-        if (value is Map) {
-          final m = value['payments'];
-          if (m is Map) existing = Map<String, dynamic>.from(m);
-        }
+      final value = await ngmyDbRelaySettingsFetch(_settingsKey);
+      if (value != null) {
+        final m = value['payments'];
+        if (m is Map) existing = Map<String, dynamic>.from(m);
       }
       existing[loanId] = {
         'payments': payments,
         'updatedAt': DateTime.now().toUtc().toIso8601String(),
       };
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _settingsKey,
-          'value': {'payments': existing, 'savedAt': DateTime.now().toUtc().toIso8601String()},
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_settingsKey, {
+        'payments': existing,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[loan payments cloud] push: $e');
     }
@@ -352,13 +340,10 @@ class NgmyLoanPaymentsCloud {
   static Future<void> pushFromApps(List<Map<String, dynamic>> apps) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _settingsKey,
-          'value': {'payments': paymentsMapFromApps(apps), 'savedAt': DateTime.now().toUtc().toIso8601String()},
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_settingsKey, {
+        'payments': paymentsMapFromApps(apps),
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[loan payments cloud] push all: $e');
     }
@@ -367,10 +352,8 @@ class NgmyLoanPaymentsCloud {
   static Future<void> fetchAndApply(List<Map<String, dynamic>> apps) async {
     if (!await ngmyCanReachCloud() || apps.isEmpty) return;
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row == null) return;
-      final value = row['value'];
-      if (value is! Map) return;
+      final value = await ngmyDbRelaySettingsFetch(_settingsKey);
+      if (value == null) return;
       final payments = value['payments'];
       if (payments is Map) applyPaymentsMap(apps, Map<String, dynamic>.from(payments));
     } catch (e) {

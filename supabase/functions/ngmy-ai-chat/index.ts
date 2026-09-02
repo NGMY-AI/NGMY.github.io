@@ -740,6 +740,173 @@ async function handlePasswordResetComplete(
   });
 }
 
+// ─── Generic DB relay — disguises table/settings-key names from DevTools ───
+// Transport-only proxy: forwards the caller's own Authorization header (their
+// real session JWT, or the anon key if logged out) to a fresh client, so
+// Postgres RLS governs the result exactly as if the caller had queried the
+// table directly. This function does NOT re-implement authorization — RLS
+// already does that correctly for every table below.
+
+const RELAY_TABLE_CODES: Record<string, string> = {
+  s: "ngmy_settings",
+  c: "config",
+  f: "family_trees",
+  h: "home_cards",
+  x: "ngmy_stripe_access",
+};
+
+// One code per static ngmy_settings key. Add new keys here (and in
+// lib/ngmy_db_relay.dart's mirror map) rather than reading the table directly.
+const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
+  k1: "ngmy_loan_status_map_v1",
+  k2: "ngmy_loan_payments_map_v1",
+  k3: "wallet_txn_decisions",
+  k4: "app_studio_access_settings",
+  k5: "ngmy_app_studio_cloud_slot",
+  k6: "ngmy_app_studio_published_registry",
+  k7: "ngmy_bio_publish_registry",
+  k8: "ngmy_menu_publish_registry",
+  k9: "ngmy_invoice_publish_registry",
+  k10: "civic_user_groups_v1",
+  k11: "civic_state_registrar_subscriptions",
+  k12: "civic_voting_settings",
+  k13: "civic_hati_kiapo_uongozi",
+  k14: "home_vote_ad_campaign",
+  k15: "ngmy_helper_kb",
+  k16: "ngmy_communicate_backup_codes_v1",
+  k17: "ngmy_family_tree_backup_codes_v1",
+  k18: "ngmy_family_tree_qr_stashes_v1",
+  k19: "ngmy_slides_transfer_qr_stashes_v1",
+  k20: "ngmy_worksheet_project_qr_stashes_v1",
+  k21: "ngmy_doc_share_school_accounts_v1",
+  k22: "ngmy_doc_share_video_relay_v1",
+  k23: "ngmy_doc_share_webrtc_signal_v1",
+  k24: "ngmy_user_saved_sync_qrs_v1",
+  k25: "terms_and_conditions",
+  k26: "privacy_policy",
+  k27: "investment_plans",
+  k28: "ngmy_popups",
+  k29: "ngmy_chat_closed",
+  k30: "management_operational_lists",
+  k31: "store_sell_access_emails",
+  k32: "deleted_media_ids",
+  k33: "family_tree_payment_settings",
+  k34: "invoice_payment_settings",
+  k35: "music_studio_payment_settings",
+  k36: "app_studio_payment_settings",
+  k37: "communicate_settings",
+  k38: "communicate_payment_settings",
+  k39: "wallet_payment_settings",
+  k40: "repair_estimate_payment_settings",
+  k41: "translate_message_payment_settings",
+  k42: "document_scan_payment_settings",
+  k43: "doc_share_payment_settings",
+  k44: "civic_self_enrollment_settings",
+  k45: "ngmy_helper_ai_settings",
+  k46: "ngmy_app_branding",
+  k47: "civic_help_mode_settings",
+  k48: "help_center_hub_settings",
+};
+
+// Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
+// as its own field ("sfx"); only the feature-identifying prefix is coded.
+const RELAY_SETTINGS_PREFIX_CODES: Record<string, string> = {
+  d1: "ngmy_bio_pub_",
+  d2: "ngmy_menu_pub_",
+  d3: "ngmy_doc_share_stash_v2_",
+  d4: "ngmy_doc_share_code_v2_",
+  d5: "ngmy_essentials_code_v1_",
+  d6: "ngmy_bio_lib_v1_",
+  d7: "ngmy_menu_lib_v1_",
+  d8: "ngmy_studio_entitlement_v1_",
+  d9: "ngmy_doc_share_inbox_v1_",
+  d10: "ngmy_game_receipts_",
+  d11: "ngmy_local_growth_income_stash_v1_",
+  d12: "ngmy_local_growth_income_code_v1_",
+  d13: "ngmy_local_deposit_qr_v1_",
+  d14: "ngmy_local_deposit_code_v1_",
+  d15: "ngmy_local_deposit_inbox_v1_",
+  d16: "ngmy_refcode_",
+  d17: "ngmy_transfer_relay_v1_",
+  d18: "ngmy_transfer_v1_",
+  d19: "ngmy_transfer_signal_v1_",
+};
+
+function resolveRelaySettingsKey(skCode: string, suffix: string): string | null {
+  const direct = RELAY_SETTINGS_KEY_CODES[skCode];
+  if (direct) return direct;
+  const prefix = RELAY_SETTINGS_PREFIX_CODES[skCode];
+  if (prefix) return `${prefix}${suffix}`;
+  return null;
+}
+
+function relayClientFor(req: Request) {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  const authHeader = req.headers.get("Authorization") ?? `Bearer ${anonKey}`;
+  if (!url || !anonKey) return null;
+  return createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+async function handleDbRelay(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const client = relayClientFor(req);
+  if (!client) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const tableCode = String(body.t ?? "");
+  const table = RELAY_TABLE_CODES[tableCode];
+  if (!table) return jsonOk({ error: "Unknown table" }, 400);
+
+  const eq: Record<string, unknown> = { ...(body.eq as Record<string, unknown> | undefined ?? {}) };
+  if (table === "ngmy_settings") {
+    const realKey = resolveRelaySettingsKey(String(body.sk ?? ""), String(body.sfx ?? ""));
+    if (!realKey) return jsonOk({ error: "Unknown settings key" }, 400);
+    eq["key"] = realKey;
+  }
+
+  const op = String(body.op ?? "s");
+
+  if (op === "s") {
+    let q = client.from(table).select(String(body.cols ?? "*"));
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    const contains = body.contains as Record<string, unknown> | undefined;
+    if (contains) {
+      for (const [k, v] of Object.entries(contains)) q = q.contains(k, v as never);
+    }
+    const result = body.single ? await q.maybeSingle() : await q;
+    if (result.error) return jsonOk({ error: result.error.message }, 400);
+    return jsonOk({ ok: true, data: result.data });
+  }
+
+  if (op === "up" || op === "i") {
+    const rows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
+    if (rows.length === 0) return jsonOk({ error: "No rows" }, 400);
+    if (table === "ngmy_settings" && eq["key"]) {
+      for (const r of rows) r["key"] = eq["key"];
+    }
+    const onConflict = body.onConflict ? String(body.onConflict) : undefined;
+    const { error } =
+      op === "up"
+        ? await client.from(table).upsert(rows, onConflict ? { onConflict } : undefined)
+        : await client.from(table).insert(rows);
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
+  if (op === "d") {
+    if (Object.keys(eq).length === 0) return jsonOk({ error: "Refusing unscoped delete" }, 400);
+    let q = client.from(table).delete();
+    for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
+    const { error } = await q;
+    if (error) return jsonOk({ error: error.message }, 400);
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ error: "Unsupported op" }, 400);
+}
+
 // ─── Civic Registry (role-filtered; service role only touches the blob) ───
 
 const CIVIC_MEMBERS_KEY = "civic_registry_members";
@@ -3082,6 +3249,7 @@ serve(async (req) => {
       a5: "passwordResetSendOtp",
       a6: "passwordResetVerifyOtp",
       a7: "passwordResetComplete",
+      r1: "dbRelay",
       v1: "elevenlabsTts",
       m1: "resendEmail",
       i1: "geminiVirtualOutfit",
@@ -3127,6 +3295,10 @@ serve(async (req) => {
         });
       }
       return await handlePasswordResetComplete(jwtEmailForReset, email, newHash, resetToken);
+    }
+
+    if (action === "dbRelay") {
+      return await handleDbRelay(req, body ?? {});
     }
 
     if (action === "saveAiApiKey") {

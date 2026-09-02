@@ -61,6 +61,7 @@ import 'ngmy_multiplayer.dart';
 import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
 import 'ngmy_password_reset_otp.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_health.dart';
@@ -5399,64 +5400,30 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
   final public = NgmyCloudPolicy.settingsKeyPublicReadable(key);
   final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
   if (!public && !admin) return false;
-  final row = <String, dynamic>{
-    'key': key,
-    'value': value,
-    'updated_at': DateTime.now().toUtc().toIso8601String(),
-  };
-  for (int i = 0; i < 8; i++) {
-    try {
-      // Without a timeout, a stalled (not failed — a request that never
-      // resolves at all) connection blocks this await forever. That's
-      // fatal for a caller like the Deactivate Help Mode button, which
-      // awaits this before closing its dialog: no exception ever fires,
-      // so the retry/error handling below never runs either — the button
-      // just looks permanently stuck instead of failing visibly.
-      await Supabase.instance.client.from('ngmy_settings').upsert([row], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
-    } catch (e) {
-      _rememberSupabasePersistError(e);
-      if (_isMissingTablePostgrestError(e, 'ngmy_settings')) {
-        debugPrint('[ngmy_settings] table missing — run supabase/ngmy_settings_table.sql');
-        return false;
-      }
-      final missing = _missingColumnFromPostgrestError(e);
-      if (missing != null && missing.isNotEmpty) {
-        row.remove(missing);
-        continue;
-      }
-      debugPrint('[ngmy_settings] upsert error: $e');
-      return false;
-    }
+  try {
+    // Relayed through bright-handler (disguised as /api/sync) instead of a
+    // direct ngmy_settings upsert — RLS still governs the actual write.
+    final ok = await ngmyDbRelaySettingsUpsert(key, value);
+    if (!ok) _rememberSupabasePersistError('relay upsert failed for $key');
+    return ok;
+  } catch (e) {
+    _rememberSupabasePersistError(e);
+    debugPrint('[ngmy_settings] relay upsert error: $e');
+    return false;
   }
-  return false;
 }
 
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
-  // Never download civic geography / help / email blobs into the Network tab.
-  if (NgmyCloudPolicy.settingsKeyNetworkSensitive(key)) {
-    debugPrint('[ngmy_settings] blocked sensitive fetch: $key');
-    return null;
-  }
   if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
     final email = ngmyCurrentAuthEmail();
     if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
   }
   try {
-    final row = await Supabase.instance.client
-        .from('ngmy_settings')
-        .select('value')
-        .eq('key', key)
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    if (row == null) return null;
-    final value = row['value'];
-    if (value is Map) return Map<String, dynamic>.from(value);
-    return null;
+    // Relayed through bright-handler (disguised as /api/sync) instead of a
+    // direct ngmy_settings select — RLS still governs what comes back.
+    return await ngmyDbRelaySettingsFetch(key, timeout: kNgmyCloudLoadTimeout);
   } catch (e) {
-    if (!_isMissingTablePostgrestError(e, 'ngmy_settings')) {
-      debugPrint('[ngmy_settings] fetch error: $e');
-    }
+    debugPrint('[ngmy_settings] relay fetch error: $e');
     return null;
   }
 }

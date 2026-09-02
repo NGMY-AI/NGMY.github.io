@@ -1,31 +1,26 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_db_relay.dart';
 
 /// Cloud-backed Stripe access via Supabase (authoritative when webhook is configured).
+/// Reads are relayed through bright-handler (disguised as /api/sync) instead of
+/// a direct ngmy_stripe_access select — RLS still restricts this to the
+/// caller's own email (or an admin).
 abstract final class NgmyStripeCloud {
-  static SupabaseClient? get _client {
-    try {
-      return Supabase.instance.client;
-    } catch (_) {
-      return null;
-    }
-  }
-
   static Future<DateTime?> fetchAccessUntil(String email, String productSlug) async {
-    final client = _client;
     final key = email.toLowerCase().trim();
     final slug = productSlug.trim().toLowerCase();
-    if (client == null || key.isEmpty || slug.isEmpty) return null;
+    if (key.isEmpty || slug.isEmpty) return null;
 
     try {
-      final row = await client
-          .from('ngmy_stripe_access')
-          .select('access_until')
-          .eq('email', key)
-          .eq('product', slug)
-          .maybeSingle();
-      if (row == null) return null;
-      final raw = row['access_until'];
+      final rows = await ngmyDbRelaySelect(
+        'ngmy_stripe_access',
+        cols: 'access_until',
+        eq: {'email': key, 'product': slug},
+        single: true,
+      );
+      if (rows.isEmpty) return null;
+      final raw = rows.first['access_until'];
       if (raw == null) return null;
       return DateTime.tryParse(raw.toString());
     } catch (e) {
@@ -43,15 +38,15 @@ abstract final class NgmyStripeCloud {
   }
 
   static Future<Map<String, DateTime>> fetchAllActiveAccess(String email) async {
-    final client = _client;
     final key = email.toLowerCase().trim();
-    if (client == null || key.isEmpty) return {};
+    if (key.isEmpty) return {};
 
     try {
-      final rows = await client
-          .from('ngmy_stripe_access')
-          .select('product, access_until')
-          .eq('email', key);
+      final rows = await ngmyDbRelaySelect(
+        'ngmy_stripe_access',
+        cols: 'product, access_until',
+        eq: {'email': key},
+      );
       final out = <String, DateTime>{};
       for (final row in rows) {
         final slug = row['product']?.toString() ?? '';

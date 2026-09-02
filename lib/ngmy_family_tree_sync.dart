@@ -2,9 +2,9 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_communicate_payments.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_family_book_storage.dart';
 import 'ngmy_network_resilience.dart';
@@ -29,10 +29,8 @@ class NgmyFamilyTreeBackupCodes {
   static Future<Map<String, dynamic>> _loadCloudMap() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _kCloudSettingsKey).maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kCloudSettingsKey);
+      if (value == null) return {};
       final codes = value['codes'];
       if (codes is Map) return Map<String, dynamic>.from(codes);
     } catch (e) {
@@ -44,16 +42,10 @@ class NgmyFamilyTreeBackupCodes {
   static Future<void> _saveCloudMap(Map<String, dynamic> codes) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kCloudSettingsKey,
-          'value': {
-            'codes': codes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_kCloudSettingsKey, {
+        'codes': codes,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[family tree sync codes] save: $e');
     }
@@ -174,10 +166,8 @@ class NgmyFamilyTreeQrStash {
   static Future<Map<String, dynamic>> _loadStashes() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _kQrStashSettingsKey).maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kQrStashSettingsKey);
+      if (value == null) return {};
       final stashes = value['stashes'];
       if (stashes is Map) return Map<String, dynamic>.from(stashes);
     } catch (e) {
@@ -189,16 +179,10 @@ class NgmyFamilyTreeQrStash {
   static Future<void> _saveStashes(Map<String, dynamic> stashes) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kQrStashSettingsKey,
-          'value': {
-            'stashes': stashes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_kQrStashSettingsKey, {
+        'stashes': stashes,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[family tree qr stash] save: $e');
     }
