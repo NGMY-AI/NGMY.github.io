@@ -845,6 +845,26 @@ function resolveRelaySettingsKey(skCode: string, suffix: string): string | null 
   return null;
 }
 
+// Fields that must never leave the server for these settings keys, even
+// though the app itself wrote them (audit-only metadata like who published
+// something — the client never reads it back, so it should not be on the wire).
+const RELAY_SETTINGS_STRIP_FIELDS: Record<string, string[]> = {
+  home_vote_ad_campaign: ["publishedBy"],
+};
+
+function redactSettingsRow(realKey: string | null, row: unknown): unknown {
+  if (!realKey || !row || typeof row !== "object") return row;
+  const strip = RELAY_SETTINGS_STRIP_FIELDS[realKey];
+  if (!strip || strip.length === 0) return row;
+  const r = row as Record<string, unknown>;
+  if (r.value && typeof r.value === "object" && !Array.isArray(r.value)) {
+    const v = { ...(r.value as Record<string, unknown>) };
+    for (const f of strip) delete v[f];
+    return { ...r, value: v };
+  }
+  return row;
+}
+
 function relayClientFor(req: Request) {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -865,10 +885,11 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
   if (!table) return jsonOk({ error: "Unknown table" }, 400);
 
   const eq: Record<string, unknown> = { ...(body.eq as Record<string, unknown> | undefined ?? {}) };
+  let settingsRealKey: string | null = null;
   if (table === "ngmy_settings") {
-    const realKey = resolveRelaySettingsKey(String(body.sk ?? ""), String(body.sfx ?? ""));
-    if (!realKey) return jsonOk({ error: "Unknown settings key" }, 400);
-    eq["key"] = realKey;
+    settingsRealKey = resolveRelaySettingsKey(String(body.sk ?? ""), String(body.sfx ?? ""));
+    if (!settingsRealKey) return jsonOk({ error: "Unknown settings key" }, 400);
+    eq["key"] = settingsRealKey;
   }
 
   const op = String(body.op ?? "s");
@@ -896,7 +917,10 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     if (Array.isArray(range) && range.length === 2) q = q.range(range[0], range[1]);
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
-    return jsonOk({ ok: true, data: result.data });
+    const data = Array.isArray(result.data)
+      ? result.data.map((r) => redactSettingsRow(settingsRealKey, r))
+      : redactSettingsRow(settingsRealKey, result.data);
+    return jsonOk({ ok: true, data });
   }
 
   if (op === "up" || op === "i") {

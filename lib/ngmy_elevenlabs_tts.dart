@@ -4,7 +4,6 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_edge_invoke.dart';
@@ -118,27 +117,13 @@ class NgmyElevenLabsTts {
 
     for (final model in _models) {
       final viaAiChat = await _fetchViaSupabaseFunction(
-        functionName: kNgmySupabaseAiFunction,
         apiKey: apiKey,
         text: text,
         langCode: langCode,
         modelId: model,
-        action: 'elevenlabsTts',
       );
       if (viaAiChat.bytes != null) return viaAiChat;
       lastError = viaAiChat.error ?? lastError;
-    }
-
-    for (final model in _models) {
-      final viaTts = await _fetchViaSupabaseFunction(
-        functionName: 'ngmy-elevenlabs-tts',
-        apiKey: apiKey,
-        text: text,
-        langCode: langCode,
-        modelId: model,
-      );
-      if (viaTts.bytes != null) return viaTts;
-      lastError = viaTts.error ?? lastError;
     }
 
     if (kIsWeb && (lastError == null || lastError.contains('404'))) {
@@ -217,12 +202,10 @@ class NgmyElevenLabsTts {
   }
 
   static Future<({Uint8List? bytes, String? error})> _fetchViaSupabaseFunction({
-    required String functionName,
     required String apiKey,
     required String text,
     required String langCode,
     required String modelId,
-    String action = 'elevenlabsTts',
   }) async {
     try {
       final body = {

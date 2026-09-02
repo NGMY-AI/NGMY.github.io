@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
+import 'ngmy_edge_invoke.dart';
 
 String _visionApiError(Object? err, {String? body}) {
   if (body != null && body.trim().isNotEmpty) {
@@ -102,13 +102,14 @@ Future<({String? text, String? error})> _callGeminiVisionDirect({
   return (text: null, error: _visionApiError(lastError, body: lastBody));
 }
 
-/// Supabase Edge Function (same as NGMY Helper) — required for web/PWA CORS.
+/// Same disguised relay as every other AI call (`/api/sync` on web) — never
+/// calls the Supabase function by name or attaches raw Supabase headers
+/// directly, so DevTools shows the same generic request as chat/civic calls.
 Future<({String? text, String? error})> _callGeminiVisionViaProxy({
   required String prompt,
   required List<({Uint8List bytes, String mimeType})> images,
 }) async {
   try {
-    final client = Supabase.instance.client;
     final imagePayload = images
         .map(
           (img) => {
@@ -118,70 +119,29 @@ Future<({String? text, String? error})> _callGeminiVisionViaProxy({
         )
         .toList();
     final body = <String, dynamic>{
+      'action': 'chat',
       'provider': 'gemini',
       'prompt': prompt,
       'images': imagePayload,
     };
 
-    try {
-      final res = await client.functions.invoke(kNgmySupabaseAiFunction, body: body);
-      if (res.status == 200) {
-        final data = res.data;
-        if (data is Map) {
-          final text = data['text']?.toString();
-          if (text != null && text.trim().isNotEmpty) {
-            return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-          }
-          final err = data['error']?.toString();
-          if (err != null && err.isNotEmpty) return (text: null, error: err);
-        }
-      } else if (res.status == 404) {
-        return (
-          text: null,
-          error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase, then try again.',
-        );
-      } else {
-        return (text: null, error: 'AI proxy HTTP ${res.status}');
-      }
-    } catch (e) {
-      debugPrint('[gemini vision] functions.invoke: $e');
+    final data = await ngmyEdgeInvoke(body, timeout: const Duration(seconds: 120));
+    if (data == null) {
+      return (text: null, error: 'Could not reach server.');
     }
-
-    final restUrl = client.rest.url;
-    final base = restUrl.contains('/rest/v1')
-        ? restUrl.substring(0, restUrl.indexOf('/rest/v1'))
-        : restUrl;
-    final url = '$base/functions/v1/$kNgmySupabaseAiFunction';
-    final session = client.auth.currentSession;
-    final anonKey = client.headers['apikey'] ?? client.headers['Apikey'] ?? '';
-    final token = session?.accessToken ?? anonKey;
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(body),
-        )
-        .timeout(const Duration(seconds: 120));
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final text = data['text']?.toString();
-      if (text != null && text.trim().isNotEmpty) {
-        return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
-      }
+    if (data['ok'] == false) {
       final err = data['error']?.toString();
-      if (err != null && err.isNotEmpty) return (text: null, error: err);
-    }
-    if (response.statusCode == 404) {
       return (
         text: null,
-        error: 'AI proxy not deployed. Deploy $kNgmySupabaseAiFunction in Supabase Dashboard.',
+        error: (err != null && err.isNotEmpty) ? err : 'AI proxy error.',
       );
     }
-    return (text: null, error: _visionApiError('HTTP ${response.statusCode}', body: response.body));
+    final text = data['text']?.toString();
+    if (text != null && text.trim().isNotEmpty) {
+      return (text: NgmyAiMemoryStore.sanitizeHelperReply(text.trim()), error: null);
+    }
+    final err = data['error']?.toString();
+    return (text: null, error: (err != null && err.isNotEmpty) ? err : 'Empty AI response');
   } catch (e) {
     debugPrint('[gemini vision] proxy error: $e');
     return (text: null, error: _visionApiError(e));
