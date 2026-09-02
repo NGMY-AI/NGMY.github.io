@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
 import 'ngmy_network_resilience.dart';
@@ -21,15 +22,7 @@ class NgmyTransferCloudRelay {
   static Future<Map<String, dynamic>?> _loadRelay(String code) async {
     if (!await ngmyCanReachCloud()) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _relayKey(code))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(_relayKey(code), timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[ngmy transfer relay] load: $e');
     }
@@ -40,16 +33,11 @@ class NgmyTransferCloudRelay {
     if (!await ngmyCanReachCloud()) return;
     try {
       final now = DateTime.now().toUtc();
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _relayKey(code),
-          'value': {
-            ...value,
-            'updatedAt': now.toIso8601String(),
-          },
-          'updated_at': now.toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _relayKey(code),
+        {...value, 'updatedAt': now.toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[ngmy transfer relay] save: $e');
     }
@@ -332,7 +320,7 @@ class NgmyTransferCloudRelay {
 
   static Future<void> _cleanupRelay(String code, List<String> storagePaths) async {
     try {
-      await Supabase.instance.client.from('ngmy_settings').delete().eq('key', _relayKey(code));
+      await ngmyDbRelaySettingsDelete(_relayKey(code));
       await ngmySupabaseRemovePaths(storagePaths);
     } catch (e) {
       debugPrint('[ngmy transfer relay] cleanup: $e');
@@ -343,7 +331,7 @@ class NgmyTransferCloudRelay {
     final normalized = NgmyTransferRendezvous.normalizeInput(code);
     if (normalized == null) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').delete().eq('key', _relayKey(normalized));
+      await ngmyDbRelaySettingsDelete(_relayKey(normalized));
     } catch (_) {}
   }
 }

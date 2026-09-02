@@ -367,10 +367,9 @@ Future<bool> ngmyUserPersistLoanApplications(AppConfig config) async {
 
 Future<bool> _upsertManagementListColumn(String column, dynamic value) async {
   try {
-    await Supabase.instance.client.from('config').upsert({
-      'id': kNgmyConfigRowId,
-      column: value,
-    });
+    await ngmyDbRelayUpsert('config', [
+      {'id': kNgmyConfigRowId, column: value},
+    ]);
     return true;
   } catch (e) {
     debugPrint('[admin mgmt] config column $column: $e');
@@ -567,10 +566,9 @@ Future<bool> ngmyPersistWalletPaymentSettings(AppConfig config) async {
       'officialBitcoin': config.officialBitcoin.trim(),
     }.entries) {
       try {
-        await Supabase.instance.client.from('config').upsert({
-          'id': kNgmyConfigRowId,
-          entry.key: entry.value,
-        });
+        await ngmyDbRelayUpsert('config', [
+          {'id': kNgmyConfigRowId, entry.key: entry.value},
+        ]);
         cloudOk = true;
       } catch (e) {
         debugPrint('[admin wallet payments] config column ${entry.key}: $e');
@@ -630,7 +628,7 @@ Future<bool> ngmyPersistFamilyTreePaymentSettings(AppConfig config) async {
       };
       for (var i = 0; i < 6; i++) {
         try {
-          await Supabase.instance.client.from('config').upsert(row);
+          await ngmyDbRelayUpsert('config', [row]);
           cloudOk = true;
           break;
         } catch (e) {
@@ -1437,7 +1435,7 @@ Future<bool> ngmyPersistAppBrandingSettings(AppConfig config) async {
       };
       for (var i = 0; i < 6; i++) {
         try {
-          await Supabase.instance.client.from('config').upsert(row);
+          await ngmyDbRelayUpsert('config', [row]);
           cloudOk = true;
           break;
         } catch (e) {
@@ -1475,7 +1473,7 @@ Future<bool> ngmyPersistHelperAiSettings(AppConfig config) async {
       };
       for (var i = 0; i < 6; i++) {
         try {
-          await Supabase.instance.client.from('config').upsert(row);
+          await ngmyDbRelayUpsert('config', [row]);
           cloudOk = true;
           break;
         } catch (e) {
@@ -1665,7 +1663,7 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
         try {
           // See _upsertNgmySettingSafe — no timeout here meant a stalled
           // connection could block Deactivate Help Mode's await forever.
-          await Supabase.instance.client.from('config').upsert(row).timeout(kNgmyCloudWriteTimeout);
+          await ngmyDbRelayUpsert('config', [row], timeout: kNgmyCloudWriteTimeout);
           cloudOk = true;
           break;
         } catch (e) {

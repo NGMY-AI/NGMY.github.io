@@ -4,8 +4,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 const int kNgmyGameNotificationMax = 99;
@@ -135,14 +135,7 @@ class NgmyGameNotifications {
     if (key.isEmpty) return [];
     if (!await ngmyCanReachCloud()) return [];
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _cloudSettingsKey(key))
-          .maybeSingle()
-          .timeout(_kGameReceiptCloudTimeout);
-      if (row == null) return [];
-      final value = row['value'];
+      final value = await ngmyDbRelaySettingsFetchRaw(_cloudSettingsKey(key), timeout: _kGameReceiptCloudTimeout);
       if (value is! List) return [];
       return value
           .whereType<Map>()
@@ -159,13 +152,11 @@ class NgmyGameNotifications {
     if (key.isEmpty) return;
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _cloudSettingsKey(key),
-          'value': items.map((e) => e.toJson()).toList(),
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ]).timeout(_kGameReceiptCloudTimeout);
+      await ngmyDbRelaySettingsUpsertRaw(
+        _cloudSettingsKey(key),
+        items.map((e) => e.toJson()).toList(),
+        timeout: _kGameReceiptCloudTimeout,
+      );
     } catch (e) {
       debugPrint('[game-receipts] cloud push: $e');
     }

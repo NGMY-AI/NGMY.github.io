@@ -4,9 +4,9 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_memory.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_communicate_storage.dart';
 import 'ngmy_communicate_sync_download_io.dart' if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
@@ -32,10 +32,8 @@ class NgmyCommunicateBackupCodes {
   static Future<Map<String, dynamic>> _loadCloudMap() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _kCloudSettingsKey).maybeSingle();
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kCloudSettingsKey);
+      if (value == null) return {};
       final codes = value['codes'];
       if (codes is Map) return Map<String, dynamic>.from(codes);
     } catch (e) {
@@ -47,16 +45,10 @@ class NgmyCommunicateBackupCodes {
   static Future<void> _saveCloudMap(Map<String, dynamic> codes) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kCloudSettingsKey,
-          'value': {
-            'codes': codes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(_kCloudSettingsKey, {
+        'codes': codes,
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
     } catch (e) {
       debugPrint('[advisor sync codes] save: $e');
     }

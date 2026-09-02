@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 const String kNgmyHelperKbPrefsKey = 'ngmy_helper_kb_v1';
@@ -398,18 +398,7 @@ class NgmyHelperKbStore {
   static Future<Map<String, dynamic>?> _fetchCloudRow() async {
     try {
       if (!await ngmyCanReachCloud()) return null;
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select('value')
-          .eq('key', kNgmyHelperKbCloudKey)
-          .maybeSingle();
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
-      if (value is String && value.trim().isNotEmpty) {
-        final decoded = jsonDecode(value);
-        if (decoded is Map) return Map<String, dynamic>.from(decoded);
-      }
+      return await ngmyDbRelaySettingsFetch(kNgmyHelperKbCloudKey);
     } catch (e) {
       debugPrint('[helper kb] cloud fetch: $e');
     }
@@ -419,12 +408,7 @@ class NgmyHelperKbStore {
   static Future<bool> _upsertCloud(Map<String, dynamic> payload) async {
     try {
       if (!await ngmyCanReachCloud()) return false;
-      await Supabase.instance.client.from('ngmy_settings').upsert({
-        'key': kNgmyHelperKbCloudKey,
-        'value': payload,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      });
-      return true;
+      return await ngmyDbRelaySettingsUpsert(kNgmyHelperKbCloudKey, payload);
     } catch (e) {
       debugPrint('[helper kb] cloud upsert: $e');
       return false;

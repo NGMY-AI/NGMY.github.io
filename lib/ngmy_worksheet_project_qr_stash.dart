@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Short QR prefix — full project data lives in cloud stash (scannable on any phone).
@@ -23,15 +23,8 @@ class NgmyWorksheetProjectQrStash {
   static Future<Map<String, dynamic>> _loadStashes() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _kWorksheetQrStashSettingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kWorksheetQrStashSettingsKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return {};
       final stashes = value['stashes'];
       if (stashes is Map) return Map<String, dynamic>.from(stashes);
     } catch (e) {
@@ -43,16 +36,11 @@ class NgmyWorksheetProjectQrStash {
   static Future<void> _saveStashes(Map<String, dynamic> stashes) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kWorksheetQrStashSettingsKey,
-          'value': {
-            'stashes': stashes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _kWorksheetQrStashSettingsKey,
+        {'stashes': stashes, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[worksheet qr stash] save: $e');
     }

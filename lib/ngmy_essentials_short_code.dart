@@ -3,8 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 const kNgmyEssentialsShortQrPrefix = 'NGMY-ESS6';
@@ -119,13 +119,8 @@ class NgmyEssentialsShortCode {
     final record = _record(normalized: normalized, ownerEmail: ownerEmail, payload: payload, now: now);
     await _cacheLocal(normalized, record);
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _localKey(normalized),
-          'value': record,
-          'updated_at': now.toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      final ok = await ngmyDbRelaySettingsUpsert(_localKey(normalized), record, timeout: kNgmyCloudWriteTimeout);
+      if (!ok) throw Exception('relay upsert failed');
       return normalized;
     } catch (e) {
       debugPrint('[essentials short code] cloud publish $code: $e');
@@ -138,21 +133,12 @@ class NgmyEssentialsShortCode {
     if (normalized == null) return null;
 
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _localKey(normalized))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row != null) {
-        final value = row['value'];
-        if (value is Map) {
-          final map = Map<String, dynamic>.from(value);
-          final exp = DateTime.tryParse((map['expiresAt'] ?? '').toString());
-          if (exp != null && DateTime.now().toUtc().isAfter(exp)) return null;
-          final payload = (map['payload'] ?? '').toString().trim();
-          if (payload.isNotEmpty) return payload;
-        }
+      final value = await ngmyDbRelaySettingsFetch(_localKey(normalized), timeout: kNgmyCloudLoadTimeout);
+      if (value != null) {
+        final exp = DateTime.tryParse((value['expiresAt'] ?? '').toString());
+        if (exp != null && DateTime.now().toUtc().isAfter(exp)) return null;
+        final payload = (value['payload'] ?? '').toString().trim();
+        if (payload.isNotEmpty) return payload;
       }
     } catch (e) {
       debugPrint('[essentials short code] cloud resolve $rawCode: $e');

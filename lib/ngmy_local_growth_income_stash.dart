@@ -3,8 +3,8 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Same code/QR-stash trick as Doc Share and Advisors sync: the snapshot
@@ -78,24 +78,16 @@ class NgmyLocalSnapshotStash {
     final code = generateCode();
     final now = DateTime.now().toUtc().toIso8601String();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashKey(token),
-          'value': {
-            'ownerEmail': ownerEmail.toLowerCase().trim(),
-            'payload': base64Encode(utf8.encode(snapshotJson)),
-            'createdAt': now,
-          },
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _codeKey(code),
-          'value': {'token': token, 'updatedAt': now},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(_stashKey(token), {
+        'ownerEmail': ownerEmail.toLowerCase().trim(),
+        'payload': base64Encode(utf8.encode(snapshotJson)),
+        'createdAt': now,
+      }, timeout: kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _codeKey(code),
+        {'token': token, 'updatedAt': now},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[local growth income stash] create: $e');
       return null;
@@ -114,25 +106,17 @@ class NgmyLocalSnapshotStash {
     final code = await _liveCodeForOwner(ownerEmail);
     final now = DateTime.now().toUtc().toIso8601String();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashKey(token),
-          'value': {
-            'ownerEmail': ownerEmail.toLowerCase().trim(),
-            'payload': base64Encode(utf8.encode(snapshotJson)),
-            'createdAt': now,
-            'live': true,
-          },
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _codeKey(code),
-          'value': {'token': token, 'updatedAt': now, 'live': true},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(_stashKey(token), {
+        'ownerEmail': ownerEmail.toLowerCase().trim(),
+        'payload': base64Encode(utf8.encode(snapshotJson)),
+        'createdAt': now,
+        'live': true,
+      }, timeout: kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _codeKey(code),
+        {'token': token, 'updatedAt': now, 'live': true},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[local growth income live stash] create: $e');
       return null;
@@ -144,14 +128,8 @@ class NgmyLocalSnapshotStash {
     final normalized = normalizeCode(code);
     if (normalized == null) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _codeKey(normalized))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is Map) return (value['token'] ?? '').toString().trim();
+      final value = await ngmyDbRelaySettingsFetch(_codeKey(normalized), timeout: kNgmyCloudLoadTimeout);
+      if (value != null) return (value['token'] ?? '').toString().trim();
     } catch (e) {
       debugPrint('[local growth income stash] code lookup: $e');
     }
@@ -167,14 +145,8 @@ class NgmyLocalSnapshotStash {
     final id = token.trim();
     if (id.isEmpty) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _stashKey(id))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is! Map) return null;
+      final value = await ngmyDbRelaySettingsFetch(_stashKey(id), timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return null;
       final payloadRaw = (value['payload'] ?? '').toString();
       if (payloadRaw.isEmpty) return null;
       final ownerEmail = (value['ownerEmail'] ?? '').toString().trim();

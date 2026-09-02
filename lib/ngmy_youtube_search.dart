@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_supabase_columns.dart';
 
 const _kNgmyYouTubeConfigRowId = '1';
@@ -18,23 +18,28 @@ String _ngmyYouTubeKeyFromMap(Map<String, dynamic>? json) {
 }
 
 Future<Map<String, dynamic>?> _ngmyFetchConfigRowForYouTube() async {
-  final client = Supabase.instance.client;
   for (final id in [_kNgmyYouTubeConfigRowId, 1]) {
     try {
-      final row = await client
-          .from('config')
-          .select(NgmySupabaseColumns.youtubeOnly)
-          .eq('id', id)
-          .maybeSingle()
-          .timeout(const Duration(seconds: 15));
-      if (row != null) return Map<String, dynamic>.from(row);
+      final rows = await ngmyDbRelaySelect(
+        'config',
+        cols: NgmySupabaseColumns.youtubeOnly,
+        eq: {'id': id},
+        single: true,
+        timeout: const Duration(seconds: 15),
+      );
+      if (rows.isNotEmpty) return rows.first;
     } catch (e) {
       debugPrint('[ngmy-yt] config fetch id=$id: $e');
     }
   }
   try {
-    final row = await client.from('config').select(NgmySupabaseColumns.youtubeOnly).limit(1).maybeSingle().timeout(const Duration(seconds: 15));
-    if (row != null) return Map<String, dynamic>.from(row);
+    final rows = await ngmyDbRelaySelect(
+      'config',
+      cols: NgmySupabaseColumns.youtubeOnly,
+      single: true,
+      timeout: const Duration(seconds: 15),
+    );
+    if (rows.isNotEmpty) return rows.first;
   } catch (e) {
     debugPrint('[ngmy-yt] config fetch fallback: $e');
   }

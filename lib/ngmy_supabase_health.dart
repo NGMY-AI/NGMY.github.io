@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_supabase_config.dart';
 
 class NgmySupabaseHealth {
@@ -23,14 +23,14 @@ class NgmySupabaseHealth {
 
 Future<NgmySupabaseHealth> ngmyProbeSupabaseHealth() async {
   try {
-    final client = Supabase.instance.client;
     var invalidApiKey = false;
     var ngmySettingsOk = false;
     var configOk = false;
     var detail = '';
 
     try {
-      await client.from('config').select('id').limit(1);
+      final rows = await ngmyDbRelaySelect('config', cols: 'id', timeout: const Duration(seconds: 8));
+      if (rows.isEmpty) throw Exception('No config row returned');
       configOk = true;
     } catch (e) {
       detail = e.toString();
@@ -39,7 +39,9 @@ Future<NgmySupabaseHealth> ngmyProbeSupabaseHealth() async {
 
     if (!invalidApiKey) {
       try {
-        await client.from('ngmy_settings').select('key').limit(1);
+        // Relayed through bright-handler instead of a direct ngmy_settings
+        // probe; throws on genuine failure, succeeds even if the row is missing.
+        await ngmyDbRelayPing('ngmy_popups', timeout: const Duration(seconds: 8));
         ngmySettingsOk = true;
       } catch (e) {
         if (detail.isEmpty) detail = e.toString();

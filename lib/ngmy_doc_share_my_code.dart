@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_stash.dart';
 import 'ngmy_doc_share_store.dart';
@@ -68,15 +69,7 @@ class NgmyDocShareMyCode {
 
   static Future<Map<String, dynamic>?> _loadSettingsRow(String key) async {
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', key)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(key, timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[doc share my code] load $key: $e');
     }
@@ -85,14 +78,7 @@ class NgmyDocShareMyCode {
 
   static Future<bool> _saveSettingsRow(String key, Map<String, dynamic> value) async {
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': key,
-          'value': value,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
+      return await ngmyDbRelaySettingsUpsert(key, value, timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[doc share my code] save $key: $e');
       return false;

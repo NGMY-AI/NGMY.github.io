@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'main.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_qr_download.dart';
@@ -103,28 +104,20 @@ class NgmyLocalDepositQr {
     final code = generateCode();
     final now = DateTime.now().toUtc().toIso8601String();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashKey(token),
-          'value': {
-            'amount': amount,
-            'adminEmail': adminEmail.toLowerCase().trim(),
-            'lockedToEmail': locked,
-            'requiredVerificationCode': verify,
-            'shortCode': code,
-            'createdAt': now,
-            'redeemedBy': '',
-          },
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _codeKey(code),
-          'value': {'token': token, 'updatedAt': now, 'redeemed': false},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(_stashKey(token), {
+        'amount': amount,
+        'adminEmail': adminEmail.toLowerCase().trim(),
+        'lockedToEmail': locked,
+        'requiredVerificationCode': verify,
+        'shortCode': code,
+        'createdAt': now,
+        'redeemedBy': '',
+      }, timeout: kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _codeKey(code),
+        {'token': token, 'updatedAt': now, 'redeemed': false},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[local deposit qr] create: $e');
       return null;
@@ -134,14 +127,7 @@ class NgmyLocalDepositQr {
 
   static Future<Map<String, dynamic>?> _loadStash(String token) async {
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _stashKey(token))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(_stashKey(token), timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[local deposit qr] load: $e');
     }
@@ -152,14 +138,8 @@ class NgmyLocalDepositQr {
     final normalized = normalizeCode(code);
     if (normalized == null) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _codeKey(normalized))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is! Map) return null;
+      final value = await ngmyDbRelaySettingsFetch(_codeKey(normalized), timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return null;
       if (value['redeemed'] == true) return null;
       return (value['token'] ?? '').toString().trim();
     } catch (e) {
@@ -392,15 +372,8 @@ class NgmyLocalDepositQr {
     final now = DateTime.now().toUtc().toIso8601String();
     final redeemer = ngmyNormalizeEmail(redeemerEmail);
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _stashKey(token))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final latest = row?['value'];
-      if (latest is! Map) return NgmyLocalDepositRedeemResult.fail('Could not apply deposit. Try again.');
-      final latestMap = Map<String, dynamic>.from(latest);
+      final latestMap = await ngmyDbRelaySettingsFetch(_stashKey(token), timeout: kNgmyCloudLoadTimeout);
+      if (latestMap == null) return NgmyLocalDepositRedeemResult.fail('Could not apply deposit. Try again.');
       if ((latestMap['redeemedBy'] ?? '').toString().trim().isNotEmpty) {
         return NgmyLocalDepositRedeemResult.fail('This deposit code was already used.');
       }
@@ -413,27 +386,19 @@ class NgmyLocalDepositQr {
       );
       if (reCheck != null) return reCheck;
 
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashKey(token),
-          'value': {
-            ...latestMap,
-            'redeemedBy': redeemer,
-            'redeemedAt': now,
-          },
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(_stashKey(token), {
+        ...latestMap,
+        'redeemedBy': redeemer,
+        'redeemedAt': now,
+      }, timeout: kNgmyCloudWriteTimeout);
 
       final shortCode = (latestMap['shortCode'] ?? '').toString().trim();
       if (shortCode.isNotEmpty) {
-        await Supabase.instance.client.from('ngmy_settings').upsert([
-          {
-            'key': _codeKey(shortCode),
-            'value': {'token': token, 'redeemed': true, 'redeemedAt': now},
-            'updated_at': now,
-          },
-        ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelaySettingsUpsert(
+          _codeKey(shortCode),
+          {'token': token, 'redeemed': true, 'redeemedAt': now},
+          timeout: kNgmyCloudWriteTimeout,
+        );
       }
     } catch (e) {
       debugPrint('[local deposit qr] redeem: $e');
@@ -499,39 +464,24 @@ class NgmyLocalDepositQr {
         return NgmyLocalDepositRedeemResult.fail('This deposit was already sent or redeemed.');
       }
 
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashKey(token),
-          'value': {
-            ...value,
-            'redeemedBy': 'admin_push:$admin',
-            'redeemedAt': now,
-            'adminPushed': true,
-            'adminPushId': creditId,
-          },
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(_stashKey(token), {
+        ...value,
+        'redeemedBy': 'admin_push:$admin',
+        'redeemedAt': now,
+        'adminPushed': true,
+        'adminPushId': creditId,
+      }, timeout: kNgmyCloudWriteTimeout);
 
       final short = code.isNotEmpty ? code : (value['shortCode'] ?? '').toString().trim();
       if (short.isNotEmpty) {
-        await Supabase.instance.client.from('ngmy_settings').upsert([
-          {
-            'key': _codeKey(short),
-            'value': {'token': token, 'redeemed': true, 'redeemedAt': now, 'adminPushed': true},
-            'updated_at': now,
-          },
-        ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+        await ngmyDbRelaySettingsUpsert(
+          _codeKey(short),
+          {'token': token, 'redeemed': true, 'redeemedAt': now, 'adminPushed': true},
+          timeout: kNgmyCloudWriteTimeout,
+        );
       }
 
-      final inboxRow = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _inboxKey(locked))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final inboxRaw = inboxRow?['value'];
-      final inbox = inboxRaw is Map ? Map<String, dynamic>.from(inboxRaw) : <String, dynamic>{};
+      final inbox = await ngmyDbRelaySettingsFetch(_inboxKey(locked), timeout: kNgmyCloudLoadTimeout) ?? <String, dynamic>{};
       final credits = (inbox['credits'] as List?)
               ?.whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
@@ -547,13 +497,11 @@ class NgmyLocalDepositQr {
         'createdAt': now,
         'status': 'pending',
       });
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _inboxKey(locked),
-          'value': {'credits': credits, 'updatedAt': now},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _inboxKey(locked),
+        {'credits': credits, 'updatedAt': now},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[local deposit qr] admin send: $e');
       return NgmyLocalDepositRedeemResult.fail('Could not send deposit. Check connection and try again.');
@@ -570,15 +518,8 @@ class NgmyLocalDepositQr {
     final email = ngmyNormalizeEmail(userEmail);
     if (email.isEmpty) return const [];
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _inboxKey(email))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is! Map) return const [];
-      final inbox = Map<String, dynamic>.from(value);
+      final inbox = await ngmyDbRelaySettingsFetch(_inboxKey(email), timeout: kNgmyCloudLoadTimeout);
+      if (inbox == null) return const [];
       final credits = (inbox['credits'] as List?)
               ?.whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
@@ -608,15 +549,8 @@ class NgmyLocalDepositQr {
     final ids = creditIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
     if (email.isEmpty || ids.isEmpty) return;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _inboxKey(email))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
-      if (value is! Map) return;
-      final inbox = Map<String, dynamic>.from(value);
+      final inbox = await ngmyDbRelaySettingsFetch(_inboxKey(email), timeout: kNgmyCloudLoadTimeout);
+      if (inbox == null) return;
       final credits = (inbox['credits'] as List?)
               ?.whereType<Map>()
               .map((e) => Map<String, dynamic>.from(e))
@@ -633,13 +567,11 @@ class NgmyLocalDepositQr {
         changed = true;
       }
       if (!changed) return;
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _inboxKey(email),
-          'value': {'credits': credits, 'updatedAt': now},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _inboxKey(email),
+        {'credits': credits, 'updatedAt': now},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[local deposit qr] mark claimed: $e');
     }

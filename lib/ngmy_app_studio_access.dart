@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Admin toggle — opens App Studio for all users (synced via ngmy_settings).
@@ -35,15 +35,8 @@ class NgmyAppStudioAccess {
     }
     if (!await ngmyCanReachCloud()) return;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', settingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return;
-      final value = row['value'];
-      if (value is Map) _apply(config, Map<String, dynamic>.from(value));
+      final value = await ngmyDbRelaySettingsFetch(settingsKey, timeout: kNgmyCloudLoadTimeout);
+      if (value != null) _apply(config, value);
     } catch (e) {
       debugPrint('[app studio access] cloud hydrate: $e');
     }
@@ -58,14 +51,7 @@ class NgmyAppStudioAccess {
     }
     if (!await ngmyCanReachCloud()) return false;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': settingsKey,
-          'value': _payload(config),
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
+      return await ngmyDbRelaySettingsUpsert(settingsKey, _payload(config), timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[app studio access] cloud save: $e');
       return false;

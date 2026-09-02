@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 const String kNgmyTransferRendezvousPrefix = 'ngmy_transfer_v1_';
@@ -28,15 +28,7 @@ class NgmyTransferRendezvous {
     final normalized = _normalizeCode(code);
     if (normalized == null) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', ngmyTransferSettingsKey(normalized))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(ngmyTransferSettingsKey(normalized), timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[ngmy transfer rendezvous] lookup $code: $e');
     }
@@ -58,26 +50,24 @@ class NgmyTransferRendezvous {
     if (normalized == null || transferKey.trim().isEmpty) return false;
     final now = DateTime.now().toUtc();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
+      await ngmyDbRelaySettingsUpsert(
+        ngmyTransferSettingsKey(normalized),
         {
-          'key': ngmyTransferSettingsKey(normalized),
-          'value': {
-            'code': normalized,
-            'transferKey': transferKey.trim(),
-            'ownerEmail': ownerEmail.toLowerCase().trim(),
-            'host': host.trim(),
-            'port': port,
-            'sessionId': sessionId.trim(),
-            'mode': mode,
-            if (offerToken != null && offerToken.trim().isNotEmpty) 'offerToken': offerToken.trim(),
-            'files': files,
-            'fileCount': files.length,
-            'expiresAt': now.add(const Duration(hours: 2)).toIso8601String(),
-            'updatedAt': now.toIso8601String(),
-          },
-          'updated_at': now.toIso8601String(),
+          'code': normalized,
+          'transferKey': transferKey.trim(),
+          'ownerEmail': ownerEmail.toLowerCase().trim(),
+          'host': host.trim(),
+          'port': port,
+          'sessionId': sessionId.trim(),
+          'mode': mode,
+          if (offerToken != null && offerToken.trim().isNotEmpty) 'offerToken': offerToken.trim(),
+          'files': files,
+          'fileCount': files.length,
+          'expiresAt': now.add(const Duration(hours: 2)).toIso8601String(),
+          'updatedAt': now.toIso8601String(),
         },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+        timeout: kNgmyCloudWriteTimeout,
+      );
       return true;
     } catch (e) {
       debugPrint('[ngmy transfer rendezvous] publish $code: $e');
@@ -122,11 +112,7 @@ class NgmyTransferRendezvous {
     final normalized = _normalizeCode(code);
     if (normalized == null) return;
     try {
-      await Supabase.instance.client
-          .from('ngmy_settings')
-          .delete()
-          .eq('key', ngmyTransferSettingsKey(normalized))
-          .timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsDelete(ngmyTransferSettingsKey(normalized), timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[ngmy transfer rendezvous] unpublish $code: $e');
     }

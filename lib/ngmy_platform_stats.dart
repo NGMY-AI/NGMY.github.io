@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Shared live platform metrics — same numbers for every user (stored in ngmy_settings).
@@ -47,10 +48,7 @@ class NgmyPlatformLiveStats {
 
 Future<Map<String, dynamic>?> _readNgmySetting(String key) async {
   try {
-    final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', key).maybeSingle();
-    if (row == null) return null;
-    final value = row['value'];
-    if (value is Map) return Map<String, dynamic>.from(value);
+    return await ngmyDbRelaySettingsFetch(key);
   } catch (e) {
     debugPrint('[platform_stats] read setting: $e');
   }
@@ -59,13 +57,7 @@ Future<Map<String, dynamic>?> _readNgmySetting(String key) async {
 
 Future<void> _writeNgmySetting(String key, Map<String, dynamic> value) async {
   try {
-    await Supabase.instance.client.from('ngmy_settings').upsert([
-      {
-        'key': key,
-        'value': value,
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
-      },
-    ], onConflict: 'key');
+    await ngmyDbRelaySettingsUpsert(key, value);
   } catch (e) {
     debugPrint('[platform_stats] write setting: $e');
   }

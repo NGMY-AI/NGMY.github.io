@@ -806,6 +806,7 @@ const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
   k46: "ngmy_app_branding",
   k47: "civic_help_mode_settings",
   k48: "help_center_hub_settings",
+  k49: "platform_live_stats",
 };
 
 // Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
@@ -830,6 +831,8 @@ const RELAY_SETTINGS_PREFIX_CODES: Record<string, string> = {
   d17: "ngmy_transfer_relay_v1_",
   d18: "ngmy_transfer_v1_",
   d19: "ngmy_transfer_signal_v1_",
+  d20: "ngmy_doc_share_my_code_lookup_v1_",
+  d21: "ngmy_doc_share_my_code_user_v1_",
 };
 
 function resolveRelaySettingsKey(skCode: string, suffix: string): string | null {

@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_bio_urls.dart';
 import 'ngmy_cloud_policy.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
 import 'ngmy_supabase_auth.dart';
@@ -36,16 +36,9 @@ class NgmyBioPublishRegistry {
     if (!await ngmyCanReachCloud()) return null;
     await ngmyWaitForSupabaseReady();
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', settingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is! Map) return null;
-      return Map<String, dynamic>.from(value);
+      final value = await ngmyDbRelaySettingsFetch(settingsKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return _fetchRegistryValueViaRest();
+      return value;
     } catch (e) {
       debugPrint('[bio registry] supabase fetch: $e');
       return _fetchRegistryValueViaRest();
@@ -74,19 +67,8 @@ class NgmyBioPublishRegistry {
     if (!await ngmyCanReachCloud()) return null;
     await ngmyWaitForSupabaseReady(timeout: _guestFetchTimeout);
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _slugSettingsKey(target))
-          .maybeSingle()
-          .timeout(_guestFetchTimeout);
-      if (row != null) {
-        final value = row['value'];
-        if (value is Map) {
-          final entry = Map<String, dynamic>.from(value);
-          if (entry['data'] is Map) return entry;
-        }
-      }
+      final entry = await ngmyDbRelaySettingsFetch(_slugSettingsKey(target), timeout: _guestFetchTimeout);
+      if (entry != null && entry['data'] is Map) return entry;
     } catch (e) {
       debugPrint('[bio registry] supabase slug fetch $target: $e');
     }
@@ -143,16 +125,8 @@ class NgmyBioPublishRegistry {
 
       Map<String, dynamic> value = {};
       try {
-        final row = await Supabase.instance.client
-            .from('ngmy_settings')
-            .select()
-            .eq('key', settingsKey)
-            .maybeSingle()
-            .timeout(kNgmyCloudLoadTimeout);
-        if (row != null) {
-          final raw = row['value'];
-          if (raw is Map) value = Map<String, dynamic>.from(raw);
-        }
+        final raw = await ngmyDbRelaySettingsFetch(settingsKey, timeout: kNgmyCloudLoadTimeout);
+        if (raw != null) value = raw;
       } catch (_) {
         final rest = await _fetchRegistryValueViaRest();
         if (rest != null) value = rest;
@@ -214,16 +188,8 @@ class NgmyBioPublishRegistry {
 
       Map<String, dynamic> value = {};
       try {
-        final row = await Supabase.instance.client
-            .from('ngmy_settings')
-            .select()
-            .eq('key', settingsKey)
-            .maybeSingle()
-            .timeout(kNgmyCloudLoadTimeout);
-        if (row != null) {
-          final raw = row['value'];
-          if (raw is Map) value = Map<String, dynamic>.from(raw);
-        }
+        final raw = await ngmyDbRelaySettingsFetch(settingsKey, timeout: kNgmyCloudLoadTimeout);
+        if (raw != null) value = raw;
       } catch (_) {
         final rest = await _fetchRegistryValueViaRest();
         if (rest != null) value = rest;

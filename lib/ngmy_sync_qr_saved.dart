@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_communicate_sync.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_family_tree_sync.dart';
 import 'ngmy_network_resilience.dart';
 
@@ -82,10 +82,8 @@ class NgmySyncQrSavedStore {
   static Future<Map<String, dynamic>> _loadRoot() async {
     if (!await ngmyCanReachCloud()) return {'byEmail': <String, dynamic>{}};
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', _settingsKey).maybeSingle();
-      if (row == null) return {'byEmail': <String, dynamic>{}};
-      final value = row['value'];
-      if (value is! Map) return {'byEmail': <String, dynamic>{}};
+      final value = await ngmyDbRelaySettingsFetch(_settingsKey);
+      if (value == null) return {'byEmail': <String, dynamic>{}};
       final byEmail = value['byEmail'];
       if (byEmail is Map) {
         return {'byEmail': Map<String, dynamic>.from(byEmail)};
@@ -99,16 +97,11 @@ class NgmySyncQrSavedStore {
   static Future<void> _saveRoot(Map<String, dynamic> root) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _settingsKey,
-          'value': {
-            'byEmail': root['byEmail'] ?? {},
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      final ok = await ngmyDbRelaySettingsUpsert(_settingsKey, {
+        'byEmail': root['byEmail'] ?? {},
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
+      });
+      if (!ok) throw Exception('relay upsert failed');
     } catch (e) {
       debugPrint('[sync qr saved] save: $e');
       rethrow;

@@ -9,12 +9,12 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_transfer_payments.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 const String kNgmySlidesDeckBundleType = 'ngmy_slides_deck_v1';
 const String kNgmySlidesLibraryBundleType = 'ngmy_slides_library_v1';
@@ -36,15 +36,8 @@ class NgmySlidesTransferQrStash {
   static Future<Map<String, dynamic>> _loadStashes() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _kSlidesQrStashSettingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kSlidesQrStashSettingsKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return {};
       final stashes = value['stashes'];
       if (stashes is Map) return Map<String, dynamic>.from(stashes);
     } catch (e) {
@@ -56,16 +49,11 @@ class NgmySlidesTransferQrStash {
   static Future<void> _saveStashes(Map<String, dynamic> stashes) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kSlidesQrStashSettingsKey,
-          'value': {
-            'stashes': stashes,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _kSlidesQrStashSettingsKey,
+        {'stashes': stashes, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[slides qr stash] save: $e');
     }

@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_app_builder_data.dart';
 import 'ngmy_app_builder_export.dart';
 import 'ngmy_app_builder_models.dart';
 import 'ngmy_app_builder_storage.dart';
 import 'ngmy_app_studio_payments.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Up to [NgmyAppStudioPayments.maxCloudApps] apps per account — synced across devices.
@@ -30,10 +30,8 @@ class NgmyAppStudioCloudSlot {
   static Future<Map<String, dynamic>?> _fetchUsersMap() async {
     if (!await ngmyCanReachCloud()) return null;
     try {
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', settingsKey).maybeSingle();
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is! Map) return null;
+      final value = await ngmyDbRelaySettingsFetch(settingsKey);
+      if (value == null) return null;
       final users = value['users'];
       if (users is! Map) return {};
       return Map<String, dynamic>.from(users);
@@ -90,13 +88,10 @@ class NgmyAppStudioCloudSlot {
     try {
       final bundle = await ngmyBuildAppBundle(project);
       Map<String, dynamic> users = {};
-      final row = await Supabase.instance.client.from('ngmy_settings').select().eq('key', settingsKey).maybeSingle();
-      if (row != null) {
-        final value = row['value'];
-        if (value is Map) {
-          final raw = value['users'];
-          if (raw is Map) users = Map<String, dynamic>.from(raw);
-        }
+      final value = await ngmyDbRelaySettingsFetch(settingsKey);
+      if (value != null) {
+        final raw = value['users'];
+        if (raw is Map) users = Map<String, dynamic>.from(raw);
       }
       final key = _norm(email);
       final userEntry = users[key] is Map ? Map<String, dynamic>.from(users[key] as Map) : <String, dynamic>{};
@@ -113,13 +108,7 @@ class NgmyAppStudioCloudSlot {
       };
       userEntry['apps'] = apps;
       users[key] = userEntry;
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': settingsKey,
-          'value': {'users': users, 'savedAt': DateTime.now().toUtc().toIso8601String()},
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key');
+      await ngmyDbRelaySettingsUpsert(settingsKey, {'users': users, 'savedAt': DateTime.now().toUtc().toIso8601String()});
       return null;
     } catch (e) {
       debugPrint('[app studio cloud] save: $e');

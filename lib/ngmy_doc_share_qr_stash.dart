@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Short QR prefix — full bundle lives in cloud stash (scannable like NGMY Advisors).
@@ -28,15 +28,7 @@ class NgmyDocShareQrStash {
     final id = token.trim();
     if (id.isEmpty) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _stashSettingsKey(id))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(_stashSettingsKey(id), timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[doc share qr stash] load $id: $e');
     }
@@ -47,14 +39,7 @@ class NgmyDocShareQrStash {
     final id = token.trim();
     if (id.isEmpty) return false;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _stashSettingsKey(id),
-          'value': row,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
+      return await ngmyDbRelaySettingsUpsert(_stashSettingsKey(id), row, timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[doc share qr stash] save $id: $e');
       return false;
@@ -116,11 +101,7 @@ class NgmyDocShareQrStash {
     final id = token.trim();
     if (id.isEmpty) return;
     try {
-      await Supabase.instance.client
-          .from('ngmy_settings')
-          .delete()
-          .eq('key', _stashSettingsKey(id))
-          .timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsDelete(_stashSettingsKey(id), timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[doc share qr stash] delete $id: $e');
     }

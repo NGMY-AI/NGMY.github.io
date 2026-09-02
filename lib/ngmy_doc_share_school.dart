@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_doc_share_payments.dart';
 import 'ngmy_network_resilience.dart';
 
@@ -18,15 +18,8 @@ class NgmyDocShareSchool {
   static Future<Map<String, dynamic>> _loadSchools() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _kSchoolAccountsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kSchoolAccountsKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return {};
       final schools = value['schools'];
       if (schools is Map) return Map<String, dynamic>.from(schools);
     } catch (e) {
@@ -38,16 +31,11 @@ class NgmyDocShareSchool {
   static Future<void> _saveSchools(Map<String, dynamic> schools) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kSchoolAccountsKey,
-          'value': {
-            'schools': schools,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _kSchoolAccountsKey,
+        {'schools': schools, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[doc share org] save: $e');
     }

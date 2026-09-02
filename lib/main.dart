@@ -3867,10 +3867,12 @@ Future<void> _persistStoreSellAccessEmails(AppConfig config) async {
   }
   if (!await ngmyCanReachCloud()) return;
   try {
-    await Supabase.instance.client.from('config').upsert({
-      'id': kNgmyConfigRowId,
-      'storeSellAccessEmails': config.storeSellAccessEmails,
-    });
+    await ngmyDbRelayUpsert('config', [
+      {
+        'id': kNgmyConfigRowId,
+        'storeSellAccessEmails': config.storeSellAccessEmails,
+      },
+    ]);
   } catch (e) {
     debugPrint('[config] storeSellAccessEmails upsert: $e');
   }
@@ -3897,7 +3899,7 @@ Future<bool> _persistOperationalConfigToCloud(AppConfig config) async {
   if (sig == _lastOperationalConfigCloudSig) return true;
   for (var i = 0; i < 12; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert(row);
+      await ngmyDbRelayUpsert('config', [row]);
       _lastOperationalConfigCloudSig = sig;
       return true;
     } catch (e) {
@@ -3927,7 +3929,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
   await _mergeCivicCitiesAndRoomsIntoConfig(config);
   final remoteRegistrarApps = await _fetchRemoteCivicRegistrarApplications();
   _mergeRegistrarApplicationsIntoConfig(config, remoteRegistrarApps);
-  final client = Supabase.instance.client;
   final combined = NgmyCloudPolicy.filterConfigForCloud(<String, dynamic>{
     'id': kNgmyConfigRowId,
     'storeSellAccessEmails': config.storeSellAccessEmails,
@@ -3939,7 +3940,7 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'rooms': config.rooms,
   });
   try {
-    await client.from('config').upsert(combined);
+    await ngmyDbRelayUpsert('config', [combined]);
   } catch (e) {
     debugPrint('[config] combined critical upsert: $e');
   }
@@ -5375,7 +5376,7 @@ Future<bool> _upsertConfigAdminLegalAndPlans({
   if (row.length <= 1) return false;
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert(row, onConflict: 'id');
+      await ngmyDbRelayUpsert('config', [row], onConflict: 'id');
       return true;
     } catch (e) {
       _rememberSupabasePersistError(e);
@@ -5436,7 +5437,7 @@ Future<bool> _upsertConfigLegalColumns(String terms, String privacy) async {
   };
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert([row], onConflict: 'id');
+      await ngmyDbRelayUpsert('config', [row], onConflict: 'id');
       return true;
     } catch (e) {
       _rememberSupabasePersistError(e);
@@ -5457,7 +5458,7 @@ Future<bool> _upsertConfigInvestmentPlansColumn(List<Map<String, dynamic>> plans
   final row = <String, dynamic>{'id': kNgmyConfigRowId, 'investmentPlans': plans};
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert([row], onConflict: 'id');
+      await ngmyDbRelayUpsert('config', [row], onConflict: 'id');
       return true;
     } catch (e) {
       _rememberSupabasePersistError(e);
@@ -6275,7 +6276,7 @@ Future<bool> _upsertConfigNgmyPopupsColumns(List<Map<String, dynamic>> popups, L
   var row = <String, dynamic>{'id': kNgmyConfigRowId, 'ngmyPopups': popups, 'ngmyVideoPopups': videos};
   for (int i = 0; i < 8; i++) {
     try {
-      await Supabase.instance.client.from('config').upsert(row);
+      await ngmyDbRelayUpsert('config', [row]);
       return true;
     } catch (e) {
       final missing = _missingColumnFromPostgrestError(e);
@@ -6285,7 +6286,13 @@ Future<bool> _upsertConfigNgmyPopupsColumns(List<Map<String, dynamic>> popups, L
         continue;
       }
       try {
-        await Supabase.instance.client.from('config').update({'ngmyPopups': popups, 'ngmyVideoPopups': videos}).eq('id', kNgmyConfigRowId);
+        await ngmyDbRelayUpsert(
+          'config',
+          [
+            {'id': kNgmyConfigRowId, 'ngmyPopups': popups, 'ngmyVideoPopups': videos},
+          ],
+          onConflict: 'id',
+        );
         return true;
       } catch (e2) {
         debugPrint('[popups] config column save error: $e2');
@@ -7522,12 +7529,15 @@ Future<Map<String, dynamic>?> _fetchNgmyConfigRow({String columns = NgmySupabase
 }
 
 Future<Map<String, dynamic>?> _fetchNgmyConfigRowUncached(String cols) async {
-  final client = Supabase.instance.client;
-
   Future<Map<String, dynamic>?> once(String selectCols) async {
     try {
-      final row = await client.from('config').select(selectCols).eq('id', kNgmyConfigRowId).maybeSingle();
-      if (row != null) return Map<String, dynamic>.from(row);
+      final rows = await ngmyDbRelaySelect(
+        'config',
+        cols: selectCols,
+        eq: {'id': kNgmyConfigRowId},
+        single: true,
+      );
+      if (rows.isNotEmpty) return rows.first;
     } catch (e) {
       final bad = _ngmyConfigColumnFault(e);
       if (bad != null && bad.isNotEmpty) {
@@ -7657,7 +7667,13 @@ Future<bool> ngmyPersistNgmyChatClosed(AppConfig config, bool closed) async {
   try {
     final existing = await _fetchNgmyConfigRow(columns: 'id');
     final idValue = _ngmyConfigRowIdValue(existing);
-    await Supabase.instance.client.from('config').update({'ngmyChatClosed': closed}).eq('id', idValue);
+    await ngmyDbRelayUpsert(
+      'config',
+      [
+        {'id': idValue, 'ngmyChatClosed': closed},
+      ],
+      onConflict: 'id',
+    );
     saved = true;
   } catch (e) {
     final missing = _missingColumnFromError(e);
@@ -7665,7 +7681,13 @@ Future<bool> ngmyPersistNgmyChatClosed(AppConfig config, bool closed) async {
       try {
         final existing = await _fetchNgmyConfigRow(columns: 'id');
         final idValue = _ngmyConfigRowIdValue(existing);
-        await Supabase.instance.client.from('config').upsert({'id': idValue, 'ngmyChatClosed': closed});
+        await ngmyDbRelayUpsert(
+          'config',
+          [
+            {'id': idValue, 'ngmyChatClosed': closed},
+          ],
+          onConflict: 'id',
+        );
         saved = true;
       } catch (e2) {
         debugPrint('[ngmyChatClosed] config save: $e2');

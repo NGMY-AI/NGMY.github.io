@@ -10,12 +10,26 @@
 /// `kNgmyRelayTableCodes` in sync with the server-side copies in
 /// `supabase/functions/ngmy-ai-chat/index.ts` (`RELAY_TABLE_CODES`,
 /// `RELAY_SETTINGS_KEY_CODES`, `RELAY_SETTINGS_PREFIX_CODES`).
+///
+/// Every function here throws [NgmyDbRelayException] when the edge call
+/// itself fails or the server reports an error — matching the old direct
+/// Supabase client's throw-on-error behavior, so existing `try/catch` retry
+/// logic (e.g. missing-column fallback) keeps working. A successful call
+/// that simply found no matching row returns null/false/empty normally;
+/// that is not an error.
 library;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_network_resilience.dart';
+
+class NgmyDbRelayException implements Exception {
+  NgmyDbRelayException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
 
 const Map<String, String> kNgmyRelayTableCodes = {
   'ngmy_settings': 's',
@@ -74,6 +88,7 @@ const Map<String, String> kNgmySettingsKeyCodes = {
   'ngmy_app_branding': 'k46',
   'civic_help_mode_settings': 'k47',
   'help_center_hub_settings': 'k48',
+  'platform_live_stats': 'k49',
 };
 
 /// Dynamic key prefixes — the suffix (share code/token/base64 email) is sent
@@ -98,6 +113,8 @@ const Map<String, String> kNgmySettingsPrefixCodes = {
   'ngmy_transfer_relay_v1_': 'd17',
   'ngmy_transfer_v1_': 'd18',
   'ngmy_transfer_signal_v1_': 'd19',
+  'ngmy_doc_share_my_code_lookup_v1_': 'd20',
+  'ngmy_doc_share_my_code_user_v1_': 'd21',
 };
 
 ({String code, String? suffix})? _resolveSettingsKey(String key) {
@@ -113,29 +130,68 @@ const Map<String, String> kNgmySettingsPrefixCodes = {
 
 bool get _ngmyHasSession => Supabase.instance.client.auth.currentSession != null;
 
+/// Throws [NgmyDbRelayException] if the edge call itself failed or the server
+/// reported an error. A successful call that found no matching row still
+/// returns normally (`data` key present but null) — that is not an error.
+Map<String, dynamic> _checkOk(Map<String, dynamic>? data) {
+  if (data == null) {
+    throw NgmyDbRelayException('Could not reach server.');
+  }
+  if (data['ok'] != true) {
+    throw NgmyDbRelayException((data['error'] ?? 'Relay error').toString());
+  }
+  return data;
+}
+
+/// Low-level reachability probe — a response proves the round trip worked
+/// even if no row matched. Throws on genuine failure (network/auth/server).
+Future<Map<String, dynamic>?> ngmyDbRelayPing(
+  String settingsKey, {
+  Duration timeout = kNgmyCloudLoadTimeout,
+}) async {
+  final resolved = _resolveSettingsKey(settingsKey);
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $settingsKey');
+  final data = _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 's',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+        'cols': 'key',
+        'single': true,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
+  );
+  return data;
+}
+
 /// Fetches one `ngmy_settings` row's `value` by key through the relay.
-/// Returns null if the row doesn't exist, the key isn't in the codebook, or
-/// the caller isn't authorized (mirrors the old direct-call behavior).
+/// Returns null if the row doesn't exist. Throws on a genuine failure.
 Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
   String key, {
   Duration timeout = kNgmyCloudLoadTimeout,
 }) async {
   final resolved = _resolveSettingsKey(key);
-  if (resolved == null) return null;
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 's',
-      't': kNgmyRelayTableCodes['ngmy_settings'],
-      'sk': resolved.code,
-      if (resolved.suffix != null) 'sfx': resolved.suffix,
-      'cols': 'value',
-      'single': true,
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
+  final data = _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 's',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+        'cols': 'value',
+        'single': true,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  if (data == null || data['ok'] != true) return null;
   final row = data['data'];
   if (row is! Map) return null;
   final value = row['value'];
@@ -143,8 +199,7 @@ Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
   return Map<String, dynamic>.from(value);
 }
 
-/// Upserts a `ngmy_settings` row through the relay. Returns false if the key
-/// isn't in the codebook or the write is rejected (matches old return shape).
+/// Upserts a `ngmy_settings` row through the relay. Throws on failure.
 Future<bool> ngmyDbRelaySettingsUpsert(
   String key,
   Map<String, dynamic> value, {
@@ -152,50 +207,116 @@ Future<bool> ngmyDbRelaySettingsUpsert(
   Duration timeout = kNgmyCloudWriteTimeout,
 }) async {
   final resolved = _resolveSettingsKey(key);
-  if (resolved == null) return false;
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
   final at = updatedAt ?? DateTime.now().toUtc().toIso8601String();
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 'up',
-      't': kNgmyRelayTableCodes['ngmy_settings'],
-      'sk': resolved.code,
-      if (resolved.suffix != null) 'sfx': resolved.suffix,
-      'onConflict': 'key',
-      'rows': [
-        {'value': value, 'updated_at': at},
-      ],
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'up',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+        'onConflict': 'key',
+        'rows': [
+          {'value': value, 'updated_at': at},
+        ],
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  return data != null && data['ok'] == true;
+  return true;
 }
 
-/// Deletes a `ngmy_settings` row by key through the relay.
+/// Fetches a `ngmy_settings` row's raw `value` by key — use when the stored
+/// value is a JSON array rather than an object (`ngmyDbRelaySettingsFetch`
+/// only accepts object-shaped values). Throws on a genuine failure.
+Future<dynamic> ngmyDbRelaySettingsFetchRaw(
+  String key, {
+  Duration timeout = kNgmyCloudLoadTimeout,
+}) async {
+  final resolved = _resolveSettingsKey(key);
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
+  final data = _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 's',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+        'cols': 'value',
+        'single': true,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
+  );
+  final row = data['data'];
+  if (row is! Map) return null;
+  return row['value'];
+}
+
+/// Upserts a `ngmy_settings` row with an arbitrary JSON-encodable [value]
+/// (array or object) through the relay. Throws on failure.
+Future<bool> ngmyDbRelaySettingsUpsertRaw(
+  String key,
+  dynamic value, {
+  String? updatedAt,
+  Duration timeout = kNgmyCloudWriteTimeout,
+}) async {
+  final resolved = _resolveSettingsKey(key);
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
+  final at = updatedAt ?? DateTime.now().toUtc().toIso8601String();
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'up',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+        'onConflict': 'key',
+        'rows': [
+          {'value': value, 'updated_at': at},
+        ],
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
+  );
+  return true;
+}
+
+/// Deletes a `ngmy_settings` row by key through the relay. Throws on failure.
 Future<bool> ngmyDbRelaySettingsDelete(
   String key, {
   Duration timeout = kNgmyCloudWriteTimeout,
 }) async {
   final resolved = _resolveSettingsKey(key);
-  if (resolved == null) return false;
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 'd',
-      't': kNgmyRelayTableCodes['ngmy_settings'],
-      'sk': resolved.code,
-      if (resolved.suffix != null) 'sfx': resolved.suffix,
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'd',
+        't': kNgmyRelayTableCodes['ngmy_settings'],
+        'sk': resolved.code,
+        if (resolved.suffix != null) 'sfx': resolved.suffix,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  return data != null && data['ok'] == true;
+  return true;
 }
 
 /// Generic relayed select for a non-`ngmy_settings` table (`config`,
 /// `family_trees`, `home_cards`, `ngmy_stripe_access`). [eq] are simple
-/// equality filters; [contains] filters by jsonb/array containment.
+/// equality filters; [contains] filters by jsonb/array containment. Throws
+/// on a genuine failure (bad column, permission denied, network); an empty
+/// result set is returned normally as `[]`.
 Future<List<Map<String, dynamic>>> ngmyDbRelaySelect(
   String table, {
   String cols = '*',
@@ -205,21 +326,22 @@ Future<List<Map<String, dynamic>>> ngmyDbRelaySelect(
   Duration timeout = kNgmyCloudLoadTimeout,
 }) async {
   final tableCode = kNgmyRelayTableCodes[table];
-  if (tableCode == null) return const [];
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 's',
-      't': tableCode,
-      'cols': cols,
-      if (eq != null && eq.isNotEmpty) 'eq': eq,
-      if (contains != null && contains.isNotEmpty) 'contains': contains,
-      'single': single,
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  if (tableCode == null) throw NgmyDbRelayException('Unknown relay table: $table');
+  final data = _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 's',
+        't': tableCode,
+        'cols': cols,
+        if (eq != null && eq.isNotEmpty) 'eq': eq,
+        if (contains != null && contains.isNotEmpty) 'contains': contains,
+        'single': single,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  if (data == null || data['ok'] != true) return const [];
   final result = data['data'];
   if (result == null) return const [];
   if (result is Map) return [Map<String, dynamic>.from(result)];
@@ -229,7 +351,7 @@ Future<List<Map<String, dynamic>>> ngmyDbRelaySelect(
   return const [];
 }
 
-/// Generic relayed upsert for a non-`ngmy_settings` table.
+/// Generic relayed upsert for a non-`ngmy_settings` table. Throws on failure.
 Future<bool> ngmyDbRelayUpsert(
   String table,
   List<Map<String, dynamic>> rows, {
@@ -237,39 +359,45 @@ Future<bool> ngmyDbRelayUpsert(
   Duration timeout = kNgmyCloudWriteTimeout,
 }) async {
   final tableCode = kNgmyRelayTableCodes[table];
-  if (tableCode == null || rows.isEmpty) return false;
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 'up',
-      't': tableCode,
-      'rows': rows,
-      if (onConflict != null) 'onConflict': onConflict,
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  if (tableCode == null) throw NgmyDbRelayException('Unknown relay table: $table');
+  if (rows.isEmpty) return false;
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'up',
+        't': tableCode,
+        'rows': rows,
+        if (onConflict != null) 'onConflict': onConflict,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  return data != null && data['ok'] == true;
+  return true;
 }
 
 /// Generic relayed delete for a non-`ngmy_settings` table. [eq] must be
-/// non-empty — the server refuses an unscoped delete.
+/// non-empty — the server refuses an unscoped delete. Throws on failure.
 Future<bool> ngmyDbRelayDelete(
   String table, {
   required Map<String, dynamic> eq,
   Duration timeout = kNgmyCloudWriteTimeout,
 }) async {
   final tableCode = kNgmyRelayTableCodes[table];
-  if (tableCode == null || eq.isEmpty) return false;
-  final data = await ngmyEdgeInvoke(
-    {
-      'action': 'dbRelay',
-      'op': 'd',
-      't': tableCode,
-      'eq': eq,
-    },
-    anonymous: !_ngmyHasSession,
-    timeout: timeout,
+  if (tableCode == null) throw NgmyDbRelayException('Unknown relay table: $table');
+  if (eq.isEmpty) return false;
+  _checkOk(
+    await ngmyEdgeInvoke(
+      {
+        'action': 'dbRelay',
+        'op': 'd',
+        't': tableCode,
+        'eq': eq,
+      },
+      anonymous: !_ngmyHasSession,
+      timeout: timeout,
+    ),
   );
-  return data != null && data['ok'] == true;
+  return true;
 }

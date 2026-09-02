@@ -264,16 +264,9 @@ Future<Map<String, dynamic>?> ngmyLookupReferrerFromIndex(String rawCode) async 
   final normalized = ngmyNormalizeReferralCode(rawCode);
   if (normalized.isEmpty) return null;
   try {
-    final row = await Supabase.instance.client
-        .from('ngmy_settings')
-        .select()
-        .eq('key', _referralIndexKey(normalized))
-        .maybeSingle()
-        .timeout(kNgmyCloudLoadTimeout);
-    if (row == null) return null;
-    final value = row['value'];
-    if (value is! Map) return null;
-    final parsed = Map<String, dynamic>.from(value);
+    final value = await ngmyDbRelaySettingsFetch(_referralIndexKey(normalized), timeout: kNgmyCloudLoadTimeout);
+    if (value == null) return null;
+    final parsed = value;
     final email = (parsed['email'] ?? '').toString().trim();
     if (email.isEmpty) return null;
     return {

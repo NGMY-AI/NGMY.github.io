@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_doc_share_lan_download.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_store.dart';
@@ -37,15 +38,8 @@ class NgmyDocShareVideoCloud {
   static Future<Map<String, dynamic>> _loadRelays() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _kVideoRelayKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kVideoRelayKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return {};
       final relays = value['relays'];
       if (relays is Map) return Map<String, dynamic>.from(relays);
     } catch (e) {
@@ -57,16 +51,11 @@ class NgmyDocShareVideoCloud {
   static Future<void> _saveRelays(Map<String, dynamic> relays) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kVideoRelayKey,
-          'value': {
-            'relays': relays,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _kVideoRelayKey,
+        {'relays': relays, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[doc share video cloud] save: $e');
     }

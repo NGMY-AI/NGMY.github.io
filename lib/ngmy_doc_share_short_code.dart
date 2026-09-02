@@ -1,8 +1,8 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_doc_share_models.dart';
 import 'ngmy_doc_share_qr_stash.dart';
 import 'ngmy_network_resilience.dart';
@@ -42,15 +42,7 @@ class NgmyDocShareShortCode {
     final normalized = normalizeInput(code);
     if (normalized == null) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _codeSettingsKey(normalized))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is Map) return Map<String, dynamic>.from(value);
+      return await ngmyDbRelaySettingsFetch(_codeSettingsKey(normalized), timeout: kNgmyCloudLoadTimeout);
     } catch (e) {
       debugPrint('[doc share short code] load $code: $e');
     }
@@ -61,14 +53,7 @@ class NgmyDocShareShortCode {
     final normalized = normalizeInput(code);
     if (normalized == null) return false;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _codeSettingsKey(normalized),
-          'value': row,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
+      return await ngmyDbRelaySettingsUpsert(_codeSettingsKey(normalized), row, timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[doc share short code] save $code: $e');
       return false;

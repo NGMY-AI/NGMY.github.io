@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// One row per transfer token — fast poll (no giant signals map).
@@ -30,18 +30,16 @@ class NgmyTransferSignal {
     if (id.isEmpty || !id.startsWith(kNgmyTransferSignalPrefix)) return null;
     final now = DateTime.now().toUtc();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
+      await ngmyDbRelaySettingsUpsert(
+        _rowKey(id),
         {
-          'key': _rowKey(id),
-          'value': {
-            'token': id,
-            'ownerEmail': ownerEmail.trim().toLowerCase(),
-            'offer': base64Encode(utf8.encode(json)),
-            'createdAt': now.toIso8601String(),
-          },
-          'updated_at': now.toIso8601String(),
+          'token': id,
+          'ownerEmail': ownerEmail.trim().toLowerCase(),
+          'offer': base64Encode(utf8.encode(json)),
+          'createdAt': now.toIso8601String(),
         },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+        timeout: kNgmyCloudWriteTimeout,
+      );
       return id;
     } catch (e) {
       debugPrint('[ngmy transfer signal] stash offer: $e');
@@ -53,15 +51,8 @@ class NgmyTransferSignal {
     final id = token.trim();
     if (id.isEmpty) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _rowKey(id))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is! Map) return null;
+      final value = await ngmyDbRelaySettingsFetch(_rowKey(id), timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return null;
       final offerRaw = (value['offer'] ?? '').toString();
       if (offerRaw.isEmpty) return null;
       return utf8.decode(base64Decode(offerRaw));
@@ -75,41 +66,22 @@ class NgmyTransferSignal {
     final id = token.trim();
     if (id.isEmpty || answerJson.trim().isEmpty) return false;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _rowKey(id))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
+      final value = await ngmyDbRelaySettingsFetch(_rowKey(id), timeout: kNgmyCloudLoadTimeout);
       final now = DateTime.now().toUtc();
       final answerB64 = base64Encode(utf8.encode(answerJson.trim()));
-      if (row == null) {
-        await Supabase.instance.client.from('ngmy_settings').upsert([
-          {
-            'key': _rowKey(id),
-            'value': {
-              'token': id,
-              'answer': answerB64,
-              'answerAt': now.toIso8601String(),
-            },
-            'updated_at': now.toIso8601String(),
-          },
-        ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      if (value == null) {
+        await ngmyDbRelaySettingsUpsert(
+          _rowKey(id),
+          {'token': id, 'answer': answerB64, 'answerAt': now.toIso8601String()},
+          timeout: kNgmyCloudWriteTimeout,
+        );
         return true;
       }
-      final value = row['value'];
-      if (value is! Map) return false;
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _rowKey(id),
-          'value': {
-            ...Map<String, dynamic>.from(value),
-            'answer': answerB64,
-            'answerAt': now.toIso8601String(),
-          },
-          'updated_at': now.toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _rowKey(id),
+        {...value, 'answer': answerB64, 'answerAt': now.toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
       return true;
     } catch (e) {
       debugPrint('[ngmy transfer signal] stash answer: $e');
@@ -121,15 +93,8 @@ class NgmyTransferSignal {
     final id = token.trim();
     if (id.isEmpty) return null;
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _rowKey(id))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return null;
-      final value = row['value'];
-      if (value is! Map) return null;
+      final value = await ngmyDbRelaySettingsFetch(_rowKey(id), timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return null;
       final answerRaw = (value['answer'] ?? '').toString();
       if (answerRaw.isEmpty) return null;
       return utf8.decode(base64Decode(answerRaw));
@@ -143,11 +108,7 @@ class NgmyTransferSignal {
     final id = token.trim();
     if (id.isEmpty) return;
     try {
-      await Supabase.instance.client
-          .from('ngmy_settings')
-          .delete()
-          .eq('key', _rowKey(id))
-          .timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsDelete(_rowKey(id), timeout: kNgmyCloudWriteTimeout);
     } catch (e) {
       debugPrint('[ngmy transfer signal] clear: $e');
     }

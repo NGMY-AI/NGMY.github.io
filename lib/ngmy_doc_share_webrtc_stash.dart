@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Short WebRTC offer/answer tokens — SDP lives in cloud; QR stays scannable.
@@ -21,15 +21,8 @@ class NgmyDocShareWebRtcStash {
   static Future<Map<String, dynamic>> _loadSignals() async {
     if (!await ngmyCanReachCloud()) return {};
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _kWebRtcStashKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return {};
-      final value = row['value'];
-      if (value is! Map) return {};
+      final value = await ngmyDbRelaySettingsFetch(_kWebRtcStashKey, timeout: kNgmyCloudLoadTimeout);
+      if (value == null) return {};
       final signals = value['signals'];
       if (signals is Map) return Map<String, dynamic>.from(signals);
     } catch (e) {
@@ -41,16 +34,11 @@ class NgmyDocShareWebRtcStash {
   static Future<void> _saveSignals(Map<String, dynamic> signals) async {
     if (!await ngmyCanReachCloud()) return;
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _kWebRtcStashKey,
-          'value': {
-            'signals': signals,
-            'savedAt': DateTime.now().toUtc().toIso8601String(),
-          },
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      await ngmyDbRelaySettingsUpsert(
+        _kWebRtcStashKey,
+        {'signals': signals, 'savedAt': DateTime.now().toUtc().toIso8601String()},
+        timeout: kNgmyCloudWriteTimeout,
+      );
     } catch (e) {
       debugPrint('[doc share webrtc stash] save: $e');
     }
