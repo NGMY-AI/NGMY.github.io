@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260901204832';
+      var embedded = '20260902034514';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -320,6 +320,24 @@
         try { document.title = "Loading local bio…"; } catch (e2) {}
       } else {
         try { sessionStorage.removeItem("ngmy_guest_local_bio_slug"); } catch (e3) {}
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      function ngmyIsCivicEnrollLaunch() {
+        var path = location.pathname || "";
+        if (/\/enroll\/[^/?#]+/i.test(path)) return true;
+        try {
+          var q = new URLSearchParams(location.search);
+          if ((q.get("civic") || "").toLowerCase() === "enroll") return true;
+        } catch (e) {}
+        return false;
+      }
+      if (ngmyIsCivicEnrollLaunch()) {
+        try { sessionStorage.setItem("ngmy_civic_enroll", "1"); } catch (e) {}
+        try { document.title = "NGMY Self Enrollment"; } catch (e2) {}
       }
     })();
   </script>
@@ -731,7 +749,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260901204832";
+      var CURRENT = "20260902034514";
 
       function showError(msg) {
 
@@ -866,7 +884,7 @@
 
   <script>
     (function () {
-      var deployId = '20260901204832';
+      var deployId = '20260902034514';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
