@@ -1514,7 +1514,18 @@ Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
       // full app config resync happened.
       'helpModeByState': config.helpModeByState,
       'helpCampaignClosures': config.helpCampaignClosures,
-      // helpCampaignSpendings — Edge-only (civic_help_campaign_spendings)
+      // Spending recorded against a state's Contribution Case. This used to be
+      // Edge-only (privateListsPersist -> civic_help_campaign_spendings), but
+      // the matching fetch is ack-only, so a spend recorded by one registrar
+      // never reached anyone else and every device computed a different
+      // Contribution Case balance. Riding along here (one shared row, merged
+      // by id) makes the balance the same for everyone.
+      'helpCampaignSpendings': config.helpCampaignSpendings,
+      // Delete tombstones, same reason: `civicAdminSettingsFetch` never
+      // returns data, so a registrar's "delete this receipt" or an admin's
+      // "delete this contribution" stayed on the device that pressed it.
+      'contributionReceiptRemovedKeys': config.contributionReceiptRemovedKeys,
+      'civicDeletedContributionIds': config.civicDeletedContributionIds,
       'savedAt': DateTime.now().toUtc().toIso8601String(),
     };
 
@@ -1585,7 +1596,33 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
         .toList();
     config.helpCampaignClosures = _mergeHelpCampaignClosuresLists(config.helpCampaignClosures, remote);
   }
-  // helpCampaignSpendings intentionally ignored here — loaded via Edge privateListsFetch.
+  // Spendings are merged (additive, id-keyed) rather than overwritten, so they
+  // are exempt from deferLiveFields for the same reason the comment above
+  // gives — deferring would only delay other registrars from seeing a
+  // just-recorded spend against the Contribution Case.
+  if (payload['helpCampaignSpendings'] is List) {
+    final remote = (payload['helpCampaignSpendings'] as List)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    config.helpCampaignSpendings =
+        _mergeHelpCampaignSpendingsLists(config.helpCampaignSpendings, remote);
+  }
+  // Delete tombstones are a union — once any registrar or admin removes a
+  // receipt/contribution it must stay removed on every device, and a device
+  // that has not synced yet must never resurrect it.
+  final removedKeys = _stringIdListFromPayload(payload['contributionReceiptRemovedKeys']);
+  if (removedKeys.isNotEmpty) {
+    config.contributionReceiptRemovedKeys = List<String>.from(
+      NgmyCivicReadState.mergeSets(config.contributionReceiptRemovedKeys, removedKeys),
+    );
+  }
+  final deletedContributionIds = _stringIdListFromPayload(payload['civicDeletedContributionIds']);
+  if (deletedContributionIds.isNotEmpty) {
+    config.civicDeletedContributionIds = List<String>.from(
+      NgmyCivicReadState.mergeSets(config.civicDeletedContributionIds, deletedContributionIds),
+    );
+  }
 }
 
 Future<void> _persistCivicHelpModeSettingsLocal(AppConfig config) async {
@@ -1628,13 +1665,21 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   if (await ngmyCanReachCloud()) {
     final payload = _civicHelpModeSettingsPayload(config);
     final email = ngmyCurrentAuthEmail();
-    cloudOk = await ngmyCivicAdminSettingsPersist(
-      email: email,
-      kind: 'civicHelpModeSettings',
-      payload: payload,
-    );
+    // Relay first, Edge second — deliberately this order. The Edge
+    // `civicHelpModeSettings` handler strips helpCampaignSpendings and then
+    // replaces the whole row, so letting it win would wipe the spendings and
+    // tombstones this payload now carries. The relay write goes through RLS
+    // (registrar or admin only, see civic_contributions_shared_visibility.sql)
+    // and stores the payload intact. Edge stays as the offline/permission
+    // fallback; the next successful relay write restores the full row from
+    // local config, so a fallback write is self-healing rather than lossy.
+    cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
     if (!cloudOk) {
-      cloudOk = await _upsertNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey, payload);
+      cloudOk = await ngmyCivicAdminSettingsPersist(
+        email: email,
+        kind: 'civicHelpModeSettings',
+        payload: payload,
+      );
     }
     if (email.isNotEmpty) {
       final spendOk = await ngmyPrivateListsPersistHelpSpendings(
@@ -1871,7 +1916,27 @@ Future<void> _persistCivicReceiptRemovedLocal(AppConfig config) async {
   }
 }
 
+/// The one shared civic row every signed-in user can read. `civicAdminSettingsFetch`
+/// is ack-only (it answers `networkEmpty` and returns no data at all), so this
+/// is the only path by which help mode, spendings, and delete tombstones
+/// actually travel between devices.
+Future<Map<String, dynamic>?> _fetchCivicSharedHelpModeRow() async {
+  if (ngmyCurrentAuthEmail().isEmpty) return null;
+  if (!await ngmyCanReachCloud()) return null;
+  try {
+    return await _fetchNgmySettingSafe(_kNgmyCivicHelpModeSettingsKey);
+  } catch (e) {
+    debugPrint('[civic help mode] shared row fetch: $e');
+    return null;
+  }
+}
+
 Future<Set<String>> _fetchCivicReceiptRemovedFromCloud() async {
+  final shared = await _fetchCivicSharedHelpModeRow();
+  if (shared != null) {
+    final keys = _stringIdListFromPayload(shared['contributionReceiptRemovedKeys']).toSet();
+    if (keys.isNotEmpty) return keys;
+  }
   final email = ngmyCurrentAuthEmail();
   if (email.isEmpty) return {};
   final data = await ngmyCivicAdminSettingsFetch(email: email);
@@ -1922,11 +1987,15 @@ Future<bool> ngmyPersistCivicContributionReceiptRemoved(AppConfig config, {Strin
     };
     config.contributionReceiptRemovedKeys = merged.toList()..sort();
     await _persistCivicReceiptRemovedLocal(config);
-    return await ngmyCivicAdminSettingsPersist(
+    // The shared civic row is what other devices actually read, so the
+    // tombstone has to go there or the receipt reappears for everyone else.
+    final sharedOk = await ngmyPersistCivicHelpModeSettings(config);
+    final legacyOk = await ngmyCivicAdminSettingsPersist(
       email: ngmyCurrentAuthEmail(),
       kind: 'civicContributionReceiptRemoved',
       payload: _civicReceiptRemovedPayload(config),
     );
+    return sharedOk || legacyOk;
   } catch (e) {
     debugPrint('[civic receipt removed] cloud save: $e');
     return false;
@@ -2022,6 +2091,11 @@ Future<void> ngmyHydratePrivilegedCivicSettingsFromEdge(AppConfig config, {UserD
 }
 
 Future<Set<String>> _fetchCivicDeletedContributionsFromCloud() async {
+  final shared = await _fetchCivicSharedHelpModeRow();
+  if (shared != null) {
+    final ids = _stringIdListFromPayload(shared['civicDeletedContributionIds']).toSet();
+    if (ids.isNotEmpty) return ids;
+  }
   final email = ngmyCurrentAuthEmail();
   if (email.isEmpty) return {};
   final data = await ngmyCivicAdminSettingsFetch(email: email);
@@ -2071,11 +2145,15 @@ Future<bool> ngmyPersistCivicDeletedContributions(AppConfig config, {Iterable<St
     };
     config.civicDeletedContributionIds = merged.toList()..sort();
     await _persistCivicDeletedContributionsLocal(config);
-    return await ngmyCivicAdminSettingsPersist(
+    // Same as the receipt tombstone above — the shared civic row is the only
+    // one other devices can read.
+    final sharedOk = await ngmyPersistCivicHelpModeSettings(config);
+    final legacyOk = await ngmyCivicAdminSettingsPersist(
       email: ngmyCurrentAuthEmail(),
       kind: 'civicDeletedContributionIds',
       ids: config.civicDeletedContributionIds,
     );
+    return sharedOk || legacyOk;
   } catch (e) {
     debugPrint('[civic deleted contributions] cloud save: $e');
     return false;

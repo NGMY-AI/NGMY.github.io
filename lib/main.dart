@@ -3267,6 +3267,33 @@ List<Map<String, dynamic>> _mergeHelpCampaignClosuresLists(
   return byId.values.toList();
 }
 
+/// Latest thing that happened to one state's campaign entry — its start, or
+/// its deactivation if it was ended afterwards. Used to break merge ties
+/// between two *different* campaigns for the same state.
+DateTime? _helpCampaignStampAt(Map<String, dynamic> campaign) {
+  final started = DateTime.tryParse((campaign['campaignStartedAt'] ?? '').toString().trim());
+  final ended = DateTime.tryParse((campaign['deactivatedAt'] ?? '').toString().trim());
+  if (started == null) return ended;
+  if (ended == null) return started;
+  return ended.isAfter(started) ? ended : started;
+}
+
+/// True only when both sides carry a usable stamp and those stamps disagree —
+/// otherwise the caller falls back to the older active-beats-inactive rule.
+bool _helpCampaignRecencyDiffers(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final at = _helpCampaignStampAt(a);
+  final bt = _helpCampaignStampAt(b);
+  return at != null && bt != null && !at.isAtSameMomentAs(bt);
+}
+
+Map<String, dynamic> _helpCampaignNewer(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final at = _helpCampaignStampAt(a);
+  final bt = _helpCampaignStampAt(b);
+  if (at == null) return b;
+  if (bt == null) return a;
+  return bt.isAfter(at) ? b : a;
+}
+
 /// Prefer inactive when either side already closed that campaign — stops cloud
 /// from resurrecting an auto-expired / deactivated help mode and re-blinking it.
 Map<String, dynamic> _mergeHelpModeByStateMaps(
@@ -3327,6 +3354,12 @@ Map<String, dynamic> _mergeHelpModeByStateMaps(
           (l['campaignStartedAt'] ?? '').toString().trim().isNotEmpty) {
         chosen['campaignStartedAt'] = l['campaignStartedAt'];
       }
+    } else if (localActive != remoteActive && _helpCampaignRecencyDiffers(l, r)) {
+      // Different campaigns, one active and one not. Newest wins — "active
+      // beats inactive" alone let a device that never managed to read the
+      // shared row keep showing its own older, still-active campaign after
+      // someone else had already started and ended a newer one in that state.
+      chosen = Map<String, dynamic>.from(_helpCampaignNewer(l, r));
     } else if (localActive && !remoteActive) {
       chosen = Map<String, dynamic>.from(l);
     } else if (remoteActive && !localActive) {
@@ -5420,7 +5453,14 @@ DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').t
 Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
   final public = NgmyCloudPolicy.settingsKeyPublicReadable(key);
   final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
-  if (!public && !admin) return false;
+  // Shared civic state (help mode, spendings, delete tombstones): let any
+  // signed-in caller try. RLS accepts the write only from an Authorized
+  // Registrar or an admin, so a member's attempt simply fails server-side
+  // instead of being blocked here — which is what stopped a registrar's
+  // Activate/Deactivate from ever reaching the cloud.
+  final civicShared =
+      NgmyCloudPolicy.settingsKeyCivicShared(key) && ngmyCurrentAuthEmail().isNotEmpty;
+  if (!public && !admin && !civicShared) return false;
   try {
     // Relayed through bright-handler (disguised as /api/sync) instead of a
     // direct ngmy_settings upsert — RLS still governs the actual write.
@@ -5437,7 +5477,14 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
   if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
     final email = ngmyCurrentAuthEmail();
-    if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
+    if (email.isEmpty) return null;
+    // Shared civic state is readable by every signed-in user (RLS still
+    // requires a session and still refuses anon). Gating it to admins meant
+    // registrars and members never learned that help mode had been turned on
+    // or off in their state, and never received delete tombstones.
+    if (!ngmyEmailIsAdmin(email) && !NgmyCloudPolicy.settingsKeyCivicShared(key)) {
+      return null;
+    }
   }
   try {
     // Relayed through bright-handler (disguised as /api/sync) instead of a
@@ -8173,7 +8220,10 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
       },
       orderBy: 'timestamp',
       orderAscending: false,
-      limit: 400,
+      // Nationwide, every state, every campaign — a single state can easily run
+      // ten or more contributions in one month, and receipts stay visible for
+      // 30 days past a campaign closing, so 400 truncated real history.
+      limit: 5000,
       timeout: kNgmyCloudLoadTimeout,
     );
     return transData
@@ -30635,6 +30685,12 @@ extension AppConfigHelpMode on AppConfig {
       ..[key] = {
         ...existing,
         'active': false,
+        // Recency stamp for _mergeHelpModeByStateMaps. Without it, a device
+        // holding an older campaign that is still marked active wins the
+        // merge over a newer campaign someone else already ended, which is
+        // why an admin could open a state and still see Help Mode running
+        // after the registrar had deactivated it.
+        'deactivatedAt': DateTime.now().toUtc().toIso8601String(),
       };
     helpModeByState = next;
   }
