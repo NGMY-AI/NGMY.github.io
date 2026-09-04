@@ -364,4 +364,51 @@ void main() {
     final outside = snapshot.spendings.where((s) => s.description == 'Rent').single;
     expect(outside.campaignTitle, isEmpty);
   });
+
+  test('store spends within 10 minutes share one slice color and keep names', () {
+    final snapshot = buildNgmyCivicWalletSnapshot(
+      state: 'Georgia',
+      contributionRows: [
+        {'id': 'c1', 'amount': 100.0, 'at': '2026-09-02T10:00:00Z'},
+      ],
+      spendingRows: [
+        {
+          'id': 's1',
+          'state': 'Georgia',
+          'amount': 5.0,
+          'description': 'Rice',
+          'recordedAt': '2026-09-02T12:00:00Z',
+        },
+        {
+          'id': 's2',
+          'state': 'Georgia',
+          'amount': 3.0,
+          'description': 'Soap',
+          'recordedAt': '2026-09-02T12:04:00Z',
+        },
+        {
+          'id': 's3',
+          'state': 'Georgia',
+          'amount': 2.0,
+          'description': 'Bags',
+          'recordedAt': '2026-09-02T12:09:00Z',
+        },
+        {
+          'id': 's4',
+          'state': 'Georgia',
+          'amount': 7.0,
+          'description': 'Fuel',
+          'recordedAt': '2026-09-02T13:00:00Z',
+        },
+      ],
+    );
+
+    expect(snapshot.categories.length, 2);
+    expect(snapshot.legend.length, 4);
+    final trip = snapshot.legend.where((e) => e.name != 'Fuel').toList();
+    expect(trip.length, 3);
+    expect(trip.map((e) => e.color).toSet(), hasLength(1));
+    expect(trip.map((e) => e.name).toSet(), {'Rice', 'Soap', 'Bags'});
+    expect(snapshot.legend.where((e) => e.name == 'Fuel').single.color, isNot(trip.first.color));
+  });
 }

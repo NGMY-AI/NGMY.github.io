@@ -2806,6 +2806,19 @@ Future<void> _hydrateCivicCitiesAndRoomsFromLocalBackup(AppConfig config) async 
 
 /// Immediate save for Manage Cities & Rooms — local backup + app_config + cloud.
 Future<void> _persistCivicCitiesAndRoomsNow(AppConfig config) async {
+  final localByState = config.civicCitiesByState.map(
+    (k, v) => MapEntry(k, List<String>.from(v)),
+  );
+  final localRooms = List<String>.from(config.rooms);
+  await _mergeCivicCitiesAndRoomsIntoConfig(config);
+  for (final e in localByState.entries) {
+    config.civicCitiesByState = NgmyCivicRegistryStats.setCitiesForState(
+      civicCitiesByState: config.civicCitiesByState,
+      state: e.key,
+      cities: e.value,
+    );
+  }
+  config.rooms = localRooms;
   config.cities = NgmyCivicRegistryStats.allCitiesUnion(config.civicCitiesByState);
   await NgmyCivicRegistryStats.saveCitiesRoomsLocalBackup(
     civicCitiesByState: config.civicCitiesByState,
@@ -2826,7 +2839,8 @@ Future<void> _persistCivicCitiesAndRoomsNow(AppConfig config) async {
       kind: 'civicCitiesRooms',
       civicCitiesByState: config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
       cities: config.cities,
-      rooms: config.rooms,
+      rooms: List<String>.from(config.rooms),
+      roomsExact: true,
     );
   } catch (e) {
     debugPrint('[config] civic cities/rooms Edge persist: $e');
@@ -4033,9 +4047,6 @@ Future<void> _persistCriticalConfigFields(AppConfig config) async {
     'civicSelfEnrollmentEnabled': config.civicSelfEnrollmentEnabled,
     'familyTreeCreateFee': config.familyTreeCreateFee,
     'familyTreePhotoMonthlyFee': config.familyTreePhotoMonthlyFee,
-    'civicCitiesByState': config.civicCitiesByState.map((k, v) => MapEntry(k, v)),
-    'cities': config.cities,
-    'rooms': config.rooms,
   });
   try {
     await ngmyDbRelayUpsert('config', [combined]);
@@ -37275,7 +37286,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               final value = roomC.text.trim();
                               if (value.isEmpty) return;
                               if (!widget.config.rooms.contains(value)) {
-                                setState(() => widget.config.rooms.add(value));
+                                setState(() => widget.config.rooms = [...widget.config.rooms, value]);
                                 await _saveCivicCitiesAndRooms();
                               }
                               roomC.clear();
@@ -37293,7 +37304,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           return Chip(
                             label: Text(r),
                             onDeleted: () async {
-                              setState(() => widget.config.rooms.remove(r));
+                              setState(() => widget.config.rooms = widget.config.rooms.where((x) => x != r).toList());
                               if (_selectedRoom == r) _selectedRoom = 'All Rooms';
                               if (_roomC.text == r) _roomC.clear();
                               await _saveCivicCitiesAndRooms();

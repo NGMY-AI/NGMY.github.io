@@ -3275,11 +3275,11 @@ async function handleCivicFetchCitiesRooms(
   const fullRooms = Array.isArray(wrap.rooms) ? wrap.rooms : [];
 
   if (role.isAdmin || role.isRegistrar) {
-    // Geography stays in local backup — never the full map in Network tab.
-    return networkFetchOk({
-      stateCount: Object.keys(fullByState).length,
-      cityCount: fullCities.length,
-      roomCount: fullRooms.length,
+    return jsonOk({
+      ok: true,
+      civicCitiesByState: fullByState,
+      cities: fullCities,
+      rooms: fullRooms,
     });
   }
 
@@ -3465,10 +3465,52 @@ async function handleCivicAdminSettingsPersist(
     return jsonOk({ ok: true });
   }
   if (kind === "civicCitiesRooms" && (role.isAdmin || role.isRegistrar)) {
+    const existing = await loadSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY);
+    const existingByState =
+      existing.civicCitiesByState && typeof existing.civicCitiesByState === "object"
+        ? { ...(existing.civicCitiesByState as Record<string, unknown>) }
+        : {};
+    const incomingByState =
+      body.civicCitiesByState && typeof body.civicCitiesByState === "object"
+        ? (body.civicCitiesByState as Record<string, unknown>)
+        : {};
+    const mergedByState: Record<string, unknown> = { ...existingByState };
+    for (const [k, v] of Object.entries(incomingByState)) {
+      mergedByState[k] = v;
+    }
+    const existingRooms = Array.isArray(existing.rooms)
+      ? existing.rooms.map((e) => String(e))
+      : [];
+    const incomingRooms = Array.isArray(body.rooms)
+      ? body.rooms.map((e) => String(e))
+      : [];
+    const roomsExact = body.roomsExact === true;
+    let rooms: string[];
+    if (roomsExact) {
+      rooms = incomingRooms;
+    } else if (incomingRooms.length === 0) {
+      rooms = existingRooms;
+    } else {
+      const seen = new Set<string>();
+      rooms = [];
+      for (const r of [...existingRooms, ...incomingRooms]) {
+        const t = r.trim();
+        if (!t || seen.has(t.toLowerCase())) continue;
+        seen.add(t.toLowerCase());
+        rooms.push(t);
+      }
+    }
+    const cities = Array.from(
+      new Set(
+        Object.values(mergedByState)
+          .flatMap((v) => (Array.isArray(v) ? v.map((e) => String(e).trim()) : []))
+          .filter((s) => s.length > 0),
+      ),
+    );
     const saved = await saveSettingsObject(admin, CIVIC_CITIES_ROOMS_KEY, {
-      civicCitiesByState: body.civicCitiesByState ?? {},
-      cities: body.cities ?? [],
-      rooms: body.rooms ?? [],
+      civicCitiesByState: mergedByState,
+      cities,
+      rooms,
     });
     if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
     await admin.from("config").upsert({

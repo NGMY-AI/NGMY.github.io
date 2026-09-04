@@ -68,10 +68,8 @@ const Set<String> kNgmyEdgeFetchAckOnlyActions = {
   'civicAdminSettingsFetch',
 };
 
-/// Web-only — settings/pins that leak geography in DevTools response bodies.
-/// Roster fetches stay enabled so admin/registrar see real member names.
+/// Web-only — PIN values stay off the wire in DevTools.
 const Set<String> kNgmyEdgeWebAckOnlyActions = {
-  'civicFetchCitiesRooms',
   'civicFetchRegistryPins',
 };
 

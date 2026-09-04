@@ -97,6 +97,7 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   Map<String, dynamic>? civicCitiesByState,
   List<dynamic>? cities,
   List<dynamic>? rooms,
+  bool roomsExact = false,
 }) async {
   final body = <String, dynamic>{
     'action': 'civicAdminSettingsPersist',
@@ -109,6 +110,7 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   if (civicCitiesByState != null) body['civicCitiesByState'] = civicCitiesByState;
   if (cities != null) body['cities'] = cities;
   if (rooms != null) body['rooms'] = rooms;
+  if (roomsExact) body['roomsExact'] = true;
   final data = await ngmyCivicInvoke(body);
   return data != null && data['ok'] == true;
 }

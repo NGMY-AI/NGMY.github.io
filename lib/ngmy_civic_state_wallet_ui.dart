@@ -126,6 +126,20 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
 class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen> {
   late NgmyCivicWalletSnapshot _snap;
   int _range = 0;
+
+  List<NgmyCivicWalletLegendRow> get _expenseLegend {
+    if (_snap.legend.isNotEmpty) return _snap.legend;
+    return _snap.categories
+        .map(
+          (c) => NgmyCivicWalletLegendRow(
+            name: c.name,
+            amount: c.amount,
+            color: c.color,
+            clusterId: c.clusterId,
+          ),
+        )
+        .toList();
+  }
   bool _searchOpen = false;
   final _searchC = TextEditingController();
   final _ledgerScrollC = ScrollController();
@@ -301,13 +315,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     return !at.isBefore(rangeStart);
   }
 
-  List<NgmyCivicWalletSpendingRow> _spendingsForCategory(String name) {
-    final key = name.trim().toLowerCase();
+  List<NgmyCivicWalletSpendingRow> _spendingsForCluster(String clusterId) {
+    final key = clusterId.trim();
+    if (key.isEmpty) return const [];
     return _snap.spendings
-        .where((s) =>
-            !s.isTrust &&
-            s.description.trim().toLowerCase() == key &&
-            _spendingInVisibleRange(s.recordedAt))
+        .where((s) => s.clusterId == key && _spendingInVisibleRange(s.recordedAt))
         .toList();
   }
 
@@ -351,7 +363,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
         spent: spent,
         money: _money,
         dateLabel: _expenseDateLabel,
-        spendingsFor: _spendingsForCategory,
+        spendingsFor: _spendingsForCluster,
         sliceIndexAt: _sliceIndexAt,
       ),
       transitionBuilder: (ctx, anim, secondary, child) {
@@ -2842,14 +2854,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: _snap.categories.isEmpty
+                              child: _expenseLegend.isEmpty
                                   ? Text('No contribution spending recorded yet.', style: TextStyle(color: tone.secondaryText, fontSize: 13))
                                   : _sixRowWindow(
                                       controller: _expenseScrollC,
-                                      itemCount: _snap.categories.length,
+                                      itemCount: _expenseLegend.length,
                                       itemExtent: 28,
                                       itemBuilder: (context, index) {
-                                        final c = _snap.categories[index];
+                                        final c = _expenseLegend[index];
                                         return Row(
                                           children: [
                                             Container(
@@ -3618,7 +3630,7 @@ class _ExpenseCircleSheet extends StatefulWidget {
   final double spent;
   final String Function(double) money;
   final String Function(DateTime) dateLabel;
-  final List<NgmyCivicWalletSpendingRow> Function(String name) spendingsFor;
+  final List<NgmyCivicWalletSpendingRow> Function(String clusterId) spendingsFor;
   final int? Function(Offset local, Size size, List<NgmyCivicWalletCategory> cats) sliceIndexAt;
 
   @override
@@ -3671,7 +3683,7 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
   Widget build(BuildContext context) {
     final tone = widget.tone;
     final cat = _cat;
-    final rows = cat == null ? const <NgmyCivicWalletSpendingRow>[] : widget.spendingsFor(cat.name);
+    final rows = cat == null ? const <NgmyCivicWalletSpendingRow>[] : widget.spendingsFor(cat.clusterId);
     final size = MediaQuery.sizeOf(context);
     final circle = math.min(size.width - 72, size.height * 0.42).clamp(228.0, 300.0);
     final inner = circle * 0.52;

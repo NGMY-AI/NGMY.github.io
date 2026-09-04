@@ -198,11 +198,28 @@ class NgmyCivicWalletCategory {
     required this.name,
     required this.amount,
     required this.color,
+    this.clusterId = '',
   });
 
   final String name;
   final double amount;
   final Color color;
+  /// Spendings recorded within the same 10-minute window share this id.
+  final String clusterId;
+}
+
+class NgmyCivicWalletLegendRow {
+  const NgmyCivicWalletLegendRow({
+    required this.name,
+    required this.amount,
+    required this.color,
+    required this.clusterId,
+  });
+
+  final String name;
+  final double amount;
+  final Color color;
+  final String clusterId;
 }
 
 class NgmyCivicWalletSpendingRow {
@@ -213,6 +230,7 @@ class NgmyCivicWalletSpendingRow {
     required this.recordedAt,
     this.campaignId = '',
     this.campaignTitle = '',
+    this.clusterId = '',
     this.pendingDeleteAt,
     this.fund = 'contribution',
   });
@@ -225,6 +243,7 @@ class NgmyCivicWalletSpendingRow {
   /// Help-mode contribution this spend was recorded against. Empty if it
   /// was not spent inside a contribution campaign.
   final String campaignTitle;
+  final String clusterId;
   final DateTime? pendingDeleteAt;
   final String fund;
 
@@ -269,6 +288,7 @@ class NgmyCivicWalletSnapshot {
     this.transferCredits = 0,
     this.trustReserved = 0,
     this.pendingTransfers = const [],
+    this.legend = const [],
   });
 
   final String state;
@@ -286,6 +306,8 @@ class NgmyCivicWalletSnapshot {
   final double trustReserved;
   final List<NgmyCivicWalletPendingTransfer> pendingTransfers;
   final List<NgmyCivicWalletCategory> categories;
+  /// Side list next to the circle — names stay as recorded, colors match the slice.
+  final List<NgmyCivicWalletLegendRow> legend;
   final List<NgmyCivicWalletTxn> recent;
   final List<NgmyCivicWalletSpendingRow> spendings;
 
@@ -871,6 +893,53 @@ bool ngmyWalletSoftResetRestorable(Map<String, dynamic>? reset, {DateTime? now})
   return purgeAt.isAfter(now ?? DateTime.now());
 }
 
+/// Spendings recorded within [window] of the previous one share a color/slice.
+List<NgmyCivicWalletSpendingRow> ngmyAssignExpenseClusters(
+  List<NgmyCivicWalletSpendingRow> spendings, {
+  Duration window = const Duration(minutes: 10),
+}) {
+  bool sliceable(NgmyCivicWalletSpendingRow s) {
+    if (s.isTrust) return false;
+    final d = s.description.trim().toLowerCase();
+    if (d.startsWith('transfer to state trust')) return false;
+    return true;
+  }
+
+  final order = <int>[
+    for (var i = 0; i < spendings.length; i++)
+      if (sliceable(spendings[i])) i,
+  ]..sort((a, b) => spendings[a].recordedAt.compareTo(spendings[b].recordedAt));
+
+  final clusterOf = List<String>.filled(spendings.length, '');
+  var n = 0;
+  DateTime? prevAt;
+  var current = '';
+  for (final i in order) {
+    final at = spendings[i].recordedAt;
+    if (current.isEmpty || prevAt == null || at.difference(prevAt).abs() > window) {
+      n += 1;
+      current = 'c$n';
+    }
+    clusterOf[i] = current;
+    prevAt = at;
+  }
+
+  return [
+    for (var i = 0; i < spendings.length; i++)
+      NgmyCivicWalletSpendingRow(
+        id: spendings[i].id,
+        description: spendings[i].description,
+        amount: spendings[i].amount,
+        recordedAt: spendings[i].recordedAt,
+        campaignId: spendings[i].campaignId,
+        campaignTitle: spendings[i].campaignTitle,
+        clusterId: clusterOf[i],
+        pendingDeleteAt: spendings[i].pendingDeleteAt,
+        fund: spendings[i].fund,
+      ),
+  ];
+}
+
 /// Build a wallet snapshot from civic contribution + spending maps.
 NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   required String state,
@@ -933,7 +1002,6 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   double transferCredits = 0;
   double trustReserved = 0;
   double silentCollectedCut = 0;
-  final byCat = <String, double>{};
   final spendings = <NgmyCivicWalletSpendingRow>[];
   final pendingTransfers = <NgmyCivicWalletPendingTransfer>[];
   for (final row in spendingRows) {
@@ -1066,9 +1134,6 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       trustSpent += amount;
     } else {
       spent += amount;
-      if (kind != 'transfer_to_trust') {
-        byCat[label] = (byCat[label] ?? 0) + amount;
-      }
     }
     final at = rowAt;
     final rawCampaignId = (row['campaignId'] ?? '').toString().trim();
@@ -1110,17 +1175,44 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   recent.sort((a, b) => b.at.compareTo(a.at));
   pendingTransfers.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
 
+  final clustered = ngmyAssignExpenseClusters(spendings);
   final cats = <NgmyCivicWalletCategory>[];
-  final sorted = byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-  for (var i = 0; i < sorted.length; i++) {
-    final e = sorted[i];
+  final legend = <NgmyCivicWalletLegendRow>[];
+  final clusterIds = <String>[];
+  for (final s in clustered) {
+    if (s.clusterId.isEmpty) continue;
+    if (!clusterIds.contains(s.clusterId)) clusterIds.add(s.clusterId);
+  }
+  for (var i = 0; i < clusterIds.length; i++) {
+    final id = clusterIds[i];
+    final members = clustered.where((s) => s.clusterId == id).toList();
+    final color = ngmyDistinctSliceColor(i, clusterIds.length);
+    final total = members.fold<double>(0, (sum, s) => sum + s.amount);
+    final names = <String>[];
+    for (final s in members) {
+      if (!names.contains(s.description)) names.add(s.description);
+    }
     cats.add(
       NgmyCivicWalletCategory(
-        name: e.key,
-        amount: e.value,
-        color: ngmyDistinctSliceColor(i, sorted.length),
+        name: names.length == 1 ? names.first : names.join(' · '),
+        amount: total,
+        color: color,
+        clusterId: id,
       ),
     );
+    for (final name in names) {
+      final amt = members
+          .where((s) => s.description == name)
+          .fold<double>(0, (sum, s) => sum + s.amount);
+      legend.add(
+        NgmyCivicWalletLegendRow(
+          name: name,
+          amount: amt,
+          color: color,
+          clusterId: id,
+        ),
+      );
+    }
   }
 
   return NgmyCivicWalletSnapshot(
@@ -1133,8 +1225,9 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     trustReserved: trustReserved,
     pendingTransfers: pendingTransfers,
     categories: cats,
+    legend: legend,
     recent: recent,
-    spendings: spendings,
+    spendings: clustered,
   );
 }
 
