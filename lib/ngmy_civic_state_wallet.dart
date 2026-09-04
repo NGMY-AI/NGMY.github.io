@@ -212,6 +212,7 @@ class NgmyCivicWalletSpendingRow {
     required this.amount,
     required this.recordedAt,
     this.campaignId = '',
+    this.campaignTitle = '',
     this.pendingDeleteAt,
     this.fund = 'contribution',
   });
@@ -221,10 +222,38 @@ class NgmyCivicWalletSpendingRow {
   final double amount;
   final DateTime recordedAt;
   final String campaignId;
+  /// Help-mode contribution this spend was recorded against. Empty if it
+  /// was not spent inside a contribution campaign.
+  final String campaignTitle;
   final DateTime? pendingDeleteAt;
   final String fund;
 
   bool get isTrust => fund == 'trust';
+}
+
+/// One unique color per expense slice — never repeats within [count].
+Color ngmyDistinctSliceColor(int index, int count) {
+  const palette = <Color>[
+    Color(0xFFA855F7),
+    Color(0xFF2563EB),
+    Color(0xFFEC4899),
+    Color(0xFFF97316),
+    Color(0xFF14B8A6),
+    Color(0xFFEAB308),
+    Color(0xFF22C55E),
+    Color(0xFFEF4444),
+    Color(0xFF6366F1),
+    Color(0xFF06B6D4),
+    Color(0xFFD946EF),
+    Color(0xFF84CC16),
+  ];
+  if (count <= palette.length && index >= 0 && index < count) {
+    return palette[index];
+  }
+  final hue = (index * 137.508) % 360.0;
+  final sat = (0.62 + (index % 4) * 0.08).clamp(0.55, 0.88);
+  final light = (0.42 + (index % 3) * 0.08).clamp(0.38, 0.58);
+  return HSLColor.fromAHSL(1, hue, sat, light).toColor();
 }
 
 class NgmyCivicWalletSnapshot {
@@ -849,14 +878,6 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   required List<Map<String, dynamic>> spendingRows,
 }) {
   final st = state.trim().toLowerCase();
-  final colors = <Color>[
-    const Color(0xFFA855F7),
-    const Color(0xFF3B82F6),
-    const Color(0xFFEC4899),
-    const Color(0xFFF97316),
-    const Color(0xFF38BDF8),
-    const Color(0xFF14B8A6),
-  ];
   final now = DateTime.now();
   final soft = ngmyActiveWalletSoftReset(spendingRows, state, now: now);
   final hideBudget = soft?['hideBudget'] == true;
@@ -871,6 +892,14 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     // Old reset rows without a timestamp retain their original hide-all
     // behavior. Current reset rows hide only records that existed at reset.
     return resetAt == null || !rowAt.isAfter(resetAt);
+  }
+
+  final campaignTitles = <String, String>{};
+  for (final row in contributionRows) {
+    final cid = (row['campaignId'] ?? row['civicCampaignId'] ?? '').toString().trim();
+    final title = (row['title'] ?? row['purpose'] ?? '').toString().trim();
+    if (cid.isEmpty || title.isEmpty) continue;
+    campaignTitles[cid] = title;
   }
 
   double collected = 0;
@@ -1042,13 +1071,21 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       }
     }
     final at = rowAt;
+    final rawCampaignId = (row['campaignId'] ?? '').toString().trim();
+    final storedTitle = (row['campaignTitle'] ?? row['purpose'] ?? '').toString().trim();
+    final lookedUp = campaignTitles[rawCampaignId] ?? '';
+    final walletBucket = rawCampaignId.toLowerCase().startsWith('wallet_');
+    final campaignTitle = fund == 'trust' || walletBucket
+        ? ''
+        : (storedTitle.isNotEmpty ? storedTitle : lookedUp);
     spendings.add(
       NgmyCivicWalletSpendingRow(
         id: (row['id'] ?? '').toString(),
         description: label,
         amount: amount,
         recordedAt: at,
-        campaignId: (row['campaignId'] ?? '').toString(),
+        campaignId: rawCampaignId,
+        campaignTitle: campaignTitle,
         pendingDeleteAt: pendingAt,
         fund: fund,
       ),
@@ -1074,11 +1111,16 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   pendingTransfers.sort((a, b) => b.requestedAt.compareTo(a.requestedAt));
 
   final cats = <NgmyCivicWalletCategory>[];
-  var i = 0;
   final sorted = byCat.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-  for (final e in sorted) {
-    cats.add(NgmyCivicWalletCategory(name: e.key, amount: e.value, color: colors[i % colors.length]));
-    i++;
+  for (var i = 0; i < sorted.length; i++) {
+    final e = sorted[i];
+    cats.add(
+      NgmyCivicWalletCategory(
+        name: e.key,
+        amount: e.value,
+        color: ngmyDistinctSliceColor(i, sorted.length),
+      ),
+    );
   }
 
   return NgmyCivicWalletSnapshot(

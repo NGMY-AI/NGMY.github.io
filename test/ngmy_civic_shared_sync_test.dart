@@ -282,4 +282,86 @@ void main() {
     expect(snapshot.available, 25);
     expect(snapshot.recent.map((e) => e.id), ['new']);
   });
+
+  test('expense slices get unique colors and contribution names on spendings', () {
+    final snapshot = buildNgmyCivicWalletSnapshot(
+      state: 'Georgia',
+      contributionRows: [
+        {
+          'id': 'c1',
+          'amount': 200.0,
+          'at': '2026-09-02T10:00:00Z',
+          'title': 'Hospital bills',
+          'campaignId': 'help_abc',
+        },
+      ],
+      spendingRows: [
+        {
+          'id': 's1',
+          'state': 'Georgia',
+          'amount': 10.0,
+          'description': 'Food',
+          'recordedAt': '2026-09-02T12:00:00Z',
+          'campaignId': 'help_abc',
+        },
+        {
+          'id': 's2',
+          'state': 'Georgia',
+          'amount': 8.0,
+          'description': 'Travel',
+          'recordedAt': '2026-09-02T13:00:00Z',
+          'campaignId': 'help_abc',
+        },
+        {
+          'id': 's3',
+          'state': 'Georgia',
+          'amount': 6.0,
+          'description': 'Rent',
+          'recordedAt': '2026-09-02T14:00:00Z',
+          'campaignId': 'wallet_georgia',
+        },
+        {
+          'id': 's4',
+          'state': 'Georgia',
+          'amount': 4.0,
+          'description': 'Clothes',
+          'recordedAt': '2026-09-02T15:00:00Z',
+          'campaignId': 'help_abc',
+        },
+        {
+          'id': 's5',
+          'state': 'Georgia',
+          'amount': 3.0,
+          'description': 'Medicine',
+          'recordedAt': '2026-09-02T16:00:00Z',
+          'campaignId': 'help_abc',
+        },
+        {
+          'id': 's6',
+          'state': 'Georgia',
+          'amount': 2.0,
+          'description': 'Utilities',
+          'recordedAt': '2026-09-02T17:00:00Z',
+          'campaignId': 'help_abc',
+        },
+        {
+          'id': 's7',
+          'state': 'Georgia',
+          'amount': 1.0,
+          'description': 'Other',
+          'recordedAt': '2026-09-02T18:00:00Z',
+          'campaignId': 'help_abc',
+        },
+      ],
+    );
+
+    final colors = snapshot.categories.map((c) => c.color).toSet();
+    expect(snapshot.categories.length, 7);
+    expect(colors.length, 7);
+
+    final inCampaign = snapshot.spendings.where((s) => s.description == 'Food').single;
+    expect(inCampaign.campaignTitle, 'Hospital bills');
+    final outside = snapshot.spendings.where((s) => s.description == 'Rent').single;
+    expect(outside.campaignTitle, isEmpty);
+  });
 }

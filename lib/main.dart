@@ -33650,6 +33650,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         'amount': t.amount,
         'title': (meta['purpose'] ?? 'Contribution').toString(),
         'at': t.timestamp.toUtc().toIso8601String(),
+        'campaignId': (meta['campaignId'] ?? '').toString().trim(),
       };
     }).toList();
     final spendingRows = widget.config.helpCampaignSpendings
@@ -34279,11 +34280,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final st = state.trim();
     if (st.isEmpty || amount <= 0) return;
     final ledger = fund == 'trust' ? 'trust' : 'contribution';
+    final helpId = _activeHelpCampaignId(st).trim();
+    final purpose = helpId.isEmpty ? '' : widget.config.helpPurposeFor(st).trim();
     final record = {
       'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
-      'campaignId': _activeHelpCampaignId(st).trim().isEmpty
-          ? 'wallet_${st.toLowerCase()}'
-          : _activeHelpCampaignId(st).trim(),
+      'campaignId': helpId.isEmpty ? 'wallet_${st.toLowerCase()}' : helpId,
+      if (ledger == 'contribution' && purpose.isNotEmpty) 'campaignTitle': purpose,
       'amount': amount,
       'description': description,
       'recordedAt': DateTime.now().toUtc().toIso8601String(),

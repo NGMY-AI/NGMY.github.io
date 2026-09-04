@@ -1010,71 +1010,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        tone.accent.withValues(alpha: tone.isDark ? 0.24 : 0.14),
-                        tone.accent.withValues(alpha: 0.03),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: tone.accent.withValues(alpha: 0.22),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: tone.accent,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.public_rounded,
-                          color: Colors.white,
-                          size: 23,
-                        ),
-                      ),
-                      const SizedBox(width: 11),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'United States nationwide',
-                              style: TextStyle(
-                                color: tone.primaryText,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              'Live Civic Registry Â· all 50 states',
-                              style: TextStyle(
-                                color: tone.secondaryText,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: Icon(
-                          Icons.close_rounded,
-                          color: tone.secondaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1143,6 +1078,32 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: tone.accent.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: tone.accent.withValues(alpha: 0.45)),
+                  ),
+                  child: Icon(Icons.public_rounded, color: tone.accent, size: 24),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'United States',
+                  style: TextStyle(
+                    color: tone.primaryText,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Civic Registry nationwide',
+                  style: TextStyle(color: tone.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 18),
                 _NationwideContributionsKeptHero(
                   tone: tone,
                   amount: _money(stats.contributionsKept),
@@ -3665,9 +3626,10 @@ class _ExpenseCircleSheet extends StatefulWidget {
 }
 
 class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   int? _selected;
   late final AnimationController _spinIn;
+  late final AnimationController _selectPop;
 
   @override
   void initState() {
@@ -3676,12 +3638,27 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
       vsync: this,
       duration: const Duration(milliseconds: 780),
     )..forward();
+    _selectPop = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
   }
 
   @override
   void dispose() {
     _spinIn.dispose();
+    _selectPop.dispose();
     super.dispose();
+  }
+
+  void _popSlice(int? next) {
+    setState(() => _selected = next);
+    _selectPop
+      ..stop()
+      ..value = 0;
+    if (next != null) {
+      _selectPop.forward();
+    }
   }
 
   NgmyCivicWalletCategory? get _cat {
@@ -3751,8 +3728,9 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                     ),
                     const SizedBox(height: 6),
                     AnimatedBuilder(
-                      animation: _spinIn,
+                      animation: Listenable.merge([_spinIn, _selectPop]),
                       builder: (context, _) {
+                        final pop = Curves.easeOutBack.transform(_selectPop.value.clamp(0.0, 1.0));
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTapDown: (d) {
@@ -3762,10 +3740,10 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                               widget.categories,
                             );
                             if (next == null) {
-                              if (_selected != null) setState(() => _selected = null);
+                              if (_selected != null) _popSlice(null);
                               return;
                             }
-                            setState(() => _selected = next);
+                            _popSlice(next);
                           },
                           child: SizedBox(
                             width: circle,
@@ -3781,13 +3759,15 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                         .toList(),
                                     progress: Curves.easeOutCubic.transform(_spinIn.value),
                                     selectedIndex: _selected,
+                                    selectedPop: pop,
                                     trackColor: tone.progressTrack,
                                     frameColor: frame,
                                   ),
                                 ),
                                 Transform.scale(
                                   scale: Tween<double>(begin: 0.72, end: 1)
-                                      .transform(Curves.easeOutBack.transform(_spinIn.value.clamp(0.0, 1.0))),
+                                          .transform(Curves.easeOutBack.transform(_spinIn.value.clamp(0.0, 1.0))) *
+                                      (1 + pop * 0.06),
                                   child: Container(
                                     width: inner,
                                     height: inner,
@@ -3796,12 +3776,13 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                       color: disc,
                                       border: Border.all(
                                         color: (cat?.color ?? tone.accent).withValues(alpha: 0.95),
-                                        width: 3.2,
+                                        width: 3.2 + pop * 2.4,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: (cat?.color ?? tone.accent).withValues(alpha: 0.28),
-                                          blurRadius: 18,
+                                          color: (cat?.color ?? tone.accent).withValues(alpha: 0.28 + pop * 0.32),
+                                          blurRadius: 18 + pop * 16,
+                                          spreadRadius: pop * 4,
                                         ),
                                       ],
                                     ),
@@ -3873,7 +3854,16 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                       curve: Curves.easeOutCubic,
                       child: cat == null
                           ? const SizedBox(width: double.infinity, height: 0)
-                          : Container(
+                          : AnimatedBuilder(
+                              animation: _selectPop,
+                              builder: (context, child) {
+                                final pop = Curves.easeOutBack.transform(_selectPop.value.clamp(0.0, 1.0));
+                                return Transform.scale(
+                                  scale: 0.96 + pop * 0.04,
+                                  child: child,
+                                );
+                              },
+                              child: Container(
                               width: double.infinity,
                               constraints: BoxConstraints(maxHeight: size.height * 0.28),
                               padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -3881,6 +3871,12 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                 color: tone.isDark ? const Color(0xFF0C0C0C) : const Color(0xFFF8FAFC),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: cat.color, width: 1.6),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cat.color.withValues(alpha: 0.22),
+                                    blurRadius: 14,
+                                  ),
+                                ],
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -3936,6 +3932,7 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                         ),
                                         itemBuilder: (_, i) {
                                           final r = rows[i];
+                                          final contribution = r.campaignTitle.trim();
                                           return Row(
                                             children: [
                                               Expanded(
@@ -3958,6 +3955,17 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                                         fontWeight: FontWeight.w600,
                                                       ),
                                                     ),
+                                                    if (contribution.isNotEmpty)
+                                                      Text(
+                                                        'For $contribution',
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          color: cat.color,
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.w800,
+                                                        ),
+                                                      ),
                                                   ],
                                                 ),
                                               ),
@@ -3975,6 +3983,7 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
                                     ),
                                 ],
                               ),
+                            ),
                             ),
                     ),
                   ],
@@ -4002,6 +4011,7 @@ class _FramedRingPainter extends CustomPainter {
     required this.trackColor,
     required this.frameColor,
     this.selectedIndex,
+    this.selectedPop = 0,
   });
 
   final List<_DonutSlice> slices;
@@ -4009,6 +4019,7 @@ class _FramedRingPainter extends CustomPainter {
   final Color trackColor;
   final Color frameColor;
   final int? selectedIndex;
+  final double selectedPop;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -4016,7 +4027,6 @@ class _FramedRingPainter extends CustomPainter {
     final outer = math.min(size.width, size.height) / 2;
     final stroke = outer * 0.26;
     final ringR = outer - stroke / 2 - 4;
-    final rect = Rect.fromCircle(center: center, radius: ringR);
 
     canvas.drawCircle(
       center,
@@ -4039,37 +4049,68 @@ class _FramedRingPainter extends CustomPainter {
     if (total <= 0 || slices.isEmpty || progress <= 0) return;
 
     final gap = slices.length <= 1 ? 0.0 : 0.08;
+    final starts = <double>[];
+    final sweeps = <double>[];
     var cursor = -math.pi / 2;
     for (var i = 0; i < slices.length; i++) {
       final share = (slices[i].value / total) * math.pi * 2;
-      final sweep = (share - gap) * progress;
-      final start = cursor + gap / 2;
+      starts.add(cursor + gap / 2);
+      sweeps.add((share - gap) * progress);
       cursor += share;
-      if (sweep <= 0.012) continue;
-      final selected = selectedIndex == i;
-      final width = selected ? stroke + 6 : stroke - 1;
+    }
+
+    void paintSlice(int i, {required bool selected}) {
+      final sweep = sweeps[i];
+      if (sweep <= 0.012) return;
+      final pop = selected ? selectedPop.clamp(0.0, 1.4) : 0.0;
+      final width = (stroke - 1) + pop * 16;
+      final sliceRect = Rect.fromCircle(center: center, radius: ringR + pop * 10);
+      final color = slices[i].color;
+      if (pop > 0.02) {
+        canvas.drawArc(
+          sliceRect,
+          starts[i],
+          sweep,
+          false,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = width + 18
+            ..strokeCap = StrokeCap.round
+            ..color = color.withValues(alpha: 0.38 * pop)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
+        );
+      }
       canvas.drawArc(
-        rect,
-        start,
+        sliceRect,
+        starts[i],
         sweep,
         false,
         Paint()
           ..style = PaintingStyle.stroke
-          ..strokeWidth = width + 7
+          ..strokeWidth = width + 8 + pop * 6
           ..strokeCap = StrokeCap.round
           ..color = frameColor,
       );
       canvas.drawArc(
-        rect,
-        start,
+        sliceRect,
+        starts[i],
         sweep,
         false,
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = width
           ..strokeCap = StrokeCap.round
-          ..color = slices[i].color,
+          ..color = color,
       );
+    }
+
+    for (var i = 0; i < slices.length; i++) {
+      if (i == selectedIndex) continue;
+      paintSlice(i, selected: false);
+    }
+    final selected = selectedIndex;
+    if (selected != null && selected >= 0 && selected < slices.length) {
+      paintSlice(selected, selected: true);
     }
   }
 
@@ -4077,6 +4118,7 @@ class _FramedRingPainter extends CustomPainter {
   bool shouldRepaint(covariant _FramedRingPainter oldDelegate) =>
       oldDelegate.progress != progress ||
       oldDelegate.selectedIndex != selectedIndex ||
+      oldDelegate.selectedPop != selectedPop ||
       oldDelegate.slices.length != slices.length;
 }
 
