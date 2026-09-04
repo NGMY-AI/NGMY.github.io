@@ -1115,6 +1115,12 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   'Civic Registry nationwide',
                   style: TextStyle(color: tone.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  'Members and family totals count only people registered in Civic Registry across every US state.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: tone.secondaryText, fontSize: 11, height: 1.35),
+                ),
                 const SizedBox(height: 18),
                 _NationwideContributionsKeptHero(
                   tone: tone,

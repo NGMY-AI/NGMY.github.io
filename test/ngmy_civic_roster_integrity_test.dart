@@ -286,4 +286,56 @@ void main() {
     expect(members, hasLength(1));
     expect(members.single['registryId'], 'GA5555555');
   });
+
+  test('nationwide members and families count only registered US Civic Registry rows', () {
+    final config = _RosterConfig();
+    NgmyCivicRegistryMembers.setList(config, [
+      {
+        ..._member(email: 'ga@example.com', registryId: 'GA1111111', state: 'Georgia'),
+        'familyMembers': 4,
+      },
+      {
+        ..._member(email: 'tx@example.com', registryId: 'TX2222222', state: 'Texas', fullName: 'Texas Head'),
+        'familyMembers': 3,
+      },
+      {
+        ..._member(email: 'dup@example.com', registryId: 'GA1111111', state: 'Georgia'),
+        'familyMembers': 9,
+      },
+      {
+        'email': 'ghost@example.com',
+        'fullName': 'Ghost',
+        'state': 'Georgia',
+        'enrollmentSource': 'registrar',
+      },
+      {
+        ..._member(email: 'ontario@example.com', registryId: 'ON9999999', state: 'Ontario'),
+        'familyMembers': 8,
+      },
+    ]);
+    NgmyCivicRegistryMembers.setRemoved(config, [
+      {
+        'email': 'gone@example.com',
+        'registryId': 'GA3333333',
+        'removedAt': '2026-03-01T00:00:00.000Z',
+      },
+    ]);
+    NgmyCivicRegistryMembers.setList(config, [
+      ...NgmyCivicRegistryMembers.listFrom(config),
+      {
+        ..._member(email: 'gone@example.com', registryId: 'GA3333333'),
+        'familyMembers': 5,
+      },
+      {
+        ..._member(email: 'late@example.com', registryId: 'FL4444444', state: 'Florida', fullName: 'Florida Head'),
+        'familyMembers': 2,
+      },
+    ]);
+    NgmyCivicRegistryMembers.setDeceased(config, [
+      {'email': 'late@example.com', 'registryId': 'FL4444444', 'deceasedAt': '2026-04-01T00:00:00.000Z'},
+    ]);
+
+    expect(NgmyCivicRegistryMembers.nationwideMemberCount(config), 2);
+    expect(NgmyCivicRegistryMembers.nationwideFamilyTotal(config), 7);
+  });
 }

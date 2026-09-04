@@ -33738,7 +33738,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   NgmyCivicNationwideStats _buildCivicNationwideStats() {
-    final members = NgmyCivicRegistryMembers.listFrom(widget.config);
     final deceasedKeys = _civicDeceasedContributorKeys(widget.config);
     final globalResetAt = DateTime.tryParse(widget.config.civicNationwideContributionCountResetAt.trim())?.toUtc();
     final stateResets = widget.config.civicContributionCountResetAtByState;
@@ -33775,8 +33774,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
     final local = buildNgmyCivicNationwideStats(
-      registeredMembers: members.length,
-      totalFamilyMembers: NgmyCivicRegistryMembers.totalFamilyMembersFrom(widget.config),
+      registeredMembers: NgmyCivicRegistryMembers.nationwideMemberCount(widget.config),
+      totalFamilyMembers: NgmyCivicRegistryMembers.nationwideFamilyTotal(widget.config),
       countedContributionRows: countedContribRows,
       allContributionRows: allContribRows,
       allSpendingRows: spendingRows,

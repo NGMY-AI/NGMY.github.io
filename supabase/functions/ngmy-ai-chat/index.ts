@@ -1550,6 +1550,50 @@ function isGhostMemberRow(m: Record<string, unknown>): boolean {
     isRedactedCivicValue(m.dob);
 }
 
+function isKnownUsState(state: string): boolean {
+  const raw = stateKey(state);
+  if (!raw) return false;
+  if (Object.prototype.hasOwnProperty.call(US_STATE_PREFIX, raw)) return true;
+  return Object.values(US_STATE_PREFIX).some((code) => code.toLowerCase() === raw);
+}
+
+function familySizeOf(m: Record<string, unknown>): number {
+  const n = Number(m.familyMembers ?? 1);
+  return Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
+}
+
+function nationwidePersonKey(m: Record<string, unknown>): string {
+  const rid = String(m.registryId ?? "").trim().toUpperCase();
+  if (rid) return `id:${rid}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  return "";
+}
+
+/** Enrolled Civic Registry members in US states — Members list nationwide. */
+function countableRegisteredMembers(
+  members: Record<string, unknown>[],
+  removed: Record<string, unknown>[],
+  deceased: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const live = filterTombstonedMembers(members, removed, deceased);
+  const seen = new Set<string>();
+  const out: Record<string, unknown>[] = [];
+  for (const m of live) {
+    const rid = String(m.registryId ?? "").trim();
+    if (!rid) continue;
+    if (isGhostMemberRow(m)) continue;
+    if (!isKnownUsState(String(m.state ?? ""))) continue;
+    const name = String(m.fullName ?? m.username ?? "").trim();
+    if (isRedactedCivicValue(name) || name.toLowerCase() === "member") continue;
+    const key = nationwidePersonKey(m);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(m);
+  }
+  return out;
+}
+
 function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
   const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
   return {
@@ -2369,7 +2413,11 @@ async function handleCivicNationwideStats(req: Request): Promise<Response> {
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
 
   const roster = await loadCivicPayload(admin);
-  const members = asMemberList(roster.members);
+  const members = countableRegisteredMembers(
+    asMemberList(roster.members),
+    asMemberList(roster.removed),
+    asMemberList(roster.deceased),
+  );
   const deceased = asMemberList(roster.deceased);
   const deceasedEmails = new Set<string>();
   const deceasedIds = new Set<string>();

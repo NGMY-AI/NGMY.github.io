@@ -101,12 +101,72 @@ class NgmyCivicRegistryMembers {
   static int deceasedCount(dynamic config) => deceasedFrom(config).length;
 
   /// Sum of [familyMembers] across all active registry rows (household headcount totals).
-  static int totalFamilyMembersFrom(dynamic config) {
-    var total = 0;
+  static int totalFamilyMembersFrom(dynamic config) => nationwideFamilyTotal(config);
+
+  static int familySizeOf(Map<String, dynamic> member) {
+    final raw = member['familyMembers'];
+    final n = raw is num ? raw.toInt() : int.tryParse('${raw ?? ''}') ?? 1;
+    return n < 1 ? 1 : n;
+  }
+
+  static String _nationwidePersonKey(Map<String, dynamic> m) {
+    final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+    if (rid.isNotEmpty) return 'id:$rid';
+    final email = emailKey((m['email'] ?? '').toString());
+    if (email.isNotEmpty && !email.contains('***')) return 'em:$email';
+    return '';
+  }
+
+  static bool _nationwideRowIsDeleted(dynamic config, Map<String, dynamic> m) {
+    final email = emailKey((m['email'] ?? '').toString());
+    final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+    Map<String, dynamic>? tomb;
+    for (final r in removedFrom(config)) {
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      if (email.isNotEmpty && e == email) {
+        tomb = r;
+        break;
+      }
+      if (rid.isNotEmpty && id == rid) {
+        tomb = r;
+        break;
+      }
+    }
+    if (tomb == null) return false;
+    final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
+    final restoredAt = DateTime.tryParse((m['restoredAt'] ?? '').toString());
+    if (restoredAt != null && (removedAt == null || !restoredAt.isBefore(removedAt))) {
+      return false;
+    }
+    return true;
+  }
+
+  /// Live Civic Registry members enrolled in a US state — same people the
+  /// Members list is meant to show, nationwide across every registrar.
+  static List<Map<String, dynamic>> nationwideRegisteredFrom(dynamic config) {
+    final seen = <String>{};
+    final out = <Map<String, dynamic>>[];
     for (final m in listFrom(config)) {
-      final raw = m['familyMembers'];
-      final n = raw is num ? raw.toInt() : int.tryParse('${raw ?? ''}') ?? 1;
-      total += n < 1 ? 1 : n;
+      final rid = (m['registryId'] ?? '').toString().trim();
+      if (rid.isEmpty) continue;
+      if (isPhantomMemberRow(m)) continue;
+      if (!NgmyCivicRegistryStats.isKnownUsState((m['state'] ?? '').toString())) continue;
+      if (isDeceased(config, email: (m['email'] ?? '').toString(), registryId: rid)) continue;
+      if (_nationwideRowIsDeleted(config, m)) continue;
+      final key = _nationwidePersonKey(m);
+      if (key.isEmpty || !seen.add(key)) continue;
+      out.add(m);
+    }
+    return out;
+  }
+
+  static int nationwideMemberCount(dynamic config) => nationwideRegisteredFrom(config).length;
+
+  static int nationwideFamilyTotal(dynamic config) {
+    var total = 0;
+    for (final m in nationwideRegisteredFrom(config)) {
+      total += familySizeOf(m);
     }
     return total;
   }

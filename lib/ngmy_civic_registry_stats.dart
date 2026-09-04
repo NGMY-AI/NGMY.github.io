@@ -99,6 +99,17 @@ class NgmyCivicRegistryStats {
     return raw;
   }
 
+  /// True for the 50 US states and DC — Civic Registry nationwide counts ignore anywhere else.
+  static bool isKnownUsState(String state) {
+    final raw = state.trim().toLowerCase();
+    if (raw.isEmpty) return false;
+    if (_usStateCodeByName.containsKey(raw)) return true;
+    for (final e in _usStateCodeByName.entries) {
+      if (raw == e.value.toLowerCase()) return true;
+    }
+    return false;
+  }
+
   static bool statesMatch(String a, String b) {
     final ka = canonicalStateKey(a);
     final kb = canonicalStateKey(b);
