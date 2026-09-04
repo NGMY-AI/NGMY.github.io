@@ -127,6 +127,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   int _range = 0;
   bool _searchOpen = false;
   final _searchC = TextEditingController();
+  final _ledgerScrollC = ScrollController();
   DateTimeRange? _dateFilter;
 
   /// 10 quick taps on a spending row unlocks edit; 2s idle resets the count.
@@ -163,6 +164,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _countdownTick?.cancel();
     _livePoll?.cancel();
     _searchC.dispose();
+    _ledgerScrollC.dispose();
     super.dispose();
   }
 
@@ -883,11 +885,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 360),
-            padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+            constraints: const BoxConstraints(maxWidth: 410),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
             decoration: BoxDecoration(
               color: tone.dialogBg,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(color: tone.cardBorder),
               boxShadow: [
                 BoxShadow(
@@ -900,6 +902,71 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        tone.accent.withValues(alpha: tone.isDark ? 0.24 : 0.14),
+                        tone.accent.withValues(alpha: 0.03),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: tone.accent.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: tone.accent,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.public_rounded,
+                          color: Colors.white,
+                          size: 23,
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'United States nationwide',
+                              style: TextStyle(
+                                color: tone.primaryText,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              'Live Civic Registry · all 50 states',
+                              style: TextStyle(
+                                color: tone.secondaryText,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: tone.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -968,32 +1035,6 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   ],
                 ),
                 const SizedBox(height: 14),
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: tone.accent.withValues(alpha: 0.14),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: tone.accent.withValues(alpha: 0.45)),
-                  ),
-                  child: Icon(Icons.public_rounded, color: tone.accent, size: 24),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'United States',
-                  style: TextStyle(
-                    color: tone.primaryText,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Civic Registry nationwide',
-                  style: TextStyle(color: tone.secondaryText, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 18),
                 _NationwideContributionsKeptHero(
                   tone: tone,
                   amount: _money(stats.contributionsKept),
@@ -2328,6 +2369,115 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     return true;
   }
 
+  Widget _animatedLedgerRow(
+    NgmyCivicWalletTxn txn,
+    _WalletTone tone,
+    int index,
+  ) {
+    return AnimatedBuilder(
+      animation: _ledgerScrollC,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _onTransactionTap(txn),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: txn.isPendingDelete
+                    ? const Color(0xFFDC2626).withValues(
+                        alpha: tone.isDark ? 0.22 : 0.12,
+                      )
+                    : tone.iconWell,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                txn.isPendingDelete
+                    ? Icons.timer_outlined
+                    : (txn.isInflow
+                        ? Icons.south_west_rounded
+                        : Icons.north_east_rounded),
+                color: txn.isPendingDelete
+                    ? const Color(0xFFDC2626)
+                    : (txn.isInflow
+                        ? const Color(0xFF059669)
+                        : const Color(0xFFEA580C)),
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    txn.title,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      color: tone.primaryText,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (txn.isPendingDelete)
+                    Text(
+                      'Deleting in ${_formatDeleteCountdown(txn.pendingDeleteAt)}',
+                      style: const TextStyle(
+                        color: Color(0xFFDC2626),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    )
+                  else
+                    Text(
+                      txn.isTrust
+                          ? (txn.isInflow
+                              ? 'State Trust deposit'
+                              : 'State Trust spend')
+                          : (txn.isInflow
+                              ? 'Contribution'
+                              : 'Contribution spend'),
+                      style: TextStyle(
+                        color: tone.secondaryText,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Text(
+              '${txn.isInflow ? '+' : '-'}${_money(txn.amount.abs())}',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+                color: txn.isInflow
+                    ? const Color(0xFF059669)
+                    : tone.primaryText,
+              ),
+            ),
+          ],
+        ),
+      ),
+      builder: (context, child) {
+        final offset = _ledgerScrollC.hasClients ? _ledgerScrollC.offset : 0.0;
+        const extent = 64.0;
+        final distance = ((index * extent) - offset).abs();
+        final motion = (distance / (extent * 6)).clamp(0.0, 1.0);
+        return Opacity(
+          opacity: 1 - (motion * 0.16),
+          child: Transform.translate(
+            offset: Offset(0, 7 * motion),
+            child: Transform.scale(
+              scale: 1 - (motion * 0.025),
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
@@ -2672,77 +2822,25 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             style: TextStyle(color: tone.secondaryText),
                           )
                         else
-                          for (final t in recent.take(20))
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => _onTransactionTap(t),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        decoration: BoxDecoration(
-                                          color: t.isPendingDelete
-                                              ? const Color(0xFFDC2626).withValues(alpha: tone.isDark ? 0.22 : 0.12)
-                                              : tone.iconWell,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Icon(
-                                          t.isPendingDelete
-                                              ? Icons.timer_outlined
-                                              : (t.isInflow ? Icons.south_west_rounded : Icons.north_east_rounded),
-                                          color: t.isPendingDelete
-                                              ? const Color(0xFFDC2626)
-                                              : (t.isInflow ? const Color(0xFF059669) : const Color(0xFFEA580C)),
-                                          size: 20,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              t.title,
-                                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tone.primaryText),
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            if (t.isPendingDelete)
-                                              Text(
-                                                'Deleting in ${_formatDeleteCountdown(t.pendingDeleteAt)}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFFDC2626),
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w800,
-                                                  fontFeatures: [FontFeature.tabularFigures()],
-                                                ),
-                                              )
-                                            else
-                                              Text(
-                                                t.isTrust
-                                                    ? (t.isInflow ? 'State Trust deposit' : 'State Trust spend')
-                                                    : (t.isInflow ? 'Contribution' : 'Contribution spend'),
-                                                style: TextStyle(color: tone.secondaryText, fontSize: 12),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                      Text(
-                                        '${t.isInflow ? '+' : '-'}${_money(t.amount.abs())}',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          color: t.isInflow ? const Color(0xFF059669) : tone.primaryText,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                          SizedBox(
+                            height: math.min(6, recent.length) * 64.0,
+                            child: Scrollbar(
+                              controller: _ledgerScrollC,
+                              thumbVisibility: recent.length > 6,
+                              child: ListView.builder(
+                                controller: _ledgerScrollC,
+                                physics: const BouncingScrollPhysics(),
+                                itemExtent: 64,
+                                itemCount: recent.length,
+                                itemBuilder: (context, index) =>
+                                    _animatedLedgerRow(
+                                      recent[index],
+                                      tone,
+                                      index,
+                                    ),
                               ),
                             ),
+                          ),
                       ],
                     ),
                   ),

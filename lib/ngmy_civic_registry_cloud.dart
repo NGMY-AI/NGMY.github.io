@@ -136,6 +136,14 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
   return data;
 }
 
+/// Privacy-safe nationwide counters computed once from the authoritative
+/// server ledger. Every signed-in user receives the same numbers.
+Future<Map<String, dynamic>?> ngmyCivicFetchNationwideStats() async {
+  final data = await ngmyCivicInvoke({'action': 'civicNationwideStats'});
+  if (data == null || data['ok'] != true) return null;
+  return data;
+}
+
 /// Guest self-enrollment — cities/rooms and enrollment flag (no auth).
 /// Pass [state] so Network only receives that state's cities (not the full US map).
 Future<Map<String, dynamic>?> ngmyCivicFetchPublicCatalog({

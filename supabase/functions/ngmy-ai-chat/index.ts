@@ -2133,6 +2133,170 @@ async function handleCivicFetchRoster(
   });
 }
 
+async function handleCivicNationwideStats(req: Request): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+
+  const roster = await loadCivicPayload(admin);
+  const members = asMemberList(roster.members);
+  const deceased = asMemberList(roster.deceased);
+  const deceasedEmails = new Set<string>();
+  const deceasedIds = new Set<string>();
+  for (const raw of deceased) {
+    const snap = raw.snapshot && typeof raw.snapshot === "object"
+      ? raw.snapshot as Record<string, unknown>
+      : raw;
+    const memberEmail = emailKey(String(raw.email ?? snap.email ?? ""));
+    const registryId = String(raw.registryId ?? snap.registryId ?? "").trim().toUpperCase();
+    if (memberEmail) deceasedEmails.add(memberEmail);
+    if (registryId) deceasedIds.add(registryId);
+  }
+
+  const contributions: Record<string, unknown>[] = [];
+  const pageSize = 1000;
+  for (let from = 0;; from += pageSize) {
+    const { data, error } = await admin
+      .from("transactions")
+      .select("id,userEmail,amount,timestamp,sourceDetails")
+      .eq("type", 5)
+      .eq("status", 1)
+      .order("timestamp", { ascending: false })
+      .range(from, from + pageSize - 1);
+    if (error) return jsonOk({ error: error.message }, 500);
+    const page = (data ?? []) as Record<string, unknown>[];
+    contributions.push(...page);
+    if (page.length < pageSize) break;
+  }
+
+  const spendingsWrap = await loadSettingsObject(admin, HELP_SPENDINGS_KEY);
+  const spendings = asItems(spendingsWrap);
+  const now = Date.now();
+  const resets = new Map<string, Record<string, unknown>>();
+  for (const row of spendings) {
+    if (row.walletSoftReset !== true) continue;
+    const state = canonicalStateKey(String(row.state ?? ""));
+    if (!state) continue;
+    const purgeAt = Date.parse(String(row.purgeAt ?? ""));
+    if (row.permanent !== true && Number.isFinite(purgeAt) && purgeAt <= now) continue;
+    const at = Date.parse(String(row.recordedAt ?? ""));
+    const prior = resets.get(state);
+    const priorAt = Date.parse(String(prior?.recordedAt ?? ""));
+    if (!prior || (!Number.isNaN(at) && (Number.isNaN(priorAt) || at > priorAt))) {
+      resets.set(state, row);
+    }
+  }
+
+  const collected = new Map<string, number>();
+  const campaignKeys = new Set<string>();
+  for (const row of contributions) {
+    let meta: Record<string, unknown> = {};
+    try {
+      const decoded = JSON.parse(String(row.sourceDetails ?? "{}"));
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+        meta = decoded as Record<string, unknown>;
+      }
+    } catch (_) {}
+    const memberEmail = emailKey(String(meta.memberEmail ?? row.userEmail ?? ""));
+    const registryId = String(meta.registryId ?? "").trim().toUpperCase();
+    if ((memberEmail && deceasedEmails.has(memberEmail)) ||
+        (registryId && deceasedIds.has(registryId))) continue;
+    const state = canonicalStateKey(String(meta.state ?? meta.civicState ?? ""));
+    if (!state) continue;
+    const txAt = Date.parse(String(row.timestamp ?? ""));
+    const reset = resets.get(state);
+    const resetAt = Date.parse(String(reset?.recordedAt ?? ""));
+    if (reset?.hideBudget === true && Number.isFinite(resetAt) &&
+        (!Number.isFinite(txAt) || txAt <= resetAt)) continue;
+    const amount = Number(row.amount ?? 0);
+    if (Number.isFinite(amount)) {
+      collected.set(state, (collected.get(state) ?? 0) + amount);
+    }
+    const campaignId = String(meta.campaignId ?? "").trim();
+    const fallback = [
+      String(meta.purpose ?? "Contribution").trim(),
+      String(meta.scopeType ?? "all"),
+      String(meta.scopeValue ?? ""),
+      state,
+    ].join("|");
+    campaignKeys.add(campaignId || fallback);
+  }
+
+  const spent = new Map<string, number>();
+  const credits = new Map<string, number>();
+  const silentCuts = new Map<string, number>();
+  for (const row of spendings) {
+    if (row.walletSoftReset === true) continue;
+    const state = canonicalStateKey(String(row.state ?? ""));
+    if (!state) continue;
+    const pendingDeleteAt = Date.parse(String(row.pendingDeleteAt ?? ""));
+    if (Number.isFinite(pendingDeleteAt) && pendingDeleteAt <= now) continue;
+    const amount = Number(row.amount ?? 0);
+    if (!Number.isFinite(amount)) continue;
+    const rowAt = Date.parse(String(row.requestedAt ?? row.recordedAt ?? ""));
+    const reset = resets.get(state);
+    const resetAt = Date.parse(String(reset?.recordedAt ?? ""));
+    const existedAtReset = Number.isFinite(resetAt) &&
+      (!Number.isFinite(rowAt) || rowAt <= resetAt);
+    const kind = String(row.kind ?? "").trim();
+    const id = String(row.id ?? "");
+    const description = String(row.description ?? "").trim();
+    const hideBudget = reset?.hideBudget === true && existedAtReset;
+    const hideSpendings = reset?.hideSpendings === true && existedAtReset;
+    if (row.silentAdminRemoval === true ||
+        description === "Admin available balance adjustment") {
+      if (!hideBudget && !hideSpendings) {
+        silentCuts.set(state, (silentCuts.get(state) ?? 0) + amount);
+      }
+      continue;
+    }
+    if (kind === "fund_transfer_pending" || id.startsWith("xfer_pending_")) continue;
+    if (kind === "transfer_from_trust" || row.contributionTransferCredit === true) {
+      if (!hideBudget) credits.set(state, (credits.get(state) ?? 0) + amount);
+      continue;
+    }
+    const trustDeposit = row.walletTrustDeposit === true ||
+      kind === "state_trust_deposit" ||
+      kind === "transfer_from_contribution" ||
+      id.startsWith("trust_deposit_") ||
+      id.startsWith("xfer_in_trust_");
+    if (trustDeposit || hideSpendings) continue;
+    const fund = String(row.fund ?? "contribution").trim().toLowerCase();
+    if (fund !== "trust") spent.set(state, (spent.get(state) ?? 0) + amount);
+  }
+
+  const states = new Set<string>([
+    ...collected.keys(),
+    ...spent.keys(),
+    ...credits.keys(),
+    ...silentCuts.keys(),
+  ]);
+  let contributionsKept = 0;
+  for (const state of states) {
+    const available = (collected.get(state) ?? 0) -
+      (silentCuts.get(state) ?? 0) -
+      (spent.get(state) ?? 0) +
+      (credits.get(state) ?? 0);
+    contributionsKept += Math.max(0, available);
+  }
+
+  let totalFamilyMembers = 0;
+  for (const member of members) {
+    const n = Number(member.familyMembers ?? 1);
+    totalFamilyMembers += Number.isFinite(n) && n >= 1 ? Math.trunc(n) : 1;
+  }
+  return jsonOk({
+    ok: true,
+    registeredMembers: members.length,
+    totalFamilyMembers,
+    deceasedMembers: deceased.length,
+    contributionsKept,
+    totalContributions: campaignKeys.size,
+    generatedAt: new Date().toISOString(),
+  });
+}
+
 async function handleCivicPersistRoster(
   req: Request,
   body: Record<string, unknown>,
@@ -3336,6 +3500,7 @@ serve(async (req) => {
       ch: "civicAdminSettingsPersist",
       ci: "civicFetchEnrollmentLink",
       cj: "civicRegenerateEnrollmentLink",
+      ck: "civicNationwideStats",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -3429,6 +3594,9 @@ serve(async (req) => {
     if (action === "civicFetchDirectory" || action === "civicFetchRoster" ||
       action === "civicFetchRegistrarRoster" || action === "civicFetchAdminRoster") {
       return await handleCivicFetchRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicNationwideStats") {
+      return await handleCivicNationwideStats(req);
     }
     if (action === "civicUpsertMember") {
       return await handleCivicUpsertMember(req, body as Record<string, unknown>);

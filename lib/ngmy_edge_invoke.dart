@@ -44,6 +44,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'civicAdminSettingsPersist': 'ch',
   'civicFetchEnrollmentLink': 'ci',
   'civicRegenerateEnrollmentLink': 'cj',
+  'civicNationwideStats': 'ck',
   'aiKeyConfigured': 'a1',
   'saveAiApiKey': 'a2',
   'verifyPasswordLogin': 'a3',

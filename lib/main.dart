@@ -30894,9 +30894,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Timer? _membersCloudPoll;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
+  Map<String, dynamic>? _sharedNationwideStats;
   /// Member state-switch cooldown after [NgmyCivicStateSwitches.maxSwitches] changes.
   DateTime? _stateSwitchLockedUntil;
   Timer? _liveRefreshDebounce;
+  RealtimeChannel? _civicHelpBroadcastChannel;
   bool _cloudHydrateInFlight = false;
   bool _helpRefreshInFlight = false;
   bool _helpSettingsRefreshInFlight = false;
@@ -30921,6 +30923,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
+    // Open directly into real Civic content. Unlock/cloud checks continue in
+    // the background instead of replacing the page with a visible loader.
+    _unlockChecked = true;
+    _registryUnlocked = _canBypassCivicGate() || !_stateRequiresMemberUnlock();
+    _subscribeToCivicHelpBroadcasts();
     // Seed in-memory civic contributions immediately so Contribution Receipts
     // are not empty while async local/cloud hydration runs (e.g. right after
     // help mode deactivation or app reopen).
@@ -30951,9 +30958,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       });
     }());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Cloud roster is authoritative when online; local prefs are offline fallback only.
-      await _refreshCivicMembersFromCloud();
-      if (!mounted) return;
+      // Open from cached data immediately; refresh the authoritative roster
+      // behind the visible page instead of blocking Civic Registry entry.
+      unawaited(_refreshCivicMembersFromCloud());
       await _checkRegistryUnlock();
       if (!mounted) return;
       setState(() {});
@@ -31047,6 +31054,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  void _subscribeToCivicHelpBroadcasts() {
+    try {
+      _civicHelpBroadcastChannel = Supabase.instance.client
+          .channel('ngmy-civic-help-mode-live-v1')
+          .onBroadcast(
+            event: 'changed',
+            callback: (_) {
+              if (!mounted) return;
+              unawaited(_refreshCivicHelpModeSettingsOnly());
+            },
+          )
+          .subscribe();
+    } catch (e) {
+      debugPrint('[help mode] live channel: $e');
+    }
+  }
+
+  Future<void> _broadcastCivicHelpModeChanged(String state) async {
+    final channel = _civicHelpBroadcastChannel;
+    if (channel == null) return;
+    try {
+      await channel.sendBroadcastMessage(
+        event: 'changed',
+        payload: {
+          'state': state.trim().toLowerCase(),
+          'at': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+    } catch (e) {
+      debugPrint('[help mode] broadcast: $e');
+    }
+  }
+
   Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
     if (_helpRefreshInFlight) {
       final pending = _helpRefreshCompleter;
@@ -31072,6 +31112,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
+    final nationwideStatsFuture = ngmyCivicFetchNationwideStats();
     final results = await Future.wait([
       // Nationwide totals and each state case use the same complete ledger.
       // A state-scoped fetch left every unvisited state absent from the
@@ -31079,6 +31120,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ngmyFetchApprovedContributionsFromCloud(),
       ngmyFetchCivicClaimsFromCloud(),
     ]);
+    final nationwideStats = await nationwideStatsFuture;
     if (!mounted) return;
     final deleted = widget.config.civicDeletedContributionIds
         .map((e) => e.trim())
@@ -31089,6 +31131,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     final localClaims = widget.allTransactions.where((t) => t.type == TransactionType.claim);
     setState(() {
+      if (nationwideStats != null) {
+        _sharedNationwideStats = Map<String, dynamic>.from(nationwideStats);
+      }
       _communityContributions = _mergeCivicCloudTransactions(
         results[0],
         prior: priorContributions,
@@ -31140,6 +31185,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _helpModePoll?.cancel();
     _membersCloudPoll?.cancel();
     _liveRefreshDebounce?.cancel();
+    final civicHelpChannel = _civicHelpBroadcastChannel;
+    if (civicHelpChannel != null) {
+      unawaited(Supabase.instance.client.removeChannel(civicHelpChannel));
+    }
     NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
     _searchController.dispose();
     _enrollSearchC.dispose();
@@ -33602,13 +33651,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final spendingRows = widget.config.helpCampaignSpendings
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
-    return buildNgmyCivicNationwideStats(
+    final local = buildNgmyCivicNationwideStats(
       registeredMembers: members.length,
       totalFamilyMembers: NgmyCivicRegistryMembers.totalFamilyMembersFrom(widget.config),
       countedContributionRows: countedContribRows,
       allContributionRows: allContribRows,
       allSpendingRows: spendingRows,
       deceasedMembers: NgmyCivicRegistryMembers.deceasedCount(widget.config),
+    );
+    final shared = _sharedNationwideStats;
+    if (shared == null) return local;
+    return NgmyCivicNationwideStats(
+      registeredMembers:
+          (shared['registeredMembers'] as num?)?.toInt() ??
+              local.registeredMembers,
+      totalFamilyMembers:
+          (shared['totalFamilyMembers'] as num?)?.toInt() ??
+              local.totalFamilyMembers,
+      contributionsKept:
+          (shared['contributionsKept'] as num?)?.toDouble() ??
+              local.contributionsKept,
+      totalContributions:
+          (shared['totalContributions'] as num?)?.toInt() ??
+              local.totalContributions,
+      deceasedMembers:
+          (shared['deceasedMembers'] as num?)?.toInt() ??
+              local.deceasedMembers,
+      contributionCampaigns: local.contributionCampaigns,
     );
   }
 
@@ -36559,6 +36628,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   if (ctx.mounted) Navigator.pop(ctx);
                                   final cloudSaved =
                                       await ngmyPersistCivicHelpModeSettings(widget.config);
+                                  if (cloudSaved) {
+                                    await _broadcastCivicHelpModeChanged(_selectedState);
+                                  }
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
@@ -36662,6 +36734,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 if (ctx.mounted) Navigator.pop(ctx);
                                 final cloudSaved =
                                     await ngmyPersistCivicHelpModeSettings(widget.config);
+                                if (cloudSaved) {
+                                  await _broadcastCivicHelpModeChanged(_selectedState);
+                                }
                                 if (mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
@@ -36933,6 +37008,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }));
     final searchC = TextEditingController();
     var selectedState = '';
+    final myState = _selectedState.trim();
     final members = _civicDeceasedMembersForDisplay(widget.config, widget.allUsers);
     members.sort((a, b) {
       final an = (a.fullName ?? a.username).trim().toLowerCase();
@@ -37030,41 +37106,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           hintText: 'Search name, state, city, registry ID…',
                           hintStyle: TextStyle(color: mute, fontSize: 13),
                           prefixIcon: Icon(Icons.search_rounded, color: mute, size: 20),
-                          suffixIcon: states.isEmpty
-                              ? null
-                              : PopupMenuButton<String>(
-                                  tooltip: 'Filter by state',
-                                  onSelected: (v) => setSheet(() => selectedState = v == '__all__' ? '' : v),
-                                  itemBuilder: (_) => [
-                                    PopupMenuItem(
-                                      value: '__all__',
-                                      child: Text(
-                                        'All states',
-                                        style: TextStyle(fontWeight: selectedState.isEmpty ? FontWeight.w800 : FontWeight.w500),
-                                      ),
-                                    ),
-                                    const PopupMenuDivider(height: 8),
-                                    ...states.map(
-                                      (st) => PopupMenuItem(
-                                        value: st,
-                                        child: Text(
-                                          st,
-                                          style: TextStyle(
-                                            fontWeight: selectedState == st ? FontWeight.w800 : FontWeight.w500,
-                                            color: selectedState == st ? const Color(0xFF475569) : null,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                    child: Icon(
-                                      Icons.filter_list_rounded,
-                                      color: selectedState.isEmpty ? mute : const Color(0xFF475569),
-                                    ),
-                                  ),
-                                ),
                           filled: true,
                           fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -37074,6 +37115,57 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                         ),
                       ),
+                      if (states.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 38,
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            children: [
+                              ChoiceChip(
+                                avatar: const Icon(Icons.public_rounded, size: 16),
+                                label: const Text('All United States'),
+                                selected: selectedState.isEmpty,
+                                onSelected: (_) => setSheet(() => selectedState = ''),
+                                showCheckmark: false,
+                              ),
+                              if (myState.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  avatar: const Icon(Icons.home_rounded, size: 16),
+                                  label: Text('My state · $myState'),
+                                  selected: NgmyCivicRegistryStats.statesMatch(
+                                    selectedState,
+                                    myState,
+                                  ),
+                                  onSelected: (_) =>
+                                      setSheet(() => selectedState = myState),
+                                  showCheckmark: false,
+                                ),
+                              ],
+                              for (final state in states.where(
+                                (state) => !NgmyCivicRegistryStats.statesMatch(
+                                  state,
+                                  myState,
+                                ),
+                              )) ...[
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: Text(state),
+                                  selected: NgmyCivicRegistryStats.statesMatch(
+                                    selectedState,
+                                    state,
+                                  ),
+                                  onSelected: (_) =>
+                                      setSheet(() => selectedState = state),
+                                  showCheckmark: false,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                       if (selectedState.isNotEmpty || query.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
