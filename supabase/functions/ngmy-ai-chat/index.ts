@@ -809,6 +809,9 @@ const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
   k47: "civic_help_mode_settings",
   k48: "help_center_hub_settings",
   k49: "platform_live_stats",
+  k50: "civic_contribution_receipt_removed",
+  k51: "civic_deleted_contribution_ids",
+  k52: "civic_help_campaign_spendings",
 };
 
 // Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
@@ -3118,10 +3121,44 @@ async function handleCivicAdminSettingsFetch(
     return jsonOk({ error: "Not allowed" }, 403);
   }
 
-  // Never put emails, phones, Zelle, CashApp, or deleted-contribution IDs on the
-  // wire (browser Network tab). App keeps working from local prefs/cache.
-  return networkFetchOk({
+  const help = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+  const deleted = await loadSettingsObject(admin, CIVIC_DELETED_CONTRIB_KEY);
+  const removed = await loadSettingsObject(admin, CIVIC_RECEIPT_REMOVED_KEY);
+  const rawByState = (help.helpModeByState && typeof help.helpModeByState === "object")
+    ? (help.helpModeByState as Record<string, unknown>)
+    : {};
+  const safeByState: Record<string, unknown> = {};
+  for (const [state, raw] of Object.entries(rawByState)) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const campaign = raw as Record<string, unknown>;
+    safeByState[state] = {
+      active: campaign.active === true,
+      purpose: String(campaign.purpose ?? ""),
+      scopeType: String(campaign.scopeType ?? "all"),
+      scopeValue: String(campaign.scopeValue ?? ""),
+      campaignId: String(campaign.campaignId ?? ""),
+      campaignStartedAt: String(campaign.campaignStartedAt ?? ""),
+      updatedAt: String(campaign.updatedAt ?? ""),
+    };
+  }
+
+  // Return only shared synchronization state. Payment handles, phone numbers,
+  // member emails, and unrelated settings never cross this endpoint.
+  return jsonOk({
+    ok: true,
     view: role.isAdmin ? "admin" : "registrar",
+    civicHelpModeSettings: {
+      helpModeByState: safeByState,
+      helpCampaignClosures: Array.isArray(help.helpCampaignClosures)
+        ? help.helpCampaignClosures
+        : [],
+      savedAt: String(help.savedAt ?? ""),
+    },
+    civicDeletedContributionIds: Array.isArray(deleted.ids) ? deleted.ids : [],
+    civicContributionReceiptRemoved: {
+      ids: Array.isArray(removed.ids) ? removed.ids : [],
+      updatedAt: String(removed.updatedAt ?? removed.savedAt ?? ""),
+    },
   });
 }
 

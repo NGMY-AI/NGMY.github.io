@@ -1215,6 +1215,18 @@ const int kNgmyHelpCampaignMaxMonths = 2;
 /// After a campaign is closed, contribution receipts stay visible this long.
 const int kNgmyContributionReceiptAfterCloseDays = 30;
 
+bool ngmyContributionReceiptExpired({
+  DateTime? visibleUntil,
+  DateTime? closedAt,
+  DateTime? now,
+}) {
+  final current = now ?? DateTime.now();
+  if (visibleUntil != null) return current.isAfter(visibleUntil);
+  if (closedAt == null) return false;
+  return current.difference(closedAt) >=
+      const Duration(days: kNgmyContributionReceiptAfterCloseDays);
+}
+
 /// True when [startedAt] has reached the 2-month help-campaign limit.
 bool ngmyHelpCampaignReachedMaxDuration(DateTime startedAt, [DateTime? now]) {
   final n = now ?? DateTime.now();
@@ -1473,7 +1485,7 @@ class AppTransaction {
 
 Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
   // Only camelCase keys — live Supabase rejects snake_case duplicates (PGRST204).
-  return {
+  final row = <String, dynamic>{
     'id': t.id,
     'userEmail': ngmyNormalizeEmail(t.userEmail),
     'amount': t.amount,
@@ -1485,6 +1497,23 @@ Map<String, dynamic> _transactionRowForCloud(AppTransaction t) {
     'status': t.status.index,
     'timestamp': t.timestamp.toUtc().toIso8601String(),
   };
+  if (t.type == TransactionType.contribution ||
+      t.type == TransactionType.claim) {
+    try {
+      final raw = (t.sourceDetails ?? '').trim();
+      final decoded = raw.isEmpty ? null : jsonDecode(raw);
+      if (decoded is Map) {
+        final meta = Map<String, dynamic>.from(decoded);
+        final state = (meta['state'] ?? '').toString().trim();
+        final campaignId = (meta['campaignId'] ?? '').toString().trim();
+        if (state.isNotEmpty) row['civicState'] = state;
+        if (campaignId.isNotEmpty) row['civicCampaignId'] = campaignId;
+      }
+    } catch (_) {
+      // Legacy non-JSON details remain valid; the base transaction still syncs.
+    }
+  }
+  return row;
 }
 
 Map<String, dynamic> _transactionRowSnakeForCloud(AppTransaction t) {
@@ -1597,6 +1626,17 @@ Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6
   if (!await ngmyCanReachCloud()) return false;
   if (t.status == TransactionStatus.pending) return false;
   for (var i = 0; i < attempts; i++) {
+    // Contributions reuse a stable transaction id when a registrar adds more
+    // money. A status-only patch succeeds for that existing row but does not
+    // update its amount/metadata, leaving every other device's state case and
+    // contribution budget at the old total. Upsert the complete row first.
+    if (t.type == TransactionType.contribution) {
+      final fullRow = await _transactionRowForCloudPrepared(t);
+      final fullSaved = await _safeUpsertTransactionRows([
+        fullRow,
+      ], requireStatus: true);
+      if (fullSaved && await _verifyTransactionStatusInCloud(t)) return true;
+    }
     if (await _patchTransactionStatusInCloud(t)) return true;
     final camel = await _transactionRowForCloudPrepared(t);
     final snake = _transactionRowSnakeForCloud(t);
@@ -3267,36 +3307,9 @@ List<Map<String, dynamic>> _mergeHelpCampaignClosuresLists(
   return byId.values.toList();
 }
 
-/// Latest thing that happened to one state's campaign entry — its start, or
-/// its deactivation if it was ended afterwards. Used to break merge ties
-/// between two *different* campaigns for the same state.
-DateTime? _helpCampaignStampAt(Map<String, dynamic> campaign) {
-  final started = DateTime.tryParse((campaign['campaignStartedAt'] ?? '').toString().trim());
-  final ended = DateTime.tryParse((campaign['deactivatedAt'] ?? '').toString().trim());
-  if (started == null) return ended;
-  if (ended == null) return started;
-  return ended.isAfter(started) ? ended : started;
-}
-
-/// True only when both sides carry a usable stamp and those stamps disagree —
-/// otherwise the caller falls back to the older active-beats-inactive rule.
-bool _helpCampaignRecencyDiffers(Map<String, dynamic> a, Map<String, dynamic> b) {
-  final at = _helpCampaignStampAt(a);
-  final bt = _helpCampaignStampAt(b);
-  return at != null && bt != null && !at.isAtSameMomentAs(bt);
-}
-
-Map<String, dynamic> _helpCampaignNewer(Map<String, dynamic> a, Map<String, dynamic> b) {
-  final at = _helpCampaignStampAt(a);
-  final bt = _helpCampaignStampAt(b);
-  if (at == null) return b;
-  if (bt == null) return a;
-  return bt.isAfter(at) ? b : a;
-}
-
 /// Prefer inactive when either side already closed that campaign — stops cloud
 /// from resurrecting an auto-expired / deactivated help mode and re-blinking it.
-Map<String, dynamic> _mergeHelpModeByStateMaps(
+Map<String, dynamic> ngmyMergeHelpModeByStateMaps(
   Map<String, dynamic> local,
   Map<String, dynamic> remote, {
   List<Map<String, dynamic>> closures = const [],
@@ -3354,25 +3367,18 @@ Map<String, dynamic> _mergeHelpModeByStateMaps(
           (l['campaignStartedAt'] ?? '').toString().trim().isNotEmpty) {
         chosen['campaignStartedAt'] = l['campaignStartedAt'];
       }
-    } else if (localActive != remoteActive && _helpCampaignRecencyDiffers(l, r)) {
-      // Different campaigns, one active and one not. Newest wins — "active
-      // beats inactive" alone let a device that never managed to read the
-      // shared row keep showing its own older, still-active campaign after
-      // someone else had already started and ended a newer one in that state.
-      chosen = Map<String, dynamic>.from(_helpCampaignNewer(l, r));
-    } else if (localActive && !remoteActive) {
-      chosen = Map<String, dynamic>.from(l);
-    } else if (remoteActive && !localActive) {
-      chosen = Map<String, dynamic>.from(r);
-    } else if (localActive && remoteActive) {
-      final lt = DateTime.tryParse((l['campaignStartedAt'] ?? '').toString());
-      final rt = DateTime.tryParse((r['campaignStartedAt'] ?? '').toString());
-      chosen = Map<String, dynamic>.from(
-        (rt != null && (lt == null || rt.isAfter(lt))) ? r : l,
-      );
     } else {
-      chosen = Map<String, dynamic>.from(l);
-      chosen['active'] = false;
+      // Different campaign ids mean one device has a newer state transition.
+      // Prefer the newest explicit mutation timestamp; when old payloads lack
+      // it, campaign start time is the fallback and the cloud row wins ties.
+      final lt = DateTime.tryParse((l['updatedAt'] ?? l['campaignStartedAt'] ?? '').toString(),
+      );
+      final rt = DateTime.tryParse((r['updatedAt'] ?? r['campaignStartedAt'] ?? '').toString(),
+      );
+      final remoteIsNewer = rt != null && (lt == null || !rt.isBefore(lt));
+      chosen = Map<String, dynamic>.from(
+        remoteIsNewer || (lt == null && rt == null) ? r : l,
+      );
     }
 
     final cid = (chosen['campaignId'] ?? '').toString().trim();
@@ -5453,14 +5459,7 @@ DateTime? _parseSettingUpdatedAt(Object? raw) => DateTime.tryParse((raw ?? '').t
 Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) async {
   final public = NgmyCloudPolicy.settingsKeyPublicReadable(key);
   final admin = ngmyEmailIsAdmin(ngmyCurrentAuthEmail());
-  // Shared civic state (help mode, spendings, delete tombstones): let any
-  // signed-in caller try. RLS accepts the write only from an Authorized
-  // Registrar or an admin, so a member's attempt simply fails server-side
-  // instead of being blocked here — which is what stopped a registrar's
-  // Activate/Deactivate from ever reaching the cloud.
-  final civicShared =
-      NgmyCloudPolicy.settingsKeyCivicShared(key) && ngmyCurrentAuthEmail().isNotEmpty;
-  if (!public && !admin && !civicShared) return false;
+  if (!public && !admin) return false;
   try {
     // Relayed through bright-handler (disguised as /api/sync) instead of a
     // direct ngmy_settings upsert — RLS still governs the actual write.
@@ -5477,15 +5476,8 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
   if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
     final email = ngmyCurrentAuthEmail();
-    if (email.isEmpty) return null;
-    // Shared civic state is readable by every signed-in user (RLS still
-    // requires a session and still refuses anon). Gating it to admins meant
-    // registrars and members never learned that help mode had been turned on
-    // or off in their state, and never received delete tombstones.
-    if (!ngmyEmailIsAdmin(email) && !NgmyCloudPolicy.settingsKeyCivicShared(key)) {
-      return null;
+    if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
     }
-  }
   try {
     // Relayed through bright-handler (disguised as /api/sync) instead of a
     // direct ngmy_settings select — RLS still governs what comes back.
@@ -8209,29 +8201,61 @@ String? ngmyApplyReferralCodeToUser({
   return referrer.email;
 }
 
-Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud() async {
+Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
+  String? state,
+}) async {
   if (!await ngmyCanReachCloud()) return [];
-  try {
-    final transData = await ngmyDbRelaySelect(
+  Future<List<AppTransaction>> fetchPages({bool useStateColumn = true}) async {
+    const pageSize = 1000;
+    var offset = 0;
+    final byId = <String, AppTransaction>{};
+    while (true) {
+      final normalizedState = (state ?? '').trim();
+      final rows = await ngmyDbRelaySelect(
       'transactions',
       eq: {
         'type': TransactionType.contribution.index,
         'status': TransactionStatus.approved.index,
       },
-      orderBy: 'timestamp',
+        ilike: useStateColumn && normalizedState.isNotEmpty
+            ? {'civicState': normalizedState}
+            : null,
+        orderBy: 'timestamp',
       orderAscending: false,
-      // Nationwide, every state, every campaign — a single state can easily run
-      // ten or more contributions in one month, and receipts stay visible for
-      // 30 days past a campaign closing, so 400 truncated real history.
-      limit: 5000,
+        range: (offset, offset + pageSize - 1),
       timeout: kNgmyCloudLoadTimeout,
     );
-    return transData
-        .map((e) => AppTransaction.fromJson(Map<String, dynamic>.from(e)))
-        .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
-        .toList();
+      for (final row in rows) {
+        final t = AppTransaction.fromJson(Map<String, dynamic>.from(row));
+        if (t.id.isNotEmpty &&
+            t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
+          byId[t.id] = t;
+        }
+      }
+      if (rows.length < pageSize) break;
+      offset += rows.length;
+    }
+    return byId.values.toList()
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+  }
+
+  try {
+    return await fetchPages();
   } catch (e) {
-    debugPrint('[civic] approved contributions fetch: $e');
+    // Compatibility while the civicState migration is being installed. The
+    // unscoped fallback still paginates every receipt; UI state filtering is
+    // applied after hydration.
+    if ((state ?? '').trim().isNotEmpty) {
+      try {
+        return await fetchPages(useStateColumn: false);
+      } catch (fallbackError) {
+        debugPrint(
+          '[civic] approved contributions fallback fetch: $fallbackError',
+        );
+      }
+    } else {
+      debugPrint('[civic] approved contributions fetch: $e');
+    }
     return [];
   }
 }
@@ -30649,6 +30673,7 @@ extension AppConfigHelpMode on AppConfig {
     // itself, which would otherwise recurse forever.
     final existingRaw = helpModeByState[key];
     final existing = existingRaw is Map ? Map<String, dynamic>.from(existingRaw) : const <String, dynamic>{};
+    final now = DateTime.now().toUtc();
     final next = Map<String, dynamic>.from(helpModeByState)
       ..[key] = {
         'active': true,
@@ -30658,8 +30683,9 @@ extension AppConfigHelpMode on AppConfig {
         'phone': phone,
         'scopeType': scopeType,
         'scopeValue': scopeValue,
-        'campaignId': startNewCampaignId ? 'help_${DateTime.now().microsecondsSinceEpoch}' : (existing['campaignId'] ?? ''),
-        'campaignStartedAt': startNewCampaignId ? DateTime.now().toUtc().toIso8601String() : (existing['campaignStartedAt'] ?? ''),
+        'campaignId': startNewCampaignId ? 'help_${now.microsecondsSinceEpoch}' : (existing['campaignId'] ?? ''),
+        'campaignStartedAt': startNewCampaignId ? now.toIso8601String() : (existing['campaignStartedAt'] ?? ''),
+        'updatedAt': now.toIso8601String(),
       };
     helpModeByState = next;
   }
@@ -30685,14 +30711,14 @@ extension AppConfigHelpMode on AppConfig {
       ..[key] = {
         ...existing,
         'active': false,
-        // Recency stamp for _mergeHelpModeByStateMaps. Without it, a device
-        // holding an older campaign that is still marked active wins the
-        // merge over a newer campaign someone else already ended, which is
-        // why an admin could open a state and still see Help Mode running
-        // after the registrar had deactivated it.
-        'deactivatedAt': DateTime.now().toUtc().toIso8601String(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
       };
     helpModeByState = next;
+    // The flat fields are legacy migration input only. Leaving this true can
+    // recreate a campaign if an older device drops the per-state map entry.
+    if (helpState.trim().isEmpty || _stateKey(helpState) == key) {
+      helpModeActive = false;
+    }
   }
 
   /// One-time migration: if this state has no entry in the new per-state
@@ -30788,6 +30814,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   DateTime? _stateSwitchLockedUntil;
   Timer? _liveRefreshDebounce;
   bool _cloudHydrateInFlight = false;
+  bool _helpRefreshInFlight = false;
   DateTime? _lastRosterMutationAt;
   bool _copyingEnrollLink = false;
   String? _lastHelpsReconcileState;
@@ -30852,7 +30879,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (mounted) setState(() {});
       }());
     });
-    _helpModePoll = Timer.periodic(const Duration(seconds: 75), (_) {
+    // Keep state-wide activate/deactivate changes close to live on every
+    // device, even though regular-user Supabase Realtime is intentionally off.
+    _helpModePoll = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       unawaited(_refreshCivicHelpModeAndContributions());
     });
@@ -30910,11 +30939,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Future<void> _refreshCivicHelpModeAndContributions() async {
-    await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+  Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
+    if (_helpRefreshInFlight) return;
+    _helpRefreshInFlight = true;
+    try {
+      final refreshState = (state ?? _selectedState).trim();
+      await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
-    final localBackup = await ngmyHydrateCivicContributionsLocal(
+      await ngmyHydrateCivicHelpCampaignSpendings(widget.config);
+      final localBackup = await ngmyHydrateCivicContributionsLocal(
       deletedIds: widget.config.civicDeletedContributionIds,
     );
     final priorContributions = [
@@ -30926,7 +30960,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
     final results = await Future.wait([
-      ngmyFetchApprovedContributionsFromCloud(),
+      ngmyFetchApprovedContributionsFromCloud(state: refreshState),
       ngmyFetchCivicClaimsFromCloud(),
     ]);
     if (!mounted) return;
@@ -30953,13 +30987,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
     });
     unawaited(_persistCivicContributionsBackup());
-    // After a cloud hydrate, re-run lifecycle so a resurrected "active"
+      NgmyCivicWalletRefresh.notify();
+      // After a cloud hydrate, re-run lifecycle so a resurrected "active"
     // campaign that already has a closure stays off (and gets persisted).
     _queueHelpModeLifecycleMaintenance();
     unawaited(_pruneExpiredResolvedClaims());
     // Re-delete any tombstoned rows that somehow still exist in cloud.
     if (deleted.isNotEmpty && await ngmyCanReachCloud()) {
       unawaited(_purgeTombstonedContributionsFromCloud(deleted));
+    }
+  } finally {
+      _helpRefreshInFlight = false;
     }
   }
 
@@ -30974,10 +31012,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!mounted) return;
       unawaited(_refreshCivicMembersFromCloud());
       unawaited(_checkRegistryUnlock());
-      unawaited(ngmyHydrateCivicContributionReceiptRemoved(widget.config).then((_) async {
-        await ngmyHydrateCivicDeletedContributions(widget.config);
-        if (mounted) setState(() {});
-      }));
+      unawaited(_refreshCivicHelpModeAndContributions());
     });
   }
 
@@ -33243,11 +33278,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
     final totals = <String, double>{};
 
-    void addAmount(String key, double amount) {
-      if (key.isEmpty || amount <= 0) return;
-      totals[key] = (totals[key] ?? 0) + amount;
-    }
-
     for (final t in _civicTransactionsForDisplay()) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
       final meta = _decodeContributionMeta(t);
@@ -33263,12 +33293,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               !t.timestamp.isBefore(campaignStartedAt));
       if (!matchesThisCampaign) continue;
 
+      final identityKeys = <String>{};
       final emailKey = NgmyCivicRegistryMembers.emailKey(t.userEmail);
-      if (emailKey.isNotEmpty) addAmount(emailKey, t.amount);
+      if (emailKey.isNotEmpty) identityKeys.add(emailKey);
       final metaEmail = NgmyCivicRegistryMembers.emailKey((meta['memberEmail'] ?? '').toString());
-      if (metaEmail.isNotEmpty) addAmount(metaEmail, t.amount);
+      if (metaEmail.isNotEmpty) identityKeys.add(metaEmail);
       final rid = (meta['registryId'] ?? '').toString().trim().toUpperCase();
-      if (rid.isNotEmpty) addAmount('rid:$rid', t.amount);
+      if (rid.isNotEmpty) identityKeys.add('rid:$rid');
+      for (final key in identityKeys) {
+        if (t.amount > 0) totals[key] = (totals[key] ?? 0) + t.amount;
+    }
     }
     return totals;
   }
@@ -34109,6 +34143,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         state: st,
         canEdit: canEdit,
         snapshotBuilder: () => _buildCivicStateWalletSnapshot(st),
+        onCloudRefresh: () => _refreshCivicHelpModeAndContributions(state: st),
         onAddSpending: ({required double amount, required String description, String fund = 'contribution'}) =>
             _addCivicWalletSpending(state: st, amount: amount, description: description, fund: fund),
         onAddTrustDeposit: ({required double amount, required String description}) =>
@@ -35580,8 +35615,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return _civicTransactionsForDisplay().where((t) {
       if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
       final meta = _decodeContributionMeta(t);
-      final scopeType = (meta['scopeType'] ?? 'all').toString();
-      final scopeValue = (meta['scopeValue'] ?? '').toString();
       final targetState = _contributionReceiptState(t, meta);
       final metaState = _contributionReceiptStateFromMetaOnly(meta);
       final stateForFilter = targetState.isNotEmpty ? targetState : metaState;
@@ -35595,8 +35628,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         final memberState = (member?['state'] ?? '').toString().trim();
         if (memberState.isEmpty || !NgmyCivicRegistryStats.statesMatch(memberState, _selectedState)) return false;
       }
-      if (_canUseRegistrarToolsHere()) return true;
-      return _audienceMatchForViewer(scopeType, scopeValue);
+      // Contribution receipts are shared civic records. Scope controls who
+      // was asked to contribute, not who may see the resulting state receipt.
+      return true;
     }).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
   }
@@ -35652,13 +35686,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _contributionReceiptExpired(String receiptKey, Map<String, dynamic> meta) {
     final visibleUntil = _contributionReceiptVisibleUntil(receiptKey, meta);
-    if (visibleUntil != null) {
-      return DateTime.now().isAfter(visibleUntil);
-    }
     final closedAt = _contributionCampaignClosedAt(receiptKey, meta);
-    if (closedAt == null) return false;
-    return DateTime.now().difference(closedAt) >=
-        const Duration(days: kNgmyContributionReceiptAfterCloseDays);
+    return ngmyContributionReceiptExpired(
+      visibleUntil: visibleUntil,
+      closedAt: closedAt,
+    );
   }
 
   bool _canDeleteReceiptForState(String receiptState) {
@@ -36387,16 +36419,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     widget.config.deactivateHelpCampaign(_selectedState);
                                   });
                                   unawaited(_persistCivicContributionsBackup());
-                                  // Close and reflect the deactivation immediately — the
-                                  // local data is already updated above. Waiting on this
-                                  // awaited cloud sync before closing meant a slow/stalled
-                                  // connection left the dialog sitting there looking stuck
-                                  // for as long as the network call took (now bounded by a
-                                  // timeout, but still not something a button press should
-                                  // block on). Sync in the background instead.
+                                  // Close immediately, but keep this handler alive until
+                                  // the authoritative shared-state write finishes. A bare
+                                  // unawaited call could be abandoned if the registrar
+                                  // navigated/refreshed, leaving other users stuck "on".
                                   widget.onDataChanged();
                                   if (ctx.mounted) Navigator.pop(ctx);
-                                  unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
+                                  final cloudSaved =
+                                      await ngmyPersistCivicHelpModeSettings(widget.config);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          cloudSaved
+                                              ? 'Help mode deactivated for everyone in $_selectedState.'
+                                              : 'Help mode is off here, but cloud sync failed. Reconnect and deactivate again.',
+                                        ),
+                                        backgroundColor: cloudSaved
+                                            ? Colors.green
+                                            : Colors.orange,
+                                      ));
+                                }
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.red.shade500,
@@ -36481,11 +36524,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     startNewCampaignId: shouldStartNewCampaign,
                                   );
                                 });
-                                // Same reasoning as Deactivate below — don't block
-                                // closing the dialog on an awaited cloud sync.
+                                // Reflect locally and close first, then await the shared
+                                // write so activation cannot be lost on navigation.
                                 widget.onDataChanged();
                                 if (ctx.mounted) Navigator.pop(ctx);
-                                unawaited(ngmyPersistCivicHelpModeSettings(widget.config));
+                                final cloudSaved =
+                                    await ngmyPersistCivicHelpModeSettings(widget.config);
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        cloudSaved
+                                            ? 'Help mode activated for everyone in $_selectedState.'
+                                            : 'Help mode is on here, but cloud sync failed. Reconnect and activate again.',
+                                      ),
+                                      backgroundColor: cloudSaved
+                                          ? Colors.green
+                                          : Colors.orange,
+                                    ));
+                              }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),
@@ -38980,7 +39037,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               if (submitted) return;
                               final amount = double.tryParse(amountC.text.trim()) ?? 0;
                               if (amount <= 0) {
@@ -39043,7 +39100,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 ];
                               });
                               unawaited(_persistCivicMemberActivity(u));
-                              unawaited(_persistCivicContributionsBackup());
+                            await _persistCivicContributionsBackup();
+                            final cloudSaved =
+                                await _pushTransactionDecisionToCloud(
+                                  tx,
+                                  attempts: 3,
+                                );
                               NgmyCivicWalletRefresh.notify();
                               NgmyAdminLiveRefresh.notify();
                               widget.onDataChanged();
@@ -39052,11 +39114,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      isUpdate
-                                          ? 'Updated contribution to \$${formatCurrency(tx.amount)}.'
-                                          : 'Contribution recorded: \$${formatCurrency(tx.amount)}.',
+                                    cloudSaved
+                                        ? (isUpdate
+                                          ? 'Updated contribution to \$${formatCurrency(tx.amount)} and saved for everyone.'
+                                              : 'Contribution recorded: \$${formatCurrency(tx.amount)} and saved for everyone.')
+                                        : 'Contribution saved on this device and queued for database sync.',
                                     ),
-                                  ),
+                                  backgroundColor: cloudSaved
+                                      ? Colors.green
+                                      : Colors.orange,
+                                ),
                                 );
                               }
                             },

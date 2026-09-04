@@ -15,10 +15,49 @@
 --      neither list, so registrars and members never read the shared help-mode
 --      row — every device ran off its own stale copy of activate/deactivate.
 --
--- NO NEW COLUMN IS REQUIRED. This only adds policies + two helper functions.
--- Safe to run more than once.
+-- Adds two normalized lookup columns while keeping `sourceDetails` as the
+-- authoritative receipt payload. Safe to run more than once.
 
 begin;
+
+-- ── Normalized civic lookup columns ─────────────────────────────────────
+-- `sourceDetails` remains the full receipt payload. These two columns make
+-- state/campaign queries indexable, so the app can page every receipt for one
+-- state instead of truncating the newest 400 receipts nationwide.
+alter table public.transactions add column if not exists "civicState" text;
+alter table public.transactions add column if not exists "civicCampaignId" text;
+
+create or replace function public.ngmy_try_jsonb(p_value text)
+returns jsonb
+language plpgsql
+immutable
+as $$
+begin
+  return p_value::jsonb;
+exception when others then
+  return null;
+end;
+$$;
+
+update public.transactions
+set
+  "civicState" = coalesce(
+    nullif(trim("civicState"), ''),
+    nullif(trim(public.ngmy_try_jsonb("sourceDetails") ->> 'state'), '')
+  ),
+  "civicCampaignId" = coalesce(
+    nullif(trim("civicCampaignId"), ''),
+    nullif(trim(public.ngmy_try_jsonb("sourceDetails") ->> 'campaignId'), '')
+  )
+where type in (5, 6)
+  and (
+    nullif(trim("civicState"), '') is null
+    or nullif(trim("civicCampaignId"), '') is null
+  );
+
+create index if not exists transactions_civic_state_type_status_ts_idx
+  on public.transactions (lower("civicState"), type, status, "timestamp" desc)
+  where type in (5, 6);
 
 -- ── Columns the registrar check reads (no-ops if already present) ────────
 alter table public.users add column if not exists "isAuthorizedRegistrar" boolean default false;
@@ -91,6 +130,8 @@ revoke all on function public.is_ngmy_registrar() from public;
 grant execute on function public.ngmy_jwt_email() to anon, authenticated, service_role;
 grant execute on function public.is_ngmy_admin() to anon, authenticated, service_role;
 grant execute on function public.is_ngmy_registrar() to anon, authenticated, service_role;
+revoke all on function public.ngmy_try_jsonb(text) from public;
+grant execute on function public.ngmy_try_jsonb(text) to anon, authenticated, service_role;
 
 -- Civic rows inside `transactions`:
 --   type 5 = TransactionType.contribution   (a contribution receipt)

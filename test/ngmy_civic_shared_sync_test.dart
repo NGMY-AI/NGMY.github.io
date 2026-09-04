@@ -1,0 +1,99 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/main.dart';
+import 'package:ngmy/ngmy_civic_state_wallet.dart';
+
+void main() {
+  test('shared contribution merge keeps more than the former 400-row cap', () {
+    final rows = List<AppTransaction>.generate(
+      1105,
+      (i) => AppTransaction(
+        id: 'contribution-$i',
+        userEmail: 'member$i@example.com',
+        amount: 1,
+        type: TransactionType.contribution,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: DateTime.utc(2026, 9, 1).add(Duration(seconds: i)),
+      ),
+    );
+    final all = <AppTransaction>[];
+
+    ngmyMergeApprovedContributionsIntoAllTransactions(all, rows);
+
+    expect(all, hasLength(1105));
+    expect(all.map((e) => e.id).toSet(), hasLength(1105));
+  });
+
+  test('remote deactivation wins over stale active help-mode cache', () {
+    final merged = ngmyMergeHelpModeByStateMaps(
+      {
+        'georgia': {
+          'active': true,
+          'campaignId': 'campaign-1',
+          'updatedAt': '2026-09-02T10:00:00Z',
+        },
+      },
+      {
+        'georgia': {
+          'active': false,
+          'campaignId': 'campaign-1',
+          'updatedAt': '2026-09-02T10:01:00Z',
+        },
+      },
+    );
+
+    expect((merged['georgia'] as Map)['active'], isFalse);
+  });
+
+  test('contribution receipts remain for 30 days after closure', () {
+    final closedAt = DateTime.utc(2026, 9, 1, 12);
+
+    expect(
+      ngmyContributionReceiptExpired(
+        closedAt: closedAt,
+        now: closedAt.add(const Duration(days: 29, hours: 23)),
+      ),
+      isFalse,
+    );
+    expect(
+      ngmyContributionReceiptExpired(
+        closedAt: closedAt,
+        now: closedAt.add(const Duration(days: 30)),
+      ),
+      isTrue,
+    );
+  });
+
+  test(
+    'state contribution case totals shared inflows and matching outflows',
+    () {
+      final snapshot = buildNgmyCivicWalletSnapshot(
+        state: 'Georgia',
+        contributionRows: [
+          {'id': 'c1', 'amount': 80.0, 'at': '2026-09-02T10:00:00Z'},
+          {'id': 'c2', 'amount': 20.0, 'at': '2026-09-02T11:00:00Z'},
+        ],
+        spendingRows: [
+          {
+            'id': 's1',
+            'state': 'Georgia',
+            'amount': 25.0,
+            'description': 'Community supplies',
+            'recordedAt': '2026-09-02T12:00:00Z',
+          },
+          {
+            'id': 's2',
+            'state': 'Alabama',
+            'amount': 90.0,
+            'description': 'Different state',
+            'recordedAt': '2026-09-02T12:00:00Z',
+          },
+        ],
+      );
+
+      expect(snapshot.collected, 100);
+      expect(snapshot.spent, 25);
+      expect(snapshot.available, 75);
+    },
+  );
+}

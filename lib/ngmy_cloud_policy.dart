@@ -109,31 +109,6 @@ class NgmyCloudPolicy {
     return false;
   }
 
-  /// Civic Registry state that every signed-in user must share, not just the
-  /// four admin emails: which state has help mode on, that state's recorded
-  /// spendings, and the registrar/admin delete tombstones.
-  ///
-  /// These are NOT public — reading them still needs a session, and writing
-  /// them still needs registrar/admin, both enforced by RLS (see
-  /// `supabase/civic_contributions_shared_visibility.sql`). They are listed
-  /// separately from [settingsKeyPublicReadable] precisely because anon must
-  /// never see them.
-  ///
-  /// Before this existed, `_fetchNgmySettingSafe` refused these keys for
-  /// anyone but an admin, so a registrar's Activate/Deactivate never reached
-  /// another registrar's or the admin's device — each one ran off its own
-  /// stale local copy, which is what made a deactivated campaign keep showing
-  /// as active in that state for whoever did not press the button.
-  static const Set<String> civicSharedSettingsKeys = {
-    'civic_help_mode_settings',
-    'civic_contribution_receipt_removed',
-    'civic_deleted_contribution_ids',
-    'civic_help_campaign_spendings',
-  };
-
-  static bool settingsKeyCivicShared(String key) =>
-      civicSharedSettingsKeys.contains(key.trim());
-
   /// Keys that must never be downloaded via public REST (visible in DevTools).
   /// Load through Edge (role-filtered / networkEmpty) or local prefs only.
   static bool settingsKeyNetworkSensitive(String key) {

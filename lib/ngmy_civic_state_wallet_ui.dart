@@ -37,6 +37,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
     required this.state,
     required this.canEdit,
     required this.snapshotBuilder,
+    this.onCloudRefresh,
     required this.onAddSpending,
     required this.onAddTrustDeposit,
     required this.onTransferFunds,
@@ -65,6 +66,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final String state;
   final bool canEdit;
   final NgmyCivicWalletSnapshot Function() snapshotBuilder;
+  final Future<void> Function()? onCloudRefresh;
   final Future<void> Function({
     required double amount,
     required String description,
@@ -133,6 +135,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   Timer? _editTapReset;
   Timer? _countdownTick;
   Timer? _livePoll;
+  DateTime? _lastCloudRefreshAt;
+  bool _cloudRefreshInFlight = false;
 
   @override
   void initState() {
@@ -141,9 +145,14 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _searchC.addListener(() => setState(() {}));
     _ensureCountdownTicker();
     NgmyCivicWalletRefresh.addListener(_reload);
+    unawaited(_refreshCloud());
     _livePoll = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       _reload();
+      final last = _lastCloudRefreshAt;
+      if (last == null || DateTime.now().difference(last) >= const Duration(seconds: 15)) {
+        unawaited(_refreshCloud());
+      }
     });
   }
 
@@ -227,6 +236,19 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   void _reload() {
     setState(() => _snap = widget.snapshotBuilder());
     _ensureCountdownTicker();
+  }
+
+  Future<void> _refreshCloud() async {
+    final refresh = widget.onCloudRefresh;
+    if (refresh == null || _cloudRefreshInFlight) return;
+    _cloudRefreshInFlight = true;
+    try {
+      await refresh();
+      _lastCloudRefreshAt = DateTime.now();
+      if (mounted) _reload();
+    } finally {
+      _cloudRefreshInFlight = false;
+    }
   }
 
   String _money(double v) {
