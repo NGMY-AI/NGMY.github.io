@@ -737,6 +737,26 @@ class PhoneDashFormatter extends TextInputFormatter {
   }
 }
 
+class NgmyUpperCaseTextFormatter extends TextInputFormatter {
+  const NgmyUpperCaseTextFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final upper = newValue.text.toUpperCase();
+    return newValue.copyWith(
+      text: upper,
+      selection: TextSelection(
+        baseOffset: newValue.selection.baseOffset.clamp(0, upper.length),
+        extentOffset: newValue.selection.extentOffset.clamp(0, upper.length),
+      ),
+      composing: TextRange.empty,
+    );
+  }
+}
+
 String ngmyFormatPhoneDisplay(String raw) {
   final digits = raw.replaceAll(RegExp(r'\D'), '');
   if (digits.isEmpty) return '';
@@ -30834,6 +30854,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Timer? _liveRefreshDebounce;
   bool _cloudHydrateInFlight = false;
   bool _helpRefreshInFlight = false;
+  bool _helpSettingsRefreshInFlight = false;
+  Completer<void>? _helpRefreshCompleter;
+  Completer<void>? _helpSettingsRefreshCompleter;
   DateTime? _lastRosterMutationAt;
   bool _copyingEnrollLink = false;
   String? _lastHelpsReconcileState;
@@ -30900,9 +30923,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
     // Keep state-wide activate/deactivate changes close to live on every
     // device, even though regular-user Supabase Realtime is intentionally off.
-    _helpModePoll = Timer.periodic(const Duration(seconds: 20), (_) {
+    _helpModePoll = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) return;
-      unawaited(_refreshCivicHelpModeAndContributions());
+      unawaited(_refreshCivicHelpModeSettingsOnly());
     });
     _membersCloudPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _activeTab != 2) return;
@@ -30958,11 +30981,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
-    if (_helpRefreshInFlight) return;
-    _helpRefreshInFlight = true;
+  Future<void> _refreshCivicHelpModeSettingsOnly() async {
+    if (_helpSettingsRefreshInFlight) {
+      final pending = _helpSettingsRefreshCompleter;
+      if (pending != null) await pending.future;
+      return;
+    }
+    _helpSettingsRefreshInFlight = true;
+    final refreshCompleter = Completer<void>();
+    _helpSettingsRefreshCompleter = refreshCompleter;
     try {
-      final refreshState = (state ?? _selectedState).trim();
+      await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+      if (!mounted) return;
+      setState(() {});
+      _queueHelpModeLifecycleMaintenance();
+    } finally {
+      _helpSettingsRefreshInFlight = false;
+      _helpSettingsRefreshCompleter = null;
+      if (!refreshCompleter.isCompleted) refreshCompleter.complete();
+    }
+  }
+
+  Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
+    if (_helpRefreshInFlight) {
+      final pending = _helpRefreshCompleter;
+      if (pending != null) await pending.future;
+      return;
+    }
+    _helpRefreshInFlight = true;
+    final refreshCompleter = Completer<void>();
+    _helpRefreshCompleter = refreshCompleter;
+    try {
       await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
@@ -30979,7 +31028,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
     final results = await Future.wait([
-      ngmyFetchApprovedContributionsFromCloud(state: refreshState),
+      // Nationwide totals and each state case use the same complete ledger.
+      // A state-scoped fetch left every unvisited state absent from the
+      // nationwide amount and campaign count.
+      ngmyFetchApprovedContributionsFromCloud(),
       ngmyFetchCivicClaimsFromCloud(),
     ]);
     if (!mounted) return;
@@ -31017,6 +31069,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   } finally {
       _helpRefreshInFlight = false;
+      _helpRefreshCompleter = null;
+      if (!refreshCompleter.isCompleted) refreshCompleter.complete();
     }
   }
 
@@ -31349,6 +31403,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }
       return false;
     }
+    // Pull the authoritative per-state map before revealing the destination.
+    // This prevents an admin/registrar state switch from briefly displaying a
+    // locally cached collecting frame that was already deactivated.
+    await _refreshCivicHelpModeSettingsOnly();
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
@@ -34305,6 +34363,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       members: ngmyCivicMembersForState(widget.config, _selectedState),
       snapshotBuilder: () => _buildCivicStateWalletSnapshot(),
       canEdit: toolsHere,
+      onCloudRefresh: () => _refreshCivicHelpModeAndContributions(
+        state: _selectedState,
+      ),
       // Only this state's first AR (and King/Admin) skip codes. Other ARs
       // and members must enter PIN / name / DOB / ID every visit.
       skipUnlockCodes: _shouldSkipStateCaseUnlock(),
@@ -36200,9 +36261,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
     );
     final purposeC = TextEditingController(
-      text: widget.config.helpPurposeFor(_selectedState).trim().isNotEmpty
-          ? widget.config.helpPurposeFor(_selectedState)
-          : (savedDraft?.purpose ?? ''),
+      text: (widget.config.helpPurposeFor(_selectedState).trim().isNotEmpty
+              ? widget.config.helpPurposeFor(_selectedState)
+              : (savedDraft?.purpose ?? ''))
+          .toUpperCase(),
     );
     final cashC = TextEditingController(
       text: widget.config.helpCashAppFor(_selectedState).trim().isNotEmpty ? widget.config.helpCashAppFor(_selectedState) : (savedDraft?.cashApp ?? ''),
@@ -36312,7 +36374,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ),
                       child: Column(
                         children: [
-                          TextField(controller: purposeC, maxLines: 2, decoration: framedInput('What are you collecting for?')),
+                          TextField(
+                            controller: purposeC,
+                            maxLines: 2,
+                            textCapitalization: TextCapitalization.characters,
+                            inputFormatters: const [NgmyUpperCaseTextFormatter()],
+                            decoration: framedInput('What are you collecting for?'),
+                          ),
                           const SizedBox(height: 10),
                           TextField(controller: cashC, decoration: framedInput('Cash App')),
                           const SizedBox(height: 10),
@@ -36511,7 +36579,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 final previousPurpose = widget.config.helpPurposeFor(_selectedState).trim();
                                 final previousScopeType = widget.config.helpScopeTypeFor(_selectedState).trim();
                                 final previousScopeValue = widget.config.helpScopeValueFor(_selectedState).trim();
-                                final nextPurpose = purposeC.text.trim();
+                                final nextPurpose = purposeC.text.trim().toUpperCase();
                                 final nextScopeType = scopeType;
                                 final nextScopeValue = scopeType == 'all' ? '' : scopeValue.trim();
                                 final draft = NgmyHelpModeDraft(
@@ -39092,10 +39160,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               });
                               final isUpdate = existing != null;
                               final stableKey = memberEmail.isNotEmpty ? memberEmail : memberRid;
+                              final reset = _softResetForState(state);
+                              final resetAt = reset?['hideBudget'] == true
+                                  ? DateTime.tryParse(
+                                      (reset?['recordedAt'] ?? '').toString(),
+                                    )
+                                  : null;
+                              final resetSuffix = resetAt == null
+                                  ? ''
+                                  : '_after_${resetAt.toUtc().microsecondsSinceEpoch}';
                               final txId = isUpdate
                                   ? existing.id
                                   : (campaignId.trim().isNotEmpty
-                                      ? 'contrib_${stableKey}_$campaignId'
+                                      ? 'contrib_${stableKey}_$campaignId$resetSuffix'
                                       : 'contrib_${stableKey}_${now.microsecondsSinceEpoch}');
                               final tx = AppTransaction(
                                 id: txId,
@@ -39118,6 +39195,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   tx,
                                 ];
                               });
+                              // Update an already-open state case/budget from
+                              // local truth before waiting on the cloud.
+                              NgmyCivicWalletRefresh.notify();
                               unawaited(_persistCivicMemberActivity(u));
                             await _persistCivicContributionsBackup();
                             final cloudSaved =
@@ -39480,8 +39560,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final campaignId = _activeHelpCampaignId(state).trim();
     final startedRaw = widget.config.helpCampaignStartedAtFor(state).trim();
     final startedAt = DateTime.tryParse(startedRaw);
+    final reset = _softResetForState(state);
+    final resetAt = reset?['hideBudget'] == true
+        ? DateTime.tryParse((reset?['recordedAt'] ?? '').toString())
+        : null;
     for (final t in _contributionsForMember(u)) {
       if (t.status != TransactionStatus.approved) continue;
+      if (resetAt != null && !t.timestamp.toUtc().isAfter(resetAt.toUtc())) {
+        continue;
+      }
       final meta = _decodeContributionMeta(t);
       final cid = (meta['campaignId'] ?? '').toString().trim();
       if (campaignId.isNotEmpty && cid.isNotEmpty) {

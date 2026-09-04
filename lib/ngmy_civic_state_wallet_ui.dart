@@ -150,7 +150,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       if (!mounted) return;
       _reload();
       final last = _lastCloudRefreshAt;
-      if (last == null || DateTime.now().difference(last) >= const Duration(seconds: 15)) {
+      if (last == null || DateTime.now().difference(last) >= const Duration(seconds: 5)) {
         unawaited(_refreshCloud());
       }
     });
@@ -863,14 +863,23 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   Future<void> _showNationwideStatsDialog() async {
     final builder = widget.nationwideStatsBuilder;
     if (builder == null) return;
-    final stats = builder();
+    await _refreshCloud();
+    var stats = builder();
     if (!mounted) return;
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    Timer? nationwideLivePoll;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        return Dialog(
+        return StatefulBuilder(builder: (ctx, setSheet) {
+          nationwideLivePoll ??= Timer.periodic(const Duration(seconds: 5), (_) async {
+            if (!ctx.mounted) return;
+            await _refreshCloud();
+            if (!ctx.mounted) return;
+            setSheet(() => stats = builder());
+          });
+          return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
           child: Container(
@@ -1007,9 +1016,11 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
               ],
             ),
           ),
-        );
+          );
+        });
       },
     );
+    nationwideLivePoll?.cancel();
   }
 
   List<NgmyCivicWalletTxn> get _filteredRecent {

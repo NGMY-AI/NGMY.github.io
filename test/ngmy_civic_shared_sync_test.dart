@@ -149,4 +149,30 @@ void main() {
       expect(snapshot.available, 75);
     },
   );
+
+  test('state-case reset hides old money but accepts new contributions', () {
+    final snapshot = buildNgmyCivicWalletSnapshot(
+      state: 'Georgia',
+      contributionRows: [
+        {'id': 'old', 'amount': 100.0, 'at': '2026-09-02T10:00:00Z'},
+        {'id': 'new', 'amount': 25.0, 'at': '2026-09-02T13:00:00Z'},
+      ],
+      spendingRows: [
+        {
+          'id': 'reset-georgia',
+          'state': 'Georgia',
+          'walletSoftReset': true,
+          'permanent': true,
+          'hideBudget': true,
+          'hideSpendings': true,
+          'hideTransactions': true,
+          'recordedAt': '2026-09-02T12:00:00Z',
+        },
+      ],
+    );
+
+    expect(snapshot.collected, 25);
+    expect(snapshot.available, 25);
+    expect(snapshot.recent.map((e) => e.id), ['new']);
+  });
 }

@@ -337,6 +337,7 @@ Future<void> openNgmyCivicStateWalletFlow({
   required List<Map<String, dynamic>> members,
   required NgmyCivicWalletSnapshot Function() snapshotBuilder,
   required bool canEdit,
+  Future<void> Function()? onCloudRefresh,
   /// Authorized registrars skip PIN / name / DOB / ID only when the caller
   /// sets [skipUnlockCodes] (first AR of the state, or King/Admin).
   bool skipUnlockCodes = false,
@@ -407,6 +408,7 @@ Future<void> openNgmyCivicStateWalletFlow({
       state: state,
       canEdit: canEdit,
       snapshotBuilder: snapshotBuilder,
+      onCloudRefresh: onCloudRefresh,
       onAddSpending: onAddSpending,
       onAddTrustDeposit: onAddTrustDeposit,
       onTransferFunds: onTransferFunds,
@@ -860,21 +862,35 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   final hideBudget = soft?['hideBudget'] == true;
   final hideSpendings = soft?['hideSpendings'] == true;
   final hideTransactions = soft?['hideTransactions'] == true;
+  final resetAt = soft == null
+      ? null
+      : DateTime.tryParse((soft['recordedAt'] ?? '').toString())?.toLocal();
+
+  bool hiddenByReset(bool enabled, DateTime rowAt) {
+    if (!enabled) return false;
+    // Old reset rows without a timestamp retain their original hide-all
+    // behavior. Current reset rows hide only records that existed at reset.
+    return resetAt == null || !rowAt.isAfter(resetAt);
+  }
 
   double collected = 0;
   final recent = <NgmyCivicWalletTxn>[];
   for (final row in contributionRows) {
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
-    if (!hideBudget) {
+    final at = DateTime.tryParse((row['at'] ?? '').toString())?.toLocal() ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final rowBudgetHidden = hiddenByReset(hideBudget, at);
+    final rowTransactionHidden = hiddenByReset(hideTransactions, at);
+    if (!rowBudgetHidden) {
       collected += amount;
     }
-    if (!hideBudget && !hideTransactions) {
+    if (!rowBudgetHidden && !rowTransactionHidden) {
       recent.add(
         NgmyCivicWalletTxn(
           id: (row['id'] ?? '').toString(),
           title: (row['title'] ?? 'Contribution').toString(),
           amount: amount,
-          at: DateTime.tryParse((row['at'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0),
+          at: at,
           isInflow: true,
           fund: 'contribution',
         ),
@@ -902,8 +918,15 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
     // Already past the 24h window — omit from wallet UI.
     if (pendingAt != null && !pendingAt.isAfter(now)) continue;
     final amount = (row['amount'] as num?)?.toDouble() ?? 0;
+    final rowAt = DateTime.tryParse(
+          (row['requestedAt'] ?? row['recordedAt'] ?? '').toString(),
+        )?.toLocal() ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final rowBudgetHidden = hiddenByReset(hideBudget, rowAt);
+    final rowSpendingHidden = hiddenByReset(hideSpendings, rowAt);
+    final rowTransactionHidden = hiddenByReset(hideTransactions, rowAt);
     if (ngmyIsSilentAdminWalletRemoval(row)) {
-      if (hideBudget || hideSpendings) continue;
+      if (rowBudgetHidden || rowSpendingHidden) continue;
       // Cuts contribution case available with no spending / last-txn trail.
       silentCollectedCut += amount;
       continue;
@@ -914,15 +937,14 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       final status = (row['status'] ?? 'pending').toString().toLowerCase();
       if (status != 'pending') continue;
       final direction = (row['direction'] ?? 'to_contribution').toString();
-      if (!hideBudget && direction == 'to_contribution') {
+      if (!rowBudgetHidden && direction == 'to_contribution') {
         trustReserved += amount;
       }
       final approvalsRaw = row['approvals'];
       final approvals = approvalsRaw is List
           ? approvalsRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
           : <Map<String, dynamic>>[];
-      final at = DateTime.tryParse((row['requestedAt'] ?? row['recordedAt'] ?? '').toString()) ??
-          DateTime.fromMillisecondsSinceEpoch(0);
+      final at = rowAt;
       final desc = (row['description'] ?? 'Fund transfer').toString().trim();
       pendingTransfers.add(
         NgmyCivicWalletPendingTransfer(
@@ -937,7 +959,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
           requiredApprovals: (row['requiredApprovals'] as num?)?.toInt() ?? 2,
         ),
       );
-      if (!hideTransactions) {
+      if (!rowTransactionHidden) {
         recent.add(
           NgmyCivicWalletTxn(
             id: (row['id'] ?? '').toString(),
@@ -956,10 +978,9 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
 
     // Credits into Contribution Case from completed Trust → Contribution transfers.
     if (ngmyIsContributionTransferCredit(row)) {
-      if (!hideBudget) transferCredits += amount;
-      if (!hideBudget && !hideTransactions) {
-        final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+      if (!rowBudgetHidden) transferCredits += amount;
+      if (!rowBudgetHidden && !rowTransactionHidden) {
+        final at = rowAt;
         final desc = (row['description'] ?? 'Transfer from State Trust').toString().trim();
         recent.add(
           NgmyCivicWalletTxn(
@@ -978,10 +999,9 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
 
     // State Trust deposits — never counted as contributions.
     if (ngmyIsStateTrustDeposit(row)) {
-      if (!hideBudget) trustDeposited += amount;
-      if (!hideBudget && !hideTransactions) {
-        final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+      if (!rowBudgetHidden) trustDeposited += amount;
+      if (!rowBudgetHidden && !rowTransactionHidden) {
+        final at = rowAt;
         final kind = (row['kind'] ?? '').toString();
         final defaultTitle = kind == 'transfer_from_contribution'
             ? 'Transfer from Contribution Case'
@@ -1002,7 +1022,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
       continue;
     }
 
-    if (hideSpendings) continue;
+    if (rowSpendingHidden) continue;
     final fund = ngmyWalletFundOf(row);
     final desc = (row['description'] ?? 'Spending').toString().trim();
     final kind = (row['kind'] ?? '').toString();
@@ -1021,7 +1041,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
         byCat[label] = (byCat[label] ?? 0) + amount;
       }
     }
-    final at = DateTime.tryParse((row['recordedAt'] ?? '').toString()) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    final at = rowAt;
     spendings.add(
       NgmyCivicWalletSpendingRow(
         id: (row['id'] ?? '').toString(),
@@ -1033,7 +1053,7 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
         fund: fund,
       ),
     );
-    if (!hideTransactions) {
+    if (!rowTransactionHidden) {
       recent.add(
         NgmyCivicWalletTxn(
           id: (row['id'] ?? '').toString(),
