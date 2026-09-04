@@ -45,6 +45,53 @@ void main() {
     expect((merged['georgia'] as Map)['active'], isFalse);
   });
 
+  test('closed local-only campaign cannot be resurrected', () {
+    final merged = ngmyMergeHelpModeByStateMaps(
+      {
+        'georgia': {
+          'active': true,
+          'campaignId': 'campaign-closed',
+          'updatedAt': '2026-09-02T10:00:00Z',
+        },
+      },
+      const {},
+      closures: [
+        {'campaignId': 'campaign-closed', 'closedAt': '2026-09-02T10:01:00Z'},
+      ],
+    );
+
+    expect((merged['georgia'] as Map)['active'], isFalse);
+  });
+
+  test('stale cloud contribution cannot reduce cumulative amount', () {
+    final at = DateTime.utc(2026, 9, 2, 10);
+    final all = [
+      AppTransaction(
+        id: 'contrib-member-campaign',
+        userEmail: 'member@example.com',
+        amount: 100,
+        type: TransactionType.contribution,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: at,
+      ),
+    ];
+
+    ngmyMergeApprovedContributionsIntoAllTransactions(all, [
+      AppTransaction(
+        id: 'contrib-member-campaign',
+        userEmail: 'member@example.com',
+        amount: 40,
+        type: TransactionType.contribution,
+        method: PaymentMethod.system,
+        status: TransactionStatus.approved,
+        timestamp: at,
+      ),
+    ]);
+
+    expect(all.single.amount, 100);
+  });
+
   test('contribution receipts remain for 30 days after closure', () {
     final closedAt = DateTime.utc(2026, 9, 1, 12);
 
@@ -86,6 +133,12 @@ void main() {
             'state': 'Alabama',
             'amount': 90.0,
             'description': 'Different state',
+            'recordedAt': '2026-09-02T12:00:00Z',
+          },
+          {
+            'id': 'legacy-no-state',
+            'amount': 500.0,
+            'description': 'Unstamped legacy row',
             'recordedAt': '2026-09-02T12:00:00Z',
           },
         ],

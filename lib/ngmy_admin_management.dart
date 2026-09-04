@@ -40,6 +40,8 @@ const String _kNgmyCivicDeletedContributionsSettingsKey = 'civic_deleted_contrib
 const String _kNgmyCivicDeletedContributionsPrefsKey = 'ngmy_civic_deleted_contribution_ids_v1';
 const String _kNgmyCivicHelpCampaignSpendingsSettingsKey =
     'civic_help_campaign_spendings';
+const String _kNgmyCivicHelpCampaignSpendingsPrefsKey =
+    'ngmy_civic_help_campaign_spendings_v1';
 const String _kNgmyCivicContributionsLocalPrefsKey = 'ngmy_civic_contributions_local_v1';
 const String _kNgmyAppBrandingPrefsKey = 'ngmy_app_branding_v1';
 
@@ -1534,38 +1536,46 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
   // would only delay other users from seeing a just-recorded spend for no
   // safety benefit.
   final deferLiveFields = ngmyShouldDeferRemoteConfigOverwrite();
-  if (!deferLiveFields) {
+  final rawStateMap = payload['helpModeByState'];
+  final hasPerStatePayload = rawStateMap is Map && rawStateMap.isNotEmpty;
+  // Flat help fields are migration input for old payloads only. Once either
+  // side has per-state data, accepting a stale legacy `helpModeActive: true`
+  // can recreate a campaign that an authorized registrar already closed.
+  if (!deferLiveFields &&
+      !hasPerStatePayload &&
+      config.helpModeByState.isEmpty) {
     if (payload.containsKey('helpModeActive')) {
-    config.helpModeActive = payload['helpModeActive'] == true;
-  }
-  if (payload.containsKey('helpPurpose')) {
-    config.helpPurpose = (payload['helpPurpose'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpCashApp')) {
-    config.helpCashApp = (payload['helpCashApp'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpZelle')) {
-    config.helpZelle = (payload['helpZelle'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpPhone')) {
-    config.helpPhone = (payload['helpPhone'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpScopeType')) {
-    final v = (payload['helpScopeType'] ?? 'all').toString().trim();
-    config.helpScopeType = v.isEmpty ? 'all' : v;
-  }
-  if (payload.containsKey('helpScopeValue')) {
-    config.helpScopeValue = (payload['helpScopeValue'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpState')) {
-    config.helpState = (payload['helpState'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpCampaignId')) {
-    config.helpCampaignId = (payload['helpCampaignId'] ?? '').toString().trim();
-  }
-  if (payload.containsKey('helpCampaignStartedAt')) {
-    config.helpCampaignStartedAt = (payload['helpCampaignStartedAt'] ?? '').toString().trim();
-  }
+      config.helpModeActive = payload['helpModeActive'] == true;
+    }
+    if (payload.containsKey('helpPurpose')) {
+      config.helpPurpose = (payload['helpPurpose'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpCashApp')) {
+      config.helpCashApp = (payload['helpCashApp'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpZelle')) {
+      config.helpZelle = (payload['helpZelle'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpPhone')) {
+      config.helpPhone = (payload['helpPhone'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpScopeType')) {
+      final v = (payload['helpScopeType'] ?? 'all').toString().trim();
+      config.helpScopeType = v.isEmpty ? 'all' : v;
+    }
+    if (payload.containsKey('helpScopeValue')) {
+      config.helpScopeValue = (payload['helpScopeValue'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpState')) {
+      config.helpState = (payload['helpState'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpCampaignId')) {
+      config.helpCampaignId = (payload['helpCampaignId'] ?? '').toString().trim();
+    }
+    if (payload.containsKey('helpCampaignStartedAt')) {
+      config.helpCampaignStartedAt =
+          (payload['helpCampaignStartedAt'] ?? '').toString().trim();
+    }
   }
   if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map && !deferLiveFields) {
     final remote = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
@@ -1588,6 +1598,10 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
     config.helpCampaignClosures = _mergeHelpCampaignClosuresLists(config.helpCampaignClosures, remote);
+  }
+  if (!deferLiveFields && config.helpModeByState.isNotEmpty) {
+    // Disable the one-time flat-field migration after per-state storage exists.
+    config.helpModeActive = false;
   }
   // helpCampaignSpendings intentionally ignored here — loaded via Edge privateListsFetch.
 }
@@ -1636,6 +1650,7 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   // See _applyCivicHelpModeSettingsPayload.
   ngmyAdminConfigMutationAt = DateTime.now();
   await _persistCivicHelpModeSettingsLocal(config);
+  await _persistCivicHelpCampaignSpendingsLocal(config);
   NgmyAdminLiveRefresh.notify();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var helpModeCloudOk = false;
@@ -2130,7 +2145,44 @@ Future<bool> ngmyPersistCivicDeletedContributions(AppConfig config, {Iterable<St
 
 /// Shared state-wallet outflows and trust transfers. These must hydrate on
 /// every device or the Contribution Case available balance diverges.
+Future<void> _persistCivicHelpCampaignSpendingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _kNgmyCivicHelpCampaignSpendingsPrefsKey,
+      jsonEncode(
+        config.helpCampaignSpendings
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+      ),
+    );
+  } catch (e) {
+    debugPrint('[civic help spendings] local persist: $e');
+  }
+}
+
+Future<void> _hydrateCivicHelpCampaignSpendingsLocal(AppConfig config) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicHelpCampaignSpendingsPrefsKey);
+    if (raw == null || raw.trim().isEmpty) return;
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return;
+    final local = decoded
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    config.helpCampaignSpendings = _mergeHelpCampaignSpendingsLists(
+      config.helpCampaignSpendings,
+      local,
+    );
+  } catch (e) {
+    debugPrint('[civic help spendings] local hydrate: $e');
+  }
+}
+
 Future<void> ngmyHydrateCivicHelpCampaignSpendings(AppConfig config) async {
+  await _hydrateCivicHelpCampaignSpendingsLocal(config);
   if (ngmyCurrentAuthEmail().isEmpty || !await ngmyCanReachCloud()) return;
   try {
     final payload = await ngmyDbRelaySettingsFetch(
@@ -2147,6 +2199,7 @@ Future<void> ngmyHydrateCivicHelpCampaignSpendings(AppConfig config) async {
       config.helpCampaignSpendings,
       remote,
     );
+    await _persistCivicHelpCampaignSpendingsLocal(config);
   } catch (e) {
     debugPrint('[civic help spendings] shared cloud hydrate: $e');
   }

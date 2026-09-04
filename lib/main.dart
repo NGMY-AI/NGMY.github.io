@@ -1099,6 +1099,14 @@ AppTransaction _pickPreferredTransaction(AppTransaction local, AppTransaction re
   late AppTransaction pick;
   if (localRank != remoteRank) {
     pick = localRank > remoteRank ? local : remote;
+  } else if (local.type == TransactionType.contribution &&
+      remote.type == TransactionType.contribution &&
+      local.timestamp.isAtSameMomentAs(remote.timestamp) &&
+      local.amount != remote.amount) {
+    // Help-mode updates keep one stable transaction id and timestamp. During
+    // cloud propagation, keep the larger cumulative amount instead of letting
+    // an older cloud copy roll the state case backward.
+    pick = local.amount > remote.amount ? local : remote;
   } else if (ngmyIsWalletDepositOrWithdraw(local) || ngmyIsWalletDepositOrWithdraw(remote)) {
     pick = local.timestamp.isAfter(remote.timestamp) ? local : remote;
   } else {
@@ -3266,11 +3274,19 @@ List<Map<String, dynamic>> _mergeHelpCampaignSpendingsLists(
   List<Map<String, dynamic>> remote,
 ) {
   final byId = <String, Map<String, dynamic>>{};
+  DateTime mutationAt(Map<String, dynamic> row) =>
+      DateTime.tryParse(
+        (row['updatedAt'] ?? row['pendingDeleteAt'] ?? row['recordedAt'] ?? '').toString(),
+      ) ??
+      DateTime.fromMillisecondsSinceEpoch(0);
   for (final raw in [...local, ...remote]) {
     final row = Map<String, dynamic>.from(raw);
     final id = (row['id'] ?? '').toString();
     if (id.isEmpty) continue;
-    byId[id] = row;
+    final existing = byId[id];
+    if (existing == null || !mutationAt(row).isBefore(mutationAt(existing))) {
+      byId[id] = row;
+    }
   }
   return byId.values.toList()
     ..sort((a, b) {
@@ -3346,7 +3362,10 @@ Map<String, dynamic> ngmyMergeHelpModeByStateMaps(
       continue;
     }
     if (r == null) {
-      out[key] = Map<String, dynamic>.from(l);
+      final campaign = Map<String, dynamic>.from(l);
+      final cid = (campaign['campaignId'] ?? '').toString().trim();
+      if (cid.isNotEmpty && closedIds.contains(cid)) campaign['active'] = false;
+      out[key] = campaign;
       continue;
     }
 
@@ -33432,7 +33451,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((e) {
           final st = (e['state'] ?? '').toString().trim();
           if (state.isEmpty) return true;
-          if (st.isEmpty) return true;
+          if (st.isEmpty) return false;
           return NgmyCivicRegistryStats.statesMatch(st, state);
         })
         .toList();
@@ -33832,9 +33851,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final ledger = fund == 'trust' ? 'trust' : 'contribution';
     final record = {
       'id': 'spend_${DateTime.now().microsecondsSinceEpoch}',
-      'campaignId': _activeHelpCampaignId().trim().isEmpty
+      'campaignId': _activeHelpCampaignId(st).trim().isEmpty
           ? 'wallet_${st.toLowerCase()}'
-          : _activeHelpCampaignId().trim(),
+          : _activeHelpCampaignId(st).trim(),
       'amount': amount,
       'description': description,
       'recordedAt': DateTime.now().toUtc().toIso8601String(),
@@ -35028,7 +35047,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _contributionMatchesState(AppTransaction t, Map<String, dynamic> meta, String state) {
     final receiptState = _contributionReceiptState(t, meta).trim();
-    if (receiptState.isEmpty) return true;
+    if (receiptState.isEmpty) return false;
     return NgmyCivicRegistryStats.statesMatch(receiptState, state);
   }
 

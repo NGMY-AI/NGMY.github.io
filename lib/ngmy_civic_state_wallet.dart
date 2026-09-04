@@ -893,7 +893,9 @@ NgmyCivicWalletSnapshot buildNgmyCivicWalletSnapshot({
   final pendingTransfers = <NgmyCivicWalletPendingTransfer>[];
   for (final row in spendingRows) {
     final rowState = (row['state'] ?? '').toString().trim().toLowerCase();
-    if (st.isNotEmpty && rowState.isNotEmpty && rowState != st) continue;
+    // A spending without an owning state must never reduce every state's
+    // Contribution Case. Legacy unstamped rows stay out until backfilled.
+    if (st.isNotEmpty && (rowState.isEmpty || rowState != st)) continue;
     if (ngmyIsWalletSoftResetRecord(row)) continue;
     final pendingRaw = (row['pendingDeleteAt'] ?? '').toString().trim();
     final pendingAt = pendingRaw.isEmpty ? null : DateTime.tryParse(pendingRaw)?.toLocal();
