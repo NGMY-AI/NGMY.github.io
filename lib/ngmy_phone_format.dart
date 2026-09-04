@@ -6,8 +6,11 @@ import 'package:flutter/services.dart';
 /// code, extension) keeps flowing after the second dash so international
 /// numbers are still enterable.
 String ngmyPhoneDashed(String raw) {
-  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  var digits = raw.replaceAll(RegExp(r'\D'), '');
   if (digits.isEmpty) return '';
+  if (digits.length == 11 && digits.startsWith('1')) {
+    digits = digits.substring(1);
+  }
   final buf = StringBuffer();
   for (var i = 0; i < digits.length; i++) {
     if (i == 3 || i == 6) buf.write('-');

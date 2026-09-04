@@ -28,7 +28,110 @@ Map<String, dynamic> _member({
       'updatedAt': enrolledAt,
     };
 
+int _helpsOf(_RosterConfig config, String email) =>
+    (NgmyCivicRegistryMembers.findByEmail(config, email)?['helps'] as num?)
+        ?.toInt() ??
+    -1;
+
+void _setHelps(_RosterConfig config, Map<String, dynamic> member, int helps) {
+  NgmyCivicRegistryMembers.syncFromFields(
+    config,
+    email: (member['email'] ?? '').toString(),
+    fullName: (member['fullName'] ?? '').toString(),
+    dob: '',
+    idType: '',
+    homeAddress: '',
+    phone: (member['phone'] ?? '').toString(),
+    city: '',
+    room: '',
+    state: (member['state'] ?? '').toString(),
+    registryId: (member['registryId'] ?? '').toString(),
+    helps: helps,
+    missed: 0,
+  );
+}
+
 void main() {
+  test('removing a help survives a cloud refresh that still has the old count', () {
+    final config = _RosterConfig();
+    final member = _member(email: 'helper@example.com', registryId: 'GA9999999');
+    NgmyCivicRegistryMembers.setList(config, [
+      {...member, 'helps': 2},
+    ]);
+
+    _setHelps(config, member, 1);
+    expect(_helpsOf(config, 'helper@example.com'), 1);
+
+    // Cloud has not caught up: still 2 helps, and its row even looks newer.
+    for (var i = 0; i < 3; i++) {
+      NgmyCivicRegistryMembers.adoptCloudPayload(
+        config,
+        {
+          'members': [
+            {
+              ...member,
+              'helps': 2,
+              'updatedAt': '2027-01-01T00:00:00.000Z',
+            },
+          ],
+          'removed': const [],
+          'deceased': const [],
+        },
+        scopeState: 'Georgia',
+      );
+      expect(
+        _helpsOf(config, 'helper@example.com'),
+        1,
+        reason: 'removed help must survive cloud refresh #${i + 1}',
+      );
+    }
+  });
+
+  test('the most recent help change wins, even when it is the smaller number', () {
+    final config = _RosterConfig();
+    final member = _member(email: 'helper@example.com', registryId: 'GA9999999');
+    NgmyCivicRegistryMembers.setList(config, [
+      {...member, 'helps': 5, 'activityAt': '2026-02-01T00:00:00.000Z'},
+    ]);
+
+    // Another registrar removed helps after this device last touched them.
+    NgmyCivicRegistryMembers.adoptCloudPayload(
+      config,
+      {
+        'members': [
+          {...member, 'helps': 1, 'activityAt': '2026-03-01T00:00:00.000Z'},
+        ],
+        'removed': const [],
+        'deceased': const [],
+      },
+      scopeState: 'Georgia',
+    );
+
+    expect(_helpsOf(config, 'helper@example.com'), 1);
+  });
+
+  test('a help recorded elsewhere still lands when this device never set one', () {
+    final config = _RosterConfig();
+    final member = _member(email: 'helper@example.com', registryId: 'GA9999999');
+    NgmyCivicRegistryMembers.setList(config, [
+      {...member, 'helps': 0},
+    ]);
+
+    NgmyCivicRegistryMembers.adoptCloudPayload(
+      config,
+      {
+        'members': [
+          {...member, 'helps': 3, 'activityAt': '2026-03-01T00:00:00.000Z'},
+        ],
+        'removed': const [],
+        'deceased': const [],
+      },
+      scopeState: 'Georgia',
+    );
+
+    expect(_helpsOf(config, 'helper@example.com'), 3);
+  });
+
   test('cloud refresh never turns a redacted row into a new member', () {
     final config = _RosterConfig();
     NgmyCivicRegistryMembers.setList(config, [

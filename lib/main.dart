@@ -2993,8 +2993,8 @@ UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> 
   // Prefer non-empty registry state — empty string must not wipe a valid account state.
   final memberState = (m['state'] ?? '').toString().trim();
   u.state = memberState.isNotEmpty ? memberState : u.state;
-  u.helps = m['helps'] is num ? (m['helps'] as num).toInt() : u.helps;
-  u.missed = m['missed'] is num ? (m['missed'] as num).toInt() : u.missed;
+  u.helps = NgmyCivicRegistryMembers.intOf(m['helps'], fallback: u.helps);
+  u.missed = NgmyCivicRegistryMembers.intOf(m['missed'], fallback: u.missed);
   return u;
 }
 
@@ -30927,6 +30927,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _copyingEnrollLink = false;
   String? _lastHelpsReconcileState;
   DateTime? _lastHelpsReconcileAt;
+  DateTime? _lastHelpMutationAt;
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -35526,10 +35527,36 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return false;
   }
 
-  bool _memberCountsAsTopHelper(UserData u, String state) {
-    if (u.helps > 0) return true;
-    return _recordedContributionCountForMember(u, forState: state) > 0;
+  /// Did a registrar/admin set this member's helps after their newest recorded
+  /// contribution? If so their number is the intended one and backfilling from
+  /// contribution rows must not touch it — otherwise removing a help credit
+  /// silently reappears the moment the Rankings tab rebuilds.
+  bool _helpsSetAfterNewestContribution(UserData u, String state) {
+    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
+    if (raw == null) return false;
+    final setAt = NgmyCivicRegistryMembers.activityStampOf(raw);
+    if (setAt == null) return false;
+    DateTime? newest;
+    for (final t in _contributionsForMember(u)) {
+      final meta = _decodeContributionMeta(t);
+      if (!_contributionMatchesState(t, meta, state)) continue;
+      if (newest == null || t.timestamp.isAfter(newest)) newest = t.timestamp;
+    }
+    if (newest == null) return true;
+    return !setAt.toUtc().isBefore(newest.toUtc());
   }
+
+  /// Rankings follow the help number on the member. Money rows must not
+  /// reconstruct a higher count — that is why removing a help looked like it
+  /// worked (snackbar) while Top Helpers never moved.
+  int _effectiveHelpsForRanking(UserData u, String state) {
+    if (u.helps > 0) return u.helps;
+    return 0;
+  }
+
+  bool _memberCountsAsTopHelper(UserData u, String state) =>
+      _effectiveHelpsForRanking(u, state) > 0;
 
   /// Earliest contribution time for rankings — active help campaign when on, else any in state.
   DateTime? _rankingContributionTime(UserData u, String state) {
@@ -35558,6 +35585,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final st = state.trim();
     if (st.isEmpty || !_canUseRegistrarToolsHere(st)) return;
     final now = DateTime.now();
+    // A just-removed help must not be written back by a recount of money rows
+    // on the next Rankings rebuild.
+    if (_lastHelpMutationAt != null &&
+        now.difference(_lastHelpMutationAt!) < const Duration(minutes: 2)) {
+      return;
+    }
     if (_lastHelpsReconcileState == st &&
         _lastHelpsReconcileAt != null &&
         now.difference(_lastHelpsReconcileAt!) < const Duration(seconds: 45)) {
@@ -35568,10 +35601,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, st))
         .toList();
     for (final u in enrolled) {
+      final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+          NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '');
+      // A registrar already set this number (including a removal). Don't
+      // reconstruct it from leftover money rows.
+      if (raw != null && NgmyCivicRegistryMembers.activityStampOf(raw) != null) {
+        continue;
+      }
       final recorded = _recordedContributionCountForMember(u, forState: st);
-      final next = recorded > u.helps ? recorded : u.helps;
-      if (u.helps == next) continue;
-      u.helps = next;
+      if (recorded <= u.helps) continue;
+      u.helps = recorded;
       _syncCivicMemberRecordFromUser(widget.config, u);
       final key = NgmyCivicRegistryMembers.emailKey(u.email);
       if (key.isNotEmpty) {
@@ -35596,29 +35635,41 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Future<void> _persistCivicMemberActivity(UserData member) async {
     _syncCivicMemberRecordFromUser(widget.config, member);
-    await ngmyPersistCivicRegistryMembers(widget.config);
+    await ngmyPersistCivicRegistryMembers(widget.config, state: _selectedState);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
     } catch (_) {}
   }
 
+  /// Writes the help count onto the roster immediately so Rankings rebuild
+  /// from the new number instead of a leftover display copy.
+  void _commitMemberHelpCount(UserData member, int helps) {
+    final next = helps < 0 ? 0 : helps;
+    member.helps = next;
+    _lastHelpMutationAt = DateTime.now();
+    _syncCivicMemberRecordFromUser(widget.config, member);
+    final key = NgmyCivicRegistryMembers.emailKey(member.email);
+    if (key.isNotEmpty) {
+      final idx = widget.allUsers.indexWhere(
+        (x) => NgmyCivicRegistryMembers.emailKey(x.email) == key,
+      );
+      if (idx >= 0) widget.allUsers[idx].helps = next;
+    }
+  }
+
   Future<void> _resetHelpsMissedForMembers(List<UserData> targets) async {
     if (targets.isEmpty) return;
     setState(() {
       for (final m in targets) {
-        m.helps = 0;
         m.missed = 0;
-        _syncCivicMemberRecordFromUser(widget.config, m);
+        _commitMemberHelpCount(m, 0);
         final key = NgmyCivicRegistryMembers.emailKey(m.email);
         if (key.isEmpty) continue;
         final idx = widget.allUsers.indexWhere(
           (u) => NgmyCivicRegistryMembers.emailKey(u.email) == key,
         );
-        if (idx >= 0) {
-          widget.allUsers[idx].helps = 0;
-          widget.allUsers[idx].missed = 0;
-        }
+        if (idx >= 0) widget.allUsers[idx].missed = 0;
       }
     });
     await ngmyPersistCivicRegistryMembers(widget.config);
@@ -35907,14 +35958,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   void _applyLocalContributionDeletion(AppTransaction target, {UserData? member}) {
     final id = target.id.trim();
-    if (id.isEmpty) return;
-    if (!widget.config.civicDeletedContributionIds.contains(id)) {
-      widget.config.civicDeletedContributionIds = [...widget.config.civicDeletedContributionIds, id];
+    if (id.isNotEmpty) {
+      if (!widget.config.civicDeletedContributionIds.contains(id)) {
+        widget.config.civicDeletedContributionIds = [...widget.config.civicDeletedContributionIds, id];
+      }
+      widget.allTransactions.removeWhere((t) => t.id == id);
+      _communityContributions.removeWhere((t) => t.id == id);
     }
-    widget.allTransactions.removeWhere((t) => t.id == id);
-    _communityContributions.removeWhere((t) => t.id == id);
     if (member != null && member.helps > 0) {
-      member.helps -= 1;
+      _commitMemberHelpCount(member, member.helps - 1);
     }
   }
 
@@ -40117,27 +40169,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     if (confirmed != true || !mounted) return;
     setState(() {
-      if (u.helps > 0) u.helps -= 1;
+      _commitMemberHelpCount(u, u.helps - 1);
     });
     await _persistCivicMemberActivity(u);
-    NgmyCivicRegistryMembers.syncFromFields(
-      widget.config,
-      email: u.email,
-      fullName: u.fullName ?? u.username,
-      dob: u.dob ?? '',
-      idType: u.idType ?? '',
-      homeAddress: u.homeAddress ?? '',
-      phone: u.phone,
-      city: u.city ?? '',
-      room: u.room ?? '',
-      state: u.state,
-      registryId: u.registryId ?? '',
-      helps: u.helps,
-      missed: u.missed,
-    );
-    unawaited(ngmyPersistCivicRegistryMembers(widget.config));
     widget.onDataChanged();
     if (!mounted) return;
+    setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Removed 1 help credit for ${u.fullName ?? u.username}.')),
     );
@@ -40333,23 +40370,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 await ngmyPersistCivicDeletedContributions(widget.config, addedIds: [id]);
                 await _purgeTombstonedContributionsFromCloud({id});
               }
-              unawaited(_persistCivicMemberActivity(u));
-              NgmyCivicRegistryMembers.syncFromFields(
-                widget.config,
-                email: u.email,
-                fullName: u.fullName ?? u.username,
-                dob: u.dob ?? '',
-                idType: u.idType ?? '',
-                homeAddress: u.homeAddress ?? '',
-                phone: u.phone,
-                city: u.city ?? '',
-                room: u.room ?? '',
-                state: u.state,
-                registryId: u.registryId ?? '',
-                helps: u.helps,
-                missed: u.missed,
-              );
-              unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+              await _persistCivicMemberActivity(u);
               widget.onDataChanged();
               records.removeWhere((r) => r.id == t.id);
               setDialogState(() {});
@@ -41100,11 +41121,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           _helpRow(
                             icon: Icons.call_outlined,
                             title: 'Call for Help',
-                            value: widget.config.helpPhoneFor(helpModeStateName),
+                            value: ngmyFormatPhoneDisplay(widget.config.helpPhoneFor(helpModeStateName)),
                             color: Colors.blue,
                             onTap: _callHelpPhone,
                             tapHint: 'Tap row to call now',
-                            onCopyTap: () => _copyText(widget.config.helpPhoneFor(helpModeStateName), 'Phone'),
+                            onCopyTap: () => _copyText(
+                              ngmyFormatPhoneDisplay(widget.config.helpPhoneFor(helpModeStateName)),
+                              'Phone number',
+                            ),
                           ),
                           Container(
                             margin: const EdgeInsets.only(top: 8),
@@ -42826,6 +42850,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     String? tapHint,
     VoidCallback? onCopyTap,
   }) {
+    final looksLikePhone = title.toLowerCase().contains('phone') ||
+        title.toLowerCase().contains('call');
+    final shown = looksLikePhone ? ngmyFormatPhoneDisplay(value) : value;
     final content = Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -42844,7 +42871,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               children: [
                 Text(title, style: const TextStyle(fontSize: 11, color: Colors.black87, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 2),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.black)),
+                Text(shown, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Colors.black)),
                 if (tapHint != null && onTap != null) ...[
                   const SizedBox(height: 2),
                   Text(tapHint, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
@@ -43265,7 +43292,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const Color(0xFFE8F5E9),
                   Colors.green,
                   isDark,
-                  helps: e.value.helps,
+                  helps: _effectiveHelpsForRanking(e.value, st),
                 ),
               ),
 
@@ -43388,7 +43415,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             rank: e.key + 1,
             name: (e.value.fullName ?? e.value.username).trim(),
             registryId: (e.value.registryId ?? '').trim(),
-            helps: e.value.helps,
+            helps: _effectiveHelpsForRanking(e.value, stateName),
             missed: e.value.missed,
           ),
         )

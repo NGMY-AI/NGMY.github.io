@@ -1436,6 +1436,17 @@ function preferMemberRow(
       preferred[key] = other[key];
     }
   }
+  // helps/missed follow activityAt, their own mutation stamp. A row can be
+  // newer overall (contact edit, dedupe pass) while carrying a stale help
+  // count, and taking it wholesale is what made "remove help" come back.
+  const aa = Date.parse(String(a.activityAt ?? "")) || 0;
+  const ba = Date.parse(String(b.activityAt ?? "")) || 0;
+  if (aa || ba) {
+    const counters = ba > aa ? b : a;
+    preferred.helps = counters.helps ?? 0;
+    preferred.missed = counters.missed ?? 0;
+    if (counters.activityAt) preferred.activityAt = counters.activityAt;
+  }
   return preferred;
 }
 
@@ -1545,6 +1556,10 @@ function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unk
     showNicknames: m.showNicknames === true,
     helps: m.helps ?? 0,
     missed: m.missed ?? 0,
+    // Ships with the counters it belongs to. Dropping it here would leave the
+    // receiving device unable to tell a fresh count from a stale one, and its
+    // merge would fall back to keeping whichever number is larger.
+    activityAt: m.activityAt,
     contributionCount: m.contributionCount,
     enrolledAt: m.enrolledAt,
     updatedAt: m.updatedAt,

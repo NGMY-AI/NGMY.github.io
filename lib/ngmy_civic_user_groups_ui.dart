@@ -4072,8 +4072,8 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeMemberSheet(
                   if (group.helpPhone.trim().isNotEmpty)
                     _helpInfoCard(
                       ctx,
-                      label: 'PHONE',
-                      value: group.helpPhone.trim(),
+                      label: 'PHONE NUMBER',
+                      value: ngmyPhoneDashed(group.helpPhone),
                       icon: Icons.phone_in_talk_rounded,
                       onTap: () => _callLightningPhone(group.helpPhone),
                       tapHint: 'Call',

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 
@@ -128,6 +129,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
   bool _searchOpen = false;
   final _searchC = TextEditingController();
   final _ledgerScrollC = ScrollController();
+  final _expenseScrollC = ScrollController();
   DateTimeRange? _dateFilter;
 
   /// 10 quick taps on a spending row unlocks edit; 2s idle resets the count.
@@ -165,6 +167,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _livePoll?.cancel();
     _searchC.dispose();
     _ledgerScrollC.dispose();
+    _expenseScrollC.dispose();
     super.dispose();
   }
 
@@ -2369,112 +2372,160 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     return true;
   }
 
-  Widget _animatedLedgerRow(
-    NgmyCivicWalletTxn txn,
-    _WalletTone tone,
-    int index,
-  ) {
+  Widget _parallaxWindowRow({
+    required ScrollController controller,
+    required int index,
+    required double extent,
+    required Widget child,
+  }) {
     return AnimatedBuilder(
-      animation: _ledgerScrollC,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _onTransactionTap(txn),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: txn.isPendingDelete
-                    ? const Color(0xFFDC2626).withValues(
-                        alpha: tone.isDark ? 0.22 : 0.12,
-                      )
-                    : tone.iconWell,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                txn.isPendingDelete
-                    ? Icons.timer_outlined
-                    : (txn.isInflow
-                        ? Icons.south_west_rounded
-                        : Icons.north_east_rounded),
-                color: txn.isPendingDelete
-                    ? const Color(0xFFDC2626)
-                    : (txn.isInflow
-                        ? const Color(0xFF059669)
-                        : const Color(0xFFEA580C)),
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    txn.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                      color: tone.primaryText,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (txn.isPendingDelete)
-                    Text(
-                      'Deleting in ${_formatDeleteCountdown(txn.pendingDeleteAt)}',
-                      style: const TextStyle(
-                        color: Color(0xFFDC2626),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: [FontFeature.tabularFigures()],
-                      ),
-                    )
-                  else
-                    Text(
-                      txn.isTrust
-                          ? (txn.isInflow
-                              ? 'State Trust deposit'
-                              : 'State Trust spend')
-                          : (txn.isInflow
-                              ? 'Contribution'
-                              : 'Contribution spend'),
-                      style: TextStyle(
-                        color: tone.secondaryText,
-                        fontSize: 12,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Text(
-              '${txn.isInflow ? '+' : '-'}${_money(txn.amount.abs())}',
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: txn.isInflow
-                    ? const Color(0xFF059669)
-                    : tone.primaryText,
-              ),
-            ),
-          ],
-        ),
-      ),
-      builder: (context, child) {
-        final offset = _ledgerScrollC.hasClients ? _ledgerScrollC.offset : 0.0;
-        const extent = 64.0;
+      animation: controller,
+      child: child,
+      builder: (context, built) {
+        final offset = controller.hasClients ? controller.offset : 0.0;
         final distance = ((index * extent) - offset).abs();
         final motion = (distance / (extent * 6)).clamp(0.0, 1.0);
         return Opacity(
-          opacity: 1 - (motion * 0.16),
+          opacity: 1 - (motion * 0.18),
           child: Transform.translate(
-            offset: Offset(0, 7 * motion),
+            offset: Offset(0, 10 * motion),
             child: Transform.scale(
-              scale: 1 - (motion * 0.025),
-              child: child,
+              scale: 1 - (motion * 0.04),
+              child: built,
             ),
           ),
         );
       },
+    );
+  }
+
+  /// Six rows on screen; anything past that scrolls with a bounce so the
+  /// outer page does not steal the drag.
+  Widget _sixRowWindow({
+    required ScrollController controller,
+    required int itemCount,
+    required double itemExtent,
+    required Widget Function(BuildContext context, int index) itemBuilder,
+  }) {
+    final visible = math.min(6, math.max(itemCount, 1));
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n.metrics.axis != Axis.vertical) return false;
+        if (itemCount <= 6) return false;
+        if (n is ScrollStartNotification || n is ScrollUpdateNotification) {
+          return n.depth == 0;
+        }
+        return false;
+      },
+      child: SizedBox(
+        height: visible * itemExtent,
+        child: Scrollbar(
+          controller: controller,
+          thumbVisibility: itemCount > 6,
+          child: ListView.builder(
+            controller: controller,
+            primary: false,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            itemExtent: itemExtent,
+            itemCount: itemCount,
+            itemBuilder: (context, index) => _parallaxWindowRow(
+              controller: controller,
+              index: index,
+              extent: itemExtent,
+              child: itemBuilder(context, index),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ledgerRow(NgmyCivicWalletTxn txn, _WalletTone tone) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _onTransactionTap(txn),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: txn.isPendingDelete
+                  ? const Color(0xFFDC2626).withValues(
+                      alpha: tone.isDark ? 0.22 : 0.12,
+                    )
+                  : tone.iconWell,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              txn.isPendingDelete
+                  ? Icons.timer_outlined
+                  : (txn.isInflow
+                      ? Icons.south_west_rounded
+                      : Icons.north_east_rounded),
+              color: txn.isPendingDelete
+                  ? const Color(0xFFDC2626)
+                  : (txn.isInflow
+                      ? const Color(0xFF059669)
+                      : const Color(0xFFEA580C)),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  txn.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    color: tone.primaryText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (txn.isPendingDelete)
+                  Text(
+                    'Deleting in ${_formatDeleteCountdown(txn.pendingDeleteAt)}',
+                    style: const TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  )
+                else
+                  Text(
+                    txn.isTrust
+                        ? (txn.isInflow
+                            ? 'State Trust deposit'
+                            : 'State Trust spend')
+                        : (txn.isInflow
+                            ? 'Contribution'
+                            : 'Contribution spend'),
+                    style: TextStyle(
+                      color: tone.secondaryText,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Text(
+            '${txn.isInflow ? '+' : '-'}${_money(txn.amount.abs())}',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: txn.isInflow
+                  ? const Color(0xFF059669)
+                  : tone.primaryText,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2722,34 +2773,45 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                children: [
-                                  if (_snap.categories.isEmpty)
-                                    Text('No contribution spending recorded yet.', style: TextStyle(color: tone.secondaryText, fontSize: 13))
-                                  else
-                                    for (final c in _snap.categories.take(6))
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 8),
-                                        child: Row(
+                              child: _snap.categories.isEmpty
+                                  ? Text('No contribution spending recorded yet.', style: TextStyle(color: tone.secondaryText, fontSize: 13))
+                                  : _sixRowWindow(
+                                      controller: _expenseScrollC,
+                                      itemCount: _snap.categories.length,
+                                      itemExtent: 28,
+                                      itemBuilder: (context, index) {
+                                        final c = _snap.categories[index];
+                                        return Row(
                                           children: [
-                                            Container(width: 8, height: 8, decoration: BoxDecoration(color: c.color, shape: BoxShape.circle)),
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(color: c.color, shape: BoxShape.circle),
+                                            ),
                                             const SizedBox(width: 8),
                                             Expanded(
                                               child: Text(
                                                 c.name,
-                                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: tone.secondaryText),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 12,
+                                                  color: tone.secondaryText,
+                                                ),
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                             Text(
                                               _money(c.amount),
-                                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: tone.primaryText),
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 12,
+                                                color: tone.primaryText,
+                                              ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                ],
-                              ),
+                                        );
+                                      },
+                                    ),
                             ),
                           ],
                         ),
@@ -2822,24 +2884,12 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             style: TextStyle(color: tone.secondaryText),
                           )
                         else
-                          SizedBox(
-                            height: math.min(6, recent.length) * 64.0,
-                            child: Scrollbar(
-                              controller: _ledgerScrollC,
-                              thumbVisibility: recent.length > 6,
-                              child: ListView.builder(
-                                controller: _ledgerScrollC,
-                                physics: const BouncingScrollPhysics(),
-                                itemExtent: 64,
-                                itemCount: recent.length,
-                                itemBuilder: (context, index) =>
-                                    _animatedLedgerRow(
-                                      recent[index],
-                                      tone,
-                                      index,
-                                    ),
-                              ),
-                            ),
+                          _sixRowWindow(
+                            controller: _ledgerScrollC,
+                            itemCount: recent.length,
+                            itemExtent: 64,
+                            itemBuilder: (context, index) =>
+                                _ledgerRow(recent[index], tone),
                           ),
                       ],
                     ),

@@ -678,6 +678,18 @@ class NgmyCivicRegistryMembers {
       final keep = members[idx];
       next['helps'] = next['helps'] ?? keep['helps'] ?? 0;
       next['missed'] = next['missed'] ?? keep['missed'] ?? 0;
+      // Stamp deliberate help/missed changes so no later merge can undo them.
+      // Removing a help used to be impossible: the counters merged by keeping
+      // the larger number, so the pre-upload cloud read handed the old count
+      // straight back and the member never left Top Helpers.
+      final countersChanged = _intOf(next['helps']) != _intOf(keep['helps']) ||
+          _intOf(next['missed']) != _intOf(keep['missed']);
+      if (countersChanged) {
+        next['activityAt'] = now;
+      } else {
+        final prevStamp = (next['activityAt'] ?? keep['activityAt'] ?? '').toString();
+        if (prevStamp.isNotEmpty) next['activityAt'] = prevStamp;
+      }
       next['familyMembers'] = next['familyMembers'] ?? keep['familyMembers'] ?? 1;
       next['familyMales'] = next['familyMales'] ?? keep['familyMales'] ?? 0;
       next['familyFemales'] = next['familyFemales'] ?? keep['familyFemales'] ?? 0;
@@ -860,12 +872,7 @@ class NgmyCivicRegistryMembers {
     if (next['passportGranted'] != true && other['passportGranted'] == true) {
       next['passportGranted'] = true;
     }
-    final helps = ((next['helps'] as num?)?.toInt() ?? 0);
-    final otherHelps = ((other['helps'] as num?)?.toInt() ?? 0);
-    if (otherHelps > helps) next['helps'] = otherHelps;
-    final missed = ((next['missed'] as num?)?.toInt() ?? 0);
-    final otherMissed = ((other['missed'] as num?)?.toInt() ?? 0);
-    if (otherMissed > missed) next['missed'] = otherMissed;
+    _mergeHelpCounters(next, keep, other);
     if ((next['nicknames'] is! List || (next['nicknames'] as List).isEmpty) && other['nicknames'] is List) {
       next['nicknames'] = other['nicknames'];
     }
@@ -2066,6 +2073,53 @@ class NgmyCivicRegistryMembers {
     return DateTime.tryParse((m['updatedAt'] ?? m['enrolledAt'] ?? '').toString());
   }
 
+  static int _intOf(dynamic v) => intOf(v);
+
+  /// Helps/missed come back from JSON as int, double, or string. Rankings
+  /// used to ignore anything that wasn't a `num`, so a removed help of `"0"`
+  /// kept showing the previous count.
+  static int intOf(dynamic v, {int fallback = 0}) {
+    if (v is num) return v.toInt();
+    return int.tryParse('${v ?? ''}') ?? fallback;
+  }
+
+  /// When helps/missed were last deliberately changed for this member.
+  ///
+  /// `updatedAt` cannot answer that question: dedupe, redaction repair and
+  /// every roster merge refresh it without touching the counters. Without a
+  /// stamp of its own, the only safe merge rule for helps was "keep the bigger
+  /// number", which made removing a help impossible — the next cloud refresh
+  /// always handed the old, larger count back.
+  static DateTime? activityStampOf(Map<String, dynamic> m) =>
+      DateTime.tryParse((m['activityAt'] ?? '').toString());
+
+  /// Reconciles helps/missed between two rows for the same person. The side
+  /// that changed them most recently wins, so a removal survives; with no
+  /// stamps on either side we fall back to the old keep-the-larger rule so
+  /// legacy rows still cannot lose a help to a stale partial payload.
+  static void _mergeHelpCounters(
+    Map<String, dynamic> out,
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    final sa = activityStampOf(a);
+    final sb = activityStampOf(b);
+    if (sa != null || sb != null) {
+      final winner = sa == null
+          ? b
+          : sb == null
+              ? a
+              : (sb.isAfter(sa) ? b : a);
+      out['helps'] = _intOf(winner['helps']);
+      out['missed'] = _intOf(winner['missed']);
+      final stamp = (winner['activityAt'] ?? '').toString();
+      if (stamp.isNotEmpty) out['activityAt'] = stamp;
+      return;
+    }
+    out['helps'] = math.max(_intOf(a['helps']), _intOf(b['helps']));
+    out['missed'] = math.max(_intOf(a['missed']), _intOf(b['missed']));
+  }
+
   static Map<String, dynamic> _preferNewerMember(Map<String, dynamic> a, Map<String, dynamic> b) {
     final ta = _memberStamp(a);
     final tb = _memberStamp(b);
@@ -2161,6 +2215,7 @@ class NgmyCivicRegistryMembers {
         'registryId',
         'helps',
         'missed',
+        'activityAt',
         'enrolledAt',
         'updatedAt',
         'enrollmentSource',
@@ -2213,6 +2268,9 @@ class NgmyCivicRegistryMembers {
         out[key] = b[key];
       }
     }
+    // helps/missed follow their own stamp, not whichever row won overall — a
+    // row can be newer for contact edits while holding a stale help count.
+    _mergeHelpCounters(out, a, b);
     return out;
   }
 
