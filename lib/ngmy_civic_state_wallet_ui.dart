@@ -266,6 +266,107 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     return neg ? '-$core' : core;
   }
 
+  String _expenseDateLabel(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+
+  bool _spendingInVisibleRange(DateTime at) {
+    if (_dateFilter != null) {
+      final d = DateTime(at.year, at.month, at.day);
+      final a = DateTime(_dateFilter!.start.year, _dateFilter!.start.month, _dateFilter!.start.day);
+      final b = DateTime(_dateFilter!.end.year, _dateFilter!.end.month, _dateFilter!.end.day);
+      return !d.isBefore(a) && !d.isAfter(b);
+    }
+    final now = DateTime.now();
+    DateTime? rangeStart;
+    switch (_range) {
+      case 0:
+        rangeStart = DateTime(now.year, now.month, now.day);
+        break;
+      case 1:
+        rangeStart = now.subtract(const Duration(days: 7));
+        break;
+      case 2:
+        rangeStart = DateTime(now.year, now.month, 1);
+        break;
+      case 3:
+        rangeStart = DateTime(now.year, 1, 1);
+        break;
+    }
+    if (rangeStart == null) return true;
+    return !at.isBefore(rangeStart);
+  }
+
+  List<NgmyCivicWalletSpendingRow> _spendingsForCategory(String name) {
+    final key = name.trim().toLowerCase();
+    return _snap.spendings
+        .where((s) =>
+            !s.isTrust &&
+            s.description.trim().toLowerCase() == key &&
+            _spendingInVisibleRange(s.recordedAt))
+        .toList();
+  }
+
+  int? _sliceIndexAt(Offset local, Size size, List<NgmyCivicWalletCategory> cats) {
+    if (cats.isEmpty) return null;
+    final center = Offset(size.width / 2, size.height / 2);
+    final dx = local.dx - center.dx;
+    final dy = local.dy - center.dy;
+    final radius = math.min(size.width, size.height) / 2;
+    if (math.sqrt(dx * dx + dy * dy) > radius) return null;
+    var angle = math.atan2(dy, dx);
+    // Painter starts at 12 o'clock (-pi/2) and sweeps clockwise (positive).
+    var fromTop = angle + math.pi / 2;
+    if (fromTop < 0) fromTop += math.pi * 2;
+    final total = cats.fold<double>(0, (s, c) => s + c.amount);
+    if (total <= 0) return null;
+    var start = 0.0;
+    for (var i = 0; i < cats.length; i++) {
+      final sweep = (cats[i].amount / total) * math.pi * 2;
+      if (fromTop >= start && fromTop < start + sweep) return i;
+      start += sweep;
+    }
+    return cats.length - 1;
+  }
+
+  Future<void> _openExpenseCircle() async {
+    final cats = _snap.categories;
+    if (cats.isEmpty) return;
+    final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
+    final spent = cats.fold<double>(0, (s, c) => s + c.amount);
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Close expenses',
+      barrierColor: Colors.black.withValues(alpha: 0.62),
+      transitionDuration: const Duration(milliseconds: 480),
+      pageBuilder: (ctx, a, b) => _ExpenseCircleSheet(
+        tone: tone,
+        categories: cats,
+        spent: spent,
+        money: _money,
+        dateLabel: _expenseDateLabel,
+        spendingsFor: _spendingsForCategory,
+        sliceIndexAt: _sliceIndexAt,
+      ),
+      transitionBuilder: (ctx, anim, secondary, child) {
+        final open = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
+        final fade = CurvedAnimation(parent: anim, curve: Curves.easeOut);
+        return FadeTransition(
+          opacity: fade,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.22, end: 1).animate(open),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showNationwideContributionsDialog(NgmyCivicNationwideStats stats) async {
     final tone = _WalletTone(Theme.of(context).brightness == Brightness.dark);
     final isAdmin = widget.onAdminDeleteContribution != null || widget.onAdminResetContributionCount != null;
@@ -2419,9 +2520,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       },
       child: SizedBox(
         height: visible * itemExtent,
-        child: Scrollbar(
-          controller: controller,
-          thumbVisibility: itemCount > 6,
+        child: ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
           child: ListView.builder(
             controller: controller,
             primary: false,
@@ -2757,17 +2857,21 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         const SizedBox(height: 18),
                         Row(
                           children: [
-                            SizedBox(
-                              width: 140,
-                              height: 140,
-                              child: CustomPaint(
-                                painter: _DonutPainter(
-                                  slices: _snap.categories.map((c) => _DonutSlice(c.amount, c.color)).toList(),
-                                  centerLabel: 'Total',
-                                  centerValue: _money(spent),
-                                  labelColor: tone.secondaryText,
-                                  valueColor: tone.primaryText,
-                                  emptyColor: tone.progressTrack,
+                            GestureDetector(
+                              onTap: _openExpenseCircle,
+                              behavior: HitTestBehavior.opaque,
+                              child: SizedBox(
+                                width: 140,
+                                height: 140,
+                                child: CustomPaint(
+                                  painter: _DonutPainter(
+                                    slices: _snap.categories.map((c) => _DonutSlice(c.amount, c.color)).toList(),
+                                    centerLabel: 'Total',
+                                    centerValue: _money(spent),
+                                    labelColor: tone.secondaryText,
+                                    valueColor: tone.primaryText,
+                                    emptyColor: tone.progressTrack,
+                                  ),
                                 ),
                               ),
                             ),
@@ -3533,6 +3637,225 @@ class _Card extends StatelessWidget {
   }
 }
 
+class _ExpenseCircleSheet extends StatefulWidget {
+  const _ExpenseCircleSheet({
+    required this.tone,
+    required this.categories,
+    required this.spent,
+    required this.money,
+    required this.dateLabel,
+    required this.spendingsFor,
+    required this.sliceIndexAt,
+  });
+
+  final _WalletTone tone;
+  final List<NgmyCivicWalletCategory> categories;
+  final double spent;
+  final String Function(double) money;
+  final String Function(DateTime) dateLabel;
+  final List<NgmyCivicWalletSpendingRow> Function(String name) spendingsFor;
+  final int? Function(Offset local, Size size, List<NgmyCivicWalletCategory> cats) sliceIndexAt;
+
+  @override
+  State<_ExpenseCircleSheet> createState() => _ExpenseCircleSheetState();
+}
+
+class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet> {
+  int? _selected;
+
+  NgmyCivicWalletCategory? get _cat {
+    final i = _selected;
+    if (i == null || i < 0 || i >= widget.categories.length) return null;
+    return widget.categories[i];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = widget.tone;
+    final cat = _cat;
+    final rows = cat == null ? const <NgmyCivicWalletSpendingRow>[] : widget.spendingsFor(cat.name);
+    final size = MediaQuery.sizeOf(context);
+    final circle = math.min(size.width - 48, size.height * 0.52).clamp(220.0, 340.0);
+    final percent = cat == null || widget.spent <= 0
+        ? ''
+        : '${((cat.amount / widget.spent) * 100).toStringAsFixed(0)}% of spending';
+
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
+          child: Column(
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.close_rounded, color: tone.headerFg),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: GestureDetector(
+                    onTapDown: (d) {
+                      final next = widget.sliceIndexAt(
+                        d.localPosition,
+                        Size(circle, circle),
+                        widget.categories,
+                      );
+                      if (next == null) return;
+                      setState(() => _selected = next);
+                    },
+                    child: SizedBox(
+                      width: circle,
+                      height: circle,
+                      child: CustomPaint(
+                        painter: _DonutPainter(
+                          slices: widget.categories
+                              .map((c) => _DonutSlice(c.amount, c.color))
+                              .toList(),
+                          centerLabel: cat?.name ?? 'Total',
+                          centerValue: widget.money(cat?.amount ?? widget.spent),
+                          labelColor: tone.secondaryText,
+                          valueColor: tone.primaryText,
+                          emptyColor: tone.progressTrack,
+                          filled: true,
+                          selectedIndex: _selected,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                cat == null
+                    ? 'Tap a color for every expense in that slice'
+                    : percent,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: tone.secondaryText,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 12),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 280),
+                curve: Curves.easeOutCubic,
+                child: cat == null
+                    ? const SizedBox(width: double.infinity, height: 0)
+                    : Container(
+                        width: double.infinity,
+                        constraints: BoxConstraints(maxHeight: size.height * 0.32),
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                        decoration: BoxDecoration(
+                          color: tone.cardBg,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: cat.color.withValues(alpha: 0.55), width: 1.4),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    cat.name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 16,
+                                      color: tone.primaryText,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  widget.money(cat.amount),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16,
+                                    color: tone.primaryText,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            if (rows.isEmpty)
+                              Text(
+                                'No recorded dates for this slice.',
+                                style: TextStyle(color: tone.secondaryText, fontSize: 13),
+                              )
+                            else
+                              ConstrainedBox(
+                                constraints: BoxConstraints(maxHeight: size.height * 0.22),
+                                child: ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: rows.length,
+                                  separatorBuilder: (_, __) => Divider(
+                                    height: 14,
+                                    color: tone.cardBorder,
+                                  ),
+                                  itemBuilder: (_, i) {
+                                    final r = rows[i];
+                                    return Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                r.description,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 13,
+                                                  color: tone.primaryText,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                widget.dateLabel(r.recordedAt),
+                                                style: TextStyle(
+                                                  color: tone.secondaryText,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          widget.money(r.amount),
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: tone.primaryText,
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DonutSlice {
   const _DonutSlice(this.value, this.color);
   final double value;
@@ -3547,6 +3870,8 @@ class _DonutPainter extends CustomPainter {
     required this.labelColor,
     required this.valueColor,
     required this.emptyColor,
+    this.filled = false,
+    this.selectedIndex,
   });
   final List<_DonutSlice> slices;
   final String centerLabel;
@@ -3554,27 +3879,41 @@ class _DonutPainter extends CustomPainter {
   final Color labelColor;
   final Color valueColor;
   final Color emptyColor;
+  final bool filled;
+  final int? selectedIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius - 6);
     final total = slices.fold<double>(0, (s, e) => s + e.value);
     var start = -math.pi / 2;
     if (total <= 0 || slices.isEmpty) {
-      canvas.drawArc(
-        rect,
-        0,
-        math.pi * 2,
-        false,
+      canvas.drawCircle(
+        center,
+        radius - (filled ? 2 : 6),
         Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 16
-          ..color = emptyColor
-          ..strokeCap = StrokeCap.round,
+          ..style = filled ? PaintingStyle.fill : PaintingStyle.stroke
+          ..strokeWidth = filled ? 0 : 16
+          ..color = emptyColor,
       );
+    } else if (filled) {
+      canvas.drawCircle(center, radius - 2, Paint()..color = emptyColor.withValues(alpha: 0.35));
+      for (var i = 0; i < slices.length; i++) {
+        final slice = slices[i];
+        final sweep = (slice.value / total) * math.pi * 2;
+        final grow = selectedIndex == i ? 10.0 : 0.0;
+        canvas.drawArc(
+          Rect.fromCircle(center: center, radius: radius - 4 + grow),
+          start,
+          sweep,
+          true,
+          Paint()..style = PaintingStyle.fill..color = slice.color,
+        );
+        start += sweep;
+      }
     } else {
+      final rect = Rect.fromCircle(center: center, radius: radius - 6);
       for (final slice in slices) {
         final sweep = (slice.value / total) * math.pi * 2;
         canvas.drawArc(
@@ -3592,15 +3931,27 @@ class _DonutPainter extends CustomPainter {
       }
     }
     final tp1 = TextPainter(
-      text: TextSpan(text: centerLabel, style: TextStyle(color: labelColor, fontSize: 11, fontWeight: FontWeight.w600)),
+      text: TextSpan(
+        text: centerLabel,
+        style: TextStyle(
+          color: labelColor,
+          fontSize: filled ? 13 : 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
       textDirection: TextDirection.ltr,
-    )..layout();
+      maxLines: 2,
+      ellipsis: '…',
+    )..layout(maxWidth: radius * (filled ? 1.1 : 1.0));
     final tp2 = TextPainter(
-      text: TextSpan(text: centerValue, style: TextStyle(color: valueColor, fontSize: 13, fontWeight: FontWeight.w900)),
+      text: TextSpan(
+        text: centerValue,
+        style: TextStyle(color: valueColor, fontSize: filled ? 18 : 13, fontWeight: FontWeight.w900),
+      ),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: radius);
-    tp1.paint(canvas, Offset(center.dx - tp1.width / 2, center.dy - 12));
-    tp2.paint(canvas, Offset(center.dx - tp2.width / 2, center.dy + 2));
+    tp1.paint(canvas, Offset(center.dx - tp1.width / 2, center.dy - (filled ? 18 : 12)));
+    tp2.paint(canvas, Offset(center.dx - tp2.width / 2, center.dy + (filled ? 4 : 2)));
   }
 
   @override

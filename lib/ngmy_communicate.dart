@@ -3487,7 +3487,7 @@ class _LoveWorldBackground extends StatelessWidget {
   }
 }
 
-/// Hold message text ~3 seconds to auto-copy to clipboard.
+/// Hold ~3 seconds or double-tap to copy a message.
 class _HoldToCopyBubble extends StatefulWidget {
   const _HoldToCopyBubble({
     required this.child,
@@ -3534,6 +3534,10 @@ class _HoldToCopyBubbleState extends State<_HoldToCopyBubble> {
       onLongPressStart: (_) => _startHold(),
       onLongPressEnd: (_) => _cancelHold(),
       onLongPressCancel: _cancelHold,
+      onDoubleTap: () {
+        _cancelHold();
+        unawaited(widget.onCopied(widget.copyText.trim()));
+      },
       behavior: HitTestBehavior.opaque,
       child: widget.child,
     );
