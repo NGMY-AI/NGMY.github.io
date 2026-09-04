@@ -12626,6 +12626,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateWalletPaymentsFromAllBackups(_config);
       await ngmyHydrateHelperAiSettingsFromAllBackups(_config);
       await ngmyHydrateCivicHelpModeFromAllBackups(_config);
+      await ngmyHydrateCivicHelpCampaignSpendings(_config);
       await ngmyHydrateCivicContributionReceiptRemoved(_config);
       await ngmyHydrateCivicDeletedContributions(_config);
       await ngmyHydrateAppBrandingFromAllBackups(_config);
