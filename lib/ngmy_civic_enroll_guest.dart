@@ -10,6 +10,7 @@ import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_network_resilience.dart';
+import 'ngmy_phone_format.dart';
 import 'ngmy_state_picker.dart';
 import 'ngmy_web_status_bar.dart';
 
@@ -283,7 +284,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     if (_submitting) return;
     final fullName = _nameC.text.trim();
     final address = _addressC.text.trim();
-    final phone = _phoneC.text.trim();
+    // The field shows dashes (123-456-7890); the registry stores digits only,
+    // same as registrar enrollment, so matching and de-duplication still work.
+    final phone = ngmyPhoneDigits(_phoneC.text);
     final familyRaw = _familyMembersC.text.trim();
     final familyMembers = int.tryParse(familyRaw) ?? 0;
     final malesRaw = _familyMalesC.text.trim();
@@ -310,7 +313,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       return;
     }
     if (!RegExp(r'^\d{7,15}$').hasMatch(phone)) {
-      _toast('Simu iwe nambari tu (tarakimu 7–15).');
+      _toast('Nambari ya simu iwe tarakimu 7–15.');
       return;
     }
     if (familyRaw.isEmpty) {
@@ -966,8 +969,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     controller: _phoneC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: _dec('Simu'),
+                    inputFormatters: const [NgmyPhoneDashFormatter()],
+                    decoration: _dec('Nambari ya simu').copyWith(hintText: '123-456-7890'),
                   ),
                 ),
                 const SizedBox(height: 12),

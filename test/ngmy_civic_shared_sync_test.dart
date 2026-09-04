@@ -45,6 +45,81 @@ void main() {
     expect((merged['georgia'] as Map)['active'], isFalse);
   });
 
+  test('stale cloud deactivation cannot undo a fresh local activation', () {
+    final merged = ngmyMergeHelpModeByStateMaps(
+      {
+        'georgia': {
+          'active': true,
+          'campaignId': 'campaign-1',
+          'updatedAt': '2026-09-02T10:05:00Z',
+        },
+      },
+      {
+        'georgia': {
+          'active': false,
+          'campaignId': 'campaign-1',
+          'updatedAt': '2026-09-02T10:01:00Z',
+        },
+      },
+    );
+
+    expect((merged['georgia'] as Map)['active'], isTrue);
+  });
+
+  test('deactivation still lands while a local write is deferred', () {
+    final merged = ngmyMergeHelpModeByStateMaps(
+      {
+        'alabama': {
+          'active': true,
+          'campaignId': 'campaign-al',
+          'cashApp': r'$alabama',
+          'updatedAt': '2026-09-02T10:00:00Z',
+        },
+      },
+      {
+        'alabama': {
+          'active': false,
+          'campaignId': 'campaign-al',
+          'updatedAt': '2026-09-02T10:01:00Z',
+        },
+      },
+      remoteOffSignalsOnly: true,
+    );
+
+    expect((merged['alabama'] as Map)['active'], isFalse);
+  });
+
+  test('deferred merge keeps local campaigns the cloud has not caught up on', () {
+    final merged = ngmyMergeHelpModeByStateMaps(
+      {
+        'georgia': {
+          'active': true,
+          'campaignId': 'campaign-new',
+          'purpose': 'Roof repair',
+          'updatedAt': '2026-09-02T10:05:00Z',
+        },
+      },
+      {
+        'georgia': {
+          'active': false,
+          'campaignId': 'campaign-old',
+          'updatedAt': '2026-09-02T10:01:00Z',
+        },
+        // A state this device has never seen must not appear mid-defer.
+        'alabama': {
+          'active': true,
+          'campaignId': 'campaign-al',
+          'updatedAt': '2026-09-02T10:04:00Z',
+        },
+      },
+      remoteOffSignalsOnly: true,
+    );
+
+    expect((merged['georgia'] as Map)['active'], isTrue);
+    expect((merged['georgia'] as Map)['purpose'], 'Roof repair');
+    expect(merged.containsKey('alabama'), isFalse);
+  });
+
   test('closed local-only campaign cannot be resurrected', () {
     final merged = ngmyMergeHelpModeByStateMaps(
       {

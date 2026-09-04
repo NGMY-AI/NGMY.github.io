@@ -128,6 +128,7 @@ import 'ngmy_hub_tools_bridge.dart';
 import 'ngmy_help_center.dart';
 import 'ngmy_help_center_ui.dart';
 import 'ngmy_help_center_admin.dart';
+import 'ngmy_phone_format.dart';
 import 'ngmy_phone_required_gate.dart';
 import 'ngmy_loans.dart';
 import 'ngmy_bottom_nav_frame.dart';
@@ -717,24 +718,8 @@ class DateSlashFormatter extends TextInputFormatter {
 }
 
 /// Formats phone as 123-456-7890 (dashes after 3 and 6 digits).
-class PhoneDashFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length > 15) {
-      return oldValue;
-    }
-    final buf = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      if (i == 3 || i == 6) buf.write('-');
-      buf.write(digits[i]);
-    }
-    final text = buf.toString();
-    return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
-    );
-  }
+class PhoneDashFormatter extends NgmyPhoneDashFormatter {
+  const PhoneDashFormatter();
 }
 
 class NgmyUpperCaseTextFormatter extends TextInputFormatter {
@@ -757,16 +742,7 @@ class NgmyUpperCaseTextFormatter extends TextInputFormatter {
   }
 }
 
-String ngmyFormatPhoneDisplay(String raw) {
-  final digits = raw.replaceAll(RegExp(r'\D'), '');
-  if (digits.isEmpty) return '';
-  final buf = StringBuffer();
-  for (var i = 0; i < digits.length; i++) {
-    if (i == 3 || i == 6) buf.write('-');
-    buf.write(digits[i]);
-  }
-  return buf.toString();
-}
+String ngmyFormatPhoneDisplay(String raw) => ngmyPhoneDashed(raw);
 
 String formatCurrency(double amount) {
   String str = amount.toStringAsFixed(2);
@@ -3343,12 +3319,24 @@ List<Map<String, dynamic>> _mergeHelpCampaignClosuresLists(
   return byId.values.toList();
 }
 
-/// Prefer inactive when either side already closed that campaign — stops cloud
-/// from resurrecting an auto-expired / deactivated help mode and re-blinking it.
+/// When is `a`'s campaign row an older mutation than `b`'s? A missing stamp
+/// counts as "not older" so the cloud still wins against ancient payloads that
+/// predate `updatedAt`.
+bool _helpCampaignRowIsOlder(Map<String, dynamic> a, Map<String, dynamic> b) {
+  final at = DateTime.tryParse((a['updatedAt'] ?? a['campaignStartedAt'] ?? '').toString());
+  final bt = DateTime.tryParse((b['updatedAt'] ?? b['campaignStartedAt'] ?? '').toString());
+  if (at == null || bt == null) return false;
+  return at.isBefore(bt);
+}
+
+/// A closed campaign stays closed, and the newest mutation wins when the two
+/// sides disagree — so neither a stale cloud read nor a stale local cache can
+/// flip a state's help mode back to what it used to be.
 Map<String, dynamic> ngmyMergeHelpModeByStateMaps(
   Map<String, dynamic> local,
   Map<String, dynamic> remote, {
   List<Map<String, dynamic>> closures = const [],
+  bool remoteOffSignalsOnly = false,
 }) {
   final closedIds = <String>{
     for (final c in closures)
@@ -3375,6 +3363,9 @@ Map<String, dynamic> ngmyMergeHelpModeByStateMaps(
     final r = remoteNorm[key];
     if (l == null && r == null) continue;
     if (l == null) {
+      // While deferring, the cloud may not introduce a campaign this device
+      // has never seen — it can only confirm one is over.
+      if (remoteOffSignalsOnly) continue;
       final campaign = Map<String, dynamic>.from(r!);
       final cid = (campaign['campaignId'] ?? '').toString().trim();
       if (cid.isNotEmpty && closedIds.contains(cid)) campaign['active'] = false;
@@ -3395,10 +3386,31 @@ Map<String, dynamic> ngmyMergeHelpModeByStateMaps(
     final remoteActive = r['active'] == true;
     final sameCampaign = localId.isNotEmpty && localId == remoteId;
 
+    if (remoteOffSignalsOnly) {
+      // A deferred merge keeps this device's own fields, but an authoritative
+      // "this campaign is over" still lands right away. Letting it wait is
+      // what kept a deactivated flyer (payment numbers and all) on screen for
+      // minutes after the state closed its campaign.
+      final campaign = Map<String, dynamic>.from(l);
+      if (sameCampaign && localActive && !remoteActive && !_helpCampaignRowIsOlder(r, l)) {
+        campaign['active'] = false;
+        final stamp = (r['updatedAt'] ?? '').toString().trim();
+        if (stamp.isNotEmpty) campaign['updatedAt'] = stamp;
+      }
+      final cid = (campaign['campaignId'] ?? '').toString().trim();
+      if (cid.isNotEmpty && closedIds.contains(cid)) campaign['active'] = false;
+      out[key] = campaign;
+      continue;
+    }
+
     late final Map<String, dynamic> chosen;
     if (sameCampaign) {
-      chosen = Map<String, dynamic>.from(remoteActive ? r : l);
-      if (!localActive || !remoteActive) chosen['active'] = false;
+      // Same campaign, but the two sides disagree on whether it's running:
+      // the newer mutation wins. Blindly preferring inactive let a lagging
+      // cloud read undo a fresh activation; blindly preferring active let a
+      // stale cache keep a closed campaign alive.
+      final remoteWins = localActive == remoteActive || !_helpCampaignRowIsOlder(r, l);
+      chosen = Map<String, dynamic>.from(remoteWins ? r : l);
       if ((chosen['campaignId'] ?? '').toString().trim().isEmpty && localId.isNotEmpty) {
         chosen['campaignId'] = localId;
       }
@@ -14141,7 +14153,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() async {
     final email = _e.text.toLowerCase().trim();
-    final phone = _p.text.trim();
+    final phone = ngmyPhoneDigits(_p.text);
     final username = _u.text.trim();
 
     if (email.isEmpty || !email.endsWith('@gmail.com')) {
@@ -14449,7 +14461,7 @@ class _AuthScreenState extends State<AuthScreen> {
       TextField(controller: _e, decoration: InputDecoration(labelText: 'Gmail Address', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       if (!_isLogin) ...[
         const SizedBox(height: 14),
-        TextField(controller: _p, decoration: InputDecoration(labelText: 'Phone Number', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
+        TextField(controller: _p, keyboardType: TextInputType.phone, inputFormatters: const [PhoneDashFormatter()], decoration: InputDecoration(labelText: 'Phone Number', hintText: '123-456-7890', filled: true, fillColor: Theme.of(context).cardColor, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none))),
       ],
       const SizedBox(height: 14),
       TextField(
@@ -23492,7 +23504,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           Text(u.email, style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
                           const SizedBox(height: 2),
                           Text(ngmyUserDisplayAccountId(u), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white54 : Colors.black45)),
-                          if (u.phone.trim().isNotEmpty) Text(u.phone, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
+                          if (u.phone.trim().isNotEmpty) Text(ngmyFormatPhoneDisplay(u.phone), style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black45)),
                         ],
                       ),
                     ),
@@ -23775,7 +23787,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void _showEditUserDialog(UserData u, bool isDark) {
     final nameC = TextEditingController(text: u.username);
     final emailC = TextEditingController(text: u.email);
-    final phoneC = TextEditingController(text: u.phone);
+    final phoneC = TextEditingController(text: ngmyFormatPhoneDisplay(u.phone));
     final fullC = TextEditingController(text: u.fullName ?? '');
     showDialog(context: context, builder: (c) => AlertDialog(
       title: const Text('Edit User'),
@@ -23785,7 +23797,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           children: [
             TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Username')),
             TextField(controller: emailC, decoration: const InputDecoration(labelText: 'Email')),
-            TextField(controller: phoneC, decoration: const InputDecoration(labelText: 'Phone')),
+            TextField(
+              controller: phoneC,
+              keyboardType: TextInputType.phone,
+              inputFormatters: const [PhoneDashFormatter()],
+              decoration: const InputDecoration(labelText: 'Phone Number', hintText: '123-456-7890'),
+            ),
             TextField(controller: fullC, decoration: const InputDecoration(labelText: 'Full Name')),
           ],
         ),
@@ -23796,7 +23813,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
           onPressed: () async {
             u.username = nameC.text.trim().isEmpty ? u.username : nameC.text.trim();
             u.email = emailC.text.trim().isEmpty ? u.email : emailC.text.trim();
-            u.phone = phoneC.text.trim();
+            u.phone = ngmyPhoneDigits(phoneC.text);
             u.fullName = fullC.text.trim().isEmpty ? u.fullName : fullC.text.trim();
             await _applyAdminUserAccountChange(
               u,
@@ -27558,7 +27575,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _editMe(BuildContext ctx) {
     final e = TextEditingController(text: widget.user.email);
-    final p = TextEditingController(text: widget.user.phone);
+    final p = TextEditingController(text: ngmyFormatPhoneDisplay(widget.user.phone));
     final n = TextEditingController(text: widget.user.username);
     final isDark = Theme.of(ctx).brightness == Brightness.dark;
     const brand = Color(0xFF00B25A);
@@ -27600,7 +27617,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 );
                 return;
               }
-              final phone = p.text.trim();
+              final phone = ngmyPhoneDigits(p.text);
               if (!ngmyUserPhoneOnFile(phone)) {
                 ScaffoldMessenger.of(dialogCtx).showSnackBar(
                   const SnackBar(content: Text('Phone number is required (at least 10 digits).')),
@@ -27710,9 +27727,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             TextField(
                               controller: p,
                               keyboardType: TextInputType.phone,
+                              inputFormatters: const [PhoneDashFormatter()],
                               style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
                               decoration: fieldDec(
-                                'Phone',
+                                'Phone Number',
                                 icon: Icons.phone_in_talk_rounded,
                                 helper: 'Required — synced across your devices',
                               ),
@@ -31768,8 +31786,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     TextField(
                       controller: phoneC,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: const [PhoneDashFormatter()],
                       decoration: InputDecoration(
                         labelText: 'Phone number (optional)',
+                        hintText: '123-456-7890',
                         filled: true,
                         fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -34013,6 +34033,210 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ),
       );
     }
+  }
+
+  /// Type-the-name confirmation for the start-over wipe. `phrase` is what the
+  /// admin has to type: the state name, or ALL STATES nationwide.
+  Future<bool> _confirmStartStateOver({
+    required String phrase,
+    required int memberCount,
+    required int contributionCount,
+  }) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? Colors.white70 : const Color(0xFF64748B);
+    final typeC = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final typedOk = typeC.text.trim().toUpperCase() == phrase.toUpperCase();
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.restart_alt_rounded, color: Color(0xFFDC2626)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Start $phrase over?',
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 17),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Everything below is permanently deleted and cannot be undone:',
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w700, fontSize: 13),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '• $contributionCount recorded contribution(s)\n'
+                    '• Helps and missed for $memberCount member(s) — back to 0\n'
+                    '• The help campaign and its spending ledger\n'
+                    '• Contribution case / available money',
+                    style: TextStyle(color: mute, fontSize: 13, height: 1.5),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Members stay enrolled and keep their registry IDs. State Trust '
+                    'deposits are not touched — that money is held for the state, not '
+                    'campaign activity.',
+                    style: TextStyle(color: mute, fontSize: 12, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Type $phrase to continue',
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 12),
+                  ),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: typeC,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => setLocal(() {}),
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w800, letterSpacing: 0.6),
+                    decoration: InputDecoration(
+                      hintText: phrase,
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        borderSide: BorderSide(color: Color(0xFFDC2626), width: 1.6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: typedOk ? () => Navigator.pop(ctx, true) : null,
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                child: Text('Start $phrase over'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    typeC.dispose();
+    return ok == true;
+  }
+
+  /// Does a wallet ledger row belong to `st`'s contribution money? Trust rows
+  /// are excluded — they are real deposits held for the state, not campaign
+  /// activity, and every other admin wipe leaves them alone too.
+  bool _ledgerRowBelongsToStateContributions(Map<String, dynamic> row, String st) {
+    if (ngmyWalletFundOf(row) == 'trust') return false;
+    if (st.isEmpty) return true;
+    final rowState = (row['state'] ?? '').toString().trim();
+    if (NgmyCivicRegistryStats.statesMatch(rowState, st)) return true;
+    // Admin cuts and soft-reset markers are keyed by the wallet campaign id.
+    return (row['campaignId'] ?? '').toString().trim().toLowerCase() ==
+        'wallet_${st.toLowerCase()}';
+  }
+
+  /// Puts a state back to day one: every recorded contribution deleted, every
+  /// member's helps and missed back to 0, the help campaign closed, and the
+  /// contribution wallet emptied. Members stay enrolled; State Trust is left
+  /// alone. Pass an empty state to do this nationwide.
+  Future<void> _startStateOverLikeNew({String state = ''}) async {
+    final st = state.trim();
+    if (!_isGlobalCivicRegistryAdmin()) return;
+    final nationwide = st.isEmpty;
+    final phrase = nationwide ? 'ALL STATES' : st;
+
+    final members = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+        .where((u) => nationwide || NgmyCivicRegistryStats.statesMatch(u.state, st))
+        .toList();
+    final contributions = <AppTransaction>[];
+    for (final t in _civicTransactionsForDisplay()) {
+      if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+      if (t.id.trim().isEmpty) continue;
+      if (!nationwide) {
+        final meta = _decodeContributionMeta(t);
+        if (!NgmyCivicRegistryStats.statesMatch(_contributionReceiptState(t, meta), st)) continue;
+      }
+      contributions.add(t);
+    }
+
+    final confirmed = await _confirmStartStateOver(
+      phrase: phrase,
+      memberCount: members.length,
+      contributionCount: contributions.length,
+    );
+    if (!confirmed || !mounted) return;
+
+    // Contributions go first. Zeroing helps before this would be undone by
+    // _reconcileHelpsFromRecordedContributions, which pulls helps back up to
+    // however many contributions are still on file.
+    final touchedMembers = <String, UserData>{};
+    setState(() {
+      for (final t in contributions) {
+        final member = _memberForContributionTx(t);
+        _applyLocalContributionDeletion(t, member: member);
+        if (member != null) {
+          touchedMembers[NgmyCivicRegistryMembers.emailKey(member.email)] = member;
+        }
+      }
+    });
+    final ids = contributions.map((t) => t.id.trim()).where((e) => e.isNotEmpty).toSet();
+    if (ids.isNotEmpty) {
+      await ngmyPersistCivicDeletedContributions(widget.config, addedIds: ids);
+      await _purgeTombstonedContributionsFromCloud(ids);
+    }
+    for (final member in touchedMembers.values) {
+      await _persistMemberAfterContributionDelete(member);
+    }
+    if (!mounted) return;
+
+    // Close the campaign and empty the contribution ledger. Closure records are
+    // deliberately kept: they are the missed-count idempotency key, and
+    // reactivating always mints a fresh campaign id, so nothing stays blocked.
+    setState(() {
+      if (nationwide) {
+        for (final key in widget.config.helpModeByState.keys.toList()) {
+          widget.config.deactivateHelpCampaign(key);
+        }
+      } else {
+        widget.config.deactivateHelpCampaign(st);
+      }
+      widget.config.helpCampaignSpendings = widget.config.helpCampaignSpendings
+          .map((e) => Map<String, dynamic>.from(e))
+          .where((row) => !_ledgerRowBelongsToStateContributions(row, st))
+          .toList();
+    });
+    await ngmyPersistCivicHelpModeSettings(widget.config);
+    if (!mounted) return;
+
+    // Helps and missed last, so nothing left above can put them back.
+    await _resetHelpsMissedForMembers(members);
+    _lastHelpsReconcileState = null;
+    _lastHelpsReconcileAt = null;
+    await _persistCivicContributionsBackup();
+    widget.onDataChanged();
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFF059669),
+        content: Text(
+          '$phrase started over: ${ids.length} contribution(s) deleted, '
+          '${members.length} member(s) back to 0 helps and 0 missed. '
+          'State Trust unchanged.',
+        ),
+      ),
+    );
   }
 
   Future<bool> _adminDeleteNationwideContribution(String contributionId) async {
@@ -37106,6 +37330,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 u.city ?? '',
                 u.registryId ?? '',
                 u.phone,
+                ngmyFormatPhoneDisplay(u.phone),
                 raw?['dob']?.toString() ?? '',
                 deceasedRow?['deceasedAt']?.toString() ?? '',
               ].join(' ').toLowerCase();
@@ -37379,7 +37604,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final city = (u.city ?? raw?['city'] ?? 'N/A').toString();
     final room = (u.room ?? raw?['room'] ?? 'N/A').toString();
     final homeAddress = (u.homeAddress ?? raw?['homeAddress'] ?? 'N/A').toString();
-    final phone = u.phone.trim().isNotEmpty ? u.phone.trim() : (raw?['phone'] ?? 'N/A').toString();
+    final phoneRaw = u.phone.trim().isNotEmpty ? u.phone.trim() : (raw?['phone'] ?? 'N/A').toString();
+    final phone = ngmyFormatPhoneDisplay(phoneRaw).isEmpty ? phoneRaw : ngmyFormatPhoneDisplay(phoneRaw);
     final email = u.email.trim().isNotEmpty ? u.email.trim() : (raw?['email'] ?? 'N/A').toString();
     final deathLabel = deceasedAt == null ? 'N/A' : '${deceasedAt.month}/${deceasedAt.day}/${deceasedAt.year}';
 
@@ -38124,7 +38350,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             children: [
                               _contactRow('Home Address', u.homeAddress ?? 'N/A', isDark),
                               _contactDivider(isDark),
-                              _contactRow('Phone Number', u.phone.isEmpty ? 'N/A' : u.phone, isDark),
+                              _contactRow('Phone Number', u.phone.isEmpty ? 'N/A' : ngmyFormatPhoneDisplay(u.phone), isDark),
                               _contactDivider(isDark),
                               _contactRow('Email Address', u.email, isDark),
                             ],
@@ -38601,7 +38827,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..writeln('')
       ..writeln('--- CONTACT ---')
       ..writeln('Home Address: ${u.homeAddress ?? 'N/A'}')
-      ..writeln('Phone: ${u.phone.isEmpty ? 'N/A' : u.phone}')
+      ..writeln('Phone: ${u.phone.isEmpty ? 'N/A' : ngmyFormatPhoneDisplay(u.phone)}')
       ..writeln('Email: ${u.email}')
       ..writeln('')
       ..writeln('--- ACTIVITY ---')
@@ -40570,7 +40796,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 final u = results[i];
                                 final email = (u.email ?? '').toString();
                                 final username = (u.username ?? '').toString();
-                                final phone = (u.phone ?? '').toString();
+                                final phone = ngmyFormatPhoneDisplay((u.phone ?? '').toString());
                                 return ListTile(
                                   leading: const Icon(Icons.person_outline_rounded),
                                   title: Text(username.isEmpty ? email : username, style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -41296,7 +41522,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     const SizedBox(width: 6),
                     Expanded(child: _publicMetaChip(Icons.meeting_room_rounded, u.room ?? 'Room n/a', const Color(0xFFF59E0B), isDark)),
                     const SizedBox(width: 6),
-                    Expanded(child: _publicMetaChip(Icons.phone_rounded, u.phone.isEmpty ? 'No phone' : u.phone, const Color(0xFF64748B), isDark)),
+                    Expanded(child: _publicMetaChip(Icons.phone_rounded, u.phone.isEmpty ? 'No phone' : ngmyFormatPhoneDisplay(u.phone), const Color(0xFF64748B), isDark)),
                     const SizedBox(width: 6),
                     Expanded(child: _publicMetaChip(Icons.family_restroom_rounded, '$familyCount', const Color(0xFF14B8A6), isDark)),
                   ],
@@ -41602,7 +41828,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         _editingMemberRegistryId = null;
                         _fullNameC.text = u.fullName ?? u.username;
                         _emailC.text = u.email;
-                        _phoneC.text = u.phone;
+                        _phoneC.text = ngmyFormatPhoneDisplay(u.phone);
                         _addressC.text = u.homeAddress ?? '';
                       });
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User details pre-filled in form above.')));
@@ -41755,6 +41981,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     var clearExpanded = false;
     var removeExpanded = false;
     var resetExpanded = false;
+    var startOverExpanded = false;
 
     final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
@@ -42015,6 +42242,60 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               ],
                             ),
                           ),
+                          if (_isGlobalCivicRegistryAdmin())
+                            sectionShell(
+                              title: 'Start over like new',
+                              subtitle: 'Wipe contributions, helps & missed for a whole state',
+                              icon: Icons.cleaning_services_rounded,
+                              accent: const Color(0xFFDC2626),
+                              expanded: startOverExpanded,
+                              onToggle: () => setSheet(() => startOverExpanded = !startOverExpanded),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Puts a state back to day one: every recorded contribution is deleted, '
+                                    'every member shows 0 helps and 0 missed, the help campaign is closed and '
+                                    'its spending ledger and available money are cleared. Members stay '
+                                    'enrolled and keep their registry IDs. State Trust deposits are not touched.',
+                                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.35),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton.icon(
+                                    onPressed: _selectedState.trim().isEmpty
+                                        ? null
+                                        : () => Navigator.pop(ctx, {
+                                              'action': 'startOver',
+                                              'state': _selectedState.trim(),
+                                            }),
+                                    icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                                    label: Text(
+                                      'Start ${_selectedState.trim().isEmpty ? 'this state' : _selectedState.trim()} over',
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFFDC2626),
+                                      minimumSize: const Size(double.infinity, 44),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  OutlinedButton.icon(
+                                    onPressed: () => Navigator.pop(ctx, {
+                                      'action': 'startOver',
+                                      'state': '',
+                                    }),
+                                    icon: const Icon(Icons.public_rounded, size: 18),
+                                    label: const Text('Start ALL STATES over'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFFDC2626),
+                                      side: const BorderSide(color: Color(0xFFDC2626)),
+                                      minimumSize: const Size(double.infinity, 44),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           sectionShell(
                             title: 'Clear missed',
                             subtitle: withMissed.isEmpty ? 'No matches have missed' : 'Up to $maxMissed missed · ${withMissed.length} member(s)',
@@ -42125,6 +42406,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     searchC.dispose();
     if (result == null || !mounted) return;
     final action = (result['action'] ?? '').toString();
+    if (action == 'startOver') {
+      await _startStateOverLikeNew(state: (result['state'] ?? '').toString());
+      return;
+    }
     if (action == 'reset') {
       final targets = (result['members'] as List<UserData>?) ?? const <UserData>[];
       if (targets.isEmpty) return;
@@ -42453,7 +42738,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                 _memberInfo(Icons.home_work_rounded, room.isEmpty ? 'No room assigned' : room, Colors.orange),
               if (showAddress && room.isNotEmpty)
                 _memberInfo(Icons.meeting_room_rounded, room, Colors.amber.shade700),
-              _memberInfo(Icons.phone_android_rounded, u.phone, Colors.black54),
+              _memberInfo(Icons.phone_android_rounded, ngmyFormatPhoneDisplay(u.phone), Colors.black54),
               _memberInfo(Icons.email_outlined, u.email, Colors.blueAccent),
               _memberInfo(
                 Icons.family_restroom_rounded,

@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'ngmy_civic_user_groups.dart';
 import 'ngmy_civic_user_groups_payments.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_phone_format.dart';
 import 'ngmy_qr_download.dart';
 
 const _kBolt = Color(0xFF67E8F9);
@@ -3892,9 +3893,10 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
                   TextField(
                     controller: phoneC,
                     keyboardType: TextInputType.phone,
+                    inputFormatters: const [NgmyPhoneDashFormatter()],
                     style: const TextStyle(color: Colors.white),
                     decoration: _lightningFieldDecoration(
-                      'Phone — questions or confirm payment',
+                      'Phone number — questions or confirm payment',
                     ),
                   ),
                   const SizedBox(height: 18),

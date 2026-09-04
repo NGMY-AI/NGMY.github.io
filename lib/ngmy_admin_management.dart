@@ -1564,6 +1564,14 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
   // it's merged (additive, id-keyed) rather than overwritten, so deferring it
   // would only delay other users from seeing a just-recorded spend for no
   // safety benefit.
+  //
+  // Deferring no longer skips helpModeByState outright: it downgrades the
+  // merge to off-signals-only. The guard exists so a lagging cloud row cannot
+  // resurrect a campaign this device just closed, and accepting "that campaign
+  // is over" can never resurrect anything. Skipping the whole map meant an
+  // admin or registrar switching into a state that had just ended its campaign
+  // kept seeing the live flyer — payment numbers included — for as long as the
+  // window kept re-arming from unrelated admin writes.
   final deferLiveFields = ngmyShouldDeferRemoteConfigOverwrite();
   final rawStateMap = payload['helpModeByState'];
   final hasPerStatePayload = rawStateMap is Map && rawStateMap.isNotEmpty;
@@ -1606,7 +1614,7 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
           (payload['helpCampaignStartedAt'] ?? '').toString().trim();
     }
   }
-  if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map && !deferLiveFields) {
+  if (payload.containsKey('helpModeByState') && payload['helpModeByState'] is Map) {
     final remote = Map<String, dynamic>.from(payload['helpModeByState'] as Map);
     // Merge closures first when both arrive in the same payload so inactive
     // closed campaigns cannot be resurrected by a stale active cloud row.
@@ -1620,9 +1628,12 @@ void _applyCivicHelpModeSettingsPayload(AppConfig config, Map<String, dynamic> p
       config.helpModeByState,
       remote,
       closures: pendingClosures,
+      remoteOffSignalsOnly: deferLiveFields,
     );
   }
-  if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List && !deferLiveFields) {
+  if (payload.containsKey('helpCampaignClosures') && payload['helpCampaignClosures'] is List) {
+    // Always additive, and a closure can only ever end a campaign — deferring
+    // it would only delay other devices from seeing that a state closed out.
     final remote = (payload['helpCampaignClosures'] as List)
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
