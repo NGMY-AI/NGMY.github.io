@@ -68,6 +68,26 @@ void main() {
     expect(next['accessLockedBy'], 'ar@ngmy.org');
   });
 
+  test('registrar can give access back before the lock expires', () {
+    final locked = NgmyCivicRegistryAccess.apply(
+      member: {'email': 'a@b.com', 'registryId': 'GA123'},
+      action: NgmyCivicAccessAction.lock,
+      lockFor: const Duration(hours: 6),
+      lockedBy: 'ar@ngmy.org',
+    );
+    expect(NgmyCivicRegistryAccess.evaluate(removed: false, member: locked).kind, NgmyCivicAccessKind.locked);
+
+    final restored = NgmyCivicRegistryAccess.apply(
+      member: locked,
+      action: NgmyCivicAccessAction.lift,
+      lockedBy: 'ar@ngmy.org',
+    );
+    final status = NgmyCivicRegistryAccess.evaluate(removed: false, member: restored);
+    expect(status.kind, NgmyCivicAccessKind.ok);
+    expect(status.allowsLogin, isTrue);
+    expect(NgmyCivicRegistryAccess.lockedUntilOf(restored), isNull);
+  });
+
   test('lock also kicks the current session', () {
     final member = NgmyCivicRegistryAccess.apply(
       member: {'email': 'a@b.com', 'registryId': 'GA123'},

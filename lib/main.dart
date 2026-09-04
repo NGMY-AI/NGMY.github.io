@@ -31468,13 +31468,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final access = await _civicUnlockAccessStatus();
-    if (access.invalidatesStoredUnlock) {
+    final stored = await civicRegistryStoredUnlockEntry(
+      widget.user.email,
+      state: _selectedState,
+    );
+    final remote = await ngmyCivicCheckAccess(
+      email: widget.user.email,
+      state: _selectedState,
+      memberEmail: widget.user.email,
+      registryId: (stored?['registryId'] ?? widget.user.registryId ?? '').toString(),
+    );
+    if (access.invalidatesStoredUnlock || !remote.allowed) {
       await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
       if (mounted) {
         setState(() {
           _registryUnlocked = false;
           _unlockChecked = true;
-          _registryGateMessage = access.message;
+          _registryGateMessage = !remote.allowed
+              ? (remote.error ?? access.message)
+              : access.message;
         });
       }
       return;
@@ -40721,21 +40733,29 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<void> _openCivicAccessControl(Map<String, dynamic> record) async {
     final email = (record['email'] ?? '').toString();
     final rid = (record['registryId'] ?? '').toString();
+    final live = NgmyCivicRegistryMembers.findByEmail(widget.config, email) ??
+        NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid) ??
+        record;
     await showNgmyCivicAccessControlSheet(
       context: context,
-      record: record,
+      record: live,
       removed: NgmyCivicRegistryMembers.isRemoved(widget.config, email: email, registryId: rid),
-      onApply: (action, {lockFor}) => _applyCivicMemberAccess(record, action: action, lockFor: lockFor),
+      onApply: (action, {lockFor}) => _applyCivicMemberAccess(live, action: action, lockFor: lockFor),
     );
   }
 
-  Future<void> _applyCivicMemberAccess(
+  Future<Map<String, dynamic>?> _applyCivicMemberAccess(
     Map<String, dynamic> record, {
     required NgmyCivicAccessAction action,
     Duration? lockFor,
   }) async {
+    final emailKey = NgmyCivicRegistryMembers.emailKey((record['email'] ?? '').toString());
+    final ridKey = (record['registryId'] ?? '').toString();
+    final latest = NgmyCivicRegistryMembers.findByEmail(widget.config, emailKey) ??
+        NgmyCivicRegistryMembers.findByRegistryId(widget.config, ridKey) ??
+        record;
     final next = NgmyCivicRegistryAccess.apply(
-      member: record,
+      member: latest,
       action: action,
       lockFor: lockFor,
       lockedBy: widget.user.email,
@@ -40758,7 +40778,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final hitsThisDevice = (targetEmail.isNotEmpty &&
             targetEmail == NgmyCivicRegistryMembers.emailKey(widget.user.email)) ||
         (targetRid.isNotEmpty && storedRid == targetRid);
-    if (hitsThisDevice && !_canBypassCivicGate()) {
+    if (hitsThisDevice && !_canBypassCivicGate() && action != NgmyCivicAccessAction.lift) {
       await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
       if (mounted) {
         setState(() {
@@ -40771,11 +40791,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         });
       }
     }
-    if (!mounted) return;
+    if (!mounted) return next;
     final label = switch (action) {
       NgmyCivicAccessAction.logout => 'Member logged out of Civic Registry. They must enter their information again.',
-      NgmyCivicAccessAction.lock => 'Member is blocked from Civic Registry for ${lockFor?.inHours ?? 24} hours.',
-      NgmyCivicAccessAction.lift => 'Restriction lifted.',
+      NgmyCivicAccessAction.lock =>
+        'Blocked on every device for ${lockFor?.inHours ?? 24} hours. You can give access back anytime.',
+      NgmyCivicAccessAction.lift => 'Access restored. They can log in again on any device.',
     };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -40783,6 +40804,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         backgroundColor: upsert.ok ? Colors.green : Colors.orange,
       ),
     );
+    return next;
   }
 
   void _showMyCivicIdCard() {

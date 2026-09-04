@@ -78,6 +78,7 @@ class NgmyCivicRegistryAccess {
     'accessLockedUntil',
     'accessLockedBy',
     'accessLockHours',
+    'accessLockLiftedAt',
   ];
 
   static DateTime? parseStamp(dynamic raw) {
@@ -133,6 +134,7 @@ class NgmyCivicRegistryAccess {
       case NgmyCivicAccessAction.lift:
         next['accessLockedUntil'] = '';
         next['accessLockHours'] = null;
+        next['accessLockLiftedAt'] = now.toIso8601String();
     }
     return next;
   }
@@ -162,113 +164,137 @@ Future<void> showNgmyCivicAccessControlSheet({
   required BuildContext context,
   required Map<String, dynamic> record,
   required bool removed,
-  required Future<void> Function(NgmyCivicAccessAction action, {Duration? lockFor}) onApply,
+  required Future<Map<String, dynamic>?> Function(NgmyCivicAccessAction action, {Duration? lockFor}) onApply,
 }) {
   final name = (record['fullName'] ?? record['registryId'] ?? 'Member').toString().trim();
   final rid = (record['registryId'] ?? '').toString().trim();
-  final status = NgmyCivicRegistryAccess.evaluate(removed: removed, member: record);
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) {
-      final isDark = Theme.of(ctx).brightness == Brightness.dark;
-      final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
-      final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-      return Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
-        child: Container(
-          decoration: BoxDecoration(
-            color: panel,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.withOpacity(0.4),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
+      var live = Map<String, dynamic>.from(record);
+      var busy = false;
+      return StatefulBuilder(
+        builder: (ctx, setSheet) {
+          final isDark = Theme.of(ctx).brightness == Brightness.dark;
+          final panel = isDark ? const Color(0xFF151C2C) : Colors.white;
+          final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+          final status = NgmyCivicRegistryAccess.evaluate(removed: removed, member: live);
+          final locked = !removed && status.kind == NgmyCivicAccessKind.locked;
+
+          Future<void> run(NgmyCivicAccessAction action, {Duration? lockFor}) async {
+            if (busy) return;
+            setSheet(() => busy = true);
+            final updated = await onApply(action, lockFor: lockFor);
+            if (!ctx.mounted) return;
+            setSheet(() {
+              busy = false;
+              if (updated != null) live = Map<String, dynamic>.from(updated);
+            });
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(ctx).bottom),
+            child: Container(
+              decoration: BoxDecoration(
+                color: panel,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
               ),
-              const SizedBox(height: 14),
-              Text(
-                'Civic Registry access',
-                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                rid.isEmpty ? name : '$name · $rid',
-                style: TextStyle(fontSize: 13, color: ink.withOpacity(0.65)),
-              ),
-              const SizedBox(height: 12),
-              if (removed)
-                _accessBanner(
-                  isDark,
-                  Icons.block_rounded,
-                  'This member was removed. Their information cannot open Civic Registry.',
-                )
-              else if (status.kind == NgmyCivicAccessKind.locked)
-                _accessBanner(
-                  isDark,
-                  Icons.lock_clock_rounded,
-                  status.message,
-                ),
-              if (!removed) ...[
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.logout_rounded, color: Color(0xFFB91C1C)),
-                  title: const Text('Log out of Civic Registry', style: TextStyle(fontWeight: FontWeight.w800)),
-                  subtitle: const Text('They must enter PIN, name, date of birth, and Registry ID again.'),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    await onApply(NgmyCivicAccessAction.logout);
-                  },
-                ),
-                const Divider(height: 20),
-                Text(
-                  'Restrict login for a time',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink.withOpacity(0.8)),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final d in kNgmyCivicAccessDurations)
-                      ActionChip(
-                        label: Text(d.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          await onApply(NgmyCivicAccessAction.lock, lockFor: d.duration);
-                        },
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(99),
                       ),
-                  ],
-                ),
-                if (status.kind == NgmyCivicAccessKind.locked) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(ctx);
-                      await onApply(NgmyCivicAccessAction.lift);
-                    },
-                    icon: const Icon(Icons.lock_open_rounded, size: 18),
-                    label: const Text('Lift restriction'),
+                    ),
                   ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Civic Registry access',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    rid.isEmpty ? name : '$name · $rid',
+                    style: TextStyle(fontSize: 13, color: ink.withOpacity(0.65)),
+                  ),
+                  const SizedBox(height: 12),
+                  if (removed)
+                    _accessBanner(
+                      isDark,
+                      Icons.block_rounded,
+                      'This member was removed. Their information cannot open Civic Registry.',
+                    )
+                  else if (locked)
+                    _accessBanner(
+                      isDark,
+                      Icons.lock_clock_rounded,
+                      status.message,
+                    ),
+                  if (locked) ...[
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: busy ? null : () => run(NgmyCivicAccessAction.lift),
+                      icon: const Icon(Icons.lock_open_rounded, size: 18),
+                      label: Text(busy ? 'Updating…' : 'Give access back'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF15803D),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Remove the restriction now. They can log in again on any phone or device with their information.',
+                      style: TextStyle(fontSize: 12, height: 1.35, color: ink.withOpacity(0.7)),
+                    ),
+                  ],
+                  if (!removed) ...[
+                    const SizedBox(height: 8),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.logout_rounded, color: Color(0xFFB91C1C)),
+                      title: const Text('Log out of Civic Registry', style: TextStyle(fontWeight: FontWeight.w800)),
+                      subtitle: const Text('They must enter PIN, name, date of birth, and Registry ID again.'),
+                      onTap: busy ? null : () => run(NgmyCivicAccessAction.logout),
+                    ),
+                    const Divider(height: 20),
+                    Text(
+                      'Restrict login for a time',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: ink.withOpacity(0.8)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Blocks this member on every device. You can give access back before the time ends.',
+                      style: TextStyle(fontSize: 12, height: 1.35, color: ink.withOpacity(0.65)),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final d in kNgmyCivicAccessDurations)
+                          ActionChip(
+                            label: Text(d.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                            onPressed: busy ? null : () => run(NgmyCivicAccessAction.lock, lockFor: d.duration),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
                 ],
-              ],
-              const SizedBox(height: 8),
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
-            ],
-          ),
-        ),
+              ),
+            ),
+          );
+        },
       );
     },
   );

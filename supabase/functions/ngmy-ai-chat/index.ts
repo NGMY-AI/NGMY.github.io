@@ -1456,6 +1456,7 @@ function preferMemberRow(
     preferred.accessLockedUntil = access.accessLockedUntil;
     preferred.accessLockedBy = access.accessLockedBy;
     preferred.accessLockHours = access.accessLockHours;
+    preferred.accessLockLiftedAt = access.accessLockLiftedAt;
   }
   return preferred;
 }
@@ -1578,6 +1579,7 @@ function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unk
     accessSessionEpoch: m.accessSessionEpoch,
     accessLockedUntil: m.accessLockedUntil,
     accessLockHours: m.accessLockHours,
+    accessLockLiftedAt: m.accessLockLiftedAt,
     // Public directory only — no address/phone/dob/idPhoto/idType
   };
 }
@@ -2020,6 +2022,67 @@ function generateRegistryId(state: string, existing: Set<string>): string {
     if (!existing.has(candidate.toUpperCase())) return candidate;
   }
   return `${prefix}${Date.now()}`;
+}
+
+async function handleCivicCheckAccess(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const memberEmail = emailKey(String(body.memberEmail ?? ""));
+  const registryId = String(body.registryId ?? "").trim();
+  const fullName = String(body.fullName ?? "").trim();
+  if (!memberEmail && !registryId && !fullName) {
+    return jsonOk({ ok: true, allowed: true });
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const payload = await loadCivicPayload(admin);
+  const inState = (m: Record<string, unknown>) =>
+    !state || canonicalStateKey(String(m.state ?? "")) === canonicalStateKey(state);
+  const members = asMemberList(payload.members).filter(inState);
+  const removed = asMemberList(payload.removed).filter(inState);
+  const deceased = asMemberList(payload.deceased).filter((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return inState({ state: d.state ?? snap.state });
+  });
+  if (removed.some((r) => memberMatchesNameOrKeys(r, fullName, memberEmail, registryId))) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "removed",
+      error: "You were removed from Civic Registry and cannot log in.",
+    });
+  }
+  if (deceased.some((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return memberMatchesNameOrKeys(snap, fullName, memberEmail, registryId);
+  })) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "deceased",
+      error: "This Civic Registry record is closed and cannot be used to log in.",
+    });
+  }
+  const match = members.find((m) => memberMatchesNameOrKeys(m, fullName, memberEmail, registryId));
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "locked",
+      lockedUntil: match?.accessLockedUntil ?? null,
+      error: accessErr,
+    });
+  }
+  return jsonOk({ ok: true, allowed: true });
 }
 
 async function handleCivicVerifyStatePin(
@@ -3714,6 +3777,7 @@ serve(async (req) => {
       ci: "civicFetchEnrollmentLink",
       cj: "civicRegenerateEnrollmentLink",
       ck: "civicNationwideStats",
+      cl: "civicCheckAccess",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -3810,6 +3874,9 @@ serve(async (req) => {
     }
     if (action === "civicNationwideStats") {
       return await handleCivicNationwideStats(req);
+    }
+    if (action === "civicCheckAccess") {
+      return await handleCivicCheckAccess(req, body as Record<string, unknown>);
     }
     if (action === "civicUpsertMember") {
       return await handleCivicUpsertMember(req, body as Record<string, unknown>);

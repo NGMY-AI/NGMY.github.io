@@ -469,8 +469,22 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
           });
           return;
         }
+        final remoteAccess = await ngmyCivicCheckAccess(
+          email: widget.userEmail,
+          state: _state,
+          fullName: value,
+          memberEmail: (localMember?['email'] ?? '').toString(),
+          registryId: (localMember?['registryId'] ?? '').toString(),
+        );
+        if (!mounted) return;
+        if (!remoteAccess.allowed) {
+          setState(() {
+            _busy = false;
+            _error = remoteAccess.error ?? localAccess.message;
+          });
+          return;
+        }
         if (localMember != null) {
-          if (!mounted) return;
           setState(() {
             _busy = false;
             _error = null;
@@ -637,6 +651,16 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     final preAccess = _accessFor(_matchedMember);
     if (!preAccess.allowsLogin) {
       setState(() => _error = preAccess.message);
+      return;
+    }
+    final remoteIdAccess = await ngmyCivicCheckAccess(
+      email: widget.userEmail,
+      state: _state,
+      memberEmail: memberEmail,
+      registryId: value,
+    );
+    if (!remoteIdAccess.allowed) {
+      setState(() => _error = remoteIdAccess.error ?? preAccess.message);
       return;
     }
     setState(() {

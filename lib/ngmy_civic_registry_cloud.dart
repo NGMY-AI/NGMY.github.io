@@ -66,6 +66,28 @@ Future<({bool ok, String? pinSig, String? error})> ngmyCivicVerifyStatePin({
   );
 }
 
+Future<({bool allowed, String? error})> ngmyCivicCheckAccess({
+  required String email,
+  String state = '',
+  String memberEmail = '',
+  String registryId = '',
+  String fullName = '',
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicCheckAccess',
+    'email': email.trim().toLowerCase(),
+    'state': state.trim(),
+    if (memberEmail.trim().isNotEmpty) 'memberEmail': memberEmail.trim().toLowerCase(),
+    if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
+    if (fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
+  });
+  if (data == null) return (allowed: true, error: null);
+  if (data['ok'] == true && data['allowed'] == false) {
+    return (allowed: false, error: _civicCloudError(data, 'You are blocked from Civic Registry.'));
+  }
+  return (allowed: true, error: null);
+}
+
 Future<({bool ok, String? memberEmail, String? error})> ngmyCivicGateMatchName({
   required String email,
   required String state,
