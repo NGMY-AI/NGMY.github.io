@@ -8,7 +8,6 @@ _flutter.loader.load({
     useLocalCanvasKit: true,
   },
 }).catch(function (e) {
-  console.error('[ngmy] Flutter load failed', e);
   window.__ngmyShowLoadError && window.__ngmyShowLoadError(
     'NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen.',
   );

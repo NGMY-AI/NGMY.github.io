@@ -82,9 +82,7 @@ Future<Map<String, dynamic>?> ngmyFetchUserLoginRow(
 
 String ngmyAuthReachabilityMessage(Object err) {
   if (ngmySupabaseErrorIsInvalidApiKey(err)) {
-    return 'Supabase API key is invalid or the project is paused. '
-        'Open supabase.com → Project Settings → API, copy the anon public key, '
-        'update lib/ngmy_supabase_config.dart, rebuild, and redeploy.';
+    return 'Could not reach the server. Try again in a moment.';
   }
   final text = err.toString().toLowerCase();
   if (_ngmyErrorIsMissingColumn(err)) {

@@ -1,6 +1,8 @@
 /* NGMY PWA — cache-first shell so the app opens offline after one online visit. */
 'use strict';
 
+function ngmySwQuiet() {}
+
 const CACHE_PREFIX = 'ngmy-pwa-';
 function ngmySwBasePath() {
   var p = self.location.pathname || '/';
@@ -14,8 +16,6 @@ const NGMY_EDGE_UPSTREAM =
   'https://gvufllqqxjnpicmkxzcg.supabase.co/functions/v1/bright-handler';
 const NGMY_REST_UPSTREAM =
   'https://gvufllqqxjnpicmkxzcg.supabase.co/rest/v1';
-const NGMY_SUPABASE_ANON =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM';
 
 /** ngmy_settings keys that must never download via REST (legacy rows may hold PII). */
 const NGMY_SENSITIVE_SETTINGS_KEYS = new Set([
@@ -65,7 +65,7 @@ function ngmySensitiveSettingsKey(url) {
 }
 
 function ngmyBlockSensitiveSettingsGet(request, url) {
-  if (request.method !== 'GET') return null;
+  if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   var key = ngmySensitiveSettingsKey(url);
   if (!key) return null;
   if (key.indexOf('civic_') === 0 || NGMY_SENSITIVE_SETTINGS_KEYS.has(key)) {
@@ -77,9 +77,33 @@ function ngmyBlockSensitiveSettingsGet(request, url) {
   return null;
 }
 
+function ngmyBlockSensitiveRest(request, url) {
+  var path = url.pathname || '';
+  if (path.indexOf('/rpc/') !== -1) return null;
+  var blockedTables = [
+    'users_store_contact',
+    'password_reset_otp',
+    'live_help_codes',
+    'live_support_sessions',
+    'help_applications',
+    'help_businesses',
+    'help_requests',
+  ];
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    for (var i = 0; i < blockedTables.length; i++) {
+      if (path.indexOf(blockedTables[i]) !== -1) {
+        return new Response('[]', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    }
+  }
+  return ngmyBlockSensitiveSettingsGet(request, url);
+}
+
 async function ngmyProxyApiSync(request) {
   var headers = new Headers(request.headers);
-  if (!headers.get('apikey')) headers.set('apikey', NGMY_SUPABASE_ANON);
   if (!headers.get('content-type')) headers.set('content-type', 'application/json');
   var body = await request.text();
   var res = await fetch(NGMY_EDGE_UPSTREAM, {
@@ -97,11 +121,10 @@ async function ngmyProxyApiSync(request) {
 
 async function ngmyProxyApiRest(request) {
   var url = new URL(request.url);
-  var blocked = ngmyBlockSensitiveSettingsGet(request, url);
+  var blocked = ngmyBlockSensitiveRest(request, url);
   if (blocked) return blocked;
 
   var headers = new Headers(request.headers);
-  if (!headers.get('apikey')) headers.set('apikey', NGMY_SUPABASE_ANON);
   var upstream = ngmyRestUpstreamUrl(url);
   var init = {
     method: request.method,
@@ -191,7 +214,7 @@ async function cacheAbsoluteShell(cache) {
       }
       await precacheUrl(cache, abs);
     } catch (e) {
-      console.warn('[ngmy-sw] absolute shell', abs, e);
+      ngmySwQuiet('[ngmy-sw] absolute shell', abs, e);
     }
   }
 }
@@ -240,7 +263,7 @@ async function precacheUrl(cache, url) {
       return true;
     }
   } catch (e) {
-    console.warn('[ngmy-sw] precache skip', url, e);
+    ngmySwQuiet('[ngmy-sw] precache skip', url, e);
   }
   return false;
 }
@@ -283,7 +306,7 @@ self.addEventListener('activate', (event) => {
             .map((k) => caches.delete(k)),
         );
       } else {
-        console.warn('[ngmy-sw] keep prior cache — new shell not ready yet');
+        ngmySwQuiet('[ngmy-sw] keep prior cache — new shell not ready yet');
       }
 
       await self.clients.claim();
@@ -366,7 +389,7 @@ async function loadStoredAlarms() {
     const list = await hit.json();
     return Array.isArray(list) ? list : [];
   } catch (e) {
-    console.warn('[ngmy-sw] load alarms failed', e);
+    ngmySwQuiet('[ngmy-sw] load alarms failed', e);
     return [];
   }
 }
@@ -378,7 +401,7 @@ async function saveStoredAlarms(alarms) {
       headers: { 'Content-Type': 'application/json' },
     }));
   } catch (e) {
-    console.warn('[ngmy-sw] save alarms failed', e);
+    ngmySwQuiet('[ngmy-sw] save alarms failed', e);
   }
 }
 
@@ -402,7 +425,7 @@ async function fireAlarm(alarm) {
       data: { alarmId: alarm.id },
     });
   } catch (e) {
-    console.warn('[ngmy-sw] showNotification failed', e);
+    ngmySwQuiet('[ngmy-sw] showNotification failed', e);
   }
   const remaining = (await loadStoredAlarms()).filter((a) => a.id !== alarm.id);
   await saveStoredAlarms(remaining);

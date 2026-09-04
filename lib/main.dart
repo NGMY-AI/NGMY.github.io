@@ -465,13 +465,18 @@ Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kReleaseMode) {
+    debugPrint = (String? message, {int? wrapWidth}) {};
+  }
   ngmyInitCrispRendering();
   FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    debugPrint('[flutter] ${details.exceptionAsString()}\n${details.stack}');
+    if (kDebugMode) {
+      FlutterError.presentError(details);
+      debugPrint('[flutter] ${details.exceptionAsString()}\n${details.stack}');
+    }
   };
   PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('[platform] $error\n$stack');
+    if (kDebugMode) debugPrint('[platform] $error\n$stack');
     return true;
   };
 
@@ -13637,7 +13642,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                 onGithubLogin: (emailHint) => _startOAuthSignIn(OAuthProvider.github, emailHint: emailHint),
                 onResetPasswordByEmail: (email, newHash, resetToken) async {
                   final emailNorm = email.toLowerCase().trim();
-                  debugPrint('[ResetPW] Starting reset for $emailNorm');
+                  debugPrint('[ResetPW] Starting reset');
                   _isSyncing = true;
 
                   try {
@@ -48948,19 +48953,23 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (!await ngmyCanReachCloud()) return -1;
       // Counterparty (seller/buyer), not the current session's own row — only
       // pull the narrow contact-info view, not their full profile.
-      final row = await Supabase.instance.client
-          .from('users_store_contact')
-          .select()
-          .eq('email', key)
-          .maybeSingle()
+      final raw = await Supabase.instance.client
+          .rpc('ngmy_store_contact', params: {'p_email': key})
           .timeout(kNgmyCloudLoadTimeout);
-      if (row == null) return -1;
-      final remote = UserData.fromJson(Map<String, dynamic>.from(row));
+      Map<String, dynamic>? row;
+      if (raw is Map) {
+        row = Map<String, dynamic>.from(raw);
+      } else if (raw is String && raw.trim().isNotEmpty && raw.trim() != 'null') {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) row = Map<String, dynamic>.from(decoded);
+      }
+      if (row == null || row.isEmpty) return -1;
+      final remote = UserData.fromJson(row);
       widget.allUsers.add(remote);
       widget.onDataChanged();
       return widget.allUsers.length - 1;
     } catch (e) {
-      debugPrint('[store] resolve user $key: $e');
+      debugPrint('[store] resolve user: $e');
       return -1;
     }
   }

@@ -20,10 +20,7 @@ bool ngmySupabaseErrorIsMissingTable(Object error, String table) {
 
 String ngmySupabaseSaveFailureMessage(Object? lastError) {
   if (lastError != null && ngmySupabaseErrorIsInvalidApiKey(lastError)) {
-    return 'Supabase API key is invalid or the project is paused. '
-        'Open supabase.com → Project Settings → API, copy the anon public key, '
-        'update lib/ngmy_supabase_config.dart, rebuild, and redeploy.';
+    return 'Could not reach the server. Try again in a moment.';
   }
-  return 'Could not sync to cloud. In Supabase SQL Editor run supabase/SUPABASE_SETUP.sql '
-      '(or admin_dashboard_persistence.sql), then save again.';
+  return 'Could not sync to the cloud right now. Try again in a moment.';
 }

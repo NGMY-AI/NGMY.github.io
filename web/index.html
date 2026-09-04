@@ -1070,7 +1070,7 @@
             return navigator.serviceWorker.ready.then(function () { return reg; }).catch(function () { return reg; });
           })
           .catch(function (e) {
-            console.warn('[ngmy] sw register', e);
+            void e;
             return null;
           });
       }

@@ -40,7 +40,7 @@ async function decodeAudioBuffer(src) {
     const resp = await fetch(src);
     buffer = await resp.arrayBuffer();
   } catch (e) {
-    console.warn('[ngmy fast export] audio fetch failed', e);
+    void ('[ngmy fast export] audio fetch failed', e);
     return null;
   }
   if (!buffer || buffer.byteLength === 0) return null;
@@ -52,7 +52,7 @@ async function decodeAudioBuffer(src) {
     } catch (_) {}
     return audioBuffer;
   } catch (e) {
-    console.warn('[ngmy fast export] audio decode failed', e);
+    void ('[ngmy fast export] audio decode failed', e);
     try {
       await decodeCtx.close();
     } catch (_) {}
@@ -79,7 +79,7 @@ async function encodeAudioTrack(muxer, audioBuffer, videoDurationSec, onProgress
       srcNode.start(0);
       pcmBuffer = await offline.startRendering();
     } catch (e) {
-      console.warn('[ngmy fast export] audio resample failed', e);
+      void ('[ngmy fast export] audio resample failed', e);
       return false;
     }
   }
@@ -89,7 +89,7 @@ async function encodeAudioTrack(muxer, audioBuffer, videoDurationSec, onProgress
     output: (chunk, meta) => {
       if (audioConfigured) muxer.addAudioChunk(chunk, meta);
     },
-    error: (e) => console.warn('[ngmy fast export] audio encoder', e),
+    error: (e) => void ('[ngmy fast export] audio encoder', e),
   });
 
   try {
@@ -108,7 +108,7 @@ async function encodeAudioTrack(muxer, audioBuffer, videoDurationSec, onProgress
     });
     audioConfigured = true;
   } catch (e) {
-    console.warn('[ngmy fast export] audio configure failed', e);
+    void ('[ngmy fast export] audio configure failed', e);
     return false;
   }
 
@@ -139,7 +139,7 @@ async function encodeAudioTrack(muxer, audioBuffer, videoDurationSec, onProgress
       audioEncoder.encode(audioData);
       audioData.close();
     } catch (e) {
-      console.warn('[ngmy fast export] audio frame', e);
+      void ('[ngmy fast export] audio frame', e);
       break;
     }
     if (onProgress && offset % (chunkSize * 16) === 0) {
