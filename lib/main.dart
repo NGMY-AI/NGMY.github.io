@@ -31916,10 +31916,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     widget.onDataChanged();
   }
 
-  void _markCampaignClosed(String campaignId, DateTime closedAt, {String? state}) {
-    if (campaignId.trim().isEmpty) return;
+  /// Stable "already closed out" key for a campaign.
+  ///
+  /// Campaigns started before campaignId existed (or restored from an older
+  /// cloud row) carry an empty id. Without a fallback key the missed sweep had
+  /// nothing to record, so it re-ran on every rebuild and kept adding misses
+  /// to members who had done nothing wrong.
+  String _helpCampaignClosureKey(
+    String campaignId, {
+    required String state,
+    DateTime? campaignStartedAt,
+  }) {
+    final id = campaignId.trim();
+    if (id.isNotEmpty) return id;
+    final st = state.trim().toLowerCase();
+    final started = campaignStartedAt?.toUtc().toIso8601String() ?? '';
+    if (st.isEmpty || started.isEmpty) return '';
+    return 'auto:$st:$started';
+  }
+
+  void _markCampaignClosed(
+    String campaignId,
+    DateTime closedAt, {
+    String? state,
+    String? closureKey,
+  }) {
+    final recordKey = (closureKey ?? campaignId).trim();
+    if (recordKey.isEmpty) return;
     final closures = List<Map<String, dynamic>>.from(widget.config.helpCampaignClosures.map((e) => Map<String, dynamic>.from(e)));
-    final idx = closures.indexWhere((e) => (e['campaignId'] ?? '').toString() == campaignId);
+    final idx = closures.indexWhere((e) => (e['campaignId'] ?? '').toString() == recordKey);
     final visibleUntil = closedAt.add(const Duration(days: kNgmyContributionReceiptAfterCloseDays));
     final contributionTxIds = _visibleContributionTx()
         .where((t) {
@@ -31933,7 +31958,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .toSet()
         .toList();
     final record = <String, dynamic>{
-      'campaignId': campaignId,
+      'campaignId': recordKey,
       'closedAt': closedAt.toUtc().toIso8601String(),
       'receiptVisibleUntil': visibleUntil.toUtc().toIso8601String(),
       if (contributionTxIds.isNotEmpty) 'contributionTxIds': contributionTxIds,
@@ -31994,9 +32019,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         // never blink back on. Missed is recorded only at that close.
         if (ngmyHelpCampaignReachedMaxDuration(startedAt, now)) {
           final campaignId = _activeHelpCampaignId(state);
-          final alreadyClosed = campaignId.trim().isNotEmpty &&
+          final closureKey = _helpCampaignClosureKey(
+            campaignId,
+            state: state,
+            campaignStartedAt: startedAt,
+          );
+          // An unkeyable campaign counts as closed: re-running the sweep with
+          // nothing to record kept adding a miss on every rebuild.
+          final alreadyClosed = closureKey.isEmpty ||
               widget.config.helpCampaignClosures.any(
-                (c) => (c['campaignId'] ?? '').toString().trim() == campaignId.trim(),
+                (c) => (c['campaignId'] ?? '').toString().trim() == closureKey,
               );
           // Snapshot members while help is still active so a second pass
           // (or another device) cannot re-increment missed.
@@ -32012,7 +32044,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               campaignStartedAt: startedAt,
               campaignState: state,
             );
-            _markCampaignClosed(campaignId, now, state: state);
+            _markCampaignClosed(campaignId, now, state: state, closureKey: closureKey);
           }
           widget.config.deactivateHelpCampaign(state);
           changed = true;
@@ -35465,6 +35497,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }) {
     final normalizedCampaignId = campaignId.trim();
     if (normalizedCampaignId.isEmpty && campaignStartedAt == null) return;
+    final closureKey = _helpCampaignClosureKey(
+      normalizedCampaignId,
+      state: (campaignState ?? _selectedState).trim(),
+      campaignStartedAt: campaignStartedAt,
+    );
+    // No stable key means no way to record "already handled" — skip rather
+    // than risk marking everyone missed again on the next rebuild.
+    if (closureKey.isEmpty) {
+      debugPrint('[help mode] no stable closure key — skipping missed marking');
+      return;
+    }
     // Idempotency guard: a campaign can only ever be closed out once. Two
     // devices/sessions racing to deactivate the same campaign (or a
     // manual Deactivate overlapping the 2-month auto-expiry sweep) would
@@ -35474,9 +35517,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     // device knows has been closed (and syncs across devices via
     // ngmyPersistCivicHelpModeSettings/ngmyHydrateCivicHelpModeFromAllBackups),
     // so it doubles as the "already handled, don't do it again" record.
-    if (normalizedCampaignId.isNotEmpty &&
-        widget.config.helpCampaignClosures.any((c) => (c['campaignId'] ?? '').toString().trim() == normalizedCampaignId)) {
-      debugPrint('[help mode] campaign $normalizedCampaignId already closed — skipping duplicate missed marking');
+    if (widget.config.helpCampaignClosures.any((c) => (c['campaignId'] ?? '').toString().trim() == closureKey)) {
+      debugPrint('[help mode] campaign $closureKey already closed — skipping duplicate missed marking');
       return;
     }
     final stateKey = (campaignState ?? _selectedState).trim();
@@ -36614,7 +36656,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       debugPrint('[help mode] mark missed on deactivate: $e');
                                     }
                                     try {
-                                      _markCampaignClosed(activeCampaignId, DateTime.now(), state: _selectedState);
+                                      // Same key the missed sweep guards on, so a
+                                      // campaign with no id is still recorded as
+                                      // closed and cannot be swept twice.
+                                      _markCampaignClosed(
+                                        activeCampaignId,
+                                        DateTime.now(),
+                                        state: _selectedState,
+                                        closureKey: _helpCampaignClosureKey(
+                                          activeCampaignId,
+                                          state: _selectedState,
+                                          campaignStartedAt: campaignStartedAt,
+                                        ),
+                                      );
                                     } catch (e) {
                                       debugPrint('[help mode] mark campaign closed: $e');
                                     }

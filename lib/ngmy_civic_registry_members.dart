@@ -290,39 +290,53 @@ class NgmyCivicRegistryMembers {
     return true;
   }
 
-  static void _clearTombstone(dynamic config, String email, {String registryId = ''}) {
+  /// True when a tombstone was actually dropped.
+  static bool _clearTombstone(dynamic config, String email, {String registryId = ''}) {
     final key = emailKey(email);
     final rid = registryId.trim().toUpperCase();
-    if (key.isEmpty && rid.isEmpty) return;
-    final next = removedFrom(config)
-      ..removeWhere((r) {
-        final e = emailKey((r['email'] ?? '').toString());
-        final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
-        if (key.isNotEmpty && e == key) return true;
-        if (rid.isNotEmpty && id == rid) return true;
-        return false;
-      });
-    setRemoved(config, next);
-  }
-
-  /// Drop soft-delete rows for anyone already back on the live roster.
-  static int clearSoftDeletesForActiveMembers(dynamic config) {
-    final activeEmails = <String>{};
-    final activeRids = <String>{};
-    for (final m in listFrom(config)) {
-      final e = emailKey((m['email'] ?? '').toString());
-      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
-      if (e.isNotEmpty) activeEmails.add(e);
-      if (id.isNotEmpty) activeRids.add(id);
-    }
+    if (key.isEmpty && rid.isEmpty) return false;
     final before = removedFrom(config);
     final next = before.where((r) {
-      // Live roster always wins — including over "permanent" tombstones after backup restore.
       final e = emailKey((r['email'] ?? '').toString());
       final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
-      if (e.isNotEmpty && activeEmails.contains(e)) return false;
-      if (id.isNotEmpty && activeRids.contains(id)) return false;
+      if (key.isNotEmpty && e == key) return false;
+      if (rid.isNotEmpty && id == rid) return false;
       return true;
+    }).map((e) => Map<String, dynamic>.from(e)).toList();
+    if (next.length == before.length) return false;
+    setRemoved(config, next);
+    return true;
+  }
+
+  /// Drop delete rows for anyone explicitly restored or re-enrolled.
+  ///
+  /// Only [restoredAt] counts as "this person is back". Clearing tombstones for
+  /// every live row resurrected deleted members: a cloud merge re-added the row,
+  /// that row then erased its own tombstone, and the delete could never stick.
+  static int clearSoftDeletesForActiveMembers(dynamic config) {
+    final restoredByEmail = <String, DateTime>{};
+    final restoredByRid = <String, DateTime>{};
+    for (final m in listFrom(config)) {
+      final at = DateTime.tryParse((m['restoredAt'] ?? '').toString());
+      if (at == null) continue;
+      final e = emailKey((m['email'] ?? '').toString());
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (e.isNotEmpty) restoredByEmail[e] = at;
+      if (id.isNotEmpty) restoredByRid[id] = at;
+    }
+    if (restoredByEmail.isEmpty && restoredByRid.isEmpty) return 0;
+
+    final before = removedFrom(config);
+    final next = before.where((r) {
+      final e = emailKey((r['email'] ?? '').toString());
+      final id = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      final restored = (e.isNotEmpty ? restoredByEmail[e] : null) ??
+          (id.isNotEmpty ? restoredByRid[id] : null);
+      if (restored == null) return true;
+      final removedAt = DateTime.tryParse((r['removedAt'] ?? '').toString());
+      // Deleted again after the restore — that delete stands.
+      if (removedAt != null && removedAt.isAfter(restored)) return true;
+      return false;
     }).map((e) => Map<String, dynamic>.from(e)).toList();
     if (next.length == before.length) return 0;
     setRemoved(config, next);
@@ -634,8 +648,10 @@ class NgmyCivicRegistryMembers {
 
     // Registrar can enroll without email; registryId is the unique row key.
     if (email.isEmpty && rid.isEmpty) return;
-    if (email.isNotEmpty || rid.isNotEmpty) {
-      _clearTombstone(config, email, registryId: rid);
+    // Re-adding someone who was deleted must survive the next cloud merge, and
+    // restoredAt is the only stamp a delete tombstone yields to.
+    if (_clearTombstone(config, email, registryId: rid)) {
+      next['restoredAt'] = now;
     }
 
     if (forceNew) {
@@ -862,7 +878,20 @@ class NgmyCivicRegistryMembers {
       final prev = (next['previousRegistryId'] ?? '').toString().trim();
       if (prev.isEmpty) next['previousRegistryId'] = oldId;
     }
-    next['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+    // Keep the newest restore stamp so collapsing twins cannot lose the one
+    // marker that lets a member survive a stale delete tombstone.
+    final restoreKeep = DateTime.tryParse((next['restoredAt'] ?? '').toString());
+    final restoreOther = DateTime.tryParse((other['restoredAt'] ?? '').toString());
+    if (restoreOther != null && (restoreKeep == null || restoreOther.isAfter(restoreKeep))) {
+      next['restoredAt'] = other['restoredAt'];
+    }
+    // Collapsing twins is cleanup, not an edit: re-stamping updatedAt here made
+    // every row look newer than any delete and defeated tombstones.
+    final stampKeep = _memberStamp(next);
+    final stampOther = _memberStamp(other);
+    if (stampOther != null && (stampKeep == null || stampOther.isAfter(stampKeep))) {
+      next['updatedAt'] = other['updatedAt'] ?? next['updatedAt'];
+    }
     return next;
   }
 
@@ -1588,6 +1617,9 @@ class NgmyCivicRegistryMembers {
 
   static Map<String, dynamic> payload(dynamic config) {
     pruneIncompleteEnrollments(config);
+    // Never upload nameless auto-created rows — that is how "Member" ghosts
+    // spread from one device to every other one.
+    purgePhantomMembers(config);
     return {
       'members': listFrom(config),
       'removed': removedFrom(config),
@@ -1599,6 +1631,7 @@ class NgmyCivicRegistryMembers {
   /// Cloud persist for a single state — never upload other states' rows by accident.
   static Map<String, dynamic> payloadForState(dynamic config, {required String state}) {
     pruneIncompleteEnrollments(config);
+    purgePhantomMembers(config);
     final st = state.trim();
     if (st.isEmpty) return payload(config);
     bool inState(Map<String, dynamic> m) =>
@@ -1606,6 +1639,9 @@ class NgmyCivicRegistryMembers {
     bool removedInState(Map<String, dynamic> r) {
       final snap = r['snapshot'];
       final s = (r['state'] ?? (snap is Map ? snap['state'] : '') ?? '').toString();
+      // A delete with no state on record still has to reach the server,
+      // otherwise the next merge hands the member back.
+      if (s.trim().isEmpty) return true;
       return NgmyCivicRegistryStats.statesMatch(s, st);
     }
     bool deceasedInState(Map<String, dynamic> d) {
@@ -1700,8 +1736,76 @@ class NgmyCivicRegistryMembers {
     setDeceased(config, [...keptDeceased, ...incomingDeceased]);
   }
 
+  /// Cloud rows this device may merge into its own roster.
+  ///
+  /// Two rules keep the roster from growing ghosts and twins:
+  /// out-of-scope states are dropped (a registrar who unlocks another state
+  /// receives that state's *masked* directory, which is not enrollable data),
+  /// and privacy-redacted rows may only update someone already enrolled here —
+  /// never create a member. Merging those rows created "Member" rows with no
+  /// name and duplicate profiles keyed by masked emails.
+  static Map<String, dynamic> _incomingForAdopt(
+    dynamic config,
+    Map<String, dynamic> payload, {
+    String scopeState = '',
+  }) {
+    final st = scopeState.trim();
+    bool inScope(String state) =>
+        st.isEmpty || NgmyCivicRegistryStats.statesMatch(state, st);
+
+    final knownKeys = <String>{};
+    final knownDigits = <String>{};
+    for (final m in listFrom(config)) {
+      final k = _mergeKey(m);
+      if (k.isNotEmpty) knownKeys.add(k);
+      final digits = _digitsOfRegistryId((m['registryId'] ?? '').toString());
+      if (digits.length >= 5) knownDigits.add(digits);
+    }
+
+    final members = <Map<String, dynamic>>[];
+    final rawMembers = payload['members'];
+    if (rawMembers is List) {
+      for (final e in rawMembers) {
+        if (e is! Map) continue;
+        final m = Map<String, dynamic>.from(e);
+        if (!inScope((m['state'] ?? '').toString())) continue;
+        if (_isSanitizedMemberRow(m)) {
+          final digits = _digitsOfRegistryId((m['registryId'] ?? '').toString());
+          final known = knownKeys.contains(_mergeKey(m)) ||
+              (digits.length >= 5 && knownDigits.contains(digits));
+          if (!known) continue;
+        }
+        members.add(m);
+      }
+    }
+
+    List<Map<String, dynamic>> rowsInScope(dynamic raw) {
+      final out = <Map<String, dynamic>>[];
+      if (raw is! List) return out;
+      for (final e in raw) {
+        if (e is! Map) continue;
+        final row = Map<String, dynamic>.from(e);
+        final snap = row['snapshot'];
+        final state =
+            (row['state'] ?? (snap is Map ? snap['state'] : '') ?? '').toString();
+        // Keep deletes that carry no state — dropping them let the member
+        // return on the next merge.
+        if (state.trim().isNotEmpty && !inScope(state)) continue;
+        out.add(row);
+      }
+      return out;
+    }
+
+    return {
+      'members': members,
+      'removed': rowsInScope(payload['removed'] ?? payload['civicRegistryRemoved']),
+      'deceased': rowsInScope(payload['deceased']),
+    };
+  }
+
   /// Authoritative cloud hydrate — merge (never replace) so a truncated cloud
-  /// roster cannot wipe members that still exist on this device.
+  /// roster cannot wipe members that still exist on this device, then clean up
+  /// so the merge cannot leave twins or nameless rows behind.
   static void adoptCloudPayload(
     dynamic config,
     Map<String, dynamic> payload, {
@@ -1719,14 +1823,7 @@ class NgmyCivicRegistryMembers {
       if (digits.length >= 5) priorByDigits[digits] = m;
     }
 
-    applyPayload(config, payload);
-
-    final st = scopeState.trim();
-    if (st.isNotEmpty) {
-      repairRedactedFields(config, fallbackState: st);
-    } else {
-      repairRedactedFields(config);
-    }
+    applyPayload(config, _incomingForAdopt(config, payload, scopeState: scopeState));
 
     final next = <Map<String, dynamic>>[];
     for (final raw in listFrom(config)) {
@@ -1756,6 +1853,9 @@ class NgmyCivicRegistryMembers {
       next.add(m);
     }
     setList(config, next);
+    dedupeMembers(config);
+    pruneIncompleteEnrollments(config);
+    purgePhantomMembers(config);
     clearSoftDeletesForActiveMembers(config);
   }
 
@@ -2202,13 +2302,13 @@ class NgmyCivicRegistryMembers {
       final live = (email.isNotEmpty ? liveByEmail[email] : null) ??
           (rid.isNotEmpty ? liveByRid[rid] : null);
       if (live == null) return false;
+      // Only an explicit restore / re-enroll drops a delete. Every merge and
+      // dedupe pass refreshes updatedAt, so trusting it meant deleted members
+      // came back on the very next cloud refresh.
+      final restoredAt = DateTime.tryParse((live['restoredAt'] ?? '').toString());
+      if (restoredAt == null) return false;
       final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
-      final updatedAt = _memberStamp(live);
-      // Restored member (or any newer roster row) wins over soft-delete / permanent tombstone.
-      if ((live['restoredAt'] ?? '').toString().trim().isNotEmpty) return true;
-      if (removedAt == null) return true;
-      if (updatedAt != null && !updatedAt.isBefore(removedAt)) return true;
-      return false;
+      return removedAt == null || !restoredAt.isBefore(removedAt);
     }
 
     final tombstones = <String, Map<String, dynamic>>{};
@@ -2228,7 +2328,6 @@ class NgmyCivicRegistryMembers {
       if (b != null && (a == null || b.isAfter(a))) tombstones[key] = r;
     }
     setRemoved(config, tombstones.values.toList());
-    clearSoftDeletesForActiveMembers(config);
 
     // Merge deceased roster from every device — deceased members stay out of the live list.
     final remoteDeceasedRaw = payload['deceased'] ?? payload['civicRegistryDeceased'];
@@ -2271,12 +2370,13 @@ class NgmyCivicRegistryMembers {
       tomb ??= rid.isNotEmpty ? tombstones['id:$rid'] : null;
       if (tomb == null) return false;
       final removedAt = DateTime.tryParse((tomb['removedAt'] ?? '').toString());
-      final updatedAt = _memberStamp(m);
       final restoredAt = DateTime.tryParse((m['restoredAt'] ?? '').toString());
-      if (removedAt == null) return true;
-      // Recover stamps restoredAt/updatedAt so soft-delete tombstones lose.
-      if (restoredAt != null && !restoredAt.isBefore(removedAt)) return false;
-      if (updatedAt != null && !updatedAt.isBefore(removedAt)) return false;
+      // Restore / re-enroll is the only way back. updatedAt must never count
+      // here: it is refreshed by every merge, which resurrected deleted
+      // members (and duplicates) on each cloud refresh.
+      if (restoredAt != null && (removedAt == null || !restoredAt.isBefore(removedAt))) {
+        return false;
+      }
       return true;
     }
 
@@ -2325,6 +2425,9 @@ class NgmyCivicRegistryMembers {
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
         applyPayload(config, Map<String, dynamic>.from(decoded));
+        dedupeMembers(config);
+        pruneIncompleteEnrollments(config);
+        purgePhantomMembers(config);
       }
     } catch (_) {}
   }

@@ -1466,10 +1466,6 @@ function tombstoneRowKey(r: Record<string, unknown>): string {
   return "";
 }
 
-function memberStampMs(m: Record<string, unknown>): number {
-  return Date.parse(String(m.updatedAt ?? m.enrolledAt ?? m.restoredAt ?? "")) || 0;
-}
-
 /** Keep live roster rows that are not superseded by delete/deceased tombstones. */
 function filterTombstonedMembers(
   members: Record<string, unknown>[],
@@ -1512,16 +1508,24 @@ function filterTombstonedMembers(
     if (!tomb) return true;
 
     const removedAt = Date.parse(String(tomb.removedAt ?? "")) || 0;
-    const updatedAt = memberStampMs(m);
     const restoredAt = Date.parse(String(m.restoredAt ?? "")) || 0;
 
-    // Restored / newer live row wins over soft-delete tombstone.
-    if (restoredAt > 0 && restoredAt >= removedAt) return true;
-    if (updatedAt > 0 && updatedAt >= removedAt) return true;
-
-    // Permanent tombstone or active soft-delete — hide from live roster.
-    return false;
+    // Only an explicit restore / re-enroll brings a deleted member back.
+    // updatedAt must not count: every roster merge refreshes it, which let
+    // deleted members and duplicates reappear on the next sync.
+    return restoredAt > 0 && restoredAt >= removedAt;
   });
+}
+
+/// Auto-created roster ghosts: no registry id, or no name and nothing else to
+/// identify a person. These are what surfaced in the app as "Member" rows.
+function isGhostMemberRow(m: Record<string, unknown>): boolean {
+  if (!String(m.registryId ?? "").trim()) return true;
+  if (!isRedactedCivicValue(m.fullName)) return false;
+  return isRedactedCivicValue(m.username) &&
+    isRedactedCivicValue(m.phone) &&
+    isRedactedCivicValue(m.homeAddress) &&
+    isRedactedCivicValue(m.dob);
 }
 
 function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
@@ -2425,15 +2429,15 @@ async function handleCivicPersistRoster(
       members = mergeStateSlice(members, incomingMembers, bodySk);
     }
 
-    const otherRemoved = removed.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) !== sk,
-    );
-    const homeRemovedExisting = removed.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
-    );
-    const homeRemovedIncoming = incomingRemoved.filter(
-      (m) => canonicalStateKey(String(m.state ?? "")) === sk,
-    );
+    // Deletes with no state on record belong to whoever is syncing — dropping
+    // them meant the member was handed straight back on the next merge.
+    const ownsRemoved = (m: Record<string, unknown>) => {
+      const k = canonicalStateKey(String(m.state ?? ""));
+      return !k || k === sk;
+    };
+    const otherRemoved = removed.filter((m) => !ownsRemoved(m));
+    const homeRemovedExisting = removed.filter(ownsRemoved);
+    const homeRemovedIncoming = incomingRemoved.filter(ownsRemoved);
     removed = [...otherRemoved, ...mergeMemberLists(homeRemovedExisting, homeRemovedIncoming)];
 
     const otherDeceased = deceased.filter((d) => {
@@ -2461,6 +2465,7 @@ async function handleCivicPersistRoster(
   }
 
   members = filterTombstonedMembers(members, removed, deceased);
+  members = members.filter((m) => !isGhostMemberRow(m));
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased });
   if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);

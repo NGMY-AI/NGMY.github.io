@@ -988,7 +988,8 @@ Future<bool> ngmyPersistCivicRegistryMembers(
 
     // Safety net: union cloud roster into local before upload so a stale device
     // never pushes a truncated state slice (server also merges, but this keeps
-    // local backups accurate too).
+    // local backups accurate too). Uses the same guarded adopt path as hydrate
+    // so redacted / out-of-state directory rows never enter the roster here.
     final scope = (state ?? '').trim();
     final cloudRow = await ngmyCivicFetchRoster(
       email: email,
@@ -999,18 +1000,17 @@ Future<bool> ngmyPersistCivicRegistryMembers(
         cloudRow['needsUnlock'] != true) {
       final view = (cloudRow['view'] ?? '').toString();
       if (view == 'admin' || view == 'registrar') {
-        NgmyCivicRegistryMembers.applyPayload(
+        NgmyCivicRegistryMembers.adoptCloudPayload(
           config,
           {
             'members': cloudRow['members'] ?? const [],
             'removed': cloudRow['removed'] ?? const [],
             'deceased': cloudRow['deceased'] ?? const [],
           },
+          scopeState: view == 'registrar'
+              ? (cloudRow['registrarState'] ?? scope).toString()
+              : '',
         );
-        if (scope.isNotEmpty) {
-          NgmyCivicRegistryMembers.repairRedactedFields(config, fallbackState: scope);
-        }
-        NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
       }
     }
 
