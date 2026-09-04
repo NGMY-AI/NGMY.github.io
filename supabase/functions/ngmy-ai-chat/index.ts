@@ -1458,6 +1458,72 @@ function mergeMemberLists(
   return [...byKey.values()];
 }
 
+function tombstoneRowKey(r: Record<string, unknown>): string {
+  const em = emailKey(String(r.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  const rid = String(r.registryId ?? "").trim().toUpperCase();
+  if (rid) return `id:${rid}`;
+  return "";
+}
+
+function memberStampMs(m: Record<string, unknown>): number {
+  return Date.parse(String(m.updatedAt ?? m.enrolledAt ?? m.restoredAt ?? "")) || 0;
+}
+
+/** Keep live roster rows that are not superseded by delete/deceased tombstones. */
+function filterTombstonedMembers(
+  members: Record<string, unknown>[],
+  removed: Record<string, unknown>[],
+  deceased: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const tombstones = new Map<string, Record<string, unknown>>();
+  for (const r of removed) {
+    const key = tombstoneRowKey(r);
+    if (!key) continue;
+    const prev = tombstones.get(key);
+    if (!prev) {
+      tombstones.set(key, r);
+      continue;
+    }
+    const a = Date.parse(String(prev.removedAt ?? "")) || 0;
+    const b = Date.parse(String(r.removedAt ?? "")) || 0;
+    if (b >= a) tombstones.set(key, r);
+  }
+
+  const deceasedKeys = new Set<string>();
+  for (const d of deceased) {
+    const key = tombstoneRowKey(d);
+    if (key) deceasedKeys.add(key);
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : null;
+    if (snap) {
+      const sk = memberRowKey(snap);
+      if (sk) deceasedKeys.add(sk);
+    }
+  }
+
+  return members.filter((m) => {
+    const key = memberRowKey(m);
+    if (!key) return true;
+    if (deceasedKeys.has(key)) return false;
+
+    const tomb = tombstones.get(key);
+    if (!tomb) return true;
+
+    const removedAt = Date.parse(String(tomb.removedAt ?? "")) || 0;
+    const updatedAt = memberStampMs(m);
+    const restoredAt = Date.parse(String(m.restoredAt ?? "")) || 0;
+
+    // Restored / newer live row wins over soft-delete tombstone.
+    if (restoredAt > 0 && restoredAt >= removedAt) return true;
+    if (updatedAt > 0 && updatedAt >= removedAt) return true;
+
+    // Permanent tombstone or active soft-delete — hide from live roster.
+    return false;
+  });
+}
+
 function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unknown> {
   const nicknames = Array.isArray(m.nicknames) ? m.nicknames : [];
   return {
@@ -2323,7 +2389,8 @@ async function handleCivicPersistRoster(
   let deceased = asMemberList(current.deceased);
 
   if (role.isAdmin && !scopeState) {
-    members = mergeMemberLists([], incomingMembers);
+    // Union with existing cloud roster — never let a stale device wipe members.
+    members = mergeMemberLists(members, incomingMembers);
     removed = mergeMemberLists(removed, incomingRemoved);
     if (incomingDeceased.length > 0) {
       deceased = mergeMemberLists(deceased, incomingDeceased);
@@ -2339,13 +2406,14 @@ async function handleCivicPersistRoster(
       const other = allMembers.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
       );
+      const existing = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
       const inc = incoming.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
       );
-      // Incoming roster is authoritative for this state — merging with the
-      // old slice kept deleted members on the server and they reappeared
-      // after every cloud refresh.
-      return [...other, ...mergeMemberLists([], inc)];
+      // Union cloud + incoming for this state — tombstones below keep deletes final.
+      return [...other, ...mergeMemberLists(existing, inc)];
     };
 
     members = mergeStateSlice(members, incomingMembers, sk);
@@ -2391,6 +2459,8 @@ async function handleCivicPersistRoster(
       ...mergeMemberLists(homeDeceasedExisting, homeDeceasedIncoming),
     ];
   }
+
+  members = filterTombstonedMembers(members, removed, deceased);
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased });
   if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);

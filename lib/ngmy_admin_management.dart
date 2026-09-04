@@ -985,12 +985,41 @@ Future<bool> ngmyPersistCivicRegistryMembers(
   if (email.isNotEmpty) {
     // Never write soft-delete rows for people already back on the roster.
     NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
+
+    // Safety net: union cloud roster into local before upload so a stale device
+    // never pushes a truncated state slice (server also merges, but this keeps
+    // local backups accurate too).
+    final scope = (state ?? '').trim();
+    final cloudRow = await ngmyCivicFetchRoster(
+      email: email,
+      state: scope,
+    );
+    if (cloudRow != null &&
+        cloudRow['networkEmpty'] != true &&
+        cloudRow['needsUnlock'] != true) {
+      final view = (cloudRow['view'] ?? '').toString();
+      if (view == 'admin' || view == 'registrar') {
+        NgmyCivicRegistryMembers.applyPayload(
+          config,
+          {
+            'members': cloudRow['members'] ?? const [],
+            'removed': cloudRow['removed'] ?? const [],
+            'deceased': cloudRow['deceased'] ?? const [],
+          },
+        );
+        if (scope.isNotEmpty) {
+          NgmyCivicRegistryMembers.repairRedactedFields(config, fallbackState: scope);
+        }
+        NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
+      }
+    }
+
     final result = await ngmyCivicPersistRoster(
       email: email,
-      state: (state ?? '').trim(),
-      payload: (state ?? '').trim().isEmpty
+      state: scope,
+      payload: scope.isEmpty
           ? NgmyCivicRegistryMembers.payload(config)
-          : NgmyCivicRegistryMembers.payloadForState(config, state: state!.trim()),
+          : NgmyCivicRegistryMembers.payloadForState(config, state: scope),
     );
     cloudOk = result.ok;
   }

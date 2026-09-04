@@ -1700,7 +1700,8 @@ class NgmyCivicRegistryMembers {
     setDeceased(config, [...keptDeceased, ...incomingDeceased]);
   }
 
-  /// Authoritative cloud hydrate — replace (not merge) and keep good local PII when cloud row is redacted.
+  /// Authoritative cloud hydrate — merge (never replace) so a truncated cloud
+  /// roster cannot wipe members that still exist on this device.
   static void adoptCloudPayload(
     dynamic config,
     Map<String, dynamic> payload, {
@@ -1718,11 +1719,13 @@ class NgmyCivicRegistryMembers {
       if (digits.length >= 5) priorByDigits[digits] = m;
     }
 
+    applyPayload(config, payload);
+
     final st = scopeState.trim();
-    if (st.isEmpty) {
-      replacePayload(config, payload);
+    if (st.isNotEmpty) {
+      repairRedactedFields(config, fallbackState: st);
     } else {
-      replacePayloadScoped(config, payload, scopeState: st);
+      repairRedactedFields(config);
     }
 
     final next = <Map<String, dynamic>>[];
@@ -1753,8 +1756,6 @@ class NgmyCivicRegistryMembers {
       next.add(m);
     }
     setList(config, next);
-    dedupeMembers(config);
-    pruneIncompleteEnrollments(config);
     clearSoftDeletesForActiveMembers(config);
   }
 
@@ -2323,9 +2324,7 @@ class NgmyCivicRegistryMembers {
       if (raw == null || raw.isEmpty) return;
       final decoded = jsonDecode(raw);
       if (decoded is Map) {
-        replacePayload(config, Map<String, dynamic>.from(decoded));
-        dedupeMembers(config);
-        pruneIncompleteEnrollments(config);
+        applyPayload(config, Map<String, dynamic>.from(decoded));
       }
     } catch (_) {}
   }
