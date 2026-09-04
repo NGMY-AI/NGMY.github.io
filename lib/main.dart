@@ -141,6 +141,7 @@ import 'ngmy_civic_registry_admin.dart';
 import 'ngmy_civic_state_transfer_ui.dart';
 import 'ngmy_civic_registry_pins.dart';
 import 'ngmy_civic_registry_gate.dart';
+import 'ngmy_civic_registry_access.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_private_lists_cloud.dart';
 import 'ngmy_transactions_cloud.dart';
@@ -30899,6 +30900,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   late String _selectedState;
   bool _registryUnlocked = false;
   bool _unlockChecked = false;
+  String? _registryGateMessage;
   String _selectedCity = 'All Cities';
   String _selectedRoom = 'All Rooms';
   final TextEditingController _searchController = TextEditingController();
@@ -31434,12 +31436,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  Future<NgmyCivicAccessStatus> _civicUnlockAccessStatus([String? state]) async {
+    final stored = await civicRegistryStoredUnlockEntry(
+      widget.user.email,
+      state: (state ?? _selectedState).trim(),
+    );
+    final storedRid = (stored?['registryId'] ?? '').toString().trim();
+    final storedAt = DateTime.tryParse((stored?['at'] ?? '').toString());
+    Map<String, dynamic>? member;
+    if (storedRid.isNotEmpty) {
+      member = NgmyCivicRegistryMembers.findByRegistryId(widget.config, storedRid);
+    }
+    member ??= _civicMemberRecordForCurrentUser();
+    final email = (member?['email'] ?? widget.user.email).toString();
+    final rid = (member?['registryId'] ?? storedRid).toString();
+    return NgmyCivicRegistryAccess.evaluate(
+      removed: NgmyCivicRegistryMembers.isRemoved(widget.config, email: email, registryId: rid),
+      deceased: NgmyCivicRegistryMembers.isDeceased(widget.config, email: email, registryId: rid),
+      member: member,
+      localUnlockAt: storedAt,
+    );
+  }
+
   Future<void> _checkRegistryUnlock() async {
     if (_canBypassCivicGate() || !_stateRequiresMemberUnlock()) {
       if (mounted) setState(() {
         _registryUnlocked = true;
         _unlockChecked = true;
+        _registryGateMessage = null;
       });
+      return;
+    }
+    final access = await _civicUnlockAccessStatus();
+    if (access.invalidatesStoredUnlock) {
+      await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
+      if (mounted) {
+        setState(() {
+          _registryUnlocked = false;
+          _unlockChecked = true;
+          _registryGateMessage = access.message;
+        });
+      }
       return;
     }
     final ok = await civicRegistryIsUnlocked(
@@ -31447,11 +31484,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
       globalPin: widget.config.civicRegistryPin,
       pinsByState: widget.config.civicRegistryPinsByState,
+      access: access,
     );
     if (mounted) {
       setState(() {
         _registryUnlocked = ok;
         _unlockChecked = true;
+        if (ok) _registryGateMessage = null;
       });
     }
   }
@@ -31563,6 +31602,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         state: newState,
         globalPin: widget.config.civicRegistryPin,
         pinsByState: widget.config.civicRegistryPinsByState,
+        access: await _civicUnlockAccessStatus(newState),
       );
       if (!unlocked) {
         if (!mounted) return false;
@@ -38031,13 +38071,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                     if (registryId.isNotEmpty && raw != null) ...[
                       const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _showCivicIdCardForRecord(raw),
-                          icon: const Icon(Icons.badge_outlined),
-                          label: const Text('View Registry ID / Passport'),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showCivicIdCardForRecord(raw),
+                              icon: const Icon(Icons.badge_outlined),
+                              label: const Text('View Registry ID / Passport'),
+                            ),
+                          ),
+                          if (_canUseRegistrarToolsHere()) ...[
+                            const SizedBox(width: 8),
+                            IconButton(
+                              tooltip: 'Log out or restrict Civic Registry access',
+                              onPressed: () => unawaited(_openCivicAccessControl(raw)),
+                              icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFFB91C1C)),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -38513,18 +38564,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ),
                   const SizedBox(height: 20),
                   if ((u.registryId ?? '').trim().isNotEmpty) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
-                          if (raw != null) {
-                            _showCivicIdCardForRecord(raw);
-                          }
-                        },
-                        icon: const Icon(Icons.badge_outlined),
-                        label: const Text('View Registry ID / Passport'),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+                              if (raw != null) {
+                                _showCivicIdCardForRecord(raw);
+                              }
+                            },
+                            icon: const Icon(Icons.badge_outlined),
+                            label: const Text('View Registry ID / Passport'),
+                          ),
+                        ),
+                        if (_canUseRegistrarToolsHere()) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            tooltip: 'Log out or restrict Civic Registry access',
+                            onPressed: () {
+                              final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+                              if (raw != null) unawaited(_openCivicAccessControl(raw));
+                            },
+                            icon: const Icon(Icons.logout_rounded, size: 20, color: Color(0xFFB91C1C)),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -40602,6 +40667,121 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               );
             }
           : null,
+      onAccessControl: _canUseRegistrarToolsHere()
+          ? () => unawaited(_openCivicAccessControl(displayRecord))
+          : (!_canBypassCivicGate() && email == NgmyCivicRegistryMembers.emailKey(widget.user.email)
+              ? () => unawaited(_leaveCivicRegistrySession())
+              : null),
+    );
+  }
+
+  Widget _civicHomeIdFrame() {
+    final record = _civicMemberRecordForCurrentUser();
+    if (record == null) return const SizedBox.shrink();
+    final email = NgmyCivicRegistryMembers.emailKey((record['email'] ?? widget.user.email).toString());
+    final photoPath = ngmyCivicIdPhotoForRecord(
+      record,
+      profilePicturePath: widget.user.profilePicturePath,
+      emailHint: email,
+    );
+    return NgmyCivicRegistryIdFrame(
+      record: record,
+      photoPath: photoPath,
+      photoImage: ngmyCachedProfileImage(photoPath),
+      onViewPassport: _showMyCivicIdCard,
+      onAccessControl: _canUseRegistrarToolsHere()
+          ? () => unawaited(_openCivicAccessControl(record))
+          : (!_canBypassCivicGate() ? () => unawaited(_leaveCivicRegistrySession()) : null),
+    );
+  }
+
+  Future<void> _leaveCivicRegistrySession() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Leave Civic Registry?'),
+        content: const Text(
+          'You will be logged out of Civic Registry. Opening it again will ask for your PIN, name, date of birth, and Registry ID.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Log out')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
+    if (!mounted) return;
+    setState(() {
+      _registryUnlocked = false;
+      _registryGateMessage = 'You were logged out of Civic Registry. Enter your PIN, name, date of birth, and Registry ID again.';
+    });
+  }
+
+  Future<void> _openCivicAccessControl(Map<String, dynamic> record) async {
+    final email = (record['email'] ?? '').toString();
+    final rid = (record['registryId'] ?? '').toString();
+    await showNgmyCivicAccessControlSheet(
+      context: context,
+      record: record,
+      removed: NgmyCivicRegistryMembers.isRemoved(widget.config, email: email, registryId: rid),
+      onApply: (action, {lockFor}) => _applyCivicMemberAccess(record, action: action, lockFor: lockFor),
+    );
+  }
+
+  Future<void> _applyCivicMemberAccess(
+    Map<String, dynamic> record, {
+    required NgmyCivicAccessAction action,
+    Duration? lockFor,
+  }) async {
+    final next = NgmyCivicRegistryAccess.apply(
+      member: record,
+      action: action,
+      lockFor: lockFor,
+      lockedBy: widget.user.email,
+    );
+    setState(() {
+      NgmyCivicRegistryMembers.upsert(widget.config, next);
+    });
+    final upsert = await ngmyCivicUpsertMember(
+      email: widget.user.email,
+      member: Map<String, dynamic>.from(next),
+      state: (next['state'] ?? _selectedState).toString(),
+    );
+    await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+    widget.onDataChanged();
+
+    final targetEmail = NgmyCivicRegistryMembers.emailKey((next['email'] ?? '').toString());
+    final targetRid = (next['registryId'] ?? '').toString().trim().toUpperCase();
+    final stored = await civicRegistryStoredUnlockEntry(widget.user.email, state: _selectedState);
+    final storedRid = (stored?['registryId'] ?? '').toString().trim().toUpperCase();
+    final hitsThisDevice = (targetEmail.isNotEmpty &&
+            targetEmail == NgmyCivicRegistryMembers.emailKey(widget.user.email)) ||
+        (targetRid.isNotEmpty && storedRid == targetRid);
+    if (hitsThisDevice && !_canBypassCivicGate()) {
+      await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
+      if (mounted) {
+        setState(() {
+          _registryUnlocked = false;
+          _registryGateMessage = NgmyCivicRegistryAccess.evaluate(
+            removed: false,
+            member: next,
+            localUnlockAt: DateTime.tryParse((stored?['at'] ?? '').toString()),
+          ).message;
+        });
+      }
+    }
+    if (!mounted) return;
+    final label = switch (action) {
+      NgmyCivicAccessAction.logout => 'Member logged out of Civic Registry. They must enter their information again.',
+      NgmyCivicAccessAction.lock => 'Member is blocked from Civic Registry for ${lockFor?.inHours ?? 24} hours.',
+      NgmyCivicAccessAction.lift => 'Restriction lifted.',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(upsert.ok ? label : 'Saved on this device — will sync when online.'),
+        backgroundColor: upsert.ok ? Colors.green : Colors.orange,
+      ),
     );
   }
 
@@ -40975,7 +41155,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         globalPin: widget.config.civicRegistryPin,
         userEmail: widget.user.email,
         initialState: _selectedState,
+        initialMessage: _registryGateMessage,
         members: NgmyCivicRegistryMembers.listFrom(widget.config)
+            .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), _selectedState))
+            .toList(),
+        removed: NgmyCivicRegistryMembers.removedFrom(widget.config)
             .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), _selectedState))
             .toList(),
         onBack: () => NgmyNavigator.pop(context),
@@ -41079,6 +41263,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
             const SizedBox(height: 20),
+            if (_canViewCivicIdForCurrentUser()) ...[
+              _civicHomeIdFrame(),
+              const SizedBox(height: 20),
+            ],
 
             if (_canCurrentUserSeeHelpMode()) ...[
               Builder(builder: (context) {
@@ -41386,6 +41574,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!mounted) return;
       setState(() {});
       widget.onDataChanged();
+      unawaited(_checkRegistryUnlock());
     } finally {
       _cloudHydrateInFlight = false;
     }

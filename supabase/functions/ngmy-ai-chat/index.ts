@@ -1447,6 +1447,16 @@ function preferMemberRow(
     preferred.missed = counters.missed ?? 0;
     if (counters.activityAt) preferred.activityAt = counters.activityAt;
   }
+  const accessA = Date.parse(String(a.accessControlAt ?? "")) || 0;
+  const accessB = Date.parse(String(b.accessControlAt ?? "")) || 0;
+  if (accessA || accessB) {
+    const access = accessB > accessA ? b : a;
+    preferred.accessControlAt = access.accessControlAt;
+    preferred.accessSessionEpoch = access.accessSessionEpoch;
+    preferred.accessLockedUntil = access.accessLockedUntil;
+    preferred.accessLockedBy = access.accessLockedBy;
+    preferred.accessLockHours = access.accessLockHours;
+  }
   return preferred;
 }
 
@@ -1564,6 +1574,10 @@ function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unk
     enrolledAt: m.enrolledAt,
     updatedAt: m.updatedAt,
     enrollmentSource: m.enrollmentSource,
+    accessControlAt: m.accessControlAt,
+    accessSessionEpoch: m.accessSessionEpoch,
+    accessLockedUntil: m.accessLockedUntil,
+    accessLockHours: m.accessLockHours,
     // Public directory only — no address/phone/dob/idPhoto/idType
   };
 }
@@ -1937,6 +1951,38 @@ function normName(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function civicAccessLoginError(
+  member: Record<string, unknown> | undefined,
+  removed: boolean,
+): string | null {
+  if (removed) {
+    return "You were removed from Civic Registry and cannot log in.";
+  }
+  if (!member) return null;
+  const until = Date.parse(String(member.accessLockedUntil ?? ""));
+  if (Number.isFinite(until) && Date.now() < until) {
+    const when = new Date(until).toLocaleString();
+    return `You are blocked from Civic Registry until ${when}.`;
+  }
+  return null;
+}
+
+function memberMatchesNameOrKeys(
+  row: Record<string, unknown>,
+  fullName: string,
+  memberEmail = "",
+  registryId = "",
+): boolean {
+  const want = normName(fullName);
+  const rn = normName(String(row.fullName ?? ""));
+  if (want && rn && want === rn) return true;
+  const em = emailKey(String(row.email ?? ""));
+  if (memberEmail && em && em === memberEmail) return true;
+  const rid = String(row.registryId ?? "").trim().toUpperCase();
+  if (registryId && rid && rid === registryId.trim().toUpperCase()) return true;
+  return false;
+}
+
 function normAddress(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -2016,9 +2062,35 @@ async function handleCivicGateMatchName(
   }
   const payload = await loadCivicPayload(admin);
   const members = filterMembersByState(asMemberList(payload.members), state);
+  const removed = filterMembersByState(asMemberList(payload.removed), state);
+  const deceased = asMemberList(payload.deceased).filter((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return canonicalStateKey(String(d.state ?? snap.state ?? "")) === canonicalStateKey(state);
+  });
   const want = normName(fullName);
+  if (removed.some((r) => memberMatchesNameOrKeys(r, fullName))) {
+    return jsonOk({
+      ok: false,
+      error: "You were removed from Civic Registry and cannot log in.",
+    }, 403);
+  }
+  if (deceased.some((d) => {
+    const snap = d.snapshot && typeof d.snapshot === "object"
+      ? (d.snapshot as Record<string, unknown>)
+      : d;
+    return memberMatchesNameOrKeys(snap, fullName);
+  })) {
+    return jsonOk({
+      ok: false,
+      error: "This Civic Registry record is closed and cannot be used to log in.",
+    }, 403);
+  }
   const match = members.find((m) => normName(String(m.fullName ?? "")) === want);
   if (!match) return jsonOk({ error: "That name is not registered in this state." }, 404);
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
   const matchToken = await sha256Hex(
     `${email}|${stateKey(state)}|${emailKey(String(match.email ?? ""))}|${String(match.registryId ?? "")}|${pinSig}`,
   );
@@ -2055,8 +2127,17 @@ async function handleCivicGateVerifyIdentity(
   }
   const payload = await loadCivicPayload(admin);
   const members = filterMembersByState(asMemberList(payload.members), state);
+  const removed = filterMembersByState(asMemberList(payload.removed), state);
+  if (removed.some((r) => memberMatchesNameOrKeys(r, "", memberEmail, registryId))) {
+    return jsonOk({
+      ok: false,
+      error: "You were removed from Civic Registry and cannot log in.",
+    }, 403);
+  }
   const match = members.find((m) => emailKey(String(m.email ?? "")) === memberEmail);
   if (!match) return jsonOk({ error: "Member not found" }, 404);
+  const accessErr = civicAccessLoginError(match, false);
+  if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
 
   const normDob = (s: string) => s.replace(/[^\d]/g, "");
   if (step === "dob" || step === "both") {

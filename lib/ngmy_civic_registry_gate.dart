@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_civic_identity.dart';
+import 'ngmy_civic_registry_access.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_stats.dart';
 
@@ -83,7 +84,10 @@ Future<void> _saveUnlockRoot(Map<String, dynamic> root) async {
   await prefs.remove('civic_registry_unlock');
 }
 
-Future<String?> civicRegistryStoredPinSig(String userEmail, {required String state}) async {
+Future<Map<String, dynamic>?> civicRegistryStoredUnlockEntry(
+  String userEmail, {
+  required String state,
+}) async {
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
   if (email.isEmpty || st.isEmpty) return null;
@@ -93,8 +97,27 @@ Future<String?> civicRegistryStoredPinSig(String userEmail, {required String sta
   if (states is! Map) return null;
   final entry = states[st] ?? states[st.toLowerCase()];
   if (entry is! Map) return null;
+  return Map<String, dynamic>.from(entry);
+}
+
+Future<String?> civicRegistryStoredPinSig(String userEmail, {required String state}) async {
+  final entry = await civicRegistryStoredUnlockEntry(userEmail, state: state);
+  if (entry == null) return null;
   final sig = (entry['pinSig'] ?? '').toString().trim();
   return sig.isEmpty ? null : sig;
+}
+
+Future<void> civicRegistryClearUnlockForState(String userEmail, {required String state}) async {
+  final email = userEmail.toLowerCase().trim();
+  final st = state.trim();
+  if (email.isEmpty || st.isEmpty) return;
+  final root = await _loadUnlockRoot();
+  if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return;
+  final states = Map<String, dynamic>.from((root['states'] as Map?) ?? {});
+  states.remove(st);
+  states.remove(st.toLowerCase());
+  root['states'] = states;
+  await _saveUnlockRoot(root);
 }
 
 Future<void> civicRegistrySaveServerUnlock(
@@ -127,7 +150,9 @@ Future<bool> civicRegistryIsUnlocked(
   required String state,
   required String globalPin,
   required Map<String, String> pinsByState,
+  NgmyCivicAccessStatus? access,
 }) async {
+  if (access != null && access.invalidatesStoredUnlock) return false;
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
   if (email.isEmpty || st.isEmpty) return false;
@@ -197,8 +222,10 @@ class CivicRegistryGateScreen extends StatefulWidget {
   final VoidCallback? onBack;
   final String globalPin;
   final List<Map<String, dynamic>> members;
+  final List<Map<String, dynamic>> removed;
   /// When false for a picked state, unlock immediately (no PIN / identity).
   final bool Function(String state)? stateRequiresUnlock;
+  final String? initialMessage;
 
   const CivicRegistryGateScreen({
     super.key,
@@ -210,7 +237,9 @@ class CivicRegistryGateScreen extends StatefulWidget {
     required this.onUnlocked,
     this.onBack,
     this.members = const [],
+    this.removed = const [],
     this.stateRequiresUnlock,
+    this.initialMessage,
   });
 
   @override
@@ -252,6 +281,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   void initState() {
     super.initState();
     _state = widget.usStates.contains(widget.initialState) ? widget.initialState : widget.usStates.first;
+    _error = (widget.initialMessage ?? '').trim().isEmpty ? null : widget.initialMessage!.trim();
     // Authorized Registrar returning home (or any state that does not require
     // unlock) should never be stuck on verify membership.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -259,6 +289,23 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       final requires = widget.stateRequiresUnlock?.call(_state) ?? true;
       if (!requires) widget.onUnlocked(_state);
     });
+  }
+
+  NgmyCivicAccessStatus _accessFor(Map<String, dynamic>? member, {String name = ''}) {
+    final want = name.trim().toLowerCase();
+    final removed = widget.removed.any((r) {
+      final email = (r['email'] ?? '').toString().trim().toLowerCase();
+      final rid = (r['registryId'] ?? '').toString().trim().toUpperCase();
+      final rn = (r['fullName'] ?? '').toString().trim().toLowerCase();
+      if (member != null) {
+        final me = (member['email'] ?? '').toString().trim().toLowerCase();
+        final mr = (member['registryId'] ?? '').toString().trim().toUpperCase();
+        if (me.isNotEmpty && me == email) return true;
+        if (mr.isNotEmpty && mr == rid) return true;
+      }
+      return want.isNotEmpty && rn == want;
+    });
+    return NgmyCivicRegistryAccess.evaluate(removed: removed, member: member);
   }
 
   @override
@@ -413,6 +460,15 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
           state: _state,
           fullName: value,
         );
+        final localAccess = _accessFor(localMember, name: value);
+        if (!localAccess.allowsLogin) {
+          if (!mounted) return;
+          setState(() {
+            _busy = false;
+            _error = localAccess.message;
+          });
+          return;
+        }
         if (localMember != null) {
           if (!mounted) return;
           setState(() {
@@ -576,6 +632,16 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
         _error = 'Start over — verification incomplete.';
         _step = 1;
       });
+      return;
+    }
+    final preAccess = _accessFor(_matchedMember);
+    if (!preAccess.allowsLogin) {
+      setState(() => _error = preAccess.message);
+      return;
+    }
+    final preAccess = _accessFor(_matchedMember);
+    if (!preAccess.allowsLogin) {
+      setState(() => _error = preAccess.message);
       return;
     }
     setState(() {

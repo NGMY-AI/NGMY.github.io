@@ -800,6 +800,102 @@ class _MiniNgmySealPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+Widget _idFramePassportChip({VoidCallback? onPressed}) {
+  return Material(
+    color: const Color(0xE6FFFFFF),
+    elevation: 2,
+    shadowColor: Colors.black26,
+    borderRadius: BorderRadius.circular(99),
+    child: InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(99),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Text(
+          'View Registry ID / Passport',
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1E3A8A),
+            letterSpacing: 0.1,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _idFrameAccessIcon({required VoidCallback onPressed}) {
+  return Material(
+    color: const Color(0xE6FFFFFF),
+    elevation: 2,
+    shadowColor: Colors.black26,
+    shape: const CircleBorder(),
+    child: InkWell(
+      onTap: onPressed,
+      customBorder: const CircleBorder(),
+      child: const Padding(
+        padding: EdgeInsets.all(5),
+        child: Icon(Icons.logout_rounded, size: 13, color: Color(0xFFB91C1C)),
+      ),
+    ),
+  );
+}
+
+/// Compact on-page ID with corner View / logout controls.
+class NgmyCivicRegistryIdFrame extends StatelessWidget {
+  const NgmyCivicRegistryIdFrame({
+    super.key,
+    required this.record,
+    this.photoPath,
+    this.photoImage,
+    this.onViewPassport,
+    this.onAccessControl,
+  });
+
+  final Map<String, dynamic> record;
+  final String? photoPath;
+  final ImageProvider? photoImage;
+  final VoidCallback? onViewPassport;
+  final VoidCallback? onAccessControl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GestureDetector(
+          onTap: onViewPassport,
+          child: FittedBox(
+            fit: BoxFit.contain,
+            child: NgmyCivicRegistryIdCard(
+              record: record,
+              photoPath: photoPath,
+              photoImage: photoImage,
+              scale: 1,
+            ),
+          ),
+        ),
+        Positioned(
+          top: 4,
+          left: 4,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _idFramePassportChip(onPressed: onViewPassport),
+              if (onAccessControl != null) ...[
+                const SizedBox(width: 6),
+                _idFrameAccessIcon(onPressed: onAccessControl!),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 Widget _floatingIconButton({
   required IconData icon,
   required VoidCallback onPressed,
@@ -929,6 +1025,7 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
   String? photoPath,
   ImageProvider? photoImage,
   VoidCallback? onChangePhoto,
+  VoidCallback? onAccessControl,
 }) {
   final captureKey = GlobalKey();
   var downloading = false;
@@ -1004,6 +1101,27 @@ Future<void> showNgmyCivicRegistryIdCardDialog(
                         ),
                       ),
                     ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  left: 8,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _idFramePassportChip(
+                        onPressed: () {},
+                      ),
+                      if (onAccessControl != null) ...[
+                        const SizedBox(width: 6),
+                        _idFrameAccessIcon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onAccessControl();
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Positioned(

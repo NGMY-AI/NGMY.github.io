@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_civic_registry_access.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_stats.dart';
 
@@ -108,6 +109,19 @@ class NgmyCivicRegistryMembers {
       total += n < 1 ? 1 : n;
     }
     return total;
+  }
+
+  static bool isRemoved(dynamic config, {String email = '', String registryId = ''}) {
+    final key = emailKey(email);
+    final rid = registryId.trim().toUpperCase();
+    if (key.isEmpty && rid.isEmpty) return false;
+    for (final row in removedFrom(config)) {
+      final e = emailKey((row['email'] ?? '').toString());
+      final id = (row['registryId'] ?? '').toString().trim().toUpperCase();
+      if (key.isNotEmpty && e == key) return true;
+      if (rid.isNotEmpty && id == rid) return true;
+    }
+    return false;
   }
 
   static bool isDeceased(dynamic config, {String email = '', String registryId = ''}) {
@@ -713,6 +727,7 @@ class NgmyCivicRegistryMembers {
       if (!next.containsKey('profileFlags') || next['profileFlags'] == null) {
         next['profileFlags'] = keep['profileFlags'] ?? const <String, dynamic>{};
       }
+      NgmyCivicRegistryAccess.mergeInto(next, keep);
       next['updatedAt'] = now;
       members[idx] = next;
     } else {
@@ -892,6 +907,7 @@ class NgmyCivicRegistryMembers {
     if (restoreOther != null && (restoreKeep == null || restoreOther.isAfter(restoreKeep))) {
       next['restoredAt'] = other['restoredAt'];
     }
+    NgmyCivicRegistryAccess.mergeInto(next, other);
     // Collapsing twins is cleanup, not an edit: re-stamping updatedAt here made
     // every row look newer than any delete and defeated tombstones.
     final stampKeep = _memberStamp(next);
