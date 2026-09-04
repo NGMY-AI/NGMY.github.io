@@ -30670,11 +30670,40 @@ extension AppConfigHelpMode on AppConfig {
   /// removed under the key the read side was looking up.
   String _stateKey(String state) => state.trim().toLowerCase();
 
+  bool _helpCampaignIsClosed(String campaignId) {
+    final id = campaignId.trim();
+    if (id.isEmpty) return false;
+    return helpCampaignClosures.any(
+      (closure) =>
+          (closure['campaignId'] ?? '').toString().trim() == id,
+    );
+  }
+
+  dynamic _rawCampaignForKey(String key) {
+    final exact = helpModeByState[key];
+    if (exact != null) return exact;
+    for (final entry in helpModeByState.entries) {
+      if (_stateKey(entry.key) == key) return entry.value;
+    }
+    return null;
+  }
+
   Map<String, dynamic> _campaignFor(String state) {
-    migrateLegacyHelpModeIfNeeded(state);
     final key = _stateKey(state);
-    final raw = helpModeByState[key];
-    return raw is Map ? Map<String, dynamic>.from(raw) : const {};
+    if (key.isEmpty) return const {};
+    var raw = _rawCampaignForKey(key);
+    if (raw == null) {
+      migrateLegacyHelpModeIfNeeded(state);
+      raw = _rawCampaignForKey(key);
+    }
+    if (raw is! Map) return const {};
+    final campaign = Map<String, dynamic>.from(raw);
+    if (_helpCampaignIsClosed(
+      (campaign['campaignId'] ?? '').toString(),
+    )) {
+      campaign['active'] = false;
+    }
+    return campaign;
   }
 
   bool helpActiveFor(String state) => _campaignFor(state)['active'] == true;
@@ -30755,9 +30784,7 @@ extension AppConfigHelpMode on AppConfig {
     helpModeByState = next;
     // The flat fields are legacy migration input only. Leaving this true can
     // recreate a campaign if an older device drops the per-state map entry.
-    if (helpState.trim().isEmpty || _stateKey(helpState) == key) {
-      helpModeActive = false;
-    }
+    helpModeActive = false;
   }
 
   /// One-time migration: if this state has no entry in the new per-state
@@ -30766,9 +30793,27 @@ extension AppConfigHelpMode on AppConfig {
   /// so this never runs again for that state).
   void migrateLegacyHelpModeIfNeeded(String state) {
     final key = _stateKey(state);
-    if (key.isEmpty || helpModeByState.containsKey(key)) return;
+    if (key.isEmpty || _rawCampaignForKey(key) != null) return;
     if (!helpModeActive) return;
     if (helpState.trim().isNotEmpty && _stateKey(helpState) != key) return;
+    if (_helpCampaignIsClosed(helpCampaignId)) {
+      final now = DateTime.now().toUtc().toIso8601String();
+      helpModeByState = Map<String, dynamic>.from(helpModeByState)
+        ..[key] = {
+          'active': false,
+          'purpose': helpPurpose,
+          'cashApp': helpCashApp,
+          'zelle': helpZelle,
+          'phone': helpPhone,
+          'scopeType': helpScopeType,
+          'scopeValue': helpScopeValue,
+          'campaignId': helpCampaignId,
+          'campaignStartedAt': helpCampaignStartedAt,
+          'updatedAt': now,
+        };
+      helpModeActive = false;
+      return;
+    }
     setHelpCampaign(
       key,
       purpose: helpPurpose,
@@ -38995,7 +39040,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     // contribution recorded here has to be tagged and scoped the same way
     // or it can end up attached to a different campaign than the one that
     // eventually gets deactivated.
-    final state = _selectedState;
+    final state = _selectedState.trim();
+    if (state.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a state before adding a contribution.')),
+      );
+      return;
+    }
     if (!widget.config.helpActiveFor(state)) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;

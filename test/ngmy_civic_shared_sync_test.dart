@@ -63,6 +63,38 @@ void main() {
     expect((merged['georgia'] as Map)['active'], isFalse);
   });
 
+  test(
+    'closed campaign is inactive even when cached map still says active',
+    () {
+      final config = AppConfig(
+        helpModeByState: {
+          'Georgia': {'active': true, 'campaignId': 'closed-campaign'},
+        },
+        helpCampaignClosures: const [
+          {'campaignId': 'closed-campaign'},
+        ],
+      );
+
+      expect(config.helpActiveFor('georgia'), isFalse);
+    },
+  );
+
+  test('closed legacy campaign cannot migrate back to active', () {
+    final config = AppConfig(
+      helpModeActive: true,
+      helpState: 'Georgia',
+      helpPurpose: 'Emergency',
+      helpCampaignId: 'closed-legacy',
+      helpCampaignClosures: const [
+        {'campaignId': 'closed-legacy'},
+      ],
+    );
+
+    expect(config.helpActiveFor('Georgia'), isFalse);
+    expect((config.helpModeByState['georgia'] as Map)['active'], isFalse);
+    expect(config.helpModeActive, isFalse);
+  });
+
   test('stale cloud contribution cannot reduce cumulative amount', () {
     final at = DateTime.utc(2026, 9, 2, 10);
     final all = [
