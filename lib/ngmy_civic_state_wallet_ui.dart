@@ -31,7 +31,7 @@ class _WalletTone {
   Color get fieldBorder => isDark ? const Color(0xFF3F3F3F) : const Color(0xFFD1D5DB);
 }
 
-/// Themed state wallet (true dark / light — no bluish slate).
+/// Themed state wallet (true dark / light â€” no bluish slate).
 class NgmyCivicStateWalletScreen extends StatefulWidget {
   const NgmyCivicStateWalletScreen({
     super.key,
@@ -86,7 +86,7 @@ class NgmyCivicStateWalletScreen extends StatefulWidget {
   final Future<void> Function(String transferId) onRejectTransfer;
   final String currentUserEmail;
   final bool isGlobalAdmin;
-  /// When true, Trust → Contribution needs a second state registrar (admins bypass).
+  /// When true, Trust â†’ Contribution needs a second state registrar (admins bypass).
   final bool trustOutRequiresDualApproval;
   final Future<void> Function({
     required String spendingId,
@@ -210,7 +210,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
 
   void _onTransactionTap(NgmyCivicWalletTxn txn) {
     if (!widget.canEdit || txn.isInflow) return;
-    // Silent taps — no counter, no splash, no UI feedback until unlock.
+    // Silent taps â€” no counter, no splash, no UI feedback until unlock.
     if (_editTapTxnId != txn.id) {
       _editTapTxnId = txn.id;
       _editTapCount = 0;
@@ -317,9 +317,10 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     final dx = local.dx - center.dx;
     final dy = local.dy - center.dy;
     final radius = math.min(size.width, size.height) / 2;
-    if (math.sqrt(dx * dx + dy * dy) > radius) return null;
+    final dist = math.sqrt(dx * dx + dy * dy);
+    // Only the framed ring is tappable â€” the money disc in the middle is not.
+    if (dist > radius || dist < radius * 0.46) return null;
     var angle = math.atan2(dy, dx);
-    // Painter starts at 12 o'clock (-pi/2) and sweeps clockwise (positive).
     var fromTop = angle + math.pi / 2;
     if (fromTop < 0) fromTop += math.pi * 2;
     final total = cats.fold<double>(0, (s, c) => s + c.amount);
@@ -342,8 +343,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Close expenses',
-      barrierColor: Colors.black.withValues(alpha: 0.62),
-      transitionDuration: const Duration(milliseconds: 480),
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: const Duration(milliseconds: 420),
       pageBuilder: (ctx, a, b) => _ExpenseCircleSheet(
         tone: tone,
         categories: cats,
@@ -354,13 +355,16 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
         sliceIndexAt: _sliceIndexAt,
       ),
       transitionBuilder: (ctx, anim, secondary, child) {
-        final open = CurvedAnimation(parent: anim, curve: Curves.easeOutBack);
         final fade = CurvedAnimation(parent: anim, curve: Curves.easeOut);
+        final slide = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
         return FadeTransition(
           opacity: fade,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.22, end: 1).animate(open),
-            child: child,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(slide),
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.92, end: 1).animate(slide),
+              child: child,
+            ),
           ),
         );
       },
@@ -493,7 +497,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       Text(
                         selectedState.isEmpty
                             ? 'State'
-                            : (selectedState.length <= 8 ? selectedState : '${selectedState.substring(0, 6)}…'),
+                            : (selectedState.length <= 8 ? selectedState : '${selectedState.substring(0, 6)}â€¦'),
                         style: TextStyle(
                           color: selectedState.isEmpty ? tone.secondaryText : tone.accent,
                           fontSize: 11,
@@ -560,7 +564,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                   style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 16),
                                 ),
                                 Text(
-                                  '${campaign.state} · ${campaign.contributorCount} contributor${campaign.contributorCount == 1 ? '' : 's'} · ${_money(campaign.totalAmount)}',
+                                  '${campaign.state} Â· ${campaign.contributorCount} contributor${campaign.contributorCount == 1 ? '' : 's'} Â· ${_money(campaign.totalAmount)}',
                                   style: TextStyle(color: tone.secondaryText, fontSize: 11),
                                 ),
                               ],
@@ -575,7 +579,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           onChanged: (_) => setSheet(() {}),
                           style: TextStyle(color: tone.primaryText, fontSize: 14),
                           decoration: InputDecoration(
-                            hintText: 'Search a contributor to delete…',
+                            hintText: 'Search a contributor to deleteâ€¦',
                             hintStyle: TextStyle(color: tone.secondaryText, fontSize: 13),
                             prefixIcon: Icon(Icons.search_rounded, color: tone.accent, size: 20),
                             filled: true,
@@ -600,7 +604,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                 itemBuilder: (_, i) {
                                   final p = people[i];
                                   final dateLabel =
-                                      '${p.at.month}/${p.at.day}/${p.at.year} · ${p.at.hour.toString().padLeft(2, '0')}:${p.at.minute.toString().padLeft(2, '0')}';
+                                      '${p.at.month}/${p.at.day}/${p.at.year} Â· ${p.at.hour.toString().padLeft(2, '0')}:${p.at.minute.toString().padLeft(2, '0')}';
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Row(
@@ -753,7 +757,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                 ),
                                 SizedBox(height: 4),
                                 Text(
-                                  'Delete all contributions · 3 confirmations required',
+                                  'Delete all contributions Â· 3 confirmations required',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Color(0xFF991B1B),
@@ -774,7 +778,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                         onChanged: (_) => setSheet(() {}),
                         style: TextStyle(color: tone.primaryText, fontSize: 14),
                         decoration: InputDecoration(
-                          hintText: 'Search contribution name, state…',
+                          hintText: 'Search contribution name, stateâ€¦',
                           hintStyle: TextStyle(color: tone.secondaryText, fontSize: 13),
                           prefixIcon: Icon(Icons.search_rounded, color: tone.accent, size: 20),
                           suffixIcon: Padding(padding: const EdgeInsets.only(right: 4), child: stateMenu()),
@@ -816,7 +820,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                   ),
                                   const SizedBox(height: 2),
                                   const Text(
-                                    '3 confirmations required · State Trust unchanged',
+                                    '3 confirmations required Â· State Trust unchanged',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.w700, fontSize: 10),
                                   ),
@@ -845,7 +849,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               if (stateKey.isNotEmpty) selectedState,
                               '${filtered.length} contribution${filtered.length == 1 ? '' : 's'}',
                               if (query.isNotEmpty) 'matching search',
-                            ].join(' · '),
+                            ].join(' Â· '),
                             style: TextStyle(color: tone.accent, fontSize: 11, fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -906,7 +910,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                                                 ),
                                                 const SizedBox(height: 3),
                                                 Text(
-                                                  '${c.state} · $dateLabel · ${c.contributorCount} people',
+                                                  '${c.state} Â· $dateLabel Â· ${c.contributorCount} people',
                                                   style: TextStyle(color: tone.secondaryText, fontSize: 11),
                                                 ),
                                               ],
@@ -1049,7 +1053,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                               ),
                             ),
                             Text(
-                              'Live Civic Registry · all 50 states',
+                              'Live Civic Registry Â· all 50 states',
                               style: TextStyle(
                                 color: tone.secondaryText,
                                 fontWeight: FontWeight.w600,
@@ -1277,7 +1281,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                   title: Text('Transfer between ledgers', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w800)),
                   subtitle: Text(
                     widget.trustOutRequiresDualApproval && !widget.isGlobalAdmin
-                        ? 'Trust → Contribution needs a second registrar approval'
+                        ? 'Trust â†’ Contribution needs a second registrar approval'
                         : 'Move money between Contribution Case and State Trust',
                     style: TextStyle(color: tone.secondaryText, fontSize: 12),
                   ),
@@ -1367,7 +1371,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     Text('Direction', style: TextStyle(color: tone.secondaryText, fontWeight: FontWeight.w700, fontSize: 12)),
                     const SizedBox(height: 8),
                     ChoiceChip(
-                      label: Text('Contribution → State Trust (${_money(_snap.available)})'),
+                      label: Text('Contribution â†’ State Trust (${_money(_snap.available)})'),
                       selected: direction == 'to_trust',
                       onSelected: (_) => setLocal(() => direction = 'to_trust'),
                       selectedColor: const Color(0xFF0F766E),
@@ -1379,7 +1383,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     ),
                     const SizedBox(height: 8),
                     ChoiceChip(
-                      label: Text('State Trust → Contribution (${_money(_snap.trustBalance)})'),
+                      label: Text('State Trust â†’ Contribution (${_money(_snap.trustBalance)})'),
                       selected: direction == 'to_contribution',
                       onSelected: (_) => setLocal(() => direction = 'to_contribution'),
                       selectedColor: const Color(0xFF2563EB),
@@ -1464,7 +1468,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       SnackBar(
         content: Text(
           needsDual
-              ? 'Transfer requested — waiting for a second registrar to approve.'
+              ? 'Transfer requested â€” waiting for a second registrar to approve.'
               : 'Transfer of ${_money(amount)} recorded.',
         ),
       ),
@@ -1498,7 +1502,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                 Text('Add to State Trust', style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
                 const SizedBox(height: 6),
                 Text(
-                  'This goes into the state reserve — never mixed with contribution money.',
+                  'This goes into the state reserve â€” never mixed with contribution money.',
                   style: TextStyle(color: tone.secondaryText, fontSize: 12, height: 1.35),
                 ),
                 const SizedBox(height: 16),
@@ -1736,7 +1740,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       return;
     }
 
-    // Trash → schedule 24h delete.
+    // Trash â†’ schedule 24h delete.
     if (action == 'delete' && existing != null && mounted) {
       final schedule = await showDialog<bool>(
         context: context,
@@ -1804,7 +1808,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
         if (!mounted) return;
         _reload();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Delete scheduled — fully removed in 24 hours.')),
+          const SnackBar(content: Text('Delete scheduled â€” fully removed in 24 hours.')),
         );
       }
       return;
@@ -1820,7 +1824,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       return;
     }
 
-    // Second step — confirm amount / purpose before it is recorded.
+    // Second step â€” confirm amount / purpose before it is recorded.
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -1929,7 +1933,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     if (!mounted) return;
     _reload();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Spending recorded — members see it live.')),
+      const SnackBar(content: Text('Spending recorded â€” members see it live.')),
     );
   }
 
@@ -2025,7 +2029,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                           onChanged: (_) => setSheet(() {}),
                           style: TextStyle(color: tone.primaryText),
                           decoration: InputDecoration(
-                            hintText: 'Search states…',
+                            hintText: 'Search statesâ€¦',
                             hintStyle: TextStyle(color: tone.secondaryText),
                             prefixIcon: Icon(Icons.search_rounded, color: tone.secondaryText),
                             filled: true,
@@ -2341,7 +2345,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     Text(state, style: TextStyle(color: tone.primaryText, fontWeight: FontWeight.w900, fontSize: 18)),
                     const SizedBox(height: 6),
                     Text(
-                      'Choose what to reset. Hidden for 24 hours — you can undo, then it is gone forever.',
+                      'Choose what to reset. Hidden for 24 hours â€” you can undo, then it is gone forever.',
                       style: TextStyle(color: tone.secondaryText, fontSize: 12, height: 1.35),
                     ),
                     const SizedBox(height: 10),
@@ -2655,7 +2659,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                     child: Column(
                       children: [
                         Text(
-                          'State case · ${_snap.state}',
+                          'State case Â· ${_snap.state}',
                           style: TextStyle(color: tone.headerMuted, fontWeight: FontWeight.w700, fontSize: 12),
                         ),
                         const SizedBox(height: 2),
@@ -2707,8 +2711,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       subtitle: 'Registrar reserve',
                       amount: _money(_snap.trustBalance),
                       detail: _snap.trustReserved > 0
-                          ? 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)} · Reserved ${_money(_snap.trustReserved)}'
-                          : 'In ${_money(_snap.trustDeposited)} · Out ${_money(_snap.trustSpent)}',
+                          ? 'In ${_money(_snap.trustDeposited)} Â· Out ${_money(_snap.trustSpent)} Â· Reserved ${_money(_snap.trustReserved)}'
+                          : 'In ${_money(_snap.trustDeposited)} Â· Out ${_money(_snap.trustSpent)}',
                       gradient: const [Color(0xFF0F766E), Color(0xFF134E4A)],
                       icon: Icons.account_balance_rounded,
                     ),
@@ -2720,8 +2724,8 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                       subtitle: 'Community funds',
                       amount: _money(available),
                       detail: _snap.transferCredits > 0
-                          ? 'In ${_money(_snap.collected)} · Credits ${_money(_snap.transferCredits)} · Out ${_money(spent)}'
-                          : 'In ${_money(_snap.collected)} · Out ${_money(spent)}',
+                          ? 'In ${_money(_snap.collected)} Â· Credits ${_money(_snap.transferCredits)} Â· Out ${_money(spent)}'
+                          : 'In ${_money(_snap.collected)} Â· Out ${_money(spent)}',
                       gradient: const [Color(0xFF047857), Color(0xFF065F46)],
                       icon: Icons.volunteer_activism_rounded,
                     ),
@@ -2978,7 +2982,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
                             padding: const EdgeInsets.only(bottom: 8),
                             child: Text(
                               'Dates: ${_dateFilter!.start.month}/${_dateFilter!.start.day}/${_dateFilter!.start.year}'
-                              ' – ${_dateFilter!.end.month}/${_dateFilter!.end.day}/${_dateFilter!.end.year}',
+                              ' â€“ ${_dateFilter!.end.month}/${_dateFilter!.end.day}/${_dateFilter!.end.year}',
                               style: TextStyle(color: tone.accent, fontSize: 12, fontWeight: FontWeight.w700),
                             ),
                           ),
@@ -3060,8 +3064,8 @@ class _PendingTransferCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   transfer.isToContribution
-                      ? 'Pending Trust → Contribution'
-                      : 'Pending Contribution → Trust',
+                      ? 'Pending Trust â†’ Contribution'
+                      : 'Pending Contribution â†’ Trust',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14),
                 ),
               ),
@@ -3073,13 +3077,13 @@ class _PendingTransferCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${transfer.description} · by ${transfer.requestedByName}',
+            '${transfer.description} Â· by ${transfer.requestedByName}',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
           ),
           const SizedBox(height: 4),
           Text(
             'Approvals ${transfer.approvalCount}/${transfer.requiredApprovals}'
-            '${transfer.approvalsNeeded > 0 ? ' · needs ${transfer.approvalsNeeded} more' : ''}',
+            '${transfer.approvalsNeeded > 0 ? ' Â· needs ${transfer.approvalsNeeded} more' : ''}',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12, fontWeight: FontWeight.w700),
           ),
           if (canApprove || canReject) ...[
@@ -3441,7 +3445,7 @@ class _NationwideContributionsKeptHeroState extends State<_NationwideContributio
                                   ),
                                 ),
                                 Text(
-                                  'Nationwide · contribution cases',
+                                  'Nationwide Â· contribution cases',
                                   style: TextStyle(
                                     color: Colors.white.withValues(alpha: 0.68),
                                     fontSize: 10,
@@ -3660,8 +3664,25 @@ class _ExpenseCircleSheet extends StatefulWidget {
   State<_ExpenseCircleSheet> createState() => _ExpenseCircleSheetState();
 }
 
-class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet> {
+class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet>
+    with SingleTickerProviderStateMixin {
   int? _selected;
+  late final AnimationController _spinIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _spinIn = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 780),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _spinIn.dispose();
+    super.dispose();
+  }
 
   NgmyCivicWalletCategory? get _cat {
     final i = _selected;
@@ -3675,180 +3696,291 @@ class _ExpenseCircleSheetState extends State<_ExpenseCircleSheet> {
     final cat = _cat;
     final rows = cat == null ? const <NgmyCivicWalletSpendingRow>[] : widget.spendingsFor(cat.name);
     final size = MediaQuery.sizeOf(context);
-    final circle = math.min(size.width - 48, size.height * 0.52).clamp(220.0, 340.0);
+    final circle = math.min(size.width - 72, size.height * 0.42).clamp(228.0, 300.0);
+    final inner = circle * 0.52;
     final percent = cat == null || widget.spent <= 0
-        ? ''
-        : '${((cat.amount / widget.spent) * 100).toStringAsFixed(0)}% of spending';
+        ? null
+        : '${((cat.amount / widget.spent) * 100).toStringAsFixed(0)}%';
+    final frame = tone.isDark ? const Color(0xFFE5E7EB) : const Color(0xFF0F172A);
+    final disc = tone.isDark ? const Color(0xFF111111) : Colors.white;
 
     return Material(
       color: Colors.transparent,
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-          child: Column(
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close_rounded, color: tone.headerFg),
-                ),
-              ),
-              Expanded(
-                child: Center(
-                  child: GestureDetector(
-                    onTapDown: (d) {
-                      final next = widget.sliceIndexAt(
-                        d.localPosition,
-                        Size(circle, circle),
-                        widget.categories,
-                      );
-                      if (next == null) return;
-                      setState(() => _selected = next);
-                    },
-                    child: SizedBox(
-                      width: circle,
-                      height: circle,
-                      child: CustomPaint(
-                        painter: _DonutPainter(
-                          slices: widget.categories
-                              .map((c) => _DonutSlice(c.amount, c.color))
-                              .toList(),
-                          centerLabel: cat?.name ?? 'Total',
-                          centerValue: widget.money(cat?.amount ?? widget.spent),
-                          labelColor: tone.secondaryText,
-                          valueColor: tone.primaryText,
-                          emptyColor: tone.progressTrack,
-                          filled: true,
-                          selectedIndex: _selected,
-                        ),
-                      ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                decoration: BoxDecoration(
+                  color: tone.cardBg,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: tone.cardBorder, width: 1.4),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: tone.isDark ? 0.45 : 0.16),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
                     ),
-                  ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                cat == null
-                    ? 'Tap a color for every expense in that slice'
-                    : percent,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: tone.secondaryText,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 12),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                child: cat == null
-                    ? const SizedBox(width: double.infinity, height: 0)
-                    : Container(
-                        width: double.infinity,
-                        constraints: BoxConstraints(maxHeight: size.height * 0.32),
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                        decoration: BoxDecoration(
-                          color: tone.cardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: cat.color.withValues(alpha: 0.55), width: 1.4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Expenses',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 18,
+                            color: tone.primaryText,
+                          ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Row(
+                        const Spacer(),
+                        IconButton(
+                          tooltip: 'Close',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(Icons.close_rounded, color: tone.secondaryText),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    AnimatedBuilder(
+                      animation: _spinIn,
+                      builder: (context, _) {
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTapDown: (d) {
+                            final next = widget.sliceIndexAt(
+                              d.localPosition,
+                              Size(circle, circle),
+                              widget.categories,
+                            );
+                            if (next == null) {
+                              if (_selected != null) setState(() => _selected = null);
+                              return;
+                            }
+                            setState(() => _selected = next);
+                          },
+                          child: SizedBox(
+                            width: circle,
+                            height: circle,
+                            child: Stack(
+                              alignment: Alignment.center,
                               children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(color: cat.color, shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    cat.name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 16,
-                                      color: tone.primaryText,
-                                    ),
+                                CustomPaint(
+                                  size: Size.square(circle),
+                                  painter: _FramedRingPainter(
+                                    slices: widget.categories
+                                        .map((c) => _DonutSlice(c.amount, c.color))
+                                        .toList(),
+                                    progress: Curves.easeOutCubic.transform(_spinIn.value),
+                                    selectedIndex: _selected,
+                                    trackColor: tone.progressTrack,
+                                    frameColor: frame,
                                   ),
                                 ),
-                                Text(
-                                  widget.money(cat.amount),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 16,
-                                    color: tone.primaryText,
+                                Transform.scale(
+                                  scale: Tween<double>(begin: 0.72, end: 1)
+                                      .transform(Curves.easeOutBack.transform(_spinIn.value.clamp(0.0, 1.0))),
+                                  child: Container(
+                                    width: inner,
+                                    height: inner,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: disc,
+                                      border: Border.all(
+                                        color: (cat?.color ?? tone.accent).withValues(alpha: 0.95),
+                                        width: 3.2,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (cat?.color ?? tone.accent).withValues(alpha: 0.28),
+                                          blurRadius: 18,
+                                        ),
+                                      ],
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          cat == null ? 'TOTAL' : cat.name.toUpperCase(),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: tone.secondaryText,
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: 10,
+                                            letterSpacing: 1.1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        FittedBox(
+                                          fit: BoxFit.scaleDown,
+                                          child: Text(
+                                            widget.money(cat?.amount ?? widget.spent),
+                                            style: TextStyle(
+                                              color: tone.primaryText,
+                                              fontWeight: FontWeight.w900,
+                                              fontSize: 22,
+                                              letterSpacing: -0.6,
+                                              height: 1.05,
+                                            ),
+                                          ),
+                                        ),
+                                        if (percent != null) ...[
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            percent,
+                                            style: TextStyle(
+                                              color: cat?.color ?? tone.accent,
+                                              fontWeight: FontWeight.w800,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            if (rows.isEmpty)
-                              Text(
-                                'No recorded dates for this slice.',
-                                style: TextStyle(color: tone.secondaryText, fontSize: 13),
-                              )
-                            else
-                              ConstrainedBox(
-                                constraints: BoxConstraints(maxHeight: size.height * 0.22),
-                                child: ListView.separated(
-                                  shrinkWrap: true,
-                                  itemCount: rows.length,
-                                  separatorBuilder: (_, __) => Divider(
-                                    height: 14,
-                                    color: tone.cardBorder,
-                                  ),
-                                  itemBuilder: (_, i) {
-                                    final r = rows[i];
-                                    return Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                r.description,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w800,
-                                                  fontSize: 13,
-                                                  color: tone.primaryText,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                widget.dateLabel(r.recordedAt),
-                                                style: TextStyle(
-                                                  color: tone.secondaryText,
-                                                  fontSize: 12,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      cat == null
+                          ? 'Tap a framed color for dates and amounts'
+                          : 'Every expense in this color',
+                      style: TextStyle(
+                        color: tone.secondaryText,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                      child: cat == null
+                          ? const SizedBox(width: double.infinity, height: 0)
+                          : Container(
+                              width: double.infinity,
+                              constraints: BoxConstraints(maxHeight: size.height * 0.28),
+                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+                              decoration: BoxDecoration(
+                                color: tone.isDark ? const Color(0xFF0C0C0C) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: cat.color, width: 1.6),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: BoxDecoration(
+                                          color: cat.color,
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(color: frame, width: 1.2),
                                         ),
-                                        Text(
-                                          widget.money(r.amount),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          cat.name,
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
+                                            fontSize: 15,
                                             color: tone.primaryText,
                                           ),
                                         ),
-                                      ],
-                                    );
-                                  },
-                                ),
+                                      ),
+                                      Text(
+                                        widget.money(cat.amount),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 15,
+                                          color: tone.primaryText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (rows.isEmpty)
+                                    Text(
+                                      'No recorded dates for this color.',
+                                      style: TextStyle(color: tone.secondaryText, fontSize: 13),
+                                    )
+                                  else
+                                    ConstrainedBox(
+                                      constraints: BoxConstraints(maxHeight: size.height * 0.18),
+                                      child: ListView.separated(
+                                        shrinkWrap: true,
+                                        itemCount: rows.length,
+                                        separatorBuilder: (_, __) => Divider(
+                                          height: 12,
+                                          color: tone.cardBorder,
+                                        ),
+                                        itemBuilder: (_, i) {
+                                          final r = rows[i];
+                                          return Row(
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      r.description,
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w800,
+                                                        fontSize: 13,
+                                                        color: tone.primaryText,
+                                                      ),
+                                                    ),
+                                                    Text(
+                                                      widget.dateLabel(r.recordedAt),
+                                                      style: TextStyle(
+                                                        color: tone.secondaryText,
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Text(
+                                                widget.money(r.amount),
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.w900,
+                                                  color: tone.primaryText,
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                ],
                               ),
-                          ],
-                        ),
-                      ),
+                            ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -3862,6 +3994,92 @@ class _DonutSlice {
   final Color color;
 }
 
+/// Thick ring segments with a light/dark frame around each color.
+class _FramedRingPainter extends CustomPainter {
+  _FramedRingPainter({
+    required this.slices,
+    required this.progress,
+    required this.trackColor,
+    required this.frameColor,
+    this.selectedIndex,
+  });
+
+  final List<_DonutSlice> slices;
+  final double progress;
+  final Color trackColor;
+  final Color frameColor;
+  final int? selectedIndex;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final outer = math.min(size.width, size.height) / 2;
+    final stroke = outer * 0.26;
+    final ringR = outer - stroke / 2 - 4;
+    final rect = Rect.fromCircle(center: center, radius: ringR);
+
+    canvas.drawCircle(
+      center,
+      ringR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke + 10
+        ..color = frameColor.withValues(alpha: 0.18),
+    );
+    canvas.drawCircle(
+      center,
+      ringR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = stroke
+        ..color = trackColor,
+    );
+
+    final total = slices.fold<double>(0, (s, e) => s + e.value);
+    if (total <= 0 || slices.isEmpty || progress <= 0) return;
+
+    final gap = slices.length <= 1 ? 0.0 : 0.08;
+    var cursor = -math.pi / 2;
+    for (var i = 0; i < slices.length; i++) {
+      final share = (slices[i].value / total) * math.pi * 2;
+      final sweep = (share - gap) * progress;
+      final start = cursor + gap / 2;
+      cursor += share;
+      if (sweep <= 0.012) continue;
+      final selected = selectedIndex == i;
+      final width = selected ? stroke + 6 : stroke - 1;
+      canvas.drawArc(
+        rect,
+        start,
+        sweep,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width + 7
+          ..strokeCap = StrokeCap.round
+          ..color = frameColor,
+      );
+      canvas.drawArc(
+        rect,
+        start,
+        sweep,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = width
+          ..strokeCap = StrokeCap.round
+          ..color = slices[i].color,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FramedRingPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.selectedIndex != selectedIndex ||
+      oldDelegate.slices.length != slices.length;
+}
+
 class _DonutPainter extends CustomPainter {
   _DonutPainter({
     required this.slices,
@@ -3870,8 +4088,6 @@ class _DonutPainter extends CustomPainter {
     required this.labelColor,
     required this.valueColor,
     required this.emptyColor,
-    this.filled = false,
-    this.selectedIndex,
   });
   final List<_DonutSlice> slices;
   final String centerLabel;
@@ -3879,41 +4095,27 @@ class _DonutPainter extends CustomPainter {
   final Color labelColor;
   final Color valueColor;
   final Color emptyColor;
-  final bool filled;
-  final int? selectedIndex;
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = math.min(size.width, size.height) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius - 6);
     final total = slices.fold<double>(0, (s, e) => s + e.value);
     var start = -math.pi / 2;
     if (total <= 0 || slices.isEmpty) {
-      canvas.drawCircle(
-        center,
-        radius - (filled ? 2 : 6),
+      canvas.drawArc(
+        rect,
+        0,
+        math.pi * 2,
+        false,
         Paint()
-          ..style = filled ? PaintingStyle.fill : PaintingStyle.stroke
-          ..strokeWidth = filled ? 0 : 16
-          ..color = emptyColor,
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 16
+          ..color = emptyColor
+          ..strokeCap = StrokeCap.round,
       );
-    } else if (filled) {
-      canvas.drawCircle(center, radius - 2, Paint()..color = emptyColor.withValues(alpha: 0.35));
-      for (var i = 0; i < slices.length; i++) {
-        final slice = slices[i];
-        final sweep = (slice.value / total) * math.pi * 2;
-        final grow = selectedIndex == i ? 10.0 : 0.0;
-        canvas.drawArc(
-          Rect.fromCircle(center: center, radius: radius - 4 + grow),
-          start,
-          sweep,
-          true,
-          Paint()..style = PaintingStyle.fill..color = slice.color,
-        );
-        start += sweep;
-      }
     } else {
-      final rect = Rect.fromCircle(center: center, radius: radius - 6);
       for (final slice in slices) {
         final sweep = (slice.value / total) * math.pi * 2;
         canvas.drawArc(
@@ -3931,27 +4133,15 @@ class _DonutPainter extends CustomPainter {
       }
     }
     final tp1 = TextPainter(
-      text: TextSpan(
-        text: centerLabel,
-        style: TextStyle(
-          color: labelColor,
-          fontSize: filled ? 13 : 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      text: TextSpan(text: centerLabel, style: TextStyle(color: labelColor, fontSize: 11, fontWeight: FontWeight.w600)),
       textDirection: TextDirection.ltr,
-      maxLines: 2,
-      ellipsis: '…',
-    )..layout(maxWidth: radius * (filled ? 1.1 : 1.0));
+    )..layout();
     final tp2 = TextPainter(
-      text: TextSpan(
-        text: centerValue,
-        style: TextStyle(color: valueColor, fontSize: filled ? 18 : 13, fontWeight: FontWeight.w900),
-      ),
+      text: TextSpan(text: centerValue, style: TextStyle(color: valueColor, fontSize: 13, fontWeight: FontWeight.w900)),
       textDirection: TextDirection.ltr,
     )..layout(maxWidth: radius);
-    tp1.paint(canvas, Offset(center.dx - tp1.width / 2, center.dy - (filled ? 18 : 12)));
-    tp2.paint(canvas, Offset(center.dx - tp2.width / 2, center.dy + (filled ? 4 : 2)));
+    tp1.paint(canvas, Offset(center.dx - tp1.width / 2, center.dy - 12));
+    tp2.paint(canvas, Offset(center.dx - tp2.width / 2, center.dy + 2));
   }
 
   @override
