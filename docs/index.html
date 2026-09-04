@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260904161025';
+      var embedded = '20260904163640';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -749,7 +749,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260904161025";
+      var CURRENT = "20260904163640";
 
       function showError(msg) {
 
@@ -884,7 +884,7 @@
 
   <script>
     (function () {
-      var deployId = '20260904161025';
+      var deployId = '20260904163640';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -1070,7 +1070,7 @@
             return navigator.serviceWorker.ready.then(function () { return reg; }).catch(function () { return reg; });
           })
           .catch(function (e) {
-            console.warn('[ngmy] sw register', e);
+            void e;
             return null;
           });
       }
