@@ -639,11 +639,6 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       setState(() => _error = preAccess.message);
       return;
     }
-    final preAccess = _accessFor(_matchedMember);
-    if (!preAccess.allowsLogin) {
-      setState(() => _error = preAccess.message);
-      return;
-    }
     setState(() {
       _busy = true;
       _error = null;
