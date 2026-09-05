@@ -133,7 +133,13 @@ const Map<String, String> kNgmySettingsPrefixCodes = {
   return null;
 }
 
-bool get _ngmyHasSession => Supabase.instance.client.auth.currentSession != null;
+bool get _ngmyHasSession {
+  try {
+    return Supabase.instance.client.auth.currentSession != null;
+  } catch (_) {
+    return false;
+  }
+}
 
 /// Throws [NgmyDbRelayException] if the edge call itself failed or the server
 /// reported an error. A successful call that found no matching row still
@@ -179,6 +185,7 @@ Future<Map<String, dynamic>?> ngmyDbRelayPing(
 Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
   String key, {
   Duration timeout = kNgmyCloudLoadTimeout,
+  bool? anonymous,
 }) async {
   final resolved = _resolveSettingsKey(key);
   if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
@@ -193,7 +200,7 @@ Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
         'cols': 'value',
         'single': true,
       },
-      anonymous: !_ngmyHasSession,
+      anonymous: anonymous ?? !_ngmyHasSession,
       timeout: timeout,
     ),
   );

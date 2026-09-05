@@ -12,6 +12,7 @@ import 'ngmy_guest_link_missing.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
 import 'ngmy_guest_html_splash_stub.dart' if (dart.library.html) 'ngmy_guest_html_splash_web.dart';
 import 'ngmy_platform_graphics.dart';
+import 'ngmy_supabase_auth.dart';
 
 String? ngmyPublishedBioSlugFromLaunch() => ngmyReadBioSlugFromLaunchUrl();
 
@@ -50,6 +51,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
   NgmyBioDocument? _doc;
   String? _error;
   bool _loading = true;
+  bool _connectionProblem = false;
 
   @override
   void initState() {
@@ -69,35 +71,45 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       _loading = true;
       _error = null;
       _doc = null;
+      _connectionProblem = false;
     });
     ngmyApplyBioPageChrome(Colors.white);
     SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(Colors.white));
 
+    await ngmyWaitForSupabaseReady(timeout: const Duration(seconds: 8));
+
+    var reachable = false;
     try {
-      for (var attempt = 0; attempt < 2; attempt++) {
-        final entry = await NgmyBioPublishRegistry.fetchBySlugForGuest(widget.slug)
-            .timeout(const Duration(seconds: 10), onTimeout: () => null);
+      for (var attempt = 0; attempt < 4; attempt++) {
+        final result = await NgmyBioPublishRegistry.fetchBySlugForGuestStatus(widget.slug)
+            .timeout(const Duration(seconds: 14), onTimeout: () => (reachable: false, entry: null));
         if (!mounted) return;
+        if (result.reachable) reachable = true;
+        final entry = result.entry;
         if (entry != null && entry['data'] is Map) {
           final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
           setState(() {
             _doc = doc;
             _loading = false;
+            _connectionProblem = false;
           });
           _applyTemplateChrome(doc);
           ngmyReleaseGuestHtmlSplash();
           return;
         }
-        if (attempt == 0) await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
       }
     } on TimeoutException {
-      // handled below
+      reachable = false;
     }
 
     if (!mounted) return;
     setState(() {
       _loading = false;
-      _error = 'This Bio link is no longer available. Ask the owner for a new link.';
+      _connectionProblem = !reachable;
+      _error = reachable
+          ? 'This Bio link is no longer available. Ask the owner for a new link.'
+          : 'Could not load this Bio. Check your connection and tap Try again.';
     });
     ngmyReleaseGuestHtmlSplash();
   }
@@ -119,6 +131,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       return NgmyGuestLinkMissingPage(
         kind: 'bio',
         message: _error ?? 'This Bio page could not be found.',
+        connectionProblem: _connectionProblem,
         onRetry: _load,
       );
     }

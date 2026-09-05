@@ -13,11 +13,21 @@ import 'ngmy_supabase_auth.dart';
 /// download one page (not the entire registry with every image).
 class NgmyBioPublishRegistry {
   static const settingsKey = 'ngmy_bio_publish_registry';
-  static const _guestFetchTimeout = Duration(seconds: 8);
+  static const _guestFetchTimeout = Duration(seconds: 12);
 
   static String _normSlug(String slug) => ngmySanitizeBioSlug(slug);
 
   static String _slugSettingsKey(String slug) => 'ngmy_bio_pub_${_normSlug(slug)}';
+
+  /// Sanitized slug first, then a letters+digits fallback for older publishes.
+  static List<String> _slugLookupKeys(String slug) {
+    final keys = <String>[];
+    final clean = _normSlug(slug);
+    if (clean.isNotEmpty) keys.add(clean);
+    final raw = slug.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (raw.isNotEmpty && raw != clean) keys.add(raw);
+    return keys;
+  }
 
   static Map<String, dynamic> _entriesFromValue(Map<String, dynamic> value) {
     final entries = value['bios'];
@@ -25,11 +35,14 @@ class NgmyBioPublishRegistry {
     return entries.map((k, v) => MapEntry(k.toString(), v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{}));
   }
 
-  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(String key) =>
-      ngmyFetchSettingsValueViaRest(key, timeout: _guestFetchTimeout);
+  static Future<Map<String, dynamic>?> _fetchSettingsRowViaRest(
+    String key, {
+    bool anonymous = false,
+  }) =>
+      ngmyFetchSettingsValueViaRest(key, timeout: _guestFetchTimeout, anonymous: anonymous);
 
-  static Future<Map<String, dynamic>?> _fetchRegistryValueViaRest() async {
-    return _fetchSettingsRowViaRest(settingsKey);
+  static Future<Map<String, dynamic>?> _fetchRegistryValueViaRest({bool anonymous = false}) async {
+    return _fetchSettingsRowViaRest(settingsKey, anonymous: anonymous);
   }
 
   static Future<Map<String, dynamic>?> _fetchRegistryValue() async {
@@ -45,50 +58,95 @@ class NgmyBioPublishRegistry {
     }
   }
 
-  static Future<Map<String, dynamic>?> _fetchSlugEntryViaRest(String slug) async {
-    final target = _normSlug(slug);
-    if (target.isEmpty) return null;
-
-    final perSlug = await _fetchSettingsRowViaRest(_slugSettingsKey(target));
-    if (perSlug != null && perSlug['data'] is Map) return perSlug;
+  static Future<Map<String, dynamic>?> _fetchSlugEntryViaRest(
+    String slug, {
+    bool anonymous = false,
+  }) async {
+    for (final target in _slugLookupKeys(slug)) {
+      final perSlug = await _fetchSettingsRowViaRest(
+        'ngmy_bio_pub_$target',
+        anonymous: anonymous,
+      );
+      if (perSlug != null && perSlug['data'] is Map) return perSlug;
+    }
 
     // Legacy path — entire registry blob (may be large).
-    final viaRest = await _fetchRegistryValueViaRest();
+    final viaRest = await _fetchRegistryValueViaRest(anonymous: anonymous);
     if (viaRest != null) {
-      final entry = _entriesFromValue(viaRest)[target];
-      if (entry != null && entry['data'] is Map) return entry;
+      final entries = _entriesFromValue(viaRest);
+      for (final target in _slugLookupKeys(slug)) {
+        final entry = entries[target];
+        if (entry != null && entry['data'] is Map) return entry;
+      }
     }
     return null;
   }
 
   static Future<Map<String, dynamic>?> _fetchSlugEntryViaSupabase(String slug) async {
-    final target = _normSlug(slug);
-    if (target.isEmpty) return null;
-    if (!await ngmyCanReachCloud()) return null;
     await ngmyWaitForSupabaseReady(timeout: _guestFetchTimeout);
     try {
-      final entry = await ngmyDbRelaySettingsFetch(_slugSettingsKey(target), timeout: _guestFetchTimeout);
-      if (entry != null && entry['data'] is Map) return entry;
+      for (final target in _slugLookupKeys(slug)) {
+        final entry = await ngmyDbRelaySettingsFetch(
+          'ngmy_bio_pub_$target',
+          timeout: _guestFetchTimeout,
+          anonymous: true,
+        );
+        if (entry != null && entry['data'] is Map) return entry;
+      }
     } catch (e) {
-      debugPrint('[bio registry] supabase slug fetch $target: $e');
+      debugPrint('[bio registry] supabase slug fetch $slug: $e');
     }
 
     final value = await _fetchRegistryValue();
     if (value == null) return null;
-    final entry = _entriesFromValue(value)[target];
-    if (entry != null && entry['data'] is Map) return entry;
+    final entries = _entriesFromValue(value);
+    for (final target in _slugLookupKeys(slug)) {
+      final entry = entries[target];
+      if (entry != null && entry['data'] is Map) return entry;
+    }
     return null;
   }
 
-  /// Guest-facing fetch — REST first, short timeout, no double download.
+  /// Guest-facing fetch — always anonymous so a leftover login cannot hide a public Bio.
   static Future<Map<String, dynamic>?> fetchBySlugForGuest(String slug) async {
-    final target = _normSlug(slug);
-    if (target.isEmpty) return null;
+    if (_slugLookupKeys(slug).isEmpty) return null;
 
-    final viaRest = await _fetchSlugEntryViaRest(target);
-    if (viaRest != null) return viaRest;
+    try {
+      final viaAnon = await _fetchSlugEntryViaRest(slug, anonymous: true);
+      if (viaAnon != null) return viaAnon;
+    } catch (e) {
+      debugPrint('[bio registry] guest rest $slug: $e');
+    }
 
-    return _fetchSlugEntryViaSupabase(target);
+    return _fetchSlugEntryViaSupabase(slug);
+  }
+
+  /// Same as [fetchBySlugForGuest] but tells the UI a network blip from a missing row.
+  static Future<({bool reachable, Map<String, dynamic>? entry})> fetchBySlugForGuestStatus(
+    String slug,
+  ) async {
+    if (_slugLookupKeys(slug).isEmpty) {
+      return (reachable: true, entry: null);
+    }
+    try {
+      final viaAnon = await ngmyDbRelaySettingsFetch(
+        _slugSettingsKey(slug),
+        timeout: _guestFetchTimeout,
+        anonymous: true,
+      );
+      if (viaAnon != null && viaAnon['data'] is Map) {
+        return (reachable: true, entry: viaAnon);
+      }
+      final fallback = await fetchBySlugForGuest(slug);
+      return (reachable: true, entry: fallback);
+    } catch (e) {
+      debugPrint('[bio registry] guest status $slug: $e');
+      try {
+        final fallback = await fetchBySlugForGuest(slug);
+        if (fallback != null) return (reachable: true, entry: fallback);
+      } catch (_) {}
+      return (reachable: false, entry: null);
+    }
   }
 
   static Future<Map<String, dynamic>?> fetchBySlug(String slug) => fetchBySlugForGuest(slug);
@@ -152,7 +210,12 @@ class NgmyBioPublishRegistry {
       }
 
       for (var attempt = 0; attempt < 4; attempt++) {
-        final verify = await ngmyFetchSettingsValueViaRest(slugKey, timeout: _guestFetchTimeout);
+        // Verify as a guest (anon key) — that is how the public link is opened.
+        final verify = await ngmyFetchSettingsValueViaRest(
+          slugKey,
+          timeout: _guestFetchTimeout,
+          anonymous: true,
+        );
         if (verify != null && verify['data'] is Map) return null;
         if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
       }

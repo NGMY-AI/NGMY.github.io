@@ -10,9 +10,10 @@ import 'ngmy_db_relay.dart';
 Future<Map<String, dynamic>?> ngmyFetchSettingsValueViaRest(
   String key, {
   Duration timeout = const Duration(seconds: 8),
+  bool? anonymous,
 }) async {
   try {
-    return await ngmyDbRelaySettingsFetch(key, timeout: timeout);
+    return await ngmyDbRelaySettingsFetch(key, timeout: timeout, anonymous: anonymous);
   } catch (e) {
     debugPrint('[ngmy_settings] relay GET $key: $e');
     return null;

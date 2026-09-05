@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_network_resilience.dart';
 import 'ngmy_supabase_config.dart';
+import 'ngmy_web_api_base.dart';
 
 /// Public same-origin path on web — service worker proxies to Supabase Edge.
 /// DevTools shows `ngmy.org/api/sync`, not `bright-handler`.
@@ -81,16 +82,9 @@ const Set<String> kNgmyEdgeStripWhenAuthed = {
   'userEmail',
 };
 
-String _ngmyEdgeBasePath() {
-  if (!kIsWeb) return '';
-  final path = Uri.base.path;
-  if (path.isEmpty || path == '/') return '';
-  return path.endsWith('/') ? path.substring(0, path.length - 1) : path;
-}
-
 String ngmyEdgeInvokeUrl({bool anonymous = false}) {
   if (kIsWeb) {
-    return '${Uri.base.origin}${_ngmyEdgeBasePath()}$kNgmyEdgePublicPath';
+    return '${Uri.base.origin}${ngmyWebApiBasePath(Uri.base.path)}$kNgmyEdgePublicPath';
   }
   return '${kNgmySupabaseUrl.trim()}/functions/v1/$kNgmySupabaseAiFunction';
 }
@@ -130,7 +124,12 @@ Map<String, dynamic> ngmyEdgeWirePayload(Map<String, dynamic> body, {bool anonym
   final action = (out.remove('action') ?? 'chat').toString().trim();
   out['a'] = kNgmyEdgeActionToWire[action] ?? action;
   if (!anonymous) {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+    String token = '';
+    try {
+      token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+    } catch (_) {
+      token = '';
+    }
     if (token.isNotEmpty) {
       for (final key in kNgmyEdgeStripWhenAuthed) {
         out.remove(key);

@@ -2,15 +2,14 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'ngmy_supabase_config.dart';
+import 'ngmy_web_api_base.dart';
 
 /// Same-origin REST path on web — service worker proxies to Supabase PostgREST.
 const String kNgmyRestPublicPath = '/api/rest/v1';
 
 String _ngmyWebBasePath() {
   if (!kIsWeb) return '';
-  final path = Uri.base.path;
-  if (path.isEmpty || path == '/') return '';
-  return path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+  return ngmyWebApiBasePath(Uri.base.path);
 }
 
 /// Public REST URL — web uses [/api/rest/v1], native uses Supabase directly.

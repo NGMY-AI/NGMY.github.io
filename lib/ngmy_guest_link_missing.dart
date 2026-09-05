@@ -8,12 +8,14 @@ class NgmyGuestLinkMissingPage extends StatelessWidget {
     required this.kind,
     required this.message,
     required this.onRetry,
+    this.connectionProblem = false,
   });
 
   /// `bio` or `menu`
   final String kind;
   final String message;
   final VoidCallback onRetry;
+  final bool connectionProblem;
 
   bool get _isBio => kind.toLowerCase() == 'bio';
 
@@ -21,8 +23,12 @@ class NgmyGuestLinkMissingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent = _isBio ? const Color(0xFF4F46E5) : const Color(0xFFB8860B);
     final accentSoft = _isBio ? const Color(0xFFEEF2FF) : const Color(0xFFFFF8E8);
-    final title = _isBio ? 'This Bio is gone' : 'This menu is gone';
-    final icon = _isBio ? Icons.link_off_rounded : Icons.restaurant_menu_rounded;
+    final title = connectionProblem
+        ? (_isBio ? 'Could not open this Bio' : 'Could not open this menu')
+        : (_isBio ? 'This Bio is gone' : 'This menu is gone');
+    final icon = connectionProblem
+        ? Icons.wifi_off_rounded
+        : (_isBio ? Icons.link_off_rounded : Icons.restaurant_menu_rounded);
     const scaffold = Color(0xFFF8FAFC);
     const ink = Color(0xFF0F172A);
     const muted = Color(0xFF64748B);
@@ -101,7 +107,9 @@ class NgmyGuestLinkMissingPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'The owner may have deleted it, or this link expired.',
+                          connectionProblem
+                              ? 'The page is published — this was a connection problem, not a deleted link.'
+                              : 'The owner may have deleted it, or this link expired.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: muted.withValues(alpha: 0.85),
@@ -136,10 +144,12 @@ class NgmyGuestLinkMissingPage extends StatelessWidget {
                                 child: Icon(Icons.info_outline_rounded, color: accent, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
-                                  'Ask the owner to publish again and share a fresh link.',
-                                  style: TextStyle(
+                                  connectionProblem
+                                      ? 'Stay on this page and tap Try again, or open the same link on home Wi‑Fi or mobile data.'
+                                      : 'Ask the owner to publish again and share a fresh link.',
+                                  style: const TextStyle(
                                     color: Color(0xFF334155),
                                     fontSize: 13,
                                     height: 1.4,

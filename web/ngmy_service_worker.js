@@ -43,6 +43,11 @@ function ngmyIsApiSyncPath(url) {
   return url.pathname === '/api/sync' || url.pathname.endsWith('/api/sync');
 }
 
+/** Guest deep links are not real files — GitHub Pages serves 404.html (the SPA). */
+function ngmyIsGuestDeepLink(url) {
+  return /\/(bio|menu|local-bio|local-menu|invoice|app)\/[^/]+/i.test(url.pathname || '');
+}
+
 function ngmyIsApiRestPath(url) {
   return url.pathname.indexOf('/api/rest/v1') !== -1;
 }
@@ -581,6 +586,14 @@ self.addEventListener('fetch', (event) => {
               cache.put(event.request, net.clone());
               await cacheAbsoluteShell(cache);
               return net;
+            }
+            // /bio/{slug} is not a file. GitHub Pages returns 404.html (the Flutter
+            // shell) with status 404 — still serve that HTML, or the cached shell.
+            if (ngmyIsGuestDeepLink(url) && net) {
+              const shell = await offlineDocumentAnyCache();
+              if (shell) return shell;
+              var ct = (net.headers && net.headers.get('content-type')) || '';
+              if (ct.indexOf('text/html') !== -1) return net;
             }
           } catch (_) {}
         }

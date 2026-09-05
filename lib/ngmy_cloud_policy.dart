@@ -87,6 +87,12 @@ class NgmyCloudPolicy {
   static bool settingsKeyPublicReadable(String key) {
     final k = key.trim();
     if (k.isEmpty) return false;
+    // Public prefixes win even if the slug happens to contain "email"/"phone".
+    if (k.startsWith('ngmy_menu_pub_')) return true;
+    if (k.startsWith('ngmy_bio_pub_')) return true;
+    if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
+    if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
+    if (k.startsWith('ngmy_essentials_code_v1_')) return true;
     if (settingsKeyNetworkSensitive(k)) return false;
     const exact = {
       'ngmy_popups',
@@ -101,11 +107,6 @@ class NgmyCloudPolicy {
       'ngmy_slides_transfer_qr_stashes_v1',
     };
     if (exact.contains(k)) return true;
-    if (k.startsWith('ngmy_menu_pub_')) return true;
-    if (k.startsWith('ngmy_bio_pub_')) return true;
-    if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
-    if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
-    if (k.startsWith('ngmy_essentials_code_v1_')) return true;
     return false;
   }
 

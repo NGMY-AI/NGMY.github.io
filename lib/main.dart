@@ -610,8 +610,8 @@ void main() async {
     }
   }
 
-  if (isGuestPublishedBio || isGuestLocalPublishedMenu || isGuestLocalPublishedBio) {
-    // Device-local and bio guests load without blocking on Supabase.
+  if (isGuestLocalPublishedMenu || isGuestLocalPublishedBio) {
+    // Device-local guests do not need the cloud.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 8)));
   } else if (isGuestLink) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));
