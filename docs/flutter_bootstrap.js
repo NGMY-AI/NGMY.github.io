@@ -44,6 +44,7 @@ _flutter.buildConfig = {"engineRevision":"a804b261645ef8c13eb3d5c44a5c2fb0340c55
 // NGMY: use ngmy_service_worker.js (registered in index.html) — not Flutter's worker.
 _flutter.loader.load({
   config: {
+    renderer: window.__NGMY_IN_APP_BROWSER__ ? "html" : "canvaskit",
     canvasKitBaseUrl: "./canvaskit/",
     useLocalCanvasKit: true
   }
