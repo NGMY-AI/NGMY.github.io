@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260906013727';
+      var embedded = '20260906015741';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -783,7 +783,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260906013727";
+      var CURRENT = "20260906015741";
 
       function showError(msg) {
 
@@ -918,7 +918,7 @@
 
   <script>
     (function () {
-      var deployId = '20260906013727';
+      var deployId = '20260906015741';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;
@@ -1237,7 +1237,7 @@
               ? 'This in-app browser is taking too long. Tap Reload, or tap the menu and choose Open in Safari / Chrome.'
               : 'NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
           }
-        }, window.__NGMY_IN_APP_BROWSER__ ? 14000 : 25000);
+        }, 25000);
 
         window.addEventListener('flutter-first-frame', function () {
           clearTimeout(bootTimer);
