@@ -1,3 +1,7 @@
+const String kNgmyBioPublicOrigin = 'https://ngmy.org';
+
+/// Legacy pretty path — Safari/Chrome still open it. Instagram's in-app
+/// browser treats GitHub Pages' 404.html fallback as a broken link.
 const String kNgmyBioPublicBaseUrl = 'https://ngmy.org/bio/';
 
 /// Letters in the public path after /bio/ — keep links short.
@@ -9,7 +13,10 @@ const int kNgmyBioSlugMaxDigitPrefix = 2;
 String ngmyBioPublicUrlForSlug(String slug) {
   final s = ngmySanitizeBioSlug(slug);
   if (s.isEmpty) return '';
-  return '$kNgmyBioPublicBaseUrl$s';
+  // Query on the real homepage returns HTTP 200. Instagram, TikTok, and
+  // Facebook in-app browsers refuse /bio/{slug} because GitHub Pages
+  // serves that path as 404.html.
+  return '$kNgmyBioPublicOrigin/?b=$s';
 }
 
 /// Turns a typed value or pasted URL into a short public slug:
@@ -17,6 +24,17 @@ String ngmyBioPublicUrlForSlug(String slug) {
 String ngmySanitizeBioSlug(String raw) {
   var s = raw.trim().toLowerCase();
   if (s.isEmpty) return '';
+
+  final asUri = Uri.tryParse(s.contains('://') ? s : 'https://$s');
+  if (asUri != null) {
+    final fromQuery = (asUri.queryParameters['b'] ??
+            asUri.queryParameters['ngmy_bio'] ??
+            asUri.queryParameters['m'] ??
+            asUri.queryParameters['ngmy_menu'] ??
+            '')
+        .trim();
+    if (fromQuery.isNotEmpty) s = fromQuery;
+  }
 
   s = s.replaceAll(RegExp(r'^https?://'), '');
   s = s.split(RegExp(r'[?#]')).first;

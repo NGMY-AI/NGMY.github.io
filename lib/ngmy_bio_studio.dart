@@ -410,7 +410,7 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         content: Text(
           widget._isLocal
               ? 'Published! Anyone can open this link.'
-              : 'Published! Link copied: $url',
+              : 'Published! Link copied. Paste it in Instagram — it opens there now.',
         ),
       ),
     );
@@ -1453,8 +1453,9 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Public link is ngmy.org/bio/ plus up to 10 letters. '
-                'You can put 1–2 numbers in front. Do not paste Instagram or other website URLs here.',
+                'After Publish, copy the link (ngmy.org/?b=yourname) into Instagram. '
+                'That form opens inside Instagram. You can put 1–2 numbers in front of the name. '
+                'Do not paste Instagram or other website URLs here.',
                 style: TextStyle(color: t.muted, fontSize: 12, height: 1.35, fontWeight: FontWeight.w500),
               ),
             ],

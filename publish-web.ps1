@@ -110,6 +110,7 @@ if (Test-Path $bootPath) {
     $loaderPatch = @'
 _flutter.loader.load({
   config: {
+    renderer: window.__NGMY_IN_APP_BROWSER__ ? "html" : "canvaskit",
     canvasKitBaseUrl: "./canvaskit/",
     useLocalCanvasKit: true
   }

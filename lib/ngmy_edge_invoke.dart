@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_edge_web_flags_stub.dart' if (dart.library.html) 'ngmy_edge_web_flags_web.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_web_api_base.dart';
@@ -82,11 +83,15 @@ const Set<String> kNgmyEdgeStripWhenAuthed = {
   'userEmail',
 };
 
+String ngmyEdgeDirectUrl() =>
+    '${kNgmySupabaseUrl.trim()}/functions/v1/$kNgmySupabaseAiFunction';
+
+String ngmyEdgeSameOriginUrl() =>
+    '${Uri.base.origin}${ngmyWebApiBasePath(Uri.base.path)}$kNgmyEdgePublicPath';
+
 String ngmyEdgeInvokeUrl({bool anonymous = false}) {
-  if (kIsWeb) {
-    return '${Uri.base.origin}${ngmyWebApiBasePath(Uri.base.path)}$kNgmyEdgePublicPath';
-  }
-  return '${kNgmySupabaseUrl.trim()}/functions/v1/$kNgmySupabaseAiFunction';
+  if (kIsWeb && !ngmyWebUseDirectEdge()) return ngmyEdgeSameOriginUrl();
+  return ngmyEdgeDirectUrl();
 }
 
 Future<String> _freshAccessToken() async {
@@ -159,7 +164,6 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
 
   try {
     final wire = ngmyEdgeWirePayload(body, anonymous: anonymous);
-    final url = ngmyEdgeInvokeUrl(anonymous: anonymous);
     final anonKey = kNgmySupabaseAnonKey;
     final token = anonymous ? anonKey : await _freshAccessToken();
 
@@ -167,21 +171,35 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
       return {'ok': false, 'error': 'Please sign in again.'};
     }
 
-    final response = await http
-        .post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ${anonymous ? anonKey : token}',
-            if (anonKey.isNotEmpty) 'apikey': anonKey,
-          },
-          body: jsonEncode(wire),
-        )
-        .timeout(timeout);
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${anonymous ? anonKey : token}',
+      if (anonKey.isNotEmpty) 'apikey': anonKey,
+    };
+    final payload = jsonEncode(wire);
 
-    final parsed = _parseEdgeBody(response.body);
+    final urls = <String>[
+      ngmyEdgeInvokeUrl(anonymous: anonymous),
+      if (kIsWeb) ngmyEdgeDirectUrl(),
+    ];
+    final seen = <String>{};
+    http.Response? response;
+    Map<String, dynamic>? parsed;
+    for (final url in urls) {
+      if (!seen.add(url)) continue;
+      try {
+        response = await http
+            .post(Uri.parse(url), headers: headers, body: payload)
+            .timeout(timeout);
+        parsed = _parseEdgeBody(response.body);
+        if (parsed != null) break;
+      } catch (e) {
+        debugPrint('[edge] invoke $url: $e');
+      }
+    }
+
     if (parsed != null) {
-      if (response.statusCode == 401 && parsed['ok'] != true) {
+      if (response?.statusCode == 401 && parsed['ok'] != true) {
         return {
           ...parsed,
           'ok': false,
@@ -190,10 +208,10 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
       }
       return parsed;
     }
-    if (response.statusCode == 401) {
+    if (response?.statusCode == 401) {
       return {'ok': false, 'error': 'Please sign in again.'};
     }
-    if (response.statusCode >= 400) {
+    if (response != null && response.statusCode >= 400) {
       return {'ok': false, 'error': 'Server error (${response.statusCode}). Try again.'};
     }
     return null;

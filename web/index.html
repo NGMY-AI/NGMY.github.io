@@ -205,8 +205,9 @@
           }
         }
         try {
-          var q = new URLSearchParams(location.search).get("ngmy_menu");
-          if (q) return q.trim().toLowerCase();
+          var q = new URLSearchParams(location.search);
+          var v = q.get("m") || q.get("ngmy_menu");
+          if (v) return v.trim().toLowerCase();
         } catch (e) {}
         var hash = (location.hash || "").replace(/^#\/?/, "");
         if (hash.indexOf("menu/") === 0) {
@@ -238,8 +239,9 @@
           }
         }
         try {
-          var q = new URLSearchParams(location.search).get("ngmy_bio");
-          if (q) return q.trim().toLowerCase();
+          var q = new URLSearchParams(location.search);
+          var v = q.get("b") || q.get("ngmy_bio");
+          if (v) return v.trim().toLowerCase();
         } catch (e) {}
         var hash = (location.hash || "").replace(/^#\/?/, "");
         if (hash.indexOf("bio/") === 0) {
@@ -342,6 +344,22 @@
     })();
   </script>
 
+  <script>
+    (function () {
+      var ua = navigator.userAgent || "";
+      var inApp = /Instagram|FBAN|FBAV|FB_IAB|Line\/|TikTok|musical_ly|Twitter|Pinterest|Snapchat|LinkedIn/i.test(ua);
+      var path = location.pathname || "";
+      var search = location.search || "";
+      var hash = location.hash || "";
+      var guest = /\/bio\/|\/menu\/|\/local-bio\/|\/local-menu\//i.test(path)
+        || /[?&](b|m|ngmy_bio|ngmy_menu|ngmy_local_bio|ngmy_local_menu)=/i.test(search)
+        || /^#\/?(bio|menu|local-bio|local-menu)\//i.test(hash);
+      window.__NGMY_IN_APP_BROWSER__ = inApp;
+      window.__NGMY_SKIP_SW__ = !!(inApp || guest);
+      window.__NGMY_GUEST_SURFACE__ = !!guest;
+    })();
+  </script>
+
 
 
   <meta charset="UTF-8">
@@ -432,7 +450,7 @@
           m.setAttribute('content', '#121212');
         });
       }
-      if (ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
+      if (window.__NGMY_GUEST_SURFACE__ || ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
       else ngmyApplyDarkChromeEarly();
     })();
   </script>
@@ -727,8 +745,24 @@
 
   <div id="ngmy-splash" aria-live="polite">
     <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#7C3AED;border-radius:50%;animation:ngmy-spin 0.9s linear infinite"></div>
-    <div>Loading NGMY</div>
+    <div id="ngmy-splash-label">Loading NGMY</div>
   </div>
+  <script>
+    (function () {
+      if (!window.__NGMY_GUEST_SURFACE__) return;
+      var splash = document.getElementById("ngmy-splash");
+      var label = document.getElementById("ngmy-splash-label");
+      var isMenu = /\/menu\/|[?&](m|ngmy_menu)=/i.test((location.pathname || "") + (location.search || ""));
+      if (label) label.textContent = isMenu ? "Opening menu…" : "Opening bio…";
+      if (splash) {
+        splash.style.background = "#ffffff";
+        splash.style.color = "#121212";
+        var ring = splash.querySelector("div");
+        if (ring) ring.style.borderColor = "rgba(79,70,229,0.2)";
+        if (ring) ring.style.borderTopColor = "#4F46E5";
+      }
+    })();
+  </script>
   <style>
     @keyframes ngmy-spin { to { transform: rotate(360deg); } }
   </style>
@@ -1199,9 +1233,11 @@
 
         var bootstrapTimer = setTimeout(function () {
           if (!window._flutter || !window._flutter.loader) {
-            showBootstrapError('NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
+            showBootstrapError(window.__NGMY_IN_APP_BROWSER__
+              ? 'This in-app browser is taking too long. Tap Reload, or tap the menu and choose Open in Safari / Chrome.'
+              : 'NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
           }
-        }, 25000);
+        }, window.__NGMY_IN_APP_BROWSER__ ? 14000 : 25000);
 
         window.addEventListener('flutter-first-frame', function () {
           clearTimeout(bootTimer);
@@ -1213,7 +1249,7 @@
             var bioGuest =
               /\/bio\/[^/?#]+/i.test(path) ||
               /\/local-bio\/[^/?#]+/i.test(path) ||
-              /[?&]ngmy_bio=/i.test(search) ||
+              /[?&](b|ngmy_bio)=/i.test(search) ||
               /[?&]ngmy_local_bio=/i.test(search) ||
               /^\/?bio\//i.test(hash) ||
               /^\/?local-bio\//i.test(hash);
@@ -1239,7 +1275,9 @@
           window.__ngmyHideSplash && window.__ngmyHideSplash();
         }, { once: true });
 
-        registerServiceWorkerAndWait();
+        if (!window.__NGMY_SKIP_SW__) {
+          registerServiceWorkerAndWait();
+        }
 
         if (navigator.onLine) {
           bootFromNetwork();

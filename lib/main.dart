@@ -610,8 +610,11 @@ void main() async {
     }
   }
 
-  if (isGuestLocalPublishedMenu || isGuestLocalPublishedBio) {
-    // Device-local guests do not need the cloud.
+  if (isGuestPublishedBio ||
+      isGuestPublishedMenu ||
+      isGuestLocalPublishedMenu ||
+      isGuestLocalPublishedBio) {
+    // Instagram / first-time guests must paint immediately. Cloud fetch is anonymous.
     unawaited(ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 8)));
   } else if (isGuestLink) {
     await ngmyIgnoreTimeout(initSupabase, timeout: const Duration(seconds: 12));

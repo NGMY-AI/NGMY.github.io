@@ -91,9 +91,9 @@ BOTTOM NAV (7 tabs):
 7) Profile — theme, logout, legal, Worksheets (Projects / Cashier IOUs / Family Tree).
 
 MENU STUDIO (Tool Hub → Menu Studio):
-- Menus tab: design restaurant/business menus, publish public link https://ngmy.org/menu/{slug}
+- Menus tab: design restaurant/business menus, publish public link https://ngmy.org/?m={slug}
 - First menu free; more menus need Menu Studio subscription (paywall shows price).
-- Bios tab (same studio): link-in-bio pages, publish https://ngmy.org/bio/{slug}
+- Bios tab (same studio): link-in-bio pages, publish https://ngmy.org/?b={slug}
 - First Bio free with starter template; more Bios/templates need Bio Studio subscription.
 - Extra Bio photo/header changes may need a photo pack after free changes.
 - Local Menu / Local Bio: Home Essentials hub → device-local publish at /local-menu/ and /local-bio/

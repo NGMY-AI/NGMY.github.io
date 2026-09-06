@@ -34,15 +34,20 @@ String? ngmyReadMenuSlugFromLaunchUrl() {
     return fromPath;
   }
 
+  final slug = (uri.queryParameters['m'] ?? uri.queryParameters['ngmy_menu'] ?? '').trim();
+  if (slug.isNotEmpty) {
+    try {
+      html.window.sessionStorage['ngmy_guest_menu_slug'] = slug.toLowerCase();
+    } catch (_) {}
+    return slug.toLowerCase();
+  }
+
   final fromSession = _slugFromSessionStorage();
   if (fromSession != null && fromSession.isNotEmpty) return fromSession;
 
   try {
     html.window.sessionStorage.remove('ngmy_guest_menu_slug');
   } catch (_) {}
-
-  final slug = uri.queryParameters['ngmy_menu']?.trim();
-  if (slug != null && slug.isNotEmpty) return slug.toLowerCase();
 
   final hash = uri.fragment.trim().replaceFirst(RegExp(r'^/?'), '');
   if (hash.startsWith('menu/')) {

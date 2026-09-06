@@ -31,6 +31,17 @@ String? ngmyReadBioSlugFromLaunchUrl() {
     }
   }
 
+  final q = (uri.queryParameters['b'] ?? uri.queryParameters['ngmy_bio'] ?? '').trim();
+  if (q.isNotEmpty) {
+    final slug = ngmySanitizeBioSlug(q);
+    if (slug.isNotEmpty) {
+      try {
+        html.window.sessionStorage['ngmy_guest_bio_slug'] = slug;
+      } catch (_) {}
+      return slug;
+    }
+  }
+
   try {
     final stored = html.window.sessionStorage['ngmy_guest_bio_slug'];
     if (stored != null && stored.trim().isNotEmpty) {
@@ -38,12 +49,6 @@ String? ngmyReadBioSlugFromLaunchUrl() {
       if (slug.isNotEmpty) return slug;
     }
   } catch (_) {}
-
-  final q = uri.queryParameters['ngmy_bio']?.trim();
-  if (q != null && q.isNotEmpty) {
-    final slug = ngmySanitizeBioSlug(q);
-    if (slug.isNotEmpty) return slug;
-  }
 
   final hash = uri.fragment.trim().replaceFirst(RegExp(r'^/?'), '');
   if (hash.startsWith('bio/')) {

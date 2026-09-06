@@ -31,14 +31,16 @@ void main() {
   });
 
   group('published bio slug', () {
-    test('public URL uses the sanitized slug', () {
-      expect(ngmyBioPublicUrlForSlug('KBPablo'), 'https://ngmy.org/bio/kbpablo');
-      expect(ngmyBioPublicUrlForSlug('https://ngmy.org/bio/kbpablo'), 'https://ngmy.org/bio/kbpablo');
+    test('public URL uses a 200 homepage query so Instagram can open it', () {
+      expect(ngmyBioPublicUrlForSlug('KBPablo'), 'https://ngmy.org/?b=kbpablo');
+      expect(ngmyBioPublicUrlForSlug('https://ngmy.org/bio/kbpablo'), 'https://ngmy.org/?b=kbpablo');
+      expect(ngmyBioPublicUrlForSlug('https://ngmy.org/?b=kbpablo'), 'https://ngmy.org/?b=kbpablo');
     });
 
     test('digits after letters are dropped so URL and stored key stay aligned', () {
       expect(ngmySanitizeBioSlug('MyBio123'), 'mybio');
       expect(ngmySanitizeBioSlug('12kbpablo'), '12kbpablo');
+      expect(ngmySanitizeBioSlug('https://ngmy.org/?b=kbpablo'), 'kbpablo');
     });
   });
 

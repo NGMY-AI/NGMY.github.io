@@ -5,7 +5,7 @@ const String kNgmyMenuPublicBaseUrl = 'https://ngmy.org/menu/';
 String ngmyMenuPublicUrlForSlug(String slug) {
   final s = ngmySanitizeBioSlug(slug);
   if (s.isEmpty) return '';
-  return '$kNgmyMenuPublicBaseUrl$s';
+  return 'https://ngmy.org/?m=$s';
 }
 
 String ngmyBuildUniqueMenuSlug(String base, List<String> existingSlugs) {

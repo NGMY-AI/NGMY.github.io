@@ -1110,7 +1110,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
               NgmyModernField(controller: _slugC, label: 'Link slug (optional)', hint: 'mymenu', icon: Icons.link_rounded, accent: _kMenuAccent),
               const SizedBox(height: 6),
               Text(
-                'Public link is ngmy.org/menu/ plus up to 10 letters. You can put 1–2 numbers in front. Do not paste a long restaurant name or website URL.',
+                'After Publish, copy the link (ngmy.org/?m=yourname) into Instagram. That form opens inside Instagram. You can put 1–2 numbers in front of the name.',
                 style: TextStyle(color: t.muted, fontSize: 12, height: 1.35, fontWeight: FontWeight.w500),
               ),
             ],
