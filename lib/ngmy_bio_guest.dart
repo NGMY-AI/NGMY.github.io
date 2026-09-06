@@ -12,7 +12,6 @@ import 'ngmy_guest_link_missing.dart';
 import 'ngmy_bio_launch_stub.dart' if (dart.library.html) 'ngmy_bio_launch_web.dart';
 import 'ngmy_guest_html_splash_stub.dart' if (dart.library.html) 'ngmy_guest_html_splash_web.dart';
 import 'ngmy_platform_graphics.dart';
-import 'ngmy_supabase_auth.dart';
 
 String? ngmyPublishedBioSlugFromLaunch() => ngmyReadBioSlugFromLaunchUrl();
 
@@ -32,7 +31,11 @@ class NgmyGuestPublishedBio extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Bio',
       builder: ngmyCrispMaterialAppBuilder,
-      theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: Colors.white),
+      theme: ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF121212),
+      ),
       home: NgmyGuestBioHostScreen(slug: slug),
     );
   }
@@ -56,6 +59,7 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
   @override
   void initState() {
     super.initState();
+    ngmyReleaseGuestHtmlSplash();
     unawaited(_load());
   }
 
@@ -73,37 +77,36 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
       _doc = null;
       _connectionProblem = false;
     });
-    ngmyApplyBioPageChrome(Colors.white);
-    SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(Colors.white));
+    ngmyApplyBioPageChrome(const Color(0xFF121212));
+    SystemChrome.setSystemUIOverlayStyle(ngmyBioSystemUiOverlay(const Color(0xFF121212)));
 
-    await ngmyWaitForSupabaseReady(timeout: const Duration(seconds: 8));
-
-    var reachable = false;
-    try {
-      for (var attempt = 0; attempt < 4; attempt++) {
+    Map<String, dynamic>? entry = await ngmyWaitPrefetchedGuestBio();
+    var reachable = entry != null;
+    if (entry == null || entry['data'] is! Map) {
+      try {
         final result = await NgmyBioPublishRegistry.fetchBySlugForGuestStatus(widget.slug)
-            .timeout(const Duration(seconds: 14), onTimeout: () => (reachable: false, entry: null));
-        if (!mounted) return;
-        if (result.reachable) reachable = true;
-        final entry = result.entry;
-        if (entry != null && entry['data'] is Map) {
-          final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
-          setState(() {
-            _doc = doc;
-            _loading = false;
-            _connectionProblem = false;
-          });
-          _applyTemplateChrome(doc);
-          ngmyReleaseGuestHtmlSplash();
-          return;
-        }
-        if (attempt < 3) await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+            .timeout(const Duration(seconds: 8), onTimeout: () => (reachable: false, entry: null));
+        reachable = result.reachable;
+        entry = result.entry;
+      } on TimeoutException {
+        reachable = false;
+        entry = null;
       }
-    } on TimeoutException {
-      reachable = false;
     }
 
     if (!mounted) return;
+    if (entry != null && entry['data'] is Map) {
+      final doc = NgmyBioDocument.fromJson(Map<String, dynamic>.from(entry['data'] as Map));
+      setState(() {
+        _doc = doc;
+        _loading = false;
+        _connectionProblem = false;
+      });
+      _applyTemplateChrome(doc);
+      ngmyReleaseGuestHtmlSplash();
+      return;
+    }
+
     setState(() {
       _loading = false;
       _connectionProblem = !reachable;
@@ -117,13 +120,20 @@ class _NgmyGuestBioHostScreenState extends State<NgmyGuestBioHostScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      // Keep a blank underlay while the HTML "Loading NGMY" splash stays up.
-      // Do not show a second "Opening bio…" loader.
       return AnnotatedRegion<SystemUiOverlayStyle>(
         value: ngmyBioSystemUiOverlay(const Color(0xFF121212)),
         child: const Scaffold(
           backgroundColor: Color(0xFF121212),
-          body: SizedBox.expand(),
+          body: Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0x66FFFFFF),
+              ),
+            ),
+          ),
         ),
       );
     }

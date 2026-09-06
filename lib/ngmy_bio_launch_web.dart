@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:html' as html;
+import 'dart:js' as js;
+import 'dart:js_util' as js_util;
 
 import 'ngmy_bio_urls.dart';
 
@@ -58,4 +61,30 @@ String? ngmyReadBioSlugFromLaunchUrl() {
   }
 
   return null;
+}
+
+Map<String, dynamic>? ngmyReadPrefetchedGuestBio() {
+  try {
+    final raw = js.context['__NGMY_GUEST_BIO_ENTRY'];
+    if (raw == null) return null;
+    final encoded = js.context.callMethod('JSON.stringify', [raw]);
+    if (encoded is! String || encoded.isEmpty || encoded == 'null') return null;
+    final decoded = jsonDecode(encoded);
+    if (decoded is Map && decoded['data'] is Map) {
+      return Map<String, dynamic>.from(decoded);
+    }
+  } catch (_) {}
+  return null;
+}
+
+Future<Map<String, dynamic>?> ngmyWaitPrefetchedGuestBio() async {
+  final ready = ngmyReadPrefetchedGuestBio();
+  if (ready != null) return ready;
+  try {
+    final pending = js.context['__NGMY_GUEST_BIO_PREFETCH'];
+    if (pending != null) {
+      await js_util.promiseToFuture<dynamic>(pending).timeout(const Duration(seconds: 4));
+    }
+  } catch (_) {}
+  return ngmyReadPrefetchedGuestBio();
 }

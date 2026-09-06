@@ -360,6 +360,47 @@
     })();
   </script>
 
+  <script>
+    (function () {
+      function ngmySanitizeBioSlug(raw) {
+        raw = String(raw || "").toLowerCase().trim();
+        var digits = "", letters = "";
+        for (var i = 0; i < raw.length; i++) {
+          var ch = raw.charAt(i);
+          if (ch >= "0" && ch <= "9") {
+            if (!letters && digits.length < 2) digits += ch;
+          } else if (ch >= "a" && ch <= "z") {
+            if (letters.length < 10) letters += ch;
+          }
+        }
+        return digits + letters;
+      }
+      var slug = "";
+      try { slug = sessionStorage.getItem("ngmy_guest_bio_slug") || ""; } catch (e) {}
+      slug = ngmySanitizeBioSlug(slug);
+      if (!slug) return;
+      var anon = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2dWZsbHFxeGpucGljbWt4emNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4MjA1OTksImV4cCI6MjA5NTM5NjU5OX0.NoJnis6t_RLSJOHu5iLdjGaCTxVj5ZAFnG3gBZ3XYbM";
+      window.__NGMY_GUEST_BIO_PREFETCH = fetch(
+        "https://gvufllqqxjnpicmkxzcg.supabase.co/functions/v1/bright-handler",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + anon,
+            "apikey": anon
+          },
+          body: JSON.stringify({ a: "r1", op: "s", t: "s", sk: "d1", sfx: slug, cols: "value", single: true })
+        }
+      ).then(function (r) { return r.json(); }).then(function (data) {
+        var value = data && data.data && data.data.value;
+        if (value && value.data) {
+          window.__NGMY_GUEST_BIO_ENTRY = value;
+        }
+        return value || null;
+      }).catch(function () { return null; });
+    })();
+  </script>
+
 
 
   <meta charset="UTF-8">
@@ -450,7 +491,8 @@
           m.setAttribute('content', '#121212');
         });
       }
-      if (window.__NGMY_GUEST_SURFACE__ || ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
+      if (window.__NGMY_GUEST_SURFACE__) ngmyApplyDarkChromeEarly();
+      else if (ngmyThemeIsLight()) ngmyApplyLightChromeEarly();
       else ngmyApplyDarkChromeEarly();
     })();
   </script>
@@ -752,14 +794,19 @@
       if (!window.__NGMY_GUEST_SURFACE__) return;
       var splash = document.getElementById("ngmy-splash");
       var label = document.getElementById("ngmy-splash-label");
-      var isMenu = /\/menu\/|[?&](m|ngmy_menu)=/i.test((location.pathname || "") + (location.search || ""));
-      if (label) label.textContent = isMenu ? "Opening menu…" : "Opening bio…";
+      if (label) label.style.display = "none";
       if (splash) {
-        splash.style.background = "#ffffff";
-        splash.style.color = "#121212";
+        splash.style.background = "#121212";
+        splash.style.color = "#ffffff";
+        splash.style.gap = "0";
         var ring = splash.querySelector("div");
-        if (ring) ring.style.borderColor = "rgba(79,70,229,0.2)";
-        if (ring) ring.style.borderTopColor = "#4F46E5";
+        if (ring) {
+          ring.style.width = "18px";
+          ring.style.height = "18px";
+          ring.style.borderWidth = "2px";
+          ring.style.borderColor = "rgba(255,255,255,0.18)";
+          ring.style.borderTopColor = "#ffffff";
+        }
       }
     })();
   </script>
@@ -1242,36 +1289,6 @@
         window.addEventListener('flutter-first-frame', function () {
           clearTimeout(bootTimer);
           clearTimeout(bootstrapTimer);
-          try {
-            var path = location.pathname || '';
-            var search = location.search || '';
-            var hash = (location.hash || '').replace(/^#/, '');
-            var bioGuest =
-              /\/bio\/[^/?#]+/i.test(path) ||
-              /\/local-bio\/[^/?#]+/i.test(path) ||
-              /[?&](b|ngmy_bio)=/i.test(search) ||
-              /[?&]ngmy_local_bio=/i.test(search) ||
-              /^\/?bio\//i.test(hash) ||
-              /^\/?local-bio\//i.test(hash);
-            if (bioGuest) {
-              // Keep the single "Loading NGMY" splash until Flutter finishes
-              // loading the bio — avoids a second "Opening bio…" screen.
-              window.__ngmyGuestSplashHeld = true;
-              window.__ngmyReleaseGuestSplash = function () {
-                window.__ngmyGuestSplashHeld = false;
-                window.__ngmyHideSplash && window.__ngmyHideSplash();
-              };
-              window.addEventListener('ngmy-guest-surface-ready', function () {
-                window.__ngmyReleaseGuestSplash && window.__ngmyReleaseGuestSplash();
-              }, { once: true });
-              setTimeout(function () {
-                if (window.__ngmyGuestSplashHeld) {
-                  window.__ngmyReleaseGuestSplash();
-                }
-              }, 20000);
-              return;
-            }
-          } catch (e) {}
           window.__ngmyHideSplash && window.__ngmyHideSplash();
         }, { once: true });
 
