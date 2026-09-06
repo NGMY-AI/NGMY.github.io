@@ -83,14 +83,15 @@ from pathlib import Path
 boot = Path("docs/flutter_bootstrap.js").read_text()
 loader = """_flutter.loader.load({
   config: {
-    renderer: window.__NGMY_IN_APP_BROWSER__ ? "html" : "canvaskit",
     canvasKitBaseUrl: "./canvaskit/",
     useLocalCanvasKit: true
   }
 }).catch(function (e) {
   console.error("[ngmy] Flutter load failed", e);
   window.__ngmyShowLoadError && window.__ngmyShowLoadError(
-    "NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen."
+    window.__NGMY_IN_APP_BROWSER__
+      ? "This in-app browser could not start the page. Tap the menu (···) and choose Open in Safari or Chrome."
+      : "NGMY could not load the app engine. Tap Reload. If you are offline, open once on Wi-Fi and wait for the home screen."
   );
 });"""
 boot = boot.replace("_flutter.loader.load({});", loader)

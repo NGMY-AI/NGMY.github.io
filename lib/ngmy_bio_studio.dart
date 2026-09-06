@@ -398,21 +398,87 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       return;
     }
-    await _copyLink(_doc.publicUrl);
+    await _copyLink(_doc.publicUrl, silent: true);
+    if (!mounted) return;
+    await _showPublishedDialog(_doc.publicUrl);
   }
 
-  Future<void> _copyLink(String url) async {
+  Future<void> _copyLink(String url, {bool silent = false}) async {
     if (url.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
-    if (!mounted) return;
+    if (!mounted || silent) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          widget._isLocal
-              ? 'Published! Anyone can open this link.'
-              : 'Published! Link copied. Paste it in Instagram — it opens there now.',
-        ),
-      ),
+      SnackBar(content: Text('Link copied: $url')),
+    );
+  }
+
+  Future<void> _showPublishedDialog(String url) async {
+    if (!mounted || url.trim().isEmpty) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 28),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Published',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Your Bio is live. Paste this link in Instagram, TikTok, or anywhere else.',
+                style: TextStyle(height: 1.4, fontSize: 14),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF86EFAC)),
+                ),
+                child: Text(
+                  url,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: Color(0xFF14532D),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+            FilledButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: url));
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF16A34A)),
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: const Text('Copy link'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1015,7 +1081,8 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
         child: Column(
           children: [
             _topBar(t),
-            if (_doc.publicUrl.isNotEmpty) _linkBar(t, _doc.publicUrl),
+            if (_doc.isPublished) _publishedBanner(t, _doc.publicUrl)
+            else if (_doc.publicUrl.isNotEmpty) _linkBar(t, _doc.publicUrl),
             Expanded(
               child: wide ? _wideLayout(t, qrUrl) : _mobileLayout(t, qrUrl),
             ),
@@ -1181,6 +1248,59 @@ class _NgmyBioStudioEditorState extends State<NgmyBioStudioEditor> {
               icon: const Icon(Icons.copy_rounded, color: _kBioAccent),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _publishedBanner(NgmyHubTheme t, String url) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Material(
+        color: const Color(0xFFECFDF5),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _copyLink(url),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFF86EFAC)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Published — this Bio is live',
+                        style: TextStyle(
+                          color: Color(0xFF14532D),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        url.isEmpty ? 'Tap Publish to copy your link' : url,
+                        style: const TextStyle(
+                          color: Color(0xFF166534),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.copy_rounded, color: Color(0xFF16A34A), size: 18),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
