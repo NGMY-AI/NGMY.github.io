@@ -4247,7 +4247,9 @@ serve(async (req) => {
     const chatLimited = await enforceRateLimit(req, "ai_chat", clientIp(req), 30, 600);
     if (chatLimited) return chatLimited;
     const prompt = String(body?.prompt ?? "").trim();
-    if (prompt.length > 24000) {
+    const appBuilderEarly = String(body?.mode ?? "") === "appBuilder";
+    const maxPrompt = appBuilderEarly ? 200000 : 120000;
+    if (prompt.length > maxPrompt) {
       return new Response(JSON.stringify({ error: "Prompt is too long." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
