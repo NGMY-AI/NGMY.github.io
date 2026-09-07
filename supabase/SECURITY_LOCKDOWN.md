@@ -13,7 +13,8 @@ Code is updated so browsers no longer download Gemini keys or password hashes.
 Supabase Dashboard → **Edge Functions** → **bright-handler** (or project Secrets):
 
 - `NGMY_AI_API_KEY` or `GEMINI_API_KEY` = your new Gemini key  
-- Optional: `ELEVENLABS_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`
+- Optional: `ELEVENLABS_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`  
+- Optional but recommended: `PW_RESET_PEPPER` = a long random string
 
 ## 3. Redeploy the AI Edge Function
 
@@ -49,7 +50,25 @@ Verify: anon `GET` of `civic_registry_members` is empty; anon select of `civicRe
 
 See also `CIVIC_REGISTRY_LOCK.md`.
 
-## 6. Hard-refresh the app
+## 6. Rate limits + remaining hardening
+
+1. Redeploy **bright-handler** from `supabase/functions/ngmy-ai-chat/index.ts`.
+2. Run `supabase/security_hardening_rate_limits.sql` in SQL Editor.
+3. Optional but recommended: set Edge secret `PW_RESET_PEPPER` to a long random string (do not leave the default).
+4. Confirm Anonymous sign-in is enabled if guests upload files (Storage → still uses the app's existing anonymous session helper).
+
+Rate-limit and abuse logs (SQL Editor):
+
+```sql
+select kind, count(*) from public.ngmy_security_events
+  where "at" > now() - interval '24 hours' group by 1 order by 2 desc;
+
+select bucket, k, hits, window_start from public.ngmy_rate_limits
+  where window_start > now() - interval '1 hour' and hits > 5
+  order by hits desc;
+```
+
+## 7. Hard-refresh the app
 
 Close/reopen the PWA or hard-refresh https://ngmy.org so clients stop using cached JS that fetched keys.
 

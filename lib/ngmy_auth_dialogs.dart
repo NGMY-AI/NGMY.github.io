@@ -226,18 +226,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     );
   }
 
-  Future<bool> _accountExists(String email) async {
-    final existsLocally = widget.knownEmails.any((e) => e.toLowerCase().trim() == email);
-    if (existsLocally) return true;
-    try {
-      await ngmyWaitForSupabaseReady();
-      final row = await ngmyFetchUserLoginRow(Supabase.instance.client, email);
-      return row != null;
-    } catch (_) {
-      return existsLocally;
-    }
-  }
-
   Future<void> _sendCode() async {
     final email = _emailCtl.text.toLowerCase().trim();
     if (email.isEmpty || !email.endsWith('@gmail.com')) {
@@ -246,13 +234,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
     setState(() => _loading = true);
     try {
-      final exists = await _accountExists(email);
-      if (!mounted) return;
-      if (!exists) {
-        setState(() => _loading = false);
-        _toast('Account not found. Sign up first.');
-        return;
-      }
       final result = await ngmyPasswordResetSendOtp(email);
       if (!mounted) return;
       if (!result.ok) {

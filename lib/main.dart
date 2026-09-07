@@ -14224,14 +14224,12 @@ class _AuthScreenState extends State<AuthScreen> {
 
         if (verified.ok) {
           await widget.onAuthComplete(email, '', '', enteredHash, true);
-        } else if ((verified.error ?? '').toLowerCase().contains('not found')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Account not found. Please Sign Up first.')),
-          );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(verified.error ?? 'Wrong password')),
-          );
+          final err = (verified.error ?? '').toLowerCase();
+          final msg = err.contains('too many')
+              ? (verified.error ?? 'Too many attempts. Try again shortly.')
+              : 'Invalid email or password.';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
         }
       } catch (err) {
         debugPrint('[Login] cloud check failed: $err');

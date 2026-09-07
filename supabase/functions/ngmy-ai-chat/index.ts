@@ -285,6 +285,87 @@ function adminClient() {
   });
 }
 
+function clientIp(req: Request): string {
+  const xf = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim();
+  return (
+    xf ||
+    req.headers.get("cf-connecting-ip")?.trim() ||
+    req.headers.get("x-real-ip")?.trim() ||
+    "unknown"
+  );
+}
+
+function rateLimitedResponse(): Response {
+  return new Response(
+    JSON.stringify({ error: "Too many requests. Try again shortly.", code: "rate_limited" }),
+    {
+      status: 429,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "60" },
+    },
+  );
+}
+
+async function logSecurityEvent(
+  admin: ReturnType<typeof createClient> | null,
+  kind: string,
+  detail: string,
+  ip: string,
+): Promise<void> {
+  if (!admin) return;
+  try {
+    await admin.from("ngmy_security_events").insert({
+      kind: kind.slice(0, 80),
+      detail: detail.slice(0, 500),
+      ip: ip.slice(0, 80),
+    });
+  } catch (e) {
+    console.error("[security-event]", kind, e);
+  }
+}
+
+/** Fail-open if the SQL migration has not been run yet — login/features keep working. */
+async function consumeRateLimit(
+  admin: ReturnType<typeof createClient> | null,
+  bucket: string,
+  key: string,
+  max: number,
+  windowSeconds: number,
+): Promise<boolean> {
+  if (!admin) return true;
+  try {
+    const { data, error } = await admin.rpc("ngmy_consume_rate_limit", {
+      p_bucket: bucket,
+      p_key: key.slice(0, 200),
+      p_max: max,
+      p_window_seconds: windowSeconds,
+    });
+    if (error) {
+      console.error("[rate-limit-rpc]", bucket, error.message);
+      return true;
+    }
+    return data === true;
+  } catch (e) {
+    console.error("[rate-limit-rpc]", bucket, e);
+    return true;
+  }
+}
+
+async function enforceRateLimit(
+  req: Request,
+  bucket: string,
+  key: string,
+  max: number,
+  windowSeconds: number,
+): Promise<Response | null> {
+  const admin = adminClient();
+  const ok = await consumeRateLimit(admin, bucket, key, max, windowSeconds);
+  if (ok) return null;
+  const ip = clientIp(req);
+  console.error("[rate-limit]", bucket, key.slice(0, 80), ip);
+  await logSecurityEvent(admin, "rate_limit", `${bucket}:${key}`, ip);
+  return rateLimitedResponse();
+}
+
 function keyFromConfigRow(row: Record<string, unknown> | null): string {
   if (!row) return "";
   for (const field of ["aiApiKey", "ai_api_key", "geminiApiKey", "gemini_api_key"]) {
@@ -464,11 +545,15 @@ async function handleVerifyPasswordLogin(email: string, passwordHash: string): P
       .maybeSingle();
     if (fuzzy.data) row = fuzzy.data as Record<string, unknown>;
   }
-  if (!row) return jsonOk({ ok: false, error: "Account not found" }, 404);
+  if (!row) {
+    await logSecurityEvent(admin, "login_failed", `unknown:${key}`, "edge");
+    return jsonOk({ ok: false, error: "Invalid email or password" }, 401);
+  }
 
   const dbHash = String(row.passwordHash ?? row.password_hash ?? "").trim();
   if (!dbHash || dbHash !== hash) {
-    return jsonOk({ ok: false, error: "Wrong password" }, 401);
+    await logSecurityEvent(admin, "login_failed", `bad_password:${key}`, "edge");
+    return jsonOk({ ok: false, error: "Invalid email or password" }, 401);
   }
 
   const session = await issueAuthSessionForEmail(admin, String(row.email ?? key));
@@ -586,9 +671,10 @@ async function handlePasswordResetSendOtp(email: string): Promise<Response> {
     });
   }
 
+  // Always return ok so this endpoint cannot be used to enumerate accounts.
+  // Only send a code when the app user already exists (never create Auth users here).
   if (!(await userAccountExists(admin, email))) {
-    return new Response(JSON.stringify({ error: "Account not found" }), {
-      status: 404,
+    return new Response(JSON.stringify({ ok: true, method: "supabase" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -898,8 +984,13 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
   const op = String(body.op ?? "s");
 
   const inFilter = body.in as Record<string, unknown[]> | undefined;
+  const DB_RELAY_DEFAULT_LIMIT = 200;
+  const DB_RELAY_MAX_LIMIT = 500;
+  const DB_RELAY_MAX_ROWS = 50;
 
   if (op === "s") {
+    const readLimited = await enforceRateLimit(req, "db_read", clientIp(req), 120, 60);
+    if (readLimited) return readLimited;
     let q = client.from(table).select(String(body.cols ?? "*"));
     for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
     const contains = body.contains as Record<string, unknown> | undefined;
@@ -915,9 +1006,19 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     }
     const order = body.order as { col?: string; ascending?: boolean } | undefined;
     if (order?.col) q = q.order(order.col, { ascending: order.ascending !== false });
-    if (typeof body.limit === "number") q = q.limit(body.limit);
     const range = body.range as [number, number] | undefined;
-    if (Array.isArray(range) && range.length === 2) q = q.range(range[0], range[1]);
+    const hasRange = Array.isArray(range) && range.length === 2;
+    if (typeof body.limit === "number" && Number.isFinite(body.limit)) {
+      q = q.limit(Math.min(Math.max(1, Math.floor(body.limit)), DB_RELAY_MAX_LIMIT));
+    } else if (!body.single && !hasRange) {
+      q = q.limit(DB_RELAY_DEFAULT_LIMIT);
+    }
+    if (hasRange) {
+      const from = Math.max(0, Math.floor(Number(range[0]) || 0));
+      const toRaw = Math.floor(Number(range[1]) || from);
+      const to = Math.min(Math.max(from, toRaw), from + DB_RELAY_MAX_LIMIT - 1);
+      q = q.range(from, to);
+    }
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
     const data = Array.isArray(result.data)
@@ -926,9 +1027,15 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     return jsonOk({ ok: true, data });
   }
 
+  const writeLimited = await enforceRateLimit(req, "db_write", clientIp(req), 60, 60);
+  if (writeLimited) return writeLimited;
+
   if (op === "up" || op === "i") {
     const rows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
     if (rows.length === 0) return jsonOk({ error: "No rows" }, 400);
+    if (rows.length > DB_RELAY_MAX_ROWS) {
+      return jsonOk({ error: `At most ${DB_RELAY_MAX_ROWS} rows per write` }, 400);
+    }
     if (table === "ngmy_settings" && eq["key"]) {
       for (const r of rows) r["key"] = eq["key"];
     }
@@ -3729,8 +3836,8 @@ async function handleTransactionsFetch(
   const pendingWallet = body.pendingWallet === true;
   const rawLimit = Number(body.limit ?? 0);
   const limit = role.isAdmin
-    ? (rawLimit > 0 ? Math.max(rawLimit, 1) : 500000)
-    : Math.min(Math.max(rawLimit > 0 ? rawLimit : 1000, 1), 10000);
+    ? Math.min(Math.max(rawLimit > 0 ? rawLimit : 2000, 1), 5000)
+    : Math.min(Math.max(rawLimit > 0 ? rawLimit : 1000, 1), 2000);
 
   let query = admin
     .from("transactions")
@@ -3768,12 +3875,13 @@ async function handleAdminUsersList(
 
   let rows: Record<string, unknown>[] = [];
   try {
-    const { data, error } = await admin.from("users").select(columns).order("email");
+    const { data, error } = await admin.from("users").select(columns).order("email").limit(5000);
     if (error) {
       const { data: fallback, error: err2 } = await admin
         .from("users")
         .select("email,username,phone,accountBalance,status,isAdmin")
-        .order("email");
+        .order("email")
+        .limit(5000);
       if (err2) return jsonOk({ error: err2.message }, 500);
       rows = (fallback ?? []) as Record<string, unknown>[];
     } else {
@@ -3852,6 +3960,11 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const ip = clientIp(req);
+      const limitedEmail = await enforceRateLimit(req, "pw_reset_email", email, 3, 900);
+      if (limitedEmail) return limitedEmail;
+      const limitedIp = await enforceRateLimit(req, "pw_reset_ip", ip, 8, 3600);
+      if (limitedIp) return limitedIp;
       return await handlePasswordResetSendOtp(email);
     }
 
@@ -3864,6 +3977,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const limited = await enforceRateLimit(req, "pw_reset_verify", email, 12, 900);
+      if (limited) return limited;
       return await handlePasswordResetVerifyOtp(email, code);
     }
 
@@ -3878,6 +3993,8 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      const limited = await enforceRateLimit(req, "pw_reset_complete", email || clientIp(req), 8, 900);
+      if (limited) return limited;
       return await handlePasswordResetComplete(jwtEmailForReset, email, newHash, resetToken);
     }
 
@@ -3886,9 +4003,7 @@ serve(async (req) => {
     }
 
     if (action === "saveAiApiKey") {
-      const requesterEmail =
-        (await requireJwtEmail(req)) ||
-        String(body?.requesterEmail ?? "").trim().toLowerCase();
+      const requesterEmail = (await requireJwtEmail(req)).trim().toLowerCase();
       const apiKey = String(body?.apiKey ?? "").trim();
       return await handleSaveAiApiKey(requesterEmail, apiKey);
     }
@@ -3900,20 +4015,33 @@ serve(async (req) => {
     if (action === "verifyPasswordLogin") {
       const email = String(body?.email ?? "").trim().toLowerCase();
       const passwordHash = String(body?.passwordHash ?? "").trim();
+      const ip = clientIp(req);
+      const limitedEmail = await enforceRateLimit(req, "login_email", `${ip}:${email}`, 10, 900);
+      if (limitedEmail) return limitedEmail;
+      const limitedIp = await enforceRateLimit(req, "login_ip", ip, 40, 900);
+      if (limitedIp) return limitedIp;
       return await handleVerifyPasswordLogin(email, passwordHash);
     }
 
     if (action === "registerAppUser") {
+      const limited = await enforceRateLimit(req, "register_ip", clientIp(req), 5, 3600);
+      if (limited) return limited;
       return await handleRegisterAppUser(body as Record<string, unknown>);
     }
 
     if (action === "civicVerifyStatePin") {
+      const limited = await enforceRateLimit(req, "civic_pin", clientIp(req), 15, 900);
+      if (limited) return limited;
       return await handleCivicVerifyStatePin(req, body as Record<string, unknown>);
     }
     if (action === "civicGateMatchName") {
+      const limited = await enforceRateLimit(req, "civic_gate", clientIp(req), 20, 900);
+      if (limited) return limited;
       return await handleCivicGateMatchName(req, body as Record<string, unknown>);
     }
     if (action === "civicGateVerifyIdentity") {
+      const limited = await enforceRateLimit(req, "civic_gate", clientIp(req), 20, 900);
+      if (limited) return limited;
       return await handleCivicGateVerifyIdentity(req, body as Record<string, unknown>);
     }
     if (action === "civicFetchDirectory" || action === "civicFetchRoster" ||
@@ -3927,16 +4055,24 @@ serve(async (req) => {
       return await handleCivicCheckAccess(req, body as Record<string, unknown>);
     }
     if (action === "civicUpsertMember") {
+      const limited = await enforceRateLimit(req, "civic_write", clientIp(req), 40, 60);
+      if (limited) return limited;
       return await handleCivicUpsertMember(req, body as Record<string, unknown>);
     }
     if (action === "civicRemoveMember" ||
       action === "civicMarkDeceased" || action === "civicPersistRoster") {
+      const limited = await enforceRateLimit(req, "civic_write", clientIp(req), 40, 60);
+      if (limited) return limited;
       return await handleCivicPersistRoster(req, body as Record<string, unknown>);
     }
     if (action === "civicGuestEnroll") {
+      const limited = await enforceRateLimit(req, "civic_enroll", clientIp(req), 8, 3600);
+      if (limited) return limited;
       return await handleCivicGuestEnroll(body as Record<string, unknown>);
     }
     if (action === "civicPublicCatalog") {
+      const limited = await enforceRateLimit(req, "civic_catalog", clientIp(req), 60, 60);
+      if (limited) return limited;
       return await handleCivicPublicCatalog(body as Record<string, unknown>);
     }
     if (action === "civicFetchEnrollmentLink") {
@@ -3961,12 +4097,16 @@ serve(async (req) => {
       return await handlePrivateListsFetch(req, body as Record<string, unknown>);
     }
     if (action === "privateListsPersist") {
+      const limited = await enforceRateLimit(req, "private_lists", clientIp(req), 40, 60);
+      if (limited) return limited;
       return await handlePrivateListsPersist(req, body as Record<string, unknown>);
     }
     if (action === "adminUsersList") {
       return await handleAdminUsersList(req, body as Record<string, unknown>);
     }
     if (action === "transactionsFetch") {
+      const limited = await enforceRateLimit(req, "txn_fetch", clientIp(req), 30, 60);
+      if (limited) return limited;
       return await handleTransactionsFetch(req, body as Record<string, unknown>);
     }
     if (action === "civicFetchCitiesRooms") {
@@ -3980,7 +4120,9 @@ serve(async (req) => {
     }
 
     if (action === "elevenlabsTts") {
-      const text = String(body?.text ?? "").trim();
+      const limited = await enforceRateLimit(req, "tts", clientIp(req), 20, 600);
+      if (limited) return limited;
+      const text = String(body?.text ?? "").trim().slice(0, 2500);
       const voiceId = String(body?.voiceId ?? "21m00Tcm4TlvDq8ikWAM").trim();
       const modelId = String(body?.modelId ?? "eleven_turbo_v2_5").trim();
       const apiKey = (await resolveServerElevenLabsKey()) || clientApiKeyIgnored;
@@ -4000,16 +4142,16 @@ serve(async (req) => {
     }
 
     if (action === "resendEmail") {
-      const requesterEmail =
-        (await requireJwtEmail(req)) ||
-        String(body?.requesterEmail ?? "").trim().toLowerCase();
+      const limited = await enforceRateLimit(req, "resend", clientIp(req), 20, 3600);
+      if (limited) return limited;
+      const requesterEmail = (await requireJwtEmail(req)).trim().toLowerCase();
       if (!requesterEmail || !NGMY_ADMIN_EMAILS.has(requesterEmail)) {
         return new Response(JSON.stringify({ error: "Admin access required for email send" }), {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? clientApiKeyIgnored ?? "").trim();
+      const resendKey = String(Deno.env.get("RESEND_API_KEY") ?? "").trim();
       const to = String(body?.to ?? "").trim();
       const subject = String(body?.subject ?? "Message from NGMY").trim();
       const html = String(body?.html ?? body?.body ?? "").trim();
@@ -4032,6 +4174,8 @@ serve(async (req) => {
     }
 
     if (action === "geminiVirtualOutfit") {
+      const limited = await enforceRateLimit(req, "ai_outfit", clientIp(req), 15, 600);
+      if (limited) return limited;
       const outfitPrompt = String(body?.prompt ?? "").trim();
       const images: GeminiImagePart[] = Array.isArray(body?.images)
         ? body.images
@@ -4062,6 +4206,8 @@ serve(async (req) => {
 
     // Partner chat selfies — fetch image server-side so phone browsers skip CORS.
     if (action === "pollinationsImage") {
+      const limited = await enforceRateLimit(req, "ai_image", clientIp(req), 15, 600);
+      if (limited) return limited;
       const imgPrompt = String(body?.prompt ?? "").trim();
       const allowAdult = Boolean(body?.allowAdult);
       if (!imgPrompt) {
@@ -4098,13 +4244,21 @@ serve(async (req) => {
       });
     }
 
+    const chatLimited = await enforceRateLimit(req, "ai_chat", clientIp(req), 30, 600);
+    if (chatLimited) return chatLimited;
     const prompt = String(body?.prompt ?? "").trim();
+    if (prompt.length > 24000) {
+      return new Response(JSON.stringify({ error: "Prompt is too long." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     const provider = String(body?.provider ?? "gemini") as Provider;
     const openAiBaseUrl = body?.openAiBaseUrl
       ? String(body.openAiBaseUrl).trim()
       : undefined;
     const images: GeminiImagePart[] = Array.isArray(body?.images)
-      ? body.images
+      ? (body.images as GeminiImagePart[]).slice(0, 6)
       : [];
     // App Builder sends a full multi-screen app as JSON, which needs a much
     // bigger output budget (and a stronger model) than a short chat reply.
