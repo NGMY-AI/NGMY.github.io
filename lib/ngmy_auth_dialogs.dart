@@ -246,7 +246,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
         _otpMethod = result.method;
         _step = 2;
       });
-      _toast('Code is on My Profile — tap the profile icon to read it.', success: true);
+      _toast('Code is in your Codes inbox — tap the profile icon to read it.', success: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -266,7 +266,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     final pw = _newPwCtl.text;
     final confirm = _confirmCtl.text;
     if (code.length < 6) {
-      _toast('Enter the 6-digit code from the profile table');
+      _toast('Enter the 6-digit code from your Codes inbox');
       return;
     }
     if (pw.length < 6) {
@@ -311,8 +311,8 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     if (err.contains('7 days') || err.contains('three password reset') || err.contains('3 password reset')) {
       return 'You can only send 3 password reset codes every 7 days.';
     }
-    if (err.contains('civic registry email on profile') || err.contains('civic recovery')) {
-      return 'Add a Civic Registry email on Profile first (tap the profile icon).';
+    if (err.contains('login email on profile') || err.contains('civic registry email on profile') || err.contains('civic recovery')) {
+      return 'Add a login email on Profile first (tap the profile icon).';
     }
     if (err.contains('rate') || err.contains('too many') || err.contains('over_email_send_rate_limit')) {
       return 'Too many tries. Wait a bit and try again.';
@@ -397,8 +397,8 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                     const SizedBox(height: 2),
                                     Text(
                                       _step == 1
-                                          ? 'Code appears under the profile icon on My Profile'
-                                          : 'Enter the code from the profile table',
+                                          ? 'The code appears in your Codes inbox on My Profile'
+                                          : 'Enter the code from your Codes inbox',
                                       style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -433,7 +433,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                         autofocus: true,
                                         maxLength: 8,
                                         style: const TextStyle(color: Colors.white, letterSpacing: 2),
-                                        decoration: _field('6-digit code from profile table'),
+                                        decoration: _field('6-digit code from Codes inbox'),
                                       ),
                                       const SizedBox(height: 12),
                                       TextField(

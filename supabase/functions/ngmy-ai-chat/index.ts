@@ -665,24 +665,6 @@ async function passwordResetSendResendCode(
 const CIVIC_RECOVERY_KEY = "civic_recovery_emails";
 const CIVIC_RECOVERY_INBOX_KEY = "civic_recovery_inbox";
 
-function civicMemberHasEmail(m: Record<string, unknown>, want: string): boolean {
-  const target = emailKey(want);
-  if (!target) return false;
-  for (const f of ["email", "userEmail", "recoveryEmail", "linkedAppEmail"]) {
-    if (emailKey(String(m[f] ?? "")) === target) return true;
-  }
-  return false;
-}
-
-async function civicRosterHasEmail(
-  admin: NonNullable<ReturnType<typeof adminClient>>,
-  email: string,
-): Promise<boolean> {
-  const payload = await loadCivicPayload(admin);
-  const members = asMemberList(payload.members);
-  return members.some((m) => civicMemberHasEmail(m, email));
-}
-
 function asRecoveryEmails(raw: unknown): string[] {
   const out: string[] = [];
   const push = (v: unknown) => {
@@ -785,24 +767,24 @@ async function handleCivicRecoveryStatus(req: Request): Promise<Response> {
 async function handleCivicRecoveryLink(req: Request, body: Record<string, unknown>): Promise<Response> {
   const jwtEmail = await requireJwtEmail(req);
   if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
-  const civicEmail = emailKey(String(body.email ?? body.civicEmail ?? ""));
-  if (!civicEmail || !civicEmail.includes("@")) {
-    return jsonOk({ error: "Enter a valid email already in Civic Registry." }, 400);
+  const loginEmail = emailKey(String(body.email ?? body.civicEmail ?? ""));
+  if (!loginEmail || !loginEmail.includes("@")) {
+    return jsonOk({ error: "Enter an email that was used to log in." }, 400);
   }
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
-  if (!(await civicRosterHasEmail(admin, civicEmail))) {
-    return jsonOk({ error: "That email is not in Civic Registry." }, 400);
+  if (!(await userAccountExists(admin, loginEmail))) {
+    return jsonOk({ error: "That email has not been used to log in." }, 400);
   }
   const emails = await loadRecoveryEmails(admin, jwtEmail);
-  if (emails.includes(civicEmail)) return jsonOk({ ok: true, emails, email: civicEmail });
+  if (emails.includes(loginEmail)) return jsonOk({ ok: true, emails, email: loginEmail });
   if (emails.length >= 2) {
     return jsonOk({ error: "You can save a maximum of 2 emails." }, 400);
   }
-  emails.push(civicEmail);
+  emails.push(loginEmail);
   const saved = await saveRecoveryEmails(admin, jwtEmail, emails);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not save." }, 500);
-  return jsonOk({ ok: true, emails, email: civicEmail });
+  return jsonOk({ ok: true, emails, email: loginEmail });
 }
 
 async function handleCivicRecoveryRemove(req: Request, body: Record<string, unknown>): Promise<Response> {
@@ -824,7 +806,7 @@ async function issueCivicAuthCode(
 ): Promise<{ ok: boolean; error?: string }> {
   const emails = await loadRecoveryEmails(admin, accountEmail);
   if (emails.length === 0) {
-    return { ok: false, error: "Add a Civic Registry email on Profile first." };
+    return { ok: false, error: "Add a login email on Profile first." };
   }
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
@@ -878,7 +860,7 @@ async function handlePasswordResetSendOtp(email: string, req: Request): Promise<
   const emails = await loadRecoveryEmails(admin, email);
   if (emails.length === 0) {
     return jsonOk({
-      error: "Add a Civic Registry email on Profile first. Password reset codes appear there.",
+      error: "Add a login email on Profile first. Password reset codes appear there.",
     }, 400);
   }
 
