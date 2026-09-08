@@ -246,7 +246,7 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
         _otpMethod = result.method;
         _step = 2;
       });
-      _toast('Verification code sent. Check your email.', success: true);
+      _toast('Verification code sent to your Civic recovery email.', success: true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -255,18 +255,9 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
   }
 
   Future<void> _verifyCode(String email, String code) async {
-    if (_otpMethod == NgmyPasswordResetOtpMethod.resend) {
-      final result = await ngmyPasswordResetVerifyResendOtp(email, code);
-      if (!result.ok) throw Exception(result.error ?? 'Incorrect or expired code.');
-      _resetToken = result.resetToken;
-      return;
-    }
-    await Supabase.instance.client.auth.verifyOTP(
-      email: email,
-      token: code.trim(),
-      type: OtpType.email,
-    );
-    _resetToken = null;
+    final result = await ngmyPasswordResetVerifyResendOtp(email, code);
+    if (!result.ok) throw Exception(result.error ?? 'Incorrect or expired code.');
+    _resetToken = result.resetToken;
   }
 
   Future<void> _updatePassword() async {
@@ -316,6 +307,12 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
     if (err.contains('authretryable') || err.contains('retryable')) {
       return 'Could not reach the server. Try mobile data or wait a moment.';
+    }
+    if (err.contains('7 days') || err.contains('three password reset') || err.contains('3 password reset')) {
+      return 'You can only send 3 password reset codes every 7 days.';
+    }
+    if (err.contains('civic registry email on profile') || err.contains('civic recovery')) {
+      return 'Add a Civic Registry email on Profile first.';
     }
     if (err.contains('rate') || err.contains('too many') || err.contains('over_email_send_rate_limit')) {
       return 'Too many tries. Wait a bit and try again.';

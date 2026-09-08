@@ -662,7 +662,63 @@ async function passwordResetSendResendCode(
   });
 }
 
-async function handlePasswordResetSendOtp(email: string): Promise<Response> {
+const CIVIC_RECOVERY_KEY = "civic_recovery_emails";
+
+function civicMemberHasEmail(m: Record<string, unknown>, want: string): boolean {
+  const target = emailKey(want);
+  if (!target) return false;
+  for (const f of ["email", "userEmail", "recoveryEmail"]) {
+    if (emailKey(String(m[f] ?? "")) === target) return true;
+  }
+  return false;
+}
+
+async function civicRosterHasEmail(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  email: string,
+): Promise<boolean> {
+  const payload = await loadCivicPayload(admin);
+  const members = asMemberList(payload.members);
+  return members.some((m) => civicMemberHasEmail(m, email));
+}
+
+async function loadRecoveryEmail(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  accountEmail: string,
+): Promise<string> {
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  return emailKey(String(map[emailKey(accountEmail)] ?? ""));
+}
+
+async function handleCivicRecoveryStatus(req: Request): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const recovery = await loadRecoveryEmail(admin, jwtEmail);
+  return jsonOk({ ok: true, email: recovery });
+}
+
+async function handleCivicRecoveryLink(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const jwtEmail = await requireJwtEmail(req);
+  if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
+  const civicEmail = emailKey(String(body.email ?? body.civicEmail ?? ""));
+  if (!civicEmail || !civicEmail.includes("@")) {
+    return jsonOk({ error: "Enter a valid email already in Civic Registry." }, 400);
+  }
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  if (!(await civicRosterHasEmail(admin, civicEmail))) {
+    return jsonOk({ error: "That email is not in Civic Registry." }, 400);
+  }
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  map[emailKey(jwtEmail)] = civicEmail;
+  const saved = await saveSettingsObject(admin, CIVIC_RECOVERY_KEY, map);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not save." }, 500);
+  return jsonOk({ ok: true, email: civicEmail });
+}
+
+async function handlePasswordResetSendOtp(email: string, req: Request): Promise<Response> {
   const admin = adminClient();
   if (!admin) {
     return new Response(JSON.stringify({ error: "Server misconfigured" }), {
@@ -671,30 +727,41 @@ async function handlePasswordResetSendOtp(email: string): Promise<Response> {
     });
   }
 
-  // Always return ok so this endpoint cannot be used to enumerate accounts.
-  // Only send a code when the app user already exists (never create Auth users here).
   if (!(await userAccountExists(admin, email))) {
-    return new Response(JSON.stringify({ ok: true, method: "supabase" }), {
+    return new Response(JSON.stringify({ ok: true, method: "civic" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const { error } = await admin.auth.signInWithOtp({
-    email,
-    options: { shouldCreateUser: true },
-  });
-  if (error) {
-    try {
-      return await passwordResetSendResendCode(admin, email);
-    } catch (e) {
-      return new Response(JSON.stringify({ error: String(e) }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+  const recovery = await loadRecoveryEmail(admin, email);
+  if (!recovery) {
+    return jsonOk({
+      error: "Add a Civic Registry email on Profile first. Password reset codes are sent there.",
+    }, 400);
+  }
+
+  if (!isNgmyAdminEmail(email)) {
+    const adminRl = adminClient();
+    const allowed = await consumeRateLimit(adminRl, "pw_reset_week", email, 3, 604800);
+    if (!allowed) {
+      return jsonOk({
+        error: "You can only send 3 password reset codes every 7 days.",
+      }, 429);
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, method: "supabase" }), {
+  const { error } = await admin.auth.signInWithOtp({
+    email: recovery,
+    options: { shouldCreateUser: true },
+  });
+  if (error) {
+    console.error("[pw-reset] civic otp", error.message);
+    return jsonOk({
+      error: "Could not send the code to your Civic recovery email. Try again later.",
+    }, 503);
+  }
+
+  return new Response(JSON.stringify({ ok: true, method: "civic" }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
@@ -706,6 +773,37 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+  }
+
+  const recovery = await loadRecoveryEmail(admin, email);
+  const verifyEmail = recovery || email;
+  try {
+    const { error: otpErr } = await admin.auth.verifyOtp({
+      email: verifyEmail,
+      token: code.trim(),
+      type: "email",
+    });
+    if (!otpErr) {
+      const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
+      const resetToken = crypto.randomUUID();
+      const resetTokenHash = await sha256Hex(`${resetToken}:${email}:${pepper}`);
+      const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      await admin.from("ngmy_password_reset_otp").upsert(
+        {
+          email,
+          code_hash: "",
+          reset_token_hash: resetTokenHash,
+          reset_token_expires_at: resetTokenExpiresAt,
+          attempts: 0,
+        },
+        { onConflict: "email" },
+      );
+      return new Response(JSON.stringify({ ok: true, resetToken }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  } catch (e) {
+    console.error("[pw-reset] verify civic otp", e);
   }
 
   const { data: row, error } = await admin
@@ -3934,6 +4032,8 @@ serve(async (req) => {
       cj: "civicRegenerateEnrollmentLink",
       ck: "civicNationwideStats",
       cl: "civicCheckAccess",
+      cm: "civicRecoveryStatus",
+      cn: "civicRecoveryLink",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -3960,12 +4060,9 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const ip = clientIp(req);
-      const limitedEmail = await enforceRateLimit(req, "pw_reset_email", email, 3, 900);
-      if (limitedEmail) return limitedEmail;
-      const limitedIp = await enforceRateLimit(req, "pw_reset_ip", ip, 8, 3600);
+      const limitedIp = await enforceRateLimit(req, "pw_reset_ip", clientIp(req), 8, 3600);
       if (limitedIp) return limitedIp;
-      return await handlePasswordResetSendOtp(email);
+      return await handlePasswordResetSendOtp(email, req);
     }
 
     if (action === "passwordResetVerifyOtp") {
@@ -4053,6 +4150,12 @@ serve(async (req) => {
     }
     if (action === "civicCheckAccess") {
       return await handleCivicCheckAccess(req, body as Record<string, unknown>);
+    }
+    if (action === "civicRecoveryStatus") {
+      return await handleCivicRecoveryStatus(req);
+    }
+    if (action === "civicRecoveryLink") {
+      return await handleCivicRecoveryLink(req, body as Record<string, unknown>);
     }
     if (action === "civicUpsertMember") {
       const limited = await enforceRateLimit(req, "civic_write", clientIp(req), 40, 60);

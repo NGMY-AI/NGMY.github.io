@@ -38,7 +38,9 @@ Future<({bool ok, NgmyPasswordResetOtpMethod? method, String? error})> ngmyPassw
   });
   if (parsed.ok) {
     final methodRaw = (parsed.data?['method'] ?? 'supabase').toString();
-    final method = methodRaw == 'resend' ? NgmyPasswordResetOtpMethod.resend : NgmyPasswordResetOtpMethod.supabase;
+    final method = methodRaw == 'resend' || methodRaw == 'civic'
+        ? NgmyPasswordResetOtpMethod.resend
+        : NgmyPasswordResetOtpMethod.supabase;
     return (ok: true, method: method, error: null);
   }
   return (ok: false, method: null, error: parsed.error ?? 'Could not send verification code.');
