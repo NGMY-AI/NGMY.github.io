@@ -254,19 +254,42 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
   }
 
-  Future<void> _verifyCode(String email, String code) async {
-    final result = await ngmyPasswordResetVerifyResendOtp(email, code);
-    if (!result.ok) throw Exception(result.error ?? 'Incorrect or expired code.');
-    _resetToken = result.resetToken;
+  Future<void> _confirmCode() async {
+    final email = _emailCtl.text.toLowerCase().trim();
+    final code = _codeCtl.text.trim();
+    if (code.length < 6) {
+      _toast('Enter the 6-digit code from your Codes inbox');
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await ngmyWaitForSupabaseReady();
+      final result = await ngmyPasswordResetVerifyResendOtp(email, code);
+      if (!mounted) return;
+      if (!result.ok || result.resetToken == null || result.resetToken!.isEmpty) {
+        setState(() => _loading = false);
+        _toast(result.error ?? 'That code is not right. Check Received codes.');
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _resetToken = result.resetToken;
+        _step = 3;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      _toast(_friendlyResetError(e));
+    }
   }
 
   Future<void> _updatePassword() async {
     final email = _emailCtl.text.toLowerCase().trim();
-    final code = _codeCtl.text.trim();
     final pw = _newPwCtl.text;
     final confirm = _confirmCtl.text;
-    if (code.length < 6) {
-      _toast('Enter the 6-digit code from your Codes inbox');
+    if (_resetToken == null || _resetToken!.isEmpty) {
+      _toast('Confirm the code from Received codes first.');
+      setState(() => _step = 2);
       return;
     }
     if (pw.length < 6) {
@@ -280,7 +303,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     setState(() => _loading = true);
     try {
       await ngmyWaitForSupabaseReady();
-      await _verifyCode(email, code);
       final ok = await widget.onResetPasswordByEmail(email, hashPassword(pw), _resetToken);
       if (!mounted) return;
       Navigator.pop(context);
@@ -391,14 +413,20 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _step == 1 ? 'Reset password' : 'Verify & set password',
+                                      _step == 1
+                                          ? 'Reset password'
+                                          : _step == 2
+                                              ? 'Enter your code'
+                                              : 'Create new password',
                                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       _step == 1
-                                          ? 'The code appears in your Codes inbox on My Profile'
-                                          : 'Enter the code from your Codes inbox',
+                                          ? 'The code appears under Received codes'
+                                          : _step == 2
+                                              ? 'Use the code from Received codes. Wrong codes will not work.'
+                                              : 'Code confirmed. Set your new password.',
                                       style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
@@ -426,41 +454,43 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                         decoration: _field('Gmail address'),
                                       ),
                                     ]
-                                  : [
-                                      TextField(
-                                        controller: _codeCtl,
-                                        keyboardType: TextInputType.number,
-                                        autofocus: true,
-                                        maxLength: 8,
-                                        style: const TextStyle(color: Colors.white, letterSpacing: 2),
-                                        decoration: _field('6-digit code from Codes inbox'),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: _newPwCtl,
-                                        obscureText: true,
-                                        style: const TextStyle(color: Colors.white),
-                                        decoration: _field('New password (min 6 chars)', obscure: true),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      TextField(
-                                        controller: _confirmCtl,
-                                        obscureText: true,
-                                        style: const TextStyle(color: Colors.white),
-                                        decoration: _field('Confirm password', obscure: true),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: TextButton(
-                                          onPressed: _loading ? null : _sendCode,
-                                          child: Text(
-                                            'Resend code',
-                                            style: TextStyle(color: accent.withOpacity(0.95), fontWeight: FontWeight.w700),
+                                  : _step == 2
+                                      ? [
+                                          TextField(
+                                            controller: _codeCtl,
+                                            keyboardType: TextInputType.number,
+                                            autofocus: true,
+                                            maxLength: 8,
+                                            style: const TextStyle(color: Colors.white, letterSpacing: 2),
+                                            decoration: _field('6-digit code from Received codes'),
                                           ),
-                                        ),
-                                      ),
-                                    ],
+                                          const SizedBox(height: 4),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton(
+                                              onPressed: _loading ? null : _sendCode,
+                                              child: Text(
+                                                'Resend code',
+                                                style: TextStyle(color: accent.withOpacity(0.95), fontWeight: FontWeight.w700),
+                                              ),
+                                            ),
+                                          ),
+                                        ]
+                                      : [
+                                          TextField(
+                                            controller: _newPwCtl,
+                                            obscureText: true,
+                                            style: const TextStyle(color: Colors.white),
+                                            decoration: _field('New password (min 6 chars)', obscure: true),
+                                          ),
+                                          const SizedBox(height: 12),
+                                          TextField(
+                                            controller: _confirmCtl,
+                                            obscureText: true,
+                                            style: const TextStyle(color: Colors.white),
+                                            decoration: _field('Confirm password', obscure: true),
+                                          ),
+                                        ],
                             ),
                           ),
                         ),
@@ -473,10 +503,13 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                   onPressed: _loading
                                       ? null
                                       : () {
-                                          if (_step == 2) {
+                                          if (_step == 3) {
+                                            setState(() => _step = 2);
+                                          } else if (_step == 2) {
                                             setState(() {
                                               _step = 1;
                                               _otpMethod = null;
+                                              _resetToken = null;
                                               _codeCtl.clear();
                                             });
                                           } else {
@@ -489,14 +522,20 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                     padding: const EdgeInsets.symmetric(vertical: 13),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                   ),
-                                  child: Text(_step == 2 ? 'Back' : 'Cancel'),
+                                  child: Text(_step == 1 ? 'Cancel' : 'Back'),
                                 ),
                               ),
                               const SizedBox(width: 10),
                               Expanded(
                                 flex: 2,
                                 child: ElevatedButton(
-                                  onPressed: _loading ? null : (_step == 1 ? _sendCode : _updatePassword),
+                                  onPressed: _loading
+                                      ? null
+                                      : (_step == 1
+                                          ? _sendCode
+                                          : _step == 2
+                                              ? _confirmCode
+                                              : _updatePassword),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: accent,
                                     foregroundColor: Colors.white,
@@ -511,7 +550,11 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
                                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                         )
                                       : Text(
-                                          _step == 1 ? 'Send code' : 'Update password',
+                                          _step == 1
+                                              ? 'Send code'
+                                              : _step == 2
+                                                  ? 'Confirm code'
+                                                  : 'Update password',
                                           style: const TextStyle(fontWeight: FontWeight.w800),
                                         ),
                                 ),

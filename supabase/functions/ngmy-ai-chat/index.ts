@@ -674,10 +674,24 @@ function asRecoveryEmails(raw: unknown): string[] {
   };
   if (Array.isArray(raw)) {
     for (const v of raw) push(v);
+  } else if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (Array.isArray(o.emails)) {
+      for (const v of o.emails) push(v);
+    } else {
+      push(o.email);
+    }
   } else {
     push(raw);
   }
   return out.slice(0, MAX_RECOVERY_EMAILS);
+}
+
+function recoveryOwnerHasRecord(map: Record<string, unknown>, accountEmail: string): boolean {
+  const key = emailKey(accountEmail);
+  if (!key) return false;
+  if (map[key] !== undefined && map[key] !== null) return true;
+  return Object.keys(map).some((k) => k !== "savedAt" && emailKey(k) === key);
 }
 
 async function loadRecoveryEmails(
@@ -685,7 +699,17 @@ async function loadRecoveryEmails(
   accountEmail: string,
 ): Promise<string[]> {
   const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
-  return asRecoveryEmails(map[emailKey(accountEmail)]);
+  const want = emailKey(accountEmail);
+  const direct = asRecoveryEmails(map[want]);
+  if (direct.length > 0) return direct;
+  for (const [k, raw] of Object.entries(map)) {
+    if (k === "savedAt") continue;
+    if (emailKey(k) === want) {
+      const parsed = asRecoveryEmails(raw);
+      if (parsed.length > 0) return parsed;
+    }
+  }
+  return [];
 }
 
 type InboxItem = { purpose: string; code: string; at: string; expiresAt: string };
@@ -718,7 +742,7 @@ async function saveRecoveryEmails(
   emails: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
-  map[emailKey(accountEmail)] = emails.slice(0, MAX_RECOVERY_EMAILS);
+  map[emailKey(accountEmail)] = { emails: emails.slice(0, MAX_RECOVERY_EMAILS) };
   return await saveSettingsObject(admin, CIVIC_RECOVERY_KEY, map);
 }
 
@@ -788,8 +812,9 @@ async function handleCivicRecoveryStatus(req: Request): Promise<Response> {
   if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const stored = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
   let emails = await loadRecoveryEmails(admin, jwtEmail);
-  if (emails.length === 0 && await userAccountExists(admin, jwtEmail)) {
+  if (emails.length === 0 && !recoveryOwnerHasRecord(stored, jwtEmail) && await userAccountExists(admin, jwtEmail)) {
     emails = [emailKey(jwtEmail)];
     await saveRecoveryEmails(admin, jwtEmail, emails);
   }

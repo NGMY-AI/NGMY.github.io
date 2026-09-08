@@ -27381,7 +27381,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 pulse: pulse,
                 orbit: orbit,
                 icon: Icons.person_rounded,
-                onIconTap: () => showNgmyCivicRecoveryEmailDialog(context),
+                onIconTap: () => showNgmyCivicRecoveryEmailDialog(
+                  context,
+                  accountEmail: widget.user.email,
+                ),
                 dense: true,
               ),
             ),

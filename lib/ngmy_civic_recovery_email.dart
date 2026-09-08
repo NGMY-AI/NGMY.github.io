@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_edge_invoke.dart';
@@ -7,6 +11,8 @@ import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_password_reset_otp.dart';
 import 'ngmy_supabase_auth.dart';
 import 'utils.dart';
+
+const _kSavedEmailsPref = 'ngmy_saved_login_emails_v1';
 
 class NgmyCivicInboxCode {
   const NgmyCivicInboxCode({
@@ -66,10 +72,41 @@ List<String> _emailsFrom(dynamic raw) {
     for (final v in raw) {
       push(v);
     }
+  } else if (raw is Map) {
+    final nested = raw['emails'];
+    if (nested is List) {
+      for (final v in nested) {
+        push(v);
+      }
+    } else {
+      push(raw['email']);
+    }
   } else if (raw != null) {
     push(raw);
   }
   return out.take(3).toList();
+}
+
+Future<List<String>> _localSavedEmails(String owner) async {
+  final p = await SharedPreferences.getInstance();
+  final key = owner.trim().toLowerCase();
+  final raw = p.getString('$_kSavedEmailsPref:$key') ?? p.getString(_kSavedEmailsPref);
+  if (raw == null || raw.isEmpty) return const [];
+  try {
+    return _emailsFrom(jsonDecode(raw));
+  } catch (_) {
+    return _emailsFrom(raw);
+  }
+}
+
+Future<void> _writeLocalSavedEmails(String owner, List<String> emails) async {
+  final p = await SharedPreferences.getInstance();
+  final key = owner.trim().toLowerCase();
+  final encoded = jsonEncode(emails.take(3).toList());
+  if (key.contains('@')) {
+    await p.setString('$_kSavedEmailsPref:$key', encoded);
+  }
+  await p.setString(_kSavedEmailsPref, encoded);
 }
 
 List<NgmyCivicInboxCode> _codesFrom(dynamic raw) {
@@ -91,7 +128,13 @@ List<NgmyCivicInboxCode> _codesFrom(dynamic raw) {
   return out;
 }
 
-Future<NgmyCivicRecoveryStatus> ngmyCivicRecoveryLoad() async {
+Future<NgmyCivicRecoveryStatus> ngmyCivicRecoveryLoad({String? accountEmail}) async {
+  final owner = (accountEmail ??
+          Supabase.instance.client.auth.currentUser?.email ??
+          '')
+      .trim()
+      .toLowerCase();
+  final local = await _localSavedEmails(owner);
   try {
     await ngmyWaitForSupabaseReady();
     final data = await ngmyEdgeInvoke(
@@ -99,33 +142,42 @@ Future<NgmyCivicRecoveryStatus> ngmyCivicRecoveryLoad() async {
       timeout: const Duration(seconds: 20),
     );
     if (data == null) {
-      return const NgmyCivicRecoveryStatus(
-        emails: [],
-        codes: [],
-        error: 'Could not reach the server.',
+      return NgmyCivicRecoveryStatus(
+        emails: local,
+        codes: const [],
+        error: local.isEmpty ? 'Could not reach the server.' : null,
       );
     }
     if (data['ok'] != true) {
       return NgmyCivicRecoveryStatus(
-        emails: const [],
+        emails: local,
         codes: const [],
-        error: (data['error'] ?? 'Could not load login emails.').toString(),
+        error: local.isEmpty ? (data['error'] ?? 'Could not load login emails.').toString() : null,
       );
     }
     final emails = _emailsFrom(data['emails']);
     if (emails.isEmpty) {
       emails.addAll(_emailsFrom(data['email']));
     }
+    if (emails.isEmpty && local.isNotEmpty) {
+      for (final email in local) {
+        await ngmyCivicRecoveryEmailSave(email);
+      }
+      emails.addAll(local);
+    }
+    if (emails.isNotEmpty) {
+      await _writeLocalSavedEmails(owner, emails);
+    }
     return NgmyCivicRecoveryStatus(
-      emails: emails,
+      emails: emails.isNotEmpty ? emails : local,
       codes: _codesFrom(data['codes']),
     );
   } catch (e) {
     debugPrint('[codes inbox] status: $e');
-    return const NgmyCivicRecoveryStatus(
-      emails: [],
-      codes: [],
-      error: 'Could not load login emails.',
+    return NgmyCivicRecoveryStatus(
+      emails: local,
+      codes: const [],
+      error: local.isEmpty ? 'Could not load login emails.' : null,
     );
   }
 }
@@ -151,7 +203,10 @@ Future<({bool ok, List<String> emails, String? error})> ngmyCivicRecoveryEmailSa
       return (ok: false, emails: const <String>[], error: 'Could not reach the server.');
     }
     if (data['ok'] == true) {
-      return (ok: true, emails: _emailsFrom(data['emails']), error: null);
+      final emails = _emailsFrom(data['emails']);
+      final owner = (Supabase.instance.client.auth.currentUser?.email ?? key).trim().toLowerCase();
+      await _writeLocalSavedEmails(owner, emails.isNotEmpty ? emails : [key]);
+      return (ok: true, emails: emails.isNotEmpty ? emails : [key], error: null);
     }
     return (
       ok: false,
@@ -176,7 +231,10 @@ Future<({bool ok, List<String> emails, String? error})> ngmyCivicRecoveryEmailRe
       return (ok: false, emails: const <String>[], error: 'Could not reach the server.');
     }
     if (data['ok'] == true) {
-      return (ok: true, emails: _emailsFrom(data['emails']), error: null);
+      final emails = _emailsFrom(data['emails']);
+      final owner = (Supabase.instance.client.auth.currentUser?.email ?? key).trim().toLowerCase();
+      await _writeLocalSavedEmails(owner, emails);
+      return (ok: true, emails: emails, error: null);
     }
     return (
       ok: false,
@@ -205,7 +263,10 @@ Future<({bool ok, String? error})> ngmyCivicRecoveryIssueCode(String purpose) as
   }
 }
 
-Future<void> showNgmyCivicRecoveryEmailDialog(BuildContext context) async {
+Future<void> showNgmyCivicRecoveryEmailDialog(
+  BuildContext context, {
+  String? accountEmail,
+}) async {
   final signedIn = Supabase.instance.client.auth.currentSession != null;
   if (!signedIn) {
     if (!context.mounted) return;
@@ -217,19 +278,21 @@ Future<void> showNgmyCivicRecoveryEmailDialog(BuildContext context) async {
   await Navigator.of(context).push<void>(
     MaterialPageRoute<void>(
       fullscreenDialog: true,
-      builder: (_) => const NgmyCodesInboxPage(),
+      builder: (_) => NgmyCodesInboxPage(accountEmail: accountEmail),
     ),
   );
 }
 
 class NgmyCodesInboxPage extends StatefulWidget {
-  const NgmyCodesInboxPage({super.key});
+  const NgmyCodesInboxPage({super.key, this.accountEmail});
+
+  final String? accountEmail;
 
   @override
   State<NgmyCodesInboxPage> createState() => _NgmyCodesInboxPageState();
 }
 
-class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
+class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBindingObserver {
   static const _colors = [Color(0xFF22D3EE), Color(0xFF8B5CF6)];
 
   var _loading = true;
@@ -237,25 +300,45 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
   var _emails = <String>[];
   var _codes = <NgmyCivicInboxCode>[];
   String? _error;
+  Timer? _refreshTimer;
 
-  String get _loginEmail =>
-      (Supabase.instance.client.auth.currentUser?.email ?? '').trim().toLowerCase();
+  String get _loginEmail {
+    final fromAccount = (widget.accountEmail ?? '').trim().toLowerCase();
+    if (fromAccount.contains('@')) return fromAccount;
+    return (Supabase.instance.client.auth.currentUser?.email ?? '').trim().toLowerCase();
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _reload();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (mounted && !_busy) unawaited(_reload(silent: true));
+    });
   }
 
-  Future<void> _reload() async {
-    setState(() => _loading = true);
-    final status = await ngmyCivicRecoveryLoad();
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_reload(silent: true));
+  }
+
+  Future<void> _reload({bool silent = false}) async {
+    if (!silent && mounted) setState(() => _loading = true);
+    final status = await ngmyCivicRecoveryLoad(accountEmail: _loginEmail);
     if (!mounted) return;
     setState(() {
       _loading = false;
       _emails = status.emails;
       _codes = status.codes;
-      _error = status.error;
+      if (!silent || status.error != null) _error = status.error;
     });
   }
 
@@ -279,6 +362,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (result.ok) {
+      await _writeLocalSavedEmails(_loginEmail, result.emails);
       await _reload();
       _toast('Login email saved.', ok: true);
     } else {
@@ -294,23 +378,6 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
     setState(() => _busy = false);
     if (result.ok) {
       await _reload();
-    } else {
-      setState(() => _error = result.error);
-    }
-  }
-
-  Future<void> _issue(String purpose) async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final result = await ngmyCivicRecoveryIssueCode(purpose);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (result.ok) {
-      await _reload();
-      _toast('Code received. Use it below to reset your password.', ok: true);
     } else {
       setState(() => _error = result.error);
     }
@@ -640,9 +707,10 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
                                   ),
                                 ),
                               ),
-                              TextButton(
-                                onPressed: _busy || _emails.isEmpty ? null : () => _issue('password_reset'),
-                                child: const Text('Get reset code'),
+                              IconButton(
+                                tooltip: 'Refresh codes',
+                                onPressed: _busy ? null : () => _reload(),
+                                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
                               ),
                             ],
                           ),
@@ -661,7 +729,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
                                               child: Text(
                                                 _emails.isEmpty
                                                     ? 'Add a saved NGMY login email first. You will not need to type it again.'
-                                                    : 'No codes yet. Tap Get reset code, or request a reset with one of the saved emails. The code appears here.',
+                                                    : 'No codes yet. Request a password reset with a saved email, then tap refresh to see the code here.',
                                                 textAlign: TextAlign.center,
                                                 style: TextStyle(
                                                   color: Colors.white.withValues(alpha: 0.55),
