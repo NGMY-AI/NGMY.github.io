@@ -27381,18 +27381,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 pulse: pulse,
                 orbit: orbit,
                 icon: Icons.person_rounded,
+                onIconTap: () => showNgmyCivicRecoveryEmailDialog(context),
                 dense: true,
-              ),
-            ),
-            IconButton(
-              onPressed: () => showNgmyCivicRecoveryEmailDialog(context),
-              tooltip: 'Civic recovery email',
-              icon: NgmyHudMiniOrb(
-                colors: const [Color(0xFF38BDF8), Color(0xFF6366F1)],
-                pulse: pulse,
-                orbit: orbit,
-                size: 36,
-                icon: Icons.mark_email_unread_rounded,
               ),
             ),
             if (widget.user.isAdmin)

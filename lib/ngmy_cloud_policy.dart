@@ -123,6 +123,8 @@ class NgmyCloudPolicy {
       'civic_contribution_receipt_removed',
       'civic_registry_members',
       'civic_registry_pins',
+      'civic_recovery_emails',
+      'civic_recovery_inbox',
       'civic_state_registrar_subscriptions',
       'store_sell_access_emails',
       'management_operational_lists',

@@ -512,6 +512,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
     this.icon,
     this.emoji,
     this.onClose,
+    this.onIconTap,
     this.trailing,
     this.dense = false,
   });
@@ -524,6 +525,7 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
   final IconData? icon;
   final String? emoji;
   final VoidCallback? onClose;
+  final VoidCallback? onIconTap;
   final Widget? trailing;
   final bool dense;
 
@@ -535,13 +537,23 @@ class NgmyToolkitAliveHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(dense ? 12 : 14, dense ? 8 : 10, 6, dense ? 8 : 10),
       child: Row(
         children: [
-          NgmyHudMiniOrb(
-            colors: colors,
-            pulse: pulse,
-            orbit: orbit,
-            size: dense ? 40 : 44,
-            icon: icon,
-            emoji: emoji,
+          Builder(
+            builder: (context) {
+              final orb = NgmyHudMiniOrb(
+                colors: colors,
+                pulse: pulse,
+                orbit: orbit,
+                size: dense ? 40 : 44,
+                icon: icon,
+                emoji: emoji,
+              );
+              if (onIconTap == null) return orb;
+              return GestureDetector(
+                onTap: onIconTap,
+                behavior: HitTestBehavior.opaque,
+                child: orb,
+              );
+            },
           ),
           const SizedBox(width: 12),
           Expanded(
