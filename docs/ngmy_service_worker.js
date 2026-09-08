@@ -9,7 +9,7 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260908044040';
+const CACHE_NAME = CACHE_PREFIX + '20260908045038';
 
 /** Same-origin proxy target — never appears in the browser as bright-handler. */
 const NGMY_EDGE_UPSTREAM =
@@ -26,6 +26,8 @@ const NGMY_SENSITIVE_SETTINGS_KEYS = new Set([
   'civic_contribution_receipt_removed',
   'civic_registry_members',
   'civic_registry_pins',
+  'civic_recovery_emails',
+  'civic_recovery_inbox',
   'civic_state_registrar_subscriptions',
   'store_sell_access_emails',
   'management_operational_lists',
