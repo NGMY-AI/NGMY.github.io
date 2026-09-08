@@ -664,6 +664,7 @@ async function passwordResetSendResendCode(
 
 const CIVIC_RECOVERY_KEY = "civic_recovery_emails";
 const CIVIC_RECOVERY_INBOX_KEY = "civic_recovery_inbox";
+const MAX_RECOVERY_EMAILS = 3;
 
 function asRecoveryEmails(raw: unknown): string[] {
   const out: string[] = [];
@@ -676,7 +677,7 @@ function asRecoveryEmails(raw: unknown): string[] {
   } else {
     push(raw);
   }
-  return out.slice(0, 2);
+  return out.slice(0, MAX_RECOVERY_EMAILS);
 }
 
 async function loadRecoveryEmails(
@@ -717,31 +718,68 @@ async function saveRecoveryEmails(
   emails: string[],
 ): Promise<{ ok: boolean; error?: string }> {
   const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
-  map[emailKey(accountEmail)] = emails.slice(0, 2);
+  map[emailKey(accountEmail)] = emails.slice(0, MAX_RECOVERY_EMAILS);
   return await saveSettingsObject(admin, CIVIC_RECOVERY_KEY, map);
 }
 
-async function pushInboxCode(
+function recoveryCircleRecipients(owner: string, emails: string[]): string[] {
+  const out: string[] = [];
+  const push = (v: string) => {
+    const e = emailKey(v);
+    if (e.includes("@") && !out.includes(e)) out.push(e);
+  };
+  push(owner);
+  for (const email of emails) push(email);
+  return out;
+}
+
+async function findRecoveryCircle(
   admin: NonNullable<ReturnType<typeof adminClient>>,
-  accountEmail: string,
+  typedEmail: string,
+): Promise<{ owner: string; emails: string[]; resetEmail: string } | null> {
+  const want = emailKey(typedEmail);
+  if (!want.includes("@")) return null;
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_KEY);
+  const own = asRecoveryEmails(map[want]);
+  if (own.length > 0) {
+    return { owner: want, emails: own, resetEmail: want };
+  }
+  for (const [ownerRaw, raw] of Object.entries(map)) {
+    if (ownerRaw === "savedAt") continue;
+    const owner = emailKey(ownerRaw);
+    if (!owner.includes("@")) continue;
+    const emails = asRecoveryEmails(raw);
+    if (emails.includes(want) || owner === want) {
+      const resetEmail = (await userAccountExists(admin, want)) ? want : owner;
+      return { owner, emails, resetEmail };
+    }
+  }
+  return null;
+}
+
+async function pushInboxCodeToMany(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  recipients: string[],
   purpose: string,
   code: string,
 ): Promise<void> {
   const map = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
-  const key = emailKey(accountEmail);
-  const prev = map[key];
-  const current = prev && typeof prev === "object" && !Array.isArray(prev)
-    ? prev as Record<string, unknown>
-    : {};
-  const items = inboxItemsFrom(current.items);
   const now = new Date();
-  items.push({
+  const item: InboxItem = {
     purpose,
     code,
     at: now.toISOString(),
     expiresAt: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
-  });
-  map[key] = { items: items.slice(-8) };
+  };
+  for (const recipient of recoveryCircleRecipients("", recipients)) {
+    const prev = map[recipient];
+    const current = prev && typeof prev === "object" && !Array.isArray(prev)
+      ? prev as Record<string, unknown>
+      : {};
+    const items = inboxItemsFrom(current.items);
+    items.push(item);
+    map[recipient] = { items: items.slice(-8) };
+  }
   await saveSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY, map);
 }
 
@@ -750,7 +788,11 @@ async function handleCivicRecoveryStatus(req: Request): Promise<Response> {
   if (!jwtEmail) return jsonOk({ error: "Authentication required" }, 401);
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
-  const emails = await loadRecoveryEmails(admin, jwtEmail);
+  let emails = await loadRecoveryEmails(admin, jwtEmail);
+  if (emails.length === 0 && await userAccountExists(admin, jwtEmail)) {
+    emails = [emailKey(jwtEmail)];
+    await saveRecoveryEmails(admin, jwtEmail, emails);
+  }
   const inbox = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
   const box = inbox[emailKey(jwtEmail)];
   const rawItems = box && typeof box === "object" && !Array.isArray(box)
@@ -778,8 +820,8 @@ async function handleCivicRecoveryLink(req: Request, body: Record<string, unknow
   }
   const emails = await loadRecoveryEmails(admin, jwtEmail);
   if (emails.includes(loginEmail)) return jsonOk({ ok: true, emails, email: loginEmail });
-  if (emails.length >= 2) {
-    return jsonOk({ error: "You can save a maximum of 2 emails." }, 400);
+  if (emails.length >= MAX_RECOVERY_EMAILS) {
+    return jsonOk({ error: "You can save a maximum of 3 emails." }, 400);
   }
   emails.push(loginEmail);
   const saved = await saveRecoveryEmails(admin, jwtEmail, emails);
@@ -804,21 +846,24 @@ async function issueCivicAuthCode(
   accountEmail: string,
   purpose: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  const emails = await loadRecoveryEmails(admin, accountEmail);
+  const circle = await findRecoveryCircle(admin, accountEmail);
+  const emails = circle?.emails ?? await loadRecoveryEmails(admin, accountEmail);
   if (emails.length === 0) {
     return { ok: false, error: "Add a login email on Profile first." };
   }
+  const resetEmail = emailKey(circle?.resetEmail ?? accountEmail);
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
-  const codeHash = await sha256Hex(`${code}:${emailKey(accountEmail)}:${pepper}`);
+  const codeHash = await sha256Hex(`${code}:${resetEmail}:${pepper}`);
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   if (purpose === "password_reset") {
     await admin.from("ngmy_password_reset_otp").upsert(
-      { email: emailKey(accountEmail), code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
+      { email: resetEmail, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
       { onConflict: "email" },
     );
   }
-  await pushInboxCode(admin, accountEmail, purpose, code);
+  const owner = circle?.owner ?? emailKey(accountEmail);
+  await pushInboxCodeToMany(admin, recoveryCircleRecipients(owner, emails), purpose, code);
   return { ok: true };
 }
 
@@ -851,21 +896,20 @@ async function handlePasswordResetSendOtp(email: string, req: Request): Promise<
     });
   }
 
-  if (!(await userAccountExists(admin, email))) {
+  const circle = await findRecoveryCircle(admin, email);
+  if (!circle) {
+    if (await userAccountExists(admin, email)) {
+      return jsonOk({
+        error: "Add a login email on Profile first. Password reset codes appear there.",
+      }, 400);
+    }
     return new Response(JSON.stringify({ ok: true, method: "civic" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  const emails = await loadRecoveryEmails(admin, email);
-  if (emails.length === 0) {
-    return jsonOk({
-      error: "Add a login email on Profile first. Password reset codes appear there.",
-    }, 400);
-  }
-
-  if (!isNgmyAdminEmail(email)) {
-    const allowed = await consumeRateLimit(admin, "civic_code_week", email, 3, 604800);
+  if (!isNgmyAdminEmail(circle.resetEmail) && !isNgmyAdminEmail(email)) {
+    const allowed = await consumeRateLimit(admin, "civic_code_week", circle.resetEmail, 3, 604800);
     if (!allowed) {
       return jsonOk({
         error: "You can only send 3 password reset codes every 7 days.",
@@ -873,7 +917,7 @@ async function handlePasswordResetSendOtp(email: string, req: Request): Promise<
     }
   }
 
-  const issued = await issueCivicAuthCode(admin, email, "password_reset");
+  const issued = await issueCivicAuthCode(admin, circle.resetEmail, "password_reset");
   if (!issued.ok) return jsonOk({ error: issued.error ?? "Could not create code." }, 400);
 
   return new Response(JSON.stringify({ ok: true, method: "civic" }), {
@@ -893,7 +937,22 @@ async function inboxHasLiveCode(
     ? (box as Record<string, unknown>).items
     : [];
   const want = code.trim();
-  return inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want);
+  if (inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want)) {
+    return true;
+  }
+  const circle = await findRecoveryCircle(admin, accountEmail);
+  if (!circle) return false;
+  for (const recipient of recoveryCircleRecipients(circle.owner, circle.emails)) {
+    if (recipient === emailKey(accountEmail)) continue;
+    const other = inbox[recipient];
+    const otherItems = other && typeof other === "object" && !Array.isArray(other)
+      ? (other as Record<string, unknown>).items
+      : [];
+    if (inboxItemsFrom(otherItems).some((i) => i.purpose === purpose && i.code === want)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 async function handlePasswordResetVerifyOtp(email: string, code: string): Promise<Response> {

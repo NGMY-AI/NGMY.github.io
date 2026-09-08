@@ -69,7 +69,7 @@ List<String> _emailsFrom(dynamic raw) {
   } else if (raw != null) {
     push(raw);
   }
-  return out.take(2).toList();
+  return out.take(3).toList();
 }
 
 List<NgmyCivicInboxCode> _codesFrom(dynamic raw) {
@@ -322,8 +322,8 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
   }
 
   Future<void> _showAddEmail() async {
-    if (_emails.length >= 2) {
-      _toast('You can save a maximum of 2 emails.');
+    if (_emails.length >= 3) {
+      _toast('You can save a maximum of 3 emails.');
       return;
     }
     final ctl = TextEditingController(
@@ -349,7 +349,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Use an email that already logs into this app. Maximum 2.',
+                'Use an email that already has an NGMY account. You can save up to 3. They stay saved.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.62), height: 1.35),
               ),
               const SizedBox(height: 16),
@@ -526,20 +526,12 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
               children: [
                 NgmyToolkitAliveHeader(
                   title: 'CODES',
-                  subtitle: 'Login emails · password reset inbox',
+                  subtitle: 'Saved login emails · codes stay here',
                   colors: _colors,
                   pulse: pulse,
                   orbit: orbit,
                   icon: Icons.person_rounded,
                   onClose: () => Navigator.pop(context),
-                  trailing: Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: FilledButton.tonalIcon(
-                      onPressed: _busy || _emails.length >= 2 ? null : _showAddEmail,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text('Add email'),
-                    ),
-                  ),
                 ),
                 if (_error != null)
                   Padding(
@@ -572,12 +564,18 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
                               ),
                             ),
                             Text(
-                              '${_emails.length} / 2',
+                              '${_emails.length} / 3',
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w700),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 12),
+                        _AddEmailButton(
+                          pulse: pulse,
+                          enabled: !_busy && _emails.length < 3,
+                          onTap: _showAddEmail,
+                        ),
+                        const SizedBox(height: 12),
                         if (_loading)
                           const Padding(
                             padding: EdgeInsets.symmetric(vertical: 10),
@@ -585,7 +583,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
                           )
                         else if (_emails.isEmpty)
                           Text(
-                            'Add an email that was used to log in. Password reset codes will land in the table below.',
+                            'Add up to 3 NGMY login emails. They are saved. Forgot password with any of them drops the code in the table below.',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.58), height: 1.4),
                           )
                         else
@@ -662,8 +660,8 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
                                               padding: const EdgeInsets.all(24),
                                               child: Text(
                                                 _emails.isEmpty
-                                                    ? 'Add a login email first, then codes will show here.'
-                                                    : 'No codes yet. Tap Get reset code, then use it here to change your password.',
+                                                    ? 'Add a saved NGMY login email first. You will not need to type it again.'
+                                                    : 'No codes yet. Tap Get reset code, or request a reset with one of the saved emails. The code appears here.',
                                                 textAlign: TextAlign.center,
                                                 style: TextStyle(
                                                   color: Colors.white.withValues(alpha: 0.55),
@@ -745,6 +743,69 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _AddEmailButton extends StatelessWidget {
+  const _AddEmailButton({
+    required this.pulse,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final double pulse;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = 0.28 + pulse * 0.35;
+    return Opacity(
+      opacity: enabled ? 1 : 0.42,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF22D3EE), Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF22D3EE).withValues(alpha: glow),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                  SizedBox(width: 8),
+                  Text(
+                    'Add email',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
