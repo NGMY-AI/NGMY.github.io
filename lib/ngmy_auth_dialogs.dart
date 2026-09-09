@@ -329,8 +329,8 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     if (err.contains('authretryable') || err.contains('retryable')) {
       return 'Could not reach the server. Try mobile data or wait a moment.';
     }
-    if (err.contains('7 days') || err.contains('three password reset') || err.contains('3 password reset')) {
-      return 'You can only send 3 password reset codes every 7 days.';
+    if (err.contains('7 days') || err.contains('password reset code') || err.contains('3 password reset')) {
+      return 'You can only send 1 password reset code every 7 days.';
     }
     if (err.contains('login email on profile') || err.contains('civic registry email on profile') || err.contains('civic recovery')) {
       return 'Add a login email on Profile first (tap the profile icon).';

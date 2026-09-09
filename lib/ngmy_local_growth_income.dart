@@ -1,23 +1,31 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
+import 'ngmy_db_relay.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_local_snapshot_sync.dart';
+import 'ngmy_network_resilience.dart';
 
-/// Local history + investment/clock-in state for Growth Income.
-/// Spendable money is the same shared account balance used across the whole app
-/// (Store, fees, games, Doc Share, etc.) — prefs keep GI history/plans, while
-/// `accountBalance` is always mirrored to the real signed-in user.
+/// One NGMY account's Growth Income wallet — local cache plus a cloud copy so
+/// every device signed into that account shows the same money, plan, and profit.
 class NgmyLocalGrowthIncomeStore {
   /// v1 copied the main Growth Income wallet on first open; v2 starts fresh.
   static const int walletSchemaVersion = 2;
+  static const String cloudKeyPrefix = 'ngmy_gi_account_wallet_v1_';
 
   static String _normalize(String email) => email.toLowerCase().trim();
 
   static String _key(String realEmail) => 'ngmy_local_growth_income_${_normalize(realEmail)}';
+
+  static String creditedPrefsKey(String realEmail) =>
+      'ngmy_gi_credited_txn_ids_${_normalize(realEmail)}';
+
+  static String cloudSettingsKey(String realEmail) =>
+      '$cloudKeyPrefix${base64Url.encode(utf8.encode(_normalize(realEmail)))}';
 
   /// The `UserData.email` used internally for this copy. Deliberately distinct
   /// from the real account email so widgets we reuse from the real app (like
@@ -26,13 +34,14 @@ class NgmyLocalGrowthIncomeStore {
   /// cause of the balance shown here disagreeing with the local figures.
   static String identityEmailFor(String realEmail) => '${_normalize(realEmail)}+local.ngmy';
 
-  /// Loads the local copy. The first time this device opens it, the wallet
-  /// starts at \$0 with no investment — nothing is copied from the main
-  /// Growth Income account. After that the local copy is fully independent.
+  /// Loads this device's cached copy. Call [reconcileWithCloud] afterwards so
+  /// a second phone on the same account picks up the same wallet.
   static Future<({
     UserData user,
     List<AppTransaction> transactions,
     int walletStateRevision,
+    DateTime? updatedAt,
+    List<String> creditedTxnIds,
   })> load(String realEmail, UserData liveUserSeed) async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key(realEmail));
@@ -40,7 +49,13 @@ class NgmyLocalGrowthIncomeStore {
       final seeded = _freshUser(realEmail, liveUserSeed);
       await save(realEmail, seeded, const [], walletStateRevision: 0);
       ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
-      return (user: seeded, transactions: <AppTransaction>[], walletStateRevision: 0);
+      return (
+        user: seeded,
+        transactions: <AppTransaction>[],
+        walletStateRevision: 0,
+        updatedAt: null,
+        creditedTxnIds: await loadCreditedIds(realEmail),
+      );
     }
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
@@ -58,12 +73,25 @@ class NgmyLocalGrowthIncomeStore {
         await save(realEmail, user, transactions, walletStateRevision: revision);
       }
       ngmySeedLiveBalance(user.email, user.accountBalance);
-      return (user: user, transactions: transactions, walletStateRevision: revision);
+      final credited = _creditedFromMap(map);
+      return (
+        user: user,
+        transactions: transactions,
+        walletStateRevision: revision,
+        updatedAt: _updatedAtFromMap(map),
+        creditedTxnIds: credited.isNotEmpty ? credited : await loadCreditedIds(realEmail),
+      );
     } catch (_) {
       final seeded = _freshUser(realEmail, liveUserSeed);
       await save(realEmail, seeded, const [], walletStateRevision: 0);
       ngmySeedLiveBalance(seeded.email, seeded.accountBalance);
-      return (user: seeded, transactions: <AppTransaction>[], walletStateRevision: 0);
+      return (
+        user: seeded,
+        transactions: <AppTransaction>[],
+        walletStateRevision: 0,
+        updatedAt: null,
+        creditedTxnIds: await loadCreditedIds(realEmail),
+      );
     }
   }
 
@@ -92,6 +120,8 @@ class NgmyLocalGrowthIncomeStore {
     List<AppTransaction> transactions, {
     int? walletStateRevision,
     bool bumpWalletRevision = false,
+    DateTime? updatedAt,
+    List<String>? creditedTxnIds,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     var revision = walletStateRevision;
@@ -99,7 +129,20 @@ class NgmyLocalGrowthIncomeStore {
       revision = await readWalletStateRevision(realEmail);
       if (bumpWalletRevision) revision++;
     }
-    await prefs.setString(_key(realEmail), jsonEncode(_toMap(user, transactions, walletStateRevision: revision)));
+    final at = updatedAt ?? DateTime.now().toUtc();
+    final credited = creditedTxnIds ?? await loadCreditedIds(realEmail);
+    await prefs.setString(
+      _key(realEmail),
+      jsonEncode(_toMap(
+        user,
+        transactions,
+        ownerEmail: realEmail,
+        walletStateRevision: revision,
+        updatedAt: at,
+        creditedTxnIds: credited,
+      )),
+    );
+    await saveCreditedIds(realEmail, credited);
     unawaited(ngmySyncLocalLiveSnapshotIfRegistered(
       ownerEmail: realEmail,
       user: user,
@@ -141,11 +184,17 @@ class NgmyLocalGrowthIncomeStore {
   static Map<String, dynamic> _toMap(
     UserData user,
     List<AppTransaction> transactions, {
+    required String ownerEmail,
     required int walletStateRevision,
+    DateTime? updatedAt,
+    List<String>? creditedTxnIds,
   }) =>
       {
         'walletSchemaVersion': walletSchemaVersion,
         'walletStateRevision': walletStateRevision,
+        'ownerEmail': _normalize(ownerEmail),
+        'updatedAt': (updatedAt ?? DateTime.now().toUtc()).toIso8601String(),
+        'creditedTxnIds': creditedTxnIds ?? const <String>[],
         'username': user.username,
         'accountBalance': user.accountBalance,
         'totalProfit': user.totalProfit,
@@ -255,24 +304,47 @@ class NgmyLocalGrowthIncomeStore {
     }
   }
 
-  /// Pulls this device's local Growth Income balance onto [liveUser] if it's
-  /// higher than what's already there. The mirroring in [applyTransaction]
-  /// only fires while the Growth Income screen is open and running — a user
-  /// who earned money there, then went straight to a payment screen (Store,
-  /// Advisors, Family Tree, Music, ...) without reopening Growth Income this
-  /// session would otherwise see a stale/zero balance. Call this before
-  /// showing any "pay with your balance" screen anywhere in the app.
+  /// Pulls this account's Growth Income wallet (cloud + this phone) onto
+  /// [liveUser] so Store, fees, and games spend the same money as Growth Income.
   static Future<void> reconcileIntoLiveUser(dynamic liveUser) async {
     final user = liveUser as UserData;
     final realEmail = user.email.trim();
     if (realEmail.isEmpty) return;
     try {
       final loaded = await load(realEmail, user);
-      final localBalance = loaded.user.accountBalance;
-      if (localBalance > user.accountBalance + 0.009) {
-        user.accountBalance = localBalance;
-        ngmySeedLiveBalance(user.email, localBalance, allowIncrease: true);
-      }
+      final synced = await reconcileWithCloud(
+        realEmail: realEmail,
+        localUser: loaded.user,
+        localTransactions: loaded.transactions,
+        localRevision: loaded.walletStateRevision,
+        localUpdatedAt: loaded.updatedAt,
+        localCreditedIds: loaded.creditedTxnIds,
+      );
+      final gi = synced.user;
+      user.accountBalance = gi.accountBalance;
+      user.totalProfit = gi.totalProfit;
+      user.isClockedIn = gi.isClockedIn;
+      user.clockInStartTime = gi.clockInStartTime;
+      user.clockInPenaltyPercent = gi.clockInPenaltyPercent;
+      user.lastClockInDate = gi.lastClockInDate;
+      user.lastClockInEarningsDate = gi.lastClockInEarningsDate;
+      user.todayClockInEarned = gi.todayClockInEarned;
+      user.pendingInvestmentName = gi.pendingInvestmentName;
+      user.pendingInvestmentAmount = gi.pendingInvestmentAmount;
+      user.pendingInvestmentRoi = gi.pendingInvestmentRoi;
+      final inv = gi.activeInvestment;
+      user.activeInvestment = inv == null
+          ? null
+          : ActiveInvestment(
+              name: inv.name,
+              amount: inv.amount,
+              dailyROI: inv.dailyROI,
+              purchaseDate: inv.purchaseDate,
+              daysClockedIn: inv.daysClockedIn,
+              totalEarned: inv.totalEarned,
+            );
+      ngmySeedLiveBalance(user.email, gi.accountBalance, allowIncrease: true);
+      ngmySeedLiveBalance(gi.email, gi.accountBalance, allowIncrease: true);
     } catch (_) {}
   }
 
@@ -345,5 +417,229 @@ class NgmyLocalGrowthIncomeStore {
       user.todayClockInEarned = 0;
     }
     return addedPayout;
+  }
+
+  static DateTime? _updatedAtFromMap(Map<String, dynamic> map) =>
+      DateTime.tryParse((map['updatedAt'] ?? '').toString())?.toUtc();
+
+  static List<String> _creditedFromMap(Map<String, dynamic> map) {
+    final raw = map['creditedTxnIds'];
+    if (raw is! List) return const [];
+    return raw.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+  }
+
+  static Future<List<String>> loadCreditedIds(String realEmail) async {
+    final prefs = await SharedPreferences.getInstance();
+    return List<String>.from(prefs.getStringList(creditedPrefsKey(realEmail)) ?? const <String>[]);
+  }
+
+  static Future<void> saveCreditedIds(String realEmail, List<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(creditedPrefsKey(realEmail), ids.toSet().toList());
+  }
+
+  static bool walletHasActivity(UserData user, List<AppTransaction> transactions) {
+    if (user.accountBalance > 0.009) return true;
+    if (user.totalProfit > 0.009) return true;
+    if (user.activeInvestment != null) return true;
+    if (user.pendingInvestmentAmount != null && user.pendingInvestmentAmount! > 0) return true;
+    return transactions.isNotEmpty;
+  }
+
+  static double walletRank(UserData user, int revision) {
+    final inv = user.activeInvestment;
+    final invested = inv == null ? 0.0 : inv.amount.abs();
+    final earned = inv?.totalEarned ?? 0.0;
+    return invested * 1000000.0 + user.accountBalance + user.totalProfit + earned + revision * 0.0001;
+  }
+
+  static bool _samePlan(UserData a, UserData b) {
+    final left = a.activeInvestment;
+    final right = b.activeInvestment;
+    if (left == null && right == null) return true;
+    if (left == null || right == null) return false;
+    return left.name == right.name && (left.amount - right.amount).abs() < 0.01;
+  }
+
+  static Future<({
+    UserData user,
+    List<AppTransaction> transactions,
+    int walletStateRevision,
+    DateTime updatedAt,
+    List<String> creditedTxnIds,
+  })?> fetchCloudWallet(String realEmail) async {
+    try {
+      final value = await ngmyDbRelaySettingsFetch(
+        cloudSettingsKey(realEmail),
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (value == null) return null;
+      final user = _userFromMap(realEmail, value);
+      final transactions = _transactionsFromMap(value);
+      return (
+        user: user,
+        transactions: transactions,
+        walletStateRevision: _revisionFromMap(value),
+        updatedAt: _updatedAtFromMap(value) ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+        creditedTxnIds: _creditedFromMap(value),
+      );
+    } catch (e) {
+      debugPrint('[growth income] cloud fetch: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> pushCloudWallet({
+    required String realEmail,
+    required UserData user,
+    required List<AppTransaction> transactions,
+    required int walletStateRevision,
+    required DateTime updatedAt,
+    required List<String> creditedTxnIds,
+  }) async {
+    try {
+      await ngmyDbRelaySettingsUpsert(
+        cloudSettingsKey(realEmail),
+        _toMap(
+          user,
+          transactions,
+          ownerEmail: realEmail,
+          walletStateRevision: walletStateRevision,
+          updatedAt: updatedAt.toUtc(),
+          creditedTxnIds: creditedTxnIds,
+        ),
+        updatedAt: updatedAt.toUtc().toIso8601String(),
+        timeout: kNgmyCloudWriteTimeout,
+      );
+      return true;
+    } catch (e) {
+      debugPrint('[growth income] cloud push: $e');
+      return false;
+    }
+  }
+
+  /// Picks one wallet for this account. Cloud wins once devices are in sync;
+  /// the first time they differ, the richer plan/balance wins so a $0 phone
+  /// cannot wipe the phone that actually has the investment.
+  static bool cloudWalletShouldWin({
+    required UserData localUser,
+    required List<AppTransaction> localTransactions,
+    required int localRevision,
+    required DateTime? localUpdatedAt,
+    required UserData cloudUser,
+    required List<AppTransaction> cloudTransactions,
+    required int cloudRevision,
+    required DateTime cloudUpdatedAt,
+  }) {
+    final localActive = walletHasActivity(localUser, localTransactions);
+    final cloudActive = walletHasActivity(cloudUser, cloudTransactions);
+    if (!localActive && cloudActive) return true;
+    if (localActive && !cloudActive) return false;
+
+    if (_samePlan(localUser, cloudUser) && localUpdatedAt != null) {
+      final localAt = localUpdatedAt.toUtc();
+      final cloudAt = cloudUpdatedAt.toUtc();
+      if (cloudAt.isAfter(localAt.add(const Duration(seconds: 2)))) return true;
+      if (localAt.isAfter(cloudAt.add(const Duration(seconds: 2)))) return false;
+    }
+
+    return walletRank(cloudUser, cloudRevision) > walletRank(localUser, localRevision) + 0.01;
+  }
+
+  static Future<({
+    UserData user,
+    List<AppTransaction> transactions,
+    int walletStateRevision,
+    DateTime updatedAt,
+    List<String> creditedTxnIds,
+    bool adoptedCloud,
+  })> reconcileWithCloud({
+    required String realEmail,
+    required UserData localUser,
+    required List<AppTransaction> localTransactions,
+    required int localRevision,
+    required DateTime? localUpdatedAt,
+    required List<String> localCreditedIds,
+    bool pushIfLocalWins = true,
+  }) async {
+    final cloud = await fetchCloudWallet(realEmail);
+    if (cloud == null) {
+      final at = localUpdatedAt ?? DateTime.now().toUtc();
+      if (pushIfLocalWins && walletHasActivity(localUser, localTransactions)) {
+        await pushCloudWallet(
+          realEmail: realEmail,
+          user: localUser,
+          transactions: localTransactions,
+          walletStateRevision: localRevision,
+          updatedAt: at,
+          creditedTxnIds: localCreditedIds,
+        );
+      }
+      return (
+        user: localUser,
+        transactions: localTransactions,
+        walletStateRevision: localRevision,
+        updatedAt: at,
+        creditedTxnIds: localCreditedIds,
+        adoptedCloud: false,
+      );
+    }
+
+    final takeCloud = cloudWalletShouldWin(
+      localUser: localUser,
+      localTransactions: localTransactions,
+      localRevision: localRevision,
+      localUpdatedAt: localUpdatedAt,
+      cloudUser: cloud.user,
+      cloudTransactions: cloud.transactions,
+      cloudRevision: cloud.walletStateRevision,
+      cloudUpdatedAt: cloud.updatedAt,
+    );
+    if (takeCloud) {
+      await save(
+        realEmail,
+        cloud.user,
+        cloud.transactions,
+        walletStateRevision: cloud.walletStateRevision,
+        updatedAt: cloud.updatedAt,
+        creditedTxnIds: cloud.creditedTxnIds.isNotEmpty ? cloud.creditedTxnIds : localCreditedIds,
+      );
+      return (
+        user: cloud.user,
+        transactions: cloud.transactions,
+        walletStateRevision: cloud.walletStateRevision,
+        updatedAt: cloud.updatedAt,
+        creditedTxnIds: cloud.creditedTxnIds.isNotEmpty ? cloud.creditedTxnIds : localCreditedIds,
+        adoptedCloud: true,
+      );
+    }
+
+    final at = localUpdatedAt ?? DateTime.now().toUtc();
+    if (pushIfLocalWins) {
+      await save(
+        realEmail,
+        localUser,
+        localTransactions,
+        walletStateRevision: localRevision,
+        updatedAt: at,
+        creditedTxnIds: localCreditedIds,
+      );
+      await pushCloudWallet(
+        realEmail: realEmail,
+        user: localUser,
+        transactions: localTransactions,
+        walletStateRevision: localRevision,
+        updatedAt: at,
+        creditedTxnIds: localCreditedIds,
+      );
+    }
+    return (
+      user: localUser,
+      transactions: localTransactions,
+      walletStateRevision: localRevision,
+      updatedAt: at,
+      creditedTxnIds: localCreditedIds,
+      adoptedCloud: false,
+    );
   }
 }

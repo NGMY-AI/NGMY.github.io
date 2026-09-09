@@ -151,6 +151,7 @@ class NgmyCloudPolicy {
     };
     if (exact.contains(k)) return true;
     if (k.startsWith('civic_')) return true;
+    if (k.startsWith('ngmy_gi_account_wallet_v1_')) return true;
     if (k.contains('email') || k.contains('phone') || k.contains('password')) return true;
     return false;
   }

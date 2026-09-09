@@ -639,7 +639,7 @@ async function passwordResetSendResendCode(
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
   const codeHash = await sha256Hex(`${code}:${email}:${pepper}`);
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString();
 
   const { error: upsertErr } = await admin.from("ngmy_password_reset_otp").upsert(
     { email, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
@@ -654,7 +654,7 @@ async function passwordResetSendResendCode(
 
   const html =
     `<p>Your NGMY password reset code is:</p><p style="font-size:28px;font-weight:bold;letter-spacing:4px">${code}</p>` +
-    `<p>This code expires in 15 minutes. If you did not request this, ignore this email.</p>`;
+    `<p>This code expires in 1 day. If you did not request this, ignore this email.</p>`;
   await resendSendEmail(resendKey, from, email, "Your NGMY password reset code", html);
 
   return new Response(JSON.stringify({ ok: true, method: "resend" }), {
@@ -665,6 +665,7 @@ async function passwordResetSendResendCode(
 const CIVIC_RECOVERY_KEY = "civic_recovery_emails";
 const CIVIC_RECOVERY_INBOX_KEY = "civic_recovery_inbox";
 const MAX_RECOVERY_EMAILS = 3;
+const AUTH_CODE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function asRecoveryEmails(raw: unknown): string[] {
   const out: string[] = [];
@@ -793,7 +794,7 @@ async function pushInboxCodeToMany(
     purpose,
     code,
     at: now.toISOString(),
-    expiresAt: new Date(now.getTime() + 15 * 60 * 1000).toISOString(),
+    expiresAt: new Date(now.getTime() + AUTH_CODE_TTL_MS).toISOString(),
   };
   for (const recipient of recoveryCircleRecipients("", recipients)) {
     const prev = map[recipient];
@@ -880,7 +881,7 @@ async function issueCivicAuthCode(
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const pepper = Deno.env.get("PW_RESET_PEPPER") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "ngmy";
   const codeHash = await sha256Hex(`${code}:${resetEmail}:${pepper}`);
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  const expiresAt = new Date(Date.now() + AUTH_CODE_TTL_MS).toISOString();
   if (purpose === "password_reset") {
     await admin.from("ngmy_password_reset_otp").upsert(
       { email: resetEmail, code_hash: codeHash, expires_at: expiresAt, attempts: 0 },
@@ -901,7 +902,12 @@ async function handleCivicRecoveryIssue(req: Request, body: Record<string, unkno
   }
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
-  if (!isNgmyAdminEmail(jwtEmail)) {
+  if (purpose === "password_reset") {
+    const allowed = await consumeRateLimit(admin, "pw_reset_week", jwtEmail, 1, 604800);
+    if (!allowed) {
+      return jsonOk({ error: "You can only send 1 password reset code every 7 days." }, 429);
+    }
+  } else if (!isNgmyAdminEmail(jwtEmail)) {
     const allowed = await consumeRateLimit(admin, "civic_code_week", jwtEmail, 3, 604800);
     if (!allowed) {
       return jsonOk({ error: "You can only receive 3 codes every 7 days." }, 429);
@@ -933,13 +939,11 @@ async function handlePasswordResetSendOtp(email: string, req: Request): Promise<
     });
   }
 
-  if (!isNgmyAdminEmail(circle.resetEmail) && !isNgmyAdminEmail(email)) {
-    const allowed = await consumeRateLimit(admin, "civic_code_week", circle.resetEmail, 3, 604800);
-    if (!allowed) {
-      return jsonOk({
-        error: "You can only send 3 password reset codes every 7 days.",
-      }, 429);
-    }
+  const allowed = await consumeRateLimit(admin, "pw_reset_week", circle.resetEmail, 1, 604800);
+  if (!allowed) {
+    return jsonOk({
+      error: "You can only send 1 password reset code every 7 days.",
+    }, 429);
   }
 
   const issued = await issueCivicAuthCode(admin, circle.resetEmail, "password_reset");
@@ -965,6 +969,30 @@ async function inboxHasLiveCode(
   return inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want);
 }
 
+async function consumeInboxCodeEverywhere(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  purpose: string,
+  code: string,
+): Promise<void> {
+  const want = code.trim();
+  if (!want) return;
+  const map = await loadSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY);
+  let changed = false;
+  for (const [k, raw] of Object.entries(map)) {
+    if (k === "savedAt") continue;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+    const current = raw as Record<string, unknown>;
+    const items = inboxItemsFrom(current.items);
+    const next = items.filter((i) => !(i.purpose === purpose && i.code === want));
+    if (next.length !== items.length) {
+      current.items = next;
+      map[k] = current;
+      changed = true;
+    }
+  }
+  if (changed) await saveSettingsObject(admin, CIVIC_RECOVERY_INBOX_KEY, map);
+}
+
 async function handlePasswordResetVerifyOtp(email: string, code: string): Promise<Response> {
   const admin = adminClient();
   if (!admin) {
@@ -986,6 +1014,7 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
       const resetToken = crypto.randomUUID();
       const resetTokenHash = await sha256Hex(`${resetToken}:${account}:${pepper}`);
       const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      await consumeInboxCodeEverywhere(admin, "password_reset", code);
       await admin.from("ngmy_password_reset_otp").upsert(
         {
           email: account,
@@ -1037,6 +1066,7 @@ async function handlePasswordResetVerifyOtp(email: string, code: string): Promis
   // The client has no Supabase Auth session on this path (unlike the verifyOTP
   // path), so it can't authenticate the password write via JWT; this token lets
   // passwordResetComplete authorize it server-side instead.
+  await consumeInboxCodeEverywhere(admin, "password_reset", code);
   const resetToken = crypto.randomUUID();
   const resetTokenHash = await sha256Hex(`${resetToken}:${account}:${pepper}`);
   const resetTokenExpiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -1210,6 +1240,7 @@ const RELAY_SETTINGS_PREFIX_CODES: Record<string, string> = {
   d19: "ngmy_transfer_signal_v1_",
   d20: "ngmy_doc_share_my_code_lookup_v1_",
   d21: "ngmy_doc_share_my_code_user_v1_",
+  d22: "ngmy_gi_account_wallet_v1_",
 };
 
 function resolveRelaySettingsKey(skCode: string, suffix: string): string | null {

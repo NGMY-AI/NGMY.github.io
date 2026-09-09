@@ -43,9 +43,12 @@ class NgmyCivicInboxCode {
   String get expiresLabel {
     final exp = DateTime.tryParse(expiresAt);
     if (exp == null) return '';
-    final mins = exp.difference(DateTime.now()).inMinutes;
-    if (mins <= 0) return 'Expired';
-    return '${mins}m left';
+    final left = exp.difference(DateTime.now());
+    if (left.isNegative) return 'Expired';
+    if (left.inHours >= 24) return '${left.inDays}d left';
+    if (left.inHours >= 1) return '${left.inHours}h left';
+    if (left.inMinutes >= 1) return '${left.inMinutes}m left';
+    return 'Soon';
   }
 }
 

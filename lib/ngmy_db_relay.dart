@@ -120,6 +120,7 @@ const Map<String, String> kNgmySettingsPrefixCodes = {
   'ngmy_transfer_signal_v1_': 'd19',
   'ngmy_doc_share_my_code_lookup_v1_': 'd20',
   'ngmy_doc_share_my_code_user_v1_': 'd21',
+  'ngmy_gi_account_wallet_v1_': 'd22',
 };
 
 ({String code, String? suffix})? _resolveSettingsKey(String key) {

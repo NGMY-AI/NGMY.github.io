@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
@@ -27,9 +26,10 @@ String _ngmyLocalProfileDisplayName(UserData live) {
   return 'Member';
 }
 
-/// Entry point for the wifi-icon button on the home screen: a second,
-/// fully local copy of Growth Income (Home / Invest / Wallet) that never
-/// touches Supabase. The real Growth Income tabs are untouched.
+/// Entry point for the wifi-icon button on the home screen: Growth Income
+/// (Home / Invest / Wallet) for this NGMY account. The wallet is cached on
+/// the phone and synced to the cloud so every device on the same login
+/// shows the same balance, plan, and profit. The main app tabs are untouched.
 Future<void> showNgmyLocalGrowthIncomePage(
   BuildContext context, {
   required UserData liveUser,
@@ -77,6 +77,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   UserData? _user;
   List<AppTransaction> _transactions = [];
   int _walletStateRevision = 0;
+  DateTime? _walletUpdatedAt;
+  List<String> _creditedTxnIds = [];
+  bool _cloudBusy = false;
   int _idx = 0;
   bool _investPurchaseInFlight = false;
   bool _loading = true;
@@ -114,7 +117,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
     unawaited(_load());
     _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
-      unawaited(_pullApprovedBalanceFromCloud());
+      unawaited(_pullCloudWallet());
     });
     _earningsTick = Timer.periodic(const Duration(seconds: 2), (_) {
       _tickLocalClockInEarnings();
@@ -196,66 +199,91 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_pullApprovedBalanceFromCloud());
+      unawaited(_pullCloudWallet());
     }
+  }
+
+  void _mirrorWalletOntoLiveUser() {
+    final user = _user;
+    if (user == null) return;
+    widget.liveUser.accountBalance = user.accountBalance;
+    widget.liveUser.totalProfit = user.totalProfit;
+    widget.liveUser.isClockedIn = user.isClockedIn;
+    widget.liveUser.clockInStartTime = user.clockInStartTime;
+    widget.liveUser.clockInPenaltyPercent = user.clockInPenaltyPercent;
+    widget.liveUser.lastClockInDate = user.lastClockInDate;
+    widget.liveUser.lastClockInEarningsDate = user.lastClockInEarningsDate;
+    widget.liveUser.todayClockInEarned = user.todayClockInEarned;
+    widget.liveUser.pendingInvestmentName = user.pendingInvestmentName;
+    widget.liveUser.pendingInvestmentAmount = user.pendingInvestmentAmount;
+    widget.liveUser.pendingInvestmentRoi = user.pendingInvestmentRoi;
+    final inv = user.activeInvestment;
+    widget.liveUser.activeInvestment = inv == null
+        ? null
+        : ActiveInvestment(
+            name: inv.name,
+            amount: inv.amount,
+            dailyROI: inv.dailyROI,
+            purchaseDate: inv.purchaseDate,
+            daysClockedIn: inv.daysClockedIn,
+            totalEarned: inv.totalEarned,
+          );
   }
 
   Future<void> _syncBalanceToCloud({required bool allowDecrease}) async {
     final user = _user;
     if (user == null) return;
-    // Growth Income shares the main account balance used by every payment in the app.
-    if (!allowDecrease && user.accountBalance + 0.01 < widget.liveUser.accountBalance) {
-      _publishAppBalance(widget.liveUser.accountBalance, allowDecrease: false);
-      return;
-    }
+    _mirrorWalletOntoLiveUser();
     _publishAppBalance(user.accountBalance, allowDecrease: allowDecrease);
     await widget.onPersistBalanceToCloud?.call(widget.liveUser.accountBalance, allowDecrease: allowDecrease);
   }
 
-  /// Pull the saved account balance from the database so admin-approved deposits appear.
-  /// Authority order: never wipe stacked Growth Income earnings — cloud/live may only raise the balance.
-  Future<void> _pullApprovedBalanceFromCloud() async {
-    final user = _user;
-    if (user == null) return;
-    final email = ngmyNormalizeEmail(widget.liveUser.email);
-    if (email.isEmpty) return;
+  /// Pull the saved account wallet from the cloud so every device on this
+  /// login shows the same money, plan, and profit.
+  Future<void> _pullCloudWallet() async {
+    if (_cloudBusy || _user == null) return;
+    _cloudBusy = true;
     try {
-      final rows = await ngmyDbRelaySelect(
-        'users',
-        cols: 'accountBalance',
-        eq: {'email': email},
-        single: true,
-        timeout: kNgmyCloudLoadTimeout,
+      final synced = await NgmyLocalGrowthIncomeStore.reconcileWithCloud(
+        realEmail: widget.liveUser.email,
+        localUser: _user!,
+        localTransactions: _transactions,
+        localRevision: _walletStateRevision,
+        localUpdatedAt: _walletUpdatedAt,
+        localCreditedIds: _creditedTxnIds,
+        pushIfLocalWins: false,
       );
       if (!mounted) return;
-      final cloud = rows.isEmpty
-          ? 0.0
-          : ((rows.first['accountBalance'] as num?)?.toDouble() ?? 0).clamp(0.0, double.infinity);
-      // Never replace a higher local balance with a lower cloud/live figure —
-      // that was wiping day-to-day stacked earnings (looking like "replace").
-      final best = math.max(
-        user.accountBalance,
-        math.max(cloud, widget.liveUser.accountBalance),
-      );
-      if (best > user.accountBalance + 0.009) {
-        setState(() => _publishAppBalance(best, allowDecrease: false));
+      if (synced.adoptedCloud) {
+        setState(() {
+          _user = synced.user;
+          _transactions = List<AppTransaction>.from(synced.transactions);
+          _walletStateRevision = synced.walletStateRevision;
+          _walletUpdatedAt = synced.updatedAt;
+          _creditedTxnIds = List<String>.from(synced.creditedTxnIds);
+          _mirrorWalletOntoLiveUser();
+          _publishAppBalance(synced.user.accountBalance, allowDecrease: true);
+        });
+        unawaited(_syncBalanceToCloud(allowDecrease: true));
       }
-      // Always reconcile approved deposit history → balance (even if cloud still shows old amount).
       await _refreshDepositStatusesFromCloud();
-      unawaited(_persist(syncBalance: false));
     } catch (e) {
-      debugPrint('[growth income] pull balance: $e');
+      debugPrint('[growth income] pull wallet: $e');
       await _refreshDepositStatusesFromCloud();
+    } finally {
+      _cloudBusy = false;
     }
   }
+
+  Future<void> _pullApprovedBalanceFromCloud() => _pullCloudWallet();
 
   /// Credits approved deposits that never hit the balance (tracked per txn id so we never double-pay).
   Future<void> _applyMissingWalletCredits({Iterable<String>? onlyIds}) async {
     final user = _user;
     if (user == null) return;
     final prefs = await SharedPreferences.getInstance();
-    final key = 'ngmy_gi_credited_txn_ids_${ngmyNormalizeEmail(widget.liveUser.email)}';
-    final credited = (prefs.getStringList(key) ?? <String>[]).toSet();
+    final key = NgmyLocalGrowthIncomeStore.creditedPrefsKey(widget.liveUser.email);
+    final credited = {..._creditedTxnIds, ...(prefs.getStringList(key) ?? <String>[])};
     var gained = 0.0;
     final newlyCredited = <String>[];
     final idFilter = onlyIds?.toSet();
@@ -276,7 +304,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _publishAppBalance(user.accountBalance + gained, allowDecrease: false);
     });
     credited.addAll(newlyCredited);
-    await prefs.setStringList(key, credited.toList());
+    _creditedTxnIds = credited.toList();
+    await NgmyLocalGrowthIncomeStore.saveCreditedIds(widget.liveUser.email, _creditedTxnIds);
     unawaited(_persist(syncBalance: true, allowDecrease: false));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -287,10 +316,11 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
   Future<void> _markTxnCredited(String txnId) async {
     if (txnId.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'ngmy_gi_credited_txn_ids_${ngmyNormalizeEmail(widget.liveUser.email)}';
-    final credited = (prefs.getStringList(key) ?? <String>[]).toSet()..add(txnId);
-    await prefs.setStringList(key, credited.toList());
+    await NgmyLocalGrowthIncomeStore.saveCreditedIds(
+      widget.liveUser.email,
+      {..._creditedTxnIds, txnId}.toList(),
+    );
+    _creditedTxnIds = {..._creditedTxnIds, txnId}.toList();
   }
 
   Future<void> _refreshDepositStatusesFromCloud() async {
@@ -358,34 +388,28 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
   Future<void> _load() async {
     final loaded = await NgmyLocalGrowthIncomeStore.load(widget.liveUser.email, widget.liveUser);
-    final user = loaded.user;
-    final transactions = List<AppTransaction>.from(loaded.transactions);
-    var revision = loaded.walletStateRevision;
-    // Keep the higher of live wallet vs saved GI wallet so stacked earnings
-    // are not wiped when reopening Growth Income.
-    final liveBal = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
-    final prefsBal = user.accountBalance.clamp(0.0, double.infinity);
-    final seedBal = math.max(liveBal, prefsBal);
-    user.accountBalance = seedBal;
+    final synced = await NgmyLocalGrowthIncomeStore.reconcileWithCloud(
+      realEmail: widget.liveUser.email,
+      localUser: loaded.user,
+      localTransactions: loaded.transactions,
+      localRevision: loaded.walletStateRevision,
+      localUpdatedAt: loaded.updatedAt,
+      localCreditedIds: loaded.creditedTxnIds,
+    );
+    final user = synced.user;
+    final transactions = List<AppTransaction>.from(synced.transactions);
+    var revision = synced.walletStateRevision;
+    _creditedTxnIds = List<String>.from(synced.creditedTxnIds);
+    _walletUpdatedAt = synced.updatedAt;
     _user = user;
-    _publishAppBalance(seedBal, allowDecrease: seedBal < liveBal);
+    _mirrorWalletOntoLiveUser();
+    _publishAppBalance(user.accountBalance, allowDecrease: true);
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
     if (payoutAdded) {
       _publishAppBalance(user.accountBalance, allowDecrease: false);
     }
 
-    // Keep live app user investment in sync so daily clock-in outside GI works.
-    if (user.activeInvestment != null) {
-      final inv = user.activeInvestment!;
-      widget.liveUser.activeInvestment = ActiveInvestment(
-        name: inv.name,
-        amount: inv.amount,
-        dailyROI: inv.dailyROI,
-        purchaseDate: inv.purchaseDate,
-        daysClockedIn: inv.daysClockedIn,
-        totalEarned: inv.totalEarned,
-      );
-    }
+    _mirrorWalletOntoLiveUser();
 
     // Admin "Send money now" credits — no QR scan required.
     final pendingAdminCredits = await NgmyLocalDepositQr.claimPendingCredits(widget.liveUser.email);
@@ -421,28 +445,40 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _user = user;
       _transactions = transactions;
       _walletStateRevision = revision;
+      _walletUpdatedAt = DateTime.now().toUtc();
       _loading = false;
     });
-    unawaited(_persist(bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty, syncBalance: false));
-    if (appliedCreditIds.isNotEmpty) {
-      // Raise cloud balance to include admin push credits — never lower it.
-      unawaited(_syncBalanceToCloud(allowDecrease: false));
-    }
-    unawaited(_pullApprovedBalanceFromCloud());
+    unawaited(_persist(
+      bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty,
+      syncBalance: true,
+      allowDecrease: true,
+    ));
   }
 
   Future<void> _persist({bool bumpWalletRevision = false, bool syncBalance = false, bool allowDecrease = false}) async {
     final user = _user;
     if (user == null) return;
+    if (bumpWalletRevision) {
+      _walletStateRevision++;
+    }
+    final at = DateTime.now().toUtc();
+    _walletUpdatedAt = at;
     await NgmyLocalGrowthIncomeStore.save(
       widget.liveUser.email,
       user,
       _transactions,
-      bumpWalletRevision: bumpWalletRevision,
+      walletStateRevision: _walletStateRevision,
+      updatedAt: at,
+      creditedTxnIds: _creditedTxnIds,
     );
-    if (bumpWalletRevision) {
-      _walletStateRevision++;
-    }
+    unawaited(NgmyLocalGrowthIncomeStore.pushCloudWallet(
+      realEmail: widget.liveUser.email,
+      user: user,
+      transactions: _transactions,
+      walletStateRevision: _walletStateRevision,
+      updatedAt: at,
+      creditedTxnIds: _creditedTxnIds,
+    ));
     if (syncBalance) {
       unawaited(_syncBalanceToCloud(allowDecrease: allowDecrease));
     }

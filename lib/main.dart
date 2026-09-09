@@ -9838,7 +9838,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ...rows.first,
       });
       setState(() {
-        _preserveLocalSessionState(_currentUser!, remote);
         _currentUser!.accountBalance = remote.accountBalance;
         _currentUser!.totalProfit = remote.totalProfit;
         _currentUser!.activeInvestment = remote.activeInvestment;
@@ -9855,7 +9854,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final key = ngmyNormalizeEmail(email);
         final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == key);
         if (idx >= 0) {
-          _preserveLocalSessionState(_allUsers[idx], _currentUser!);
           _allUsers[idx] = _currentUser!;
         }
       });
@@ -12517,12 +12515,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final localInv = local.activeInvestment!;
         final remoteInv = remote.activeInvestment!;
         final samePlan = localInv.name == remoteInv.name && (localInv.amount - remoteInv.amount).abs() < 0.01;
-        if (samePlan) {
-          if (localInv.daysClockedIn > remoteInv.daysClockedIn ||
-              localInv.totalEarned > remoteInv.totalEarned + 0.001) {
-            remote.activeInvestment = localInv;
-          }
-        } else if (localInv.purchaseDate.isAfter(remoteInv.purchaseDate)) {
+        if (samePlan &&
+            (localInv.daysClockedIn > remoteInv.daysClockedIn ||
+                localInv.totalEarned > remoteInv.totalEarned + 0.001)) {
           remote.activeInvestment = localInv;
         }
       }
