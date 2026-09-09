@@ -4203,7 +4203,11 @@ Future<bool> _pushSignupUserToCloudReliable(UserData u, {bool includeFreeTrial =
 }
 
 Future<bool> _pushUserToCloudFast(UserData u, {bool includeFreeTrial = false, bool includeBalance = false}) async {
-  return _pushUserProfilePictureToCloud(u);
+  final photo = await _pushUserProfilePictureToCloud(u);
+  if (includeBalance) {
+    await _pushUserBalanceToCloud(u, allowDecrease: true);
+  }
+  return photo;
 }
 
 Future<bool> _pushUserMediaProfileFast(UserData u) async {
@@ -4993,18 +4997,24 @@ Future<bool> _pushUserBalanceToCloud(
         final cloud = (row['accountBalance'] ?? 0.0).toDouble();
         if (cloud > local + 0.01) {
           u.accountBalance = cloud;
-          return true;
         }
       }
     }
-    await ngmyDbRelayUpsert(
-      'users',
-      [
-        {'email': email, 'accountBalance': local},
-      ],
-      onConflict: 'email',
-      timeout: kNgmyCloudWriteTimeout,
-    );
+    await _safeUpsertUserRow({
+      'email': email,
+      'accountBalance': u.accountBalance.clamp(0.0, double.infinity),
+      'totalProfit': u.totalProfit,
+      'activeInvestment': u.activeInvestment?.toJson(),
+      'isClockedIn': u.isClockedIn,
+      'clockInStartTime': u.clockInStartTime?.toUtc().toIso8601String(),
+      'clockInPenaltyPercent': u.clockInPenaltyPercent,
+      'lastClockInDate': u.lastClockInDate?.toUtc().toIso8601String(),
+      'lastClockInEarningsDate': u.lastClockInEarningsDate?.toUtc().toIso8601String(),
+      'todayClockInEarned': u.todayClockInEarned,
+      'pendingInvestmentName': u.pendingInvestmentName,
+      'pendingInvestmentAmount': u.pendingInvestmentAmount,
+      'pendingInvestmentRoi': u.pendingInvestmentRoi,
+    });
     return true;
   } catch (e) {
     debugPrint('[user] balance upsert: $e');
@@ -9627,6 +9637,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     NgmyFeatureSyncSession.onEnteredGrowthIncomeUser = () {
       _startUserTransactionSync();
+      unawaited(_pullGrowthIncomeWalletFromCloud());
     };
     NgmyFeatureSyncSession.onLeftGrowthIncomeUser = () {
       _userTxnSyncTimer?.cancel();
@@ -9808,6 +9819,51 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_persistLocalOnly());
   }
 
+  Future<void> _pullGrowthIncomeWalletFromCloud() async {
+    if (_currentUser == null || !await ngmyCanReachCloud()) return;
+    final email = _currentUser!.email.trim();
+    if (email.isEmpty) return;
+    try {
+      final rows = await ngmyDbRelaySelect(
+        'users',
+        cols:
+            'accountBalance,totalProfit,activeInvestment,isClockedIn,clockInStartTime,clockInPenaltyPercent,lastClockInDate,lastClockInEarningsDate,todayClockInEarned,pendingInvestmentName,pendingInvestmentAmount,pendingInvestmentRoi',
+        eq: {'email': email},
+        single: true,
+        timeout: kNgmyCloudLoadTimeout,
+      );
+      if (rows.isEmpty || !mounted || _currentUser == null) return;
+      final remote = UserData.fromJson({
+        ..._currentUser!.toJson(),
+        ...rows.first,
+      });
+      setState(() {
+        _preserveLocalSessionState(_currentUser!, remote);
+        _currentUser!.accountBalance = remote.accountBalance;
+        _currentUser!.totalProfit = remote.totalProfit;
+        _currentUser!.activeInvestment = remote.activeInvestment;
+        _currentUser!.isClockedIn = remote.isClockedIn;
+        _currentUser!.clockInStartTime = remote.clockInStartTime;
+        _currentUser!.clockInPenaltyPercent = remote.clockInPenaltyPercent;
+        _currentUser!.lastClockInDate = remote.lastClockInDate;
+        _currentUser!.lastClockInEarningsDate = remote.lastClockInEarningsDate;
+        _currentUser!.todayClockInEarned = remote.todayClockInEarned;
+        _currentUser!.pendingInvestmentName = remote.pendingInvestmentName;
+        _currentUser!.pendingInvestmentAmount = remote.pendingInvestmentAmount;
+        _currentUser!.pendingInvestmentRoi = remote.pendingInvestmentRoi;
+        ngmyReconcileUserAccountBalance(_currentUser!, _allTransactions);
+        final key = ngmyNormalizeEmail(email);
+        final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == key);
+        if (idx >= 0) {
+          _preserveLocalSessionState(_allUsers[idx], _currentUser!);
+          _allUsers[idx] = _currentUser!;
+        }
+      });
+    } catch (e) {
+      debugPrint('[user] growth income pull: $e');
+    }
+  }
+
   Future<void> _refreshCurrentUserFromCloud() async {
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
     if (NgmyGameSession.suppressExternalNotifications) return;
@@ -9820,6 +9876,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     try {
       final email = _currentUser!.email.trim();
       if (email.isEmpty) return;
+      await _pullGrowthIncomeWalletFromCloud();
       await _maybeUploadLocalProfilePhotoToCloud(_currentUser!);
       if (!kIsWeb) {
         final photoRows = await ngmyDbRelaySelect(
@@ -10330,6 +10387,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
+    if (_currentUser != null) {
+      unawaited(_pushUserBalanceToCloud(_currentUser!, allowDecrease: true, ledgerTransactions: _allTransactions));
+    }
     _dataChangedUiDebounce?.cancel();
     _dataChangedUiDebounce = Timer(const Duration(milliseconds: 150), () {
     if (mounted) setState(() {});
@@ -12456,9 +12516,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       } else {
         final localInv = local.activeInvestment!;
         final remoteInv = remote.activeInvestment!;
-        final localNewer = localInv.purchaseDate.isAfter(remoteInv.purchaseDate);
-        final localHigher = localInv.amount > remoteInv.amount + 0.001;
-        if (localNewer || localHigher) {
+        final samePlan = localInv.name == remoteInv.name && (localInv.amount - remoteInv.amount).abs() < 0.01;
+        if (samePlan) {
+          if (localInv.daysClockedIn > remoteInv.daysClockedIn ||
+              localInv.totalEarned > remoteInv.totalEarned + 0.001) {
+            remote.activeInvestment = localInv;
+          }
+        } else if (localInv.purchaseDate.isAfter(remoteInv.purchaseDate)) {
           remote.activeInvestment = localInv;
         }
       }

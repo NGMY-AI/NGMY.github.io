@@ -74,6 +74,18 @@ class NgmyCloudPolicy {
     'civicRegistryStateSwitchesUsed',
     'civicRegistryAnchorState',
     'profilePicturePath',
+    'accountBalance',
+    'totalProfit',
+    'activeInvestment',
+    'isClockedIn',
+    'clockInStartTime',
+    'clockInPenaltyPercent',
+    'lastClockInDate',
+    'lastClockInEarningsDate',
+    'todayClockInEarned',
+    'pendingInvestmentName',
+    'pendingInvestmentAmount',
+    'pendingInvestmentRoi',
   };
 
   /// Growth Income deposits/withdrawals sync to Supabase so admin can approve with proofs.

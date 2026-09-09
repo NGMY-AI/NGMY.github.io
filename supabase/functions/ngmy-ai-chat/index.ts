@@ -962,22 +962,7 @@ async function inboxHasLiveCode(
     ? (box as Record<string, unknown>).items
     : [];
   const want = code.trim();
-  if (inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want)) {
-    return true;
-  }
-  const circle = await findRecoveryCircle(admin, accountEmail);
-  if (!circle) return false;
-  for (const recipient of recoveryCircleRecipients(circle.owner, circle.emails)) {
-    if (recipient === emailKey(accountEmail)) continue;
-    const other = inbox[recipient];
-    const otherItems = other && typeof other === "object" && !Array.isArray(other)
-      ? (other as Record<string, unknown>).items
-      : [];
-    if (inboxItemsFrom(otherItems).some((i) => i.purpose === purpose && i.code === want)) {
-      return true;
-    }
-  }
-  return false;
+  return inboxItemsFrom(rawItems).some((i) => i.purpose === purpose && i.code === want);
 }
 
 async function handlePasswordResetVerifyOtp(email: string, code: string): Promise<Response> {

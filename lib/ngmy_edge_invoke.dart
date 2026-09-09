@@ -157,6 +157,7 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
   Map<String, dynamic> body, {
   bool anonymous = false,
   Duration timeout = kNgmyEdgeTimeout,
+  bool preferDirect = false,
 }) async {
   final action = (body['action'] ?? 'chat').toString().trim();
   if (!anonymous && kNgmyEdgeFetchAckOnlyActions.contains(action)) {
@@ -183,8 +184,9 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     final payload = jsonEncode(wire);
 
     final urls = <String>[
+      if (preferDirect) ngmyEdgeDirectUrl(),
       ngmyEdgeInvokeUrl(anonymous: anonymous),
-      if (kIsWeb) ngmyEdgeDirectUrl(),
+      if (kIsWeb && !preferDirect) ngmyEdgeDirectUrl(),
     ];
     final seen = <String>{};
     http.Response? response;

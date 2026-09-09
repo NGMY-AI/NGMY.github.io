@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,10 +9,15 @@ enum NgmyPasswordResetOtpMethod { supabase, resend }
 Future<({bool ok, Map<String, dynamic>? data, String? error})> _invokePasswordResetProxy(
   Map<String, dynamic> body, {
   bool anonymous = true,
+  Duration timeout = const Duration(seconds: 8),
 }) async {
-  await ngmyWaitForSupabaseReady();
   try {
-    final data = await ngmyEdgeInvoke(body, anonymous: anonymous, timeout: const Duration(seconds: 35));
+    final data = await ngmyEdgeInvoke(
+      body,
+      anonymous: anonymous,
+      timeout: timeout,
+      preferDirect: true,
+    );
     if (data == null) {
       return (ok: false, data: null, error: ngmyAuthReachabilityMessage('Could not reach server'));
     }
@@ -32,10 +35,13 @@ Future<({bool ok, NgmyPasswordResetOtpMethod? method, String? error})> ngmyPassw
     return (ok: false, method: null, error: 'Enter a valid email address.');
   }
 
-  final parsed = await _invokePasswordResetProxy(<String, dynamic>{
-    'action': 'passwordResetSendOtp',
-    'email': key,
-  });
+  final parsed = await _invokePasswordResetProxy(
+    <String, dynamic>{
+      'action': 'passwordResetSendOtp',
+      'email': key,
+    },
+    timeout: const Duration(seconds: 12),
+  );
   if (parsed.ok) {
     final methodRaw = (parsed.data?['method'] ?? 'supabase').toString();
     final method = methodRaw == 'resend' || methodRaw == 'civic'

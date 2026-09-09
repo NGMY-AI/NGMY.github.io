@@ -592,8 +592,8 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBin
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 NgmyToolkitAliveHeader(
-                  title: 'CODES',
-                  subtitle: 'Saved login emails · codes stay here',
+                  title: 'NGMY AUTHENTICATION',
+                  subtitle: 'Saved login emails stay here',
                   colors: _colors,
                   pulse: pulse,
                   orbit: orbit,
@@ -650,7 +650,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBin
                           )
                         else if (_emails.isEmpty)
                           Text(
-                            'Add up to 3 NGMY login emails. They are saved. Forgot password with any of them drops the code in the table below.',
+                            'Add up to 3 NGMY login emails. They stay saved for authentication on every device.',
                             style: TextStyle(color: Colors.white.withValues(alpha: 0.58), height: 1.4),
                           )
                         else
@@ -698,7 +698,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBin
                             children: [
                               const Expanded(
                                 child: Text(
-                                  'RECEIVED CODES',
+                                  'VERIFICATION',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
@@ -728,8 +728,8 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBin
                                               padding: const EdgeInsets.all(24),
                                               child: Text(
                                                 _emails.isEmpty
-                                                    ? 'Add a saved NGMY login email first. You will not need to type it again.'
-                                                    : 'No codes yet. Request a password reset with a saved email, then tap refresh to see the code here.',
+                                                    ? 'Add a saved NGMY login email first. Authentication codes will appear here.'
+                                                    : 'No verification codes yet. Request a password reset, then tap refresh.',
                                                 textAlign: TextAlign.center,
                                                 style: TextStyle(
                                                   color: Colors.white.withValues(alpha: 0.55),

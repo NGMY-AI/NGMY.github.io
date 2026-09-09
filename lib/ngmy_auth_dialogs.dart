@@ -263,7 +263,6 @@ class _NgmyForgotPasswordDialogState extends State<_NgmyForgotPasswordDialog> wi
     }
     setState(() => _loading = true);
     try {
-      await ngmyWaitForSupabaseReady();
       final result = await ngmyPasswordResetVerifyResendOtp(email, code);
       if (!mounted) return;
       if (!result.ok || result.resetToken == null || result.resetToken!.isEmpty) {
