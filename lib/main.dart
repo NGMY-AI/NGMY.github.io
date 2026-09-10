@@ -17320,9 +17320,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   ),
                                 ),
                             Expanded(child: Center(child: NgmyHomeBrandBadge(onTap: widget.onOpenAdminDashboard))),
-                            widget.user.isAdmin
-                                ? _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome)
-                                : const SizedBox(width: 42),
+                            _roundGlassButton(
+                              icon: Icons.wifi_rounded,
+                              tooltip: 'Growth Income',
+                              onTap: widget.user.isAdmin ? _openLocalGrowthFromHome : null,
+                            ),
                           ],
                         ),
                         if (widget.user.isOnFreeTrial) ...[
@@ -17500,14 +17502,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
         ),
         const SizedBox(width: 10),
-        widget.user.isAdmin
-            ? _roundGlassButton(icon: Icons.wifi_rounded, tooltip: 'Growth Income', onTap: _openLocalGrowthFromHome)
-            : const SizedBox(width: 42),
+        _roundGlassButton(
+          icon: Icons.wifi_rounded,
+          tooltip: 'Growth Income',
+          onTap: widget.user.isAdmin ? _openLocalGrowthFromHome : null,
+        ),
       ],
     );
   }
 
-  Widget _roundGlassButton({required IconData icon, required String tooltip, required VoidCallback onTap}) {
+  Widget _roundGlassButton({required IconData icon, required String tooltip, VoidCallback? onTap}) {
     final isLight = Theme.of(context).brightness == Brightness.light;
     return Tooltip(
       message: tooltip,

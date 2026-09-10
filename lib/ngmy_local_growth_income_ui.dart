@@ -12,6 +12,7 @@ import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_local_growth_income.dart';
+import 'ngmy_back_scope.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -755,7 +756,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     // a loose height during transition, which made only the nav render in the
     // middle of a black page. This pins the tabs and menu to the full viewport,
     // while the page remains visible behind the transparent nav area.
-    return Material(
+    return NgmyTabBackScope(
+      activeTab: _idx,
+      onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 2)),
+      child: Material(
       color: bg,
       child: SizedBox(
         width: double.infinity,
@@ -778,6 +782,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -1283,59 +1288,66 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.clockedIn ? 'ACTIVE' : 'CLOSED';
+    final status = widget.clockedIn ? 'ACTIVE' : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN');
     final name = widget.profileDisplayName.trim().isEmpty ? 'Member' : widget.profileDisplayName.trim().toUpperCase();
 
     return InkWell(
       onTap: widget.clockedIn ? null : () => unawaited(widget.onClockIn()),
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(32),
       child: Container(
-        height: 370,
+        height: 392,
         decoration: BoxDecoration(
-          color: widget.card,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+          borderRadius: BorderRadius.circular(32),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A2330), Color(0xFF12161E), Color(0xFF0C1016)],
+          ),
+          border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: 0.22), width: 1.4),
+          boxShadow: [
+            BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.10), blurRadius: 28, offset: const Offset(0, 12)),
+            BoxShadow(color: widget.green.withValues(alpha: 0.08), blurRadius: 18, offset: const Offset(-6, -4)),
+          ],
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            Positioned(right: -30, top: -36, child: _glowBlob(const Color(0xFF22D3EE), 120)),
+            Positioned(left: -36, bottom: -40, child: _glowBlob(widget.green, 130)),
             Positioned(
-              top: 13,
-              left: 12,
+              top: 14,
+              left: 14,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 168),
+                constraints: const BoxConstraints(maxWidth: 176),
                 child: Container(
-                  padding: const EdgeInsets.all(3),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(13),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.25),
-                        widget.green.withValues(alpha: 0.28),
-                        Colors.white.withValues(alpha: 0.08),
-                      ],
-                    ),
-                    boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.38), blurRadius: 18)],
+                    borderRadius: BorderRadius.circular(999),
+                    color: Colors.white.withValues(alpha: 0.06),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
                   ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [widget.green.withValues(alpha: 0.90), const Color(0xFF047857).withValues(alpha: 0.72)],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: widget.clockedIn ? widget.green : const Color(0xFF67E8F9),
+                          boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.5), blurRadius: 8)],
+                        ),
                       ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.40)),
-                    ),
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.7),
-                    ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1350,16 +1362,16 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                 return AnimatedBuilder(
                   animation: Listenable.merge([_spinCtrl, _glowCtrl]),
                   builder: (context, _) {
-                    final glow = 0.72 + _glowCtrl.value * 0.28;
+                    final glow = 0.55 + _glowCtrl.value * 0.45;
                     return Center(
                       child: SizedBox(
-                        width: 258,
-                        height: 258,
+                        width: 276,
+                        height: 276,
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
                             CustomPaint(
-                              size: const Size(258, 258),
+                              size: const Size(276, 276),
                               painter: _ClockInRingPainter(
                                 progress: progress,
                                 spin: _spinCtrl.value,
@@ -1369,59 +1381,80 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                               ),
                             ),
                             Container(
-                              width: 188,
-                              height: 188,
+                              width: 176,
+                              height: 176,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
+                                  center: const Alignment(-0.25, -0.35),
+                                  radius: 1.05,
                                   colors: [
-                                    const Color(0xFF3A403D).withValues(alpha: 0.96),
-                                    const Color(0xFF1A1D1B).withValues(alpha: 0.98),
-                                    const Color(0xFF0E1011),
+                                    const Color(0xFF243044),
+                                    const Color(0xFF141A24),
+                                    const Color(0xFF0A0D12),
                                   ],
                                 ),
-                                border: Border.all(color: const Color(0xFFFFD166).withValues(alpha: 0.30), width: 2),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.14), width: 1.2),
                                 boxShadow: [
-                                  BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10)),
-                                  BoxShadow(color: widget.green.withValues(alpha: widget.clockedIn ? 0.14 : 0.06), blurRadius: 24),
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.50), blurRadius: 24, offset: const Offset(0, 10)),
+                                  BoxShadow(
+                                    color: (widget.clockedIn ? widget.green : const Color(0xFF22D3EE)).withValues(alpha: 0.16),
+                                    blurRadius: 28,
+                                  ),
                                 ],
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Container(
-                                    width: 56,
-                                    height: 56,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors: [
-                                          widget.green.withValues(alpha: 0.50),
-                                          const Color(0xFF064E3B).withValues(alpha: 0.62),
-                                        ],
-                                      ),
-                                      border: Border.all(color: widget.green.withValues(alpha: 0.40)),
-                                    ),
-                                    child: Icon(Icons.savings_rounded, color: Colors.white.withValues(alpha: 0.92), size: 30),
+                                  Icon(
+                                    widget.clockedIn ? Icons.bolt_rounded : Icons.fingerprint_rounded,
+                                    color: widget.clockedIn ? widget.green : const Color(0xFF67E8F9),
+                                    size: 26,
                                   ),
-                                  const SizedBox(height: 10),
-                                  Text('Daily Earnings', style: TextStyle(color: Colors.white.withValues(alpha: 0.72), fontSize: 10, fontWeight: FontWeight.w800)),
                                   const SizedBox(height: 6),
+                                  Text(
+                                    'DAILY EARNINGS',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.55),
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
                                   TweenAnimationBuilder<double>(
                                     tween: Tween<double>(begin: live, end: live),
                                     duration: const Duration(milliseconds: 900),
                                     curve: Curves.easeOutCubic,
                                     builder: (context, value, _) => Text(
                                       '\$${formatCurrency(value)}',
-                                      style: const TextStyle(color: Color(0xFFFFD166), fontSize: 30, fontWeight: FontWeight.w900),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: -0.6,
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    widget.hasPlan ? status : 'NO PLAN',
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      color: (widget.clockedIn ? widget.green : const Color(0xFF67E8F9)).withValues(alpha: 0.14),
+                                      border: Border.all(
+                                        color: (widget.clockedIn ? widget.green : const Color(0xFF67E8F9)).withValues(alpha: 0.45),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      status,
+                                      style: TextStyle(
+                                        color: widget.clockedIn ? widget.green : const Color(0xFFA5F3FC),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.1,
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1435,6 +1468,19 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _glowBlob(Color color, double size) {
+    return IgnorePointer(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)]),
         ),
       ),
     );
@@ -1459,45 +1505,88 @@ class _ClockInRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - 8;
-    const stroke = 11.0;
+    final outer = size.width / 2 - 4;
+    final frameRadius = outer - 7;
+    final progressRadius = outer - 18;
+
+    final frameFill = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..shader = SweepGradient(
+        colors: [
+          const Color(0xFF67E8F9).withValues(alpha: 0.18),
+          accent.withValues(alpha: 0.28),
+          const Color(0xFFA855F7).withValues(alpha: 0.16),
+          const Color(0xFF67E8F9).withValues(alpha: 0.18),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: frameRadius));
+    canvas.drawCircle(center, frameRadius, frameFill);
+
+    final bezel = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6
+      ..color = Colors.white.withValues(alpha: 0.22);
+    canvas.drawCircle(center, outer - 1, bezel);
+    canvas.drawCircle(center, progressRadius + 9, bezel);
+
+    final tickPaint = Paint()
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withValues(alpha: 0.18);
+    for (var i = 0; i < 12; i++) {
+      final a = (i / 12) * math.pi * 2 - math.pi / 2;
+      final inner = Offset(center.dx + math.cos(a) * (outer - 3), center.dy + math.sin(a) * (outer - 3));
+      final tip = Offset(center.dx + math.cos(a) * (outer + 2), center.dy + math.sin(a) * (outer + 2));
+      canvas.drawLine(inner, tip, tickPaint);
+    }
 
     final track = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round
       ..color = Colors.white.withValues(alpha: 0.08);
-    canvas.drawCircle(center, radius, track);
+    canvas.drawCircle(center, progressRadius, track);
 
     if (progress > 0.01) {
-      final arcRect = Rect.fromCircle(center: center, radius: radius);
+      final arcRect = Rect.fromCircle(center: center, radius: progressRadius);
       final sweep = progress.clamp(0.0, 1.0) * math.pi * 2;
+      final glowPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 16
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
+        ..color = accent.withValues(alpha: 0.22 * glowStrength);
+      canvas.drawArc(arcRect, -math.pi / 2, sweep, false, glowPaint);
       final progressPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
+        ..strokeWidth = 10
         ..strokeCap = StrokeCap.round
         ..shader = SweepGradient(
           startAngle: -math.pi / 2,
           endAngle: math.pi * 1.5,
           colors: [
-            const Color(0xFFFFD166),
-            const Color(0xFFFFF3B0),
-            accent.withValues(alpha: 0.95),
-            const Color(0xFFFFD166),
+            const Color(0xFF67E8F9),
+            accent,
+            const Color(0xFFA5F3FC),
+            const Color(0xFF67E8F9),
           ],
         ).createShader(arcRect);
       canvas.drawArc(arcRect, -math.pi / 2, sweep, false, progressPaint);
     }
 
     if (clockedIn) {
-      final highlightRect = Rect.fromCircle(center: center, radius: radius);
-      final highlightSweep = math.pi / 5;
       final highlightPaint = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
+        ..strokeWidth = 3.4
         ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.16 + glowStrength * 0.12);
-      canvas.drawArc(highlightRect, spin * math.pi * 2, highlightSweep, false, highlightPaint);
+        ..color = Colors.white.withValues(alpha: 0.28 + glowStrength * 0.18);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: progressRadius),
+        spin * math.pi * 2,
+        math.pi / 6,
+        false,
+        highlightPaint,
+      );
     }
   }
 
