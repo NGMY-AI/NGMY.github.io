@@ -6066,17 +6066,18 @@ double _ngmyClockInProgressOneMinute(DateTime? clockInStart) {
   return (elapsedMs / windowMs).clamp(0.0, 1.0);
 }
 
-/// Progress from clock-in toward full daily earnings at 12:00 PM (0.0–1.0).
-/// Midnight clock-in → fills steadily over 12 hours. Later clock-ins → shorter window, faster fill.
+/// Progress toward full daily earnings at 12:00 PM (0.0–1.0).
+/// Always uses midnight → midday (12 hours). Clocking in later does not
+/// speed the count up — the money still finishes at noon at the same pace.
 double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
   if (clockInStart == null) return 0.0;
   final now = DateTime.now();
   final noon = _ngmyTodayNoon(now);
+  final midnight = DateTime(now.year, now.month, now.day);
   if (!now.isBefore(noon)) return 1.0;
-  final start = clockInStart.isAfter(noon) ? noon : clockInStart;
-  final windowMs = noon.difference(start).inMilliseconds;
-  if (windowMs <= 0) return 1.0;
-  final elapsedMs = now.difference(start).inMilliseconds;
+  if (now.isBefore(midnight)) return 0.0;
+  const windowMs = 12 * 60 * 60 * 1000;
+  final elapsedMs = now.difference(midnight).inMilliseconds;
   if (elapsedMs <= 0) return 0.0;
   return (elapsedMs / windowMs).clamp(0.0, 1.0);
 }
@@ -15142,7 +15143,7 @@ class _LateClockInDialogState extends State<_LateClockInDialog> with SingleTicke
                   ),
                 const SizedBox(height: 12),
                 Text(
-                  'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
+                  'Daily earnings always finish at 12:00 PM midday, at the same pace no matter what time you clock in.',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white.withOpacity(0.72), fontSize: 12, height: 1.35),
                 ),
@@ -16000,7 +16001,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 10),
               Text(
-                'Daily earnings reach 100% by 12:00 PM. The later you clock in, the faster your battery fills.',
+                'Daily earnings always finish at 12:00 PM midday, at the same pace no matter what time you clock in.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 12, height: 1.35),
               ),
@@ -16250,7 +16251,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         double earned = 0;
         bool completed = false;
         final goal = widget.user.todayDailyGoal;
-        if (goal > 0 && widget.user.currentTodayEarnings >= goal - 0.0001) {
+        final reachedNoon = !now.isBefore(_ngmyTodayNoon(now));
+        if (goal > 0 && (reachedNoon || widget.user.currentTodayEarnings >= goal - 0.0001)) {
           earned = goal;
           setState(() {
             widget.user.totalProfit += earned;

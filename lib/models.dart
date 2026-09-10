@@ -417,11 +417,11 @@ class UserData {
     if (goal <= 0) return 0.0;
     final now = DateTime.now();
     final noon = DateTime(now.year, now.month, now.day, 12);
+    final midnight = DateTime(now.year, now.month, now.day);
     if (!now.isBefore(noon)) return goal;
-    final start = clockInStartTime!.isAfter(noon) ? noon : clockInStartTime!;
-    final windowMs = noon.difference(start).inMilliseconds;
-    if (windowMs <= 0) return goal;
-    final elapsedMs = now.difference(start).inMilliseconds;
+    if (now.isBefore(midnight)) return 0.0;
+    const windowMs = 12 * 60 * 60 * 1000;
+    final elapsedMs = now.difference(midnight).inMilliseconds;
     if (elapsedMs <= 0) return 0.0;
     final progress = (elapsedMs / windowMs).clamp(0.0, 1.0);
     final earnings = goal * progress;

@@ -155,7 +155,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
     final goal = user.todayDailyGoal;
     if (goal <= 0) return;
-    if (user.currentTodayEarnings < goal - 0.0001) {
+    final noon = DateTime(now.year, now.month, now.day, 12);
+    final reachedNoon = !now.isBefore(noon);
+    if (!reachedNoon && user.currentTodayEarnings < goal - 0.0001) {
       if (mounted) setState(() {});
       return;
     }
@@ -901,18 +903,16 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   double _liveEarningsAt(DateTime now) {
     final goal = user.todayDailyGoal;
     if (goal <= 0) return 0;
-    final start = user.clockInStartTime;
-    if (!user.isClockedIn || start == null) {
+    if (!user.isClockedIn || user.clockInStartTime == null) {
       return user.todayClockInEarned.clamp(0, goal).toDouble();
     }
-    final noon = DateTime(start.year, start.month, start.day, 12);
-    if (!noon.isAfter(start)) return goal;
-    if (!now.isAfter(start)) return user.todayClockInEarned.clamp(0, goal).toDouble();
+    final noon = DateTime(now.year, now.month, now.day, 12);
+    final midnight = DateTime(now.year, now.month, now.day);
     if (!now.isBefore(noon)) return goal;
-    final totalMs = noon.difference(start).inMilliseconds;
-    if (totalMs <= 0) return goal;
-    final elapsedMs = now.difference(start).inMilliseconds.clamp(0, totalMs);
-    final live = goal * (elapsedMs / totalMs);
+    if (!now.isAfter(midnight)) return user.todayClockInEarned.clamp(0, goal).toDouble();
+    const windowMs = 12 * 60 * 60 * 1000;
+    final elapsedMs = now.difference(midnight).inMilliseconds.clamp(0, windowMs);
+    final live = goal * (elapsedMs / windowMs);
     return live.clamp(user.todayClockInEarned, goal).toDouble();
   }
 
@@ -1270,26 +1270,28 @@ class _LocalClockInShowcase extends StatefulWidget {
 }
 
 class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with TickerProviderStateMixin {
-  late final AnimationController _spinCtrl;
+  late final AnimationController _countCtrl;
   late final AnimationController _glowCtrl;
 
   @override
   void initState() {
     super.initState();
-    _spinCtrl = AnimationController(vsync: this, duration: const Duration(seconds: 14))..repeat();
+    _countCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
     _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _spinCtrl.dispose();
+    _countCtrl.dispose();
     _glowCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final status = widget.clockedIn ? 'ACTIVE' : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN');
+    final status = widget.clockedIn
+        ? 'COUNTING TO 12 PM'
+        : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN');
     final name = widget.profileDisplayName.trim().isEmpty ? 'Member' : widget.profileDisplayName.trim().toUpperCase();
 
     return InkWell(
@@ -1361,7 +1363,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                 final live = widget.liveEarningsAt(now);
                 final progress = widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0);
                 return AnimatedBuilder(
-                  animation: Listenable.merge([_spinCtrl, _glowCtrl]),
+                  animation: Listenable.merge([_countCtrl, _glowCtrl]),
                   builder: (context, _) {
                     final glow = 0.55 + _glowCtrl.value * 0.45;
                     return Center(
@@ -1373,9 +1375,9 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                           children: [
                             CustomPaint(
                               size: const Size(276, 276),
-                              painter: _ClockInRingPainter(
+                              painter: _ClockInMoneyCountPainter(
                                 progress: progress,
-                                spin: _spinCtrl.value,
+                                wave: _countCtrl.value,
                                 clockedIn: widget.clockedIn,
                                 accent: widget.green,
                                 glowStrength: glow,
@@ -1386,18 +1388,10 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                               height: 176,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  center: const Alignment(-0.25, -0.35),
-                                  radius: 1.05,
-                                  colors: [
-                                    const Color(0xFF243044),
-                                    const Color(0xFF141A24),
-                                    const Color(0xFF0A0D12),
-                                  ],
-                                ),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.14), width: 1.2),
+                                color: Colors.transparent,
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1.2),
                                 boxShadow: [
-                                  BoxShadow(color: Colors.black.withValues(alpha: 0.50), blurRadius: 24, offset: const Offset(0, 10)),
+                                  BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 24, offset: const Offset(0, 10)),
                                   BoxShadow(
                                     color: (widget.clockedIn ? widget.green : const Color(0xFF22D3EE)).withValues(alpha: 0.16),
                                     blurRadius: 28,
@@ -1408,18 +1402,18 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    widget.clockedIn ? Icons.bolt_rounded : Icons.fingerprint_rounded,
+                                    widget.clockedIn ? Icons.payments_rounded : Icons.fingerprint_rounded,
                                     color: widget.clockedIn ? widget.green : const Color(0xFF67E8F9),
                                     size: 26,
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'DAILY EARNINGS',
+                                    'COUNTING TO 12 PM',
                                     style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.55),
+                                      color: Colors.white.withValues(alpha: 0.62),
                                       fontSize: 9,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.4,
+                                      letterSpacing: 1.2,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
@@ -1488,17 +1482,17 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
   }
 }
 
-class _ClockInRingPainter extends CustomPainter {
-  _ClockInRingPainter({
+class _ClockInMoneyCountPainter extends CustomPainter {
+  _ClockInMoneyCountPainter({
     required this.progress,
-    required this.spin,
+    required this.wave,
     required this.clockedIn,
     required this.accent,
     required this.glowStrength,
   });
 
   final double progress;
-  final double spin;
+  final double wave;
   final bool clockedIn;
   final Color accent;
   final double glowStrength;
@@ -1508,7 +1502,7 @@ class _ClockInRingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final outer = size.width / 2 - 4;
     final frameRadius = outer - 7;
-    final progressRadius = outer - 18;
+    final bowlRadius = outer - 22;
 
     final frameFill = Paint()
       ..style = PaintingStyle.stroke
@@ -1528,7 +1522,7 @@ class _ClockInRingPainter extends CustomPainter {
       ..strokeWidth = 1.6
       ..color = Colors.white.withValues(alpha: 0.22);
     canvas.drawCircle(center, outer - 1, bezel);
-    canvas.drawCircle(center, progressRadius + 9, bezel);
+    canvas.drawCircle(center, bowlRadius + 8, bezel);
 
     final tickPaint = Paint()
       ..strokeWidth = 1.4
@@ -1541,60 +1535,103 @@ class _ClockInRingPainter extends CustomPainter {
       canvas.drawLine(inner, tip, tickPaint);
     }
 
-    final track = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.08);
-    canvas.drawCircle(center, progressRadius, track);
+    canvas.save();
+    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: bowlRadius)));
 
-    if (progress > 0.01) {
-      final arcRect = Rect.fromCircle(center: center, radius: progressRadius);
-      final sweep = progress.clamp(0.0, 1.0) * math.pi * 2;
-      final glowPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 16
-        ..strokeCap = StrokeCap.round
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8)
-        ..color = accent.withValues(alpha: 0.22 * glowStrength);
-      canvas.drawArc(arcRect, -math.pi / 2, sweep, false, glowPaint);
-      final progressPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 10
-        ..strokeCap = StrokeCap.round
-        ..shader = SweepGradient(
-          startAngle: -math.pi / 2,
-          endAngle: math.pi * 1.5,
-          colors: [
-            const Color(0xFF67E8F9),
-            accent,
-            const Color(0xFFA5F3FC),
-            const Color(0xFF67E8F9),
-          ],
-        ).createShader(arcRect);
-      canvas.drawArc(arcRect, -math.pi / 2, sweep, false, progressPaint);
+    canvas.drawRect(
+      Rect.fromCircle(center: center, radius: bowlRadius),
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.25, -0.35),
+          radius: 1.05,
+          colors: [Color(0xFF243044), Color(0xFF141A24), Color(0xFF0A0D12)],
+        ).createShader(Rect.fromCircle(center: center, radius: bowlRadius)),
+    );
+
+    final fill = progress.clamp(0.0, 1.0);
+    if (fill > 0.004) {
+      final surfaceY = center.dy + bowlRadius - (bowlRadius * 2 * fill);
+      final waveAmp = clockedIn ? 4.6 : 1.6;
+      final fillPath = Path()
+        ..moveTo(center.dx - bowlRadius, center.dy + bowlRadius + 4);
+      for (var x = center.dx - bowlRadius; x <= center.dx + bowlRadius; x += 3) {
+        final t = (x - center.dx) / bowlRadius;
+        final y = surfaceY +
+            math.sin((t * math.pi * 2) + (wave * math.pi * 2)) * waveAmp +
+            math.sin((t * math.pi * 3.2) - (wave * math.pi * 2.4)) * (waveAmp * 0.45);
+        fillPath.lineTo(x, y);
+      }
+      fillPath
+        ..lineTo(center.dx + bowlRadius, center.dy + bowlRadius + 4)
+        ..close();
+
+      canvas.drawPath(
+        fillPath,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              accent.withValues(alpha: 0.22 + glowStrength * 0.10),
+              const Color(0xFF2EF6A3).withValues(alpha: 0.38),
+              const Color(0xFF0F766E).withValues(alpha: 0.72),
+            ],
+          ).createShader(Rect.fromCircle(center: center, radius: bowlRadius)),
+      );
+
+      canvas.drawPath(
+        fillPath,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2
+          ..color = Colors.white.withValues(alpha: 0.22 + glowStrength * 0.10),
+      );
     }
 
     if (clockedIn) {
-      final highlightPaint = Paint()
+      final coinPaint = Paint()..color = const Color(0xFFFDE68A).withValues(alpha: 0.86);
+      final coinEdge = Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.4
-        ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: 0.28 + glowStrength * 0.18);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: progressRadius),
-        spin * math.pi * 2,
-        math.pi / 6,
-        false,
-        highlightPaint,
-      );
+        ..strokeWidth = 1.2
+        ..color = const Color(0xFFF59E0B).withValues(alpha: 0.90);
+      for (var i = 0; i < 9; i++) {
+        final seed = (i * 0.137) + 0.08;
+        final rise = ((wave + seed) % 1.0);
+        final sway = math.sin((wave * math.pi * 2) + i * 1.7) * bowlRadius * 0.34;
+        final x = center.dx + sway * (0.35 + (i % 3) * 0.18);
+        final y = center.dy + bowlRadius * 0.72 - rise * bowlRadius * 1.55;
+        final dx = x - center.dx;
+        final dy = y - center.dy;
+        final inside = (dx * dx + dy * dy) < (bowlRadius - 8) * (bowlRadius - 8);
+        final inFill = y > (center.dy + bowlRadius - (bowlRadius * 2 * fill)) - 10;
+        if (!inside || !inFill) continue;
+        final r = 5.0 + (i % 3);
+        canvas.drawCircle(Offset(x, y), r, coinPaint);
+        canvas.drawCircle(Offset(x, y), r, coinEdge);
+        if (r >= 7) {
+          final dollar = TextPainter(
+            text: const TextSpan(
+              text: r'$',
+              style: TextStyle(
+                color: Color(0xFF92400E),
+                fontSize: 8,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            textDirection: TextDirection.ltr,
+          )..layout();
+          dollar.paint(canvas, Offset(x - dollar.width / 2, y - dollar.height / 2));
+        }
+      }
     }
+
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _ClockInRingPainter oldDelegate) =>
+  bool shouldRepaint(covariant _ClockInMoneyCountPainter oldDelegate) =>
       oldDelegate.progress != progress ||
-      oldDelegate.spin != spin ||
+      oldDelegate.wave != wave ||
       oldDelegate.clockedIn != clockedIn ||
       oldDelegate.glowStrength != glowStrength;
 }
