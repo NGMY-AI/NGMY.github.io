@@ -9639,7 +9639,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     };
     NgmyFeatureSyncSession.onEnteredGrowthIncomeUser = () {
       _startUserTransactionSync();
-      unawaited(_pullGrowthIncomeWalletFromCloud());
+      Future<void>.delayed(const Duration(milliseconds: 500), () {
+        unawaited(_pullGrowthIncomeWalletFromCloud());
+      });
     };
     NgmyFeatureSyncSession.onLeftGrowthIncomeUser = () {
       _userTxnSyncTimer?.cancel();

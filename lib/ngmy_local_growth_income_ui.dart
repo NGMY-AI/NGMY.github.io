@@ -118,7 +118,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     _user = NgmyLocalGrowthIncomeStore.previewUser(widget.liveUser);
     _mirrorWalletOntoLiveUser();
     _publishAppBalance(_user!.accountBalance, allowDecrease: true);
-    unawaited(_load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_load());
+    });
     _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
       unawaited(_pullCloudWallet());
     });
@@ -1004,36 +1006,35 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-              decoration: BoxDecoration(
-                color: card,
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: glassGreen, shape: BoxShape.circle),
-                      ),
-                      const SizedBox(width: 10),
-                      Text('LIVE ACTIVITY', style: TextStyle(color: muted, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1)),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  if (recent.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      child: Text('No activity yet. Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
-                    )
-                  else
-                    ...recent.map((t) => _activityRow(context, t, isDark: true)),
-                ],
+            _giFramedCard(
+              radius: 24,
+              accent: glassGreen,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(color: glassGreen, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 10),
+                        Text('LIVE ACTIVITY', style: TextStyle(color: muted, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    if (recent.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: Text('No activity yet. Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
+                      )
+                    else
+                      ...recent.map((t) => _activityRow(context, t, isDark: true)),
+                  ],
+                ),
               ),
             ),
           ],
@@ -1077,135 +1078,194 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     required Color card,
     VoidCallback? onTap,
   }) {
-    final content = Container(
-      height: 88,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+    final content = _giFramedCard(
+      radius: 18,
+      accent: iconColor,
+      child: SizedBox(
+        height: 88,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 29,
+                    height: 29,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [iconColor.withValues(alpha: 0.95), iconColor.withValues(alpha: 0.55)],
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                      boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.28), blurRadius: 12)],
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 17),
+                  ),
+                  const SizedBox(width: 9),
+                  Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w800, fontSize: 12)),
+                ],
+              ),
+              const Spacer(),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 20)),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    );
+    if (onTap == null) return content;
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: content);
+  }
+
+  Widget _networkStatus({required Color card, required Color green}) {
+    return _giFramedCard(
+      radius: 22,
+      accent: green,
+      child: SizedBox(
+        height: 76,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: Row(
             children: [
               Container(
-                width: 29,
-                height: 29,
+                width: 46,
+                height: 46,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [iconColor.withValues(alpha: 0.95), iconColor.withValues(alpha: 0.55)],
+                    colors: [green.withValues(alpha: 0.92), const Color(0xFF047857).withValues(alpha: 0.65)],
                   ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.22), blurRadius: 12)],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.44), blurRadius: 18)],
                 ),
-                child: Icon(icon, color: Colors.white, size: 17),
+                child: const Icon(Icons.wifi_rounded, color: Colors.white, size: 25),
               ),
-              const SizedBox(width: 9),
-              Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
+                    Text('Real-time statistics', style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: onOpenGameCenter,
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding: const EdgeInsets.all(2.2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.55),
+                        green.withValues(alpha: 0.70),
+                        Colors.white.withValues(alpha: 0.22),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
+                      BoxShadow(color: green.withValues(alpha: 0.28), blurRadius: 14),
+                    ],
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [green.withValues(alpha: 0.95), const Color(0xFF16A34A).withValues(alpha: 0.82)],
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.sports_esports_rounded, color: Colors.white, size: 14),
+                        SizedBox(width: 6),
+                        Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                        SizedBox(width: 7),
+                        Icon(Icons.flash_on_rounded, color: Colors.white, size: 13),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-          const Spacer(),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 20)),
-        ],
+        ),
       ),
     );
-    if (onTap == null) return content;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(14), child: content);
   }
 
-  Widget _networkStatus({required Color card, required Color green}) {
+  Widget _giFramedCard({
+    required Widget child,
+    required double radius,
+    Color accent = const Color(0xFF2EF6A3),
+  }) {
     return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-        boxShadow: [BoxShadow(color: green.withValues(alpha: 0.14), blurRadius: 20)],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [green.withValues(alpha: 0.92), const Color(0xFF047857).withValues(alpha: 0.65)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-              boxShadow: [BoxShadow(color: green.withValues(alpha: 0.44), blurRadius: 18)],
-            ),
-            child: const Icon(Icons.wifi_rounded, color: Colors.white, size: 25),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-                Text('Real-time statistics', style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12, fontWeight: FontWeight.w600)),
-              ],
-            ),
-          ),
-          InkWell(
-            onTap: onOpenGameCenter,
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [green.withValues(alpha: 0.88), const Color(0xFF16A34A).withValues(alpha: 0.70)],
-                ),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.30)),
-                boxShadow: [BoxShadow(color: green.withValues(alpha: 0.46), blurRadius: 16)],
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.sports_esports_rounded, color: Colors.white, size: 14),
-                  SizedBox(width: 6),
-                  Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                  SizedBox(width: 7),
-                  Icon(Icons.flash_on_rounded, color: Colors.white, size: 13),
-                ],
-              ),
-            ),
-          ),
+        borderRadius: BorderRadius.circular(radius + 3),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.28),
+            accent.withValues(alpha: 0.34),
+            Colors.white.withValues(alpha: 0.10),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.42), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(color: accent.withValues(alpha: 0.14), blurRadius: 20, offset: const Offset(0, 3)),
         ],
+      ),
+      padding: const EdgeInsets.all(1.7),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF262B34), Color(0xFF16191F)],
+          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: child,
       ),
     );
   }
 
   Widget _smallTotalBox(String title, String value, {required Color card, VoidCallback? onTap}) {
-    final content = Container(
-      height: 76,
-      padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontSize: 11, fontWeight: FontWeight.w800)),
-          const Spacer(),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-        ],
+    final content = _giFramedCard(
+      radius: 18,
+      accent: const Color(0xFF67E8F9),
+      child: SizedBox(
+        height: 76,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontSize: 11, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
       ),
     );
     if (onTap == null) return content;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(18), child: content);
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: content);
   }
 
   Widget _activityRow(BuildContext context, AppTransaction t, {required bool isDark}) {
@@ -1269,21 +1329,18 @@ class _LocalClockInShowcase extends StatefulWidget {
   State<_LocalClockInShowcase> createState() => _LocalClockInShowcaseState();
 }
 
-class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with TickerProviderStateMixin {
+class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with SingleTickerProviderStateMixin {
   late final AnimationController _countCtrl;
-  late final AnimationController _glowCtrl;
 
   @override
   void initState() {
     super.initState();
-    _countCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))..repeat();
-    _glowCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
+    _countCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
   }
 
   @override
   void dispose() {
     _countCtrl.dispose();
-    _glowCtrl.dispose();
     super.dispose();
   }
 
@@ -1296,344 +1353,196 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
 
     return InkWell(
       onTap: widget.clockedIn ? null : () => unawaited(widget.onClockIn()),
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(30),
       child: Container(
-        height: 392,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(32),
-          gradient: const LinearGradient(
+          borderRadius: BorderRadius.circular(30),
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1A2330), Color(0xFF12161E), Color(0xFF0C1016)],
+            colors: [
+              Colors.white.withValues(alpha: 0.28),
+              widget.green.withValues(alpha: 0.38),
+              Colors.white.withValues(alpha: 0.10),
+            ],
           ),
-          border: Border.all(color: const Color(0xFF67E8F9).withValues(alpha: 0.22), width: 1.4),
           boxShadow: [
-            BoxShadow(color: const Color(0xFF22D3EE).withValues(alpha: 0.10), blurRadius: 28, offset: const Offset(0, 12)),
-            BoxShadow(color: widget.green.withValues(alpha: 0.08), blurRadius: 18, offset: const Offset(-6, -4)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.46), blurRadius: 22, offset: const Offset(0, 10)),
+            BoxShadow(color: widget.green.withValues(alpha: 0.16), blurRadius: 24),
           ],
         ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(right: -30, top: -36, child: _glowBlob(const Color(0xFF22D3EE), 120)),
-            Positioned(left: -36, bottom: -40, child: _glowBlob(widget.green, 130)),
-            Positioned(
-              top: 14,
-              left: 14,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 176),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    color: Colors.white.withValues(alpha: 0.06),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: widget.clockedIn ? widget.green : const Color(0xFF67E8F9),
-                          boxShadow: [BoxShadow(color: widget.green.withValues(alpha: 0.5), blurRadius: 8)],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.8),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+        padding: const EdgeInsets.all(1.8),
+        child: Container(
+          height: 286,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1C2430), Color(0xFF10141B)],
             ),
-            StreamBuilder<DateTime>(
-              stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
-              initialData: DateTime.now(),
-              builder: (context, snapshot) {
-                final now = snapshot.data ?? DateTime.now();
-                final live = widget.liveEarningsAt(now);
-                final progress = widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0);
-                return AnimatedBuilder(
-                  animation: Listenable.merge([_countCtrl, _glowCtrl]),
-                  builder: (context, _) {
-                    final glow = 0.55 + _glowCtrl.value * 0.45;
-                    return Center(
-                      child: SizedBox(
-                        width: 276,
-                        height: 276,
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            CustomPaint(
-                              size: const Size(276, 276),
-                              painter: _ClockInMoneyCountPainter(
-                                progress: progress,
-                                wave: _countCtrl.value,
-                                clockedIn: widget.clockedIn,
-                                accent: widget.green,
-                                glowStrength: glow,
+          ),
+          child: StreamBuilder<DateTime>(
+            stream: Stream.periodic(const Duration(seconds: 1), (_) => DateTime.now()),
+            initialData: DateTime.now(),
+            builder: (context, snapshot) {
+              final now = snapshot.data ?? DateTime.now();
+              final live = widget.liveEarningsAt(now);
+              final progress = widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0);
+              return AnimatedBuilder(
+                animation: _countCtrl,
+                builder: (context, _) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: FractionallySizedBox(
+                              widthFactor: 1,
+                              heightFactor: progress.clamp(0.04, 1.0),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      widget.green.withValues(alpha: widget.clockedIn ? 0.55 : 0.22),
+                                      const Color(0xFF047857).withValues(alpha: 0.88),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                            Container(
-                              width: 176,
-                              height: 176,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.transparent,
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.10), width: 1.2),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withValues(alpha: 0.28), blurRadius: 24, offset: const Offset(0, 10)),
-                                  BoxShadow(
-                                    color: (widget.clockedIn ? widget.green : const Color(0xFF22D3EE)).withValues(alpha: 0.16),
-                                    blurRadius: 28,
+                          ),
+                        ),
+                        if (widget.clockedIn)
+                          ...List.generate(6, (i) {
+                            final t = (_countCtrl.value + i * 0.16) % 1.0;
+                            final left = 18.0 + (i * 52.0) % 240.0;
+                            return Positioned(
+                              left: left,
+                              bottom: 18 + t * 210,
+                              child: Opacity(
+                                opacity: (1 - t).clamp(0.15, 0.95),
+                                child: Text(
+                                  r'$',
+                                  style: TextStyle(
+                                    color: const Color(0xFFFDE68A).withValues(alpha: 0.9),
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 16 + (i % 3) * 3,
                                   ),
-                                ],
+                                ),
                               ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                            );
+                          }),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Icon(
-                                    widget.clockedIn ? Icons.payments_rounded : Icons.fingerprint_rounded,
-                                    color: widget.clockedIn ? widget.green : const Color(0xFF67E8F9),
-                                    size: 26,
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'COUNTING TO 12 PM',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.62),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  TweenAnimationBuilder<double>(
-                                    tween: Tween<double>(begin: live, end: live),
-                                    duration: const Duration(milliseconds: 900),
-                                    curve: Curves.easeOutCubic,
-                                    builder: (context, value, _) => Text(
-                                      '\$${formatCurrency(value)}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: -0.6,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(999),
-                                      color: (widget.clockedIn ? widget.green : const Color(0xFF67E8F9)).withValues(alpha: 0.14),
-                                      border: Border.all(
-                                        color: (widget.clockedIn ? widget.green : const Color(0xFF67E8F9)).withValues(alpha: 0.45),
-                                      ),
+                                      color: Colors.black.withValues(alpha: 0.28),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                                    ),
+                                    child: Text(
+                                      name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.7),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(999),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                                      color: (widget.clockedIn ? widget.green : const Color(0xFF67E8F9)).withValues(alpha: 0.16),
                                     ),
                                     child: Text(
                                       status,
                                       style: TextStyle(
                                         color: widget.clockedIn ? widget.green : const Color(0xFFA5F3FC),
-                                        fontSize: 9,
+                                        fontSize: 10,
                                         fontWeight: FontWeight.w900,
-                                        letterSpacing: 1.1,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+                              const Spacer(),
+                              Text(
+                                widget.clockedIn ? 'MONEY COUNTING' : 'DAILY EARNINGS',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.68),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '\$${formatCurrency(live)}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 40,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Finishes at 12:00 PM midday',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.62),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(999),
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                                ),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor: progress.clamp(0.02, 1.0),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(999),
+                                        gradient: LinearGradient(
+                                          colors: [widget.green, const Color(0xFF67E8F9)],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ],
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );
   }
-
-  Widget _glowBlob(Color color, double size) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0)]),
-        ),
-      ),
-    );
-  }
-}
-
-class _ClockInMoneyCountPainter extends CustomPainter {
-  _ClockInMoneyCountPainter({
-    required this.progress,
-    required this.wave,
-    required this.clockedIn,
-    required this.accent,
-    required this.glowStrength,
-  });
-
-  final double progress;
-  final double wave;
-  final bool clockedIn;
-  final Color accent;
-  final double glowStrength;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final outer = size.width / 2 - 4;
-    final frameRadius = outer - 7;
-    final bowlRadius = outer - 22;
-
-    final frameFill = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 14
-      ..shader = SweepGradient(
-        colors: [
-          const Color(0xFF67E8F9).withValues(alpha: 0.18),
-          accent.withValues(alpha: 0.28),
-          const Color(0xFFA855F7).withValues(alpha: 0.16),
-          const Color(0xFF67E8F9).withValues(alpha: 0.18),
-        ],
-      ).createShader(Rect.fromCircle(center: center, radius: frameRadius));
-    canvas.drawCircle(center, frameRadius, frameFill);
-
-    final bezel = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..color = Colors.white.withValues(alpha: 0.22);
-    canvas.drawCircle(center, outer - 1, bezel);
-    canvas.drawCircle(center, bowlRadius + 8, bezel);
-
-    final tickPaint = Paint()
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.18);
-    for (var i = 0; i < 12; i++) {
-      final a = (i / 12) * math.pi * 2 - math.pi / 2;
-      final inner = Offset(center.dx + math.cos(a) * (outer - 3), center.dy + math.sin(a) * (outer - 3));
-      final tip = Offset(center.dx + math.cos(a) * (outer + 2), center.dy + math.sin(a) * (outer + 2));
-      canvas.drawLine(inner, tip, tickPaint);
-    }
-
-    canvas.save();
-    canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: bowlRadius)));
-
-    canvas.drawRect(
-      Rect.fromCircle(center: center, radius: bowlRadius),
-      Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.25, -0.35),
-          radius: 1.05,
-          colors: [Color(0xFF243044), Color(0xFF141A24), Color(0xFF0A0D12)],
-        ).createShader(Rect.fromCircle(center: center, radius: bowlRadius)),
-    );
-
-    final fill = progress.clamp(0.0, 1.0);
-    if (fill > 0.004) {
-      final surfaceY = center.dy + bowlRadius - (bowlRadius * 2 * fill);
-      final waveAmp = clockedIn ? 4.6 : 1.6;
-      final fillPath = Path()
-        ..moveTo(center.dx - bowlRadius, center.dy + bowlRadius + 4);
-      for (var x = center.dx - bowlRadius; x <= center.dx + bowlRadius; x += 3) {
-        final t = (x - center.dx) / bowlRadius;
-        final y = surfaceY +
-            math.sin((t * math.pi * 2) + (wave * math.pi * 2)) * waveAmp +
-            math.sin((t * math.pi * 3.2) - (wave * math.pi * 2.4)) * (waveAmp * 0.45);
-        fillPath.lineTo(x, y);
-      }
-      fillPath
-        ..lineTo(center.dx + bowlRadius, center.dy + bowlRadius + 4)
-        ..close();
-
-      canvas.drawPath(
-        fillPath,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              accent.withValues(alpha: 0.22 + glowStrength * 0.10),
-              const Color(0xFF2EF6A3).withValues(alpha: 0.38),
-              const Color(0xFF0F766E).withValues(alpha: 0.72),
-            ],
-          ).createShader(Rect.fromCircle(center: center, radius: bowlRadius)),
-      );
-
-      canvas.drawPath(
-        fillPath,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2
-          ..color = Colors.white.withValues(alpha: 0.22 + glowStrength * 0.10),
-      );
-    }
-
-    if (clockedIn) {
-      final coinPaint = Paint()..color = const Color(0xFFFDE68A).withValues(alpha: 0.86);
-      final coinEdge = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2
-        ..color = const Color(0xFFF59E0B).withValues(alpha: 0.90);
-      for (var i = 0; i < 9; i++) {
-        final seed = (i * 0.137) + 0.08;
-        final rise = ((wave + seed) % 1.0);
-        final sway = math.sin((wave * math.pi * 2) + i * 1.7) * bowlRadius * 0.34;
-        final x = center.dx + sway * (0.35 + (i % 3) * 0.18);
-        final y = center.dy + bowlRadius * 0.72 - rise * bowlRadius * 1.55;
-        final dx = x - center.dx;
-        final dy = y - center.dy;
-        final inside = (dx * dx + dy * dy) < (bowlRadius - 8) * (bowlRadius - 8);
-        final inFill = y > (center.dy + bowlRadius - (bowlRadius * 2 * fill)) - 10;
-        if (!inside || !inFill) continue;
-        final r = 5.0 + (i % 3);
-        canvas.drawCircle(Offset(x, y), r, coinPaint);
-        canvas.drawCircle(Offset(x, y), r, coinEdge);
-        if (r >= 7) {
-          final dollar = TextPainter(
-            text: const TextSpan(
-              text: r'$',
-              style: TextStyle(
-                color: Color(0xFF92400E),
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            textDirection: TextDirection.ltr,
-          )..layout();
-          dollar.paint(canvas, Offset(x - dollar.width / 2, y - dollar.height / 2));
-        }
-      }
-    }
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _ClockInMoneyCountPainter oldDelegate) =>
-      oldDelegate.progress != progress ||
-      oldDelegate.wave != wave ||
-      oldDelegate.clockedIn != clockedIn ||
-      oldDelegate.glowStrength != glowStrength;
 }
 
 /// Wallet tab for Growth Income (deposit / withdraw / history).
