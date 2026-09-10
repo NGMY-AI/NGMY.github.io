@@ -8703,6 +8703,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<void> _performLogout() async {
     _userExplicitlyLoggedOut = true;
+    _MainScreenState.clearSessionTab();
     _resetWalletLedgerSyncState();
     _pauseBackgroundSync(disableRealtimeLoop: true);
     await ngmyWriteUserLoggedOutFlag(true);
@@ -15720,11 +15721,17 @@ class NgmyAdminLiveRefresh {
   }
 }
 
+/// Keeps the main tab (NGMY hub, etc.) if the shell remounts after a swipe-back.
+int? _ngmySessionMainTabIdx;
+
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
   Timer? _metricsDebounce;
 
+  static void clearSessionTab() => _ngmySessionMainTabIdx = null;
+
   void _goToMainTab(int i, {bool refreshLegal = false}) {
+    _ngmySessionMainTabIdx = i;
     setState(() {
       _idx = i;
       _visitedTabs.add(i);
@@ -16143,9 +16150,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     _mainShellMountedAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
-    // Always land on Home for a fresh shell. Never restore a previous tab — that
-    // fought mid-session stability and is wrong for cold open (close → reopen).
-    _idx = 0;
+    // Keep the tab the user was on (NGMY hub, etc.) if this shell remounts
+    // after swipe-back. Cold start / logout still land on Home.
+    _idx = (_ngmySessionMainTabIdx ?? 0).clamp(0, 6);
+    _visitedTabs.add(_idx);
     try {
       SharedPreferences.getInstance().then((p) => p.remove('ngmy_main_tab_idx')).catchError((_) {});
     } catch (_) {}
@@ -16871,20 +16879,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 240),
+                  duration: const Duration(milliseconds: 200),
                   width: NgmyBottomNavMetrics.centerButtonSize,
                   height: NgmyBottomNavMetrics.centerButtonSize,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
+                    color: _idx == i
+                        ? const Color(0xFF6D28D9)
+                        : (Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF2A2438)
+                            : const Color(0xFFEEEDF5)),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6200EE).withValues(alpha: _idx == i ? 0.55 : 0.35),
-                        blurRadius: _idx == i ? 16 : 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    border: Border.all(color: _idx == i ? Colors.white : Colors.white24, width: _idx == i ? 2.2 : 1.2),
+                    border: Border.all(
+                      color: _idx == i ? const Color(0xFFC4B5FD) : const Color(0xFF7C6FA8).withValues(alpha: 0.45),
+                      width: 1.4,
+                    ),
                   ),
                   child: Center(
                     child: ClipRRect(

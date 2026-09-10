@@ -83,7 +83,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   bool _cloudBusy = false;
   int _idx = 0;
   bool _investPurchaseInFlight = false;
-  bool _loading = true;
   Timer? _balancePoll;
   Timer? _earningsTick;
 
@@ -116,6 +115,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
     WidgetsBinding.instance.addObserver(this);
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
+    _user = NgmyLocalGrowthIncomeStore.previewUser(widget.liveUser);
+    _mirrorWalletOntoLiveUser();
+    _publishAppBalance(_user!.accountBalance, allowDecrease: true);
     unawaited(_load());
     _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
       unawaited(_pullCloudWallet());
@@ -447,7 +449,6 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _transactions = transactions;
       _walletStateRevision = revision;
       _walletUpdatedAt = DateTime.now().toUtc();
-      _loading = false;
     });
     unawaited(_persist(
       bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty,
@@ -703,10 +704,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0B0F18) : const Color(0xFFF4F6FB);
 
-    if (_loading || _user == null) {
-      return Scaffold(
-        backgroundColor: bg,
-        body: const Center(child: CircularProgressIndicator(color: WorksheetPalette.green)),
+    if (_user == null) {
+      return ColoredBox(
+        color: bg,
+        child: const SizedBox.expand(),
       );
     }
 

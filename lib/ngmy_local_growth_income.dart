@@ -166,6 +166,25 @@ class NgmyLocalGrowthIncomeStore {
         username: live.username,
       );
 
+  /// Immediate first frame so Growth Income never shows a spinner.
+  static UserData previewUser(UserData live) {
+    final user = _freshUser(live.email, live);
+    user.accountBalance = live.accountBalance.clamp(0.0, double.infinity);
+    user.totalProfit = live.totalProfit;
+    final inv = live.activeInvestment;
+    if (inv != null) {
+      user.activeInvestment = ActiveInvestment(
+        name: inv.name,
+        amount: inv.amount,
+        dailyROI: inv.dailyROI,
+        purchaseDate: inv.purchaseDate,
+        daysClockedIn: inv.daysClockedIn,
+        totalEarned: inv.totalEarned,
+      );
+    }
+    return user;
+  }
+
   static void _resetFinancialState(UserData user) {
     user.accountBalance = 0;
     user.totalProfit = 0;

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 int _stackDepth = 0;
 int _suppressPopState = 0;
 bool _popFromBrowser = false;
+DateTime? _lastBrowserBackAt;
 
 Route<T> ngmyBuildRoute<T extends Object?>(
   WidgetBuilder builder, {
@@ -34,9 +35,8 @@ Route<T> ngmyBuildRoute<T extends Object?>(
   );
 }
 
-/// Browser/OS back (including iOS swipe-from-edge): ask Flutter to pop one
-/// route, honoring PopScope so in-screen tabs go back one step instead of
-/// jumping to Home.
+/// Browser/OS back (including iOS swipe-from-edge): pop exactly one Flutter
+/// route. Never drain the stack down to Home in a single swipe.
 void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
   html.window.history.replaceState(<String, dynamic>{'ngmy': 0}, '', html.window.location.href);
   _stackDepth = 0;
@@ -51,6 +51,13 @@ void installWebHistorySync(GlobalKey<NavigatorState> navigatorKey) {
 }
 
 Future<void> _onBrowserBack(GlobalKey<NavigatorState> navigatorKey) async {
+  final now = DateTime.now();
+  if (_lastBrowserBackAt != null && now.difference(_lastBrowserBackAt!) < const Duration(milliseconds: 480)) {
+    _restoreHistoryEntry();
+    return;
+  }
+  _lastBrowserBackAt = now;
+
   final nav = navigatorKey.currentState;
   if (nav == null || !nav.mounted) {
     _restoreHistoryEntry();
@@ -65,9 +72,6 @@ Future<void> _onBrowserBack(GlobalKey<NavigatorState> navigatorKey) async {
     return;
   }
 
-  // PopScope consumed the back (previous tab / previous in-screen page).
-  // Put the history entry back so the next swipe can go back again, and so
-  // we do not fall out of the app to Home/blank.
   _popFromBrowser = false;
   _restoreHistoryEntry();
 }
@@ -100,11 +104,7 @@ void onNavigatorDidPop() {
     _markSessionBusy(_stackDepth > 0);
     return;
   }
-  if (_stackDepth > 0) {
-    _stackDepth--;
-    _suppressPopState++;
-    html.window.history.back();
-  }
+  if (_stackDepth > 0) _stackDepth--;
   _markSessionBusy(_stackDepth > 0);
 }
 
