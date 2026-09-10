@@ -16883,20 +16883,20 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               height: NgmyBottomNavMetrics.barHeight,
               child: Center(
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 240),
                   width: NgmyBottomNavMetrics.centerButtonSize,
                   height: NgmyBottomNavMetrics.centerButtonSize,
                   decoration: BoxDecoration(
-                    color: _idx == i
-                        ? const Color(0xFF6D28D9)
-                        : (Theme.of(context).brightness == Brightness.dark
-                            ? const Color(0xFF2A2438)
-                            : const Color(0xFFEEEDF5)),
+                    gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFFBB86FC)]),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: _idx == i ? const Color(0xFFC4B5FD) : const Color(0xFF7C6FA8).withValues(alpha: 0.45),
-                      width: 1.4,
-                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6200EE).withValues(alpha: _idx == i ? 0.55 : 0.35),
+                        blurRadius: _idx == i ? 16 : 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(color: _idx == i ? Colors.white : Colors.white24, width: _idx == i ? 2.2 : 1.2),
                   ),
                   child: Center(
                     child: ClipRRect(
