@@ -37,8 +37,8 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final height = widgetBarHeight;
-    final radius = widget.borderRadius ?? 22.0;
+    final height = barHeight ?? NgmyBottomNavMetrics.barHeight;
+    final radius = borderRadius ?? 22.0;
 
     return SizedBox(
       height: height,
@@ -65,8 +65,6 @@ class NgmySculptedBottomNavFrame extends StatelessWidget {
       ),
     );
   }
-
-  double get widgetBarHeight => barHeight ?? NgmyBottomNavMetrics.barHeight;
 }
 
 /// Sliding selection highlight behind the active bottom-nav tab.
