@@ -99,4 +99,58 @@ void main() {
     expect(NgmyCivicRegistryAccess.sessionEpochOf(member), isNotNull);
     expect(member['accessLockHours'], 6);
   });
+
+  test('a finished membership verify is not bounced by leftover local flags', () {
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.loggedOut,
+      ),
+      isFalse,
+    );
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.removed,
+      ),
+      isFalse,
+    );
+  });
+
+  test('registrar restrict, removal, or a changed state code still bounce them', () {
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.ok,
+        remoteBlocked: 'locked',
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.ok,
+        remoteBlocked: 'removed',
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.ok,
+        remoteBlocked: 'pin',
+        pinSigIsServerIssued: true,
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+        alreadyUnlocked: true,
+        localKind: NgmyCivicAccessKind.ok,
+        remoteBlocked: 'pin',
+        pinSigIsServerIssued: false,
+      ),
+      isFalse,
+    );
+  });
 }

@@ -73,6 +73,7 @@ Future<({bool allowed, String? error, String? blocked})> ngmyCivicCheckAccess({
   String registryId = '',
   String fullName = '',
   String pinSig = '',
+  String unlockAt = '',
 }) async {
   final data = await ngmyCivicInvoke({
     'action': 'civicCheckAccess',
@@ -82,6 +83,7 @@ Future<({bool allowed, String? error, String? blocked})> ngmyCivicCheckAccess({
     if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
     if (fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
     if (pinSig.trim().isNotEmpty) 'pinSig': pinSig.trim(),
+    if (unlockAt.trim().isNotEmpty) 'unlockAt': unlockAt.trim(),
   });
   if (data == null) return (allowed: true, error: null, blocked: null);
   if (data['ok'] == true && data['allowed'] == false) {

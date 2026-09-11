@@ -24,6 +24,30 @@ class NgmyCivicAccessStatus {
       kind == NgmyCivicAccessKind.locked ||
       kind == NgmyCivicAccessKind.loggedOut;
 
+  /// After a member finishes Verify your membership, leftover local flags
+  /// (old session epoch, a stale removed row) must not bounce them back.
+  /// Only a live Civic restrict, removal, or changed state code can.
+  static bool shouldBounceVerifiedSession({
+    required bool alreadyUnlocked,
+    required NgmyCivicAccessKind localKind,
+    String remoteBlocked = '',
+    bool pinSigIsServerIssued = false,
+  }) {
+    final blocked = remoteBlocked.trim().toLowerCase();
+    if (blocked == 'locked' ||
+        blocked == 'removed' ||
+        blocked == 'deceased' ||
+        blocked == 'loggedout') {
+      return true;
+    }
+    if (blocked == 'pin' && pinSigIsServerIssued) return true;
+    if (alreadyUnlocked) return false;
+    return localKind == NgmyCivicAccessKind.removed ||
+        localKind == NgmyCivicAccessKind.deceased ||
+        localKind == NgmyCivicAccessKind.locked ||
+        localKind == NgmyCivicAccessKind.loggedOut;
+  }
+
   String get message {
     switch (kind) {
       case NgmyCivicAccessKind.removed:

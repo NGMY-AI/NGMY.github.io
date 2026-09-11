@@ -31011,6 +31011,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _maintenanceQueued = false;
   Timer? _helpModePoll;
   Timer? _membersCloudPoll;
+  Timer? _civicAccessPoll;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
   Map<String, dynamic>? _sharedNationwideStats;
@@ -31086,12 +31087,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       });
     }());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Open from cached data immediately; refresh the authoritative roster
-      // behind the visible page instead of blocking Civic Registry entry.
-      unawaited(_refreshCivicMembersFromCloud());
+      // Restore a finished membership verify immediately. Do not wait on
+      // cloud hydrate — that check is what bounced people out after 3–4s.
       await _checkRegistryUnlock();
       if (!mounted) return;
-      setState(() {});
+      unawaited(_refreshCivicMembersFromCloud());
       unawaited(_hydrateStateSwitchLock());
       unawaited(_maybePromptCivicIdPhoto());
       unawaited(_ensureUniqueRegistryIdsDeferred());
@@ -31114,6 +31114,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return;
       }
       unawaited(_refreshCivicMembersFromCloud());
+    });
+    _civicAccessPoll = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (!mounted || !_registryUnlocked || _canBypassCivicGate()) return;
+      unawaited(_checkRegistryUnlock());
     });
   }
 
@@ -31302,7 +31306,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _liveRefreshDebounce = Timer(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       unawaited(_refreshCivicMembersFromCloud());
-      unawaited(_checkRegistryUnlock());
       unawaited(_refreshCivicHelpModeAndContributions());
     });
   }
@@ -31312,6 +31315,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     _membersCloudPoll?.cancel();
+    _civicAccessPoll?.cancel();
     _liveRefreshDebounce?.cancel();
     final civicHelpChannel = _civicHelpBroadcastChannel;
     if (civicHelpChannel != null) {
@@ -31456,9 +31460,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_hydrateReceiptReadState());
       unawaited(_hydrateRegistrarApplication());
     }
-    if (!_canBypassCivicGate()) {
-      unawaited(_checkRegistryUnlock());
-    }
   }
 
   Future<void> _hydrateReceiptReadState() async {
@@ -31558,33 +31559,46 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final gen = ++_unlockCheckGen;
-    final access = await _civicUnlockAccessStatus();
     final stored = await civicRegistryStoredUnlockEntry(
       widget.user.email,
       state: _selectedState,
     );
+    final locallyHeld = await civicRegistryIsUnlocked(
+      widget.user.email,
+      state: _selectedState,
+      globalPin: widget.config.civicRegistryPin,
+      pinsByState: widget.config.civicRegistryPinsByState,
+    );
+    if (!mounted || gen != _unlockCheckGen) return;
+    if (locallyHeld || _registryUnlocked) {
+      setState(() {
+        _registryUnlocked = true;
+        _unlockChecked = true;
+        _registryGateMessage = null;
+      });
+    }
+
+    final alreadyIn = _registryUnlocked;
+    final access = await _civicUnlockAccessStatus();
     final storedPinSig = (stored?['pinSig'] ?? '').toString().trim();
     final pinSigForRemote = civicRegistryPinSigIsServerIssued(storedPinSig) ? storedPinSig : '';
+    final storedRid = (stored?['registryId'] ?? '').toString().trim();
     final remote = await ngmyCivicCheckAccess(
       email: widget.user.email,
       state: _selectedState,
-      memberEmail: widget.user.email,
-      registryId: (stored?['registryId'] ?? widget.user.registryId ?? '').toString(),
+      registryId: storedRid,
       pinSig: pinSigForRemote,
+      unlockAt: (stored?['at'] ?? '').toString(),
     );
     if (!mounted || gen != _unlockCheckGen) return;
 
-    final civicOnlyBlock = !remote.allowed &&
-        (remote.blocked == 'removed' ||
-            remote.blocked == 'deceased' ||
-            remote.blocked == 'locked' ||
-            (remote.blocked == 'pin' && pinSigForRemote.isNotEmpty));
-    final hardBlock = access.kind == NgmyCivicAccessKind.removed ||
-        access.kind == NgmyCivicAccessKind.deceased ||
-        access.kind == NgmyCivicAccessKind.locked ||
-        access.kind == NgmyCivicAccessKind.loggedOut ||
-        civicOnlyBlock;
-    if (hardBlock) {
+    final bounce = NgmyCivicAccessStatus.shouldBounceVerifiedSession(
+      alreadyUnlocked: alreadyIn,
+      localKind: access.kind,
+      remoteBlocked: remote.blocked ?? '',
+      pinSigIsServerIssued: pinSigForRemote.isNotEmpty,
+    );
+    if (bounce) {
       await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
       if (!mounted || gen != _unlockCheckGen) return;
       setState(() {
@@ -31597,21 +31611,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
 
-    final ok = await civicRegistryIsUnlocked(
-      widget.user.email,
-      state: _selectedState,
-      globalPin: widget.config.civicRegistryPin,
-      pinsByState: widget.config.civicRegistryPinsByState,
-      access: access,
-    );
     if (!mounted || gen != _unlockCheckGen) return;
     setState(() {
       _unlockChecked = true;
-      if (ok) {
+      if (alreadyIn || locallyHeld) {
         _registryUnlocked = true;
         _registryGateMessage = null;
-      } else if (!_registryUnlocked) {
-        _registryUnlocked = false;
       }
     });
   }
@@ -41886,7 +41891,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (!mounted) return;
       setState(() {});
       widget.onDataChanged();
-      unawaited(_checkRegistryUnlock());
       unawaited(_loadSharedCivicDirectory());
     } finally {
       _cloudHydrateInFlight = false;

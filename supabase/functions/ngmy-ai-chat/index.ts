@@ -2631,28 +2631,36 @@ async function handleCivicCheckAccess(
       : d;
     return inState({ state: d.state ?? snap.state });
   });
-  if (removed.some((r) => memberMatchesNameOrKeys(r, fullName, memberEmail, registryId))) {
-    return jsonOk({
-      ok: true,
-      allowed: false,
-      blocked: "removed",
-      error: "You were removed from Civic Registry and cannot log in.",
-    });
+  const matchAccess = (row: Record<string, unknown>) =>
+    registryId
+      ? memberMatchesNameOrKeys(row, "", "", registryId)
+      : memberMatchesNameOrKeys(row, fullName, memberEmail, registryId);
+  // A current member always wins over an old tombstone — re-enrolled people
+  // were getting bounced back to Verify your membership.
+  const match = members.find(matchAccess);
+  if (!match) {
+    if (removed.some(matchAccess)) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "removed",
+        error: "You were removed from Civic Registry and cannot log in.",
+      });
+    }
+    if (deceased.some((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return matchAccess(snap);
+    })) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "deceased",
+        error: "This Civic Registry record is closed and cannot be used to log in.",
+      });
+    }
   }
-  if (deceased.some((d) => {
-    const snap = d.snapshot && typeof d.snapshot === "object"
-      ? (d.snapshot as Record<string, unknown>)
-      : d;
-    return memberMatchesNameOrKeys(snap, fullName, memberEmail, registryId);
-  })) {
-    return jsonOk({
-      ok: true,
-      allowed: false,
-      blocked: "deceased",
-      error: "This Civic Registry record is closed and cannot be used to log in.",
-    });
-  }
-  const match = members.find((m) => memberMatchesNameOrKeys(m, fullName, memberEmail, registryId));
   const accessErr = civicAccessLoginError(match, false);
   if (accessErr) {
     return jsonOk({
@@ -2661,6 +2669,21 @@ async function handleCivicCheckAccess(
       blocked: "locked",
       lockedUntil: match?.accessLockedUntil ?? null,
       error: accessErr,
+    });
+  }
+  const unlockAt = Date.parse(String(body.unlockAt ?? ""));
+  const epoch = Date.parse(String(match?.accessSessionEpoch ?? ""));
+  if (
+    match &&
+    Number.isFinite(epoch) &&
+    Number.isFinite(unlockAt) &&
+    unlockAt < epoch
+  ) {
+    return jsonOk({
+      ok: true,
+      allowed: false,
+      blocked: "loggedOut",
+      error: "You were logged out of Civic Registry. Enter your PIN, name, date of birth, and Registry ID again.",
     });
   }
   const pinSig = String(body.pinSig ?? "").trim();
