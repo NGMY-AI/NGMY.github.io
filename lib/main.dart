@@ -31011,11 +31011,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _maintenanceQueued = false;
   Timer? _helpModePoll;
   Timer? _membersCloudPoll;
-  Timer? _rankingsLivePoll;
-  List<UserData> _liveRankingUsers = const [];
-  String _liveRankingState = '';
-  bool _liveRankingsReady = false;
-  bool _rankingsLiveInFlight = false;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
   Map<String, dynamic>? _sharedNationwideStats;
@@ -31093,7 +31088,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_maybePromptCivicIdPhoto());
       unawaited(_ensureUniqueRegistryIdsDeferred());
       unawaited(_refreshCivicHelpModeAndContributions());
-      unawaited(_refreshCivicLiveRankings());
       unawaited(() async {
         await _mergeCivicRegistryPinsIntoConfig(widget.config);
         if (mounted) setState(() {});
@@ -31112,10 +31106,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return;
       }
       unawaited(_refreshCivicMembersFromCloud());
-    });
-    _rankingsLivePoll = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || !_isRankingsTab) return;
-      unawaited(_refreshCivicLiveRankings());
     });
   }
 
@@ -31306,7 +31296,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_refreshCivicMembersFromCloud());
       unawaited(_checkRegistryUnlock());
       unawaited(_refreshCivicHelpModeAndContributions());
-      unawaited(_refreshCivicLiveRankings());
     });
   }
 
@@ -31315,7 +31304,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     _membersCloudPoll?.cancel();
-    _rankingsLivePoll?.cancel();
     _liveRefreshDebounce?.cancel();
     final civicHelpChannel = _civicHelpBroadcastChannel;
     if (civicHelpChannel != null) {
@@ -31620,7 +31608,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       requesterEmail: widget.user.email,
       state: state,
     ));
-    unawaited(_refreshCivicLiveRankings());
     widget.onDataChanged();
   }
 
@@ -31700,7 +31687,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_persistStateSwitchLocal());
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
       widget.onDataChanged();
-      unawaited(_refreshCivicLiveRankings());
       return true;
     }
 
@@ -31742,7 +31728,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
-    unawaited(_refreshCivicLiveRankings());
     return true;
   }
 
@@ -35844,7 +35829,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
     } catch (_) {}
     widget.onDataChanged();
-    unawaited(_refreshCivicLiveRankings());
   }
 
   void _showStatePicker() {
@@ -41679,41 +41663,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  bool get _isRankingsTab =>
-      _canUseRegistrarToolsHere() ? _activeTab == 3 : _activeTab == 1;
-
-  UserData _userFromLiveRankingRow(Map<String, dynamic> m) {
-    final rid = (m['registryId'] ?? '').toString().trim();
-    final local = rid.isEmpty ? null : NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
-    final u = local != null
-        ? _civicMemberRecordToDisplayUser(local, widget.allUsers)
-        : UserData(
-            email: rid.isEmpty ? '' : 'civic.${rid.toLowerCase()}@rank.ngmy',
-            username: 'Member',
-            state: _selectedState,
-            isEnrolledInRegistry: true,
-          );
-    u.registryId = rid.isNotEmpty ? rid : u.registryId;
-    u.state = (m['state'] ?? u.state).toString().trim().isNotEmpty
-        ? (m['state'] ?? u.state).toString()
-        : _selectedState;
-    u.helps = NgmyCivicRegistryMembers.intOf(m['helps']);
-    u.missed = NgmyCivicRegistryMembers.intOf(m['missed']);
-    u.isEnrolledInRegistry = true;
-    final liveName = NgmyCivicRegistryMembers.resolvedDisplayName(m);
-    if (!NgmyCivicRegistryMembers.isPublicPersonName(
-          (u.fullName ?? u.username).trim(),
-          registryId: rid,
-        ) &&
-        NgmyCivicRegistryMembers.isPublicPersonName(liveName, registryId: rid)) {
-      u.fullName = liveName;
-      if (u.username.trim().isEmpty || u.username == 'Member' || u.username == 'User') {
-        u.username = liveName;
-      }
-    }
-    return u;
-  }
-
   List<UserData> _dedupeRankingUsers(List<UserData> users) {
     final seen = <String>{};
     final out = <UserData>[];
@@ -41729,46 +41678,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return out;
   }
 
-  /// One live state roster for every user. Local names are attached; nobody is dropped.
+  /// Exact same people as the Members tab for this state. No extra server rows.
   List<UserData> _rankingsEnrolled() {
-    if (_liveRankingsReady &&
-        NgmyCivicRegistryStats.statesMatch(_liveRankingState, _selectedState)) {
-      return _dedupeRankingUsers(_liveRankingUsers);
-    }
     return _dedupeRankingUsers(
       _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
           .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
           .toList(),
     );
-  }
-
-  Future<void> _refreshCivicLiveRankings() async {
-    final st = _selectedState.trim();
-    if (st.isEmpty || _rankingsLiveInFlight) return;
-    _rankingsLiveInFlight = true;
-    try {
-      final pinSig = (await civicRegistryStoredPinSig(widget.user.email, state: st)) ?? '';
-      final fetched = await ngmyCivicFetchRankings(
-        email: widget.user.email,
-        state: st,
-        pinSig: pinSig,
-      );
-      if (!mounted) return;
-      if (!fetched.ok) return;
-      final users = _dedupeRankingUsers(fetched.members.map(_userFromLiveRankingRow).toList());
-      NgmyCivicRegistryMembers.applyLiveRankingCounters(
-        widget.config,
-        fetched.members,
-        state: st,
-      );
-      setState(() {
-        _liveRankingUsers = users;
-        _liveRankingState = st;
-        _liveRankingsReady = true;
-      });
-    } finally {
-      _rankingsLiveInFlight = false;
-    }
   }
 
   Future<void> _refreshCivicMembersFromCloud() async {
@@ -41799,10 +41715,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onTap: () {
           setState(() => _activeTab = index);
           if (index == 2) unawaited(_refreshCivicMembersFromCloud());
-          if (index == 3 || (!_canUseRegistrarToolsHere() && index == 1)) {
-            unawaited(_refreshCivicLiveRankings());
-          }
-          if (index == 3) unawaited(_reconcileHelpsForState(_selectedState));
         },
         borderRadius: BorderRadius.circular(20),
         child: Container(
@@ -43614,9 +43526,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _rankingsSection(bool isDark) {
     final st = _selectedState.trim();
-    if (_canUseRegistrarToolsHere(st)) {
-      unawaited(_reconcileHelpsForState(st));
-    }
     final enrolled = _rankingsEnrolled();
 
     final speed = _helperSpeedStatsForState(st);
@@ -43624,7 +43533,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ..sort((a, b) => _compareTopHelpers(a, b, st));
     final leastHelpers = enrolled.where((u) => u.missed > 0).toList()
       ..sort((a, b) => _compareLeastHelpers(a, b, speed, st));
-    final nonHelpers = enrolled.where((u) => !_memberCountsAsTopHelper(u, st)).toList()
+    final nonHelpers = enrolled.where((u) => u.missed >= 5).toList()
       ..sort((a, b) => b.missed.compareTo(a.missed));
 
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -43657,9 +43566,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   children: [
                     Text('$st Rankings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
                     Text(
-                      enrolled.isEmpty
-                          ? 'Ranked by who puts money in first when help starts.'
-                          : '${enrolled.length} members in $st — same live list for everyone.',
+                      'Same members as the Members tab. Ranked by helps and missed.',
                       style: TextStyle(fontSize: 11, color: muted, height: 1.3),
                     ),
                   ],
@@ -43761,7 +43668,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ),
         const SizedBox(height: 10),
         if (nonHelpers.isEmpty)
-          _rankingsEmptyBox('Everyone in $st is helping!', isDark)
+          _rankingsEmptyBox('No red-status members in $st.', isDark)
         else
           ...nonHelpers.asMap().entries.map(
                 (e) => _civicRankCard(
