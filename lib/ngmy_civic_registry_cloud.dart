@@ -168,6 +168,35 @@ Future<Map<String, dynamic>?> ngmyCivicFetchRoster({
   return data;
 }
 
+/// Live helps/missed for one state — same payload for registrar and members.
+Future<({bool ok, List<Map<String, dynamic>> members, String? error})> ngmyCivicFetchRankings({
+  required String email,
+  required String state,
+  String pinSig = '',
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicFetchRankings',
+    'email': email.trim().toLowerCase(),
+    'state': state.trim(),
+    if (pinSig.trim().isNotEmpty) 'pinSig': pinSig.trim(),
+  });
+  if (data == null) {
+    return (ok: false, members: const <Map<String, dynamic>>[], error: 'Could not reach live rankings.');
+  }
+  if (data['ok'] == true) {
+    final raw = data['members'];
+    final members = raw is List
+        ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+    return (ok: true, members: members, error: null);
+  }
+  return (
+    ok: false,
+    members: const <Map<String, dynamic>>[],
+    error: _civicCloudError(data, 'Could not load live rankings.'),
+  );
+}
+
 /// Privacy-safe nationwide counters computed once from the authoritative
 /// server ledger. Every signed-in user receives the same numbers.
 Future<Map<String, dynamic>?> ngmyCivicFetchNationwideStats() async {

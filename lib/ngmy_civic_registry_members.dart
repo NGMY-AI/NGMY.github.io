@@ -1442,6 +1442,55 @@ class NgmyCivicRegistryMembers {
     return null;
   }
 
+  /// Overwrite local helps/missed from the live server ranking list (by registry ID).
+  /// Does not add or remove people — Rankings should display the live list itself.
+  static bool applyLiveRankingCounters(
+    dynamic config,
+    List<Map<String, dynamic>> live, {
+    required String state,
+  }) {
+    final byId = <String, Map<String, dynamic>>{};
+    for (final row in live) {
+      final id = (row['registryId'] ?? '').toString().trim().toUpperCase();
+      if (id.isEmpty) continue;
+      byId[id] = row;
+    }
+    if (byId.isEmpty && live.isEmpty) {
+      // Empty live state: zero leftover local counters so Top Helpers cannot
+      // keep showing people the registrar already cleared.
+      var wiped = false;
+      final members = listFrom(config);
+      for (final m in members) {
+        if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) continue;
+        if (_intOf(m['helps']) == 0 && _intOf(m['missed']) == 0) continue;
+        m['helps'] = 0;
+        m['missed'] = 0;
+        wiped = true;
+      }
+      if (wiped) setList(config, members);
+      return wiped;
+    }
+    var changed = false;
+    final members = listFrom(config);
+    for (final m in members) {
+      if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) continue;
+      final id = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (id.isEmpty) continue;
+      final liveRow = byId[id];
+      if (liveRow == null) continue;
+      final helps = _intOf(liveRow['helps']);
+      final missed = _intOf(liveRow['missed']);
+      if (_intOf(m['helps']) == helps && _intOf(m['missed']) == missed) continue;
+      m['helps'] = helps;
+      m['missed'] = missed;
+      final stamp = (liveRow['activityAt'] ?? '').toString();
+      if (stamp.isNotEmpty) m['activityAt'] = stamp;
+      changed = true;
+    }
+    if (changed) setList(config, members);
+    return changed;
+  }
+
   static Map<String, dynamic>? findByRegistryId(dynamic config, String registryId) {
     if (NgmyCivicWalletIdentity.normalizeId(registryId).isEmpty) return null;
     for (final m in listFrom(config)) {

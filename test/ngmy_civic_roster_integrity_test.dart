@@ -338,4 +338,42 @@ void main() {
     expect(NgmyCivicRegistryMembers.nationwideMemberCount(config), 2);
     expect(NgmyCivicRegistryMembers.nationwideFamilyTotal(config), 7);
   });
+
+  test('live ranking counters overwrite stale local helps', () {
+    final config = _RosterConfig();
+    NgmyCivicRegistryMembers.setList(config, [
+      {
+        ..._member(email: 'a@example.com', registryId: 'GA1111111'),
+        'helps': 4,
+        'missed': 1,
+      },
+      {
+        ..._member(email: 'b@example.com', registryId: 'GA2222222', fullName: 'Other'),
+        'helps': 2,
+      },
+    ]);
+    final changed = NgmyCivicRegistryMembers.applyLiveRankingCounters(
+      config,
+      [
+        {'registryId': 'GA1111111', 'helps': 0, 'missed': 0},
+        {'registryId': 'GA2222222', 'helps': 1, 'missed': 0},
+      ],
+      state: 'Georgia',
+    );
+    expect(changed, isTrue);
+    expect(NgmyCivicRegistryMembers.findByRegistryId(config, 'GA1111111')?['helps'], 0);
+    expect(NgmyCivicRegistryMembers.findByRegistryId(config, 'GA2222222')?['helps'], 1);
+  });
+
+  test('empty live rankings wipe leftover local helps in that state', () {
+    final config = _RosterConfig();
+    NgmyCivicRegistryMembers.setList(config, [
+      {
+        ..._member(email: 'a@example.com', registryId: 'GA1111111'),
+        'helps': 3,
+      },
+    ]);
+    NgmyCivicRegistryMembers.applyLiveRankingCounters(config, const [], state: 'Georgia');
+    expect(NgmyCivicRegistryMembers.findByRegistryId(config, 'GA1111111')?['helps'], 0);
+  });
 }

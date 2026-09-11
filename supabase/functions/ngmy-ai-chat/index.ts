@@ -2883,6 +2883,67 @@ async function handleCivicFetchRoster(
   });
 }
 
+/** Same live counters for every unlocked viewer — Rankings must not use a device-local roster. */
+async function handleCivicFetchRankings(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const state = String(body.state ?? "").trim();
+  const pinSig = String(body.pinSig ?? "").trim();
+  if (!state) return jsonOk({ error: "state required" }, 400);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const want = canonicalStateKey(state);
+  let allowed = role.isAdmin;
+  if (
+    !allowed &&
+    role.isRegistrar &&
+    role.registrarState &&
+    canonicalStateKey(role.registrarState) === want
+  ) {
+    allowed = true;
+  }
+  if (!allowed) {
+    const pins = await loadRegistryPins(admin);
+    const expected = effectivePinForState(pins, state);
+    if (!expected || !pinSig || (await pinSigFor(state, expected)) !== pinSig) {
+      return jsonOk({ error: "State unlock required", ok: false }, 403);
+    }
+  }
+  const payload = await loadCivicPayload(admin);
+  const live = filterTombstonedMembers(
+    filterMembersByState(asMemberList(payload.members), state),
+    filterMembersByState(asMemberList(payload.removed), state),
+    asMemberList(payload.deceased).filter((d) => {
+      const snap = d.snapshot && typeof d.snapshot === "object"
+        ? (d.snapshot as Record<string, unknown>)
+        : d;
+      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === want;
+    }),
+  );
+  const members = live
+    .filter((m) => !isGhostMemberRow(m))
+    .map((m) => ({
+      fullName: String(m.fullName ?? ""),
+      username: String(m.username ?? ""),
+      registryId: String(m.registryId ?? ""),
+      state: displayStateName(String(m.state ?? state)),
+      helps: Number(m.helps ?? 0) || 0,
+      missed: Number(m.missed ?? 0) || 0,
+      activityAt: m.activityAt ?? null,
+      enrolledAt: m.enrolledAt ?? null,
+    }));
+  return jsonOk({
+    ok: true,
+    state: displayStateName(state),
+    savedAt: payload.savedAt ?? null,
+    members,
+  });
+}
+
 async function handleCivicNationwideStats(req: Request): Promise<Response> {
   const email = await requireJwtEmail(req);
   if (!email) return jsonOk({ error: "Authentication required" }, 401);
@@ -4308,6 +4369,7 @@ serve(async (req) => {
       cn: "civicRecoveryLink",
       co: "civicRecoveryRemove",
       cp: "civicRecoveryIssue",
+      cq: "civicFetchRankings",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -4418,6 +4480,9 @@ serve(async (req) => {
     if (action === "civicFetchDirectory" || action === "civicFetchRoster" ||
       action === "civicFetchRegistrarRoster" || action === "civicFetchAdminRoster") {
       return await handleCivicFetchRoster(req, body as Record<string, unknown>);
+    }
+    if (action === "civicFetchRankings") {
+      return await handleCivicFetchRankings(req, body as Record<string, unknown>);
     }
     if (action === "civicNationwideStats") {
       return await handleCivicNationwideStats(req);

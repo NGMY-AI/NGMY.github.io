@@ -31010,6 +31010,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _maintenanceQueued = false;
   Timer? _helpModePoll;
   Timer? _membersCloudPoll;
+  Timer? _rankingsLivePoll;
+  List<UserData> _liveRankingUsers = const [];
+  String _liveRankingState = '';
+  bool _liveRankingsReady = false;
+  bool _rankingsLiveInFlight = false;
   List<AppTransaction> _communityContributions = [];
   List<AppTransaction> _communityClaims = [];
   Map<String, dynamic>? _sharedNationwideStats;
@@ -31087,6 +31092,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_maybePromptCivicIdPhoto());
       unawaited(_ensureUniqueRegistryIdsDeferred());
       unawaited(_refreshCivicHelpModeAndContributions());
+      unawaited(_refreshCivicLiveRankings());
       unawaited(() async {
         await _mergeCivicRegistryPinsIntoConfig(widget.config);
         if (mounted) setState(() {});
@@ -31105,6 +31111,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         return;
       }
       unawaited(_refreshCivicMembersFromCloud());
+    });
+    _rankingsLivePoll = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_isRankingsTab) return;
+      unawaited(_refreshCivicLiveRankings());
     });
   }
 
@@ -31295,6 +31305,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_refreshCivicMembersFromCloud());
       unawaited(_checkRegistryUnlock());
       unawaited(_refreshCivicHelpModeAndContributions());
+      unawaited(_refreshCivicLiveRankings());
     });
   }
 
@@ -31303,6 +31314,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     _membersCloudPoll?.cancel();
+    _rankingsLivePoll?.cancel();
     _liveRefreshDebounce?.cancel();
     final civicHelpChannel = _civicHelpBroadcastChannel;
     if (civicHelpChannel != null) {
@@ -31607,6 +31619,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       requesterEmail: widget.user.email,
       state: state,
     ));
+    unawaited(_refreshCivicLiveRankings());
     widget.onDataChanged();
   }
 
@@ -31686,6 +31699,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_persistStateSwitchLocal());
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
       widget.onDataChanged();
+      unawaited(_refreshCivicLiveRankings());
       return true;
     }
 
@@ -31727,6 +31741,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
+    unawaited(_refreshCivicLiveRankings());
     return true;
   }
 
@@ -32050,9 +32065,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   List<UserData> _registryMembersMatchingSearch() {
     final q = _searchQuery.trim();
-    final active = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
-        .where((u) => u.state.trim().toLowerCase() == _selectedState.trim().toLowerCase())
-        .toList();
+    final liveActive = !_canUseRegistrarToolsHere() &&
+        _liveRankingsReady &&
+        NgmyCivicRegistryStats.statesMatch(_liveRankingState, _selectedState);
+    final active = liveActive
+        ? _liveRankingUsers
+            .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+            .toList()
+        : _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+            .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+            .toList();
     final deceased = _civicDeceasedMembersForDisplay(widget.config, widget.allUsers, state: _selectedState);
     final pool = [...active, ...deceased];
     if (q.isEmpty) return pool;
@@ -35828,6 +35850,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
     } catch (_) {}
     widget.onDataChanged();
+    unawaited(_refreshCivicLiveRankings());
   }
 
   void _showStatePicker() {
@@ -41662,6 +41685,65 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  bool get _isRankingsTab =>
+      _canUseRegistrarToolsHere() ? _activeTab == 3 : _activeTab == 1;
+
+  UserData _userFromLiveRankingRow(Map<String, dynamic> m) {
+    final name = NgmyCivicRegistryMembers.resolvedDisplayName(m);
+    final rid = (m['registryId'] ?? '').toString().trim();
+    return UserData(
+      email: rid.isEmpty ? '' : 'civic.${rid.toLowerCase()}@rank.ngmy',
+      username: name == 'Member' ? (m['username'] ?? 'Member').toString() : name,
+      fullName: name == 'Member' ? null : name,
+      state: (m['state'] ?? _selectedState).toString(),
+      registryId: rid,
+      helps: NgmyCivicRegistryMembers.intOf(m['helps']),
+      missed: NgmyCivicRegistryMembers.intOf(m['missed']),
+      isEnrolledInRegistry: true,
+    );
+  }
+
+  List<UserData> _rankingsEnrolled() {
+    if (_liveRankingsReady &&
+        NgmyCivicRegistryStats.statesMatch(_liveRankingState, _selectedState)) {
+      return _liveRankingUsers
+          .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+          .toList();
+    }
+    // Do not fall back to a device-local roster — that is how members kept
+    // seeing Top Helpers after the registrar cleared them in the database.
+    return const [];
+  }
+
+  Future<void> _refreshCivicLiveRankings() async {
+    final st = _selectedState.trim();
+    if (st.isEmpty || _rankingsLiveInFlight) return;
+    _rankingsLiveInFlight = true;
+    try {
+      final pinSig = (await civicRegistryStoredPinSig(widget.user.email, state: st)) ?? '';
+      final fetched = await ngmyCivicFetchRankings(
+        email: widget.user.email,
+        state: st,
+        pinSig: pinSig,
+      );
+      if (!mounted) return;
+      if (!fetched.ok) return;
+      final users = fetched.members.map(_userFromLiveRankingRow).toList();
+      NgmyCivicRegistryMembers.applyLiveRankingCounters(
+        widget.config,
+        fetched.members,
+        state: st,
+      );
+      setState(() {
+        _liveRankingUsers = users;
+        _liveRankingState = st;
+        _liveRankingsReady = true;
+      });
+    } finally {
+      _rankingsLiveInFlight = false;
+    }
+  }
+
   Future<void> _refreshCivicMembersFromCloud() async {
     if (_cloudHydrateInFlight) return;
     _cloudHydrateInFlight = true;
@@ -41690,6 +41772,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onTap: () {
           setState(() => _activeTab = index);
           if (index == 2) unawaited(_refreshCivicMembersFromCloud());
+          if (index == 3 || (!_canUseRegistrarToolsHere() && index == 1)) {
+            unawaited(_refreshCivicLiveRankings());
+          }
           if (index == 3) unawaited(_reconcileHelpsForState(_selectedState));
         },
         borderRadius: BorderRadius.circular(20),
@@ -43505,9 +43590,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (_canUseRegistrarToolsHere(st)) {
       unawaited(_reconcileHelpsForState(st));
     }
-    final enrolled = _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
-        .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, st))
-        .toList();
+    final enrolled = _rankingsEnrolled();
 
     final speed = _helperSpeedStatsForState(st);
     final topHelpers = enrolled.where((u) => _memberCountsAsTopHelper(u, st)).toList()
@@ -43592,7 +43675,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ),
         const SizedBox(height: 10),
         if (topHelpers.isEmpty)
-          _rankingsEmptyBox('No data yet for $st.', isDark)
+          _rankingsEmptyBox(
+            _liveRankingsReady ? 'No data yet for $st.' : 'Loading live rankings for $st…',
+            isDark,
+          )
         else
           ...topHelpers.asMap().entries.map(
                 (e) => _civicRankCard(

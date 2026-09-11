@@ -52,6 +52,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'civicRecoveryLink': 'cn',
   'civicRecoveryRemove': 'co',
   'civicRecoveryIssue': 'cp',
+  'civicFetchRankings': 'cq',
   'aiKeyConfigured': 'a1',
   'saveAiApiKey': 'a2',
   'verifyPasswordLogin': 'a3',
