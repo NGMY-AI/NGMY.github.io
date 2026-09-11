@@ -1657,6 +1657,90 @@ function overlayRegistrarAppsOnCurrent(
   });
 }
 
+const MAX_AUTHORIZED_REGISTRARS_PER_STATE = 5;
+
+function registrarSlotKey(a: Record<string, unknown>): string {
+  const email = emailKey(String(a.userEmail ?? a.email ?? ""));
+  if (email && !isRedactedCivicValue(email)) return `em:${email}`;
+  const id = String(a.id ?? "").trim();
+  if (id) return `id:${id}`;
+  if (email) return `em:${email}`;
+  return "";
+}
+
+function countApprovedRegistrarsInState(
+  apps: Record<string, unknown>[],
+  state: string,
+): number {
+  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  for (const a of apps) {
+    if (String(a.status ?? "").toLowerCase() !== "approved") continue;
+    if (!statesMatch(String(a.state ?? ""), state)) continue;
+    const id = String(a.id ?? "").trim();
+    if (id && seenIds.has(id)) continue;
+    const key = registrarSlotKey(a);
+    if (!key) continue;
+    if (id) seenIds.add(id);
+    seen.add(key);
+  }
+  return seen.size;
+}
+
+function applicationWasApproved(
+  current: Record<string, unknown>[],
+  row: Record<string, unknown>,
+): boolean {
+  const id = String(row.id ?? "").trim();
+  const email = emailKey(String(row.userEmail ?? row.email ?? ""));
+  for (const a of current) {
+    const sameId = id && String(a.id ?? "").trim() === id;
+    const sameEmail = email && emailKey(String(a.userEmail ?? a.email ?? "")) === email;
+    if (!sameId && !sameEmail) continue;
+    if (String(a.status ?? "").toLowerCase() === "approved") return true;
+  }
+  return false;
+}
+
+/** Keep existing approvals; block any new approval that would go past 5. */
+function limitNewRegistrarApprovals(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const approvedKeysByState = new Map<string, Set<string>>();
+  const take = (state: string, key: string, force: boolean): boolean => {
+    const st = canonicalStateKey(state);
+    if (!st || !key) return false;
+    let set = approvedKeysByState.get(st);
+    if (!set) {
+      set = new Set();
+      approvedKeysByState.set(st, set);
+    }
+    if (set.has(key)) return true;
+    if (!force && set.size >= MAX_AUTHORIZED_REGISTRARS_PER_STATE) return false;
+    set.add(key);
+    return true;
+  };
+
+  const next = incoming.map((row) => ({ ...row }));
+  for (const row of next) {
+    if (String(row.status ?? "").toLowerCase() !== "approved") continue;
+    if (!applicationWasApproved(current, row)) continue;
+    take(String(row.state ?? ""), registrarSlotKey(row), true);
+  }
+  for (const row of next) {
+    if (String(row.status ?? "").toLowerCase() !== "approved") continue;
+    if (applicationWasApproved(current, row)) continue;
+    const key = registrarSlotKey(row);
+    if (!take(String(row.state ?? ""), key, false)) {
+      const id = String(row.id ?? "").trim();
+      const prev = current.find((a) => String(a.id ?? "").trim() === id);
+      row.status = String(prev?.status ?? "pending");
+    }
+  }
+  return next;
+}
+
 function loanAppNetworkSummary(
   a: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -2397,6 +2481,8 @@ async function handleCivicPersistRegistrarApplications(
     next = [...others, ...mineIncoming];
   }
 
+  next = limitNewRegistrarApprovals(current, next);
+
   const saved = await saveRegistrarApplications(admin, next);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
   return jsonOk({ ok: true, count: next.length });
@@ -2448,6 +2534,19 @@ async function handleCivicDecideRegistrarApplication(
   if (!role.isAdmin) {
     if (!statesMatch(role.registrarState, appState)) {
       return jsonOk({ error: "Forbidden" }, 403);
+    }
+  }
+
+  const alreadyApproved = String(row.status ?? "").toLowerCase() === "approved";
+  if (status === "approved" && !alreadyApproved) {
+    const used = countApprovedRegistrarsInState(apps, appState);
+    if (used >= MAX_AUTHORIZED_REGISTRARS_PER_STATE) {
+      const label = displayStateName(appState) || "This state";
+      return jsonOk({
+        ok: false,
+        capped: true,
+        error: `${label} already has ${MAX_AUTHORIZED_REGISTRARS_PER_STATE} authorized registrars.`,
+      });
     }
   }
 

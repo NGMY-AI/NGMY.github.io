@@ -2993,7 +2993,8 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
   });
 }
 
-Future<bool> _applyRegistrarApplicationDecision({
+/// Returns an error message when the decision cannot be applied (e.g. 5-AR cap).
+Future<String?> _applyRegistrarApplicationDecision({
   required AppConfig config,
   required List<UserData> allUsers,
   required Map<String, dynamic> app,
@@ -3002,9 +3003,24 @@ Future<bool> _applyRegistrarApplicationDecision({
 }) async {
   final decidedAt = DateTime.now().toUtc().toIso8601String();
   final id = (app['id'] ?? '').toString().trim();
+  final appState = (app['state'] ?? '').toString().trim();
+  if (status == 'approved' &&
+      appState.isNotEmpty &&
+      (app['status'] ?? '').toString().toLowerCase() != 'approved' &&
+      !NgmyCivicRegistryStats.canApproveRegistrarForState(
+        state: appState,
+        applications: config.civicRegistrarApplications,
+        users: allUsers,
+      )) {
+    return '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars.';
+  }
   Map<String, dynamic>? remote;
   if (id.isNotEmpty) {
-    remote = await ngmyCivicDecideRegistrarApplication(id: id, status: status);
+    final decided = await ngmyCivicDecideRegistrarApplication(id: id, status: status);
+    if (decided.capped) {
+      return decided.error ?? '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars.';
+    }
+    if (decided.ok) remote = decided.application;
   }
   final next = Map<String, dynamic>.from(app);
   if (remote != null) {
@@ -3053,7 +3069,7 @@ Future<bool> _applyRegistrarApplicationDecision({
     _mergeRegistrarApplicationsIntoConfig(config, refreshed);
   }
   await _syncRegistrarStateAfterConfigChange(config, allUsers);
-  return true;
+  return null;
 }
 
 Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
@@ -4485,13 +4501,19 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
-                                              await _applyRegistrarApplicationDecision(
+                                              final err = await _applyRegistrarApplicationDecision(
                                                 config: config,
                                                 allUsers: allUsers,
                                                 app: app,
                                                 status: 'approved',
                                                 reviewer: reviewer,
                                               );
+                                              if (err != null) {
+                                                if (ctx.mounted) {
+                                                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                                                }
+                                                return;
+                                              }
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -4558,13 +4580,19 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
-                                              await _applyRegistrarApplicationDecision(
+                                              final err = await _applyRegistrarApplicationDecision(
                                                 config: config,
                                                 allUsers: allUsers,
                                                 app: app,
                                                 status: 'approved',
                                                 reviewer: reviewer,
                                               );
+                                              if (err != null) {
+                                                if (ctx.mounted) {
+                                                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                                                }
+                                                return;
+                                              }
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});

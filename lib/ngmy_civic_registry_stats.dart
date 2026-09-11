@@ -277,12 +277,11 @@ class NgmyCivicRegistryStats {
     required String state,
   }) {
     if (!isAuthorizedRegistrar) return false;
-    final st = NgmyCivicRegistryStats.canonicalStateKey(state);
     final key = _emailKey(email);
     for (final a in applications) {
       if ((a['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
       final status = (a['status'] ?? '').toString().toLowerCase();
-      if (status != 'approved' && status != 'pending') continue;
+      if (status != 'approved') continue;
       if (NgmyCivicRegistryStats.statesMatch((a['state'] ?? '').toString(), state)) return true;
     }
     // Home state from approved application — never treat a temporary
@@ -324,18 +323,64 @@ class NgmyCivicRegistryStats {
         0;
   }
 
-  static int activeRegistrarsInState({
+  static bool _isSlotExemptUser(dynamic u) {
+    try {
+      if ((u as dynamic).isCivicRegistryAdmin == true) return true;
+      if ((u as dynamic).isCivicRegistryKing == true) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  static String _registrarSlotKey(Map<String, dynamic> a) {
+    final email = _emailKey((a['userEmail'] ?? a['email'] ?? '').toString());
+    if (email.isNotEmpty) return 'em:$email';
+    final id = (a['id'] ?? '').toString().trim();
+    if (id.isNotEmpty) return 'id:$id';
+    return '';
+  }
+
+  static Set<String> _exemptRegistrarEmails(Iterable<dynamic> users) {
+    final out = <String>{};
+    for (final u in users) {
+      if (!_isSlotExemptUser(u)) continue;
+      final email = _emailKey((u as dynamic).email.toString());
+      if (email.isNotEmpty) out.add(email);
+    }
+    return out;
+  }
+
+  /// Unique Authorized Registrars for [state]. Approved applications are the
+  /// source of truth so the 5-slot cap still holds when this device has no
+  /// user list. Civic Registry Admin / King do not consume a slot.
+  static Set<String> activeRegistrarKeysInState({
     required String state,
     required List<Map<String, dynamic>> applications,
     required Iterable<dynamic> users,
     bool excludeRegistryAdmins = true,
   }) {
-    final emails = <String>{};
+    final keys = <String>{};
+    final seenIds = <String>{};
+    final exempt = excludeRegistryAdmins ? _exemptRegistrarEmails(users) : <String>{};
+
+    for (final a in approvedApplicationsForState(applications, state)) {
+      final email = _emailKey((a['userEmail'] ?? a['email'] ?? '').toString());
+      if (excludeRegistryAdmins && email.isNotEmpty && exempt.contains(email)) continue;
+      final id = (a['id'] ?? '').toString().trim();
+      if (id.isNotEmpty && seenIds.contains(id)) continue;
+      final key = _registrarSlotKey(a);
+      if (key.isEmpty) continue;
+      if (id.isNotEmpty) seenIds.add(id);
+      keys.add(key);
+    }
+
     for (final u in users) {
       final isReg = (u as dynamic).isAuthorizedRegistrar == true;
       if (!isReg) continue;
-      if (excludeRegistryAdmins && (u as dynamic).isCivicRegistryAdmin == true) continue;
-      final email = (u as dynamic).email.toString();
+      if (excludeRegistryAdmins && _isSlotExemptUser(u)) continue;
+      final email = _emailKey((u as dynamic).email.toString());
+      if (email.isEmpty) continue;
+      final key = 'em:$email';
+      if (keys.contains(key)) continue;
       final userState = (u as dynamic).state.toString();
       if (isRegistrarAssignedToState(
         email: email,
@@ -344,10 +389,24 @@ class NgmyCivicRegistryStats {
         applications: applications,
         state: state,
       )) {
-        emails.add(_emailKey(email));
+        keys.add(key);
       }
     }
-    return emails.length;
+    return keys;
+  }
+
+  static int activeRegistrarsInState({
+    required String state,
+    required List<Map<String, dynamic>> applications,
+    required Iterable<dynamic> users,
+    bool excludeRegistryAdmins = true,
+  }) {
+    return activeRegistrarKeysInState(
+      state: state,
+      applications: applications,
+      users: users,
+      excludeRegistryAdmins: excludeRegistryAdmins,
+    ).length;
   }
 
   static int slotsRemaining({

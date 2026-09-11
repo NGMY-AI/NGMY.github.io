@@ -523,7 +523,8 @@ Future<bool> ngmyCivicPersistRegistrarApplications({
 
 /// Approve / reject / revoke by application id so a masked reviewer copy
 /// cannot grant the wrong person (or nobody).
-Future<Map<String, dynamic>?> ngmyCivicDecideRegistrarApplication({
+Future<({bool ok, Map<String, dynamic>? application, String? error, bool capped})>
+    ngmyCivicDecideRegistrarApplication({
   required String id,
   required String status,
 }) async {
@@ -532,8 +533,23 @@ Future<Map<String, dynamic>?> ngmyCivicDecideRegistrarApplication({
     'id': id.trim(),
     'status': status.trim().toLowerCase(),
   });
-  if (data == null || data['ok'] != true) return null;
-  final raw = data['application'];
-  if (raw is! Map) return null;
-  return Map<String, dynamic>.from(raw);
+  if (data == null) {
+    return (ok: false, application: null, error: 'Could not reach server.', capped: false);
+  }
+  if (data['ok'] == true) {
+    final raw = data['application'];
+    return (
+      ok: true,
+      application: raw is Map ? Map<String, dynamic>.from(raw) : null,
+      error: null,
+      capped: false,
+    );
+  }
+  final err = (data['error'] ?? data['message'] ?? '').toString().trim();
+  return (
+    ok: false,
+    application: null,
+    error: err.isEmpty ? 'Could not update this application.' : err,
+    capped: data['capped'] == true,
+  );
 }
