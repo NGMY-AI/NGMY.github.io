@@ -2448,6 +2448,48 @@ function civicIdsMatch(a: string, b: string): boolean {
   return dx.length >= 6 && dx === dy;
 }
 
+function isPlaceholderRegistryId(id: string): boolean {
+  const s = String(id ?? "").trim();
+  if (!s) return true;
+  if (s.includes("***")) return true;
+  return /^\*+\d/.test(s);
+}
+
+function isCanonicalRegistryId(id: string): boolean {
+  return /^[A-Z]{2}\d{6,}$/i.test(String(id ?? "").trim());
+}
+
+/** GA6250732 and **6250732 must count as one member. */
+function rankingPersonKey(m: Record<string, unknown>): string {
+  const rid = String(m.registryId ?? "");
+  if (isPlaceholderRegistryId(rid)) {
+    const digits = rid.replace(/\D/g, "");
+    return digits.length >= 6 ? `d:${digits}` : "";
+  }
+  const n = normCivicId(rid);
+  const digits = n.replace(/^[A-Z]+/, "");
+  if (digits.length >= 6) return `d:${digits}`;
+  if (n) return `id:${n}`;
+  const em = emailKey(String(m.email ?? ""));
+  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
+  return "";
+}
+
+function preferCanonicalRankingRow(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): Record<string, unknown> {
+  const aCanon = isCanonicalRegistryId(String(a.registryId ?? ""));
+  const bCanon = isCanonicalRegistryId(String(b.registryId ?? ""));
+  if (aCanon !== bCanon) return aCanon ? a : b;
+  const aName = String(a.fullName ?? a.username ?? "").trim();
+  const bName = String(b.fullName ?? b.username ?? "").trim();
+  const aOk = aName.length > 0 && !isRedactedCivicValue(aName) && aName.toLowerCase() !== "member";
+  const bOk = bName.length > 0 && !isRedactedCivicValue(bName) && bName.toLowerCase() !== "member";
+  if (aOk !== bOk) return aOk ? a : b;
+  return aCanon ? a : b;
+}
+
 function civicAccessLoginError(
   member: Record<string, unknown> | undefined,
   removed: boolean,
@@ -2934,19 +2976,22 @@ async function handleCivicFetchRankings(
       return jsonOk({ error: "State unlock required", ok: false }, 403);
     }
   }
-  const seen = new Set<string>();
-  const members: Record<string, unknown>[] = [];
+  const seen = new Map<string, Record<string, unknown>>();
   for (const m of live) {
     if (isGhostMemberRow(m)) continue;
     const rid = String(m.registryId ?? "").trim();
-    if (!rid) continue;
-    const key = nationwidePersonKey(m);
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    if (!rid || isPlaceholderRegistryId(rid)) continue;
+    const key = rankingPersonKey(m);
+    if (!key) continue;
+    const prev = seen.get(key);
+    seen.set(key, prev ? preferCanonicalRankingRow(prev, m) : m);
+  }
+  const members: Record<string, unknown>[] = [];
+  for (const m of seen.values()) {
     members.push({
       fullName: String(m.fullName ?? ""),
       username: String(m.username ?? ""),
-      registryId: rid,
+      registryId: String(m.registryId ?? "").trim(),
       state: displayStateName(String(m.state ?? state)),
       helps: Number(m.helps ?? 0) || 0,
       missed: Number(m.missed ?? 0) || 0,

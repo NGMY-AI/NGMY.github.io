@@ -41675,18 +41675,36 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   List<UserData> _dedupeRankingUsers(List<UserData> users) {
-    final seen = <String>{};
-    final out = <UserData>[];
+    final byKey = <String, UserData>{};
     for (final u in users) {
-      final id = NgmyCivicWalletIdentity.normalizeId(u.registryId ?? '');
-      final key = id.isNotEmpty
-          ? 'id:$id'
-          : 'em:${NgmyCivicRegistryMembers.emailKey(u.email)}';
-      if (key == 'id:' || key == 'em:') continue;
-      if (!seen.add(key)) continue;
-      out.add(u);
+      final rid = (u.registryId ?? '').trim();
+      if (NgmyCivicWalletIdentity.isMaskedRegistryId(rid)) continue;
+      final key = NgmyCivicWalletIdentity.rankingPersonKey(rid, email: u.email);
+      if (key.isEmpty) continue;
+      final prev = byKey[key];
+      if (prev == null) {
+        byKey[key] = u;
+        continue;
+      }
+      byKey[key] = _preferRankingUser(prev, u);
     }
-    return out;
+    return byKey.values.toList();
+  }
+
+  UserData _preferRankingUser(UserData a, UserData b) {
+    final aCanon = NgmyCivicWalletIdentity.isCanonicalRegistryId(a.registryId ?? '');
+    final bCanon = NgmyCivicWalletIdentity.isCanonicalRegistryId(b.registryId ?? '');
+    if (aCanon != bCanon) return aCanon ? a : b;
+    final aName = NgmyCivicRegistryMembers.isPublicPersonName(
+      a.fullName ?? a.username,
+      registryId: a.registryId ?? '',
+    );
+    final bName = NgmyCivicRegistryMembers.isPublicPersonName(
+      b.fullName ?? b.username,
+      registryId: b.registryId ?? '',
+    );
+    if (aName != bName) return aName ? a : b;
+    return a;
   }
 
   /// Search: registrars still use the Members roster. Rankings never uses this
@@ -41723,9 +41741,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final users = <UserData>[];
     for (final raw in rows) {
       final m = Map<String, dynamic>.from(raw);
-      if (NgmyCivicWalletIdentity.normalizeId((m['registryId'] ?? '').toString()).isEmpty) {
-        continue;
-      }
+      final rid = (m['registryId'] ?? '').toString().trim();
+      if (NgmyCivicWalletIdentity.isMaskedRegistryId(rid)) continue;
+      if (NgmyCivicWalletIdentity.normalizeId(rid).isEmpty) continue;
       final ms = (m['state'] ?? '').toString().trim();
       if (ms.isNotEmpty &&
           !NgmyCivicRegistryStats.statesMatch(ms, _selectedState)) {
@@ -41737,10 +41755,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Map<String, dynamic>? _rankingSourceRow(UserData u) {
-    final id = NgmyCivicWalletIdentity.normalizeId(u.registryId ?? '');
-    if (id.isEmpty) return null;
+    final rid = (u.registryId ?? '').trim();
+    if (rid.isNotEmpty) {
+      final local = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+      if (local != null) return local;
+    }
+    if (u.email.trim().isNotEmpty) {
+      final local = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+      if (local != null) return local;
+    }
     for (final row in _sharedDirectoryRows) {
-      if (NgmyCivicWalletIdentity.normalizeId((row['registryId'] ?? '').toString()) == id) {
+      if (NgmyCivicWalletIdentity.idsEqual((row['registryId'] ?? '').toString(), rid)) {
         return row;
       }
     }
@@ -41808,8 +41833,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
-  /// Same live Members list for every Civic viewer — not each phone's leftovers.
-  List<UserData> _rankingsEnrolled() => _dedupeRankingUsers(_sharedDirectoryUsers);
+  /// Same people as the Members tab for this state. Masked ** IDs are dropped.
+  List<UserData> _rankingsEnrolled() {
+    if (_canUseRegistrarToolsHere()) {
+      return _civicVisibleMembersForState();
+    }
+    return _dedupeRankingUsers(_sharedDirectoryUsers);
+  }
 
   Future<void> _refreshCivicMembersFromCloud() async {
     if (_cloudHydrateInFlight) return;

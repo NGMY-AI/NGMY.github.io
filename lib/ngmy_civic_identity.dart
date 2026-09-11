@@ -43,6 +43,33 @@ class NgmyCivicWalletIdentity {
     return t.replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
 
+  /// Legacy network redaction: **6250732 instead of GA6250732.
+  static bool isMaskedRegistryId(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return false;
+    if (s.contains('***')) return true;
+    return RegExp(r'^\*+\d').hasMatch(s);
+  }
+
+  /// Real printed Civic ID, e.g. GA1234567.
+  static bool isCanonicalRegistryId(String raw) =>
+      RegExp(r'^[A-Z]{2}\d{6,}$').hasMatch(raw.trim().toUpperCase());
+
+  /// One key for GA6250732 and **6250732 so Rankings cannot list the same person twice.
+  static String rankingPersonKey(String registryId, {String email = ''}) {
+    if (isMaskedRegistryId(registryId)) {
+      final digits = digitsOnly(registryId);
+      return digits.length >= 6 ? 'd:$digits' : '';
+    }
+    final id = normalizeId(registryId);
+    final digits = digitsOnly(id);
+    if (digits.length >= 6) return 'd:$digits';
+    if (id.isNotEmpty) return 'id:$id';
+    final em = email.toLowerCase().trim();
+    if (em.isNotEmpty && !em.contains('***')) return 'em:$em';
+    return '';
+  }
+
   static bool idsEqual(String a, String b) {
     final x = normalizeId(a);
     final y = normalizeId(b);

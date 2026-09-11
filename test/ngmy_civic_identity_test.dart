@@ -11,6 +11,16 @@ void main() {
       expect(NgmyCivicWalletIdentity.idsEqual('GA1234567', 'GA1234568'), isFalse);
     });
 
+    test('masked ** IDs are the same person as the printed GA ID', () {
+      expect(NgmyCivicWalletIdentity.idsEqual('**6250732', 'GA6250732'), isTrue);
+      expect(
+        NgmyCivicWalletIdentity.rankingPersonKey('**6250732'),
+        NgmyCivicWalletIdentity.rankingPersonKey('GA6250732'),
+      );
+      expect(NgmyCivicWalletIdentity.isMaskedRegistryId('**6250732'), isTrue);
+      expect(NgmyCivicWalletIdentity.isCanonicalRegistryId('GA6250732'), isTrue);
+    });
+
     test('accepts a previous registry ID after a reprint', () {
       final member = {
         'state': 'Georgia',
