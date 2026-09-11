@@ -4361,6 +4361,38 @@ async function handleCivicAdminSettingsPersist(
       : {};
     const cleaned = { ...payload };
     delete cleaned.helpCampaignSpendings;
+    const current = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
+    const incomingByState =
+      cleaned.helpModeByState && typeof cleaned.helpModeByState === "object"
+        ? (cleaned.helpModeByState as Record<string, unknown>)
+        : {};
+    const existingByState =
+      current.helpModeByState && typeof current.helpModeByState === "object"
+        ? (current.helpModeByState as Record<string, unknown>)
+        : {};
+    const mergedByState: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(existingByState)) {
+      const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+      if (ck) mergedByState[ck] = v;
+    }
+    for (const [k, v] of Object.entries(incomingByState)) {
+      const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+      if (ck) mergedByState[ck] = v;
+    }
+    cleaned.helpModeByState = mergedByState;
+    if (Array.isArray(cleaned.helpCampaignClosures) && Array.isArray(current.helpCampaignClosures)) {
+      const seen = new Set<string>();
+      const closures: unknown[] = [];
+      for (const row of [...(current.helpCampaignClosures as unknown[]), ...(cleaned.helpCampaignClosures as unknown[])]) {
+        if (!row || typeof row !== "object") continue;
+        const id = String((row as Record<string, unknown>).campaignId ?? "").trim();
+        const key = id || JSON.stringify(row);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        closures.push(row);
+      }
+      cleaned.helpCampaignClosures = closures;
+    }
     const saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, cleaned);
     if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
     return jsonOk({ ok: true });

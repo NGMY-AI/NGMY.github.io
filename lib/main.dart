@@ -2661,23 +2661,32 @@ void _applyRegistrarGrantsFromConfig(
   List<UserData> users, {
   UserData? currentUser,
 }) {
+  void apply(UserData u) {
+    final status = _registrarApplicationStatusForEmail(config, u.email);
+    if (status == 'approved') {
+      u.isAuthorizedRegistrar = true;
+    } else if (status == 'revoked' || status == 'rejected') {
+      u.isAuthorizedRegistrar = false;
+    }
+    // No application row on this device: keep the cloud/user flag so a
+    // second phone does not strip Authorized Registrar access.
+  }
+
   for (final u in users) {
-    u.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(config, u);
+    apply(u);
   }
-  if (currentUser != null) {
-    currentUser.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(config, currentUser);
-  }
+  if (currentUser != null) apply(currentUser);
 }
 
-/// Registrar controls are granted only by an approved application, never by
-/// the cached flag stored on a user record. Explicit Registry King/Admin
-/// assignments remain valid only when they have no application record; an
-/// explicit revoke or rejection always overrides every registrar grant.
+/// Approved application always wins. A rejected/revoked application always
+/// loses. If this phone has not loaded applications yet, the user-row
+/// Authorized Registrar flag (and King/Admin) still opens Civic Registry.
 bool _hasEffectiveRegistrarAccess(AppConfig config, UserData user) {
   final status = _registrarApplicationStatusForEmail(config, user.email);
   if (status == 'approved') return true;
-  if (status == null) return user.isCivicRegistryKing || user.isCivicRegistryAdmin;
-  return false;
+  if (status == 'revoked' || status == 'rejected') return false;
+  if (user.isCivicRegistryKing || user.isCivicRegistryAdmin) return true;
+  return user.isAuthorizedRegistrar;
 }
 
 List<Map<String, dynamic>> _civicRegistrarApplicationsFromConfigValue(dynamic raw) {
@@ -30786,7 +30795,7 @@ extension AppConfigHelpMode on AppConfig {
   /// Deactivate could run to completion, appear to succeed, and the
   /// campaign would still show active because nothing was actually
   /// removed under the key the read side was looking up.
-  String _stateKey(String state) => state.trim().toLowerCase();
+  String _stateKey(String state) => NgmyCivicRegistryStats.canonicalStateKey(state);
 
   bool _helpCampaignIsClosed(String campaignId) {
     final id = campaignId.trim();
@@ -30891,17 +30900,19 @@ extension AppConfigHelpMode on AppConfig {
   void deactivateHelpCampaign(String state) {
     final key = _stateKey(state);
     if (key.isEmpty) return;
-    final existingRaw = helpModeByState[key];
+    final existingRaw = _rawCampaignForKey(key);
     final existing = existingRaw is Map ? Map<String, dynamic>.from(existingRaw) : const <String, dynamic>{};
-    final next = Map<String, dynamic>.from(helpModeByState)
-      ..[key] = {
-        ...existing,
-        'active': false,
-        'updatedAt': DateTime.now().toUtc().toIso8601String(),
-      };
+    final next = <String, dynamic>{};
+    helpModeByState.forEach((k, v) {
+      if (_stateKey(k) == key) return;
+      next[k] = v;
+    });
+    next[key] = {
+      ...existing,
+      'active': false,
+      'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    };
     helpModeByState = next;
-    // The flat fields are legacy migration input only. Leaving this true can
-    // recreate a campaign if an older device drops the per-state map entry.
     helpModeActive = false;
   }
 
@@ -31064,7 +31075,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .toList();
     unawaited(_hydrateReceiptReadState());
-    unawaited(_hydrateRegistrarApplication());
+    unawaited(() async {
+      await _hydrateRegistrarApplication();
+      if (!mounted) return;
+      if (_canBypassCivicGate()) {
+        setState(() {
+          _registryUnlocked = true;
+          _unlockChecked = true;
+          _registryGateMessage = null;
+        });
+      }
+    }());
     unawaited(() async {
       final deleted = widget.config.civicDeletedContributionIds
           .map((e) => e.trim())
@@ -31166,6 +31187,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _refreshCivicHelpModeSettingsOnly() async {
+    if (ngmyShouldDeferRemoteConfigOverwrite()) return;
     if (_helpSettingsRefreshInFlight) {
       final pending = _helpSettingsRefreshCompleter;
       if (pending != null) await pending.future;
@@ -31229,7 +31251,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final refreshCompleter = Completer<void>();
     _helpRefreshCompleter = refreshCompleter;
     try {
-      await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+      if (!ngmyShouldDeferRemoteConfigOverwrite()) {
+        await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+      }
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
       await ngmyHydrateCivicHelpCampaignSpendings(widget.config);
@@ -31496,8 +31520,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _canUseRegistrarToolsHere([String? state]) {
     if (_isGlobalCivicRegistryAdmin()) return true;
     if (!_hasRegistrarAccess()) return false;
-    final st = (state ?? _selectedState).trim().toLowerCase();
-    return st == _registrarHomeState().trim().toLowerCase();
+    final home = _registrarHomeState();
+    if (home.trim().isEmpty) return true;
+    return NgmyCivicRegistryStats.statesMatch(state ?? _selectedState, home);
   }
 
   bool _canBypassCivicGate() => _canUseRegistrarToolsHere();
@@ -31830,7 +31855,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } else if (status == 'revoked' || status == 'rejected') {
       widget.user.isAuthorizedRegistrar = false;
     }
-    if (mounted) setState(() {});
+    if (_hasRegistrarAccess() && !_isGlobalCivicRegistryAdmin()) {
+      final home = _registrarHomeState();
+      if (home.trim().isNotEmpty &&
+          (_selectedState.trim().isEmpty ||
+              !NgmyCivicRegistryStats.statesMatch(_selectedState, home))) {
+        _selectedState = home;
+        widget.user.state = home;
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      if (_canBypassCivicGate()) {
+        _registryUnlocked = true;
+        _unlockChecked = true;
+        _registryGateMessage = null;
+      }
+    });
   }
 
   bool _hasPendingRegistrarApplication() {
@@ -37137,16 +37178,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       debugPrint('[help mode] mark campaign closed: $e');
                                     }
                                     widget.config.deactivateHelpCampaign(_selectedState);
+                                    ngmyAdminConfigMutationAt = DateTime.now();
                                   });
                                   unawaited(_persistCivicContributionsBackup());
-                                  // Close immediately, but keep this handler alive until
-                                  // the authoritative shared-state write finishes. A bare
-                                  // unawaited call could be abandoned if the registrar
-                                  // navigated/refreshed, leaving other users stuck "on".
                                   widget.onDataChanged();
-                                  if (ctx.mounted) Navigator.pop(ctx);
+                                  // Write local + cloud before closing so the 5s poll cannot
+                                  // reload a stale "still active" row and turn Help Mode back on.
                                   final cloudSaved =
                                       await ngmyPersistCivicHelpModeSettings(widget.config);
+                                  if (ctx.mounted) Navigator.pop(ctx);
                                   if (cloudSaved) {
                                     await _broadcastCivicHelpModeChanged(_selectedState);
                                   }

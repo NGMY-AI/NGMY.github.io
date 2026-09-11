@@ -154,6 +154,23 @@ void main() {
     },
   );
 
+  test('deactivating a campaign stored under Georgia still turns it off', () {
+    final config = AppConfig(
+      helpModeByState: {
+        'Georgia': {
+          'active': true,
+          'campaignId': 'campaign-ga',
+          'purpose': 'ROOF',
+        },
+      },
+    );
+    config.deactivateHelpCampaign('GA');
+    expect(config.helpActiveFor('Georgia'), isFalse);
+    expect(config.helpActiveFor('georgia'), isFalse);
+    expect(config.helpModeByState.containsKey('georgia'), isTrue);
+    expect(config.helpModeByState.containsKey('Georgia'), isFalse);
+  });
+
   test('closed legacy campaign cannot migrate back to active', () {
     final config = AppConfig(
       helpModeActive: true,
