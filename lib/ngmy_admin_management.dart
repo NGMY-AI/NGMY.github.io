@@ -931,6 +931,8 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
 }) async {
   final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
   var cloudHydrated = false;
+  // Restore this device first so a short/empty cloud fetch cannot blank the list.
+  await NgmyCivicRegistryMembers.hydrateLocal(config);
   // Always try cloud when signed in — reachability probe can false-negative on Wi‑Fi.
   if (email.isNotEmpty) {
     final resolvedState = (state ?? '').trim();

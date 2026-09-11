@@ -42223,8 +42223,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return a;
   }
 
-  /// Search: registrars still use the Members roster. Rankings never uses this
-  /// for the live board — every viewer must see the same server list.
+  /// Search + Members: registrars use the local roster. Rankings unions this
+  /// with the last good shared/cloud list so names never blink out.
   List<UserData> _civicVisibleMembersForState() {
     if (_canUseRegistrarToolsHere()) {
       return _dedupeRankingUsers(
@@ -42234,6 +42234,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
     }
     return _dedupeRankingUsers(_sharedDirectoryUsers);
+  }
+
+  List<Map<String, dynamic>> _unionRankingRows(
+    List<Map<String, dynamic>> a,
+    List<Map<String, dynamic>> b,
+  ) {
+    final byKey = <String, Map<String, dynamic>>{};
+    void take(Map<String, dynamic> raw) {
+      final m = Map<String, dynamic>.from(raw);
+      final rid = (m['registryId'] ?? '').toString().trim();
+      if (NgmyCivicWalletIdentity.isMaskedRegistryId(rid)) return;
+      final key = NgmyCivicWalletIdentity.rankingPersonKey(
+        rid,
+        email: (m['email'] ?? '').toString(),
+      );
+      if (key.isEmpty) return;
+      final prev = byKey[key];
+      if (prev == null) {
+        byKey[key] = m;
+        return;
+      }
+      final prevName = NgmyCivicRegistryMembers.resolvedDisplayName(prev);
+      final nextName = NgmyCivicRegistryMembers.resolvedDisplayName(m);
+      byKey[key] = nextName != 'Member' && prevName == 'Member' ? m : prev;
+    }
+    for (final row in a) {
+      take(row);
+    }
+    for (final row in b) {
+      take(row);
+    }
+    return byKey.values.toList();
   }
 
   /// Rankings cards are built only from the live server row. Never clone
@@ -42320,7 +42352,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final email = _civicRankingsFetchEmail();
     final gen = ++_sharedDirectoryLoadGen;
     final wanted = _selectedState.trim();
-    if (mounted) setState(() => _sharedDirectoryLoading = true);
+    if (_sharedDirectoryState != wanted || _sharedDirectoryRows.isEmpty) {
+      final cached = await NgmyCivicRegistryMembers.loadRankingsCache(wanted);
+      if (cached.isNotEmpty && mounted && gen == _sharedDirectoryLoadGen) {
+        setState(() {
+          _sharedDirectoryRows = _unionRankingRows(_sharedDirectoryRows, cached);
+          _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
+          _sharedDirectoryState = wanted;
+        });
+      }
+    }
+    if (mounted) setState(() => _sharedDirectoryLoading = _sharedDirectoryUsers.isEmpty);
     try {
       final rawPin = email.isEmpty
           ? ''
@@ -42333,18 +42375,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       if (!mounted || gen != _sharedDirectoryLoadGen) return;
       if (_selectedState.trim() != wanted) return;
-      if (!rankings.ok) {
-        // Keep the last good shared list so a failed fetch cannot replace
-        // the live board with a leftover local roster.
+      if (!rankings.ok || rankings.members.isEmpty) {
         if (mounted) setState(() => _sharedDirectoryLoading = false);
         return;
       }
+      final merged = _unionRankingRows(_sharedDirectoryRows, rankings.members);
       setState(() {
-        _sharedDirectoryRows = rankings.members;
-        _sharedDirectoryUsers = _usersFromDirectoryRows(rankings.members);
+        _sharedDirectoryRows = merged;
+        _sharedDirectoryUsers = _usersFromDirectoryRows(merged);
         _sharedDirectoryState = wanted;
         _sharedDirectoryLoading = false;
       });
+      unawaited(NgmyCivicRegistryMembers.saveRankingsCache(wanted, merged));
     } finally {
       if (mounted && gen == _sharedDirectoryLoadGen && _sharedDirectoryLoading) {
         setState(() => _sharedDirectoryLoading = false);
@@ -42352,12 +42394,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
-  /// Same people as the Members tab for this state. Masked ** IDs are dropped.
+  /// Same people as the Members tab, plus anyone already saved from cloud
+  /// rankings. A refresh must never blank a list that already had names.
   List<UserData> _rankingsEnrolled() {
-    if (_canUseRegistrarToolsHere()) {
-      return _civicVisibleMembersForState();
-    }
-    return _dedupeRankingUsers(_sharedDirectoryUsers);
+    final local = _dedupeRankingUsers(
+      _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+          .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+          .toList(),
+    );
+    final shared = _dedupeRankingUsers(_sharedDirectoryUsers);
+    if (local.isEmpty) return shared;
+    if (shared.isEmpty) return local;
+    return _dedupeRankingUsers([...local, ...shared]);
   }
 
   Future<void> _refreshCivicMembersFromCloud() async {

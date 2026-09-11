@@ -1666,28 +1666,20 @@ class NgmyCivicRegistryMembers {
   }
 
   /// Auto-created roster ghosts (empty/masked name, no registrar or self-enroll trail).
+  /// A real name + registry ID is always a member — never drop them because a
+  /// cloud row omitted phone, address, or enrollmentSource.
   static bool isPhantomMemberRow(Map<String, dynamic> m) {
     final rid = (m['registryId'] ?? '').toString().trim();
     if (rid.isEmpty) return true;
 
-    final source = (m['enrollmentSource'] ?? m['source'] ?? '').toString().trim();
     final display = resolvedDisplayName(m);
-    final hasRealName = display != 'Member';
+    if (display != 'Member') return false;
 
+    final source = (m['enrollmentSource'] ?? m['source'] ?? '').toString().trim();
     if (source == 'guest_self_enrollment' || source == 'registrar') {
-      return !hasRealName;
+      return true;
     }
-
-    if (!hasRealName) return true;
-
-    if (source.isEmpty) {
-      final phone = _phoneKey((m['phone'] ?? '').toString());
-      final addr = (m['homeAddress'] ?? '').toString().trim();
-      final dob = (m['dob'] ?? '').toString().trim();
-      if (phone.length < 7 && addr.isEmpty && dob.isEmpty) return true;
-    }
-
-    return false;
+    return true;
   }
 
   /// Remove phantom rows and optionally clear stale [isEnrolledInRegistry] flags.
@@ -2696,6 +2688,41 @@ class NgmyCivicRegistryMembers {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsKey, jsonEncode(payload(config)));
     } catch (_) {}
+  }
+
+  static const _rankingsCacheKey = 'ngmy_civic_rankings_cache_v1';
+
+  static Future<void> saveRankingsCache(String state, List<Map<String, dynamic>> members) async {
+    final st = NgmyCivicRegistryStats.canonicalStateKey(state);
+    if (st.isEmpty || members.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_rankingsCacheKey);
+      final map = <String, dynamic>{};
+      if (raw != null && raw.trim().isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) map.addAll(Map<String, dynamic>.from(decoded));
+      }
+      map[st] = members.map((e) => Map<String, dynamic>.from(e)).toList();
+      await prefs.setString(_rankingsCacheKey, jsonEncode(map));
+    } catch (_) {}
+  }
+
+  static Future<List<Map<String, dynamic>>> loadRankingsCache(String state) async {
+    final st = NgmyCivicRegistryStats.canonicalStateKey(state);
+    if (st.isEmpty) return const [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_rankingsCacheKey);
+      if (raw == null || raw.trim().isEmpty) return const [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const [];
+      final hit = decoded[st] ?? decoded[state];
+      if (hit is! List) return const [];
+      return hit.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<void> hydrateLocal(dynamic config) async {

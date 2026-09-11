@@ -3439,39 +3439,8 @@ async function handleCivicFetchRankings(
       return jsonOk({ error: "State unlock required", ok: false }, 403);
     }
   }
-  const board = rankingBoardFromPayload(payload, state);
-  if (board && board.length > 0) {
-    return jsonOk({
-      ok: true,
-      state: displayStateName(state),
-      savedAt: payload.savedAt ?? null,
-      members: rankingSnapshotFrom(board, state),
-    });
-  }
-  const seen = new Map<string, Record<string, unknown>>();
-  for (const m of live) {
-    if (isGhostMemberRow(m)) continue;
-    const rid = String(m.registryId ?? "").trim();
-    if (!rid || isPlaceholderRegistryId(rid)) continue;
-    const key = rankingPersonKey(m);
-    if (!key) continue;
-    const prev = seen.get(key);
-    seen.set(key, prev ? preferCanonicalRankingRow(prev, m) : m);
-  }
-  const members: Record<string, unknown>[] = [];
-  for (const m of seen.values()) {
-    members.push({
-      fullName: String(m.fullName ?? ""),
-      username: String(m.username ?? ""),
-      registryId: String(m.registryId ?? "").trim(),
-      state: displayStateName(String(m.state ?? state)),
-      helps: Number(m.helps ?? 0) || 0,
-      missed: Number(m.missed ?? 0) || 0,
-      activityAt: m.activityAt ?? null,
-      firstHelpAt: m.firstHelpAt ?? null,
-      enrolledAt: m.enrolledAt ?? null,
-    });
-  }
+  const board = rankingBoardFromPayload(payload, state) ?? [];
+  const members = rankingSnapshotFrom(mergeMemberLists(live, board), state);
   return jsonOk({
     ok: true,
     state: displayStateName(state),
@@ -3691,14 +3660,16 @@ async function handleCivicPersistRoster(
       const other = allMembers.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
       );
+      const existingHome = allMembers.filter(
+        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
+      );
       const inc = incoming.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
       );
-      // Members tab is the live board. Union kept leftover people and stale
-      // help counts, so Rankings showed 70 names / fake Top Helpers while the
-      // registrar still had 59 with no contributions.
-      if (inc.length > 0) return [...other, ...inc];
-      return allMembers;
+      // Union this device with the cloud. A phone with a partial roster must
+      // never replace the state's members and make them disappear.
+      if (inc.length === 0) return allMembers;
+      return [...other, ...mergeMemberLists(existingHome, inc)];
     };
 
     members = mergeStateSlice(members, incomingMembers, sk);
@@ -3764,8 +3735,19 @@ async function handleCivicPersistRoster(
       !snapKey || canonicalStateKey(String(m.state ?? "")) === snapKey
     );
   if (snapKey) {
-    const rows = rankingSnapshotFrom(snapMembers, snapState);
-    if (rows.length > 0) rankingByState[snapKey] = rows;
+    const incomingRows = rankingSnapshotFrom(snapMembers, snapState);
+    const existingBoard = rankingBoardFromPayload(current, snapState) ?? [];
+    const liveHome = members.filter(
+      (m) => canonicalStateKey(String(m.state ?? "")) === snapKey,
+    );
+    const union = filterTombstonedMembers(
+      mergeMemberLists(mergeMemberLists(existingBoard, liveHome), incomingRows),
+      removed,
+      deceased,
+    );
+    if (union.length > 0) {
+      rankingByState[snapKey] = rankingSnapshotFrom(union, snapState);
+    }
   }
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased, rankingByState });
