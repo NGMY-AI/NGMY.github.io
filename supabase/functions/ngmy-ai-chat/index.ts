@@ -2907,13 +2907,6 @@ async function handleCivicFetchRankings(
   ) {
     allowed = true;
   }
-  if (!allowed) {
-    const pins = await loadRegistryPins(admin);
-    const expected = effectivePinForState(pins, state);
-    if (!expected || !pinSig || (await pinSigFor(state, expected)) !== pinSig) {
-      return jsonOk({ error: "State unlock required", ok: false }, 403);
-    }
-  }
   const payload = await loadCivicPayload(admin);
   const inState = (m: Record<string, unknown>) =>
     canonicalStateKey(String(m.state ?? "")) === want;
@@ -2927,6 +2920,20 @@ async function handleCivicFetchRankings(
       return inState({ state: d.state ?? snap.state, registryId: d.registryId ?? snap.registryId });
     }),
   );
+  if (!allowed) {
+    const enrolledHere = live.some((m) => {
+      if (emailKey(String(m.email ?? "")) === email) return true;
+      return emailKey(String(m.linkedAppEmail ?? "")) === email;
+    });
+    if (enrolledHere) allowed = true;
+  }
+  if (!allowed) {
+    const pins = await loadRegistryPins(admin);
+    const expected = effectivePinForState(pins, state);
+    if (!expected || !pinSig || (await pinSigFor(state, expected)) !== pinSig) {
+      return jsonOk({ error: "State unlock required", ok: false }, 403);
+    }
+  }
   const seen = new Set<string>();
   const members: Record<string, unknown>[] = [];
   for (const m of live) {
