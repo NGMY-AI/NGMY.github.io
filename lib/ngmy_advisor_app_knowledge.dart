@@ -104,7 +104,7 @@ SLIDES: Slides tab. Free blank + some class templates/designs. Slides Pro unlock
 
 ADVISORS: 30 free minutes, then Advisors subscription for unlimited chat (admins unlimited).
 
-CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), Civic King/Admin roles. Guest enroll can use ?civic=enroll. Georgia first registrar path differs; other states may need State Registrar sponsorship.
+CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), Civic King/Admin roles. Guest enroll can use ?civic=enroll. Georgia stays free. Every other state gets a 2-month free Civic Registry trial for Authorized Registrars, then \$50/mo State Registrar sponsorship starting month 3.
 
 VAULT GAMES (Home → Vault Channel): arcade games. Need an active Growth Income investment for full access; otherwise one free play total. Free trial does not unlock games.
 
@@ -156,7 +156,7 @@ FREEMIUM QUICK MAP (exact Stripe \$ below):
 - Kiswahili: basics free → per-level lifetime
 - Vault: 1 free play without investment
 - Doc Share: config free individual count; org license Stripe; individual wallet fee may exist
-- State Registrar: Georgia free first path; other states \$50/mo first AR
+- State Registrar: Georgia always free; other states 2 months free, then \$50/mo first AR starting month 3
 - Scanner / Translator / Phone Unlock / Business Card / Family Tree / Slides: see Stripe catalog
 
 WALLET vs STRIPE:

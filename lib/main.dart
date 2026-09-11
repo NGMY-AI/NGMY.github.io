@@ -31329,6 +31329,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   String _sharedDirectoryState = '';
   bool _sharedDirectoryLoading = false;
   int _sharedDirectoryLoadGen = 0;
+  /// Optimistic during the 2-month state trial so AR tools do not flash away.
+  bool _civicStateAccessOk = true;
+  String _civicTrialBanner = '';
 
   final List<String> _usStates = [
     'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia',
@@ -31420,6 +31423,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await _mergeCivicRegistryPinsIntoConfig(widget.config);
         if (mounted) setState(() {});
       }());
+      unawaited(_refreshCivicStateAccess());
     });
     // Keep state-wide activate/deactivate changes close to live on every
     // device, even though regular-user Supabase Realtime is intentionally off.
@@ -31819,9 +31823,46 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _canUseRegistrarToolsHere([String? state]) {
     if (_isGlobalCivicRegistryAdmin()) return true;
     if (!_hasRegistrarAccess()) return false;
+    final st = state ?? _selectedState;
+    if (!NgmyStateRegistrarPayments.isGeorgiaExempt(st) && !_civicStateAccessOk) {
+      return false;
+    }
     final home = _registrarHomeState();
     if (home.trim().isEmpty) return true;
-    return NgmyCivicRegistryStats.statesMatch(state ?? _selectedState, home);
+    return NgmyCivicRegistryStats.statesMatch(st, home);
+  }
+
+  Future<void> _refreshCivicStateAccess({bool promptPaywall = true}) async {
+    final state = _selectedState;
+    final admin = widget.user.isAdmin || _isGlobalCivicRegistryAdmin();
+    if (admin || NgmyStateRegistrarPayments.isGeorgiaExempt(state)) {
+      if (!mounted) return;
+      setState(() {
+        _civicStateAccessOk = true;
+        _civicTrialBanner = '';
+      });
+      return;
+    }
+    try {
+      final inspected = await NgmyStateRegistrarPayments.inspectState(state);
+      var ok = inspected.hasAccess;
+      if (!ok && promptPaywall && _hasRegistrarAccess() && mounted) {
+        ok = await NgmyStateRegistrarPayments.ensureRegistrarToolsAccess(
+          context: context,
+          email: widget.user.email,
+          state: state,
+          isAdmin: admin,
+        );
+      }
+      if (!mounted) return;
+      setState(() {
+        _civicStateAccessOk = ok;
+        _civicTrialBanner = inspected.banner;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _civicStateAccessOk = true);
+    }
   }
 
   /// Authorized Registrars skip Verify your membership on every device.
@@ -31996,6 +32037,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _selectedState = state;
       _registryUnlocked = true;
     });
+    unawaited(_refreshCivicStateAccess());
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     unawaited(ngmyHydrateCivicRegistryMembersFromAllBackups(
@@ -32089,6 +32131,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_persistStateSwitchLocal());
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
       unawaited(_refreshCivicMembersFromCloud());
+      unawaited(_refreshCivicStateAccess());
       widget.onDataChanged();
       return true;
     }
@@ -32131,6 +32174,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_persistStateSwitchLocal());
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     unawaited(_refreshCivicMembersFromCloud());
+    unawaited(_refreshCivicStateAccess());
     widget.onDataChanged();
     return true;
   }
@@ -32236,6 +32280,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _registryGateMessage = null;
       }
     });
+    unawaited(_refreshCivicStateAccess(promptPaywall: false));
   }
 
   bool _hasPendingRegistrarApplication() {
@@ -44117,6 +44162,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ],
                 ),
+                if (_civicTrialBanner.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _civicTrialBanner,
+                    style: TextStyle(fontSize: 9, height: 1.25, fontWeight: FontWeight.w600, color: muted),
+                  ),
+                ],
+                if (_hasRegistrarAccess() &&
+                    !_civicStateAccessOk &&
+                    !_isGlobalCivicRegistryAdmin() &&
+                    !NgmyStateRegistrarPayments.isGeorgiaExempt(st)) ...[
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () => unawaited(_refreshCivicStateAccess()),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF6200EE),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                      minimumSize: const Size(0, 24),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text(
+                      'Subscribe \$50/mo to keep Civic Registry',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9),
+                    ),
+                  ),
+                ],
                 if (_canUseRegistrarToolsHere()) ...[
                   // Home-state AR manages Activate/Deactivate + spending;
                   // King/Admin can do this across every state.

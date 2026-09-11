@@ -583,7 +583,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.deviceTransfer:
         return 'Transfer files, decks, and backups with QR or download — 2 free, then \$4.99/mo.';
       case NgmyStripeProduct.stateRegistrar:
-        return 'First Authorized Registrar in a state sponsors that state for \$50/month. Georgia is free.';
+        return 'Georgia stays free. Every other state gets 2 months free, then the first Authorized Registrar sponsors that state for \$50/month starting month 3.';
       case NgmyStripeProduct.civicUserGroupExtra:
         return 'Create an additional lightning Civic Group beyond your one free owned group (30 days).';
       case NgmyStripeProduct.civicUserGroupMembers:
