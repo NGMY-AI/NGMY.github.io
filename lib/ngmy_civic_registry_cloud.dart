@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_civic_registrar_application.dart';
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_civic_registry_members.dart';
 
@@ -443,24 +444,69 @@ Future<bool> ngmyCivicSaveRegistryPins({
   return data != null && data['ok'] == true;
 }
 
-Future<List<Map<String, dynamic>>> ngmyCivicFetchRegistrarApplications({
+class NgmyCivicRegistrarApplicationsFetch {
+  const NgmyCivicRegistrarApplicationsFetch({
+    this.applications = const [],
+    this.isRegistrar = false,
+    this.isAdmin = false,
+    this.registrarState = '',
+  });
+
+  final List<Map<String, dynamic>> applications;
+  final bool isRegistrar;
+  final bool isAdmin;
+  final String registrarState;
+}
+
+/// Last civicFetchRegistrarApplications role for the signed-in email.
+/// Lets every device skip Verify your membership without waiting on
+/// masked application rows or a local registrar backup.
+class NgmyCivicRegistrarSession {
+  static String _email = '';
+  static bool isRegistrar = false;
+  static String registrarState = '';
+
+  static void apply(String email, NgmyCivicRegistrarApplicationsFetch fetch) {
+    _email = email.toLowerCase().trim();
+    isRegistrar = fetch.isRegistrar || fetch.isAdmin;
+    registrarState = fetch.registrarState.trim();
+  }
+
+  static bool isKnownRegistrar(String email) {
+    final key = email.toLowerCase().trim();
+    return key.isNotEmpty && key == _email && isRegistrar;
+  }
+
+  static void clear() {
+    _email = '';
+    isRegistrar = false;
+    registrarState = '';
+  }
+}
+
+Future<NgmyCivicRegistrarApplicationsFetch> ngmyCivicFetchRegistrarApplications({
   required String email,
 }) async {
+  final key = email.trim().toLowerCase();
   final data = await ngmyCivicInvoke({
     'action': 'civicFetchRegistrarApplications',
-    'email': email.trim().toLowerCase(),
+    'email': key,
   });
-  if (data == null || data['ok'] != true) return const [];
-  if (data['networkEmpty'] == true) return const [];
-  final raw = data['applications'];
-  if (raw is List && raw.isNotEmpty) {
-    return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  if (data == null || data['ok'] != true || data['networkEmpty'] == true) {
+    return const NgmyCivicRegistrarApplicationsFetch();
   }
-  final mine = data['myApplications'];
-  if (mine is List && mine.isNotEmpty) {
-    return mine.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
-  }
-  return const [];
+  final combined = NgmyCivicRegistrarApplication.combineNetworkAndOwn(
+    network: data['applications'] is List ? data['applications'] as List : const [],
+    own: data['myApplications'] is List ? data['myApplications'] as List : const [],
+  );
+  final fetch = NgmyCivicRegistrarApplicationsFetch(
+    applications: combined,
+    isRegistrar: data['isRegistrar'] == true,
+    isAdmin: data['isAdmin'] == true,
+    registrarState: (data['registrarState'] ?? '').toString(),
+  );
+  if (key.isNotEmpty) NgmyCivicRegistrarSession.apply(key, fetch);
+  return fetch;
 }
 
 Future<bool> ngmyCivicPersistRegistrarApplications({

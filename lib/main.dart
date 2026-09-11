@@ -2679,14 +2679,17 @@ void _applyRegistrarGrantsFromConfig(
 }
 
 /// Approved application always wins. A rejected/revoked application always
-/// loses. If this phone has not loaded applications yet, the user-row
-/// Authorized Registrar flag (and King/Admin) still opens Civic Registry.
+/// loses. King/Admin, the user-row flag, and the cloud "this email is a
+/// registrar" hint all skip Verify your membership on every device.
 bool _hasEffectiveRegistrarAccess(AppConfig config, UserData user) {
-  final status = _registrarApplicationStatusForEmail(config, user.email);
-  if (status == 'approved') return true;
-  if (status == 'revoked' || status == 'rejected') return false;
-  if (user.isCivicRegistryKing || user.isCivicRegistryAdmin) return true;
-  return user.isAuthorizedRegistrar;
+  return NgmyCivicRegistrarApplication.shouldSkipMembershipVerify(
+    email: user.email,
+    isAuthorizedRegistrar: user.isAuthorizedRegistrar,
+    isCivicRegistryKing: user.isCivicRegistryKing,
+    isCivicRegistryAdmin: user.isCivicRegistryAdmin,
+    applications: config.civicRegistrarApplications,
+    cloudSaysRegistrar: NgmyCivicRegistrarSession.isKnownRegistrar(user.email),
+  );
 }
 
 List<Map<String, dynamic>> _civicRegistrarApplicationsFromConfigValue(dynamic raw) {
@@ -2708,7 +2711,8 @@ Future<List<Map<String, dynamic>>> _fetchRemoteCivicRegistrarApplications() asyn
   try {
     final email = ngmyCurrentAuthEmail();
     if (email.isEmpty) return const [];
-    return await ngmyCivicFetchRegistrarApplications(email: email);
+    final fetch = await ngmyCivicFetchRegistrarApplications(email: email);
+    return fetch.applications;
   } catch (e) {
     debugPrint('[config] fetch civicRegistrarApplications: $e');
     return const [];
@@ -12561,7 +12565,17 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (local.isApprovedHelper && !remote.isApprovedHelper) remote.isApprovedHelper = true;
     // Never revive a registrar grant from stale local state. The approved
     // application list is authoritative for revoke, restore, and delete.
-    remote.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(_config, remote);
+    final registrarStatus = _registrarApplicationStatusForEmail(_config, remote.email);
+    if (registrarStatus == 'revoked' || registrarStatus == 'rejected') {
+      remote.isAuthorizedRegistrar = false;
+    } else if (registrarStatus == 'approved' ||
+        remote.isAuthorizedRegistrar ||
+        local.isAuthorizedRegistrar ||
+        NgmyCivicRegistrarSession.isKnownRegistrar(remote.email)) {
+      remote.isAuthorizedRegistrar = true;
+    } else {
+      remote.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(_config, remote);
+    }
     _preserveRegistryEnrollmentFromLocal(local, remote);
   }
 
@@ -12598,6 +12612,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await _applyAuthoritativeCloudProfile(cloudUser);
         _currentUser = cloudUser;
         if (idx >= 0) _allUsers[idx] = cloudUser;
+      }
+
+      try {
+        final registrarEmail = _currentUser?.email ?? emailKey;
+        if (registrarEmail.trim().isNotEmpty) {
+          final registrarFetch = await ngmyCivicFetchRegistrarApplications(email: registrarEmail);
+          _mergeRegistrarApplicationsIntoConfig(_config, registrarFetch.applications);
+          if (_currentUser != null &&
+              (registrarFetch.isRegistrar || registrarFetch.isAdmin)) {
+            _currentUser!.isAuthorizedRegistrar = true;
+          }
+          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
+          if (_currentUser?.isAuthorizedRegistrar == true) {
+            unawaited(_pushUserAuthorizedRegistrar(_currentUser!));
+          }
+        }
+      } catch (e) {
+        debugPrint('[login] registrar role sync: $e');
       }
 
       await _refreshUserTransactionsFromCloud(force: true);
@@ -31041,6 +31073,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   DateTime? _lastHelpsReconcileAt;
   DateTime? _lastHelpMutationAt;
   int _unlockCheckGen = 0;
+  Future<void>? _registrarHydrateFuture;
   /// Display-only copy of this state's Members list for regular Civic viewers.
   /// Never merged into the registrar roster.
   List<UserData> _sharedDirectoryUsers = [];
@@ -31075,8 +31108,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .toList();
     unawaited(_hydrateReceiptReadState());
+    _registrarHydrateFuture = _hydrateRegistrarApplication();
     unawaited(() async {
-      await _hydrateRegistrarApplication();
+      await _registrarHydrateFuture;
       if (!mounted) return;
       if (_canBypassCivicGate()) {
         setState(() {
@@ -31110,6 +31144,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Restore a finished membership verify immediately. Do not wait on
       // cloud hydrate — that check is what bounced people out after 3–4s.
+      await _registrarHydrateFuture;
+      if (!mounted) return;
       await _checkRegistryUnlock();
       if (!mounted) return;
       unawaited(_refreshCivicMembersFromCloud());
@@ -31525,7 +31561,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return NgmyCivicRegistryStats.statesMatch(state ?? _selectedState, home);
   }
 
-  bool _canBypassCivicGate() => _canUseRegistrarToolsHere();
+  /// Authorized Registrars skip Verify your membership on every device.
+  /// Enroll/Members tools stay limited to the registrar's home state.
+  bool _canBypassCivicGate() => _hasRegistrarAccess();
 
   /// State case (wallet) never remembers PIN / name / DOB / ID except for
   /// this state's first Authorized Registrar. Other ARs and all members
@@ -31735,8 +31773,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     unawaited(_pushUserAuthorizedRegistrar(widget.user));
     widget.onDataChanged();
 
-    // Home-state AR (or King/Admin) never sits behind membership verify.
-    if (_canUseRegistrarToolsHere(newState)) {
+    // Authorized Registrars skip membership verify in every state, on every device.
+    if (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) {
       if (!mounted) return false;
       setState(() {
         widget.user.state = newState;
@@ -31744,6 +31782,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _selectedCity = 'All Cities';
         _selectedRoom = 'All Rooms';
         _registryUnlocked = true;
+        if (!_canUseRegistrarToolsHere() && _activeTab > 1) {
+          _activeTab = 0;
+        }
       });
       unawaited(_persistStateSwitchLocal());
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
@@ -31799,11 +31840,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   /// Full admin or Civic Registry Admin may transfer enrolled members between states.
   bool _canAdminTransferCivicState() => widget.user.isAdmin || widget.user.isCivicRegistryAdmin;
 
-  String _registrarHomeState() => NgmyCivicRegistryStats.registrarStateForUser(
-        email: widget.user.email,
+  String _registrarHomeState() {
+    final email = widget.user.email;
+    if (NgmyCivicRegistrarApplication.isApprovedForEmail(
+      widget.config.civicRegistrarApplications,
+      email,
+    )) {
+      return NgmyCivicRegistryStats.registrarStateForUser(
+        email: email,
         userState: widget.user.state,
         applications: widget.config.civicRegistrarApplications,
       );
+    }
+    final hinted = NgmyCivicRegistrarSession.registrarState;
+    if (hinted.trim().isNotEmpty) return hinted;
+    return NgmyCivicRegistryStats.registrarStateForUser(
+      email: email,
+      userState: widget.user.state,
+      applications: widget.config.civicRegistrarApplications,
+    );
+  }
 
   bool _canManageCitiesForSelectedState() => _canUseRegistrarToolsHere();
 
@@ -31850,8 +31906,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
     }
     final status = _registrarApplicationStatusForEmail(widget.config, email);
-    if (status == 'approved') {
+    if (status == 'approved' || NgmyCivicRegistrarSession.isKnownRegistrar(email)) {
       widget.user.isAuthorizedRegistrar = true;
+      unawaited(_pushUserAuthorizedRegistrar(widget.user));
     } else if (status == 'revoked' || status == 'rejected') {
       widget.user.isAuthorizedRegistrar = false;
     }
@@ -41347,7 +41404,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         // AR home / King / Admin never need PIN — picking home while on the
         // gate must dismiss verify membership immediately.
         stateRequiresUnlock: (state) =>
-            !_canUseRegistrarToolsHere(state) && _stateRequiresMemberUnlock(state),
+            !_hasRegistrarAccess() &&
+            !_canUseRegistrarToolsHere(state) &&
+            _stateRequiresMemberUnlock(state),
       );
     }
 

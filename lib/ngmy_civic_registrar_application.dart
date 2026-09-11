@@ -84,13 +84,67 @@ class NgmyCivicRegistrarApplication {
     required String email,
     required bool userFlag,
     Map<String, dynamic>? localBackup,
+    bool cloudSaysRegistrar = false,
   }) {
     if (isRevokedForEmail(applications, email)) return false;
     if (localBackup != null && _statusOf(localBackup) == 'revoked') return false;
-    if (userFlag) return true;
+    if (userFlag || cloudSaysRegistrar) return true;
     if (isApprovedForEmail(applications, email)) return true;
     if (localBackup != null && _statusOf(localBackup) == 'approved') return true;
     return false;
+  }
+
+  /// Authorized Registrars (and King/Admin) never fill Verify your membership.
+  static bool shouldSkipMembershipVerify({
+    required String email,
+    required bool isAuthorizedRegistrar,
+    bool isCivicRegistryKing = false,
+    bool isCivicRegistryAdmin = false,
+    Iterable<Map<String, dynamic>> applications = const [],
+    Map<String, dynamic>? localBackup,
+    bool cloudSaysRegistrar = false,
+  }) {
+    if (isCivicRegistryKing || isCivicRegistryAdmin) return true;
+    return hasRegistrarAccess(
+      applications: applications,
+      email: email,
+      userFlag: isAuthorizedRegistrar,
+      localBackup: localBackup,
+      cloudSaysRegistrar: cloudSaysRegistrar,
+    );
+  }
+
+  /// Network summaries mask other people's emails. Own rows keep the real
+  /// address so the signed-in registrar is recognizable on every device.
+  static List<Map<String, dynamic>> combineNetworkAndOwn({
+    Iterable<dynamic> network = const [],
+    Iterable<dynamic> own = const [],
+  }) {
+    List<Map<String, dynamic>> mapsOf(Iterable<dynamic> raw) => raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
+    final byId = <String, Map<String, dynamic>>{};
+    final extra = <Map<String, dynamic>>[];
+    void take(Map<String, dynamic> row, {required bool prefer}) {
+      final copy = Map<String, dynamic>.from(row);
+      final id = (copy['id'] ?? '').toString().trim();
+      if (id.isEmpty) {
+        extra.add(copy);
+        return;
+      }
+      if (!prefer && byId.containsKey(id)) return;
+      byId[id] = copy;
+    }
+
+    for (final row in mapsOf(network)) {
+      take(row, prefer: false);
+    }
+    for (final row in mapsOf(own)) {
+      take(row, prefer: true);
+    }
+    return [...byId.values, ...extra];
   }
 
   /// One application record per person, always — replaces every prior row

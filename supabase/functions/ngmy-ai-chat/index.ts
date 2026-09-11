@@ -1581,6 +1581,18 @@ function registrarAppNetworkSummary(
   });
 }
 
+function registrarAppForViewer(
+  a: Record<string, unknown>,
+  viewer: string,
+): Record<string, unknown> {
+  const summary = registrarAppNetworkSummary(a);
+  const own = emailKey(String(a.userEmail ?? a.email ?? ""));
+  if (own && own === viewer) {
+    summary.userEmail = own;
+  }
+  return summary;
+}
+
 function loanAppNetworkSummary(
   a: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -2250,34 +2262,36 @@ async function handleCivicFetchRegistrarApplications(
     ),
   ];
 
+  const mine = apps.filter((a) => emailKey(String(a.userEmail ?? a.email ?? "")) === email);
+  const payloadBase = {
+    ok: true,
+    isRegistrar: role.isRegistrar || role.isAdmin,
+    isAdmin: role.isAdmin,
+    registrarState: role.registrarState || "",
+    myApplications: mine.map(sanitizeRegistrarAppOwn),
+    approvedStates,
+  };
+
   if (role.isAdmin) {
     return jsonOk({
-      ok: true,
+      ...payloadBase,
       view: "admin",
-      applications: apps.map(registrarAppNetworkSummary),
-      approvedStates,
+      applications: apps.map((a) => registrarAppForViewer(a, email)),
     });
   }
 
-  // Registrar / king reviewers: status-only for all states in Network (no PII).
-  if (role.isRegistrar && role.registrarState) {
-    const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+  if (role.isRegistrar) {
     return jsonOk({
-      ok: true,
+      ...payloadBase,
       view: "registrar",
-      applications: apps.map(registrarAppNetworkSummary),
-      myApplications: mine.map(sanitizeRegistrarAppOwn),
-      approvedStates,
+      applications: apps.map((a) => registrarAppForViewer(a, email)),
     });
   }
 
-  // Normal member: only own application(s) + which states have an AR (no PII)
-  const mine = apps.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
   return jsonOk({
-    ok: true,
+    ...payloadBase,
     view: "member",
     applications: mine.map(sanitizeRegistrarAppOwn),
-    approvedStates,
   });
 }
 
@@ -2620,6 +2634,16 @@ async function handleCivicCheckAccess(
   }
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (role.isAdmin || role.isRegistrar) {
+    return jsonOk({
+      ok: true,
+      allowed: true,
+      bypass: "registrar",
+      isRegistrar: role.isRegistrar || role.isAdmin,
+      registrarState: role.registrarState || "",
+    });
+  }
   const payload = await loadCivicPayload(admin);
   const inState = (m: Record<string, unknown>) =>
     !state || canonicalStateKey(String(m.state ?? "")) === canonicalStateKey(state);
