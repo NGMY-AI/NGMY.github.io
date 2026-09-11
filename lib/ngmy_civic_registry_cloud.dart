@@ -66,12 +66,13 @@ Future<({bool ok, String? pinSig, String? error})> ngmyCivicVerifyStatePin({
   );
 }
 
-Future<({bool allowed, String? error})> ngmyCivicCheckAccess({
+Future<({bool allowed, String? error, String? blocked})> ngmyCivicCheckAccess({
   required String email,
   String state = '',
   String memberEmail = '',
   String registryId = '',
   String fullName = '',
+  String pinSig = '',
 }) async {
   final data = await ngmyCivicInvoke({
     'action': 'civicCheckAccess',
@@ -80,12 +81,17 @@ Future<({bool allowed, String? error})> ngmyCivicCheckAccess({
     if (memberEmail.trim().isNotEmpty) 'memberEmail': memberEmail.trim().toLowerCase(),
     if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
     if (fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
+    if (pinSig.trim().isNotEmpty) 'pinSig': pinSig.trim(),
   });
-  if (data == null) return (allowed: true, error: null);
+  if (data == null) return (allowed: true, error: null, blocked: null);
   if (data['ok'] == true && data['allowed'] == false) {
-    return (allowed: false, error: _civicCloudError(data, 'You are blocked from Civic Registry.'));
+    return (
+      allowed: false,
+      error: _civicCloudError(data, 'You are blocked from Civic Registry.'),
+      blocked: (data['blocked'] ?? '').toString(),
+    );
   }
-  return (allowed: true, error: null);
+  return (allowed: true, error: null, blocked: null);
 }
 
 Future<({bool ok, String? memberEmail, String? registryId, String? error})> ngmyCivicGateMatchName({
@@ -325,6 +331,7 @@ Future<({bool ok, String? error})> ngmyCivicPersistRoster({
   required String email,
   required Map<String, dynamic> payload,
   String state = '',
+  List<Map<String, dynamic>> rankingSnapshot = const [],
 }) async {
   final membersRaw = payload['members'];
   final members = membersRaw is List
@@ -340,6 +347,7 @@ Future<({bool ok, String? error})> ngmyCivicPersistRoster({
     'members': members,
     'removed': payload['removed'] ?? const [],
     'deceased': payload['deceased'] ?? const [],
+    if (rankingSnapshot.isNotEmpty) 'rankingSnapshot': rankingSnapshot,
   });
   if (data == null) {
     return (ok: false, error: 'Could not reach server.');

@@ -31028,6 +31028,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   String? _lastHelpsReconcileState;
   DateTime? _lastHelpsReconcileAt;
   DateTime? _lastHelpMutationAt;
+  int _unlockCheckGen = 0;
   /// Display-only copy of this state's Members list for regular Civic viewers.
   /// Never merged into the registrar roster.
   List<UserData> _sharedDirectoryUsers = [];
@@ -31556,6 +31557,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       });
       return;
     }
+    final gen = ++_unlockCheckGen;
     final access = await _civicUnlockAccessStatus();
     final stored = await civicRegistryStoredUnlockEntry(
       widget.user.email,
@@ -31566,20 +31568,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       state: _selectedState,
       memberEmail: widget.user.email,
       registryId: (stored?['registryId'] ?? widget.user.registryId ?? '').toString(),
+      pinSig: (stored?['pinSig'] ?? '').toString(),
     );
-    if (access.invalidatesStoredUnlock || !remote.allowed) {
+    if (!mounted || gen != _unlockCheckGen) return;
+
+    final hardBlock = access.kind == NgmyCivicAccessKind.removed ||
+        access.kind == NgmyCivicAccessKind.deceased ||
+        access.kind == NgmyCivicAccessKind.locked ||
+        access.kind == NgmyCivicAccessKind.loggedOut ||
+        (!remote.allowed &&
+            (remote.blocked == 'removed' ||
+                remote.blocked == 'deceased' ||
+                remote.blocked == 'locked' ||
+                remote.blocked == 'pin'));
+    if (hardBlock) {
       await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
-      if (mounted) {
-        setState(() {
-          _registryUnlocked = false;
-          _unlockChecked = true;
-          _registryGateMessage = !remote.allowed
-              ? (remote.error ?? access.message)
-              : access.message;
-        });
-      }
+      if (!mounted || gen != _unlockCheckGen) return;
+      setState(() {
+        _registryUnlocked = false;
+        _unlockChecked = true;
+        _registryGateMessage = !remote.allowed
+            ? (remote.error ?? access.message)
+            : access.message;
+      });
       return;
     }
+
     final ok = await civicRegistryIsUnlocked(
       widget.user.email,
       state: _selectedState,
@@ -31587,16 +31601,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       pinsByState: widget.config.civicRegistryPinsByState,
       access: access,
     );
-    if (mounted) {
-      setState(() {
-        _registryUnlocked = ok;
-        _unlockChecked = true;
-        if (ok) _registryGateMessage = null;
-      });
-    }
+    if (!mounted || gen != _unlockCheckGen) return;
+    setState(() {
+      _unlockChecked = true;
+      if (ok) {
+        _registryUnlocked = true;
+        _registryGateMessage = null;
+      } else if (!_registryUnlocked) {
+        _registryUnlocked = false;
+      }
+    });
   }
 
   void _onRegistryUnlocked(String state) {
+    _unlockCheckGen++;
     NgmyCivicStateSwitches.onGateUnlock(
       state: state,
       currentAnchor: widget.user.civicRegistryAnchorState,
@@ -41852,6 +41870,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         state: _selectedState,
       );
       await NgmyCivicRegistryMembers.saveLocalBackup(widget.config);
+      if (_canUseRegistrarToolsHere()) {
+        unawaited(ngmyPersistCivicRegistryMembers(
+          widget.config,
+          requesterEmail: widget.user.email,
+          state: _selectedState,
+        ));
+      }
       if (!mounted) return;
       setState(() {});
       widget.onDataChanged();

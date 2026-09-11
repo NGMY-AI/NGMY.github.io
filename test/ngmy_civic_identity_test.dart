@@ -123,4 +123,37 @@ void main() {
       expect(NgmyCivicWalletIdentity.dobMatches(member, '01/16/1990'), isFalse);
     });
   });
+
+  test('ranking snapshot keeps one row per person and drops masked duplicate IDs', () {
+    final config = _SnapConfig()
+      ..civicRegistryMembers = [
+        {
+          'fullName': 'Alimasi Etambala',
+          'registryId': 'GA6250732',
+          'state': 'Georgia',
+          'helps': 0,
+          'missed': 0,
+          'enrolledAt': '2026-01-01T00:00:00.000Z',
+        },
+        {
+          'fullName': 'Alimasi Etambala',
+          'registryId': '**6250732',
+          'state': 'Georgia',
+          'helps': 1,
+          'missed': 3,
+          'enrolledAt': '2026-01-01T00:00:00.000Z',
+        },
+      ];
+    final snap = NgmyCivicRegistryMembers.rankingSnapshotForState(config, 'Georgia');
+    expect(snap, hasLength(1));
+    expect(snap.first['registryId'], 'GA6250732');
+    expect(snap.first['helps'], 0);
+    expect(snap.first['missed'], 0);
+  });
+}
+
+class _SnapConfig {
+  List<Map<String, dynamic>> civicRegistryMembers = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> civicRegistryRemoved = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> civicRegistryDeceased = <Map<String, dynamic>>[];
 }

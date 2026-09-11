@@ -1790,6 +1790,46 @@ class NgmyCivicRegistryMembers {
     };
   }
 
+  /// Exact Members-tab people for one state — Rankings for every user must use this.
+  static List<Map<String, dynamic>> rankingSnapshotForState(dynamic config, String state) {
+    final st = state.trim();
+    final byKey = <String, Map<String, dynamic>>{};
+    for (final raw in listFrom(config)) {
+      if (st.isNotEmpty &&
+          !NgmyCivicRegistryStats.statesMatch((raw['state'] ?? '').toString(), st)) {
+        continue;
+      }
+      final rid = (raw['registryId'] ?? '').toString().trim();
+      if (NgmyCivicWalletIdentity.isMaskedRegistryId(rid)) continue;
+      final key = NgmyCivicWalletIdentity.rankingPersonKey(
+        rid,
+        email: (raw['email'] ?? '').toString(),
+      );
+      if (key.isEmpty) continue;
+      final prev = byKey[key];
+      if (prev == null ||
+          (NgmyCivicWalletIdentity.isCanonicalRegistryId(rid) &&
+              !NgmyCivicWalletIdentity.isCanonicalRegistryId((prev['registryId'] ?? '').toString()))) {
+        byKey[key] = raw;
+      }
+    }
+    return byKey.values
+        .map(
+          (m) => <String, dynamic>{
+            'fullName': (m['fullName'] ?? '').toString(),
+            'username': (m['username'] ?? '').toString(),
+            'registryId': (m['registryId'] ?? '').toString().trim(),
+            'state': (m['state'] ?? st).toString(),
+            'helps': intOf(m['helps']),
+            'missed': intOf(m['missed']),
+            'activityAt': m['activityAt'],
+            'firstHelpAt': m['firstHelpAt'],
+            'enrolledAt': m['enrolledAt'],
+          },
+        )
+        .toList();
+  }
+
   /// Replace local roster with a role-filtered server payload (no merge with prior PII).
   static void replacePayload(dynamic config, Map<String, dynamic> payload) {
     final members = <Map<String, dynamic>>[];

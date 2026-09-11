@@ -1790,9 +1790,10 @@ async function saveCivicPayload(
   admin: NonNullable<ReturnType<typeof adminClient>>,
   payload: Record<string, unknown>,
 ): Promise<{ ok: boolean; error?: string }> {
+  const current = await loadCivicPayload(admin);
   const row = {
     key: CIVIC_MEMBERS_KEY,
-    value: { ...payload, savedAt: new Date().toISOString() },
+    value: { ...current, ...payload, savedAt: new Date().toISOString() },
     updated_at: new Date().toISOString(),
   };
   const { error } = await admin.from("ngmy_settings").upsert(row, { onConflict: "key" });
@@ -2490,6 +2491,48 @@ function preferCanonicalRankingRow(
   return aCanon ? a : b;
 }
 
+function rankingSnapshotFrom(
+  members: Record<string, unknown>[],
+  state: string,
+): Record<string, unknown>[] {
+  const want = canonicalStateKey(state);
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const m of members) {
+    if (want && canonicalStateKey(String(m.state ?? "")) !== want) continue;
+    if (isGhostMemberRow(m)) continue;
+    const rid = String(m.registryId ?? "").trim();
+    if (!rid || isPlaceholderRegistryId(rid)) continue;
+    const key = rankingPersonKey(m);
+    if (!key) continue;
+    const prev = seen.get(key);
+    seen.set(key, prev ? preferCanonicalRankingRow(prev, m) : m);
+  }
+  return [...seen.values()].map((m) => ({
+    fullName: String(m.fullName ?? ""),
+    username: String(m.username ?? ""),
+    registryId: String(m.registryId ?? "").trim(),
+    state: displayStateName(String(m.state ?? state)),
+    helps: Number(m.helps ?? 0) || 0,
+    missed: Number(m.missed ?? 0) || 0,
+    activityAt: m.activityAt ?? null,
+    firstHelpAt: m.firstHelpAt ?? null,
+    enrolledAt: m.enrolledAt ?? null,
+  }));
+}
+
+function rankingBoardFromPayload(
+  payload: Record<string, unknown>,
+  state: string,
+): Record<string, unknown>[] | null {
+  const raw = payload.rankingByState;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const map = raw as Record<string, unknown>;
+  const want = canonicalStateKey(state);
+  const hit = map[want] ?? map[state] ?? map[displayStateName(state)];
+  if (!Array.isArray(hit) || hit.length === 0) return null;
+  return asMemberList(hit);
+}
+
 function civicAccessLoginError(
   member: Record<string, unknown> | undefined,
   removed: boolean,
@@ -2619,6 +2662,19 @@ async function handleCivicCheckAccess(
       lockedUntil: match?.accessLockedUntil ?? null,
       error: accessErr,
     });
+  }
+  const pinSig = String(body.pinSig ?? "").trim();
+  if (state && pinSig && pinSig !== "v1:local") {
+    const pins = await loadRegistryPins(admin);
+    const expected = effectivePinForState(pins, state);
+    if (expected && (await pinSigFor(state, expected)) !== pinSig) {
+      return jsonOk({
+        ok: true,
+        allowed: false,
+        blocked: "pin",
+        error: "State code changed. Verify your membership again.",
+      });
+    }
   }
   return jsonOk({ ok: true, allowed: true });
 }
@@ -2976,6 +3032,15 @@ async function handleCivicFetchRankings(
       return jsonOk({ error: "State unlock required", ok: false }, 403);
     }
   }
+  const board = rankingBoardFromPayload(payload, state);
+  if (board && board.length > 0) {
+    return jsonOk({
+      ok: true,
+      state: displayStateName(state),
+      savedAt: payload.savedAt ?? null,
+      members: rankingSnapshotFrom(board, state),
+    });
+  }
   const seen = new Map<string, Record<string, unknown>>();
   for (const m of live) {
     if (isGhostMemberRow(m)) continue;
@@ -3276,7 +3341,25 @@ async function handleCivicPersistRoster(
   members = filterTombstonedMembers(members, removed, deceased);
   members = members.filter((m) => !isGhostMemberRow(m));
 
-  const saved = await saveCivicPayload(admin, { members, removed, deceased });
+  const rankingByState: Record<string, unknown> = {
+    ...(current.rankingByState &&
+    typeof current.rankingByState === "object" &&
+    !Array.isArray(current.rankingByState)
+      ? (current.rankingByState as Record<string, unknown>)
+      : {}),
+  };
+  const snapRaw = body.rankingSnapshot;
+  const snapMembers = Array.isArray(snapRaw) && snapRaw.length > 0
+    ? asMemberList(snapRaw)
+    : incomingMembers;
+  const snapState = scopeState || String(body.state ?? "");
+  const snapKey = canonicalStateKey(snapState);
+  if (snapKey) {
+    const rows = rankingSnapshotFrom(snapMembers, snapState);
+    if (rows.length > 0) rankingByState[snapKey] = rows;
+  }
+
+  const saved = await saveCivicPayload(admin, { members, removed, deceased, rankingByState });
   if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
   return jsonOk({ ok: true, memberCount: members.length });
 }

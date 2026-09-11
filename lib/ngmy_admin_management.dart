@@ -981,6 +981,10 @@ Future<bool> ngmyPersistCivicRegistryMembers(
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var cloudOk = false;
   final email = (requesterEmail ?? ngmyCurrentAuthEmail()).trim().toLowerCase();
+  final rankingSnapshot = NgmyCivicRegistryMembers.rankingSnapshotForState(
+    config,
+    (state ?? '').trim(),
+  );
   // Do not gate on ngmyCanReachCloud() — probe often false-negatives while Wi‑Fi works.
   if (email.isNotEmpty) {
     // Never write soft-delete rows for people already back on the roster.
@@ -1020,6 +1024,7 @@ Future<bool> ngmyPersistCivicRegistryMembers(
       payload: scope.isEmpty
           ? NgmyCivicRegistryMembers.payload(config)
           : NgmyCivicRegistryMembers.payloadForState(config, state: scope),
+      rankingSnapshot: rankingSnapshot,
     );
     cloudOk = result.ok;
   }
