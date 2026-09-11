@@ -41684,63 +41684,62 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   UserData _userFromLiveRankingRow(Map<String, dynamic> m) {
     final rid = (m['registryId'] ?? '').toString().trim();
-    final name = NgmyCivicRegistryMembers.resolvedDisplayName(m);
-    return UserData(
-      email: rid.isEmpty ? '' : 'civic.${rid.toLowerCase()}@rank.ngmy',
-      username: name,
-      fullName: name == 'Member' ? null : name,
-      state: (m['state'] ?? _selectedState).toString(),
-      registryId: rid,
-      helps: NgmyCivicRegistryMembers.intOf(m['helps']),
-      missed: NgmyCivicRegistryMembers.intOf(m['missed']),
-      isEnrolledInRegistry: true,
-    );
-  }
-
-  bool _hasRankingDisplayName(UserData u) {
-    final raw = NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '') ??
-        NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
-    final name = raw != null
-        ? NgmyCivicRegistryMembers.resolvedDisplayName(raw)
-        : (u.fullName ?? u.username).trim();
-    return NgmyCivicRegistryMembers.isPublicPersonName(name, registryId: u.registryId ?? '');
-  }
-
-  List<UserData> _membersInSelectedState() {
-    return _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
-        .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
-        .where(_hasRankingDisplayName)
-        .toList();
-  }
-
-  List<UserData> _overlayLiveRankingCounters(List<UserData> enrolled) {
-    if (!_liveRankingsReady ||
-        !NgmyCivicRegistryStats.statesMatch(_liveRankingState, _selectedState)) {
-      return enrolled;
+    final local = rid.isEmpty ? null : NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+    final u = local != null
+        ? _civicMemberRecordToDisplayUser(local, widget.allUsers)
+        : UserData(
+            email: rid.isEmpty ? '' : 'civic.${rid.toLowerCase()}@rank.ngmy',
+            username: 'Member',
+            state: _selectedState,
+            isEnrolledInRegistry: true,
+          );
+    u.registryId = rid.isNotEmpty ? rid : u.registryId;
+    u.state = (m['state'] ?? u.state).toString().trim().isNotEmpty
+        ? (m['state'] ?? u.state).toString()
+        : _selectedState;
+    u.helps = NgmyCivicRegistryMembers.intOf(m['helps']);
+    u.missed = NgmyCivicRegistryMembers.intOf(m['missed']);
+    u.isEnrolledInRegistry = true;
+    final liveName = NgmyCivicRegistryMembers.resolvedDisplayName(m);
+    if (!NgmyCivicRegistryMembers.isPublicPersonName(
+          (u.fullName ?? u.username).trim(),
+          registryId: rid,
+        ) &&
+        NgmyCivicRegistryMembers.isPublicPersonName(liveName, registryId: rid)) {
+      u.fullName = liveName;
+      if (u.username.trim().isEmpty || u.username == 'Member' || u.username == 'User') {
+        u.username = liveName;
+      }
     }
-    final byId = <String, UserData>{};
-    for (final live in _liveRankingUsers) {
-      final id = NgmyCivicWalletIdentity.normalizeId(live.registryId ?? '');
-      if (id.isNotEmpty) byId[id] = live;
-    }
-    for (final u in enrolled) {
-      final live = byId[NgmyCivicWalletIdentity.normalizeId(u.registryId ?? '')];
-      if (live == null) continue;
-      u.helps = live.helps;
-      u.missed = live.missed;
-    }
-    return enrolled;
+    return u;
   }
 
-  /// Same people as the Members tab. Live server data only updates help counts.
+  List<UserData> _dedupeRankingUsers(List<UserData> users) {
+    final seen = <String>{};
+    final out = <UserData>[];
+    for (final u in users) {
+      final id = NgmyCivicWalletIdentity.normalizeId(u.registryId ?? '');
+      final key = id.isNotEmpty
+          ? 'id:$id'
+          : 'em:${NgmyCivicRegistryMembers.emailKey(u.email)}';
+      if (key == 'id:' || key == 'em:') continue;
+      if (!seen.add(key)) continue;
+      out.add(u);
+    }
+    return out;
+  }
+
+  /// One live state roster for every user. Local names are attached; nobody is dropped.
   List<UserData> _rankingsEnrolled() {
-    final local = _membersInSelectedState();
-    if (local.isNotEmpty) return _overlayLiveRankingCounters(local);
     if (_liveRankingsReady &&
         NgmyCivicRegistryStats.statesMatch(_liveRankingState, _selectedState)) {
-      return _liveRankingUsers.where(_hasRankingDisplayName).toList();
+      return _dedupeRankingUsers(_liveRankingUsers);
     }
-    return const [];
+    return _dedupeRankingUsers(
+      _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
+          .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+          .toList(),
+    );
   }
 
   Future<void> _refreshCivicLiveRankings() async {
@@ -41756,10 +41755,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       if (!mounted) return;
       if (!fetched.ok) return;
-      final users = fetched.members
-          .map(_userFromLiveRankingRow)
-          .where(_hasRankingDisplayName)
-          .toList();
+      final users = _dedupeRankingUsers(fetched.members.map(_userFromLiveRankingRow).toList());
       NgmyCivicRegistryMembers.applyLiveRankingCounters(
         widget.config,
         fetched.members,
@@ -43660,7 +43656,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('$st Rankings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-                    Text('Ranked by who puts money in first when help starts.', style: TextStyle(fontSize: 11, color: muted, height: 1.3)),
+                    Text(
+                      enrolled.isEmpty
+                          ? 'Ranked by who puts money in first when help starts.'
+                          : '${enrolled.length} members in $st — same live list for everyone.',
+                      style: TextStyle(fontSize: 11, color: muted, height: 1.3),
+                    ),
                   ],
                 ),
               ),
@@ -43870,9 +43871,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final resolved = raw != null
         ? NgmyCivicRegistryMembers.resolvedDisplayName(raw)
         : (u.fullName ?? u.username).trim();
-    final name = NgmyCivicRegistryMembers.isPublicPersonName(resolved, registryId: u.registryId ?? '')
-        ? resolved
-        : (u.fullName ?? u.username).trim();
+    final name = [
+      resolved,
+      (u.fullName ?? '').trim(),
+      u.username.trim(),
+    ].firstWhere(
+      (n) => NgmyCivicRegistryMembers.isPublicPersonName(n, registryId: u.registryId ?? ''),
+      orElse: () => 'Member',
+    );
     final id = (u.registryId ?? '—').trim();
     final helpCount = helps ?? u.helps;
     return Container(

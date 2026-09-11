@@ -2914,31 +2914,34 @@ async function handleCivicFetchRankings(
     }
   }
   const payload = await loadCivicPayload(admin);
+  const prefix = (US_STATE_PREFIX[want] ?? "").toUpperCase();
+  const inState = (m: Record<string, unknown>) => {
+    const ms = canonicalStateKey(String(m.state ?? ""));
+    if (ms === want) return true;
+    if (!ms && prefix) {
+      const rid = normCivicId(String(m.registryId ?? ""));
+      return rid.startsWith(prefix);
+    }
+    return false;
+  };
   const live = filterTombstonedMembers(
-    filterMembersByState(asMemberList(payload.members), state),
-    filterMembersByState(asMemberList(payload.removed), state),
+    asMemberList(payload.members).filter(inState),
+    asMemberList(payload.removed).filter(inState),
     asMemberList(payload.deceased).filter((d) => {
       const snap = d.snapshot && typeof d.snapshot === "object"
         ? (d.snapshot as Record<string, unknown>)
         : d;
-      return canonicalStateKey(String(d.state ?? snap.state ?? "")) === want;
+      return inState({ state: d.state ?? snap.state, registryId: d.registryId ?? snap.registryId });
     }),
   );
-  const members = live
-    .filter((m) => !isGhostMemberRow(m))
-    .filter((m) => {
-      const rid = String(m.registryId ?? "").trim().toUpperCase();
-      const name = String(m.fullName ?? "").trim();
-      const user = String(m.username ?? "").trim();
-      const label = !isRedactedCivicValue(name) ? name : user;
-      if (isRedactedCivicValue(label)) return false;
-      if (label.toLowerCase() === "member" || label.toLowerCase() === "user") return false;
-      const compact = label.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (rid && compact === rid) return false;
-      if (/^[A-Z]{2}\d{6,}$/.test(compact)) return false;
-      return true;
-    })
-    .map((m) => ({
+  const seen = new Set<string>();
+  const members: Record<string, unknown>[] = [];
+  for (const m of live) {
+    if (isGhostMemberRow(m)) continue;
+    const key = nationwidePersonKey(m);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    members.push({
       fullName: String(m.fullName ?? ""),
       username: String(m.username ?? ""),
       registryId: String(m.registryId ?? ""),
@@ -2947,7 +2950,8 @@ async function handleCivicFetchRankings(
       missed: Number(m.missed ?? 0) || 0,
       activityAt: m.activityAt ?? null,
       enrolledAt: m.enrolledAt ?? null,
-    }));
+    });
+  }
   return jsonOk({
     ok: true,
     state: displayStateName(state),
