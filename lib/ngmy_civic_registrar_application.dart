@@ -78,6 +78,60 @@ class NgmyCivicRegistrarApplication {
     );
   }
 
+  static bool isRejectedForEmail(
+    Iterable<Map<String, dynamic>> applications,
+    String email,
+  ) {
+    if (isPendingForEmail(applications, email)) return false;
+    if (isApprovedForEmail(applications, email)) return false;
+    final key = _emailKey(email);
+    if (key.isEmpty) return false;
+    return applications.any(
+      (a) =>
+          (a['userEmail'] ?? '').toString().toLowerCase().trim() == key &&
+          _statusOf(a) == 'rejected',
+    );
+  }
+
+  /// Rejected or revoked applicants may submit a new application.
+  static bool canReapply({
+    required Iterable<Map<String, dynamic>> applications,
+    required String email,
+  }) {
+    if (isPendingForEmail(applications, email)) return false;
+    if (isApprovedForEmail(applications, email)) return false;
+    return true;
+  }
+
+  static bool looksMaskedEmail(String email) {
+    final s = email.trim();
+    return s == '***' || s.contains('***');
+  }
+
+  /// Persist/merge must never replace a real applicant email with `l***@…`.
+  static Map<String, dynamic> preserveApplicantIdentity({
+    required Map<String, dynamic> incoming,
+    Map<String, dynamic>? existing,
+  }) {
+    final copy = Map<String, dynamic>.from(incoming);
+    if (existing == null) return copy;
+    final incomingEmail = (copy['userEmail'] ?? copy['email'] ?? '').toString();
+    final existingEmail = (existing['userEmail'] ?? existing['email'] ?? '').toString();
+    if (looksMaskedEmail(incomingEmail) &&
+        existingEmail.trim().isNotEmpty &&
+        !looksMaskedEmail(existingEmail)) {
+      copy['userEmail'] = existingEmail;
+    }
+    for (final f in ['fullName', 'applicantName', 'phone', 'reason', 'experience', 'username']) {
+      final inc = (copy[f] ?? '').toString().trim();
+      final ex = (existing[f] ?? '').toString().trim();
+      if ((inc.isEmpty || looksMaskedEmail(inc) || inc == '***') && ex.isNotEmpty) {
+        copy[f] = existing[f];
+      }
+    }
+    return {...existing, ...copy};
+  }
+
   /// True when user should have registrar access (config + optional local backup).
   static bool hasRegistrarAccess({
     required Iterable<Map<String, dynamic>> applications,
@@ -160,8 +214,10 @@ class NgmyCivicRegistrarApplication {
     Map<String, dynamic> application,
   ) {
     final email = (application['userEmail'] ?? '').toString().toLowerCase().trim();
+    final id = (application['id'] ?? '').toString().trim();
     final kept = list
         .where((a) {
+          if (id.isNotEmpty && (a['id'] ?? '').toString().trim() == id) return false;
           if (email.isEmpty) return true;
           return (a['userEmail'] ?? '').toString().toLowerCase().trim() != email;
         })

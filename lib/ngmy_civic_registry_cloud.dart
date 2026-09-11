@@ -520,3 +520,20 @@ Future<bool> ngmyCivicPersistRegistrarApplications({
   });
   return data != null && data['ok'] == true;
 }
+
+/// Approve / reject / revoke by application id so a masked reviewer copy
+/// cannot grant the wrong person (or nobody).
+Future<Map<String, dynamic>?> ngmyCivicDecideRegistrarApplication({
+  required String id,
+  required String status,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicDecideRegistrarApplication',
+    'id': id.trim(),
+    'status': status.trim().toLowerCase(),
+  });
+  if (data == null || data['ok'] != true) return null;
+  final raw = data['application'];
+  if (raw is! Map) return null;
+  return Map<String, dynamic>.from(raw);
+}

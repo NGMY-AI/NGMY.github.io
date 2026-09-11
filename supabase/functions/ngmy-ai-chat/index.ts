@@ -1593,6 +1593,70 @@ function registrarAppForViewer(
   return summary;
 }
 
+function statesMatch(a: string, b: string): boolean {
+  const ka = canonicalStateKey(a);
+  const kb = canonicalStateKey(b);
+  return !!ka && !!kb && ka === kb;
+}
+
+/** Reviewers must see who applied — masked emails made Approve grant nobody. */
+function sanitizeRegistrarAppReviewer(a: Record<string, unknown>): Record<string, unknown> {
+  return {
+    id: a.id,
+    userEmail: String(a.userEmail ?? a.email ?? ""),
+    email: String(a.userEmail ?? a.email ?? ""),
+    fullName: String(a.fullName ?? a.applicantName ?? ""),
+    applicantName: String(a.applicantName ?? a.fullName ?? ""),
+    username: String(a.username ?? ""),
+    phone: String(a.phone ?? ""),
+    state: String(a.state ?? ""),
+    status: String(a.status ?? ""),
+    reason: String(a.reason ?? ""),
+    experience: String(a.experience ?? ""),
+    createdAt: a.createdAt,
+    reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
+    reviewedBy: a.reviewedBy,
+    revokedBy: a.revokedBy,
+  };
+}
+
+function preserveApplicantIdentityOnIncoming(
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const copy = { ...incoming };
+  if (!existing) return copy;
+  const incomingEmail = String(copy.userEmail ?? copy.email ?? "");
+  const existingEmail = String(existing.userEmail ?? existing.email ?? "");
+  if (isRedactedCivicValue(incomingEmail) && existingEmail && !isRedactedCivicValue(existingEmail)) {
+    copy.userEmail = existingEmail;
+    if (typeof copy.email === "string") copy.email = existingEmail;
+  }
+  for (const f of ["fullName", "applicantName", "phone", "reason", "experience", "username"]) {
+    const inc = String(copy[f] ?? "").trim();
+    const ex = String(existing[f] ?? "").trim();
+    if (isRedactedCivicValue(inc) && ex) copy[f] = existing[f];
+  }
+  return { ...existing, ...copy };
+}
+
+function overlayRegistrarAppsOnCurrent(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const currentById = new Map<string, Record<string, unknown>>();
+  for (const row of current) {
+    const id = String(row.id ?? "").trim();
+    if (id) currentById.set(id, row);
+  }
+  return incoming.map((row) => {
+    const id = String(row.id ?? "").trim();
+    return preserveApplicantIdentityOnIncoming(row, id ? currentById.get(id) : undefined);
+  });
+}
+
 function loanAppNetworkSummary(
   a: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -2237,6 +2301,8 @@ function sanitizeRegistrarAppOwn(a: Record<string, unknown>): Record<string, unk
     status: String(a.status ?? ""),
     createdAt: a.createdAt,
     reviewedAt: a.reviewedAt,
+    revokedAt: a.revokedAt,
+    updatedAt: a.updatedAt,
     // no phone / address of other people — own row only
     phone: String(a.phone ?? ""),
   };
@@ -2276,7 +2342,7 @@ async function handleCivicFetchRegistrarApplications(
     return jsonOk({
       ...payloadBase,
       view: "admin",
-      applications: apps.map((a) => registrarAppForViewer(a, email)),
+      applications: apps.map((a) => sanitizeRegistrarAppReviewer(a)),
     });
   }
 
@@ -2284,7 +2350,7 @@ async function handleCivicFetchRegistrarApplications(
     return jsonOk({
       ...payloadBase,
       view: "registrar",
-      applications: apps.map((a) => registrarAppForViewer(a, email)),
+      applications: apps.map((a) => sanitizeRegistrarAppReviewer(a)),
     });
   }
 
@@ -2309,15 +2375,18 @@ async function handleCivicPersistRegistrarApplications(
 
   let next = current;
   if (role.isAdmin) {
-    next = incoming.length > 0 ? incoming : current;
-    // If client sent full list, trust replace for admin
-    if (Array.isArray(body.applications)) next = incoming;
+    // Incoming list is source of truth for which rows exist, but never
+    // let a masked reviewer copy overwrite the applicant's real email.
+    if (Array.isArray(body.applications)) {
+      next = overlayRegistrarAppsOnCurrent(current, incoming);
+    }
   } else if (role.isRegistrar && role.registrarState) {
     // Merge: keep other states unchanged; replace home-state rows from incoming home-state
-    const home = stateKey(role.registrarState);
-    const kept = current.filter((a) => stateKey(String(a.state ?? "")) !== home);
-    const homeIncoming = incoming.filter((a) => stateKey(String(a.state ?? "")) === home);
-    next = [...kept, ...homeIncoming];
+    const home = canonicalStateKey(role.registrarState);
+    const kept = current.filter((a) => canonicalStateKey(String(a.state ?? "")) !== home);
+    const currentHome = current.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
+    const homeIncoming = incoming.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
+    next = [...kept, ...overlayRegistrarAppsOnCurrent(currentHome, homeIncoming)];
   } else {
     // Member may only upsert their own pending application row(s)
     const mineIncoming = incoming.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
@@ -2331,6 +2400,79 @@ async function handleCivicPersistRegistrarApplications(
   const saved = await saveRegistrarApplications(admin, next);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
   return jsonOk({ ok: true, count: next.length });
+}
+
+async function applyRegistrarFlagToUser(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  applicantEmail: string,
+  approved: boolean,
+  state = "",
+): Promise<void> {
+  const key = emailKey(applicantEmail);
+  if (!key || isRedactedCivicValue(key)) return;
+  const patch: Record<string, unknown> = { isAuthorizedRegistrar: approved };
+  if (approved && state.trim()) patch.state = state.trim();
+  try {
+    await admin.from("users").update(patch).eq("email", key);
+  } catch (_) {
+    // user row may not exist yet — application status is the source of truth
+  }
+}
+
+async function handleCivicDecideRegistrarApplication(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const id = String(body.id ?? "").trim();
+  const status = String(body.status ?? "").toLowerCase().trim();
+  if (!id) return jsonOk({ error: "Application id required" }, 400);
+  if (!["approved", "rejected", "revoked"].includes(status)) {
+    return jsonOk({ error: "Invalid status" }, 400);
+  }
+
+  const apps = await loadRegistrarApplications(admin);
+  const idx = apps.findIndex((a) => String(a.id ?? "").trim() === id);
+  if (idx < 0) return jsonOk({ error: "Application not found" }, 404);
+
+  const row = { ...apps[idx] };
+  const appState = String(row.state ?? "");
+  if (!role.isAdmin) {
+    if (!statesMatch(role.registrarState, appState)) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+  }
+
+  const now = new Date().toISOString();
+  row.status = status;
+  row.updatedAt = now;
+  if (status === "revoked") {
+    row.revokedAt = now;
+    row.revokedBy = email;
+  } else {
+    row.reviewedAt = now;
+    row.reviewedBy = email;
+  }
+  apps[idx] = row;
+
+  const saved = await saveRegistrarApplications(admin, apps);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  const applicantEmail = String(row.userEmail ?? row.email ?? "");
+  await applyRegistrarFlagToUser(admin, applicantEmail, status === "approved", appState);
+
+  return jsonOk({
+    ok: true,
+    application: sanitizeRegistrarAppReviewer(row),
+  });
 }
 
 async function loadRegistryPins(
@@ -4605,6 +4747,7 @@ serve(async (req) => {
       co: "civicRecoveryRemove",
       cp: "civicRecoveryIssue",
       cq: "civicFetchRankings",
+      cs: "civicDecideRegistrarApplication",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -4775,6 +4918,9 @@ serve(async (req) => {
     }
     if (action === "civicPersistRegistrarApplications") {
       return await handleCivicPersistRegistrarApplications(req, body as Record<string, unknown>);
+    }
+    if (action === "civicDecideRegistrarApplication") {
+      return await handleCivicDecideRegistrarApplication(req, body as Record<string, unknown>);
     }
     if (action === "privateListsFetch") {
       return await handlePrivateListsFetch(req, body as Record<string, unknown>);

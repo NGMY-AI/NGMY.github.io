@@ -2645,7 +2645,7 @@ List<Map<String, dynamic>> _mergeCivicRegistrarApplications(
     ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
 }
 
-String? _registrarApplicationStatusForEmail(AppConfig config, String email) {
+Map<String, dynamic>? _registrarApplicationRowForEmail(AppConfig config, String email) {
   final key = email.toLowerCase().trim();
   if (key.isEmpty) return null;
   Map<String, dynamic>? best;
@@ -2654,6 +2654,11 @@ String? _registrarApplicationStatusForEmail(AppConfig config, String email) {
     final row = Map<String, dynamic>.from(a);
     best = best == null ? row : _pickRegistrarApplicationRow(best, row);
   }
+  return best;
+}
+
+String? _registrarApplicationStatusForEmail(AppConfig config, String email) {
+  final best = _registrarApplicationRowForEmail(config, email);
   return best == null ? null : (best['status'] ?? 'pending').toString().toLowerCase();
 }
 
@@ -2922,9 +2927,9 @@ String _reviewerCivicStateScope(UserData reviewer, AppConfig config) {
 bool _reviewerCanActOnRegistrarApp(UserData reviewer, Map<String, dynamic> app, AppConfig config) {
   if (reviewer.isAdmin) return true;
   if (!_hasCivicRegistrarReviewAccess(reviewer, config)) return false;
-  final scope = _reviewerCivicStateScope(reviewer, config).trim().toLowerCase();
+  final scope = _reviewerCivicStateScope(reviewer, config).trim();
   if (scope.isEmpty) return false;
-  return (app['state'] ?? '').toString().trim().toLowerCase() == scope;
+  return NgmyCivicRegistryStats.statesMatch((app['state'] ?? '').toString(), scope);
 }
 
 /// App admin, Civic Registry King, or an Authorized Registrar may review
@@ -2986,6 +2991,69 @@ Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
     'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
     'civicRegistryAnchorState': u.civicRegistryAnchorState,
   });
+}
+
+Future<bool> _applyRegistrarApplicationDecision({
+  required AppConfig config,
+  required List<UserData> allUsers,
+  required Map<String, dynamic> app,
+  required String status,
+  required UserData reviewer,
+}) async {
+  final decidedAt = DateTime.now().toUtc().toIso8601String();
+  final id = (app['id'] ?? '').toString().trim();
+  Map<String, dynamic>? remote;
+  if (id.isNotEmpty) {
+    remote = await ngmyCivicDecideRegistrarApplication(id: id, status: status);
+  }
+  final next = Map<String, dynamic>.from(app);
+  if (remote != null) {
+    next.addAll(remote);
+    next['status'] = status;
+  } else {
+    next['status'] = status;
+    next['updatedAt'] = decidedAt;
+    if (status == 'revoked') {
+      next['revokedAt'] = decidedAt;
+      next['revokedBy'] = reviewer.email;
+    } else {
+      next['reviewedAt'] = decidedAt;
+      next['reviewedBy'] = reviewer.email;
+    }
+  }
+  final email = (next['userEmail'] ?? '').toString().toLowerCase().trim();
+  config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
+    config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    next,
+  );
+  if (email.isNotEmpty && !_ngmyValueLooksRedacted(email)) {
+    final userIndex = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+    if (userIndex != -1) {
+      allUsers[userIndex].isAuthorizedRegistrar = status == 'approved';
+      if (status == 'approved') {
+        final st = (next['state'] ?? '').toString().trim();
+        if (st.isNotEmpty) allUsers[userIndex].state = st;
+      }
+      await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+    } else {
+      await _safeUpsertUserRow({
+        'email': email,
+        'isAuthorizedRegistrar': status == 'approved',
+        if (status == 'approved' && (next['state'] ?? '').toString().trim().isNotEmpty)
+          'state': (next['state'] ?? '').toString().trim(),
+      });
+    }
+    await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(next));
+  }
+  if (remote == null) {
+    await _persistCivicRegistrarApplications(config);
+  }
+  final refreshed = await _fetchRemoteCivicRegistrarApplications();
+  if (refreshed.isNotEmpty) {
+    _mergeRegistrarApplicationsIntoConfig(config, refreshed);
+  }
+  await _syncRegistrarStateAfterConfigChange(config, allUsers);
+  return true;
 }
 
 Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
@@ -4267,13 +4335,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setST) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final scope = _reviewerCivicStateScope(reviewer, config).trim().toLowerCase();
+        final scope = _reviewerCivicStateScope(reviewer, config).trim();
         final apps = List<Map<String, dynamic>>.from(
           config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)),
         )
           ..retainWhere((a) {
             if (scope.isEmpty) return true;
-            return (a['state'] ?? '').toString().trim().toLowerCase() == scope;
+            return NgmyCivicRegistryStats.statesMatch((a['state'] ?? '').toString(), scope);
           })
           ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
         final pendingApps = apps.where((a) => (a['status'] ?? 'pending').toString() == 'pending').toList();
@@ -4383,28 +4451,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                         Expanded(
                                           child: OutlinedButton(
                                             onPressed: () async {
-                                              final decidedAt = DateTime.now().toUtc().toIso8601String();
-                                              app['status'] = 'rejected';
-                                              app['reviewedAt'] = decidedAt;
-                                              app['updatedAt'] = decidedAt;
-                                              app['reviewedBy'] = reviewer.email;
-                                              // Write the update back into the FULL config list, not
-                                              // `apps` — `apps` is scope-filtered to this reviewer's own
-                                              // state (see its construction above), so assigning it
-                                              // straight to config.civicRegistrarApplications silently
-                                              // dropped every other state's applications whenever a
-                                              // King (not Admin) reviewer actioned one of their own.
-                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
-                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-                                                app,
+                                              await _applyRegistrarApplicationDecision(
+                                                config: config,
+                                                allUsers: allUsers,
+                                                app: app,
+                                                status: 'rejected',
+                                                reviewer: reviewer,
                                               );
-                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
-                                              await _persistCivicRegistrarApplications(config);
-                                              if (userIndex != -1) {
-                                                allUsers[userIndex].isAuthorizedRegistrar = false;
-                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
-                                              }
-                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -4420,7 +4473,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               if (appState.isNotEmpty &&
                                                   !NgmyCivicRegistryStats.canApproveRegistrarForState(
                                                     state: appState,
-                                                    applications: apps,
+                                                    applications: config.civicRegistrarApplications,
                                                     users: allUsers,
                                                   )) {
                                                 ScaffoldMessenger.of(ctx).showSnackBar(
@@ -4432,23 +4485,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
-                                              final decidedAt = DateTime.now().toUtc().toIso8601String();
-                                              app['status'] = 'approved';
-                                              app['reviewedAt'] = decidedAt;
-                                              app['updatedAt'] = decidedAt;
-                                              app['reviewedBy'] = reviewer.email;
-                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
-                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-                                                app,
+                                              await _applyRegistrarApplicationDecision(
+                                                config: config,
+                                                allUsers: allUsers,
+                                                app: app,
+                                                status: 'approved',
+                                                reviewer: reviewer,
                                               );
-                                              if (userIndex != -1) {
-                                                allUsers[userIndex].isAuthorizedRegistrar = true;
-                                                allUsers[userIndex].state = appState.isNotEmpty ? appState : allUsers[userIndex].state;
-                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
-                                              }
-                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
-                                              await _persistCivicRegistrarApplications(config);
-                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -4465,22 +4508,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                       child: OutlinedButton(
                                         style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
                                         onPressed: () async {
-                                          final revokedAt = DateTime.now().toUtc().toIso8601String();
-                                          app['status'] = 'revoked';
-                                          app['revokedAt'] = revokedAt;
-                                          app['updatedAt'] = revokedAt;
-                                          app['revokedBy'] = reviewer.email;
-                                          config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
-                                            config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-                                            app,
+                                          await _applyRegistrarApplicationDecision(
+                                            config: config,
+                                            allUsers: allUsers,
+                                            app: app,
+                                            status: 'revoked',
+                                            reviewer: reviewer,
                                           );
-                                          if (userIndex != -1) {
-                                            allUsers[userIndex].isAuthorizedRegistrar = false;
-                                            await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
-                                          }
-                                          await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
-                                          await _persistCivicRegistrarApplications(config);
-                                          await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                           onDataChanged();
                                           onParentSetState?.call();
                                           setST(() {});
@@ -4512,7 +4546,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               if (appState.isNotEmpty &&
                                                   !NgmyCivicRegistryStats.canApproveRegistrarForState(
                                                     state: appState,
-                                                    applications: apps,
+                                                    applications: config.civicRegistrarApplications,
                                                     users: allUsers,
                                                   )) {
                                                 ScaffoldMessenger.of(ctx).showSnackBar(
@@ -4524,23 +4558,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
-                                              final restoredAt = DateTime.now().toUtc().toIso8601String();
-                                              app['status'] = 'approved';
-                                              app['reviewedAt'] = restoredAt;
-                                              app['updatedAt'] = restoredAt;
-                                              app['reviewedBy'] = reviewer.email;
-                                              config.civicRegistrarApplications = NgmyCivicRegistrarApplication.upsertInList(
-                                                config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-                                                app,
+                                              await _applyRegistrarApplicationDecision(
+                                                config: config,
+                                                allUsers: allUsers,
+                                                app: app,
+                                                status: 'approved',
+                                                reviewer: reviewer,
                                               );
-                                              if (userIndex != -1) {
-                                                allUsers[userIndex].isAuthorizedRegistrar = true;
-                                                allUsers[userIndex].state = appState.isNotEmpty ? appState : allUsers[userIndex].state;
-                                                await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
-                                              }
-                                              await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(app));
-                                              await _persistCivicRegistrarApplications(config);
-                                              await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
@@ -31976,7 +32000,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         local,
       );
     }
-    final status = _registrarApplicationStatusForEmail(widget.config, email);
+    final latest = _registrarApplicationRowForEmail(widget.config, email);
+    if (latest != null) {
+      await NgmyCivicRegistrarApplication.save(email, latest);
+      _localRegistrarBackup = latest;
+    }
+    final status = latest == null
+        ? null
+        : (latest['status'] ?? 'pending').toString().toLowerCase();
     if (status == 'approved' || NgmyCivicRegistrarSession.isKnownRegistrar(email)) {
       widget.user.isAuthorizedRegistrar = true;
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
@@ -32004,20 +32035,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   bool _hasPendingRegistrarApplication() {
     if (_hasRegistrarAccess()) return false;
-    if (NgmyCivicRegistrarApplication.isRevokedForEmail(
-      widget.config.civicRegistrarApplications,
-      widget.user.email,
-    )) {
-      return false;
-    }
     if (NgmyCivicRegistrarApplication.isPendingForEmail(
       widget.config.civicRegistrarApplications,
       widget.user.email,
     )) {
       return true;
     }
+    final configStatus = _registrarApplicationStatusForEmail(widget.config, widget.user.email);
+    if (configStatus == 'rejected' || configStatus == 'revoked' || configStatus == 'approved') {
+      return false;
+    }
     final local = _localRegistrarBackup;
     return local != null && (local['status'] ?? 'pending').toString().toLowerCase() == 'pending';
+  }
+
+  bool _hasRejectedRegistrarApplication() {
+    if (_hasRegistrarAccess() || _hasPendingRegistrarApplication()) return false;
+    if (NgmyCivicRegistrarApplication.isRejectedForEmail(
+      widget.config.civicRegistrarApplications,
+      widget.user.email,
+    )) {
+      return true;
+    }
+    final local = _localRegistrarBackup;
+    return local != null && (local['status'] ?? '').toString().toLowerCase() == 'rejected';
   }
 
   int _registrarSlotsRemainingInSelectedState() => NgmyCivicRegistryStats.slotsRemaining(
@@ -43779,6 +43820,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               ),
                               child: const Text('Requests', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9)),
                             )
+                          else if (_hasPendingRegistrarApplication())
+                            const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 9))
+                          else if (_hasRejectedRegistrarApplication())
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Rejected', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w800, fontSize: 9)),
+                                TextButton(
+                                  onPressed: _showRegistrarApplicationDialog,
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: const Color(0xFF6200EE),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    minimumSize: const Size(0, 24),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Apply again', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9)),
+                                ),
+                              ],
+                            )
                           else if (_shouldShowRegistrarApplyButton())
                             TextButton(
                               onPressed: _showRegistrarApplicationDialog,
@@ -43790,8 +43850,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               ),
                               child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 9)),
                             )
-                          else if (_hasPendingRegistrarApplication())
-                            const Text('Pending', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w800, fontSize: 9))
                           else if (_registrarSlotsFullInSelectedState() && !_hasRegistrarAccess())
                             Text('Full', style: TextStyle(color: muted, fontWeight: FontWeight.w700, fontSize: 9)),
                           if (_canUseRegistrarToolsHere())
