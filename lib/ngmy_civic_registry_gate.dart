@@ -12,6 +12,27 @@ import 'ngmy_civic_registry_stats.dart';
 
 const String _kUnlockPrefsKey = 'civic_registry_unlock_v2';
 
+Map<String, dynamic>? civicRegistryUnlockEntryFromStates(dynamic states, String state) {
+  if (states is! Map) return null;
+  final st = state.trim();
+  if (st.isEmpty) return null;
+  final direct = states[st] ?? states[st.toLowerCase()];
+  if (direct is Map) return Map<String, dynamic>.from(direct);
+  final want = NgmyCivicRegistryStats.canonicalStateKey(st);
+  if (want.isEmpty) return null;
+  for (final e in states.entries) {
+    if (NgmyCivicRegistryStats.canonicalStateKey(e.key.toString()) == want && e.value is Map) {
+      return Map<String, dynamic>.from(e.value as Map);
+    }
+  }
+  return null;
+}
+
+bool civicRegistryPinSigIsServerIssued(String pinSig) {
+  final sig = pinSig.trim();
+  return sig.startsWith('v1:') && sig != 'v1:local';
+}
+
 String civicRegistryPinForState(Map<String, String> pinsByState, String state) {
   final sk = NgmyCivicRegistryStats.canonicalStateKey(state);
   if (sk.isEmpty) return '';
@@ -93,11 +114,7 @@ Future<Map<String, dynamic>?> civicRegistryStoredUnlockEntry(
   if (email.isEmpty || st.isEmpty) return null;
   final root = await _loadUnlockRoot();
   if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return null;
-  final states = root['states'];
-  if (states is! Map) return null;
-  final entry = states[st] ?? states[st.toLowerCase()];
-  if (entry is! Map) return null;
-  return Map<String, dynamic>.from(entry);
+  return civicRegistryUnlockEntryFromStates(root['states'], st);
 }
 
 Future<String?> civicRegistryStoredPinSig(String userEmail, {required String state}) async {
@@ -116,6 +133,12 @@ Future<void> civicRegistryClearUnlockForState(String userEmail, {required String
   final states = Map<String, dynamic>.from((root['states'] as Map?) ?? {});
   states.remove(st);
   states.remove(st.toLowerCase());
+  final want = NgmyCivicRegistryStats.canonicalStateKey(st);
+  if (want.isNotEmpty) {
+    states.removeWhere(
+      (key, _) => NgmyCivicRegistryStats.canonicalStateKey(key.toString()) == want,
+    );
+  }
   root['states'] = states;
   await _saveUnlockRoot(root);
 }
@@ -159,14 +182,13 @@ Future<bool> civicRegistryIsUnlocked(
 
   final root = await _loadUnlockRoot();
   if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return false;
-  final states = root['states'];
-  if (states is! Map) return false;
-  final entry = states[st] ?? states[st.toLowerCase()];
-  if (entry is! Map) return false;
+  final entry = civicRegistryUnlockEntryFromStates(root['states'], st);
+  if (entry == null) return false;
   final storedSig = (entry['pinSig'] ?? '').toString();
   if (storedSig.isEmpty) return false;
 
-  // Server-issued pinSig (v1:…) — members no longer hold PINs locally.
+  // Server-issued pinSig (v1:…) or a completed local unlock — stay in Civic
+  // Registry until lock / remove / PIN change.
   if (storedSig.startsWith('v1:')) return true;
 
   final expectedSig = civicRegistryPinSignature(globalPin: globalPin, pinsByState: pinsByState, state: st);
@@ -732,11 +754,11 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       _matchedMember = member;
     });
     final rid = (member['registryId'] ?? '').toString();
-    await civicRegistrySaveUnlock(
+    final serverSig = (_serverPinSig ?? '').trim();
+    await civicRegistrySaveServerUnlock(
       widget.userEmail,
       state: _state,
-      globalPin: widget.globalPin,
-      pinsByState: widget.pinsByState,
+      pinSig: civicRegistryPinSigIsServerIssued(serverSig) ? serverSig : 'v1:local',
       registryId: rid,
     );
     if (!mounted) return;

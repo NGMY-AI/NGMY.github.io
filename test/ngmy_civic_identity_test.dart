@@ -150,6 +150,31 @@ void main() {
     expect(snap.first['helps'], 0);
     expect(snap.first['missed'], 0);
   });
+
+  test('ranking snapshot is exactly the Members-tab people for that state', () {
+    final config = _SnapConfig()
+      ..civicRegistryMembers = [
+        {
+          'fullName': 'Eca Sadick',
+          'registryId': 'GA4944484',
+          'state': 'Georgia',
+          'helps': 0,
+          'missed': 0,
+          'enrolledAt': '2026-09-01T00:00:00.000Z',
+        },
+        {
+          'fullName': 'Florida Only',
+          'registryId': 'FL1111111',
+          'state': 'Florida',
+          'helps': 4,
+          'missed': 1,
+        },
+      ];
+    final snap = NgmyCivicRegistryMembers.rankingSnapshotForState(config, 'Georgia');
+    expect(snap, hasLength(1));
+    expect(snap.first['registryId'], 'GA4944484');
+    expect(snap.first['helps'], 0);
+  });
 }
 
 class _SnapConfig {

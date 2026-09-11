@@ -2664,7 +2664,9 @@ async function handleCivicCheckAccess(
     });
   }
   const pinSig = String(body.pinSig ?? "").trim();
-  if (state && pinSig && pinSig !== "v1:local") {
+  // Only server-issued v1 hashes prove the state code changed. Local leftover
+  // signatures must not bounce a member back to Verify your membership.
+  if (state && pinSig.startsWith("v1:") && pinSig !== "v1:local") {
     const pins = await loadRegistryPins(admin);
     const expected = effectivePinForState(pins, state);
     if (expected && (await pinSigFor(state, expected)) !== pinSig) {
@@ -3028,7 +3030,12 @@ async function handleCivicFetchRankings(
   if (!allowed) {
     const pins = await loadRegistryPins(admin);
     const expected = effectivePinForState(pins, state);
-    if (!expected || !pinSig || (await pinSigFor(state, expected)) !== pinSig) {
+    if (
+      !expected ||
+      !pinSig.startsWith("v1:") ||
+      pinSig === "v1:local" ||
+      (await pinSigFor(state, expected)) !== pinSig
+    ) {
       return jsonOk({ error: "State unlock required", ok: false }, 403);
     }
   }
@@ -3284,14 +3291,14 @@ async function handleCivicPersistRoster(
       const other = allMembers.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) !== stateKey,
       );
-      const existing = allMembers.filter(
-        (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
-      );
       const inc = incoming.filter(
         (m) => canonicalStateKey(String(m.state ?? "")) === stateKey,
       );
-      // Union cloud + incoming for this state — tombstones below keep deletes final.
-      return [...other, ...mergeMemberLists(existing, inc)];
+      // Members tab is the live board. Union kept leftover people and stale
+      // help counts, so Rankings showed 70 names / fake Top Helpers while the
+      // registrar still had 59 with no contributions.
+      if (inc.length > 0) return [...other, ...inc];
+      return allMembers;
     };
 
     members = mergeStateSlice(members, incomingMembers, sk);
@@ -3349,11 +3356,13 @@ async function handleCivicPersistRoster(
       : {}),
   };
   const snapRaw = body.rankingSnapshot;
+  const snapState = String(body.state ?? "").trim() || scopeState;
+  const snapKey = canonicalStateKey(snapState);
   const snapMembers = Array.isArray(snapRaw) && snapRaw.length > 0
     ? asMemberList(snapRaw)
-    : incomingMembers;
-  const snapState = scopeState || String(body.state ?? "");
-  const snapKey = canonicalStateKey(snapState);
+    : incomingMembers.filter((m) =>
+      !snapKey || canonicalStateKey(String(m.state ?? "")) === snapKey
+    );
   if (snapKey) {
     const rows = rankingSnapshotFrom(snapMembers, snapState);
     if (rows.length > 0) rankingByState[snapKey] = rows;

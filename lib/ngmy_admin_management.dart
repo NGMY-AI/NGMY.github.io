@@ -990,33 +990,10 @@ Future<bool> ngmyPersistCivicRegistryMembers(
     // Never write soft-delete rows for people already back on the roster.
     NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
 
-    // Safety net: union cloud roster into local before upload so a stale device
-    // never pushes a truncated state slice (server also merges, but this keeps
-    // local backups accurate too). Uses the same guarded adopt path as hydrate
-    // so redacted / out-of-state directory rows never enter the roster here.
+    // Upload this device's Members tab as-is. Pulling the cloud dump first
+    // re-attached leftover people and stale help counts, so other phones saw
+    // a different Rankings board than the authorized registrar.
     final scope = (state ?? '').trim();
-    final cloudRow = await ngmyCivicFetchRoster(
-      email: email,
-      state: scope,
-    );
-    if (cloudRow != null &&
-        cloudRow['networkEmpty'] != true &&
-        cloudRow['needsUnlock'] != true) {
-      final view = (cloudRow['view'] ?? '').toString();
-      if (view == 'admin' || view == 'registrar') {
-        NgmyCivicRegistryMembers.adoptCloudPayload(
-          config,
-          {
-            'members': cloudRow['members'] ?? const [],
-            'removed': cloudRow['removed'] ?? const [],
-            'deceased': cloudRow['deceased'] ?? const [],
-          },
-          scopeState: view == 'registrar'
-              ? (cloudRow['registrarState'] ?? scope).toString()
-              : '',
-        );
-      }
-    }
 
     final result = await ngmyCivicPersistRoster(
       email: email,

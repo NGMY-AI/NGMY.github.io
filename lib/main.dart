@@ -31563,24 +31563,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       widget.user.email,
       state: _selectedState,
     );
+    final storedPinSig = (stored?['pinSig'] ?? '').toString().trim();
+    final pinSigForRemote = civicRegistryPinSigIsServerIssued(storedPinSig) ? storedPinSig : '';
     final remote = await ngmyCivicCheckAccess(
       email: widget.user.email,
       state: _selectedState,
       memberEmail: widget.user.email,
       registryId: (stored?['registryId'] ?? widget.user.registryId ?? '').toString(),
-      pinSig: (stored?['pinSig'] ?? '').toString(),
+      pinSig: pinSigForRemote,
     );
     if (!mounted || gen != _unlockCheckGen) return;
 
+    final civicOnlyBlock = !remote.allowed &&
+        (remote.blocked == 'removed' ||
+            remote.blocked == 'deceased' ||
+            remote.blocked == 'locked' ||
+            (remote.blocked == 'pin' && pinSigForRemote.isNotEmpty));
     final hardBlock = access.kind == NgmyCivicAccessKind.removed ||
         access.kind == NgmyCivicAccessKind.deceased ||
         access.kind == NgmyCivicAccessKind.locked ||
         access.kind == NgmyCivicAccessKind.loggedOut ||
-        (!remote.allowed &&
-            (remote.blocked == 'removed' ||
-                remote.blocked == 'deceased' ||
-                remote.blocked == 'locked' ||
-                remote.blocked == 'pin'));
+        civicOnlyBlock;
     if (hardBlock) {
       await civicRegistryClearUnlockForState(widget.user.email, state: _selectedState);
       if (!mounted || gen != _unlockCheckGen) return;
@@ -41774,13 +41777,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Map<String, dynamic>? _rankingSourceRow(UserData u) {
     final rid = (u.registryId ?? '').trim();
-    if (rid.isNotEmpty) {
-      final local = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
-      if (local != null) return local;
-    }
-    if (u.email.trim().isNotEmpty) {
-      final local = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
-      if (local != null) return local;
+    if (_canUseRegistrarToolsHere()) {
+      if (rid.isNotEmpty) {
+        final local = NgmyCivicRegistryMembers.findByRegistryId(widget.config, rid);
+        if (local != null) return local;
+      }
+      if (u.email.trim().isNotEmpty) {
+        final local = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+        if (local != null) return local;
+      }
     }
     for (final row in _sharedDirectoryRows) {
       if (NgmyCivicWalletIdentity.idsEqual((row['registryId'] ?? '').toString(), rid)) {
@@ -41822,9 +41827,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final wanted = _selectedState.trim();
     if (mounted) setState(() => _sharedDirectoryLoading = true);
     try {
-      final pin = email.isEmpty
+      final rawPin = email.isEmpty
           ? ''
           : ((await civicRegistryStoredPinSig(email, state: wanted)) ?? '');
+      final pin = civicRegistryPinSigIsServerIssued(rawPin) ? rawPin : '';
       final rankings = await ngmyCivicFetchRankings(
         email: email,
         state: wanted,

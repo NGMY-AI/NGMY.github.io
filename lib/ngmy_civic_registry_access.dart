@@ -272,7 +272,7 @@ Future<void> showNgmyCivicAccessControlSheet({
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Blocks this member on every device. You can give access back before the time ends.',
+                      'Blocks Civic Registry only — they stay in the NGMY app. They will see Verify your membership until you give access back or the time ends.',
                       style: TextStyle(fontSize: 12, height: 1.35, color: ink.withOpacity(0.65)),
                     ),
                     const SizedBox(height: 8),
