@@ -3,11 +3,9 @@ import 'package:flutter/services.dart';
 import 'ngmy_civic_registry_stats.dart';
 
 /// Shared Civic Registry identity matching (name / DOB / registry ID).
-import 'ngmy_civic_registry_stats.dart';
-
 class NgmyCivicWalletIdentity {
   static String normalizeName(String raw) =>
-      raw.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+      raw.trim().toLowerCase().replaceAll(RegExp(r'[^a-z0-9\s]'), '').replaceAll(RegExp(r'\s+'), ' ');
 
   static String digitsOnly(String raw) => raw.replaceAll(RegExp(r'\D'), '');
 
@@ -37,8 +35,24 @@ class NgmyCivicWalletIdentity {
     return '$mm/$dd/$yyyy';
   }
 
-  static String normalizeId(String raw) =>
-      raw.trim().toUpperCase().replaceAll(RegExp(r'\s+'), '');
+  /// GA-123 4567, ga1234567, NGMY-CIVIC:GA1234567, and GA1234567 are the same ID.
+  static String normalizeId(String raw) {
+    var t = raw.trim().toUpperCase();
+    const prefix = 'NGMY-CIVIC:';
+    if (t.startsWith(prefix)) t = t.substring(prefix.length).trim();
+    return t.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  static bool idsEqual(String a, String b) {
+    final x = normalizeId(a);
+    final y = normalizeId(b);
+    if (x.isEmpty || y.isEmpty) return false;
+    if (x == y) return true;
+    final dx = digitsOnly(x);
+    final dy = digitsOnly(y);
+    if (dx.length >= 6 && dx == dy) return true;
+    return false;
+  }
 
   static Map<String, dynamic>? findByName({
     required List<Map<String, dynamic>> members,
@@ -47,9 +61,26 @@ class NgmyCivicWalletIdentity {
   }) {
     final want = normalizeName(fullName);
     if (want.isEmpty) return null;
+    Map<String, dynamic>? loose;
     for (final m in members) {
       if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) continue;
-      if (normalizeName((m['fullName'] ?? '').toString()) == want) return m;
+      final have = normalizeName((m['fullName'] ?? '').toString());
+      if (have.isEmpty) continue;
+      if (have == want) return m;
+      if (loose == null && _namesCompatible(have, want)) loose = m;
+    }
+    return loose;
+  }
+
+  static Map<String, dynamic>? findById({
+    required List<Map<String, dynamic>> members,
+    required String state,
+    required String registryId,
+  }) {
+    if (normalizeId(registryId).isEmpty) return null;
+    for (final m in members) {
+      if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) continue;
+      if (idMatches(m, registryId)) return m;
     }
     return null;
   }
@@ -57,13 +88,26 @@ class NgmyCivicWalletIdentity {
   static bool dobMatches(Map<String, dynamic> member, String dob) {
     final a = normalizeDob((member['dob'] ?? '').toString());
     final b = normalizeDob(dob);
-    return a.isNotEmpty && b.isNotEmpty && a == b;
+    if (a.isEmpty || b.isEmpty) return false;
+    return a == b || digitsOnly(a) == digitsOnly(b);
   }
 
   static bool idMatches(Map<String, dynamic> member, String registryId) {
-    final a = normalizeId((member['registryId'] ?? '').toString());
-    final b = normalizeId(registryId);
-    return a.isNotEmpty && b.isNotEmpty && a == b;
+    if (idsEqual((member['registryId'] ?? '').toString(), registryId)) return true;
+    return idsEqual((member['previousRegistryId'] ?? '').toString(), registryId);
+  }
+
+  /// "John A Smith" matches "John Smith"; extra punctuation is ignored.
+  static bool _namesCompatible(String registered, String entered) {
+    if (registered == entered) return true;
+    final a = registered.split(' ').where((p) => p.isNotEmpty).toList();
+    final b = entered.split(' ').where((p) => p.isNotEmpty).toList();
+    if (a.length < 2 || b.length < 2) return false;
+    if (a.first != b.first || a.last != b.last) return false;
+    if (a.length <= b.length) {
+      return b.every((part) => a.contains(part));
+    }
+    return a.every((part) => b.contains(part) || part.length == 1);
   }
 }
 

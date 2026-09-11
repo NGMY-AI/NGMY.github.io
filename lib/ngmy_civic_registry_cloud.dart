@@ -88,7 +88,7 @@ Future<({bool allowed, String? error})> ngmyCivicCheckAccess({
   return (allowed: true, error: null);
 }
 
-Future<({bool ok, String? memberEmail, String? error})> ngmyCivicGateMatchName({
+Future<({bool ok, String? memberEmail, String? registryId, String? error})> ngmyCivicGateMatchName({
   required String email,
   required String state,
   required String pinSig,
@@ -102,12 +102,22 @@ Future<({bool ok, String? memberEmail, String? error})> ngmyCivicGateMatchName({
     'fullName': fullName.trim(),
   });
   if (data == null) {
-    return (ok: false, memberEmail: null, error: 'Could not reach server. Check your connection and try again.');
+    return (
+      ok: false,
+      memberEmail: null,
+      registryId: null,
+      error: 'Could not reach server. Check your connection and try again.',
+    );
   }
   if (data['ok'] == true) {
-    return (ok: true, memberEmail: (data['memberEmail'] ?? '').toString(), error: null);
+    return (
+      ok: true,
+      memberEmail: (data['memberEmail'] ?? '').toString(),
+      registryId: (data['registryIdHint'] ?? data['registryId'] ?? '').toString(),
+      error: null,
+    );
   }
-  return (ok: false, memberEmail: null, error: _civicCloudError(data, 'Name not found'));
+  return (ok: false, memberEmail: null, registryId: null, error: _civicCloudError(data, 'Name not found'));
 }
 
 Future<({bool ok, String? error, String? registryId})> ngmyCivicGateVerifyIdentity({

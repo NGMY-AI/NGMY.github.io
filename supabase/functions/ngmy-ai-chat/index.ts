@@ -2418,7 +2418,33 @@ function phoneDigits(phone: string): string {
 }
 
 function normName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return s.trim().toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ");
+}
+
+function namesCompatible(registered: string, entered: string): boolean {
+  if (registered === entered) return true;
+  const a = registered.split(" ").filter(Boolean);
+  const b = entered.split(" ").filter(Boolean);
+  if (a.length < 2 || b.length < 2) return false;
+  if (a[0] !== b[0] || a[a.length - 1] !== b[b.length - 1]) return false;
+  if (a.length <= b.length) return b.every((part) => a.includes(part));
+  return a.every((part) => b.includes(part) || part.length === 1);
+}
+
+function normCivicId(s: string): string {
+  let t = s.trim().toUpperCase();
+  if (t.startsWith("NGMY-CIVIC:")) t = t.slice("NGMY-CIVIC:".length).trim();
+  return t.replace(/[^A-Z0-9]/g, "");
+}
+
+function civicIdsMatch(a: string, b: string): boolean {
+  const x = normCivicId(a);
+  const y = normCivicId(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const dx = x.replace(/^[A-Z]+/, "");
+  const dy = y.replace(/^[A-Z]+/, "");
+  return dx.length >= 6 && dx === dy;
 }
 
 function civicAccessLoginError(
@@ -2448,8 +2474,9 @@ function memberMatchesNameOrKeys(
   if (want && rn && want === rn) return true;
   const em = emailKey(String(row.email ?? ""));
   if (memberEmail && em && em === memberEmail) return true;
-  const rid = String(row.registryId ?? "").trim().toUpperCase();
-  if (registryId && rid && rid === registryId.trim().toUpperCase()) return true;
+  const rid = String(row.registryId ?? "");
+  const prev = String(row.previousRegistryId ?? "");
+  if (registryId && (civicIdsMatch(rid, registryId) || civicIdsMatch(prev, registryId))) return true;
   return false;
 }
 
@@ -2618,7 +2645,10 @@ async function handleCivicGateMatchName(
       error: "This Civic Registry record is closed and cannot be used to log in.",
     }, 403);
   }
-  const match = members.find((m) => normName(String(m.fullName ?? "")) === want);
+  let match = members.find((m) => normName(String(m.fullName ?? "")) === want);
+  if (!match) {
+    match = members.find((m) => namesCompatible(normName(String(m.fullName ?? "")), want));
+  }
   if (!match) return jsonOk({ error: "That name is not registered in this state." }, 404);
   const accessErr = civicAccessLoginError(match, false);
   if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
@@ -2646,8 +2676,8 @@ async function handleCivicGateVerifyIdentity(
   const dob = String(body.dob ?? "").trim();
   const registryId = String(body.registryId ?? "").trim();
   const step = String(body.step ?? "dob").trim(); // dob | id | both
-  if (!state || !pinSig || !memberEmail) {
-    return jsonOk({ error: "state, pinSig, and memberEmail required" }, 400);
+  if (!state || !pinSig || (!memberEmail && !registryId)) {
+    return jsonOk({ error: "state, pinSig, and memberEmail or registryId required" }, 400);
   }
   const admin = adminClient();
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
@@ -2665,7 +2695,29 @@ async function handleCivicGateVerifyIdentity(
       error: "You were removed from Civic Registry and cannot log in.",
     }, 403);
   }
-  const match = members.find((m) => emailKey(String(m.email ?? "")) === memberEmail);
+  const idMatchesRow = (m: Record<string, unknown>) =>
+    civicIdsMatch(String(m.registryId ?? ""), registryId) ||
+    civicIdsMatch(String(m.previousRegistryId ?? ""), registryId);
+  const stateAllowsRow = (m: Record<string, unknown>) => {
+    const ms = canonicalStateKey(String(m.state ?? ""));
+    const wantState = canonicalStateKey(state);
+    if (ms === wantState) return true;
+    if (!ms && registryId) {
+      const prefix = (US_STATE_PREFIX[wantState] ?? "").toUpperCase();
+      const rid = normCivicId(String(m.registryId ?? ""));
+      return Boolean(prefix && rid.startsWith(prefix));
+    }
+    return false;
+  };
+  let match = memberEmail
+    ? members.find((m) => emailKey(String(m.email ?? "")) === memberEmail)
+    : undefined;
+  if (registryId) {
+    const byId = members.find(idMatchesRow) ??
+      asMemberList(payload.members).filter(stateAllowsRow).find(idMatchesRow);
+    // At the ID step the typed registry ID is the source of truth (same-name collisions).
+    if (byId && (step === "id" || step === "both" || !match)) match = byId;
+  }
   if (!match) return jsonOk({ error: "Member not found" }, 404);
   const accessErr = civicAccessLoginError(match, false);
   if (accessErr) return jsonOk({ ok: false, error: accessErr }, 403);
@@ -2683,8 +2735,9 @@ async function handleCivicGateVerifyIdentity(
   }
   if (step === "id" || step === "both") {
     if (!registryId) return jsonOk({ error: "registryId required" }, 400);
-    const got = String(match.registryId ?? "").trim().toUpperCase();
-    if (!got || got !== registryId.trim().toUpperCase()) {
+    const got = String(match.registryId ?? "");
+    const prev = String(match.previousRegistryId ?? "");
+    if (!civicIdsMatch(got, registryId) && !civicIdsMatch(prev, registryId)) {
       return jsonOk({ error: "Registry ID does not match that member.", ok: false }, 403);
     }
   }

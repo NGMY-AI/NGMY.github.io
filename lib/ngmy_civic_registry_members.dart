@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_registry_access.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_stats.dart';
@@ -1442,10 +1443,9 @@ class NgmyCivicRegistryMembers {
   }
 
   static Map<String, dynamic>? findByRegistryId(dynamic config, String registryId) {
-    final key = registryId.trim().toUpperCase();
-    if (key.isEmpty) return null;
+    if (NgmyCivicWalletIdentity.normalizeId(registryId).isEmpty) return null;
     for (final m in listFrom(config)) {
-      if ((m['registryId'] ?? '').toString().trim().toUpperCase() == key) return m;
+      if (NgmyCivicWalletIdentity.idMatches(m, registryId)) return m;
     }
     return null;
   }

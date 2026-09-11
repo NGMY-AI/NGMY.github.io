@@ -299,9 +299,8 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       final rn = (r['fullName'] ?? '').toString().trim().toLowerCase();
       if (member != null) {
         final me = (member['email'] ?? '').toString().trim().toLowerCase();
-        final mr = (member['registryId'] ?? '').toString().trim().toUpperCase();
         if (me.isNotEmpty && me == email) return true;
-        if (mr.isNotEmpty && mr == rid) return true;
+        if (rid.isNotEmpty && NgmyCivicWalletIdentity.idMatches(member, rid)) return true;
       }
       return want.isNotEmpty && rn == want;
     });
@@ -529,7 +528,8 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
           fullName: value,
         );
         if (!mounted) return;
-        if (!matched.ok || (matched.memberEmail ?? '').isEmpty) {
+        if (!matched.ok ||
+            ((matched.memberEmail ?? '').isEmpty && (matched.registryId ?? '').isEmpty)) {
           setState(() {
             _busy = false;
             _error = matched.error ?? 'That name is not registered in $_state.';
@@ -564,7 +564,8 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
           });
           return;
         }
-        if (!NgmyCivicWalletIdentity.dobMatches(member, value)) {
+        final storedDob = (member['dob'] ?? '').toString().trim();
+        if (storedDob.isNotEmpty && !NgmyCivicWalletIdentity.dobMatches(member, value)) {
           setState(() => _error = 'Date of birth does not match that registered name.');
           return;
         }
@@ -582,33 +583,34 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
         });
         return;
       }
-      if (!NgmyCivicWalletIdentity.idMatches(member, value)) {
+      final local = _resolveMemberById(value);
+      if (local == null) {
         setState(() => _error = 'Registry ID does not match that member.');
         return;
       }
-      setState(() {
-        _busy = true;
-        _error = null;
-      });
-      final rid = (member['registryId'] ?? '').toString();
-      await civicRegistrySaveUnlock(
-        widget.userEmail,
-        state: _state,
-        globalPin: widget.globalPin,
-        pinsByState: widget.pinsByState,
-        registryId: rid,
-      );
-      if (!mounted) return;
-      widget.onUnlocked(_state);
+      await _finishLocalUnlock(local);
       return;
     }
 
     if (_step == 2) {
       final memberEmail = (_matchedMemberEmail ?? '').trim();
+      final localMember = _matchedMember;
       if (memberEmail.isEmpty) {
+        if (localMember == null) {
+          setState(() {
+            _error = 'Start over — name step was lost.';
+            _step = 1;
+          });
+          return;
+        }
+        final storedDob = (localMember['dob'] ?? '').toString().trim();
+        if (storedDob.isNotEmpty && !NgmyCivicWalletIdentity.dobMatches(localMember, value)) {
+          setState(() => _error = 'Date of birth does not match that registered name.');
+          return;
+        }
         setState(() {
-          _error = 'Start over — name step was lost.';
-          _step = 1;
+          _error = null;
+          _step = 3;
         });
         return;
       }
@@ -626,6 +628,16 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       );
       if (!mounted) return;
       if (!verified.ok) {
+        final storedDob = (localMember?['dob'] ?? '').toString().trim();
+        if (localMember != null &&
+            (storedDob.isEmpty || NgmyCivicWalletIdentity.dobMatches(localMember, value))) {
+          setState(() {
+            _busy = false;
+            _error = null;
+            _step = 3;
+          });
+          return;
+        }
         setState(() {
           _busy = false;
           _error = verified.error ?? 'Date of birth does not match that registered name.';
@@ -641,14 +653,8 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
     }
 
     final memberEmail = (_matchedMemberEmail ?? '').trim();
-    if (memberEmail.isEmpty) {
-      setState(() {
-        _error = 'Start over — verification incomplete.';
-        _step = 1;
-      });
-      return;
-    }
-    final preAccess = _accessFor(_matchedMember);
+    final local = _resolveMemberById(value);
+    final preAccess = _accessFor(local ?? _matchedMember);
     if (!preAccess.allowsLogin) {
       setState(() => _error = preAccess.message);
       return;
@@ -676,18 +682,62 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       step: 'id',
     );
     if (!mounted) return;
-    if (!verified.ok) {
-      setState(() {
-        _busy = false;
-        _error = verified.error ?? 'Registry ID does not match that member.';
-      });
+    if (verified.ok) {
+      await civicRegistrySaveServerUnlock(
+        widget.userEmail,
+        state: _state,
+        pinSig: pinSig,
+        registryId: verified.registryId ?? value,
+      );
+      if (!mounted) return;
+      widget.onUnlocked(_state);
       return;
     }
-    await civicRegistrySaveServerUnlock(
+    // Cloud roster can lag the registrar's list, or the ID may use dashes/spaces.
+    // If this device already has the matching Georgia (etc.) member, let them in.
+    if (local != null) {
+      await _finishLocalUnlock(local);
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _error = verified.error ?? 'Registry ID does not match that member.';
+    });
+  }
+
+  Map<String, dynamic>? _resolveMemberById(String registryId) {
+    final byId = NgmyCivicWalletIdentity.findById(
+      members: widget.members,
+      state: _state,
+      registryId: registryId,
+    );
+    if (byId != null) {
+      final storedDob = (byId['dob'] ?? '').toString().trim();
+      final dob = _dobC.text.trim();
+      if (storedDob.isEmpty || dob.isEmpty || NgmyCivicWalletIdentity.dobMatches(byId, dob)) {
+        return byId;
+      }
+    }
+    final matched = _matchedMember;
+    if (matched != null && NgmyCivicWalletIdentity.idMatches(matched, registryId)) {
+      return matched;
+    }
+    return null;
+  }
+
+  Future<void> _finishLocalUnlock(Map<String, dynamic> member) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+      _matchedMember = member;
+    });
+    final rid = (member['registryId'] ?? '').toString();
+    await civicRegistrySaveUnlock(
       widget.userEmail,
       state: _state,
-      pinSig: pinSig,
-      registryId: verified.registryId ?? value,
+      globalPin: widget.globalPin,
+      pinsByState: widget.pinsByState,
+      registryId: rid,
     );
     if (!mounted) return;
     widget.onUnlocked(_state);

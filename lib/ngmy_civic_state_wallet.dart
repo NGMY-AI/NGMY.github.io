@@ -618,7 +618,8 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
         });
         return;
       }
-      if (!NgmyCivicWalletIdentity.dobMatches(member, value)) {
+      final storedDob = (member['dob'] ?? '').toString().trim();
+      if (storedDob.isNotEmpty && !NgmyCivicWalletIdentity.dobMatches(member, value)) {
         setState(() => _error = 'Date of birth does not match that registered name.');
         return;
       }
@@ -634,7 +635,18 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
       });
       return;
     }
-    if (!NgmyCivicWalletIdentity.idMatches(member, value)) {
+    final byId = NgmyCivicWalletIdentity.findById(
+      members: widget.members,
+      state: widget.state,
+      registryId: value,
+    );
+    final dob = _dobC.text.trim();
+    final storedDob = (byId?['dob'] ?? '').toString().trim();
+    final resolved = (byId != null &&
+            (storedDob.isEmpty || dob.isEmpty || NgmyCivicWalletIdentity.dobMatches(byId, dob)))
+        ? byId
+        : (NgmyCivicWalletIdentity.idMatches(member, value) ? member : null);
+    if (resolved == null) {
       setState(() => _error = 'Registry ID does not match that member.');
       return;
     }
