@@ -5,6 +5,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUp(civicRegistryResetUnlockCache);
+  tearDown(civicRegistryResetUnlockCache);
+
   test('only server v1 hashes count as a changed state-code check', () {
     expect(civicRegistryPinSigIsServerIssued('v1:abc'), isTrue);
     expect(civicRegistryPinSigIsServerIssued('v1:local'), isFalse);
@@ -49,6 +52,34 @@ void main() {
         pinsByState: const {},
       ),
       isTrue,
+    );
+    expect(
+      civicRegistryCachedUnlock(userEmail: 'member@example.com', state: 'Georgia'),
+      isTrue,
+    );
+    expect(
+      civicRegistryCachedUnlock(userEmail: 'member@example.com', state: 'GA'),
+      isTrue,
+    );
+  });
+
+  test('a finished verify is already unlocked in memory so Civic can open instantly', () async {
+    SharedPreferences.setMockInitialValues({});
+    await civicRegistrySaveServerUnlock(
+      'member@example.com',
+      state: 'Georgia',
+      pinSig: 'v1:local',
+      registryId: 'GA4944484',
+    );
+    civicRegistryResetUnlockCache();
+    await civicRegistryWarmUnlockCache();
+    expect(
+      civicRegistryCachedUnlock(userEmail: 'member@example.com', state: 'Georgia'),
+      isTrue,
+    );
+    expect(
+      civicRegistryCachedUnlock(userEmail: 'stranger@example.com', state: 'Georgia'),
+      isNull,
     );
   });
 }

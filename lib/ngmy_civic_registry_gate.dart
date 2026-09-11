@@ -12,6 +12,32 @@ import 'ngmy_civic_registry_stats.dart';
 
 const String _kUnlockPrefsKey = 'civic_registry_unlock_v2';
 
+Map<String, dynamic>? _unlockRootCache;
+bool _unlockRootReady = false;
+
+@visibleForTesting
+void civicRegistryResetUnlockCache() {
+  _unlockRootCache = null;
+  _unlockRootReady = false;
+}
+
+void _rememberUnlockRoot(Map<String, dynamic> root) {
+  _unlockRootCache = {
+    'v': 2,
+    'email': (root['email'] ?? '').toString().toLowerCase().trim(),
+    'states': Map<String, dynamic>.from((root['states'] as Map?) ?? const {}),
+  };
+  _unlockRootReady = true;
+}
+
+Map<String, dynamic> _copyUnlockRoot(Map<String, dynamic> root) {
+  return {
+    'v': 2,
+    'email': (root['email'] ?? '').toString().toLowerCase().trim(),
+    'states': Map<String, dynamic>.from((root['states'] as Map?) ?? const {}),
+  };
+}
+
 Map<String, dynamic>? civicRegistryUnlockEntryFromStates(dynamic states, String state) {
   if (states is! Map) return null;
   final st = state.trim();
@@ -87,22 +113,74 @@ Map<String, dynamic> _normalizeUnlockRoot(dynamic raw) {
   return {'v': 2, 'email': email, 'states': states};
 }
 
-Future<Map<String, dynamic>> _loadUnlockRoot() async {
+Future<Map<String, dynamic>> _loadUnlockRoot({bool force = false}) async {
+  if (!force && _unlockRootReady && _unlockRootCache != null) {
+    return _copyUnlockRoot(_unlockRootCache!);
+  }
   final prefs = await SharedPreferences.getInstance();
   final raw = prefs.getString(_kUnlockPrefsKey) ?? prefs.getString('civic_registry_unlock');
-  if (raw == null || raw.isEmpty) return {'v': 2, 'email': '', 'states': <String, dynamic>{}};
+  if (raw == null || raw.isEmpty) {
+    final empty = {'v': 2, 'email': '', 'states': <String, dynamic>{}};
+    _rememberUnlockRoot(empty);
+    return empty;
+  }
   try {
-    return _normalizeUnlockRoot(jsonDecode(raw));
+    final root = _normalizeUnlockRoot(jsonDecode(raw));
+    _rememberUnlockRoot(root);
+    return root;
   } catch (_) {
-    return {'v': 2, 'email': '', 'states': <String, dynamic>{}};
+    final empty = {'v': 2, 'email': '', 'states': <String, dynamic>{}};
+    _rememberUnlockRoot(empty);
+    return empty;
   }
 }
 
 Future<void> _saveUnlockRoot(Map<String, dynamic> root) async {
   final prefs = await SharedPreferences.getInstance();
   root['v'] = 2;
+  _rememberUnlockRoot(root);
   await prefs.setString(_kUnlockPrefsKey, jsonEncode(root));
   await prefs.remove('civic_registry_unlock');
+}
+
+Future<void> civicRegistryWarmUnlockCache() async {
+  await _loadUnlockRoot();
+}
+
+bool civicRegistryUnlockHeldInRoot({
+  required Map<String, dynamic> root,
+  required String userEmail,
+  required String state,
+}) {
+  final email = userEmail.toLowerCase().trim();
+  final st = state.trim();
+  if (email.isEmpty || st.isEmpty) return false;
+  if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return false;
+  final entry = civicRegistryUnlockEntryFromStates(root['states'], st);
+  if (entry == null) return false;
+  return (entry['pinSig'] ?? '').toString().trim().isNotEmpty;
+}
+
+/// Instant read of a finished Verify your membership. `null` means not loaded yet.
+bool? civicRegistryCachedUnlock({
+  required String userEmail,
+  required String state,
+}) {
+  if (!_unlockRootReady || _unlockRootCache == null) return null;
+  final cachedEmail = (_unlockRootCache!['email'] ?? '').toString().toLowerCase().trim();
+  final email = userEmail.toLowerCase().trim();
+  if (cachedEmail.isNotEmpty && email.isNotEmpty && cachedEmail != email) return null;
+  return civicRegistryUnlockHeldInRoot(
+    root: _unlockRootCache!,
+    userEmail: userEmail,
+    state: state,
+  );
+}
+
+Future<Map<String, dynamic>> _loadUnlockRootForEmail(String email) async {
+  final key = email.toLowerCase().trim();
+  final cachedEmail = (_unlockRootCache?['email'] ?? '').toString().toLowerCase().trim();
+  return _loadUnlockRoot(force: cachedEmail.isNotEmpty && key.isNotEmpty && cachedEmail != key);
 }
 
 Future<Map<String, dynamic>?> civicRegistryStoredUnlockEntry(
@@ -112,7 +190,7 @@ Future<Map<String, dynamic>?> civicRegistryStoredUnlockEntry(
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
   if (email.isEmpty || st.isEmpty) return null;
-  final root = await _loadUnlockRoot();
+  final root = await _loadUnlockRootForEmail(email);
   if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return null;
   return civicRegistryUnlockEntryFromStates(root['states'], st);
 }
@@ -180,12 +258,12 @@ Future<bool> civicRegistryIsUnlocked(
   final st = state.trim();
   if (email.isEmpty || st.isEmpty) return false;
 
-  final root = await _loadUnlockRoot();
-  if ((root['email'] ?? '').toString().toLowerCase().trim() != email) return false;
+  final root = await _loadUnlockRootForEmail(email);
+  if (!civicRegistryUnlockHeldInRoot(root: root, userEmail: email, state: st)) {
+    return false;
+  }
   final entry = civicRegistryUnlockEntryFromStates(root['states'], st);
-  if (entry == null) return false;
-  final storedSig = (entry['pinSig'] ?? '').toString();
-  if (storedSig.isEmpty) return false;
+  final storedSig = (entry?['pinSig'] ?? '').toString();
 
   // Server-issued pinSig (v1:…) or a completed local unlock — stay in Civic
   // Registry until lock / remove / PIN change.
@@ -231,6 +309,7 @@ Future<void> civicRegistryClearUnlock() async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.remove(_kUnlockPrefsKey);
   await prefs.remove('civic_registry_unlock');
+  _rememberUnlockRoot({'v': 2, 'email': '', 'states': <String, dynamic>{}});
 }
 
 /// Red gate screen — state PIN → member name → DOB → registry ID.

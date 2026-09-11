@@ -538,6 +538,7 @@ void main() async {
       await ngmyRecoverOAuthSessionIfNeeded();
     }
     launchBootstrap = await ngmyLoadLaunchBootstrap();
+    await civicRegistryWarmUnlockCache();
 
     final launchLoggedOut = await ngmyReadUserLoggedOutFlag();
     if (launchLoggedOut) {
@@ -28822,18 +28823,36 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         scan,
                         orbit,
                         0,
-                        () => NgmyNavigator.push(
-                          context,
-                          CivicRegistryScreen(
-                            user: widget.user,
-                            allUsers: widget.allUsers,
-                            allTransactions: widget.allTransactions,
-                            onAddTransaction: widget.onAddTransaction,
-                            onDataChanged: widget.onDataChanged,
-                            config: widget.config,
-                          ),
-                          routeName: 'CivicRegistryScreen',
-                        ),
+                        () {
+                          final state = widget.user.state;
+                          final cached = civicRegistryCachedUnlock(
+                            userEmail: widget.user.email,
+                            state: state,
+                          );
+                          void openCivic() {
+                            if (!context.mounted) return;
+                            NgmyNavigator.push(
+                              context,
+                              CivicRegistryScreen(
+                                user: widget.user,
+                                allUsers: widget.allUsers,
+                                allTransactions: widget.allTransactions,
+                                onAddTransaction: widget.onAddTransaction,
+                                onDataChanged: widget.onDataChanged,
+                                config: widget.config,
+                              ),
+                              routeName: 'CivicRegistryScreen',
+                            );
+                          }
+                          if (cached != null) {
+                            openCivic();
+                            return;
+                          }
+                          unawaited(() async {
+                            await civicRegistryWarmUnlockCache();
+                            openCivic();
+                          }());
+                        },
                       ),
                       _hubBox(
                         'NGMY Store',
@@ -31096,10 +31115,23 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _selectedState = widget.user.state;
-    // Open directly into real Civic content. Unlock/cloud checks continue in
-    // the background instead of replacing the page with a visible loader.
-    _unlockChecked = true;
-    _registryUnlocked = _canBypassCivicGate() || !_stateRequiresMemberUnlock();
+    final bypass = _canBypassCivicGate();
+    final requiresUnlock = _stateRequiresMemberUnlock();
+    final cachedUnlock = civicRegistryCachedUnlock(
+      userEmail: widget.user.email,
+      state: _selectedState,
+    );
+    if (bypass || !requiresUnlock || cachedUnlock == true) {
+      _registryUnlocked = true;
+      _unlockChecked = true;
+    } else if (cachedUnlock == false) {
+      _registryUnlocked = false;
+      _unlockChecked = true;
+    } else {
+      // Unlock prefs are not in memory yet — never flash Verify your membership.
+      _registryUnlocked = false;
+      _unlockChecked = false;
+    }
     _subscribeToCivicHelpBroadcasts();
     // Seed in-memory civic contributions immediately so Contribution Receipts
     // are not empty while async local/cloud hydration runs (e.g. right after
@@ -31108,6 +31140,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         .where((t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved)
         .toList();
     unawaited(_hydrateReceiptReadState());
+    unawaited(_restoreLocalUnlockImmediately());
     _registrarHydrateFuture = _hydrateRegistrarApplication();
     unawaited(() async {
       await _registrarHydrateFuture;
@@ -31142,11 +31175,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       });
     }());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Restore a finished membership verify immediately. Do not wait on
-      // cloud hydrate — that check is what bounced people out after 3–4s.
-      await _registrarHydrateFuture;
+      // Restore a finished membership verify from local prefs first.
+      // Never wait on registrar/cloud hydrate — that painted Verify your
+      // membership for a few seconds even after they already verified.
+      await _restoreLocalUnlockImmediately();
       if (!mounted) return;
-      await _checkRegistryUnlock();
+      unawaited(_checkRegistryUnlock());
       if (!mounted) return;
       unawaited(_refreshCivicMembersFromCloud());
       unawaited(_hydrateStateSwitchLock());
@@ -31610,6 +31644,43 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       member: member,
       localUnlockAt: storedAt,
     );
+  }
+
+  Completer<void>? _localUnlockRestoreCompleter;
+
+  Future<void> _restoreLocalUnlockImmediately() async {
+    final inFlight = _localUnlockRestoreCompleter;
+    if (inFlight != null) return inFlight.future;
+    final done = Completer<void>();
+    _localUnlockRestoreCompleter = done;
+    try {
+      if (_canBypassCivicGate() || !_stateRequiresMemberUnlock()) {
+        if (mounted) {
+          setState(() {
+            _registryUnlocked = true;
+            _unlockChecked = true;
+            _registryGateMessage = null;
+          });
+        }
+        return;
+      }
+      final held = await civicRegistryIsUnlocked(
+        widget.user.email,
+        state: _selectedState,
+        globalPin: widget.config.civicRegistryPin,
+        pinsByState: widget.config.civicRegistryPinsByState,
+      );
+      if (!mounted) return;
+      setState(() {
+        _unlockChecked = true;
+        if (held) {
+          _registryUnlocked = true;
+          _registryGateMessage = null;
+        }
+      });
+    } finally {
+      if (!done.isCompleted) done.complete();
+    }
   }
 
   Future<void> _checkRegistryUnlock() async {
@@ -41381,8 +41452,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final receiptCount = receiptGroups.length;
 
     if (!_unlockChecked) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
+        body: const SizedBox.expand(),
       );
     }
     if (!_registryUnlocked && !_canBypassCivicGate() && _stateRequiresMemberUnlock()) {
