@@ -41533,44 +41533,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // Top Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(18, 14, 14, 22),
+              padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (openedAsName.isNotEmpty) ...[
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 210),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.16),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.white.withOpacity(0.32)),
-                        ),
-                        child: Text(
-                          openedAsName,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  Row(
+              child: LayoutBuilder(
+                builder: (context, headerBox) {
+                  final nameMaxWidth = (headerBox.maxWidth * 0.42).clamp(72.0, 150.0);
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Row(
                 children: [
                   SelectionContainer.disabled(
                     child: GestureDetector(
@@ -41632,9 +41607,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ),
                       ),
                     ),
-                ],
-              ),
-                ],
+                      ],
+                    ),
+                    if (openedAsName.isNotEmpty)
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: nameMaxWidth),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.16),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white.withOpacity(0.32)),
+                              ),
+                              child: Text(
+                                openedAsName,
+                                maxLines: 1,
+                                softWrap: false,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
             const SizedBox(height: 20),
