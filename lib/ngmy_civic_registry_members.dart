@@ -765,6 +765,7 @@ class NgmyCivicRegistryMembers {
         final prevStamp = (next['activityAt'] ?? keep['activityAt'] ?? '').toString();
         if (prevStamp.isNotEmpty) next['activityAt'] = prevStamp;
       }
+      preserveFirstHelpAt(next, keep, now);
       next['familyMembers'] = next['familyMembers'] ?? keep['familyMembers'] ?? 1;
       next['familyMales'] = next['familyMales'] ?? keep['familyMales'] ?? 0;
       next['familyFemales'] = next['familyFemales'] ?? keep['familyFemales'] ?? 0;
@@ -2218,6 +2219,25 @@ class NgmyCivicRegistryMembers {
   static DateTime? activityStampOf(Map<String, dynamic> m) =>
       DateTime.tryParse((m['activityAt'] ?? '').toString());
 
+  /// First time this member’s help count left zero. Never moves later helps.
+  static void preserveFirstHelpAt(
+    Map<String, dynamic> next,
+    Map<String, dynamic> keep,
+    String nowIso,
+  ) {
+    if (_intOf(next['helps']) <= 0) {
+      next.remove('firstHelpAt');
+      return;
+    }
+    final existing = (next['firstHelpAt'] ?? keep['firstHelpAt'] ?? '').toString().trim();
+    if (existing.isNotEmpty) {
+      next['firstHelpAt'] = existing;
+      return;
+    }
+    final fallback = (keep['activityAt'] ?? next['activityAt'] ?? '').toString().trim();
+    next['firstHelpAt'] = fallback.isNotEmpty ? fallback : nowIso;
+  }
+
   /// Reconciles helps/missed between two rows for the same person. The side
   /// that changed them most recently wins, so a removal survives; with no
   /// stamps on either side we fall back to the old keep-the-larger rule so
@@ -2239,10 +2259,32 @@ class NgmyCivicRegistryMembers {
       out['missed'] = _intOf(winner['missed']);
       final stamp = (winner['activityAt'] ?? '').toString();
       if (stamp.isNotEmpty) out['activityAt'] = stamp;
+      _mergeFirstHelpAt(out, a, b);
       return;
     }
     out['helps'] = math.max(_intOf(a['helps']), _intOf(b['helps']));
     out['missed'] = math.max(_intOf(a['missed']), _intOf(b['missed']));
+    _mergeFirstHelpAt(out, a, b);
+  }
+
+  static void _mergeFirstHelpAt(
+    Map<String, dynamic> out,
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    if (_intOf(out['helps']) <= 0) {
+      out.remove('firstHelpAt');
+      return;
+    }
+    DateTime? earliest;
+    for (final m in [a, b, out]) {
+      final t = DateTime.tryParse((m['firstHelpAt'] ?? '').toString());
+      if (t == null) continue;
+      if (earliest == null || t.isBefore(earliest)) earliest = t;
+    }
+    if (earliest != null) {
+      out['firstHelpAt'] = earliest.toUtc().toIso8601String();
+    }
   }
 
   static Map<String, dynamic> _preferNewerMember(Map<String, dynamic> a, Map<String, dynamic> b) {
@@ -2356,6 +2398,7 @@ class NgmyCivicRegistryMembers {
         'helps',
         'missed',
         'activityAt',
+        'firstHelpAt',
         'enrolledAt',
         'updatedAt',
         'enrollmentSource',

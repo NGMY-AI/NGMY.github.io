@@ -2039,6 +2039,7 @@ function sanitizeDirectoryMember(m: Record<string, unknown>): Record<string, unk
     // receiving device unable to tell a fresh count from a stale one, and its
     // merge would fall back to keeping whichever number is larger.
     activityAt: m.activityAt,
+    firstHelpAt: m.firstHelpAt,
     contributionCount: m.contributionCount,
     enrolledAt: m.enrolledAt,
     updatedAt: m.updatedAt,
@@ -2914,16 +2915,8 @@ async function handleCivicFetchRankings(
     }
   }
   const payload = await loadCivicPayload(admin);
-  const prefix = (US_STATE_PREFIX[want] ?? "").toUpperCase();
-  const inState = (m: Record<string, unknown>) => {
-    const ms = canonicalStateKey(String(m.state ?? ""));
-    if (ms === want) return true;
-    if (!ms && prefix) {
-      const rid = normCivicId(String(m.registryId ?? ""));
-      return rid.startsWith(prefix);
-    }
-    return false;
-  };
+  const inState = (m: Record<string, unknown>) =>
+    canonicalStateKey(String(m.state ?? "")) === want;
   const live = filterTombstonedMembers(
     asMemberList(payload.members).filter(inState),
     asMemberList(payload.removed).filter(inState),
@@ -2938,17 +2931,20 @@ async function handleCivicFetchRankings(
   const members: Record<string, unknown>[] = [];
   for (const m of live) {
     if (isGhostMemberRow(m)) continue;
+    const rid = String(m.registryId ?? "").trim();
+    if (!rid) continue;
     const key = nationwidePersonKey(m);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     members.push({
       fullName: String(m.fullName ?? ""),
       username: String(m.username ?? ""),
-      registryId: String(m.registryId ?? ""),
+      registryId: rid,
       state: displayStateName(String(m.state ?? state)),
       helps: Number(m.helps ?? 0) || 0,
       missed: Number(m.missed ?? 0) || 0,
       activityAt: m.activityAt ?? null,
+      firstHelpAt: m.firstHelpAt ?? null,
       enrolledAt: m.enrolledAt ?? null,
     });
   }
