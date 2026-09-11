@@ -40873,6 +40873,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return passport;
   }
 
+  bool _civicIsOpenedAsName(String raw) =>
+      NgmyCivicRegistryMembers.isPublicPersonName(raw);
+
+  /// Full name of the civic person whose membership opened this session.
+  String _civicOpenedAsFullName() {
+    final cached = civicRegistryCachedUnlockEntry(
+      userEmail: widget.user.email,
+      state: _selectedState,
+    );
+    final storedName = (cached?['fullName'] ?? '').toString().trim();
+    if (_civicIsOpenedAsName(storedName)) return storedName;
+    final storedRid = (cached?['registryId'] ?? '').toString().trim();
+    if (storedRid.isNotEmpty) {
+      final byId = NgmyCivicRegistryMembers.findByRegistryId(widget.config, storedRid);
+      if (byId != null) {
+        final fromId = NgmyCivicRegistryMembers.resolvedDisplayName(byId);
+        if (_civicIsOpenedAsName(fromId)) return fromId;
+      }
+    }
+    final record = _civicMemberRecordForCurrentUser();
+    if (record != null) {
+      final fromRecord = NgmyCivicRegistryMembers.resolvedDisplayName(record);
+      if (_civicIsOpenedAsName(fromRecord)) return fromRecord;
+    }
+    final profile = (widget.user.fullName ?? '').trim();
+    if (_civicIsOpenedAsName(profile)) return profile;
+    return '';
+  }
+
   bool _canViewCivicIdForCurrentUser() {
     final record = _civicMemberRecordForCurrentUser();
     if (record == null) return false;
@@ -41450,6 +41479,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final primaryColor = const Color(0xFF6200EE);
     final receiptGroups = _groupContributionReceipts(_visibleContributionTx(), unreadOnly: true);
     final receiptCount = receiptGroups.length;
+    final openedAsName = _civicOpenedAsFullName();
 
     if (!_unlockChecked) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -41503,13 +41533,44 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             // Top Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(25),
+              padding: const EdgeInsets.fromLTRB(18, 14, 14, 22),
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: [primaryColor, primaryColor.withOpacity(0.8)], begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (openedAsName.isNotEmpty) ...[
+                    Align(
+                      alignment: Alignment.topRight,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 210),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.16),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white.withOpacity(0.32)),
+                        ),
+                        child: Text(
+                          openedAsName,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  Row(
                 children: [
                   SelectionContainer.disabled(
                     child: GestureDetector(
@@ -41571,6 +41632,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ),
                       ),
                     ),
+                ],
+              ),
                 ],
               ),
             ),

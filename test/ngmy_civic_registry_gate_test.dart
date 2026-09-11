@@ -82,4 +82,22 @@ void main() {
       isNull,
     );
   });
+
+  test('unlock stores the full name used to open Civic Registry', () async {
+    SharedPreferences.setMockInitialValues({});
+    await civicRegistrySaveServerUnlock(
+      'member@example.com',
+      state: 'Georgia',
+      pinSig: 'v1:local',
+      registryId: 'GA4944484',
+      fullName: 'Ada Lovelace',
+    );
+    final entry = civicRegistryCachedUnlockEntry(
+      userEmail: 'member@example.com',
+      state: 'GA',
+    );
+    expect(entry, isNotNull);
+    expect(entry!['fullName'], 'Ada Lovelace');
+    expect(entry['registryId'], 'GA4944484');
+  });
 }

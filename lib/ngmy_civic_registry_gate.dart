@@ -166,15 +166,27 @@ bool? civicRegistryCachedUnlock({
   required String userEmail,
   required String state,
 }) {
+  final entry = civicRegistryCachedUnlockEntry(userEmail: userEmail, state: state);
+  if (entry == null) {
+    if (!_unlockRootReady || _unlockRootCache == null) return null;
+    final cachedEmail = (_unlockRootCache!['email'] ?? '').toString().toLowerCase().trim();
+    final email = userEmail.toLowerCase().trim();
+    if (cachedEmail.isNotEmpty && email.isNotEmpty && cachedEmail != email) return null;
+    return false;
+  }
+  return (entry['pinSig'] ?? '').toString().trim().isNotEmpty;
+}
+
+Map<String, dynamic>? civicRegistryCachedUnlockEntry({
+  required String userEmail,
+  required String state,
+}) {
   if (!_unlockRootReady || _unlockRootCache == null) return null;
   final cachedEmail = (_unlockRootCache!['email'] ?? '').toString().toLowerCase().trim();
   final email = userEmail.toLowerCase().trim();
   if (cachedEmail.isNotEmpty && email.isNotEmpty && cachedEmail != email) return null;
-  return civicRegistryUnlockHeldInRoot(
-    root: _unlockRootCache!,
-    userEmail: userEmail,
-    state: state,
-  );
+  if (cachedEmail != email) return null;
+  return civicRegistryUnlockEntryFromStates(_unlockRootCache!['states'], state);
 }
 
 Future<Map<String, dynamic>> _loadUnlockRootForEmail(String email) async {
@@ -226,6 +238,7 @@ Future<void> civicRegistrySaveServerUnlock(
   required String state,
   required String pinSig,
   String registryId = '',
+  String fullName = '',
 }) async {
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
@@ -237,10 +250,19 @@ Future<void> civicRegistrySaveServerUnlock(
     root['states'] = <String, dynamic>{};
   }
   final states = Map<String, dynamic>.from((root['states'] as Map?) ?? {});
+  final previous = civicRegistryUnlockEntryFromStates(states, st) ?? <String, dynamic>{};
+  final rid = registryId.trim().isNotEmpty
+      ? registryId.trim()
+      : (previous['registryId'] ?? '').toString().trim();
+  final name = fullName.trim().isNotEmpty
+      ? fullName.trim()
+      : (previous['fullName'] ?? '').toString().trim();
   states[st] = {
+    ...previous,
     'pinSig': sig,
     'at': DateTime.now().toUtc().toIso8601String(),
-    if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
+    if (rid.isNotEmpty) 'registryId': rid,
+    if (name.isNotEmpty) 'fullName': name,
   };
   root['states'] = states;
   await _saveUnlockRoot(root);
@@ -283,6 +305,7 @@ Future<void> civicRegistrySaveUnlock(
   required String globalPin,
   required Map<String, String> pinsByState,
   String registryId = '',
+  String fullName = '',
 }) async {
   final email = userEmail.toLowerCase().trim();
   final st = state.trim();
@@ -296,10 +319,19 @@ Future<void> civicRegistrySaveUnlock(
     root['states'] = <String, dynamic>{};
   }
   final states = Map<String, dynamic>.from((root['states'] as Map?) ?? {});
+  final previous = civicRegistryUnlockEntryFromStates(states, st) ?? <String, dynamic>{};
+  final rid = registryId.trim().isNotEmpty
+      ? registryId.trim()
+      : (previous['registryId'] ?? '').toString().trim();
+  final name = fullName.trim().isNotEmpty
+      ? fullName.trim()
+      : (previous['fullName'] ?? '').toString().trim();
   states[st] = {
+    ...previous,
     'pinSig': sig,
     'at': DateTime.now().toUtc().toIso8601String(),
-    if (registryId.trim().isNotEmpty) 'registryId': registryId.trim(),
+    if (rid.isNotEmpty) 'registryId': rid,
+    if (name.isNotEmpty) 'fullName': name,
   };
   root['states'] = states;
   await _saveUnlockRoot(root);
@@ -789,6 +821,9 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
         state: _state,
         pinSig: pinSig,
         registryId: verified.registryId ?? value,
+        fullName: _nameC.text.trim().isNotEmpty
+            ? _nameC.text.trim()
+            : (_matchedMember?['fullName'] ?? '').toString(),
       );
       if (!mounted) return;
       widget.onUnlocked(_state);
@@ -839,6 +874,9 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       state: _state,
       pinSig: civicRegistryPinSigIsServerIssued(serverSig) ? serverSig : 'v1:local',
       registryId: rid,
+      fullName: _nameC.text.trim().isNotEmpty
+          ? _nameC.text.trim()
+          : (member['fullName'] ?? '').toString(),
     );
     if (!mounted) return;
     widget.onUnlocked(_state);
