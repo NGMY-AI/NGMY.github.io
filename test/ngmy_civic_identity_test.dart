@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_civic_identity.dart';
+import 'package:ngmy/ngmy_civic_registry_members.dart';
 
 void main() {
   group('registry ID matching', () {
@@ -85,6 +86,22 @@ void main() {
       );
       expect(byId!['registryId'], 'GA2222222');
       expect(NgmyCivicWalletIdentity.idMatches(byName, 'GA-2222222'), isFalse);
+    });
+  });
+
+  group('display names', () {
+    test('registry IDs are not used as a person name', () {
+      expect(NgmyCivicRegistryMembers.isPublicPersonName('GA1234567'), isFalse);
+      expect(NgmyCivicRegistryMembers.isPublicPersonName('Member'), isFalse);
+      expect(NgmyCivicRegistryMembers.isPublicPersonName('Ada King', registryId: 'GA1234567'), isTrue);
+      expect(
+        NgmyCivicRegistryMembers.resolvedDisplayName({
+          'fullName': 'GA1234567',
+          'username': 'Ada King',
+          'registryId': 'GA1234567',
+        }),
+        'Ada King',
+      );
     });
   });
 

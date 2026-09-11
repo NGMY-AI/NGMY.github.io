@@ -2289,8 +2289,23 @@ class NgmyCivicRegistryMembers {
     return false;
   }
 
+  /// A real person label — never a registry ID, mask, or "Member" placeholder.
+  static bool isPublicPersonName(String raw, {String registryId = ''}) {
+    final name = raw.trim();
+    if (name.isEmpty) return false;
+    final lower = name.toLowerCase();
+    if (lower == 'member' || lower == 'user') return false;
+    if (_isValidRegistryId(name)) return false;
+    if (_isPlaceholderValue(name)) return false;
+    if (registryId.trim().isNotEmpty && NgmyCivicWalletIdentity.idsEqual(name, registryId)) {
+      return false;
+    }
+    return true;
+  }
+
   /// Best label for UI — never show masked ids or guest email tokens as a person's name.
   static String resolvedDisplayName(Map<String, dynamic> m) {
+    final rid = (m['registryId'] ?? '').toString();
     if (showNicknamesPublicly(m)) {
       final nicks = nicknamesOf(m);
       if (nicks.isNotEmpty) {
@@ -2298,9 +2313,9 @@ class NgmyCivicRegistryMembers {
       }
     }
     final fullName = (m['fullName'] ?? '').toString().trim();
-    if (!_isPlaceholderValue(fullName)) return fullName;
+    if (isPublicPersonName(fullName, registryId: rid)) return fullName;
     final username = (m['username'] ?? '').toString().trim();
-    if (!_isPlaceholderValue(username)) return username;
+    if (isPublicPersonName(username, registryId: rid)) return username;
     return 'Member';
   }
 

@@ -2926,6 +2926,18 @@ async function handleCivicFetchRankings(
   );
   const members = live
     .filter((m) => !isGhostMemberRow(m))
+    .filter((m) => {
+      const rid = String(m.registryId ?? "").trim().toUpperCase();
+      const name = String(m.fullName ?? "").trim();
+      const user = String(m.username ?? "").trim();
+      const label = !isRedactedCivicValue(name) ? name : user;
+      if (isRedactedCivicValue(label)) return false;
+      if (label.toLowerCase() === "member" || label.toLowerCase() === "user") return false;
+      const compact = label.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (rid && compact === rid) return false;
+      if (/^[A-Z]{2}\d{6,}$/.test(compact)) return false;
+      return true;
+    })
     .map((m) => ({
       fullName: String(m.fullName ?? ""),
       username: String(m.username ?? ""),
