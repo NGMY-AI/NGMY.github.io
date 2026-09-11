@@ -93,6 +93,81 @@ class NgmyCivicRegistrarApplication {
     );
   }
 
+  static List<String> revokeVotesOf(Map<String, dynamic> application) {
+    final raw = application['revokeVotes'];
+    if (raw is! List) return const [];
+    final seen = <String>{};
+    final out = <String>[];
+    for (final item in raw) {
+      final key = _emailKey(item.toString());
+      if (key.isEmpty || looksMaskedEmail(key) || seen.contains(key)) continue;
+      seen.add(key);
+      out.add(key);
+    }
+    return out;
+  }
+
+  static bool hasPendingRevoke(Map<String, dynamic> application) {
+    return _statusOf(application) == 'approved' && revokeVotesOf(application).isNotEmpty;
+  }
+
+  static bool reviewerHasRevokeVote(Map<String, dynamic> application, String email) {
+    return revokeVotesOf(application).contains(_emailKey(email));
+  }
+
+  /// Admins act alone. One Authorized Registrar in the state can revoke
+  /// alone. Two or more ARs means a second registrar must confirm.
+  static bool revokeNeedsSecondRegistrar({
+    required int activeRegistrarCount,
+    required bool reviewerIsAdmin,
+  }) {
+    if (reviewerIsAdmin) return false;
+    return activeRegistrarCount >= 2;
+  }
+
+  static Map<String, dynamic> addRevokeVote(
+    Map<String, dynamic> application,
+    String email, {
+    String? at,
+  }) {
+    final next = Map<String, dynamic>.from(application);
+    final votes = [...revokeVotesOf(next)];
+    final key = _emailKey(email);
+    if (key.isNotEmpty && !votes.contains(key)) votes.add(key);
+    final stamp = (at ?? '').trim().isEmpty ? DateTime.now().toUtc().toIso8601String() : at!.trim();
+    next['revokeVotes'] = votes;
+    next['revokeRequestedBy'] = votes.isEmpty ? '' : (next['revokeRequestedBy'] ?? votes.first);
+    next['revokeRequestedAt'] = (next['revokeRequestedAt'] ?? '').toString().trim().isEmpty
+        ? stamp
+        : next['revokeRequestedAt'];
+    next['updatedAt'] = stamp;
+    return next;
+  }
+
+  static Map<String, dynamic> clearRevokeVotes(Map<String, dynamic> application) {
+    final next = Map<String, dynamic>.from(application);
+    next.remove('revokeVotes');
+    next.remove('revokeRequestedBy');
+    next.remove('revokeRequestedAt');
+    return next;
+  }
+
+  static bool revokeVoteCompletes({
+    required Map<String, dynamic> application,
+    required String voterEmail,
+    required int activeRegistrarCount,
+    required bool reviewerIsAdmin,
+    String targetEmail = '',
+  }) {
+    if (reviewerIsAdmin) return true;
+    if (activeRegistrarCount < 2) return true;
+    final votes = [...revokeVotesOf(application)];
+    final key = _emailKey(voterEmail);
+    final target = _emailKey(targetEmail);
+    if (key.isNotEmpty && key != target && !votes.contains(key)) votes.add(key);
+    return votes.where((e) => e != target).length >= 2;
+  }
+
   /// Rejected or revoked applicants may submit a new application.
   static bool canReapply({
     required Iterable<Map<String, dynamic>> applications,
@@ -122,7 +197,10 @@ class NgmyCivicRegistrarApplication {
         !looksMaskedEmail(existingEmail)) {
       copy['userEmail'] = existingEmail;
     }
-    for (final f in ['fullName', 'applicantName', 'phone', 'reason', 'experience', 'username']) {
+    if (copy['revokeVotes'] == null && existing['revokeVotes'] != null) {
+      copy['revokeVotes'] = existing['revokeVotes'];
+    }
+    for (final f in ['fullName', 'applicantName', 'phone', 'reason', 'experience', 'username', 'revokeRequestedBy']) {
       final inc = (copy[f] ?? '').toString().trim();
       final ex = (existing[f] ?? '').toString().trim();
       if ((inc.isEmpty || looksMaskedEmail(inc) || inc == '***') && ex.isNotEmpty) {

@@ -1619,7 +1619,52 @@ function sanitizeRegistrarAppReviewer(a: Record<string, unknown>): Record<string
     updatedAt: a.updatedAt,
     reviewedBy: a.reviewedBy,
     revokedBy: a.revokedBy,
+    revokeVotes: Array.isArray(a.revokeVotes) ? a.revokeVotes : [],
+    revokeRequestedBy: a.revokeRequestedBy,
+    revokeRequestedAt: a.revokeRequestedAt,
   };
+}
+
+function normalizeRevokeVotes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const e = emailKey(String(item ?? ""));
+    if (!e || isRedactedCivicValue(e) || seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+}
+
+function protectDualRevokeOnPersist(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+  actorIsAdmin: boolean,
+): Record<string, unknown>[] {
+  if (actorIsAdmin) return incoming;
+  return incoming.map((row) => {
+    const id = String(row.id ?? "").trim();
+    const prev = current.find((a) => String(a.id ?? "").trim() === id);
+    if (!prev) return row;
+    const wasApproved = String(prev.status ?? "").toLowerCase() === "approved";
+    const nowRevoked = String(row.status ?? "").toLowerCase() === "revoked";
+    if (!wasApproved || !nowRevoked) return row;
+    const count = countApprovedRegistrarsInState(current, String(prev.state ?? row.state ?? ""));
+    if (count < 2) return row;
+    const votes = normalizeRevokeVotes(row.revokeVotes ?? prev.revokeVotes);
+    if (votes.length >= 2) return row;
+    return {
+      ...row,
+      status: "approved",
+      revokeVotes: votes,
+      revokeRequestedBy: row.revokeRequestedBy ?? prev.revokeRequestedBy,
+      revokeRequestedAt: row.revokeRequestedAt ?? prev.revokeRequestedAt,
+      revokedAt: prev.revokedAt,
+      revokedBy: prev.revokedBy,
+    };
+  });
 }
 
 function preserveApplicantIdentityOnIncoming(
@@ -2482,6 +2527,7 @@ async function handleCivicPersistRegistrarApplications(
   }
 
   next = limitNewRegistrarApprovals(current, next);
+  next = protectDualRevokeOnPersist(current, next, role.isAdmin);
 
   const saved = await saveRegistrarApplications(admin, next);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
@@ -2521,7 +2567,7 @@ async function handleCivicDecideRegistrarApplication(
   const id = String(body.id ?? "").trim();
   const status = String(body.status ?? "").toLowerCase().trim();
   if (!id) return jsonOk({ error: "Application id required" }, 400);
-  if (!["approved", "rejected", "revoked"].includes(status)) {
+  if (!["approved", "rejected", "revoked", "cancelrevoke"].includes(status)) {
     return jsonOk({ error: "Invalid status" }, 400);
   }
 
@@ -2537,6 +2583,44 @@ async function handleCivicDecideRegistrarApplication(
     }
   }
 
+  const applicantEmail = emailKey(String(row.userEmail ?? row.email ?? ""));
+  const now = new Date().toISOString();
+  let canSoloRevoke = role.isAdmin && isNgmyAdminEmail(email);
+  try {
+    const { data: actorRow } = await admin
+      .from("users")
+      .select("isAdmin,isCivicRegistryAdmin")
+      .eq("email", email)
+      .maybeSingle();
+    if (actorRow?.isAdmin === true || actorRow?.isCivicRegistryAdmin === true || isNgmyAdminEmail(email)) {
+      canSoloRevoke = true;
+    }
+  } catch (_) {
+    if (isNgmyAdminEmail(email)) canSoloRevoke = true;
+  }
+
+  if (status === "cancelrevoke") {
+    if (String(row.status ?? "").toLowerCase() !== "approved") {
+      return jsonOk({ error: "No pending revoke to cancel" });
+    }
+    const votes = normalizeRevokeVotes(row.revokeVotes);
+    if (!canSoloRevoke && !votes.includes(email)) {
+      return jsonOk({ error: "Forbidden" }, 403);
+    }
+    delete row.revokeVotes;
+    delete row.revokeRequestedBy;
+    delete row.revokeRequestedAt;
+    row.updatedAt = now;
+    apps[idx] = row;
+    const savedCancel = await saveRegistrarApplications(admin, apps);
+    if (!savedCancel.ok) return jsonOk({ error: savedCancel.error ?? "Save failed" }, 500);
+    return jsonOk({
+      ok: true,
+      pendingRevoke: false,
+      application: sanitizeRegistrarAppReviewer(row),
+    });
+  }
+
   const alreadyApproved = String(row.status ?? "").toLowerCase() === "approved";
   if (status === "approved" && !alreadyApproved) {
     const used = countApprovedRegistrarsInState(apps, appState);
@@ -2550,9 +2634,37 @@ async function handleCivicDecideRegistrarApplication(
     }
   }
 
-  const now = new Date().toISOString();
+  if (status === "revoked" && alreadyApproved && !canSoloRevoke) {
+    const used = countApprovedRegistrarsInState(apps, appState);
+    if (used >= 2) {
+      if (email && email === applicantEmail) {
+        return jsonOk({ error: "Another Authorized Registrar must confirm this revoke." });
+      }
+      const votes = normalizeRevokeVotes(row.revokeVotes);
+      if (email && !votes.includes(email)) votes.push(email);
+      const otherVotes = votes.filter((v) => v !== applicantEmail);
+      if (otherVotes.length < 2) {
+        row.revokeVotes = otherVotes;
+        row.revokeRequestedBy = otherVotes[0] ?? email;
+        row.revokeRequestedAt = String(row.revokeRequestedAt ?? now);
+        row.updatedAt = now;
+        apps[idx] = row;
+        const savedVote = await saveRegistrarApplications(admin, apps);
+        if (!savedVote.ok) return jsonOk({ error: savedVote.error ?? "Save failed" }, 500);
+        return jsonOk({
+          ok: true,
+          pendingRevoke: true,
+          application: sanitizeRegistrarAppReviewer(row),
+        });
+      }
+    }
+  }
+
   row.status = status;
   row.updatedAt = now;
+  delete row.revokeVotes;
+  delete row.revokeRequestedBy;
+  delete row.revokeRequestedAt;
   if (status === "revoked") {
     row.revokedAt = now;
     row.revokedBy = email;
@@ -2565,11 +2677,11 @@ async function handleCivicDecideRegistrarApplication(
   const saved = await saveRegistrarApplications(admin, apps);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
 
-  const applicantEmail = String(row.userEmail ?? row.email ?? "");
   await applyRegistrarFlagToUser(admin, applicantEmail, status === "approved", appState);
 
   return jsonOk({
     ok: true,
+    pendingRevoke: false,
     application: sanitizeRegistrarAppReviewer(row),
   });
 }

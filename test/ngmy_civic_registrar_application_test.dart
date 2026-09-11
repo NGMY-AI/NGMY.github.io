@@ -172,6 +172,89 @@ void main() {
     expect(merged['status'], 'approved');
   });
 
+  test('one registrar can revoke alone and two registrars need a second vote', () {
+    expect(
+      NgmyCivicRegistrarApplication.revokeNeedsSecondRegistrar(
+        activeRegistrarCount: 1,
+        reviewerIsAdmin: false,
+      ),
+      isFalse,
+    );
+    expect(
+      NgmyCivicRegistrarApplication.revokeNeedsSecondRegistrar(
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: false,
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicRegistrarApplication.revokeNeedsSecondRegistrar(
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: true,
+      ),
+      isFalse,
+    );
+
+    final approved = {
+      'id': 'app-1',
+      'userEmail': 'target@georgia.org',
+      'status': 'approved',
+      'state': 'Georgia',
+    };
+    expect(
+      NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: approved,
+        voterEmail: 'ar1@georgia.org',
+        activeRegistrarCount: 1,
+        reviewerIsAdmin: false,
+        targetEmail: 'target@georgia.org',
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: approved,
+        voterEmail: 'ar1@georgia.org',
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: false,
+        targetEmail: 'target@georgia.org',
+      ),
+      isFalse,
+    );
+    final firstVote = NgmyCivicRegistrarApplication.addRevokeVote(approved, 'ar1@georgia.org');
+    expect(NgmyCivicRegistrarApplication.hasPendingRevoke(firstVote), isTrue);
+    expect(
+      NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: firstVote,
+        voterEmail: 'ar2@georgia.org',
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: false,
+        targetEmail: 'target@georgia.org',
+      ),
+      isTrue,
+    );
+    expect(
+      NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: firstVote,
+        voterEmail: 'ar1@georgia.org',
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: false,
+        targetEmail: 'target@georgia.org',
+      ),
+      isFalse,
+    );
+    expect(
+      NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: firstVote,
+        voterEmail: 'admin@georgia.org',
+        activeRegistrarCount: 2,
+        reviewerIsAdmin: true,
+        targetEmail: 'target@georgia.org',
+      ),
+      isTrue,
+    );
+  });
+
   test('own application rows keep the real email over masked network summaries', () {
     final combined = NgmyCivicRegistrarApplication.combineNetworkAndOwn(
       network: [

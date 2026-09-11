@@ -3004,6 +3004,12 @@ Future<String?> _applyRegistrarApplicationDecision({
   final decidedAt = DateTime.now().toUtc().toIso8601String();
   final id = (app['id'] ?? '').toString().trim();
   final appState = (app['state'] ?? '').toString().trim();
+  final reviewerIsAdmin = reviewer.isAdmin || reviewer.isCivicRegistryAdmin;
+  final arCount = NgmyCivicRegistryStats.activeRegistrarsInState(
+    state: appState,
+    applications: config.civicRegistrarApplications,
+    users: allUsers,
+  );
   if (status == 'approved' &&
       appState.isNotEmpty &&
       (app['status'] ?? '').toString().toLowerCase() != 'approved' &&
@@ -3015,20 +3021,54 @@ Future<String?> _applyRegistrarApplicationDecision({
     return '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars.';
   }
   Map<String, dynamic>? remote;
+  var pendingRevoke = false;
   if (id.isNotEmpty) {
     final decided = await ngmyCivicDecideRegistrarApplication(id: id, status: status);
     if (decided.capped) {
       return decided.error ?? '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars.';
     }
-    if (decided.ok) remote = decided.application;
+    if (decided.ok) {
+      remote = decided.application;
+      pendingRevoke = decided.pendingRevoke;
+    } else if ((decided.error ?? '').trim().isNotEmpty && status == 'revoked') {
+      return decided.error;
+    }
   }
   final next = Map<String, dynamic>.from(app);
   if (remote != null) {
     next.addAll(remote);
-    next['status'] = status;
+    if (!pendingRevoke && status != 'cancelRevoke') {
+      next['status'] = status;
+    }
+  } else if (status == 'cancelRevoke') {
+    next
+      ..remove('revokeVotes')
+      ..remove('revokeRequestedBy')
+      ..remove('revokeRequestedAt');
+    next['updatedAt'] = decidedAt;
+  } else if (status == 'revoked' &&
+      NgmyCivicRegistrarApplication.revokeNeedsSecondRegistrar(
+        activeRegistrarCount: arCount,
+        reviewerIsAdmin: reviewerIsAdmin,
+      ) &&
+      !NgmyCivicRegistrarApplication.revokeVoteCompletes(
+        application: app,
+        voterEmail: reviewer.email,
+        activeRegistrarCount: arCount,
+        reviewerIsAdmin: reviewerIsAdmin,
+        targetEmail: (app['userEmail'] ?? '').toString(),
+      )) {
+    final voted = NgmyCivicRegistrarApplication.addRevokeVote(next, reviewer.email, at: decidedAt);
+    next
+      ..clear()
+      ..addAll(voted);
+    pendingRevoke = true;
   } else {
     next['status'] = status;
     next['updatedAt'] = decidedAt;
+    next.remove('revokeVotes');
+    next.remove('revokeRequestedBy');
+    next.remove('revokeRequestedAt');
     if (status == 'revoked') {
       next['revokedAt'] = decidedAt;
       next['revokedBy'] = reviewer.email;
@@ -3042,22 +3082,26 @@ Future<String?> _applyRegistrarApplicationDecision({
     config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
     next,
   );
+  final decidedStatus = (next['status'] ?? status).toString().toLowerCase();
+  final accessChanged = !pendingRevoke && status != 'cancelRevoke';
   if (email.isNotEmpty && !_ngmyValueLooksRedacted(email)) {
-    final userIndex = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
-    if (userIndex != -1) {
-      allUsers[userIndex].isAuthorizedRegistrar = status == 'approved';
-      if (status == 'approved') {
-        final st = (next['state'] ?? '').toString().trim();
-        if (st.isNotEmpty) allUsers[userIndex].state = st;
+    if (accessChanged) {
+      final userIndex = allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
+      if (userIndex != -1) {
+        allUsers[userIndex].isAuthorizedRegistrar = decidedStatus == 'approved';
+        if (decidedStatus == 'approved') {
+          final st = (next['state'] ?? '').toString().trim();
+          if (st.isNotEmpty) allUsers[userIndex].state = st;
+        }
+        await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
+      } else {
+        await _safeUpsertUserRow({
+          'email': email,
+          'isAuthorizedRegistrar': decidedStatus == 'approved',
+          if (decidedStatus == 'approved' && (next['state'] ?? '').toString().trim().isNotEmpty)
+            'state': (next['state'] ?? '').toString().trim(),
+        });
       }
-      await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
-    } else {
-      await _safeUpsertUserRow({
-        'email': email,
-        'isAuthorizedRegistrar': status == 'approved',
-        if (status == 'approved' && (next['state'] ?? '').toString().trim().isNotEmpty)
-          'state': (next['state'] ?? '').toString().trim(),
-      });
     }
     await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(next));
   }
@@ -3069,7 +3113,44 @@ Future<String?> _applyRegistrarApplicationDecision({
     _mergeRegistrarApplicationsIntoConfig(config, refreshed);
   }
   await _syncRegistrarStateAfterConfigChange(config, allUsers);
-  return null;
+  return pendingRevoke ? 'pendingRevoke' : null;
+}
+
+Future<bool> _confirmRevokeRegistrarAccess(
+  BuildContext context, {
+  required String name,
+  required bool reviewerIsAdmin,
+  required int activeCount,
+  required bool confirmingSecondVote,
+}) async {
+  final needsSecond = !reviewerIsAdmin && activeCount >= 2 && !confirmingSecondVote;
+  final detail = reviewerIsAdmin
+      ? 'You can complete this as an admin.'
+      : needsSecond
+          ? 'This state already has $activeCount Authorized Registrars, so a second registrar must also confirm.'
+          : activeCount < 2
+              ? 'This state has only one Authorized Registrar, so you can complete this yourself.'
+              : 'Confirm that you want to complete this revoke.';
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (dctx) => AlertDialog(
+      title: const Text('Revoke registrar access?'),
+      content: Text(
+        'Remove Authorized Registrar access for $name?\n\nTheir civic membership and records stay.\n\n$detail',
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(dctx, true),
+          child: Text(
+            needsSecond ? 'Request revoke' : 'Revoke access',
+            style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
 }
 
 Map<String, dynamic> _userRowForRegistryEnrollmentFlag(UserData u) => {
@@ -4525,33 +4606,129 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                     ),
                                   ] else if (status == 'approved' && _reviewerCanActOnRegistrarApp(reviewer, app, config)) ...[
                                     const SizedBox(height: 8),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton(
-                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                                        onPressed: () async {
-                                          await _applyRegistrarApplicationDecision(
-                                            config: config,
-                                            allUsers: allUsers,
-                                            app: app,
-                                            status: 'revoked',
-                                            reviewer: reviewer,
-                                          );
-                                          onDataChanged();
-                                          onParentSetState?.call();
-                                          setST(() {});
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              const SnackBar(
-                                                content: Text(
-                                                  'Registrar access removed. All enrolled members and civic records are preserved.',
+                                    Builder(
+                                      builder: (_) {
+                                        final reviewerIsAdmin = reviewer.isAdmin || reviewer.isCivicRegistryAdmin;
+                                        final arCount = NgmyCivicRegistryStats.activeRegistrarsInState(
+                                          state: (app['state'] ?? '').toString(),
+                                          applications: config.civicRegistrarApplications,
+                                          users: allUsers,
+                                        );
+                                        final pendingRevoke = NgmyCivicRegistrarApplication.hasPendingRevoke(app);
+                                        final alreadyVoted = NgmyCivicRegistrarApplication.reviewerHasRevokeVote(
+                                          app,
+                                          reviewer.email,
+                                        );
+                                        final applicantName = (app['fullName'] ?? app['username'] ?? email).toString();
+                                        return Column(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            if (pendingRevoke)
+                                              Padding(
+                                                padding: const EdgeInsets.only(bottom: 8),
+                                                child: Text(
+                                                  alreadyVoted
+                                                      ? 'Revoke requested. Waiting for a second Authorized Registrar to confirm.'
+                                                      : 'Another registrar requested this revoke. Confirm to complete it.',
+                                                  style: TextStyle(
+                                                    color: isDark ? Colors.orange.shade200 : Colors.orange.shade800,
+                                                    fontSize: 12,
+                                                    height: 1.35,
+                                                  ),
                                                 ),
                                               ),
-                                            );
-                                          }
-                                        },
-                                        child: const Text('Revoke Registrar Access'),
-                                      ),
+                                            if (!pendingRevoke || !alreadyVoted || reviewerIsAdmin)
+                                              SizedBox(
+                                                width: double.infinity,
+                                                child: OutlinedButton(
+                                                  style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                                                  onPressed: () async {
+                                                    final confirmed = await _confirmRevokeRegistrarAccess(
+                                                      ctx,
+                                                      name: applicantName,
+                                                      reviewerIsAdmin: reviewerIsAdmin,
+                                                      activeCount: arCount,
+                                                      confirmingSecondVote: pendingRevoke && !alreadyVoted,
+                                                    );
+                                                    if (!confirmed) return;
+                                                    final err = await _applyRegistrarApplicationDecision(
+                                                      config: config,
+                                                      allUsers: allUsers,
+                                                      app: app,
+                                                      status: 'revoked',
+                                                      reviewer: reviewer,
+                                                    );
+                                                    if (err == 'pendingRevoke') {
+                                                      onDataChanged();
+                                                      onParentSetState?.call();
+                                                      setST(() {});
+                                                      if (ctx.mounted) {
+                                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                                          const SnackBar(
+                                                            content: Text(
+                                                              'Revoke requested. A second Authorized Registrar must confirm it.',
+                                                            ),
+                                                          ),
+                                                        );
+                                                      }
+                                                      return;
+                                                    }
+                                                    if (err != null) {
+                                                      if (ctx.mounted) {
+                                                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                                                      }
+                                                      return;
+                                                    }
+                                                    onDataChanged();
+                                                    onParentSetState?.call();
+                                                    setST(() {});
+                                                    if (context.mounted) {
+                                                      ScaffoldMessenger.of(context).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Registrar access removed. All enrolled members and civic records are preserved.',
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  },
+                                                  child: Text(
+                                                    pendingRevoke ? 'Confirm revoke' : 'Revoke Registrar Access',
+                                                  ),
+                                                ),
+                                              ),
+                                            if (pendingRevoke && (alreadyVoted || reviewerIsAdmin)) ...[
+                                              const SizedBox(height: 8),
+                                              TextButton(
+                                                onPressed: () async {
+                                                  final err = await _applyRegistrarApplicationDecision(
+                                                    config: config,
+                                                    allUsers: allUsers,
+                                                    app: app,
+                                                    status: 'cancelRevoke',
+                                                    reviewer: reviewer,
+                                                  );
+                                                  if (err != null && err != 'pendingRevoke') {
+                                                    if (ctx.mounted) {
+                                                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                                                    }
+                                                    return;
+                                                  }
+                                                  onDataChanged();
+                                                  onParentSetState?.call();
+                                                  setST(() {});
+                                                  if (ctx.mounted) {
+                                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                                      const SnackBar(content: Text('Revoke request cancelled.')),
+                                                    );
+                                                  }
+                                                },
+                                                child: const Text('Cancel revoke request'),
+                                              ),
+                                            ],
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ] else if ((status == 'revoked' || status == 'rejected') && _reviewerCanActOnRegistrarApp(reviewer, app, config)) ...[
                                     const SizedBox(height: 8),
