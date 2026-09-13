@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_state_picker.dart';
 
 const String kNgmyMarriageDeckKind = 'marriage_agreement';
 const String kMarriageLocked = 'marriage_locked';
@@ -167,5 +168,13 @@ Future<void> launchNgmyMarriageAgreement({
   if (!context.mounted) return;
   final templateId = await showNgmyMarriageTemplatePicker(context);
   if (templateId == null || !context.mounted) return;
-  openDraftEditor(ngmyBuildMarriageAgreementDeck(templateId: templateId));
+  final state = await showNgmyStatePickerSheet(
+    context,
+    states: kNgmyUsStates,
+    selected: '',
+    title: 'Choose state',
+    searchHint: 'Search states…',
+  );
+  if (state == null || !context.mounted) return;
+  openDraftEditor(ngmyBuildMarriageAgreementDeck(templateId: templateId, state: state));
 }

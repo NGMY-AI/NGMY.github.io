@@ -855,6 +855,7 @@ NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state 
     themeId: 'hati_kuhowa_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhowaDeckKind,
+    marriageState: state.trim().isEmpty ? null : state.trim(),
     slides: [page],
   );
 }
@@ -909,6 +910,7 @@ NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String sta
     themeId: 'hati_kuhoweya_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiKuhoweshaDeckKind,
+    marriageState: state.trim().isEmpty ? null : state.trim(),
     slides: [page],
   );
 }
@@ -976,6 +978,7 @@ NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String s
     themeId: 'hati_malipo_awamu_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: kNgmyHatiMalipoAwamuDeckKind,
+    marriageState: state.trim().isEmpty ? null : state.trim(),
     slides: [page],
   );
 }

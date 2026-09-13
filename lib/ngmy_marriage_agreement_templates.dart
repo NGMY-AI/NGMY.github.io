@@ -583,6 +583,7 @@ NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String
     themeId: 'marriage_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: 'marriage_agreement',
+    marriageState: state.trim().isEmpty ? null : state.trim(),
     slides: [page1, page2],
   );
 }

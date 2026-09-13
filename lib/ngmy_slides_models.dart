@@ -316,6 +316,8 @@ class NgmySlideDeck {
     this.autoAdvanceSeconds = 5,
     this.deckKind,
     this.marriageState,
+    this.transferClaimCode,
+    this.transferReceived = false,
     this.signatureStrokeWidth,
     this.signatureInkColor,
     this.kiapoSignedAt,
@@ -334,6 +336,10 @@ class NgmySlideDeck {
   /// e.g. `marriage_agreement` for Congolese marriage certificates.
   String? deckKind;
   String? marriageState;
+  /// Stable 5-character transfer code (GA847). One per document; reused after delete.
+  String? transferClaimCode;
+  /// True when this copy arrived by QR or document code — no paywall, signatures locked.
+  bool transferReceived;
   /// Ink stroke width chosen on the document's first signature — reused as
   /// the default for every later signature box on this deck.
   double? signatureStrokeWidth;
@@ -366,6 +372,8 @@ class NgmySlideDeck {
         updatedAt: updatedAt,
         deckKind: deckKind,
         marriageState: marriageState,
+        transferClaimCode: transferClaimCode,
+        transferReceived: transferReceived,
         signatureStrokeWidth: signatureStrokeWidth,
         signatureInkColor: signatureInkColor,
         kiapoSignedAt: kiapoSignedAt,
@@ -381,6 +389,9 @@ class NgmySlideDeck {
         'updatedAt': updatedAt.toUtc().toIso8601String(),
         if (deckKind != null) 'deckKind': deckKind,
         if (marriageState != null) 'marriageState': marriageState,
+        if (transferClaimCode != null && transferClaimCode!.trim().isNotEmpty)
+          'transferClaimCode': transferClaimCode,
+        if (transferReceived) 'transferReceived': true,
         if (signatureStrokeWidth != null) 'signatureStrokeWidth': signatureStrokeWidth,
         if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
         if (kiapoSignedAt != null && kiapoSignedAt!.trim().isNotEmpty) 'kiapoSignedAt': kiapoSignedAt,
@@ -396,6 +407,8 @@ class NgmySlideDeck {
         updatedAt: DateTime.tryParse((json['updatedAt'] ?? '').toString()) ?? DateTime.now(),
         deckKind: json['deckKind']?.toString(),
         marriageState: json['marriageState']?.toString(),
+        transferClaimCode: json['transferClaimCode']?.toString(),
+        transferReceived: json['transferReceived'] == true,
         signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         kiapoSignedAt: json['kiapoSignedAt']?.toString(),

@@ -22,6 +22,7 @@ const String kNgmySlidesLibraryBundleType = 'ngmy_slides_library_v1';
 const String kNgmySlidesQrPrefixV2 = 'NGMYSLIDESYNC2';
 const String kNgmySlidesClaimPrefix = 'NGMYSLIDECODE';
 const int kNgmySlidesQrMaxUses = 25;
+const int kNgmySlidesMarriageClaimMaxUses = 2;
 const String _kSlidesQrStashSettingsKey = 'ngmy_slides_transfer_qr_stashes_v1';
 final RegExp kNgmySlidesMarriageClaimCodeRe = RegExp(r'^[A-Z]{2}\d{3}$');
 
@@ -57,6 +58,43 @@ String ngmySlidesGenerateMarriageClaimCode(
     if (!taken.contains(code)) return code;
   }
   return '$prefix${DateTime.now().millisecondsSinceEpoch.remainder(1000).toString().padLeft(3, '0')}';
+}
+
+Set<String> ngmySlidesTakenMarriageClaimCodes(Iterable<NgmySlideDeck> decks) {
+  final taken = <String>{};
+  for (final deck in decks) {
+    final code = ngmySlidesNormalizeMarriageClaimCode(deck.transferClaimCode ?? '');
+    if (code != null) taken.add(code);
+  }
+  return taken;
+}
+
+/// Keeps the document's existing code. Assigns a new unique one only once.
+String ngmySlidesAssignMarriageClaimCode(
+  NgmySlideDeck deck, {
+  Iterable<NgmySlideDeck> existing = const [],
+  Random? random,
+}) {
+  final have = ngmySlidesNormalizeMarriageClaimCode(deck.transferClaimCode ?? '');
+  if (have != null) {
+    deck.transferClaimCode = have;
+    return have;
+  }
+  final taken = ngmySlidesTakenMarriageClaimCodes(existing.where((d) => d.id != deck.id));
+  final code = ngmySlidesGenerateMarriageClaimCode(
+    deck.marriageState ?? '',
+    taken: taken,
+    random: random,
+  );
+  deck.transferClaimCode = code;
+  return code;
+}
+
+String? ngmySlidesStableMarriageClaimCode(List<NgmySlideDeck> decks) {
+  if (decks.length != 1) return null;
+  final deck = decks.first;
+  if (!ngmySlidesDeckUsesMarriageClaimCode(deck)) return null;
+  return ngmySlidesNormalizeMarriageClaimCode(deck.transferClaimCode ?? '');
 }
 
 const _slidesBlue = Color(0xFF2563EB);
@@ -101,33 +139,55 @@ class NgmySlidesTransferQrStash {
     required String ownerEmail,
     required String bundleId,
     String? marriageState,
+    String? existingClaimCode,
   }) async {
     if (!await ngmyCanReachCloud()) return null;
     final json = shareJson.trim();
     if (json.isEmpty) return null;
-    final token = _generateToken();
     final stashes = await _loadStashes();
-    String? claimCode;
-    if (marriageState != null) {
-      final taken = <String>{};
-      for (final row in stashes.values) {
-        if (row is! Map) continue;
-        final existing = ngmySlidesNormalizeMarriageClaimCode((row['claimCode'] ?? '').toString());
-        if (existing != null) taken.add(existing);
+    final claimCode = ngmySlidesNormalizeMarriageClaimCode(existingClaimCode ?? '') ??
+        (marriageState != null
+            ? ngmySlidesGenerateMarriageClaimCode(marriageState)
+            : null);
+
+    for (final e in stashes.entries) {
+      if (e.value is! Map) continue;
+      final row = Map<String, dynamic>.from(e.value as Map);
+      if ((row['bundleId'] ?? '').toString() != bundleId) continue;
+      row['payload'] = base64Encode(utf8.encode(json));
+      row['ownerEmail'] = ownerEmail.trim();
+      row['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      if (claimCode != null) {
+        row['claimCode'] = claimCode;
+        row['kind'] = 'marriage';
+        row['usesRemaining'] = (row['usesRemaining'] as num?)?.toInt() ?? kNgmySlidesMarriageClaimMaxUses;
       }
-      claimCode = ngmySlidesGenerateMarriageClaimCode(marriageState, taken: taken);
+      stashes[e.key] = row;
+      await _saveStashes(stashes);
+      return (qrPayload: '$kNgmySlidesQrPrefixV2|${e.key}', token: e.key, claimCode: claimCode);
     }
+
+    final token = _generateToken();
     stashes[token] = {
       'ownerEmail': ownerEmail.trim(),
       'bundleId': bundleId,
       'payload': base64Encode(utf8.encode(json)),
-      'usesRemaining': kNgmySlidesQrMaxUses,
+      'usesRemaining': claimCode != null ? kNgmySlidesMarriageClaimMaxUses : kNgmySlidesQrMaxUses,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
       if (claimCode != null) 'claimCode': claimCode,
       if (claimCode != null) 'kind': 'marriage',
     };
     await _saveStashes(stashes);
     return (qrPayload: '$kNgmySlidesQrPrefixV2|$token', token: token, claimCode: claimCode);
+  }
+
+  static Future<void> releaseBundle(String bundleId) async {
+    final id = bundleId.trim();
+    if (id.isEmpty || !await ngmyCanReachCloud()) return;
+    final stashes = await _loadStashes();
+    final before = stashes.length;
+    stashes.removeWhere((_, row) => row is Map && (row['bundleId'] ?? '').toString() == id);
+    if (stashes.length != before) await _saveStashes(stashes);
   }
 
   static Future<String?> consumeClaimCode(String rawCode) async {
@@ -160,12 +220,14 @@ class NgmySlidesTransferQrStash {
     }
     if (jsonText.trim().isEmpty) return null;
     final nextUses = uses - 1;
-    if (nextUses <= 0) {
+    final isMarriage = (row['kind'] ?? '').toString() == 'marriage' ||
+        ngmySlidesNormalizeMarriageClaimCode((row['claimCode'] ?? '').toString()) != null;
+    if (nextUses <= 0 && !isMarriage) {
       stashes.remove(id);
     } else {
       stashes[id] = {
         ...Map<String, dynamic>.from(row),
-        'usesRemaining': nextUses,
+        'usesRemaining': nextUses < 0 ? 0 : nextUses,
         'lastUsedAt': DateTime.now().toUtc().toIso8601String(),
       };
     }
@@ -214,15 +276,25 @@ Future<({String qrPayload, String? claimCode})> ngmySlidesQrPayloadForDisplay({
   required String shareJson,
   required String bundleId,
   String? marriageState,
+  String? existingClaimCode,
 }) async {
   final stash = await NgmySlidesTransferQrStash.createFromShareJson(
     shareJson,
     ownerEmail: ownerEmail,
     bundleId: bundleId,
     marriageState: marriageState,
+    existingClaimCode: existingClaimCode,
   );
-  if (stash != null) return (qrPayload: stash.qrPayload, claimCode: stash.claimCode);
-  return (qrPayload: ngmySlidesQrPayloadLite(shareJson), claimCode: null);
+  if (stash != null) {
+    return (
+      qrPayload: stash.qrPayload,
+      claimCode: stash.claimCode ?? ngmySlidesNormalizeMarriageClaimCode(existingClaimCode ?? ''),
+    );
+  }
+  return (
+    qrPayload: ngmySlidesQrPayloadLite(shareJson),
+    claimCode: ngmySlidesNormalizeMarriageClaimCode(existingClaimCode ?? ''),
+  );
 }
 
 bool ngmySlidesScanAcceptsPayload(String raw) {
@@ -336,6 +408,8 @@ NgmySlideDeck ngmySlidesDeckCopyForImport(NgmySlideDeck imported) {
   json['id'] = NgmySlidesTemplates.newId();
   final name = imported.name.trim();
   json['name'] = name.isEmpty ? 'Shared presentation' : name;
+  json['transferReceived'] = true;
+  json.remove('transferClaimCode');
   final slides = json['slides'];
   if (slides is List) {
     for (final s in slides) {
@@ -492,6 +566,11 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   Future<void> _showQr() async {
     final decks = _exportDecks;
     if (decks.isEmpty) return;
+    for (final deck in decks) {
+      if (ngmySlidesDeckUsesMarriageClaimCode(deck)) {
+        ngmySlidesAssignMarriageClaimCode(deck, existing: widget.decks);
+      }
+    }
     final ok = await NgmyTransferPayments.ensureCanTransfer(
       context: context,
       email: widget.ownerEmail,
@@ -1077,11 +1156,15 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
           ? ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: widget.decks.first, allDecks: null)
           : ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: null, allDecks: widget.decks);
       final bundleId = widget.decks.length == 1 ? widget.decks.first.id : 'library_${widget.decks.length}';
+      if (widget.decks.length == 1 && ngmySlidesDeckUsesMarriageClaimCode(widget.decks.first)) {
+        ngmySlidesAssignMarriageClaimCode(widget.decks.first);
+      }
       final created = await ngmySlidesQrPayloadForDisplay(
         ownerEmail: widget.ownerEmail,
         shareJson: shareJson,
         bundleId: bundleId,
         marriageState: ngmySlidesMarriageTransferState(widget.decks),
+        existingClaimCode: ngmySlidesStableMarriageClaimCode(widget.decks),
       );
       if (!mounted) return;
       setState(() {

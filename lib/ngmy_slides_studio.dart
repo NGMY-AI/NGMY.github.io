@@ -177,10 +177,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
     }
     if (!mounted) return;
+    var assignedCodes = false;
+    for (final deck in decks) {
+      if (!ngmySlidesDeckUsesMarriageClaimCode(deck)) continue;
+      if (ngmySlidesNormalizeMarriageClaimCode(deck.transferClaimCode ?? '') != null) continue;
+      ngmySlidesAssignMarriageClaimCode(deck, existing: decks);
+      assignedCodes = true;
+    }
     setState(() {
       _decks = decks;
       _loading = false;
     });
+    if (assignedCodes) unawaited(_persistDecks());
   }
 
   Future<void> _persistDecks() async {
@@ -396,10 +404,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         );
         return;
       }
+      _ensureDeckClaimCode(deck);
       unawaited(_openMarriageDraftAsync(ngmyEnsureHatiKiapoLayout(deck)));
       return;
     }
     if (NgmyStripePayments.marriageDocDeckKind(deck.deckKind)) {
+      _ensureDeckClaimCode(deck);
       unawaited(_openMarriageDraftAsync(deck));
       return;
     }
@@ -439,7 +449,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   static const _kMarriageHintSeenKey = 'ngmy_marriage_hint_seen';
 
   void _openMarriageDraft(NgmySlideDeck deck) {
+    _ensureDeckClaimCode(deck);
     unawaited(_openMarriageDraftAsync(deck, restoreKiapoToPresentations: true));
+  }
+
+  void _ensureDeckClaimCode(NgmySlideDeck deck) {
+    if (!ngmySlidesDeckUsesMarriageClaimCode(deck)) return;
+    ngmySlidesAssignMarriageClaimCode(deck, existing: _decks);
   }
 
   Future<void> _openMarriageDraftAsync(
@@ -456,7 +472,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       }
     }
     if (NgmyStripePayments.marriageDocDeckKind(openDeck.deckKind)) {
-      final ok = await _ensureMarriageDocPaid();
+      final ok = await _ensureMarriageDocPaid(openDeck);
       if (!ok || !mounted) return;
     }
     setState(() {
@@ -484,8 +500,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     }
   }
 
-  Future<bool> _ensureMarriageDocPaid() async {
+  Future<bool> _ensureMarriageDocPaid([NgmySlideDeck? deck]) async {
     if (widget.isAdmin) return true;
+    if ((deck ?? _activeDeck)?.transferReceived == true) return true;
     if (await NgmyStripePayments.hasMarriageSession(widget.userEmail)) return true;
     return NgmyStripePayments.ensurePaid(
       context: context,
@@ -893,6 +910,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       await NgmyHatiKiapoHiddenPresentations.hide(widget.userEmail, state);
       _hiddenKiapoStates.add(state.toLowerCase());
     }
+    unawaited(NgmySlidesTransferQrStash.releaseBundle(deck.id));
     if (!mounted) return;
     setState(() {
       _decks.removeWhere((d) => d.id == deck.id);
@@ -1911,7 +1929,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
+  bool _transferredSignaturesLocked() => _activeDeck?.transferReceived == true;
+
   Future<void> _addMarriageSignatureAtZone(NgmySlideElement zone) async {
+    if (_transferredSignaturesLocked()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signatures on a transferred document cannot be changed.')),
+      );
+      return;
+    }
     if (!_canEditKiapoDeck()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1944,6 +1971,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _redoMarriageSignature(NgmySlideElement placed) async {
+    if (_transferredSignaturesLocked()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signatures on a transferred document cannot be changed.')),
+      );
+      return;
+    }
     if (!_canEditKiapoDeck()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2572,6 +2606,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     await _persistDecks();
                   },
                 );
+                if (mounted) await _persistDecks();
               },
               onTrailingTap: _openDocumentCategoryPicker,
             ),
