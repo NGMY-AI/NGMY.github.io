@@ -18,11 +18,10 @@ enum NgmyMarriagePaperStyle {
   artDeco,
   rosetteCorners,
   modernLedger,
-  kenteSunset,
-  indigoMudcloth,
-  adinkraRoyal,
-  nileLotus,
-  shweshweIvory,
+  certIvoryNavy,
+  certIvoryGreen,
+  certIvoryRose,
+  certIvoryNavyBar,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -66,16 +65,14 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
       return _rosetteCornerPaper(0xFFFBF6EF, 0xFFEFE3D0, 0xFF6B3F2A, 0xFFC97B3D);
     case NgmyMarriagePaperStyle.modernLedger:
       return _modernLedgerPaper(0xFFFFFFFF, 0xFFF2F2F2, 0xFFD8D8D8, 0xFF12213D);
-    case NgmyMarriagePaperStyle.kenteSunset:
-      return _kentePaper(0xFFFFF6E4, 0xFFF3E2BC);
-    case NgmyMarriagePaperStyle.indigoMudcloth:
-      return _mudclothPaper(0xFFF7F0E4, 0xFFE8D7BE);
-    case NgmyMarriagePaperStyle.adinkraRoyal:
-      return _adinkraPaper(0xFFFFF8EC, 0xFFF4E4C8);
-    case NgmyMarriagePaperStyle.nileLotus:
-      return _lotusPaper(0xFFF4F7F4, 0xFFE4EEE8);
-    case NgmyMarriagePaperStyle.shweshweIvory:
-      return _shweshwePaper(0xFFF8F4EE, 0xFFEDE4D6);
+    case NgmyMarriagePaperStyle.certIvoryNavy:
+      return _certificatePaper(0xFFFFFBF3, 0xFFF7F0E2, 0xFFC9A227, 0xFF12213D);
+    case NgmyMarriagePaperStyle.certIvoryGreen:
+      return _certificatePaper(0xFFFFFDF8, 0xFFF3F6F0, 0xFFC9A227, 0xFF1F4D3A, topBar: 0xFF1F4D3A);
+    case NgmyMarriagePaperStyle.certIvoryRose:
+      return _certificatePaper(0xFFFFF8F5, 0xFFF8EEEA, 0xFFC9A227, 0xFF7A3B4A);
+    case NgmyMarriagePaperStyle.certIvoryNavyBar:
+      return _certificatePaper(0xFFFFFCF7, 0xFFF6F1E6, 0xFFC9A227, 0xFF12213D, topBar: 0xFF12213D);
   }
 }
 
@@ -277,175 +274,29 @@ void _diamond(img.Image im, int cx, int cy, int size, int color, {bool fill = tr
   img.drawLine(im, x1: cx - size, y1: cy, x2: cx, y2: cy - size, color: _c(color), antialias: true);
 }
 
-void _paperWindow(img.Image im, int x, int y, int w, int h, int fill) {
-  img.fillRect(im, x1: x, y1: y, x2: x + w, y2: y + h, color: _c(fill));
-}
-
-void _kenteCell(img.Image im, int gx, int gy, int cell, List<int> colors, {required bool horizontal}) {
-  if (horizontal) {
-    for (var y = 0; y < cell && gy + y < _h; y++) {
-      final c = colors[(y ~/ 5) % colors.length];
-      img.drawLine(im, x1: gx, y1: gy + y, x2: math.min(gx + cell - 1, _w - 1), y2: gy + y, color: _c(c));
-    }
-    return;
-  }
-  for (var x = 0; x < cell && gx + x < _w; x++) {
-    final c = colors[(x ~/ 5) % colors.length];
-    img.drawLine(im, x1: gx + x, y1: gy, x2: gx + x, y2: math.min(gy + cell - 1, _h - 1), color: _c(c));
-  }
-}
-
-/// Full kente-cloth sheet with a cream writing window cut into the weave.
-img.Image _kentePaper(int paperTop, int paperBottom) {
+/// Cream certificate sheet: thin gold double frame and navy/gold corner diamonds.
+img.Image _certificatePaper(
+  int paperTop,
+  int paperBottom,
+  int gold,
+  int ink, {
+  int? topBar,
+}) {
   final im = img.Image(width: _w, height: _h);
-  const colors = [0xFFD4AF37, 0xFF1B5E20, 0xFFB71C1C, 0xFF1A1208, 0xFFE8A317, 0xFF0D47A1];
-  const cell = 30;
-  for (var gy = 0; gy < _h; gy += cell) {
-    for (var gx = 0; gx < _w; gx += cell) {
-      _kenteCell(im, gx, gy, cell, colors, horizontal: ((gx ~/ cell) + (gy ~/ cell)).isEven);
-    }
-  }
-  const inset = 44;
-  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
-  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
+  _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFD4AF37, 2.2);
-  _border(im, inset + 6, inset + 6, _w - (inset + 6) * 2, _h - (inset + 6) * 2, 0xFF1A1208, 0.8);
-  return im;
-}
-
-void _vGradientWindow(img.Image im, int x, int y, int w, int h, int top, int bottom) {
-  for (var row = 0; row < h; row++) {
-    final t = h <= 1 ? 0.0 : row / (h - 1);
-    final r = ((top >> 16) & 0xFF) * (1 - t) + ((bottom >> 16) & 0xFF) * t;
-    final g = ((top >> 8) & 0xFF) * (1 - t) + ((bottom >> 8) & 0xFF) * t;
-    final b = (top & 0xFF) * (1 - t) + (bottom & 0xFF) * t;
-    final c = img.ColorRgb8(r.round().clamp(0, 255), g.round().clamp(0, 255), b.round().clamp(0, 255));
-    img.drawLine(im, x1: x, y1: y + row, x2: x + w, y2: y + row, color: c);
+  const inset = 22;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 1.6);
+  _border(im, inset + 7, inset + 7, _w - (inset + 7) * 2, _h - (inset + 7) * 2, gold, 0.7);
+  if (topBar != null) {
+    img.fillRect(im, x1: inset + 8, y1: inset + 8, x2: _w - inset - 9, y2: inset + 16, color: _c(topBar));
   }
-}
-
-void _mudGlyph(img.Image im, int cx, int cy, int kind, int color) {
-  switch (kind % 4) {
-    case 0:
-      _diamond(im, cx, cy, 7, color);
-      _diamond(im, cx, cy, 3, color, fill: false);
-    case 1:
-      img.drawLine(im, x1: cx - 7, y1: cy - 7, x2: cx + 7, y2: cy + 7, color: _c(color), antialias: true, thickness: 1.6);
-      img.drawLine(im, x1: cx + 7, y1: cy - 7, x2: cx - 7, y2: cy + 7, color: _c(color), antialias: true, thickness: 1.6);
-    case 2:
-      for (var i = -2; i <= 2; i++) {
-        img.drawLine(im, x1: cx - 8, y1: cy + i * 3, x2: cx + 8, y2: cy + i * 3, color: _c(color), antialias: true, thickness: 1.2);
-      }
-    default:
-      img.drawLine(im, x1: cx - 8, y1: cy, x2: cx + 8, y2: cy, color: _c(color), antialias: true, thickness: 1.5);
-      img.drawLine(im, x1: cx, y1: cy - 8, x2: cx, y2: cy + 8, color: _c(color), antialias: true, thickness: 1.5);
-      img.fillCircle(im, x: cx, y: cy, radius: 2, color: _c(color), antialias: true);
-  }
-}
-
-/// Full bogolanfini cloth with a tan writing panel inset in the stamps.
-img.Image _mudclothPaper(int paperTop, int paperBottom) {
-  final im = img.Image(width: _w, height: _h);
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF5A3A1C));
-  const mark = 0xFFD8B25A;
-  var n = 0;
-  for (var y = 18; y < _h; y += 32) {
-    for (var x = 18; x < _w; x += 32) {
-      _mudGlyph(im, x, y, n++, mark);
-    }
-  }
-  const inset = 46;
-  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
-  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
-  _grainNoise(im, paperTop);
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFC9A227, 1.8);
-  return im;
-}
-
-void _adinkraSeal(img.Image im, int cx, int cy, int color) {
-  img.drawCircle(im, x: cx, y: cy, radius: 16, color: _c(color), antialias: true);
-  img.drawCircle(im, x: cx, y: cy, radius: 11, color: _c(color), antialias: true);
-  _diamond(im, cx, cy, 6, color);
-  img.drawLine(im, x1: cx - 14, y1: cy, x2: cx + 14, y2: cy, color: _c(color), antialias: true, thickness: 1.3);
-  img.drawLine(im, x1: cx, y1: cy - 14, x2: cx, y2: cy + 14, color: _c(color), antialias: true, thickness: 1.3);
-}
-
-/// Dark royal decree: stamped header/footer bands and a parchment well.
-img.Image _adinkraPaper(int paperTop, int paperBottom) {
-  final im = img.Image(width: _w, height: _h);
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF2A1810));
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: 78, color: _c(0xFF4A2C14));
-  img.fillRect(im, x1: 0, y1: _h - 78, x2: _w - 1, y2: _h - 1, color: _c(0xFF4A2C14));
-  for (var x = 28; x < _w - 20; x += 44) {
-    _adinkraSeal(im, x, 39, 0xFFD4AF37);
-    _adinkraSeal(im, x, _h - 39, 0xFFD4AF37);
-  }
-  _adinkraSeal(im, _w ~/ 2, _h ~/ 2, 0xFF3D2416);
-  img.drawCircle(im, x: _w ~/ 2, y: _h ~/ 2, radius: 52, color: _c(0xFF3D2416), antialias: true);
-  const insetX = 38;
-  const insetY = 92;
-  _paperWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, paperTop);
-  _vGradientWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, paperTop, paperBottom);
-  _grainNoise(im, paperTop);
-  _border(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, 0xFFD4AF37, 1.8);
-  _border(im, insetX + 7, insetY + 7, _w - (insetX + 7) * 2, _h - (insetY + 7) * 2, 0xFF8B5A2B, 0.8);
-  return im;
-}
-
-void _lotusBloom(img.Image im, int cx, int cy, int color, {bool up = true}) {
-  final dir = up ? -1 : 1;
-  for (var i = -2; i <= 2; i++) {
-    final tipX = cx + i * 9;
-    final tipY = cy + dir * (18 - i.abs() * 3);
-    img.fillPolygon(im, vertices: [
-      img.Point(cx.toDouble(), cy.toDouble()),
-      img.Point((tipX - 5).toDouble(), (cy + dir * 4).toDouble()),
-      img.Point(tipX.toDouble(), tipY.toDouble()),
-      img.Point((tipX + 5).toDouble(), (cy + dir * 4).toDouble()),
-    ], color: _c(color));
-  }
-  img.fillCircle(im, x: cx, y: cy, radius: 3, color: _c(0xFFD4AF37), antialias: true);
-}
-
-/// Papyrus columns and a lotus arcade — not a simple framed sheet.
-img.Image _lotusPaper(int paperTop, int paperBottom) {
-  final im = img.Image(width: _w, height: _h);
-  _vGradient(im, 0xFF0B4F4F, 0xFFD7C39A);
-  for (var x = 8; x <= 34; x += 4) {
-    img.drawLine(im, x1: x, y1: 0, x2: x, y2: _h - 1, color: _c(0xFF083838), antialias: true, thickness: 1.1);
-    img.drawLine(im, x1: _w - 1 - x, y1: 0, x2: _w - 1 - x, y2: _h - 1, color: _c(0xFF083838), antialias: true, thickness: 1.1);
-  }
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: 70, color: _c(0xFF0F5C5C));
-  img.fillRect(im, x1: 0, y1: _h - 56, x2: _w - 1, y2: _h - 1, color: _c(0xFF0F5C5C));
-  for (var i = 0; i < 5; i++) {
-    _lotusBloom(im, 70 + i * 85, 48, 0xFFD4AF37);
-  }
-  const insetX = 48;
-  const insetY = 78;
-  _paperWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, paperTop);
-  _vGradientWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, paperTop, paperBottom);
-  _grainNoise(im, paperTop);
-  _border(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, 0xFFC9A227, 1.6);
-  return im;
-}
-
-/// Full shweshwe cloth with a floating ivory writing card.
-img.Image _shweshwePaper(int paperTop, int paperBottom) {
-  final im = img.Image(width: _w, height: _h);
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF1B2A4A));
-  const ivory = 0xFFE8D7B0;
-  for (var y = 10; y < _h; y += 18) {
-    for (var x = 10; x < _w; x += 18) {
-      _diamond(im, x, y, 6, ivory, fill: false);
-      img.fillCircle(im, x: x, y: y, radius: 1, color: _c(ivory), antialias: true);
-    }
-  }
-  const inset = 40;
-  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
-  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
-  _grainNoise(im, paperTop);
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFC45C3E, 2.0);
-  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, 0xFF1B2A4A, 0.8);
+  final d = 8;
+  _diamond(im, inset + 18, inset + 18, d, ink);
+  _diamond(im, _w - inset - 18, inset + 18, d, ink);
+  _diamond(im, inset + 18, _h - inset - 18, d, ink);
+  _diamond(im, _w - inset - 18, _h - inset - 18, d, ink);
+  _diamond(im, inset + 18, inset + 18, 4, gold, fill: false);
+  _diamond(im, _w - inset - 18, inset + 18, 4, gold, fill: false);
   return im;
 }

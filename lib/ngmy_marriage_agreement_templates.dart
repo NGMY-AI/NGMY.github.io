@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_models.dart';
 
+part 'ngmy_marriage_cert_layouts.dart';
+
 // Shared with ngmy_slides_marriage_agreement.dart (keep in sync)
 const _kLocked = 'marriage_locked';
 const _kField = 'marriage_field_';
@@ -10,6 +12,22 @@ const _kSign = 'marriage_sign_';
 
 /// Soft underlines — never dark/black (picker + print).
 const _softLine = 0xFFE2D8C8;
+const _certGold = 0xFFC9A227;
+const _certIvory = 0xFFFFFFF8;
+
+enum NgmyMarriageLayoutKind {
+  classic,
+  ringsNdoa,
+  coupleCards,
+  kuhoweshaForm,
+  mahariPande,
+  familiaMti,
+  ndoaSafi,
+  peteWide,
+  muhuriCrest,
+  fomuWazi,
+  upendoOrnate,
+}
 
 class NgmyMarriagePaperTemplate {
   const NgmyMarriagePaperTemplate({
@@ -23,6 +41,7 @@ class NgmyMarriagePaperTemplate {
     required this.bannerFill,
     required this.bannerText,
     required this.previewColors,
+    this.layoutKind = NgmyMarriageLayoutKind.classic,
   });
 
   final String id;
@@ -35,6 +54,7 @@ class NgmyMarriagePaperTemplate {
   final int bannerFill;
   final int bannerText;
   final List<Color> previewColors;
+  final NgmyMarriageLayoutKind layoutKind;
 }
 
 // ── Low-level element builders ──────────────────────────────────────────────
@@ -167,6 +187,77 @@ List<NgmySlideElement> _mBanner(String text, double y, double x, double w, {requ
   return [
     _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.036, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
     _mLockedText(text, x: x, y: y + 0.004, w: w, h: 0.028, fontSize: 14, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
+  ];
+}
+
+/// White gold-outlined pill header like the HATI YA NDOA example.
+List<NgmySlideElement> _mPill(String text, double y, double x, double w, {required int ink, int gold = _certGold}) {
+  return [
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.032, fillColor: _certIvory, strokeColor: gold, strokeWidth: 1.15, tag: 'pill_$text'),
+    _mLockedText(text, x: x, y: y + 0.005, w: w, h: 0.024, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'pill_t_$text'),
+  ];
+}
+
+/// Interlocking wedding rings.
+List<NgmySlideElement> _mRings(double cx, double cy, double d, {int gold = _certGold}) {
+  return [
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx - d * 0.42, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.1, tag: 'ring_l'),
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx + d * 0.06, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.1, tag: 'ring_r'),
+  ];
+}
+
+/// Navy/gold diamond rule with a jewel in the middle.
+List<NgmySlideElement> _mOrnamentRule(double x, double y, double w, {int gold = _certGold, int ink = 0xFF12213D}) {
+  final mid = x + w / 2;
+  return [
+    _mLockedShape(shape: NgmySlideShapeKind.line, x: x, y: y + 0.006, w: w * 0.40, h: 0.002, strokeColor: gold, strokeWidth: 1.0, tag: 'orn_l_$y'),
+    _mLockedShape(shape: NgmySlideShapeKind.hexagon, x: mid - 0.012, y: y, w: 0.024, h: 0.016, fillColor: ink, strokeColor: gold, strokeWidth: 0.9, tag: 'orn_c_$y'),
+    _mLockedShape(shape: NgmySlideShapeKind.line, x: mid + 0.018, y: y + 0.006, w: w * 0.40, h: 0.002, strokeColor: gold, strokeWidth: 1.0, tag: 'orn_r_$y'),
+  ];
+}
+
+/// Person silhouette in a circle — man on the groom side, woman on the bride side.
+List<NgmySlideElement> _mPersonMark(double x, double y, double size, {required bool female, required int fill, int ring = _certGold}) {
+  return [
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y, w: size, h: size, fillColor: _certIvory, strokeColor: ring, strokeWidth: 1.35, tag: 'ps_${female}_ring'),
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: x + size * 0.32, y: y + size * 0.16, w: size * 0.36, h: size * 0.36, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'ps_${female}_head'),
+    _mLockedShape(
+      shape: NgmySlideShapeKind.circle,
+      x: x + size * (female ? 0.12 : 0.18),
+      y: y + size * 0.50,
+      w: size * (female ? 0.76 : 0.64),
+      h: size * 0.46,
+      fillColor: fill,
+      strokeColor: fill,
+      strokeWidth: 0,
+      tag: 'ps_${female}_body',
+    ),
+  ];
+}
+
+List<NgmySlideElement> _mLabelLine(String label, String key, double x, double y, double w, {required int ink, double fontSize = 10.5, String startText = ''}) {
+  final lw = _tw(label, fontSize);
+  return [
+    _mLockedText(label, x: x, y: y, w: lw, h: 0.022, fontSize: fontSize, fontWeight: FontWeight.w700, color: ink, tag: 'll_$key'),
+    _mBlank(key, x + lw, y - 0.002, w - lw, ink: ink, fontSize: fontSize, startText: startText),
+    _mBlankUnderline(x + lw, y + 0.018, w - lw),
+  ];
+}
+
+List<NgmySlideElement> _mChevronHeader(String text, double x, double y, double w, {required int fill, required int textColor, int gold = _certGold}) {
+  return [
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.028, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'chv_$text'),
+    _mLockedShape(shape: NgmySlideShapeKind.hexagon, x: x - 0.008, y: y + 0.002, w: 0.024, h: 0.024, fillColor: gold, strokeColor: gold, strokeWidth: 0, tag: 'chv_l_$text'),
+    _mLockedShape(shape: NgmySlideShapeKind.hexagon, x: x + w - 0.016, y: y + 0.002, w: 0.024, h: 0.024, fillColor: gold, strokeColor: gold, strokeWidth: 0, tag: 'chv_r_$text'),
+    _mLockedText(text, x: x, y: y + 0.004, w: w, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'chv_t_$text'),
+  ];
+}
+
+List<NgmySlideElement> _mNgmyMark(double y, {required int ink, int gold = _certGold}) {
+  return [
+    ..._mOrnamentRule(0.22, y, 0.56, gold: gold, ink: ink),
+    _mLockedText('NGMY', x: 0.2, y: y + 0.02, w: 0.6, h: 0.024, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'ngmy_mark'),
+    _mLockedText('Nakalaya Hati', x: 0.2, y: y + 0.044, w: 0.6, h: 0.018, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: gold, tag: 'ngmy_sub'),
   ];
 }
 
@@ -325,78 +416,156 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     previewColors: [Color(0xFFFFFCF3), Color(0xFFA6843A), Color(0xFF6B4A12)],
   ),
   NgmyMarriagePaperTemplate(
-    id: 'kente_sunset',
-    name: 'Kente ya Jua',
-    description: 'Nguo ya kente yenye dirisha la karatasi katikati.',
-    paperStyle: NgmyMarriagePaperStyle.kenteSunset,
-    background: 0xFFFFF6E4,
-    ink: 0xFF3A2415,
-    accent: 0xFF1B5E20,
-    bannerFill: 0xFF1B5E20,
-    bannerText: 0xFFFFF6E4,
-    previewColors: [Color(0xFFFFF6E4), Color(0xFF1B5E20), Color(0xFFD4AF37)],
+    id: 'rings_ndoa',
+    name: 'Hati ya Ndoa',
+    description: 'Pete mbili · vichwa vya kidonge · hati rasmi ya ndoa.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFFFFFFF8,
+    bannerText: 0xFF12213D,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.ringsNdoa,
   ),
   NgmyMarriagePaperTemplate(
-    id: 'indigo_mudcloth',
-    name: 'Nguo ya Indigo',
-    description: 'Nguo ya udongo yenye alama · karatasi ndani.',
-    paperStyle: NgmyMarriagePaperStyle.indigoMudcloth,
-    background: 0xFFF7F0E4,
-    ink: 0xFF1A237E,
-    accent: 0xFF1A237E,
-    bannerFill: 0xFF1A237E,
-    bannerText: 0xFFF7F0E4,
-    previewColors: [Color(0xFFF7F0E4), Color(0xFF1A237E), Color(0xFFC9A227)],
+    id: 'couple_taarifa',
+    name: 'Taarifa za Wanandoa',
+    description: 'Picha ya mwanamume na mwanamke · kadi mbili za taarifa.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.coupleCards,
   ),
   NgmyMarriagePaperTemplate(
-    id: 'adinkra_royal',
-    name: 'Muhuri wa Adinkra',
-    description: 'Amri ya kifalme · bendi za muhuri juu na chini.',
-    paperStyle: NgmyMarriagePaperStyle.adinkraRoyal,
-    background: 0xFFFFF8EC,
-    ink: 0xFF6B3F1F,
-    accent: 0xFF8B5A2B,
-    bannerFill: 0xFF6B3F1F,
-    bannerText: 0xFFFFF8EC,
-    previewColors: [Color(0xFFFFF8EC), Color(0xFF6B3F1F), Color(0xFFD4AF37)],
+    id: 'barua_kuhowesha',
+    name: 'Barua ya Kuhowesha',
+    description: 'Barua rasmi · orodha ya NIMETOWEA · mashahidi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.kuhoweshaForm,
   ),
   NgmyMarriagePaperTemplate(
-    id: 'nile_lotus',
-    name: 'Lotus ya Nile',
-    description: 'Nguzo za papyrus na ua la lotus juu.',
-    paperStyle: NgmyMarriagePaperStyle.nileLotus,
-    background: 0xFFF4F7F4,
-    ink: 0xFF0F5C5C,
-    accent: 0xFF0F5C5C,
-    bannerFill: 0xFF0F5C5C,
-    bannerText: 0xFFF4F7F4,
-    previewColors: [Color(0xFFF4F7F4), Color(0xFF0F5C5C), Color(0xFFC9A227)],
+    id: 'mahari_pande',
+    name: 'Mahari ya Pande',
+    description: 'Masharti ya mahari · pande mbili za sahihi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF1A2744,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1A2744,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF1A2744), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.mahariPande,
   ),
   NgmyMarriagePaperTemplate(
-    id: 'shweshwe_ivory',
-    name: 'Shweshwe',
-    description: 'Nguo ya shweshwe · kadi ya pembe ndani.',
-    paperStyle: NgmyMarriagePaperStyle.shweshweIvory,
-    background: 0xFFF8F4EE,
-    ink: 0xFF1B2A4A,
-    accent: 0xFFC45C3E,
-    bannerFill: 0xFF1B2A4A,
-    bannerText: 0xFFF8F4EE,
-    previewColors: [Color(0xFFF8F4EE), Color(0xFF1B2A4A), Color(0xFFC45C3E)],
+    id: 'sheria_familia',
+    name: 'Sheria za Familia',
+    description: 'Mti wa familia · sheria za pamoja · kijani.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryGreen,
+    background: 0xFFFFFDF8,
+    ink: 0xFF1F4D3A,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1F4D3A,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFDF8), Color(0xFF1F4D3A), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.familiaMti,
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'ndoa_safi',
+    name: 'Ndoa ya Pamoja',
+    description: 'Safu mbili · mume na mke · masharti ya ndoa.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.ndoaSafi,
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'pete_pana',
+    name: 'Pete Pana',
+    description: 'Pete kubwa za dhahabu · nafasi wazi · hati ya heshima.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF3A2A10,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFFC9A227,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFFC9A227), Color(0xFF3A2A10)],
+    layoutKind: NgmyMarriageLayoutKind.peteWide,
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'muhuri_familia',
+    name: 'Muhuri wa Familia',
+    description: 'Muhuri mkubwa juu · fomu rasmi ya familia.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.muhuriCrest,
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'fomu_wazi',
+    name: 'Fomu ya Ndoa',
+    description: 'Fomu yenye mistari · namba · sehemu wazi za kujaza.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF1A2744,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1A2744,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF1A2744), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.fomuWazi,
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'upendo_dhahabu',
+    name: 'Upendo wa Dhahabu',
+    description: 'Mapambo ya dhahabu · picha za wanandoa · rangi ya waridi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryRose,
+    background: 0xFFFFF8F5,
+    ink: 0xFF7A3B4A,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF7A3B4A,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFF8F5), Color(0xFF7A3B4A), Color(0xFFC9A227)],
+    layoutKind: NgmyMarriageLayoutKind.upendoOrnate,
   ),
 ];
+
+const _retiredMarriageTemplateIds = {
+  'kente_sunset',
+  'indigo_mudcloth',
+  'adinkra_royal',
+  'nile_lotus',
+  'shweshwe_ivory',
+};
 
 NgmyMarriagePaperTemplate? ngmyMarriageTemplateById(String id) {
   for (final t in kNgmyMarriagePaperTemplates) {
     if (t.id == id) return t;
   }
+  if (_retiredMarriageTemplateIds.contains(id)) {
+    return kNgmyMarriagePaperTemplates.first;
+  }
   return null;
 }
 
-// ── Content builder — "Hati ya Kuhowesha (Barua ya Uchumba)" ───────────────
-// Same content on every template; only the paper art + accent colors change.
-// Split across two pages — generously sized text needs the room, and a
-// two-page engagement certificate is normal for a document this detailed.
+// ── Content builder — certificate layouts (classic + 10 unique forms) ──────
 
 List<NgmySlideElement> _buildPage1Content(NgmyMarriagePaperTemplate tpl) {
   final bgUrl = ngmyMarriagePaperDataUrl(tpl.paperStyle);
@@ -408,8 +577,62 @@ List<NgmySlideElement> _buildPage2Content(NgmyMarriagePaperTemplate tpl) {
   return [_mBgImage(bgUrl), ..._layoutPage2(tpl)];
 }
 
-/// Page 1 — title, TAREHE, UTANGULIZI, MAHARI / VITU VYA KUTOA.
 List<NgmySlideElement> _layoutPage1(NgmyMarriagePaperTemplate tpl) {
+  switch (tpl.layoutKind) {
+    case NgmyMarriageLayoutKind.classic:
+      return _layoutClassicPage1(tpl);
+    case NgmyMarriageLayoutKind.ringsNdoa:
+      return _layoutRingsNdoaPage1(tpl);
+    case NgmyMarriageLayoutKind.coupleCards:
+      return _layoutCoupleCardsPage1(tpl);
+    case NgmyMarriageLayoutKind.kuhoweshaForm:
+      return _layoutKuhoweshaFormPage1(tpl);
+    case NgmyMarriageLayoutKind.mahariPande:
+      return _layoutMahariPandePage1(tpl);
+    case NgmyMarriageLayoutKind.familiaMti:
+      return _layoutFamiliaMtiPage1(tpl);
+    case NgmyMarriageLayoutKind.ndoaSafi:
+      return _layoutNdoaSafiPage1(tpl);
+    case NgmyMarriageLayoutKind.peteWide:
+      return _layoutPeteWidePage1(tpl);
+    case NgmyMarriageLayoutKind.muhuriCrest:
+      return _layoutMuhuriCrestPage1(tpl);
+    case NgmyMarriageLayoutKind.fomuWazi:
+      return _layoutFomuWaziPage1(tpl);
+    case NgmyMarriageLayoutKind.upendoOrnate:
+      return _layoutUpendoOrnatePage1(tpl);
+  }
+}
+
+List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
+  switch (tpl.layoutKind) {
+    case NgmyMarriageLayoutKind.classic:
+      return _layoutClassicPage2(tpl);
+    case NgmyMarriageLayoutKind.ringsNdoa:
+      return _layoutRingsNdoaPage2(tpl);
+    case NgmyMarriageLayoutKind.coupleCards:
+      return _layoutCoupleCardsPage2(tpl);
+    case NgmyMarriageLayoutKind.kuhoweshaForm:
+      return _layoutKuhoweshaFormPage2(tpl);
+    case NgmyMarriageLayoutKind.mahariPande:
+      return _layoutMahariPandePage2(tpl);
+    case NgmyMarriageLayoutKind.familiaMti:
+      return _layoutFamiliaMtiPage2(tpl);
+    case NgmyMarriageLayoutKind.ndoaSafi:
+      return _layoutNdoaSafiPage2(tpl);
+    case NgmyMarriageLayoutKind.peteWide:
+      return _layoutPeteWidePage2(tpl);
+    case NgmyMarriageLayoutKind.muhuriCrest:
+      return _layoutMuhuriCrestPage2(tpl);
+    case NgmyMarriageLayoutKind.fomuWazi:
+      return _layoutFomuWaziPage2(tpl);
+    case NgmyMarriageLayoutKind.upendoOrnate:
+      return _layoutUpendoOrnatePage2(tpl);
+  }
+}
+
+/// Page 1 — title, TAREHE, UTANGULIZI, MAHARI / VITU VYA KUTOA.
+List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
   final ink = tpl.ink;
   final accent = tpl.accent;
   const cx = 0.09;
@@ -509,7 +732,7 @@ List<NgmySlideElement> _layoutPage1(NgmyMarriagePaperTemplate tpl) {
 }
 
 /// Page 2 — MASHAHIDI, MCHUMBA (MUME)/(MKE) + seal, footer.
-List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
+List<NgmySlideElement> _layoutClassicPage2(NgmyMarriagePaperTemplate tpl) {
   final ink = tpl.ink;
   final accent = tpl.accent;
   const cx = 0.09;
@@ -549,26 +772,12 @@ List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
   return out;
 }
 
-/// Soft picker preview — one silhouette shared by all templates (same
-/// content), just recolored per template.
+/// Soft picker preview — unique chrome per certificate layout.
 Widget ngmyMarriageTemplateLivePreview(String templateId) {
   final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
   final paper = ngmyMarriagePaperPng(tpl.paperStyle);
-  Widget bar({double w = 1, double h = 6}) => Align(
-        alignment: Alignment.centerLeft,
-        child: FractionallySizedBox(
-          widthFactor: w,
-          child: Container(height: h, decoration: BoxDecoration(color: ink.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(3))),
-        ),
-      );
-  Widget ribbon(String t) => Container(
-        height: 14,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3)),
-        child: Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7, letterSpacing: 0.4)),
-      );
   return Stack(
     fit: StackFit.expand,
     children: [
@@ -576,39 +785,292 @@ Widget ngmyMarriageTemplateLivePreview(String templateId) {
         child: Image.memory(paper, fit: BoxFit.cover, gaplessPlayback: true, filterQuality: FilterQuality.medium),
       ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
-        child: Column(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+        child: _NgmyCertPreview(tpl: tpl, ink: ink, accent: accent),
+      ),
+    ],
+  );
+}
+
+class _NgmyCertPreview extends StatelessWidget {
+  const _NgmyCertPreview({required this.tpl, required this.ink, required this.accent});
+
+  final NgmyMarriagePaperTemplate tpl;
+  final Color ink;
+  final Color accent;
+
+  Widget _bar({double w = 1, double h = 5}) => Align(
+        alignment: Alignment.centerLeft,
+        child: FractionallySizedBox(
+          widthFactor: w,
+          child: Container(height: h, decoration: BoxDecoration(color: ink.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(3))),
+        ),
+      );
+
+  Widget _pill(String t) => Container(
+        height: 13,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(_certIvory),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(_certGold), width: 0.9),
+        ),
+        child: Text(t, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 6.5, letterSpacing: 0.3)),
+      );
+
+  Widget _ribbon(String t) => Container(
+        height: 13,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: Color(tpl.bannerFill), borderRadius: BorderRadius.circular(3)),
+        child: Text(t, style: TextStyle(color: Color(tpl.bannerText), fontWeight: FontWeight.w900, fontSize: 6.5, letterSpacing: 0.3)),
+      );
+
+  Widget _rings({double size = 22}) => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_certGold), width: 1.6))),
+          Transform.translate(
+            offset: Offset(-size * 0.38, 0),
+            child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_certGold), width: 1.6))),
+          ),
+        ],
+      );
+
+  Widget _person({required bool female, double size = 22}) {
+    final fill = female ? const Color(0xFF7A3B4A) : ink;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(_certIvory), border: Border.all(color: const Color(_certGold), width: 1.1)),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(top: size * 0.16, child: Container(width: size * 0.32, height: size * 0.32, decoration: BoxDecoration(color: fill, shape: BoxShape.circle))),
+          Positioned(bottom: size * 0.06, child: Container(width: size * (female ? 0.62 : 0.50), height: size * 0.34, decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(8)))),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    switch (tpl.layoutKind) {
+      case NgmyMarriageLayoutKind.classic:
+        return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text('HATI YA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
             Text('KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 10),
-            ribbon('UTANGULIZI'),
-            const SizedBox(height: 6),
-            bar(),
-            const SizedBox(height: 3),
-            bar(w: 0.85),
-            const SizedBox(height: 3),
-            bar(w: 0.9),
             const SizedBox(height: 8),
-            ribbon('MAHARI'),
-            const SizedBox(height: 6),
+            _ribbon('UTANGULIZI'),
+            const SizedBox(height: 5),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.85),
+            const SizedBox(height: 8),
+            _ribbon('MAHARI'),
+            const SizedBox(height: 5),
             ...List.generate(3, (_) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
-                  Container(width: 10, height: 10, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Expanded(child: bar(h: 5)),
+                  Container(width: 9, height: 9, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Expanded(child: _bar(h: 4)),
                 ]))),
             const Spacer(),
-            ribbon('MASHAHIDI'),
-            const SizedBox(height: 8),
-            Row(children: [Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))), const SizedBox(width: 6), Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1))))]),
+            _ribbon('MASHAHIDI'),
             const SizedBox(height: 6),
-            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 9)),
+            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 8)),
           ],
-        ),
-      ),
-    ],
-  );
+        );
+      case NgmyMarriageLayoutKind.ringsNdoa:
+        return Column(
+          children: [
+            _rings(),
+            const SizedBox(height: 4),
+            Text('HATI YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 12)),
+            Text('Makubaliano ya Ndoa', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 6),
+            _pill('TAARIFA ZA WANANDOA'),
+            const SizedBox(height: 6),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.9),
+            const SizedBox(height: 3),
+            _bar(w: 0.7),
+            const SizedBox(height: 8),
+            _pill('TAMKO'),
+            const SizedBox(height: 5),
+            _bar(w: 1),
+            const SizedBox(height: 3),
+            _bar(w: 0.95),
+            const Spacer(),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
+            const SizedBox(height: 4),
+            Text('NGMY', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 8)),
+          ],
+        );
+      case NgmyMarriageLayoutKind.coupleCards:
+        return Column(
+          children: [
+            _rings(size: 16),
+            Text('TAARIFA ZA WANANDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(border: Border.all(color: const Color(_certGold)), borderRadius: BorderRadius.circular(6)),
+              child: Row(children: [_person(female: false), const SizedBox(width: 6), Expanded(child: Column(children: [_bar(), const SizedBox(height: 3), _bar(w: 0.8)]))]),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(border: Border.all(color: const Color(_certGold)), borderRadius: BorderRadius.circular(6)),
+              child: Row(children: [_person(female: true), const SizedBox(width: 6), Expanded(child: Column(children: [_bar(), const SizedBox(height: 3), _bar(w: 0.8)]))]),
+            ),
+            const Spacer(),
+            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
+        );
+      case NgmyMarriageLayoutKind.kuhoweshaForm:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [_rings(size: 16), const Spacer(), Container(width: 36, height: 14, decoration: BoxDecoration(border: Border.all(color: accent)))]),
+            const SizedBox(height: 6),
+            Text('HATI YA KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 10)),
+            const SizedBox(height: 6),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.9),
+            const SizedBox(height: 8),
+            _pill('NIMETOWEA'),
+            const SizedBox(height: 5),
+            ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: Row(children: [
+                  Text('${i + 1}.', style: TextStyle(color: ink, fontSize: 7, fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 4),
+                  Expanded(child: _bar(h: 4)),
+                ]))),
+            const Spacer(),
+            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
+        );
+      case NgmyMarriageLayoutKind.mahariPande:
+        return Column(
+          children: [
+            Text('MASHUA / MAHARI', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 10)),
+            const SizedBox(height: 6),
+            _pill('SHARTI'),
+            const SizedBox(height: 6),
+            ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: _bar(w: 1 - i * 0.05))),
+            const Spacer(),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
+            const SizedBox(height: 4),
+            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
+        );
+      case NgmyMarriageLayoutKind.familiaMti:
+        return Column(
+          children: [
+            const Text('🌳', style: TextStyle(fontSize: 18)),
+            Text('SHERIA ZA FAMILIA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+            const SizedBox(height: 6),
+            ...List.generate(5, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: _bar(w: 0.95 - i * 0.04))),
+            const Spacer(),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
+          ],
+        );
+      case NgmyMarriageLayoutKind.ndoaSafi:
+        return Column(
+          children: [
+            Text('MAKUBALIANO YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(child: Column(children: [_person(female: false), const SizedBox(height: 3), _bar(), const SizedBox(height: 2), _bar(w: 0.8)])),
+              const SizedBox(width: 8),
+              Expanded(child: Column(children: [_person(female: true), const SizedBox(height: 3), _bar(), const SizedBox(height: 2), _bar(w: 0.8)])),
+            ]),
+            const Spacer(),
+            _pill('MASHARTI'),
+          ],
+        );
+      case NgmyMarriageLayoutKind.peteWide:
+        return Column(
+          children: [
+            _rings(size: 30),
+            const SizedBox(height: 6),
+            Text('PETE ZA UMOJA', textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11)),
+            const SizedBox(height: 8),
+            _bar(),
+            const SizedBox(height: 6),
+            _bar(w: 0.85),
+            const SizedBox(height: 6),
+            _bar(w: 0.7),
+            const Spacer(),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
+          ],
+        );
+      case NgmyMarriageLayoutKind.muhuriCrest:
+        return Column(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_certGold), width: 1.6)),
+              child: Text('MUHURI', style: TextStyle(color: ink, fontSize: 5, fontWeight: FontWeight.w900)),
+            ),
+            const SizedBox(height: 6),
+            Text('HATI RASMI', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
+            const SizedBox(height: 8),
+            _pill('TAARIFA RASMI'),
+            const SizedBox(height: 6),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.9),
+            const SizedBox(height: 3),
+            _bar(w: 0.8),
+            const Spacer(),
+            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
+        );
+      case NgmyMarriageLayoutKind.fomuWazi:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('FOMU YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
+            const SizedBox(height: 6),
+            _pill('A. TAARIFA ZA MUME'),
+            const SizedBox(height: 4),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.85),
+            const SizedBox(height: 6),
+            _pill('B. TAARIFA ZA MKE'),
+            const SizedBox(height: 4),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.85),
+            const Spacer(),
+            _pill('C. MAHARI'),
+          ],
+        );
+      case NgmyMarriageLayoutKind.upendoOrnate:
+        return Column(
+          children: [
+            _rings(size: 18),
+            Text('UPENDO WA DHAHABU', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+            const SizedBox(height: 8),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_person(female: false, size: 26), _person(female: true, size: 26)]),
+            const SizedBox(height: 8),
+            _bar(),
+            const SizedBox(height: 3),
+            _bar(w: 0.9),
+            const SizedBox(height: 8),
+            _pill('MAHARI YA UPENDO'),
+            const Spacer(),
+            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
+        );
+    }
+  }
 }
 
 /// Builds the two-page "Hati ya Kuhowesha" deck from a paper template —

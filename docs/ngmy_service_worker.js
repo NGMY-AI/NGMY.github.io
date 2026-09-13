@@ -9,7 +9,7 @@ function ngmySwBasePath() {
   return p.replace(/[^/]*$/, '') || '/';
 }
 const SCOPE_PATH = ngmySwBasePath();
-const CACHE_NAME = CACHE_PREFIX + '20260913094041';
+const CACHE_NAME = CACHE_PREFIX + '20260913100649';
 
 /** Same-origin proxy target â€” never appears in the browser as bright-handler. */
 const NGMY_EDGE_UPSTREAM =
