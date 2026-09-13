@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_paper_art.dart';
 import 'ngmy_slides_models.dart';
 
@@ -144,6 +145,33 @@ NgmySlideElement _mBlank(String key, double x, double y, double w, {int ink = 0x
     fontStyle: FontStyle.italic,
     color: ink,
     align: TextAlign.center,
+    fileName: '$_kField$key:${w.toStringAsFixed(3)}',
+  );
+}
+
+NgmySlideElement _mParagraphField(
+  String key,
+  double x,
+  double y,
+  double w,
+  double h, {
+  int ink = 0xFF1A1208,
+  double fontSize = 10.5,
+  String startText = '',
+}) {
+  return NgmySlideElement(
+    id: NgmySlidesTemplates.newId(),
+    type: NgmySlideElementType.text,
+    x: x,
+    y: y,
+    w: w,
+    h: h,
+    text: startText,
+    fontSize: fontSize,
+    fontWeight: FontWeight.w500,
+    fontStyle: FontStyle.normal,
+    color: ink,
+    align: TextAlign.left,
     fileName: '$_kField$key:${w.toStringAsFixed(3)}',
   );
 }
@@ -969,8 +997,29 @@ class _NgmyCertPreview extends StatelessWidget {
 }
 
 
-/// Built in [ngmy_ndoa_hati_deck.dart] so Hati ya Ndoa can reuse the
-/// Kuhowa / Kuhowesha page without a circular import.
+/// Every marriage paper is one page. Papers and colors stay on the Ndoa
+/// certificate; only the framed intro words come from Hati ya Kuhowa.
+NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
+  final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
+
+  return NgmySlideDeck(
+    id: NgmySlidesTemplates.newId(),
+    name: tpl.name,
+    themeId: 'marriage_${tpl.id}',
+    aspectRatio: NgmySlideAspectRatio.portrait916,
+    deckKind: 'marriage_agreement',
+    marriageState: state.trim().isEmpty ? null : state.trim(),
+    slides: [
+      NgmySlide(
+        id: NgmySlidesTemplates.newId(),
+        title: 'Hati ya Ndoa',
+        layout: NgmySlideLayout.blank,
+        background: tpl.background,
+        elements: _buildPage1Content(tpl),
+      ),
+    ],
+  );
+}
 
 void ngmyUpdateMarriageDeckMeta(NgmySlideDeck deck, {String? state, String? templateId}) {
   if (templateId != null) {

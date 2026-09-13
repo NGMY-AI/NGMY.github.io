@@ -65,13 +65,13 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.heritageCrimson:
       return _tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458);
     case NgmyMarriagePaperStyle.elegantNavy:
-      return _elegantOuterNavy(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B));
+      return _withCenterMark(_elegantOuterNavy(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B)), 0);
     case NgmyMarriagePaperStyle.elegantGold:
-      return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
+      return _withCenterMark(_elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A), 1);
     case NgmyMarriagePaperStyle.elegantEmerald:
-      return _elegantOuterEmerald(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A));
+      return _withCenterMark(_elegantOuterEmerald(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A)), 2);
     case NgmyMarriagePaperStyle.elegantBurgundy:
-      return _elegantOuterBurgundy(_elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34));
+      return _withCenterMark(_elegantOuterBurgundy(_elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34)), 0);
     case NgmyMarriagePaperStyle.beadedPearl:
       return _beadedPearlPaper(0xFFFFFDF6, 0xFFF3EAD8, 0xFF7A5C2E, 0xFFC9A227);
     case NgmyMarriagePaperStyle.artDeco:
@@ -99,17 +99,17 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.certIvoryNavyBar:
       return _certificatePaper(0xFFFFFCF7, 0xFFF6F1E6, 0xFFC9A227, 0xFF12213D, topBar: 0xFF12213D);
     case NgmyMarriagePaperStyle.goldFiligree:
-      return _goldFiligreePaper();
+      return _withCenterMark(_goldFiligreePaper(), 1);
     case NgmyMarriagePaperStyle.goldLaurel:
-      return _goldLaurelPaper();
+      return _withCenterMark(_goldLaurelPaper(), 2);
     case NgmyMarriagePaperStyle.goldCrest:
-      return _goldCrestPaper();
+      return _withCenterMark(_goldCrestPaper(), 0);
     case NgmyMarriagePaperStyle.goldRibbon:
-      return _goldRibbonPaper();
+      return _withCenterMark(_goldRibbonPaper(), 1);
     case NgmyMarriagePaperStyle.goldBaroque:
-      return _goldBaroquePaper();
+      return _withCenterMark(_goldBaroquePaper(), 2);
     case NgmyMarriagePaperStyle.goldStar:
-      return _goldStarPaper();
+      return _withCenterMark(_goldStarPaper(), 0);
   }
 }
 
@@ -155,7 +155,7 @@ img.Image _tribalPaper(int paperTop, int paperBottom, int bandColor, int trimCol
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const band = 16;
+  const band = 28;
   img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(bandColor));
   img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
   img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(bandColor));
@@ -396,11 +396,11 @@ void _diamond(img.Image im, int cx, int cy, int size, int color, {bool fill = tr
 void _certCorner(img.Image im, int x, int y, int dx, int dy, int navy, int gold) {
   img.fillPolygon(im, vertices: [
     img.Point(x.toDouble(), y.toDouble()),
-    img.Point((x + dx * 14).toDouble(), y.toDouble()),
-    img.Point(x.toDouble(), (y + dy * 14).toDouble()),
+    img.Point((x + dx * 28).toDouble(), y.toDouble()),
+    img.Point(x.toDouble(), (y + dy * 28).toDouble()),
   ], color: _c(navy));
-  _diamond(im, x + dx * 7, y + dy * 7, 4, gold);
-  _diamond(im, x + dx * 7, y + dy * 7, 2, navy);
+  _diamond(im, x + dx * 14, y + dy * 14, 6, gold);
+  _diamond(im, x + dx * 14, y + dy * 14, 3, navy);
 }
 
 /// Cream certificate sheet: gold double frame and navy/gold corner marks
@@ -415,11 +415,11 @@ img.Image _certificatePaper(
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const inset = 12;
+  const inset = 18;
   _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
-  _border(im, inset + 6, inset + 6, _w - (inset + 6) * 2, _h - (inset + 6) * 2, gold, 0.9);
+  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, gold, 0.9);
   if (topBar != null) {
-    img.fillRect(im, x1: inset + 8, y1: inset + 8, x2: _w - inset - 9, y2: inset + 13, color: _c(topBar));
+    img.fillRect(im, x1: inset + 10, y1: inset + 10, x2: _w - inset - 11, y2: inset + 16, color: _c(topBar));
   }
   _certCorner(im, inset, inset, 1, 1, ink, gold);
   _certCorner(im, _w - inset, inset, -1, 1, ink, gold);
@@ -432,6 +432,37 @@ img.Image _certificatePaper(
 
 void _goldTick(img.Image im, int x, int y, int gold, {int size = 5}) {
   _diamond(im, x, y, size, gold);
+}
+
+/// Faint center seals for Hati ya Kuhowa / Kuhowesha papers.
+/// 0 = the Ndoa diamond box, 1 = double-ring medallion, 2 = gold star burst.
+img.Image _withCenterMark(img.Image im, int kind) {
+  final cx = _w ~/ 2;
+  final cy = _h ~/ 2;
+  const gold = 0xFFD4AF37;
+  const pale = 0xFFE8D5A0;
+  const navy = 0xFF12213D;
+  switch (kind % 3) {
+    case 0:
+      _diamond(im, cx, cy, 46, pale, fill: false);
+      _diamond(im, cx, cy, 32, gold, fill: false);
+      _diamond(im, cx, cy, 8, gold, fill: false);
+    case 1:
+      img.drawCircle(im, x: cx, y: cy, radius: 38, color: _c(pale), antialias: true);
+      img.drawCircle(im, x: cx, y: cy, radius: 30, color: _c(gold), antialias: true);
+      img.drawCircle(im, x: cx, y: cy, radius: 22, color: _c(navy), antialias: true);
+      _diamond(im, cx, cy, 7, gold);
+    case 2:
+      for (var i = 0; i < 8; i++) {
+        final a = i * math.pi / 4;
+        final x2 = cx + (42 * math.cos(a)).round();
+        final y2 = cy + (42 * math.sin(a)).round();
+        img.drawLine(im, x1: cx, y1: cy, x2: x2, y2: y2, color: _c(pale), antialias: true, thickness: 1.4);
+      }
+      _diamond(im, cx, cy, 16, gold, fill: false);
+      _diamond(im, cx, cy, 6, gold);
+  }
+  return im;
 }
 
 img.Image _goldFiligreePaper() {

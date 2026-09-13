@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_hati_kuhowa_templates.dart';
 import 'package:ngmy/ngmy_marriage_agreement_templates.dart';
 import 'package:ngmy/ngmy_marriage_paper_art.dart';
-import 'package:ngmy/ngmy_ndoa_hati_deck.dart';
 
 void main() {
   test('marriage documents keep every previous template plus ten certificate layouts', () {
@@ -88,18 +87,16 @@ void main() {
     }
   });
 
-  test('every Hati ya Ndoa template uses the Kuhowa page on its own paper', () {
+  test('every Hati ya Ndoa template keeps the certificate and the Kuhowa intro frame', () {
     for (final tpl in kNgmyMarriagePaperTemplates) {
       final deck = ngmyBuildMarriageAgreementDeck(templateId: tpl.id);
       expect(deck.slides, hasLength(1), reason: tpl.id);
       final texts = deck.slides[0].elements.map((e) => e.text).whereType<String>();
       expect(texts, contains('HATI YA NDOA'), reason: tpl.id);
-      expect(texts, contains('TAREHE:'), reason: tpl.id);
-      expect(texts, contains('NIMETOWA'), reason: tpl.id);
+      expect(texts, contains('TAARIFA ZA WANANDOA'), reason: tpl.id);
+      expect(texts, contains('TAMKO LA MAKUBALIANO'), reason: tpl.id);
       expect(texts, contains('MASHAHIDI'), reason: tpl.id);
-      expect(texts, contains('MWANDISHI'), reason: tpl.id);
-      expect(texts, contains('UPANDE WA MKE'), reason: tpl.id);
-      expect(texts, contains('UPANDE WA MUME'), reason: tpl.id);
+      expect(texts.any((t) => t.contains('Nimetowa mahali ya kuhoweya')), isTrue, reason: tpl.id);
     }
   });
 }
