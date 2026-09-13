@@ -416,6 +416,66 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     previewColors: [Color(0xFFFFFCF3), Color(0xFFA6843A), Color(0xFF6B4A12)],
   ),
   NgmyMarriagePaperTemplate(
+    id: 'kente_sunset',
+    name: 'Kente ya Jua',
+    description: 'Nguo ya kente yenye dirisha la karatasi katikati.',
+    paperStyle: NgmyMarriagePaperStyle.kenteSunset,
+    background: 0xFFFFF6E4,
+    ink: 0xFF3A2415,
+    accent: 0xFF1B5E20,
+    bannerFill: 0xFF1B5E20,
+    bannerText: 0xFFFFF6E4,
+    previewColors: [Color(0xFFFFF6E4), Color(0xFF1B5E20), Color(0xFFD4AF37)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'indigo_mudcloth',
+    name: 'Nguo ya Indigo',
+    description: 'Nguo ya udongo yenye alama · karatasi ndani.',
+    paperStyle: NgmyMarriagePaperStyle.indigoMudcloth,
+    background: 0xFFF7F0E4,
+    ink: 0xFF1A237E,
+    accent: 0xFF1A237E,
+    bannerFill: 0xFF1A237E,
+    bannerText: 0xFFF7F0E4,
+    previewColors: [Color(0xFFF7F0E4), Color(0xFF1A237E), Color(0xFFC9A227)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'adinkra_royal',
+    name: 'Muhuri wa Adinkra',
+    description: 'Amri ya kifalme · bendi za muhuri juu na chini.',
+    paperStyle: NgmyMarriagePaperStyle.adinkraRoyal,
+    background: 0xFFFFF8EC,
+    ink: 0xFF6B3F1F,
+    accent: 0xFF8B5A2B,
+    bannerFill: 0xFF6B3F1F,
+    bannerText: 0xFFFFF8EC,
+    previewColors: [Color(0xFFFFF8EC), Color(0xFF6B3F1F), Color(0xFFD4AF37)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'nile_lotus',
+    name: 'Lotus ya Nile',
+    description: 'Nguzo za papyrus na ua la lotus juu.',
+    paperStyle: NgmyMarriagePaperStyle.nileLotus,
+    background: 0xFFF4F7F4,
+    ink: 0xFF0F5C5C,
+    accent: 0xFF0F5C5C,
+    bannerFill: 0xFF0F5C5C,
+    bannerText: 0xFFF4F7F4,
+    previewColors: [Color(0xFFF4F7F4), Color(0xFF0F5C5C), Color(0xFFC9A227)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'shweshwe_ivory',
+    name: 'Shweshwe',
+    description: 'Nguo ya shweshwe · kadi ya pembe ndani.',
+    paperStyle: NgmyMarriagePaperStyle.shweshweIvory,
+    background: 0xFFF8F4EE,
+    ink: 0xFF1B2A4A,
+    accent: 0xFFC45C3E,
+    bannerFill: 0xFF1B2A4A,
+    bannerText: 0xFFF8F4EE,
+    previewColors: [Color(0xFFF8F4EE), Color(0xFF1B2A4A), Color(0xFFC45C3E)],
+  ),
+  NgmyMarriagePaperTemplate(
     id: 'rings_ndoa',
     name: 'Hati ya Ndoa',
     description: 'Pete mbili · vichwa vya kidonge · hati rasmi ya ndoa.',
@@ -547,20 +607,9 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   ),
 ];
 
-const _retiredMarriageTemplateIds = {
-  'kente_sunset',
-  'indigo_mudcloth',
-  'adinkra_royal',
-  'nile_lotus',
-  'shweshwe_ivory',
-};
-
 NgmyMarriagePaperTemplate? ngmyMarriageTemplateById(String id) {
   for (final t in kNgmyMarriagePaperTemplates) {
     if (t.id == id) return t;
-  }
-  if (_retiredMarriageTemplateIds.contains(id)) {
-    return kNgmyMarriagePaperTemplates.first;
   }
   return null;
 }

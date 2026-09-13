@@ -4,8 +4,8 @@ import 'package:ngmy/ngmy_marriage_agreement_templates.dart';
 import 'package:ngmy/ngmy_marriage_paper_art.dart';
 
 void main() {
-  test('marriage documents keep the original four plus ten certificate layouts', () {
-    expect(kNgmyMarriagePaperTemplates, hasLength(14));
+  test('marriage documents keep every previous template plus ten certificate layouts', () {
+    expect(kNgmyMarriagePaperTemplates, hasLength(19));
     expect(
       kNgmyMarriagePaperTemplates.map((t) => t.id).toSet(),
       {
@@ -13,6 +13,11 @@ void main() {
         'heritage_crimson',
         'elegant_navy',
         'elegant_gold',
+        'kente_sunset',
+        'indigo_mudcloth',
+        'adinkra_royal',
+        'nile_lotus',
+        'shweshwe_ivory',
         'rings_ndoa',
         'couple_taarifa',
         'barua_kuhowesha',
@@ -31,10 +36,12 @@ void main() {
     );
   });
 
-  test('retired cloth templates no longer exist and new certificates render paper', () {
-    const retired = ['kente_sunset', 'indigo_mudcloth', 'adinkra_royal', 'nile_lotus', 'shweshwe_ivory'];
-    for (final id in retired) {
-      expect(kNgmyMarriagePaperTemplates.any((t) => t.id == id), isFalse, reason: id);
+  test('previous cloth templates are back and new certificates still render', () {
+    const previous = ['kente_sunset', 'indigo_mudcloth', 'adinkra_royal', 'nile_lotus', 'shweshwe_ivory'];
+    for (final id in previous) {
+      final tpl = ngmyMarriageTemplateById(id);
+      expect(tpl, isNotNull, reason: id);
+      expect(ngmyMarriagePaperPng(tpl!.paperStyle).length, greaterThan(800), reason: id);
     }
     const ids = ['rings_ndoa', 'couple_taarifa', 'barua_kuhowesha', 'mahari_pande', 'sheria_familia', 'ndoa_safi', 'pete_pana', 'muhuri_familia', 'fomu_wazi', 'upendo_dhahabu'];
     for (final id in ids) {
@@ -46,8 +53,11 @@ void main() {
     }
   });
 
-  test('Hati ya Kuhowa picker now includes ten certificate layouts', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(16));
+  test('Hati ya Kuhowa picker keeps previous papers plus ten certificate layouts', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(21));
+    for (final id in ['kuhowa_kente_sunset', 'kuhowa_indigo_mudcloth', 'kuhowa_adinkra_royal', 'kuhowa_nile_lotus', 'kuhowa_shweshwe_ivory']) {
+      expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: id);
+    }
     const ids = [
       'kuhowa_rings_ndoa',
       'kuhowa_couple_taarifa',
