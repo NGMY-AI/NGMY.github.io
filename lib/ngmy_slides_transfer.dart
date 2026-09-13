@@ -436,40 +436,24 @@ Future<String?> ngmyScanSlidesTransferQr(BuildContext context) {
 }
 
 Future<String?> showNgmySlidesDocumentCodeDialog(BuildContext context) async {
-  final controller = TextEditingController();
-  final entered = await showDialog<String>(
+  final entered = await showGeneralDialog<String>(
     context: context,
-    builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Enter document code'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.characters,
-          maxLength: 6,
-          decoration: const InputDecoration(
-            hintText: 'GA847',
-            counterText: '',
-          ),
-          onSubmitted: (value) {
-            final code = ngmySlidesNormalizeMarriageClaimCode(value);
-            Navigator.pop(ctx, code);
-          },
+    barrierDismissible: true,
+    barrierLabel: 'Dismiss',
+    barrierColor: const Color(0xD9000000),
+    transitionDuration: const Duration(milliseconds: 240),
+    pageBuilder: (ctx, anim, secondary) => const SizedBox.shrink(),
+    transitionBuilder: (ctx, anim, secondary, child) {
+      final curve = Curves.easeOutCubic.transform(anim.value);
+      return Opacity(
+        opacity: curve,
+        child: Transform.scale(
+          scale: 0.94 + curve * 0.06,
+          child: const _NgmySlidesDocumentCodeSheet(),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final code = ngmySlidesNormalizeMarriageClaimCode(controller.text);
-              Navigator.pop(ctx, code);
-            },
-            child: const Text('Transfer'),
-          ),
-        ],
       );
     },
   );
-  controller.dispose();
   if (entered == null) return null;
   if (entered.isEmpty) {
     if (context.mounted) {
@@ -1324,6 +1308,229 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NgmySlidesDocumentCodeSheet extends StatefulWidget {
+  const _NgmySlidesDocumentCodeSheet();
+
+  @override
+  State<_NgmySlidesDocumentCodeSheet> createState() => _NgmySlidesDocumentCodeSheetState();
+}
+
+class _NgmySlidesDocumentCodeSheetState extends State<_NgmySlidesDocumentCodeSheet> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() {});
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  String get _raw => _controller.text.toUpperCase();
+  String? get _valid => ngmySlidesNormalizeMarriageClaimCode(_raw);
+
+  void _submit() {
+    Navigator.pop(context, _valid ?? '');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + inset),
+        child: Material(
+          color: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF0B1220),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: _slidesBlue.withValues(alpha: 0.4), width: 1.2),
+                boxShadow: [
+                  BoxShadow(color: _slidesBlue.withValues(alpha: 0.28), blurRadius: 36, offset: const Offset(0, 16)),
+                  const BoxShadow(color: Color(0x90000000), blurRadius: 28, offset: Offset(0, 18)),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 18),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_slidesBlue, _slidesBlueDark, _slidesIndigo],
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                            ),
+                            child: const Icon(Icons.pin_rounded, color: Colors.white, size: 26),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Enter document code',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, letterSpacing: -0.3),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Type the 5-character code shown with the QR.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w600, fontSize: 13, height: 1.35),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                      child: Column(
+                        children: [
+                          Stack(
+                            children: [
+                              Row(
+                                children: [
+                                  for (var i = 0; i < 5; i++) ...[
+                                    if (i == 2) const SizedBox(width: 10),
+                                    Expanded(child: _codeCell(i)),
+                                    if (i != 4 && i != 1) const SizedBox(width: 7),
+                                  ],
+                                ],
+                              ),
+                              Positioned.fill(
+                                child: Opacity(
+                                  opacity: 0,
+                                  child: TextField(
+                                    controller: _controller,
+                                    focusNode: _focus,
+                                    autofocus: true,
+                                    maxLength: 5,
+                                    textCapitalization: TextCapitalization.characters,
+                                    keyboardType: TextInputType.visiblePassword,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
+                                      LengthLimitingTextInputFormatter(5),
+                                      _UpperCaseTextFormatter(),
+                                    ],
+                                    onChanged: (_) => setState(() {}),
+                                    onSubmitted: (_) => _submit(),
+                                    decoration: const InputDecoration(counterText: '', border: InputBorder.none),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Example  GA847',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w700, fontSize: 12, letterSpacing: 1.2),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: FilledButton(
+                              onPressed: _valid == null ? null : _submit,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: _slidesBlue,
+                                disabledBackgroundColor: const Color(0xFF1E293B),
+                                foregroundColor: Colors.white,
+                                disabledForegroundColor: const Color(0xFF64748B),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              ),
+                              child: const Text('Transfer document', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: TextButton.styleFrom(foregroundColor: const Color(0xFF94A3B8)),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _codeCell(int index) {
+    final filled = index < _raw.length;
+    final active = index == _raw.length && _focus.hasFocus;
+    final ch = filled ? _raw[index] : '';
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      height: 56,
+      decoration: BoxDecoration(
+        color: filled || active ? const Color(0xFF111827) : const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: active
+              ? _slidesBlue
+              : filled
+                  ? _slidesBlue.withValues(alpha: 0.55)
+                  : const Color(0xFF334155),
+          width: active ? 2 : 1.2,
+        ),
+        boxShadow: active
+            ? [BoxShadow(color: _slidesBlue.withValues(alpha: 0.28), blurRadius: 12)]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        ch,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 22,
+          letterSpacing: 0,
+        ),
+      ),
+    );
+  }
+}
+
+class _UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.toUpperCase();
+    return newValue.copyWith(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
     );
   }
 }

@@ -145,7 +145,24 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   bool _isKiapoHiddenFromPresentations(String state) =>
       _hiddenKiapoStates.contains(state.trim().toLowerCase());
 
+  bool _isTransferredReadOnly([NgmySlideDeck? deck]) =>
+      (deck ?? _activeDeck)?.transferReceived == true;
+
+  void _toastTransferredReadOnly() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('This transferred document is view only. You can print or download it.')),
+    );
+  }
+
+  bool _guardTransferredEdit() {
+    if (!_isTransferredReadOnly()) return false;
+    _toastTransferredReadOnly();
+    return true;
+  }
+
   bool _canEditKiapoDeck([NgmySlideDeck? deck]) {
+    if (_isTransferredReadOnly(deck)) return false;
     final d = deck ?? _activeDeck;
     if (!ngmyIsHatiKiapoUongoziDeck(d?.deckKind)) return true;
     // App admin may edit any state's oath at any time, including after the
@@ -315,6 +332,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _updateElementText(String elementId, String value) {
+    if (_isTransferredReadOnly()) return;
     final el = _findElement(elementId);
     if (el == null || el.text == value) return;
     el.text = value;
@@ -486,8 +504,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _syncTextControllersForCurrentSlide();
       _ribbonTab = 'Home';
     });
-    unawaited(_maybeShowMarriageHint());
+    if (!_isTransferredReadOnly(openDeck)) unawaited(_maybeShowMarriageHint());
     if (mounted &&
+        !_isTransferredReadOnly(openDeck) &&
         ngmyIsHatiKiapoUongoziDeck(openDeck.deckKind) &&
         !_canEditKiapoDeck(openDeck) &&
         ngmyKiapoHasPresidentSignature(openDeck)) {
@@ -842,6 +861,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _mutate(VoidCallback fn) {
+    if (_guardTransferredEdit()) return;
     _commitDraftIfNeeded();
     _pushUndo();
     setState(fn);
@@ -923,6 +943,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _renameDeck(NgmySlideDeck deck, String name) {
+    if (deck.transferReceived) {
+      _toastTransferredReadOnly();
+      return;
+    }
     setState(() {
       deck.name = name.trim().isEmpty ? 'Untitled Presentation' : name.trim();
       deck.updatedAt = DateTime.now();
@@ -963,6 +987,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _startTextEditing(String id) {
+    if (_guardTransferredEdit()) return;
     if (!_canEditKiapoDeck()) return;
     final el = _findElement(id);
     if (el == null || el.type != NgmySlideElementType.text) return;
@@ -986,6 +1011,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   void _selectElement(String? id) {
+    if (_isTransferredReadOnly()) return;
     final prevId = _selectedElementId;
     if (prevId != null && prevId != id) {
       final prev = _findElement(prevId);
@@ -1201,6 +1227,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   /// Optional: map filled names/fields/signatures from Hati ya Kuhowa ↔ Hati ya Kuhoweya.
   Future<void> _transferHatiToPartner(NgmySlideDeck sourceDeck, {required bool fromEditor}) async {
+    if (_guardTransferredEdit()) return;
     if (!ngmyHatiIsTransferableDeck(sourceDeck)) return;
 
     NgmySlideDeck source = sourceDeck;
@@ -1889,6 +1916,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _addSignature() async {
+    if (_guardTransferredEdit()) return;
     if (!await _ensureSlidesPro()) return;
     if (!mounted) return;
     final result = await ngmySlidesCaptureSignature(context);
@@ -1929,16 +1957,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     );
   }
 
-  bool _transferredSignaturesLocked() => _activeDeck?.transferReceived == true;
-
   Future<void> _addMarriageSignatureAtZone(NgmySlideElement zone) async {
-    if (_transferredSignaturesLocked()) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signatures on a transferred document cannot be changed.')),
-      );
-      return;
-    }
+    if (_guardTransferredEdit()) return;
     if (!_canEditKiapoDeck()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1971,13 +1991,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _redoMarriageSignature(NgmySlideElement placed) async {
-    if (_transferredSignaturesLocked()) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signatures on a transferred document cannot be changed.')),
-      );
-      return;
-    }
+    if (_guardTransferredEdit()) return;
     if (!_canEditKiapoDeck()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2020,6 +2034,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   bool _marriageElementMovable(NgmySlideElement e) {
+    if (_isTransferredReadOnly()) return false;
     if (_activeDeck?.isLockedTemplateDoc != true) return true;
     if (ngmyMarriageElementIsLocked(e)) return false;
     if (ngmyMarriageElementIsField(e)) return false;
@@ -2030,6 +2045,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   bool _marriageElementSelectable(NgmySlideElement e) {
+    if (_isTransferredReadOnly()) return false;
     if (_activeDeck?.isLockedTemplateDoc != true) return true;
     if (!_canEditKiapoDeck()) return false;
     if (ngmyMarriageElementIsLocked(e)) return false;
@@ -2040,6 +2056,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _attachKiapoVideo(NgmySlideElement zone) async {
+    if (_guardTransferredEdit()) return;
     if (!_canEditKiapoDeck()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2130,6 +2147,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _applyDocTool(String toolId) async {
+    if (toolId != 'print' && toolId != 'present' && _guardTransferredEdit()) return;
     if (NgmySlidesPayments.isPaidDocTool(toolId) && !await _ensureSlidesPro()) return;
     if (!mounted) return;
     switch (toolId) {
@@ -2761,6 +2779,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       },
     );
     if (action == null || !mounted) return;
+    if (action == 'rename' || action == 'duplicate' || action == 'transfer_hati') {
+      if (deck.transferReceived) {
+        _toastTransferredReadOnly();
+        return;
+      }
+    }
     if (action == 'pdf') {
       try {
         final msg = await ngmySlidesDownloadDeckPdf(deck);
@@ -3000,15 +3024,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
           children: [
             Column(
               children: [
-                if (!editing && _activeDeck != null && NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
+                if (!editing &&
+                    _activeDeck != null &&
+                    !_isTransferredReadOnly() &&
+                    NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
                   NgmyMarriageSessionTimerBar(
                     email: widget.userEmail,
                     isAdmin: widget.isAdmin,
                     onExpired: _onMarriageSessionExpired,
                   ),
                 if (!editing) _editorTopBar(deck, isDark, compact: compact),
-                if (!hideChrome) _modernRibbon(isDark, compact: compact),
-                if (compact && _selectedElement() != null && !hideChrome)
+                if (!editing && _isTransferredReadOnly()) _transferredReadOnlyBanner(isDark),
+                if (!hideChrome && !_isTransferredReadOnly()) _modernRibbon(isDark, compact: compact),
+                if (!hideChrome && _isTransferredReadOnly()) _transferredReadOnlyRibbon(isDark),
+                if (compact && _selectedElement() != null && !hideChrome && !_isTransferredReadOnly())
                   _mobileSelectionBar(isDark),
                 Expanded(
                   child: Row(
@@ -3025,12 +3054,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                                 child: _canvas(slide, isDark, tight: editing || keyboardOpen),
                               ),
                             ),
-                            if (_shouldShowNotesPanel(compact) && !keyboardOpen && !editing)
+                            if (_shouldShowNotesPanel(compact) && !keyboardOpen && !editing && !_isTransferredReadOnly())
                               _notesPanel(slide, isDark, compact: compact),
                           ],
                         ),
                       ),
-                      if (wide && _shouldShowFormatPanel(compact)) SizedBox(width: 240, child: _formatPanel(isDark)),
+                      if (wide && !_isTransferredReadOnly() && _shouldShowFormatPanel(compact)) SizedBox(width: 240, child: _formatPanel(isDark)),
                     ],
                   ),
                 ),
@@ -3335,9 +3364,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
               ],
             ),
           ),
-          _topIconBtn(Icons.undo_rounded, 'Undo', _undo.isEmpty ? null : _undoAction, isDark),
-          _topIconBtn(Icons.redo_rounded, 'Redo', _redo.isEmpty ? null : _redoAction, isDark),
+          if (!_isTransferredReadOnly()) ...[
+            _topIconBtn(Icons.undo_rounded, 'Undo', _undo.isEmpty ? null : _undoAction, isDark),
+            _topIconBtn(Icons.redo_rounded, 'Redo', _redo.isEmpty ? null : _redoAction, isDark),
+          ],
           _topIconBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_downloadPdf()), isDark),
+          if (!_isTransferredReadOnly())
           PopupMenuButton<String>(
             tooltip: 'More',
             padding: EdgeInsets.zero,
@@ -3401,6 +3433,59 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _transferredReadOnlyBanner(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E3A5F) : const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_rounded, size: 16, color: Color(0xFF2563EB)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Received copy — view, print, or download only. Editing is turned off.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : const Color(0xFF1E3A5F),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _transferredReadOnlyRibbon(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: isDark ? const Color(0xFF111827).withValues(alpha: 0.92) : Colors.white.withValues(alpha: 0.96),
+        border: Border.all(color: isDark ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _ribbonBtn(Icons.print_rounded, 'Print', () {
+              final deck = _activeDeck;
+              if (deck != null) unawaited(ngmySlidesOpenPrintPreview(context, deck));
+            }, isDark),
+            _ribbonBtn(Icons.picture_as_pdf_outlined, 'Download PDF', () => unawaited(_downloadPdf()), isDark),
+            _ribbonBtn(Icons.slideshow_rounded, 'Present', _startSlideshow, isDark),
+          ],
+        ),
       ),
     );
   }
@@ -4041,7 +4126,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
             _selectedElementId = null;
             _syncTextControllersForCurrentSlide();
           }),
-          onLongPress: () async {
+          onLongPress: _isTransferredReadOnly()
+              ? null
+              : () async {
             if (deck.slides.length <= 1) return;
             final action = await showModalBottomSheet<String>(
               context: context,
@@ -4096,7 +4183,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       color: isDark ? const Color(0xFF111827) : const Color(0xFFF1F5F9),
       child: Column(
         children: [
-          if (vertical)
+          if (vertical && !_isTransferredReadOnly())
             Padding(
               padding: const EdgeInsets.all(8),
               child: IconButton.filled(
@@ -4186,8 +4273,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final signZone = marriage && ngmyMarriageElementIsSignZone(e);
     final placedSign = marriage && ngmyMarriageElementIsPlacedSign(e);
     final videoZone = marriage && ngmyKiapoElementIsVideoZone(e);
-    final selectable = !marriage || _marriageElementSelectable(e);
-    final movable = !marriage || _marriageElementMovable(e);
+    final selectable = !_isTransferredReadOnly() && (!marriage || _marriageElementSelectable(e));
+    final movable = !_isTransferredReadOnly() && (!marriage || _marriageElementMovable(e));
     final selected = selectable && _selectedElementId == e.id;
     final scale = cw / 960;
     final isDesign = e.fileName.startsWith('__design__') || e.id.startsWith('design_');
@@ -4196,6 +4283,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final void Function()? onCanvasTap;
     if (videoZone && ngmyKiapoHasVideo(e)) {
       // Defer to the embedded video player (play/pause).
+      onCanvasTap = null;
+    } else if (_isTransferredReadOnly()) {
       onCanvasTap = null;
     } else {
       onCanvasTap = () {
@@ -4263,7 +4352,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                 child: signZone
                     ? Center(
                         child: Text(
-                          'Tap to sign',
+                          _isTransferredReadOnly() ? '' : 'Tap to sign',
                           style: TextStyle(
                             fontSize: 10 * scale,
                             fontWeight: FontWeight.w700,
@@ -4340,7 +4429,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     ),
                   ),
                 ),
-              if (marriage && e.fileName == '${kMarriageLocked}_nim_n_4')
+              if (marriage && !_isTransferredReadOnly() && e.fileName == '${kMarriageLocked}_nim_n_4')
                 Positioned(
                   right: -6,
                   top: -6,
@@ -4359,7 +4448,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
                     ),
                   ),
                 ),
-              if (marriage && e.fileName.startsWith('${kMarriageFieldPrefix}tarehe:'))
+              if (marriage && !_isTransferredReadOnly() && e.fileName.startsWith('${kMarriageFieldPrefix}tarehe:'))
                 Positioned(
                   right: -6,
                   top: -6,
@@ -5032,6 +5121,18 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   ),
                                 ),
                                 const SizedBox(height: 14),
+                                if (deck.transferReceived) ...[
+                                  Text(
+                                    'Received copy · print or download only',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: _accent.first.withValues(alpha: 0.9),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 _DeckActionTile(
                                   icon: Icons.picture_as_pdf_outlined,
                                   label: 'Download PDF',
@@ -5039,7 +5140,7 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   tint: const Color(0xFF3B82F6),
                                   enter: _stagger(0),
                                 ),
-                                if (ngmyHatiIsTransferableDeck(deck)) ...[
+                                if (!deck.transferReceived && ngmyHatiIsTransferableDeck(deck)) ...[
                                   const SizedBox(height: 6),
                                   _DeckActionTile(
                                     icon: Icons.swap_horiz_rounded,
@@ -5049,22 +5150,24 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                     enter: _stagger(1),
                                   ),
                                 ],
-                                const SizedBox(height: 6),
-                                _DeckActionTile(
-                                  icon: Icons.drive_file_rename_outline_rounded,
-                                  label: 'Rename presentation',
-                                  value: 'rename',
-                                  tint: const Color(0xFF6366F1),
-                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 2 : 1),
-                                ),
-                                const SizedBox(height: 6),
-                                _DeckActionTile(
-                                  icon: Icons.content_copy_outlined,
-                                  label: 'Duplicate',
-                                  value: 'duplicate',
-                                  tint: const Color(0xFF8B5CF6),
-                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 3 : 2),
-                                ),
+                                if (!deck.transferReceived) ...[
+                                  const SizedBox(height: 6),
+                                  _DeckActionTile(
+                                    icon: Icons.drive_file_rename_outline_rounded,
+                                    label: 'Rename presentation',
+                                    value: 'rename',
+                                    tint: const Color(0xFF6366F1),
+                                    enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 2 : 1),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  _DeckActionTile(
+                                    icon: Icons.content_copy_outlined,
+                                    label: 'Duplicate',
+                                    value: 'duplicate',
+                                    tint: const Color(0xFF8B5CF6),
+                                    enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 3 : 2),
+                                  ),
+                                ],
                                 const SizedBox(height: 8),
                                 _DeckActionTile(
                                   icon: Icons.delete_outline_rounded,
@@ -5072,13 +5175,13 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   value: 'delete',
                                   tint: const Color(0xFFEF4444),
                                   destructive: true,
-                                  enter: _stagger(ngmyHatiIsTransferableDeck(deck) ? 4 : 3),
+                                  enter: _stagger(deck.transferReceived ? 1 : (ngmyHatiIsTransferableDeck(deck) ? 4 : 3)),
                                 ),
                                 const SizedBox(height: 4),
                                 Transform.translate(
-                                  offset: Offset(0, (1 - _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4)) * 8),
+                                  offset: Offset(0, (1 - _stagger(deck.transferReceived ? 2 : (ngmyHatiIsTransferableDeck(deck) ? 5 : 4))) * 8),
                                   child: Opacity(
-                                    opacity: _stagger(ngmyHatiIsTransferableDeck(deck) ? 5 : 4),
+                                    opacity: _stagger(deck.transferReceived ? 2 : (ngmyHatiIsTransferableDeck(deck) ? 5 : 4)),
                                     child: TextButton(
                                       onPressed: () => Navigator.pop(context),
                                       style: TextButton.styleFrom(

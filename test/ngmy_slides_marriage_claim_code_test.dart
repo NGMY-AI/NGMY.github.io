@@ -94,4 +94,11 @@ void main() {
     expect(copy.transferClaimCode, isNull);
     expect(copy.id, isNot(source.id));
   });
+
+  test('QR, typed-code, and file imports stay received after save and reload', () {
+    final copy = ngmySlidesDeckCopyForImport(_marriage(code: 'FL221'));
+    final restored = NgmySlideDeck.fromJson(copy.toJson());
+    expect(restored.transferReceived, isTrue);
+    expect(restored.transferClaimCode, isNull);
+  });
 }
