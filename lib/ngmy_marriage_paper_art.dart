@@ -32,6 +32,7 @@ enum NgmyMarriagePaperStyle {
   goldCrest,
   goldRibbon,
   goldBaroque,
+  goldStar,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -56,17 +57,17 @@ const int _h = 854;
 img.Image _renderPaper(NgmyMarriagePaperStyle style) {
   switch (style) {
     case NgmyMarriagePaperStyle.heritageGold:
-      return _tribalPaper(0xFFF9F1DD, 0xFFEFE0BE, 0xFF5C3A1E, 0xFFD4AF37);
+      return _withHeritageGoldCorners(_tribalPaper(0xFFF9F1DD, 0xFFEFE0BE, 0xFF5C3A1E, 0xFFD4AF37));
     case NgmyMarriagePaperStyle.heritageCrimson:
-      return _tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458);
+      return _withHeritageCrimsonCorners(_tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458));
     case NgmyMarriagePaperStyle.elegantNavy:
-      return _elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B);
+      return _withNavyBracketCorners(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B));
     case NgmyMarriagePaperStyle.elegantGold:
       return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
     case NgmyMarriagePaperStyle.elegantEmerald:
-      return _elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A);
+      return _withEmeraldFanCorners(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A));
     case NgmyMarriagePaperStyle.elegantBurgundy:
-      return _elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34);
+      return _withBurgundyScrollCorners(_elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34));
     case NgmyMarriagePaperStyle.beadedPearl:
       return _beadedPearlPaper(0xFFFFFDF6, 0xFFF3EAD8, 0xFF7A5C2E, 0xFFC9A227);
     case NgmyMarriagePaperStyle.artDeco:
@@ -103,6 +104,8 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
       return _goldRibbonPaper();
     case NgmyMarriagePaperStyle.goldBaroque:
       return _goldBaroquePaper();
+    case NgmyMarriagePaperStyle.goldStar:
+      return _goldStarPaper();
   }
 }
 
@@ -181,6 +184,93 @@ img.Image _elegantPaper(int paperTop, int paperBottom, int lineColor) {
   _grainNoise(im, paperTop);
   _border(im, 14, 16, _w - 28, _h - 32, lineColor, 1.6);
   _border(im, 20, 22, _w - 40, _h - 44, lineColor, 0.8);
+  return im;
+}
+
+void _cornerL(img.Image im, int x, int y, int dx, int dy, int color, {int arm = 28, double thick = 2.2}) {
+  img.drawLine(im, x1: x, y1: y, x2: x + dx * arm, y2: y, color: _c(color), antialias: true, thickness: thick);
+  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * arm, color: _c(color), antialias: true, thickness: thick);
+}
+
+img.Image _withNavyBracketCorners(img.Image im) {
+  const gold = 0xFFD4AF37;
+  const navy = 0xFF12213D;
+  void mark(int x, int y, int dx, int dy) {
+    _cornerL(im, x, y, dx, dy, gold, arm: 32, thick: 2.6);
+    _cornerL(im, x + dx * 7, y + dy * 7, dx, dy, navy, arm: 18, thick: 1.4);
+    _diamond(im, x + dx * 14, y + dy * 14, 6, gold);
+  }
+  mark(20, 22, 1, 1);
+  mark(_w - 20, 22, -1, 1);
+  mark(20, _h - 22, 1, -1);
+  mark(_w - 20, _h - 22, -1, -1);
+  return im;
+}
+
+img.Image _withEmeraldFanCorners(img.Image im) {
+  const gold = 0xFFC9A227;
+  void fan(int cx, int cy, double base) {
+    for (var i = 0; i < 5; i++) {
+      final a = base + i * 0.28;
+      img.drawLine(
+        im,
+        x1: cx,
+        y1: cy,
+        x2: (cx + 22 * math.cos(a)).round(),
+        y2: (cy + 22 * math.sin(a)).round(),
+        color: _c(gold),
+        antialias: true,
+        thickness: 1.5,
+      );
+    }
+    _diamond(im, cx, cy, 5, gold);
+  }
+  fan(26, 28, 0);
+  fan(_w - 26, 28, math.pi / 2);
+  fan(26, _h - 28, -math.pi / 2);
+  fan(_w - 26, _h - 28, math.pi);
+  return im;
+}
+
+img.Image _withBurgundyScrollCorners(img.Image im) {
+  const gold = 0xFFD4AF37;
+  void scroll(int x, int y, int dx, int dy) {
+    img.drawCircle(im, x: x + dx * 10, y: y + dy * 10, radius: 10, color: _c(gold), antialias: true);
+    img.drawCircle(im, x: x + dx * 10, y: y + dy * 10, radius: 6, color: _c(gold), antialias: true);
+    _diamond(im, x + dx * 10, y + dy * 10, 4, gold);
+    img.drawLine(im, x1: x, y1: y + dy * 10, x2: x + dx * 26, y2: y + dy * 10, color: _c(gold), antialias: true, thickness: 1.6);
+    img.drawLine(im, x1: x + dx * 10, y1: y, x2: x + dx * 10, y2: y + dy * 26, color: _c(gold), antialias: true, thickness: 1.6);
+  }
+  scroll(22, 24, 1, 1);
+  scroll(_w - 22, 24, -1, 1);
+  scroll(22, _h - 24, 1, -1);
+  scroll(_w - 22, _h - 24, -1, -1);
+  return im;
+}
+
+img.Image _withHeritageGoldCorners(img.Image im) {
+  const gold = 0xFFD4AF37;
+  void mark(int x, int y) {
+    _diamond(im, x, y, 9, gold);
+    _diamond(im, x, y, 4, 0xFF5C3A1E);
+  }
+  mark(40, 42);
+  mark(_w - 40, 42);
+  mark(40, _h - 42);
+  mark(_w - 40, _h - 42);
+  return im;
+}
+
+img.Image _withHeritageCrimsonCorners(img.Image im) {
+  const gold = 0xFFE0A458;
+  void mark(int x, int y, int dx, int dy) {
+    _cornerL(im, x, y, dx, dy, gold, arm: 22, thick: 2.0);
+    img.fillCircle(im, x: x + dx * 8, y: y + dy * 8, radius: 4, color: _c(gold), antialias: true);
+  }
+  mark(38, 40, 1, 1);
+  mark(_w - 38, 40, -1, 1);
+  mark(38, _h - 40, 1, -1);
+  mark(_w - 38, _h - 40, -1, -1);
   return im;
 }
 
@@ -491,6 +581,40 @@ img.Image _goldBaroquePaper() {
   rosette(_w - band, band);
   rosette(band, _h - band);
   rosette(_w - band, _h - band);
+  return im;
+}
+
+img.Image _goldStarPaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFCF6, 0xFFF3E6C4);
+  _grainNoise(im, 0xFFFFFCF6);
+  const gold = 0xFFD4AF37;
+  const navy = 0xFF12213D;
+  _border(im, 16, 18, _w - 32, _h - 36, gold, 2.4);
+  _border(im, 24, 26, _w - 48, _h - 52, navy, 0.9);
+  void star(int cx, int cy) {
+    for (var i = 0; i < 8; i++) {
+      final a = i * math.pi / 4;
+      img.drawLine(
+        im,
+        x1: cx,
+        y1: cy,
+        x2: (cx + 16 * math.cos(a)).round(),
+        y2: (cy + 16 * math.sin(a)).round(),
+        color: _c(gold),
+        antialias: true,
+        thickness: 1.8,
+      );
+    }
+    img.fillCircle(im, x: cx, y: cy, radius: 5, color: _c(navy), antialias: true);
+    _diamond(im, cx, cy, 4, gold);
+  }
+  star(28, 30);
+  star(_w - 28, 30);
+  star(28, _h - 30);
+  star(_w - 28, _h - 30);
+  _diamond(im, _w ~/ 2, 22, 6, gold);
+  _diamond(im, _w ~/ 2, _h - 22, 6, gold);
   return im;
 }
 

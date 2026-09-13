@@ -101,10 +101,12 @@ Future<void> launchNgmyMarriageAgreement({
   required List<NgmySlideDeck> savedDecks,
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
+  String? reuseState,
+  bool pickTemplateOnly = false,
 }) async {
   final existing = savedDecks.where((d) => d.isMarriageAgreement).toList();
 
-  if (existing.isNotEmpty) {
+  if (!pickTemplateOnly && existing.isNotEmpty) {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF1C1917),
@@ -168,13 +170,16 @@ Future<void> launchNgmyMarriageAgreement({
   if (!context.mounted) return;
   final templateId = await showNgmyMarriageTemplatePicker(context);
   if (templateId == null || !context.mounted) return;
-  final state = await showNgmyStatePickerSheet(
-    context,
-    states: kNgmyUsStates,
-    selected: '',
-    title: 'Choose state',
-    searchHint: 'Search states…',
-  );
+  final kept = (reuseState ?? '').trim();
+  final state = kept.isNotEmpty
+      ? kept
+      : await showNgmyStatePickerSheet(
+          context,
+          states: kNgmyUsStates,
+          selected: '',
+          title: 'Choose state',
+          searchHint: 'Search states…',
+        );
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildMarriageAgreementDeck(templateId: templateId, state: state));
 }

@@ -512,6 +512,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   void _closeEditor() {
     _stopTextEditing(unfocus: true);
     if (_isDraft) {
+      final draft = _activeDeck;
+      final kind = draft?.deckKind;
+      final state = (draft?.marriageState ?? '').trim();
+      final switchTemplate = draft != null &&
+          draft.isLockedTemplateDoc &&
+          !ngmyIsHatiKiapoUongoziDeck(kind) &&
+          state.isNotEmpty;
       setState(() {
         _activeDeck = null;
         _isDraft = false;
@@ -519,6 +526,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         _editingTextId = null;
         _clearTextControllers();
       });
+      if (switchTemplate && mounted) {
+        unawaited(_reopenLockedTemplatePicker(kind!, state));
+      }
       return;
     }
     unawaited(_persistDecks());
@@ -644,6 +654,48 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         duration: Duration(seconds: 4),
       ),
     );
+  }
+
+  Future<void> _reopenLockedTemplatePicker(String kind, String state) async {
+    if (!mounted) return;
+    switch (kind) {
+      case kNgmyHatiKuhowaDeckKind:
+        await launchNgmyHatiKuhowa(
+          context: context,
+          savedDecks: _decks,
+          openDraftEditor: _openMarriageDraft,
+          openSavedDeck: _openDeck,
+          reuseState: state,
+          pickTemplateOnly: true,
+        );
+      case kNgmyHatiKuhoweshaDeckKind:
+        await launchNgmyHatiKuhowesha(
+          context: context,
+          savedDecks: _decks,
+          openDraftEditor: _openMarriageDraft,
+          openSavedDeck: _openDeck,
+          reuseState: state,
+          pickTemplateOnly: true,
+        );
+      case kNgmyHatiMalipoAwamuDeckKind:
+        await launchNgmyHatiMalipoAwamu(
+          context: context,
+          savedDecks: _decks,
+          openDraftEditor: _openMarriageDraft,
+          openSavedDeck: _openDeck,
+          reuseState: state,
+          pickTemplateOnly: true,
+        );
+      case 'marriage_agreement':
+        await launchNgmyMarriageAgreement(
+          context: context,
+          savedDecks: _decks,
+          openDraftEditor: _openMarriageDraft,
+          openSavedDeck: _openDeck,
+          reuseState: state,
+          pickTemplateOnly: true,
+        );
+    }
   }
 
   void _launchMarriageAgreement() {

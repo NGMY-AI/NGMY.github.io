@@ -599,6 +599,18 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFF6E4), Color(0xFFD4AF37), Color(0xFF8B6914)],
   ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_star',
+    name: 'Nyota ya Dhahabu',
+    description: 'Nyota za dhahabu kwenye pembe · mstari wa bluu ndani.',
+    paperStyle: NgmyMarriagePaperStyle.goldStar,
+    background: 0xFFFFFCF6,
+    ink: 0xFF12213D,
+    accent: 0xFFD4AF37,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF6), Color(0xFFD4AF37), Color(0xFF12213D)],
+  ),
 ];
 
 const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
@@ -1004,7 +1016,7 @@ List<NgmySlideElement> _layoutSingle(
     y: y - 0.004,
     w: cw + 0.012,
     h: introH + 0.010,
-    fillColor: 0xFFFFFFFF,
+    fillColor: tpl.background,
     strokeColor: accent,
     strokeWidth: 1.15,
     tag: 'intro_frame',
@@ -1544,10 +1556,12 @@ Future<void> launchNgmyHatiKuhowa({
   required List<NgmySlideDeck> savedDecks,
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
+  String? reuseState,
+  bool pickTemplateOnly = false,
 }) async {
   final existing = savedDecks.where((d) => d.deckKind == kNgmyHatiKuhowaDeckKind).toList();
 
-  if (existing.isNotEmpty) {
+  if (!pickTemplateOnly && existing.isNotEmpty) {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF14192A),
@@ -1611,7 +1625,7 @@ Future<void> launchNgmyHatiKuhowa({
   if (!context.mounted) return;
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context);
   if (templateId == null || !context.mounted) return;
-  final state = await _pickNgmyHatiState(context);
+  final state = (reuseState ?? '').trim().isNotEmpty ? reuseState!.trim() : await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiKuhowaDeck(templateId: templateId, state: state));
 }
@@ -1635,10 +1649,12 @@ Future<void> launchNgmyHatiKuhowesha({
   required List<NgmySlideDeck> savedDecks,
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
+  String? reuseState,
+  bool pickTemplateOnly = false,
 }) async {
   final existing = savedDecks.where((d) => d.deckKind == kNgmyHatiKuhoweshaDeckKind).toList();
 
-  if (existing.isNotEmpty) {
+  if (!pickTemplateOnly && existing.isNotEmpty) {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF14192A),
@@ -1702,7 +1718,7 @@ Future<void> launchNgmyHatiKuhowesha({
   if (!context.mounted) return;
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Hati ya Kuhoweya');
   if (templateId == null || !context.mounted) return;
-  final state = await _pickNgmyHatiState(context);
+  final state = (reuseState ?? '').trim().isNotEmpty ? reuseState!.trim() : await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiKuhoweshaDeck(templateId: templateId, state: state));
 }
@@ -1715,10 +1731,12 @@ Future<void> launchNgmyHatiMalipoAwamu({
   required List<NgmySlideDeck> savedDecks,
   required void Function(NgmySlideDeck deck) openDraftEditor,
   required void Function(NgmySlideDeck deck) openSavedDeck,
+  String? reuseState,
+  bool pickTemplateOnly = false,
 }) async {
   final existing = savedDecks.where((d) => d.deckKind == kNgmyHatiMalipoAwamuDeckKind).toList();
 
-  if (existing.isNotEmpty) {
+  if (!pickTemplateOnly && existing.isNotEmpty) {
     final action = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: const Color(0xFF14192A),
@@ -1782,7 +1800,7 @@ Future<void> launchNgmyHatiMalipoAwamu({
   if (!context.mounted) return;
   final templateId = await showNgmyHatiKuhowaTemplatePicker(context, docLabel: 'Malipo ya Awamu ya Mahari', templates: kNgmyHatiMalipoAwamuTemplates);
   if (templateId == null || !context.mounted) return;
-  final state = await _pickNgmyHatiState(context);
+  final state = (reuseState ?? '').trim().isNotEmpty ? reuseState!.trim() : await _pickNgmyHatiState(context);
   if (state == null || !context.mounted) return;
   openDraftEditor(ngmyBuildHatiMalipoAwamuDeck(templateId: templateId, state: state));
 }
