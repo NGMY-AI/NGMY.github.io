@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_agreement_templates.dart';
+import 'ngmy_marriage_markers.dart';
+import 'ngmy_ndoa_hati_deck.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_state_picker.dart';
 
+export 'ngmy_marriage_markers.dart';
+
 const String kNgmyMarriageDeckKind = 'marriage_agreement';
-const String kMarriageLocked = 'marriage_locked';
-const String kMarriageFieldPrefix = 'marriage_field_';
-const String kMarriageSignPrefix = 'marriage_sign_';
 
 bool ngmyMarriageElementIsLocked(NgmySlideElement e) =>
     e.fileName == kMarriageLocked || e.fileName.startsWith('${kMarriageLocked}_');

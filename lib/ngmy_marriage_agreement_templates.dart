@@ -969,28 +969,8 @@ class _NgmyCertPreview extends StatelessWidget {
 }
 
 
-/// Every marriage paper is one page. Empty space is not stretched onto a second sheet.
-NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
-  final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
-
-  return NgmySlideDeck(
-    id: NgmySlidesTemplates.newId(),
-    name: tpl.name,
-    themeId: 'marriage_${tpl.id}',
-    aspectRatio: NgmySlideAspectRatio.portrait916,
-    deckKind: 'marriage_agreement',
-    marriageState: state.trim().isEmpty ? null : state.trim(),
-    slides: [
-      NgmySlide(
-        id: NgmySlidesTemplates.newId(),
-        title: 'Hati ya Ndoa',
-        layout: NgmySlideLayout.blank,
-        background: tpl.background,
-        elements: _buildPage1Content(tpl),
-      ),
-    ],
-  );
-}
+/// Built in [ngmy_ndoa_hati_deck.dart] so Hati ya Ndoa can reuse the
+/// Kuhowa / Kuhowesha page without a circular import.
 
 void ngmyUpdateMarriageDeckMeta(NgmySlideDeck deck, {String? state, String? templateId}) {
   if (templateId != null) {

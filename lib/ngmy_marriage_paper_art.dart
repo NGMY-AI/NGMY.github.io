@@ -155,18 +155,17 @@ img.Image _tribalPaper(int paperTop, int paperBottom, int bandColor, int trimCol
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const band = 28;
+  const band = 16;
   img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(bandColor));
   img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
   img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(bandColor));
   img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
-  _border(im, 8, 8, _w - 16, _h - 16, trimColor, 1.1);
-  _border(im, band + 2, band + 2, _w - (band + 2) * 2, _h - (band + 2) * 2, trimColor, 1.6);
-  _border(im, band + 8, band + 8, _w - (band + 8) * 2, _h - (band + 8) * 2, trimColor, 0.8);
-  _formalLCorner(im, band + 2, band + 2, 1, 1, trimColor);
-  _formalLCorner(im, _w - band - 2, band + 2, -1, 1, trimColor);
-  _formalLCorner(im, band + 2, _h - band - 2, 1, -1, trimColor);
-  _formalLCorner(im, _w - band - 2, _h - band - 2, -1, -1, trimColor);
+  _border(im, 5, 5, _w - 10, _h - 10, trimColor, 1.1);
+  _border(im, band, band, _w - band * 2, _h - band * 2, trimColor, 1.6);
+  _formalLCorner(im, 2, 2, 1, 1, trimColor, arm: 11);
+  _formalLCorner(im, _w - 2, 2, -1, 1, trimColor, arm: 11);
+  _formalLCorner(im, 2, _h - 2, 1, -1, trimColor, arm: 11);
+  _formalLCorner(im, _w - 2, _h - 2, -1, -1, trimColor, arm: 11);
   return im;
 }
 
@@ -397,11 +396,11 @@ void _diamond(img.Image im, int cx, int cy, int size, int color, {bool fill = tr
 void _certCorner(img.Image im, int x, int y, int dx, int dy, int navy, int gold) {
   img.fillPolygon(im, vertices: [
     img.Point(x.toDouble(), y.toDouble()),
-    img.Point((x + dx * 28).toDouble(), y.toDouble()),
-    img.Point(x.toDouble(), (y + dy * 28).toDouble()),
+    img.Point((x + dx * 14).toDouble(), y.toDouble()),
+    img.Point(x.toDouble(), (y + dy * 14).toDouble()),
   ], color: _c(navy));
-  _diamond(im, x + dx * 14, y + dy * 14, 6, gold);
-  _diamond(im, x + dx * 14, y + dy * 14, 3, navy);
+  _diamond(im, x + dx * 7, y + dy * 7, 4, gold);
+  _diamond(im, x + dx * 7, y + dy * 7, 2, navy);
 }
 
 /// Cream certificate sheet: gold double frame and navy/gold corner marks
@@ -416,11 +415,11 @@ img.Image _certificatePaper(
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const inset = 18;
+  const inset = 12;
   _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
-  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, gold, 0.9);
+  _border(im, inset + 6, inset + 6, _w - (inset + 6) * 2, _h - (inset + 6) * 2, gold, 0.9);
   if (topBar != null) {
-    img.fillRect(im, x1: inset + 10, y1: inset + 10, x2: _w - inset - 11, y2: inset + 16, color: _c(topBar));
+    img.fillRect(im, x1: inset + 8, y1: inset + 8, x2: _w - inset - 9, y2: inset + 13, color: _c(topBar));
   }
   _certCorner(im, inset, inset, 1, 1, ink, gold);
   _certCorner(im, _w - inset, inset, -1, 1, ink, gold);
@@ -489,18 +488,22 @@ img.Image _goldCrestPaper() {
   _vGradient(im, 0xFFFFF8EC, 0xFFF0E2C0);
   _grainNoise(im, 0xFFFFF8EC);
   const gold = 0xFFD4AF37;
-  const deep = 0xFF6B4F12;
-  const inset = 26;
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
-  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, deep, 0.9);
-  _formalLCorner(im, 10, 10, 1, 1, gold, arm: 14);
-  _formalLCorner(im, _w - 10, 10, -1, 1, gold, arm: 14);
-  _formalLCorner(im, 10, _h - 10, 1, -1, gold, arm: 14);
-  _formalLCorner(im, _w - 10, _h - 10, -1, -1, gold, arm: 14);
-  _beadRow(im, 12, 12, _w - 12, 12, gold, spacing: 16, radius: 3);
-  _beadRow(im, 12, _h - 12, _w - 12, _h - 12, gold, spacing: 16, radius: 3);
-  _beadRow(im, 12, 12, 12, _h - 12, gold, spacing: 18, radius: 3);
-  _beadRow(im, _w - 12, 12, _w - 12, _h - 12, gold, spacing: 18, radius: 3);
+  const navy = 0xFF12213D;
+  const rose = 0xFF6B2A1E;
+  _fillOutsideFrame(im, 14, 16, navy);
+  img.fillRect(im, x1: 4, y1: 4, x2: _w - 5, y2: 9, color: _c(gold));
+  img.fillRect(im, x1: 4, y1: _h - 10, x2: _w - 5, y2: _h - 5, color: _c(gold));
+  img.fillRect(im, x1: 4, y1: 4, x2: 9, y2: _h - 5, color: _c(gold));
+  img.fillRect(im, x1: _w - 10, y1: 4, x2: _w - 5, y2: _h - 5, color: _c(gold));
+  _beadRow(im, 10, 12, _w - 10, 12, gold, spacing: 16, radius: 2);
+  _beadRow(im, 10, _h - 12, _w - 10, _h - 12, gold, spacing: 16, radius: 2);
+  _beadRow(im, 10, 12, 10, _h - 12, gold, spacing: 18, radius: 2);
+  _beadRow(im, _w - 10, 12, _w - 10, _h - 12, gold, spacing: 18, radius: 2);
+  _formalLCorner(im, 2, 2, 1, 1, rose, arm: 10);
+  _formalLCorner(im, _w - 2, 2, -1, 1, rose, arm: 10);
+  _formalLCorner(im, 2, _h - 2, 1, -1, rose, arm: 10);
+  _formalLCorner(im, _w - 2, _h - 2, -1, -1, rose, arm: 10);
+  _border(im, 14, 16, _w - 28, _h - 32, gold, 1.8);
   return im;
 }
 
@@ -545,17 +548,23 @@ img.Image _goldStarPaper() {
   _grainNoise(im, 0xFFFFFCF6);
   const gold = 0xFFD4AF37;
   const navy = 0xFF12213D;
-  _border(im, 16, 18, _w - 32, _h - 36, gold, 2.4);
-  _border(im, 24, 26, _w - 48, _h - 52, navy, 0.9);
-  _fillOutsideFrame(im, 16, 18, navy);
-  _diamond(im, _w ~/ 2, 8, 5, gold);
-  _diamond(im, _w ~/ 2, _h - 8, 5, gold);
-  _diamond(im, 8, _h ~/ 2, 5, gold);
-  _diamond(im, _w - 8, _h ~/ 2, 5, gold);
-  _goldTick(im, 8, 8, gold, size: 3);
-  _goldTick(im, _w - 8, 8, gold, size: 3);
-  _goldTick(im, 8, _h - 8, gold, size: 3);
-  _goldTick(im, _w - 8, _h - 8, gold, size: 3);
+  const rose = 0xFF6B2A1E;
+  // Outer band only — keep the inner window clear of TAREHE at the top.
+  _fillOutsideFrame(im, 14, 16, navy);
+  img.fillRect(im, x1: 3, y1: 3, x2: _w - 4, y2: 8, color: _c(gold));
+  img.fillRect(im, x1: 3, y1: _h - 9, x2: _w - 4, y2: _h - 4, color: _c(gold));
+  img.fillRect(im, x1: 3, y1: 3, x2: 8, y2: _h - 4, color: _c(gold));
+  img.fillRect(im, x1: _w - 9, y1: 3, x2: _w - 4, y2: _h - 4, color: _c(gold));
+  _border(im, 9, 10, _w - 18, _h - 20, rose, 1.0);
+  _border(im, 14, 16, _w - 28, _h - 32, gold, 1.8);
+  _diamond(im, _w ~/ 2, 8, 4, gold);
+  _diamond(im, _w ~/ 2, _h - 8, 4, gold);
+  _diamond(im, 8, _h ~/ 2, 4, gold);
+  _diamond(im, _w - 8, _h ~/ 2, 4, gold);
+  _goldTick(im, 8, 8, rose, size: 3);
+  _goldTick(im, _w - 8, 8, rose, size: 3);
+  _goldTick(im, 8, _h - 8, rose, size: 3);
+  _goldTick(im, _w - 8, _h - 8, rose, size: 3);
   return im;
 }
 

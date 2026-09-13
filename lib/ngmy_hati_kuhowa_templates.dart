@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_marriage_markers.dart';
 import 'ngmy_marriage_paper_art.dart';
-import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_state_picker.dart';
 
@@ -1163,6 +1163,62 @@ List<NgmySlideElement> _layoutSingle(
   }
 
   return out;
+}
+
+/// Shared hati page (title, TAREHE, intro frame, list, MASHAHIDI, MWANDISHI)
+/// used by Kuhowa / Kuhowesha and also Hati ya Ndoa — Ndoa keeps its papers.
+NgmySlideDeck ngmyBuildHatiLookDeck({
+  required String name,
+  required String themeId,
+  required String deckKind,
+  required NgmyMarriagePaperStyle paperStyle,
+  required int background,
+  required int ink,
+  required int accent,
+  required String title,
+  required String introText,
+  required String sectionLabel,
+  required List<String> mahariItems,
+  String state = '',
+  bool sectionLabelEditable = false,
+}) {
+  final tpl = NgmyHatiKuhowaTemplate(
+    id: themeId,
+    name: name,
+    description: '',
+    paperStyle: paperStyle,
+    background: background,
+    ink: ink,
+    accent: accent,
+    bannerFill: accent,
+    bannerText: 0xFFFFFFFF,
+    previewColors: const [],
+  );
+  return NgmySlideDeck(
+    id: NgmySlidesTemplates.newId(),
+    name: name,
+    themeId: themeId,
+    aspectRatio: NgmySlideAspectRatio.portrait916,
+    deckKind: deckKind,
+    marriageState: state.trim().isEmpty ? null : state.trim(),
+    slides: [
+      NgmySlide(
+        id: NgmySlidesTemplates.newId(),
+        title: name,
+        layout: NgmySlideLayout.blank,
+        background: background,
+        elements: _buildPageContent(
+          tpl,
+          title: title,
+          introText: introText,
+          sectionLabel: sectionLabel,
+          sectionLabelEditable: sectionLabelEditable,
+          mahariItems: mahariItems,
+          state: state,
+        ),
+      ),
+    ],
+  );
 }
 
 /// Soft picker preview — unique chrome per certificate layout.
