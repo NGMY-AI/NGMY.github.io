@@ -198,11 +198,12 @@ List<NgmySlideElement> _mPill(String text, double y, double x, double w, {requir
   ];
 }
 
-/// Interlocking wedding rings.
-List<NgmySlideElement> _mRings(double cx, double cy, double d, {int gold = _certGold}) {
+/// Interlocking wedding rings with a small diamond above, like the sample.
+List<NgmySlideElement> _mRings(double cx, double cy, double d, {int gold = _certGold, int ink = 0xFF12213D}) {
   return [
-    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx - d * 0.42, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.1, tag: 'ring_l'),
-    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx + d * 0.06, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.1, tag: 'ring_r'),
+    _mLockedShape(shape: NgmySlideShapeKind.hexagon, x: cx + d * 0.18, y: cy - 0.018, w: 0.028, h: 0.016, fillColor: ink, strokeColor: gold, strokeWidth: 0.8, tag: 'ring_jewel'),
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx - d * 0.42, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.4, tag: 'ring_l'),
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: cx + d * 0.08, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.4, tag: 'ring_r'),
   ];
 }
 
@@ -256,8 +257,35 @@ List<NgmySlideElement> _mChevronHeader(String text, double x, double y, double w
 List<NgmySlideElement> _mNgmyMark(double y, {required int ink, int gold = _certGold}) {
   return [
     ..._mOrnamentRule(0.22, y, 0.56, gold: gold, ink: ink),
-    _mLockedText('NGMY', x: 0.2, y: y + 0.02, w: 0.6, h: 0.024, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'ngmy_mark'),
-    _mLockedText('Nakalaya Hati', x: 0.2, y: y + 0.044, w: 0.6, h: 0.018, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: gold, tag: 'ngmy_sub'),
+    _mLockedText('NGMY', x: 0.2, y: y + 0.016, w: 0.6, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'ngmy_mark'),
+    _mLockedText('Nakalaya Hati', x: 0.2, y: y + 0.036, w: 0.6, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: gold, tag: 'ngmy_sub'),
+  ];
+}
+
+List<NgmySlideElement> _mInlineSign(String key, double x, double y, double w, {required int ink}) {
+  return [
+    _mLockedText('Sahihi:', x: x, y: y, w: 0.12, h: 0.02, fontSize: 10, fontWeight: FontWeight.w700, color: ink, tag: 'is_$key'),
+    NgmySlideElement(
+      id: NgmySlidesTemplates.newId(),
+      type: NgmySlideElementType.shape,
+      shape: NgmySlideShapeKind.rectangle,
+      x: x + 0.12,
+      y: y - 0.006,
+      w: w - 0.12,
+      h: 0.032,
+      fillColor: 0x00000000,
+      strokeColor: 0x00000000,
+      fileName: '$_kSign$key',
+    ),
+    _mBlankUnderline(x + 0.12, y + 0.016, w - 0.12),
+  ];
+}
+
+List<NgmySlideElement> _mCertWitnessCol(String side, double x, double y, double w, {required int ink, required int fill, required int textColor}) {
+  return [
+    ..._mChevronHeader(side == 'mume' ? 'Shahidi wa Mume' : 'Shahidi wa Mke', x, y, w, fill: fill, textColor: textColor),
+    ..._mLabelLine('Jina:', 'witness_${side}_1_name', x, y + 0.036, w, ink: ink, fontSize: 10),
+    ..._mInlineSign('witness_${side}_1', x, y + 0.070, w, ink: ink),
   ];
 }
 
@@ -1125,35 +1153,38 @@ class _NgmyCertPreview extends StatelessWidget {
   }
 }
 
-/// Builds the two-page "Hati ya Kuhowesha" deck from a paper template —
-/// page 1 is the title/UTANGULIZI/MAHARI, page 2 is MASHAHIDI/MCHUMBA/seal.
+/// Classic / cloth papers stay two pages. The certificate layouts are one sheet.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
   ngmyClearMarriagePaperCache();
   final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
+  final single = tpl.layoutKind != NgmyMarriageLayoutKind.classic;
 
   final page1 = NgmySlide(
     id: NgmySlidesTemplates.newId(),
-    title: 'Hati ya Kuhowesha — Uk. 1',
+    title: single ? 'Hati ya Ndoa' : 'Hati ya Kuhowesha — Uk. 1',
     layout: NgmySlideLayout.blank,
     background: tpl.background,
     elements: _buildPage1Content(tpl),
   );
-  final page2 = NgmySlide(
-    id: NgmySlidesTemplates.newId(),
-    title: 'Hati ya Kuhowesha — Uk. 2',
-    layout: NgmySlideLayout.blank,
-    background: tpl.background,
-    elements: _buildPage2Content(tpl),
-  );
+  final slides = <NgmySlide>[page1];
+  if (!single) {
+    slides.add(NgmySlide(
+      id: NgmySlidesTemplates.newId(),
+      title: 'Hati ya Kuhowesha — Uk. 2',
+      layout: NgmySlideLayout.blank,
+      background: tpl.background,
+      elements: _buildPage2Content(tpl),
+    ));
+  }
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: 'Hati ya Kuhowesha',
+    name: single ? tpl.name : 'Hati ya Kuhowesha',
     themeId: 'marriage_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: 'marriage_agreement',
     marriageState: state.trim().isEmpty ? null : state.trim(),
-    slides: [page1, page2],
+    slides: slides,
   );
 }
 

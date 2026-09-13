@@ -79,13 +79,14 @@ void main() {
     }
   });
 
-  test('each new certificate builds a two-page deck with unique chrome', () {
+  test('each new certificate is a single page that matches the sample structure', () {
     const ids = ['rings_ndoa', 'couple_taarifa', 'barua_kuhowesha', 'mahari_pande', 'sheria_familia', 'ndoa_safi', 'pete_pana', 'muhuri_familia', 'fomu_wazi', 'upendo_dhahabu'];
     for (final id in ids) {
       final deck = ngmyBuildMarriageAgreementDeck(templateId: id);
-      expect(deck.slides, hasLength(2), reason: id);
-      expect(deck.slides[0].elements.length, greaterThan(8), reason: id);
-      expect(deck.slides[1].elements.length, greaterThan(8), reason: id);
+      expect(deck.slides, hasLength(1), reason: id);
+      expect(deck.slides[0].elements.length, greaterThan(20), reason: id);
     }
+    final classic = ngmyBuildMarriageAgreementDeck(templateId: 'heritage_gold');
+    expect(classic.slides, hasLength(2));
   });
 }
