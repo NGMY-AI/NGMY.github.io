@@ -236,7 +236,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       if (d.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(d.deckKind)) keep.add(d);
     }
     final active = _activeDeck;
-    if (active != null && active.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
+    if (!_isDraft &&
+        active != null &&
+        active.isLockedTemplateDoc &&
+        !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
       keep.add(active);
     }
     return keep;
@@ -257,7 +260,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   List<NgmySlideDeck> _personalDecksSnapshot() {
     final active = _activeDeck;
-    if (active != null && active.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
+    if (!_isDraft &&
+        active != null &&
+        active.isLockedTemplateDoc &&
+        !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
       _rememberLockedDoc(active);
     }
     return _decks.where((d) => !ngmyIsHatiKiapoUongoziDeck(d.deckKind)).map((d) => d.copy()).toList();
@@ -505,11 +511,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   void _closeEditor() {
     _stopTextEditing(unfocus: true);
-    final active = _activeDeck;
-    if (active != null && active.isLockedTemplateDoc) {
-      _rememberLockedDoc(active);
-      unawaited(_persistDecks());
-    } else if (_isDraft) {
+    if (_isDraft) {
       setState(() {
         _activeDeck = null;
         _isDraft = false;
@@ -518,12 +520,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         _clearTextControllers();
       });
       return;
-    } else {
-      unawaited(_persistDecks());
     }
+    unawaited(_persistDecks());
     setState(() {
       _activeDeck = null;
-      _isDraft = false;
       _selectedElementId = null;
       _editingTextId = null;
       _clearTextControllers();
@@ -559,21 +559,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       final ok = await _ensureMarriageDocPaid(openDeck);
       if (!ok || !mounted) return;
     }
+    final alreadySaved = _decks.any((d) => d.id == openDeck.id);
     setState(() {
       _activeDeck = openDeck.copy();
       _slideIndex = 0;
       _selectedElementId = null;
-      _isDraft = !openDeck.isLockedTemplateDoc;
+      _isDraft = !alreadySaved;
       _undo.clear();
       _redo.clear();
       _clearTextControllers();
       _syncTextControllersForCurrentSlide();
       _ribbonTab = 'Home';
     });
-    if (openDeck.isLockedTemplateDoc) {
-      _rememberLockedDoc(_activeDeck!);
-      unawaited(_persistDecks());
-    }
     if (!_isTransferredReadOnly(openDeck)) unawaited(_maybeShowMarriageHint());
     if (mounted &&
         !_isTransferredReadOnly(openDeck) &&

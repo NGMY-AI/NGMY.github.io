@@ -327,7 +327,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   NgmyMarriagePaperTemplate(
     id: 'kente_sunset',
     name: 'Kente ya Jua',
-    description: 'Mpaka wa mistari ya kente · dhahabu, kijani na nyekundu.',
+    description: 'Nguo ya kente yenye dirisha la karatasi katikati.',
     paperStyle: NgmyMarriagePaperStyle.kenteSunset,
     background: 0xFFFFF6E4,
     ink: 0xFF3A2415,
@@ -339,7 +339,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   NgmyMarriagePaperTemplate(
     id: 'indigo_mudcloth',
     name: 'Nguo ya Indigo',
-    description: 'Mpaka wa indigo na alama za almasi za dhahabu.',
+    description: 'Nguo ya udongo yenye alama · karatasi ndani.',
     paperStyle: NgmyMarriagePaperStyle.indigoMudcloth,
     background: 0xFFF7F0E4,
     ink: 0xFF1A237E,
@@ -351,7 +351,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   NgmyMarriagePaperTemplate(
     id: 'adinkra_royal',
     name: 'Muhuri wa Adinkra',
-    description: 'Muhuri wa pembe · ngozi ya dhahabu na kahawia.',
+    description: 'Amri ya kifalme · bendi za muhuri juu na chini.',
     paperStyle: NgmyMarriagePaperStyle.adinkraRoyal,
     background: 0xFFFFF8EC,
     ink: 0xFF6B3F1F,
@@ -363,7 +363,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   NgmyMarriagePaperTemplate(
     id: 'nile_lotus',
     name: 'Lotus ya Nile',
-    description: 'Maua ya lotus · teal ya Nile na dhahabu.',
+    description: 'Nguzo za papyrus na ua la lotus juu.',
     paperStyle: NgmyMarriagePaperStyle.nileLotus,
     background: 0xFFF4F7F4,
     ink: 0xFF0F5C5C,
@@ -375,7 +375,7 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
   NgmyMarriagePaperTemplate(
     id: 'shweshwe_ivory',
     name: 'Shweshwe',
-    description: 'Mpaka wa almasi za indigo · pembe za terracotta.',
+    description: 'Nguo ya shweshwe · kadi ya pembe ndani.',
     paperStyle: NgmyMarriagePaperStyle.shweshweIvory,
     background: 0xFFF8F4EE,
     ink: 0xFF1B2A4A,

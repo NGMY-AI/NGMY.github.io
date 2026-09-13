@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -89,35 +90,54 @@ Future<String?> ngmySlidesSignatureToImage(
 }) async {
   if (points.whereType<Offset>().isEmpty) return null;
   try {
-    const w = 800;
-    final scale = w / canvasSize.width;
-    final h = (canvasSize.height * scale).round().clamp(120, 400);
+    // Draw at the same pixel size and stroke the signer saw, then crop to the
+    // writing so the document box does not shrink a full-pad image.
+    final srcW = canvasSize.width.clamp(80.0, 2400.0);
+    final srcH = canvasSize.height.clamp(80.0, 2400.0);
+    final liveStroke = ngmySignatureStrokeForSize(strokeWidth, Size(srcW, srcH));
+    var minX = 1.0;
+    var minY = 1.0;
+    var maxX = 0.0;
+    var maxY = 0.0;
+    for (final p in points) {
+      if (p == null) continue;
+      minX = math.min(minX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxX = math.max(maxX, p.dx);
+      maxY = math.max(maxY, p.dy);
+    }
+    const pad = 0.04;
+    minX = (minX - pad).clamp(0.0, 1.0);
+    minY = (minY - pad).clamp(0.0, 1.0);
+    maxX = (maxX + pad).clamp(0.0, 1.0);
+    maxY = (maxY + pad).clamp(0.0, 1.0);
+    final fracW = (maxX - minX).clamp(0.12, 1.0);
+    final fracH = (maxY - minY).clamp(0.12, 1.0);
+    const outW = 800;
+    final outH = (outW * (fracH / fracW)).round().clamp(180, 420);
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
-    canvas.drawRect(Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()), Paint()..color = const Color(0xFFFFFFFF));
+    canvas.drawRect(Rect.fromLTWH(0, 0, outW.toDouble(), outH.toDouble()), Paint()..color = const Color(0x00FFFFFF));
+    final pathScale = outW / (fracW * srcW);
     final stroke = Paint()
       ..color = color
-      ..strokeWidth = strokeWidth * scale
+      ..strokeWidth = liveStroke * pathScale
       ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke
+      ..isAntiAlias = true;
     Offset? last;
-    // `points` are normalized 0.0-1.0 fractions of the drawing canvas (see
-    // _addPoint in ngmy_invoice_signature.dart), not raw pixel coordinates
-    // in canvasSize's space. Multiplying by `scale` (a ratio meant for
-    // pixel values) collapsed every stroke into a sub-pixel cluster near
-    // the origin — that's why nothing visible ever showed up after
-    // signing. Map the 0-1 fraction directly onto the output image size.
     for (final p in points) {
       if (p == null) {
         last = null;
         continue;
       }
-      final scaled = Offset(p.dx * w, p.dy * h);
+      final scaled = Offset((p.dx - minX) / fracW * outW, (p.dy - minY) / fracH * outH);
       if (last != null) canvas.drawLine(last, scaled, stroke);
       last = scaled;
     }
     final picture = recorder.endRecording();
-    final img = await picture.toImage(w, h);
+    final img = await picture.toImage(outW, outH);
     picture.dispose();
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     img.dispose();

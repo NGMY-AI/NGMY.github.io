@@ -277,48 +277,89 @@ void _diamond(img.Image im, int cx, int cy, int size, int color, {bool fill = tr
   img.drawLine(im, x1: cx - size, y1: cy, x2: cx, y2: cy - size, color: _c(color), antialias: true);
 }
 
-/// West African kente-inspired striped frame — gold, forest, crimson, black.
+void _paperWindow(img.Image im, int x, int y, int w, int h, int fill) {
+  img.fillRect(im, x1: x, y1: y, x2: x + w, y2: y + h, color: _c(fill));
+}
+
+void _kenteCell(img.Image im, int gx, int gy, int cell, List<int> colors, {required bool horizontal}) {
+  if (horizontal) {
+    for (var y = 0; y < cell && gy + y < _h; y++) {
+      final c = colors[(y ~/ 5) % colors.length];
+      img.drawLine(im, x1: gx, y1: gy + y, x2: math.min(gx + cell - 1, _w - 1), y2: gy + y, color: _c(c));
+    }
+    return;
+  }
+  for (var x = 0; x < cell && gx + x < _w; x++) {
+    final c = colors[(x ~/ 5) % colors.length];
+    img.drawLine(im, x1: gx + x, y1: gy, x2: gx + x, y2: math.min(gy + cell - 1, _h - 1), color: _c(c));
+  }
+}
+
+/// Full kente-cloth sheet with a cream writing window cut into the weave.
 img.Image _kentePaper(int paperTop, int paperBottom) {
   final im = img.Image(width: _w, height: _h);
-  _vGradient(im, paperTop, paperBottom);
-  _grainNoise(im, paperTop);
-  const band = 32;
   const colors = [0xFFD4AF37, 0xFF1B5E20, 0xFFB71C1C, 0xFF1A1208, 0xFFE8A317, 0xFF0D47A1];
-  for (var x = 0; x < _w; x++) {
-    final c = colors[(x ~/ 7) % colors.length];
-    img.drawLine(im, x1: x, y1: 0, x2: x, y2: band, color: _c(c));
-    img.drawLine(im, x1: x, y1: _h - band, x2: x, y2: _h - 1, color: _c(c));
+  const cell = 30;
+  for (var gy = 0; gy < _h; gy += cell) {
+    for (var gx = 0; gx < _w; gx += cell) {
+      _kenteCell(im, gx, gy, cell, colors, horizontal: ((gx ~/ cell) + (gy ~/ cell)).isEven);
+    }
   }
-  for (var y = 0; y < _h; y++) {
-    final c = colors[(y ~/ 7) % colors.length];
-    img.drawLine(im, x1: 0, y1: y, x2: band, y2: y, color: _c(c));
-    img.drawLine(im, x1: _w - band, y1: y, x2: _w - 1, y2: y, color: _c(c));
-  }
-  _border(im, band + 6, band + 6, _w - (band + 6) * 2, _h - (band + 6) * 2, 0xFFD4AF37, 1.6);
-  _border(im, band + 11, band + 11, _w - (band + 11) * 2, _h - (band + 11) * 2, 0xFF5C3A1E, 0.7);
+  const inset = 44;
+  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
+  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
+  _grainNoise(im, paperTop);
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFD4AF37, 2.2);
+  _border(im, inset + 6, inset + 6, _w - (inset + 6) * 2, _h - (inset + 6) * 2, 0xFF1A1208, 0.8);
   return im;
 }
 
-/// Indigo cloth frame with bogolanfini-style diamond marks.
+void _vGradientWindow(img.Image im, int x, int y, int w, int h, int top, int bottom) {
+  for (var row = 0; row < h; row++) {
+    final t = h <= 1 ? 0.0 : row / (h - 1);
+    final r = ((top >> 16) & 0xFF) * (1 - t) + ((bottom >> 16) & 0xFF) * t;
+    final g = ((top >> 8) & 0xFF) * (1 - t) + ((bottom >> 8) & 0xFF) * t;
+    final b = (top & 0xFF) * (1 - t) + (bottom & 0xFF) * t;
+    final c = img.ColorRgb8(r.round().clamp(0, 255), g.round().clamp(0, 255), b.round().clamp(0, 255));
+    img.drawLine(im, x1: x, y1: y + row, x2: x + w, y2: y + row, color: c);
+  }
+}
+
+void _mudGlyph(img.Image im, int cx, int cy, int kind, int color) {
+  switch (kind % 4) {
+    case 0:
+      _diamond(im, cx, cy, 7, color);
+      _diamond(im, cx, cy, 3, color, fill: false);
+    case 1:
+      img.drawLine(im, x1: cx - 7, y1: cy - 7, x2: cx + 7, y2: cy + 7, color: _c(color), antialias: true, thickness: 1.6);
+      img.drawLine(im, x1: cx + 7, y1: cy - 7, x2: cx - 7, y2: cy + 7, color: _c(color), antialias: true, thickness: 1.6);
+    case 2:
+      for (var i = -2; i <= 2; i++) {
+        img.drawLine(im, x1: cx - 8, y1: cy + i * 3, x2: cx + 8, y2: cy + i * 3, color: _c(color), antialias: true, thickness: 1.2);
+      }
+    default:
+      img.drawLine(im, x1: cx - 8, y1: cy, x2: cx + 8, y2: cy, color: _c(color), antialias: true, thickness: 1.5);
+      img.drawLine(im, x1: cx, y1: cy - 8, x2: cx, y2: cy + 8, color: _c(color), antialias: true, thickness: 1.5);
+      img.fillCircle(im, x: cx, y: cy, radius: 2, color: _c(color), antialias: true);
+  }
+}
+
+/// Full bogolanfini cloth with a tan writing panel inset in the stamps.
 img.Image _mudclothPaper(int paperTop, int paperBottom) {
   final im = img.Image(width: _w, height: _h);
-  _vGradient(im, paperTop, paperBottom);
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF5A3A1C));
+  const mark = 0xFFD8B25A;
+  var n = 0;
+  for (var y = 18; y < _h; y += 32) {
+    for (var x = 18; x < _w; x += 32) {
+      _mudGlyph(im, x, y, n++, mark);
+    }
+  }
+  const inset = 46;
+  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
+  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const band = 30;
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(0xFF1A237E));
-  img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(0xFF1A237E));
-  img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(0xFF1A237E));
-  img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF1A237E));
-  const mark = 0xFFC9A227;
-  for (var x = band + 18; x < _w - band - 10; x += 28) {
-    _diamond(im, x, band + 14, 4, mark);
-    _diamond(im, x, _h - band - 14, 4, mark);
-  }
-  for (var y = band + 18; y < _h - band - 10; y += 28) {
-    _diamond(im, band + 14, y, 4, mark);
-    _diamond(im, _w - band - 14, y, 4, mark);
-  }
-  _border(im, band + 4, band + 4, _w - (band + 4) * 2, _h - (band + 4) * 2, 0xFFC9A227, 1.2);
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFC9A227, 1.8);
   return im;
 }
 
@@ -330,21 +371,25 @@ void _adinkraSeal(img.Image im, int cx, int cy, int color) {
   img.drawLine(im, x1: cx, y1: cy - 14, x2: cx, y2: cy + 14, color: _c(color), antialias: true, thickness: 1.3);
 }
 
-/// Warm royal parchment with geometric corner seals.
+/// Dark royal decree: stamped header/footer bands and a parchment well.
 img.Image _adinkraPaper(int paperTop, int paperBottom) {
   final im = img.Image(width: _w, height: _h);
-  _vGradient(im, paperTop, paperBottom);
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF2A1810));
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: 78, color: _c(0xFF4A2C14));
+  img.fillRect(im, x1: 0, y1: _h - 78, x2: _w - 1, y2: _h - 1, color: _c(0xFF4A2C14));
+  for (var x = 28; x < _w - 20; x += 44) {
+    _adinkraSeal(im, x, 39, 0xFFD4AF37);
+    _adinkraSeal(im, x, _h - 39, 0xFFD4AF37);
+  }
+  _adinkraSeal(im, _w ~/ 2, _h ~/ 2, 0xFF3D2416);
+  img.drawCircle(im, x: _w ~/ 2, y: _h ~/ 2, radius: 52, color: _c(0xFF3D2416), antialias: true);
+  const insetX = 38;
+  const insetY = 92;
+  _paperWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, paperTop);
+  _vGradientWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const inset = 26;
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFF8B5A2B, 1.4);
-  _border(im, inset + 7, inset + 7, _w - (inset + 7) * 2, _h - (inset + 7) * 2, 0xFFD4AF37, 0.9);
-  const seal = 0xFF6B3F1F;
-  _adinkraSeal(im, inset + 2, inset + 2, seal);
-  _adinkraSeal(im, _w - inset - 2, inset + 2, seal);
-  _adinkraSeal(im, inset + 2, _h - inset - 2, seal);
-  _adinkraSeal(im, _w - inset - 2, _h - inset - 2, seal);
-  img.fillCircle(im, x: _w ~/ 2, y: 48, radius: 5, color: _c(0xFFD4AF37), antialias: true);
-  img.fillCircle(im, x: _w ~/ 2, y: _h - 48, radius: 5, color: _c(0xFFD4AF37), antialias: true);
+  _border(im, insetX, insetY, _w - insetX * 2, _h - insetY * 2, 0xFFD4AF37, 1.8);
+  _border(im, insetX + 7, insetY + 7, _w - (insetX + 7) * 2, _h - (insetY + 7) * 2, 0xFF8B5A2B, 0.8);
   return im;
 }
 
@@ -363,47 +408,44 @@ void _lotusBloom(img.Image im, int cx, int cy, int color, {bool up = true}) {
   img.fillCircle(im, x: cx, y: cy, radius: 3, color: _c(0xFFD4AF37), antialias: true);
 }
 
-/// Papyrus cream with Nile-teal frame and lotus blooms.
+/// Papyrus columns and a lotus arcade — not a simple framed sheet.
 img.Image _lotusPaper(int paperTop, int paperBottom) {
   final im = img.Image(width: _w, height: _h);
-  _vGradient(im, paperTop, paperBottom);
+  _vGradient(im, 0xFF0B4F4F, 0xFFD7C39A);
+  for (var x = 8; x <= 34; x += 4) {
+    img.drawLine(im, x1: x, y1: 0, x2: x, y2: _h - 1, color: _c(0xFF083838), antialias: true, thickness: 1.1);
+    img.drawLine(im, x1: _w - 1 - x, y1: 0, x2: _w - 1 - x, y2: _h - 1, color: _c(0xFF083838), antialias: true, thickness: 1.1);
+  }
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: 70, color: _c(0xFF0F5C5C));
+  img.fillRect(im, x1: 0, y1: _h - 56, x2: _w - 1, y2: _h - 1, color: _c(0xFF0F5C5C));
+  for (var i = 0; i < 5; i++) {
+    _lotusBloom(im, 70 + i * 85, 48, 0xFFD4AF37);
+  }
+  const insetX = 48;
+  const insetY = 78;
+  _paperWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, paperTop);
+  _vGradientWindow(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const inset = 22;
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFF0F5C5C, 2.0);
-  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, 0xFFC9A227, 1.0);
-  _lotusBloom(im, _w ~/ 2, 54, 0xFF0F5C5C);
-  _lotusBloom(im, _w ~/ 2, _h - 54, 0xFF0F5C5C, up: false);
-  _diamond(im, inset + 10, inset + 10, 5, 0xFFC9A227);
-  _diamond(im, _w - inset - 10, inset + 10, 5, 0xFFC9A227);
-  _diamond(im, inset + 10, _h - inset - 10, 5, 0xFFC9A227);
-  _diamond(im, _w - inset - 10, _h - inset - 10, 5, 0xFFC9A227);
+  _border(im, insetX, insetY, _w - insetX * 2, _h - insetY - 64, 0xFFC9A227, 1.6);
   return im;
 }
 
-/// Shweshwe-inspired indigo diamond lattice in the frame.
+/// Full shweshwe cloth with a floating ivory writing card.
 img.Image _shweshwePaper(int paperTop, int paperBottom) {
   final im = img.Image(width: _w, height: _h);
-  _vGradient(im, paperTop, paperBottom);
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF1B2A4A));
+  const ivory = 0xFFE8D7B0;
+  for (var y = 10; y < _h; y += 18) {
+    for (var x = 10; x < _w; x += 18) {
+      _diamond(im, x, y, 6, ivory, fill: false);
+      img.fillCircle(im, x: x, y: y, radius: 1, color: _c(ivory), antialias: true);
+    }
+  }
+  const inset = 40;
+  _paperWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop);
+  _vGradientWindow(im, inset, inset, _w - inset * 2, _h - inset * 2, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const band = 34;
-  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(0xFF1B2A4A));
-  img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(0xFF1B2A4A));
-  img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(0xFF1B2A4A));
-  img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(0xFF1B2A4A));
-  const ivory = 0xFFF3E6CF;
-  const coral = 0xFFC45C3E;
-  for (var x = 10; x < _w; x += 16) {
-    _diamond(im, x, 16, 4, ivory, fill: false);
-    _diamond(im, x, _h - 16, 4, ivory, fill: false);
-  }
-  for (var y = 10; y < _h; y += 16) {
-    _diamond(im, 16, y, 4, ivory, fill: false);
-    _diamond(im, _w - 16, y, 4, ivory, fill: false);
-  }
-  _diamond(im, 16, 16, 6, coral);
-  _diamond(im, _w - 16, 16, 6, coral);
-  _diamond(im, 16, _h - 16, 6, coral);
-  _diamond(im, _w - 16, _h - 16, 6, coral);
-  _border(im, band + 5, band + 5, _w - (band + 5) * 2, _h - (band + 5) * 2, 0xFFC45C3E, 1.1);
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, 0xFFC45C3E, 2.0);
+  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, 0xFF1B2A4A, 0.8);
   return im;
 }

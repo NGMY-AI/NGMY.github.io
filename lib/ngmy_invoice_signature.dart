@@ -352,6 +352,12 @@ class _SignatureCanvas extends StatelessWidget {
   }
 }
 
+/// Same visual thickness used on the live pad and when the signature is saved.
+double ngmySignatureStrokeForSize(double strokeWidthBase, Size size) {
+  if (size.shortestSide <= 0) return strokeWidthBase;
+  return (strokeWidthBase * (size.shortestSide / 280)).clamp(3.0, 28.0);
+}
+
 class NgmySignaturePainter extends CustomPainter {
   final List<Offset?> points;
   final Color color;
@@ -378,7 +384,7 @@ class NgmySignaturePainter extends CustomPainter {
     final fitted = liveDraw
         ? points.map((p) => p == null ? null : Offset(p.dx * size.width, p.dy * size.height)).toList()
         : fitSignatureToSize(points, size);
-    final stroke = (strokeWidthBase * (size.shortestSide / 280)).clamp(3.0, 28.0);
+    final stroke = ngmySignatureStrokeForSize(strokeWidthBase, size);
     final paint = Paint()
       ..color = color
       ..strokeWidth = stroke
