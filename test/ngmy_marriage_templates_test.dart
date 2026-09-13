@@ -53,8 +53,8 @@ void main() {
     }
   });
 
-  test('Hati ya Kuhowa and Kuhowesha keep yesterday’s six papers plus five gold-edge papers', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(12));
+  test('Hati ya Kuhowa and Kuhowesha keep ten papers and resolve heritage for old docs', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(10));
     expect(
       kNgmyHatiKuhowaTemplates.map((t) => t.id).toList(),
       [
@@ -68,10 +68,12 @@ void main() {
         'kuhowa_gold_laurel',
         'kuhowa_gold_crest',
         'kuhowa_gold_star',
-        'kuhowa_heritage_gold',
-        'kuhowa_heritage_crimson',
       ],
     );
+    for (final id in ['kuhowa_heritage_gold', 'kuhowa_heritage_crimson']) {
+      expect(kNgmyHatiKuhowaTemplates.any((t) => t.id == id), isFalse, reason: id);
+      expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: 'older saved $id still opens');
+    }
     for (final id in ['kuhowa_kente_sunset', 'kuhowa_rings_ndoa', 'kuhowa_upendo']) {
       expect(kNgmyHatiKuhowaTemplates.any((t) => t.id == id), isFalse, reason: id);
       expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: 'older saved $id still opens');

@@ -51,7 +51,7 @@
 
   <script>
     (function () {
-      var embedded = '20260913122607';
+      var embedded = '20260913124848';
       var base = window.__NGMY_BASE_PATH__ || '/';
       var KEY = 'ngmy_deploy_id';
       function forceRefreshForBuild(serverBuild, opts) {
@@ -97,14 +97,6 @@
       // newer build only actually takes over the next time this device
       // does a real fresh load with no live session to disrupt (new tab,
       // reinstall, or once a service-worker update naturally rolls in).
-      function isUserReload() {
-        try {
-          var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
-          if (nav && nav.type === 'reload') return true;
-          if (performance.navigation && performance.navigation.type === 1) return true;
-        } catch (e) {}
-        return false;
-      }
       function checkForUpdate(opts) {
         var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -141,7 +133,24 @@
       // only actually takes over next time nothing is relying on the page's
       // in-memory state to begin with (a real fresh tab/reinstall) — never a
       // reload injected into a session that's already live.
-      checkForUpdate({ silent: !isUserReload() });
+      // Never force-reload a live tab. PWA resume and many mobile browsers
+      // report navigation type "reload", which used to apply a pending
+      // deploy and dump the user mid-task. A queued deploy only takes over
+      // in a brand-new browsing context (new tab / fully closed app).
+      var isNewContext = false;
+      try {
+        isNewContext = !sessionStorage.getItem('ngmy_session_live');
+        sessionStorage.setItem('ngmy_session_live', '1');
+      } catch (e) {
+        isNewContext = true;
+      }
+      var pendingDeploy = null;
+      try { pendingDeploy = localStorage.getItem('ngmy_pending_deploy'); } catch (e2) {}
+      if (isNewContext && pendingDeploy && pendingDeploy !== embedded) {
+        forceRefreshForBuild(pendingDeploy, { deferIfVisible: false });
+      } else {
+        checkForUpdate({ silent: true });
+      }
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
       });
@@ -838,7 +847,7 @@
 
       var KEY = "ngmy_deploy_id";
 
-      var CURRENT = "20260913122607";
+      var CURRENT = "20260913124848";
 
       function showError(msg) {
 
@@ -973,7 +982,7 @@
 
   <script>
     (function () {
-      var deployId = '20260913122607';
+      var deployId = '20260913124848';
       var loadAttempts = 0;
       var swScope = window.__NGMY_BASE_PATH__ || '/';
       var cacheBootActive = false;

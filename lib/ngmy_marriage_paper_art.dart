@@ -36,9 +36,10 @@ enum NgmyMarriagePaperStyle {
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
+final _pngCache = <NgmyMarriagePaperStyle, Uint8List>{};
 
 Uint8List ngmyMarriagePaperPng(NgmyMarriagePaperStyle style) {
-  return img.encodePng(_renderPaper(style));
+  return _pngCache.putIfAbsent(style, () => img.encodePng(_renderPaper(style)));
 }
 
 String ngmyMarriagePaperDataUrl(NgmyMarriagePaperStyle style) {
@@ -47,7 +48,10 @@ String ngmyMarriagePaperDataUrl(NgmyMarriagePaperStyle style) {
   });
 }
 
-void ngmyClearMarriagePaperCache() => _paperCache.clear();
+void ngmyClearMarriagePaperCache() {
+  _paperCache.clear();
+  _pngCache.clear();
+}
 
 img.Color _c(int argb) => img.ColorRgba8((argb >> 16) & 0xFF, (argb >> 8) & 0xFF, argb & 0xFF, 255);
 
@@ -57,17 +61,17 @@ const int _h = 854;
 img.Image _renderPaper(NgmyMarriagePaperStyle style) {
   switch (style) {
     case NgmyMarriagePaperStyle.heritageGold:
-      return _withHeritageGoldCorners(_tribalPaper(0xFFF9F1DD, 0xFFEFE0BE, 0xFF5C3A1E, 0xFFD4AF37));
+      return _tribalPaper(0xFFF9F1DD, 0xFFEFE0BE, 0xFF5C3A1E, 0xFFD4AF37);
     case NgmyMarriagePaperStyle.heritageCrimson:
-      return _withHeritageCrimsonCorners(_tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458));
+      return _tribalPaper(0xFFFAF0E6, 0xFFF0DCC8, 0xFF6B2A1E, 0xFFE0A458);
     case NgmyMarriagePaperStyle.elegantNavy:
-      return _withNavyBracketCorners(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B));
+      return _elegantOuterNavy(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B));
     case NgmyMarriagePaperStyle.elegantGold:
       return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
     case NgmyMarriagePaperStyle.elegantEmerald:
-      return _withEmeraldFanCorners(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A));
+      return _elegantOuterEmerald(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A));
     case NgmyMarriagePaperStyle.elegantBurgundy:
-      return _withBurgundyScrollCorners(_elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34));
+      return _elegantOuterBurgundy(_elegantPaper(0xFFFFF7F6, 0xFFF7E8EA, 0xFF9C7A34));
     case NgmyMarriagePaperStyle.beadedPearl:
       return _beadedPearlPaper(0xFFFFFDF6, 0xFFF3EAD8, 0xFF7A5C2E, 0xFFC9A227);
     case NgmyMarriagePaperStyle.artDeco:
@@ -138,28 +142,15 @@ void _border(img.Image im, int x, int y, int w, int h, int color, double t) {
   img.drawLine(im, x1: x + w, y1: y, x2: x + w, y2: y + h, color: c, antialias: true, thickness: t);
 }
 
-/// A strip of alternating triangle "teeth" — the tribal zigzag trim.
-void _zigzagTrim(img.Image im, {required bool horizontal, required int pos, required int length, required int amp, required int toothLen, required int color, required bool pointForward}) {
-  final c = _c(color);
-  var i = 0;
-  while (i < length) {
-    final p0 = i;
-    final p1 = (i + toothLen / 2).round();
-    final p2 = (i + toothLen).clamp(0, length);
-    if (horizontal) {
-      final baseY = pos;
-      final tipY = pointForward ? pos + amp : pos - amp;
-      img.fillPolygon(im, vertices: [img.Point(p0, baseY), img.Point(p1, tipY), img.Point(p2, baseY)], color: c);
-    } else {
-      final baseX = pos;
-      final tipX = pointForward ? pos + amp : pos - amp;
-      img.fillPolygon(im, vertices: [img.Point(baseX, p0), img.Point(tipX, p1), img.Point(baseX, p2)], color: c);
-    }
-    i += toothLen;
-  }
+void _formalLCorner(img.Image im, int x, int y, int dx, int dy, int color, {int arm = 22}) {
+  final inner = (arm * 0.72).round().clamp(8, arm - 2);
+  img.drawLine(im, x1: x, y1: y, x2: x + dx * arm, y2: y, color: _c(color), antialias: true, thickness: 2.0);
+  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * arm, color: _c(color), antialias: true, thickness: 2.0);
+  img.drawLine(im, x1: x + dx * 3, y1: y + dy * 3, x2: x + dx * inner, y2: y + dy * 3, color: _c(color), antialias: true, thickness: 1.0);
+  img.drawLine(im, x1: x + dx * 3, y1: y + dy * 3, x2: x + dx * 3, y2: y + dy * inner, color: _c(color), antialias: true, thickness: 1.0);
 }
 
-/// Bold picture-frame band with an inward-facing zigzag trim — "Heritage".
+/// Colored outer band outside the inner window — a formal certificate frame.
 img.Image _tribalPaper(int paperTop, int paperBottom, int bandColor, int trimColor) {
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
@@ -169,11 +160,13 @@ img.Image _tribalPaper(int paperTop, int paperBottom, int bandColor, int trimCol
   img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
   img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(bandColor));
   img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(bandColor));
-  _zigzagTrim(im, horizontal: true, pos: band, length: _w, amp: 9, toothLen: 18, color: trimColor, pointForward: true);
-  _zigzagTrim(im, horizontal: true, pos: _h - band, length: _w, amp: 9, toothLen: 18, color: trimColor, pointForward: false);
-  _zigzagTrim(im, horizontal: false, pos: band, length: _h, amp: 9, toothLen: 18, color: trimColor, pointForward: true);
-  _zigzagTrim(im, horizontal: false, pos: _w - band, length: _h, amp: 9, toothLen: 18, color: trimColor, pointForward: false);
-  _border(im, band + 7, band + 7, _w - (band + 7) * 2, _h - (band + 7) * 2, trimColor, 1.0);
+  _border(im, 8, 8, _w - 16, _h - 16, trimColor, 1.1);
+  _border(im, band + 2, band + 2, _w - (band + 2) * 2, _h - (band + 2) * 2, trimColor, 1.6);
+  _border(im, band + 8, band + 8, _w - (band + 8) * 2, _h - (band + 8) * 2, trimColor, 0.8);
+  _formalLCorner(im, band + 2, band + 2, 1, 1, trimColor);
+  _formalLCorner(im, _w - band - 2, band + 2, -1, 1, trimColor);
+  _formalLCorner(im, band + 2, _h - band - 2, 1, -1, trimColor);
+  _formalLCorner(im, _w - band - 2, _h - band - 2, -1, -1, trimColor);
   return im;
 }
 
@@ -184,6 +177,45 @@ img.Image _elegantPaper(int paperTop, int paperBottom, int lineColor) {
   _grainNoise(im, paperTop);
   _border(im, 14, 16, _w - 28, _h - 32, lineColor, 1.6);
   _border(im, 20, 22, _w - 40, _h - 44, lineColor, 0.8);
+  return im;
+}
+
+/// Color and marks live in the margin OUTSIDE the two thin frame lines.
+void _fillOutsideFrame(img.Image im, int frameX, int frameY, int color) {
+  final c = _c(color);
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: frameY - 1, color: c);
+  img.fillRect(im, x1: 0, y1: _h - frameY, x2: _w - 1, y2: _h - 1, color: c);
+  img.fillRect(im, x1: 0, y1: frameY, x2: frameX - 1, y2: _h - frameY - 1, color: c);
+  img.fillRect(im, x1: _w - frameX, y1: frameY, x2: _w - 1, y2: _h - frameY - 1, color: c);
+}
+
+img.Image _elegantOuterNavy(img.Image im) {
+  _fillOutsideFrame(im, 14, 16, 0xFF12213D);
+  _border(im, 8, 9, _w - 16, _h - 18, 0xFFD4AF37, 1.2);
+  _formalLCorner(im, 2, 2, 1, 1, 0xFFD4AF37, arm: 10);
+  _formalLCorner(im, _w - 2, 2, -1, 1, 0xFFD4AF37, arm: 10);
+  _formalLCorner(im, 2, _h - 2, 1, -1, 0xFFD4AF37, arm: 10);
+  _formalLCorner(im, _w - 2, _h - 2, -1, -1, 0xFFD4AF37, arm: 10);
+  return im;
+}
+
+img.Image _elegantOuterEmerald(img.Image im) {
+  _fillOutsideFrame(im, 14, 16, 0xFF0E3B2E);
+  for (var x = 10; x < _w - 10; x += 14) {
+    _diamond(im, x, 8, 3, 0xFFC9A227);
+    _diamond(im, x, _h - 8, 3, 0xFFC9A227);
+  }
+  for (var y = 18; y < _h - 18; y += 16) {
+    _diamond(im, 7, y, 3, 0xFFC9A227);
+    _diamond(im, _w - 7, y, 3, 0xFFC9A227);
+  }
+  return im;
+}
+
+img.Image _elegantOuterBurgundy(img.Image im) {
+  _fillOutsideFrame(im, 14, 16, 0xFF4A0E1F);
+  _border(im, 6, 7, _w - 12, _h - 14, 0xFFD4AF37, 1.0);
+  _border(im, 9, 10, _w - 18, _h - 20, 0xFFC9A227, 0.7);
   return im;
 }
 
@@ -240,31 +272,6 @@ void _utepeCornersOn(
   _utepeCorner(im, _w - x, y, -1, 1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
   _utepeCorner(im, x, _h - y, 1, -1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
   _utepeCorner(im, _w - x, _h - y, -1, -1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
-}
-
-img.Image _withNavyBracketCorners(img.Image im) {
-  _utepeCornersOn(im, x: 14, y: 16, size: 34, armJewels: true);
-  return im;
-}
-
-img.Image _withEmeraldFanCorners(img.Image im) {
-  _utepeCornersOn(im, x: 14, y: 16, outer: 0xFF0E3B2E, inner: 0xFFC9A227, jewel: 0xFF0E3B2E, size: 34, goldTip: true);
-  return im;
-}
-
-img.Image _withBurgundyScrollCorners(img.Image im) {
-  _utepeCornersOn(im, x: 14, y: 16, outer: 0xFF4A0E1F, inner: 0xFFD4AF37, jewel: 0xFFFFF7F6, size: 34);
-  return im;
-}
-
-img.Image _withHeritageGoldCorners(img.Image im) {
-  _utepeCornersOn(im, x: 28, y: 28, outer: 0xFF5C3A1E, inner: 0xFFD4AF37, jewel: 0xFF5C3A1E, size: 32, armJewels: true);
-  return im;
-}
-
-img.Image _withHeritageCrimsonCorners(img.Image im) {
-  _utepeCornersOn(im, x: 28, y: 28, outer: 0xFF6B2A1E, inner: 0xFFE0A458, jewel: 0xFF6B2A1E, size: 32, goldTip: true);
-  return im;
 }
 
 /// A row of small filled "beads" tracing the perimeter, with a thin hairline
@@ -486,7 +493,10 @@ img.Image _goldCrestPaper() {
   const inset = 26;
   _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
   _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, deep, 0.9);
-  _utepeCornersOn(im, x: 12, y: 12, outer: 0xFF12213D, inner: gold, jewel: deep, size: 36, armJewels: true);
+  _formalLCorner(im, 10, 10, 1, 1, gold, arm: 14);
+  _formalLCorner(im, _w - 10, 10, -1, 1, gold, arm: 14);
+  _formalLCorner(im, 10, _h - 10, 1, -1, gold, arm: 14);
+  _formalLCorner(im, _w - 10, _h - 10, -1, -1, gold, arm: 14);
   _beadRow(im, 12, 12, _w - 12, 12, gold, spacing: 16, radius: 3);
   _beadRow(im, 12, _h - 12, _w - 12, _h - 12, gold, spacing: 16, radius: 3);
   _beadRow(im, 12, 12, 12, _h - 12, gold, spacing: 18, radius: 3);
@@ -526,7 +536,6 @@ img.Image _goldBaroquePaper() {
   img.fillRect(im, x1: 5, y1: 5, x2: 9, y2: _h - 6, color: _c(deep));
   img.fillRect(im, x1: _w - 10, y1: 5, x2: _w - 6, y2: _h - 6, color: _c(deep));
   _border(im, band + 8, band + 8, _w - (band + 8) * 2, _h - (band + 8) * 2, deep, 1.4);
-  _utepeCornersOn(im, x: 0, y: 0, outer: 0xFF12213D, inner: gold, jewel: 0xFF12213D, size: 40, goldTip: true);
   return im;
 }
 
@@ -538,9 +547,15 @@ img.Image _goldStarPaper() {
   const navy = 0xFF12213D;
   _border(im, 16, 18, _w - 32, _h - 36, gold, 2.4);
   _border(im, 24, 26, _w - 48, _h - 52, navy, 0.9);
-  _utepeCornersOn(im, x: 16, y: 18, outer: navy, inner: gold, jewel: navy, size: 36, goldTip: true);
-  _diamond(im, _w ~/ 2, 22, 6, gold);
-  _diamond(im, _w ~/ 2, _h - 22, 6, gold);
+  _fillOutsideFrame(im, 16, 18, navy);
+  _diamond(im, _w ~/ 2, 8, 5, gold);
+  _diamond(im, _w ~/ 2, _h - 8, 5, gold);
+  _diamond(im, 8, _h ~/ 2, 5, gold);
+  _diamond(im, _w - 8, _h ~/ 2, 5, gold);
+  _goldTick(im, 8, 8, gold, size: 3);
+  _goldTick(im, _w - 8, 8, gold, size: 3);
+  _goldTick(im, 8, _h - 8, gold, size: 3);
+  _goldTick(im, _w - 8, _h - 8, gold, size: 3);
   return im;
 }
 

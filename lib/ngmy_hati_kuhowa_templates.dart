@@ -641,7 +641,8 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeAll = [
   ...kNgmyHatiKuhowaGoldTail,
 ];
 
-/// Row 1: navy + gold. Row 2: Utepe + Ukanda. Heritage papers sit last.
+/// Row 1: navy + gold. Row 2: Utepe + Ukanda. Row 4 (filigree + laurel) stays as-is.
+/// Heritage papers stay resolvable for old saved docs but are off this picker.
 const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
   ...kNgmyHatiKuhowaNavyOnly,
   ...kNgmyHatiKuhowaSecondSlot,
@@ -649,7 +650,6 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
   ...kNgmyHatiKuhowaElegantRest,
   ...kNgmyHatiKuhowaGoldEdgeTemplates,
   ...kNgmyHatiKuhowaGoldTail,
-  ...kNgmyHatiKuhowaHeritageBottom,
 ];
 
 /// Newer papers kept so existing saved documents still resolve. They are
@@ -1276,7 +1276,6 @@ const _kHatiKuhowaMahariItems = [
 
 /// Builds the single-page "Hati ya Kuhowa" deck from a paper template.
 NgmySlideDeck ngmyBuildHatiKuhowaDeck({required String templateId, String state = ''}) {
-  ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
 
   final page = NgmySlide(
@@ -1331,7 +1330,6 @@ const _kHatiKuhoweshaMahariItems = [
 /// "NIMEPOKEYA CASH". The deck's own internal name stays "Hati ya Kuhoweya"
 /// so it reads as a distinct entry in the picker/deck list.
 NgmySlideDeck ngmyBuildHatiKuhoweshaDeck({required String templateId, String state = ''}) {
-  ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId) ?? kNgmyHatiKuhowaTemplates.first;
 
   final page = NgmySlide(
@@ -1392,7 +1390,6 @@ const _kHatiMalipoAwamuMahariItems = [
 /// extra vertical room the longer intro paragraph needs so nothing spills
 /// past the page's bottom border.
 NgmySlideDeck ngmyBuildHatiMalipoAwamuDeck({required String templateId, String state = ''}) {
-  ngmyClearMarriagePaperCache();
   final tpl = ngmyHatiKuhowaTemplateById(templateId, templates: kNgmyHatiMalipoAwamuTemplates) ?? kNgmyHatiMalipoAwamuTemplates.first;
 
   final page = NgmySlide(

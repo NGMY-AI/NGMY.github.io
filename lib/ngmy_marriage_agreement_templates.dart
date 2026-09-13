@@ -971,7 +971,6 @@ class _NgmyCertPreview extends StatelessWidget {
 
 /// Every marriage paper is one page. Empty space is not stretched onto a second sheet.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
-  ngmyClearMarriagePaperCache();
   final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
 
   return NgmySlideDeck(

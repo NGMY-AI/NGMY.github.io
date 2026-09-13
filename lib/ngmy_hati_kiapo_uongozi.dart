@@ -705,7 +705,6 @@ NgmySlideDeck ngmyEnsureHatiKiapoLayout(NgmySlideDeck deck) {
 
 /// Builds the single-page presidential oath document for a Civic Registry state.
 NgmySlideDeck ngmyBuildHatiKiapoUongoziDeck({required String state}) {
-  ngmyClearMarriagePaperCache();
   const ink = 0xFF12213D;
   const accent = 0xFFB8860B;
   const background = 0xFFFFFEFB;
