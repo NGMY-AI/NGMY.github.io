@@ -53,10 +53,10 @@ void main() {
     }
   });
 
-  test('Hati ya Kuhowa and Kuhowesha pickers show only yesterday’s six papers', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(6));
+  test('Hati ya Kuhowa and Kuhowesha keep yesterday’s six papers plus five gold-edge papers', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(11));
     expect(
-      kNgmyHatiKuhowaTemplates.map((t) => t.id).toList(),
+      kNgmyHatiKuhowaTemplates.take(6).map((t) => t.id).toList(),
       [
         'kuhowa_elegant_navy',
         'kuhowa_elegant_gold',
@@ -66,17 +66,38 @@ void main() {
         'kuhowa_elegant_burgundy',
       ],
     );
+    expect(
+      kNgmyHatiKuhowaTemplates.skip(6).map((t) => t.id).toList(),
+      [
+        'kuhowa_gold_filigree',
+        'kuhowa_gold_laurel',
+        'kuhowa_gold_crest',
+        'kuhowa_gold_ribbon',
+        'kuhowa_gold_baroque',
+      ],
+    );
     for (final id in ['kuhowa_kente_sunset', 'kuhowa_rings_ndoa', 'kuhowa_upendo']) {
       expect(kNgmyHatiKuhowaTemplates.any((t) => t.id == id), isFalse, reason: id);
       expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: 'older saved $id still opens');
     }
+    for (final id in ['kuhowa_gold_filigree', 'kuhowa_gold_laurel', 'kuhowa_gold_crest', 'kuhowa_gold_ribbon', 'kuhowa_gold_baroque']) {
+      final tpl = ngmyHatiKuhowaTemplateById(id);
+      expect(tpl, isNotNull, reason: id);
+      expect(tpl!.layoutKind, NgmyHatiLayoutKind.classic, reason: id);
+      expect(ngmyMarriagePaperPng(tpl.paperStyle).length, greaterThan(800), reason: id);
+      expect(ngmyBuildHatiKuhowaDeck(templateId: id).slides, hasLength(1), reason: id);
+    }
   });
 
-  test('every marriage template is a single page', () {
+  test('every Hati ya Ndoa template is the screenshot certificate on one page', () {
     for (final tpl in kNgmyMarriagePaperTemplates) {
       final deck = ngmyBuildMarriageAgreementDeck(templateId: tpl.id);
       expect(deck.slides, hasLength(1), reason: tpl.id);
-      expect(deck.slides[0].elements.length, greaterThan(20), reason: tpl.id);
+      final texts = deck.slides[0].elements.map((e) => e.text).whereType<String>();
+      expect(texts, contains('HATI YA NDOA'), reason: tpl.id);
+      expect(texts, contains('TAARIFA ZA WANANDOA'), reason: tpl.id);
+      expect(texts, contains('TAMKO LA MAKUBALIANO'), reason: tpl.id);
+      expect(texts, contains('MASHAHIDI'), reason: tpl.id);
     }
   });
 }

@@ -27,42 +27,48 @@ List<NgmySlideElement> _mEmptyPage2(NgmyMarriagePaperTemplate tpl) => const [];
 
 List<NgmySlideElement> _layoutRingsNdoaPage1(NgmyMarriagePaperTemplate tpl) {
   final ink = tpl.ink;
-  const cx = 0.10;
-  const cw = 0.80;
+  const cx = 0.11;
+  const cw = 0.78;
   final colW = (cw - 0.04) / 2;
+  final right = cx + colW + 0.04;
   return [
-    ..._mRings(0.41, 0.022, 0.070, ink: ink),
-    _mLockedText('HATI YA NDOA', x: cx, y: 0.092, w: cw, h: 0.042, fontSize: 26, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
-    _mLockedText('Hati ya Makubaliano ya Ndoa', x: cx, y: 0.144, w: cw, h: 0.020, fontSize: 13, fontWeight: FontWeight.w600, align: TextAlign.center, color: ink, tag: 'subtitle'),
-    ..._mOrnamentRule(0.16, 0.168, 0.68, ink: ink),
-    ..._mPill('TAARIFA ZA WANANDOA', 0.190, 0.18, 0.64, ink: ink),
-    ..._mLabelLine('Jina la Mume:', 'groom_name', cx, 0.232, cw, ink: ink, fontSize: 12),
-    ..._mLabelLine('Jina la Mke:', 'bride_name', cx, 0.270, cw, ink: ink, fontSize: 12),
-    ..._mLabelLine('Tarehe ya Ndoa:', 'tarehe', cx, 0.308, cw, ink: ink, fontSize: 12, startText: '__ / __ / ____'),
-    ..._mLabelLine('Mahali:', 'bride_house', cx, 0.346, cw, ink: ink, fontSize: 12),
-    ..._mPill('TAMKO LA MAKUBALIANO', 0.390, 0.18, 0.64, ink: ink),
+    ..._mRings(0.415, 0.026, 0.058, ink: ink),
+    _mLockedText('HATI YA NDOA', x: cx, y: 0.086, w: cw, h: 0.048, fontSize: 32, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
+    _mLockedText('Hati ya Makubaliano ya Ndoa', x: cx, y: 0.134, w: cw, h: 0.018, fontSize: 12, fontWeight: FontWeight.w600, align: TextAlign.center, color: ink, tag: 'subtitle'),
+    ..._mOrnamentRule(0.20, 0.154, 0.60, ink: ink),
+    ..._mPill('TAARIFA ZA WANANDOA', 0.176, 0.20, 0.60, ink: ink),
+    ..._mLabelLine('Jina la Mume:', 'groom_name', cx, 0.218, cw, ink: ink, fontSize: 11, startText: ''),
+    ..._mLabelLine('Jina la Mke:', 'bride_name', cx, 0.250, cw, ink: ink, fontSize: 11, startText: ''),
+    ..._mLabelLine('Tarehe ya Ndoa:', 'tarehe', cx, 0.282, cw, ink: ink, fontSize: 11, startText: ''),
+    ..._mLabelLine('Mahali:', 'bride_house', cx, 0.314, cw, ink: ink, fontSize: 11, startText: ''),
+    ..._mPill('TAMKO LA MAKUBALIANO', 0.350, 0.20, 0.60, ink: ink),
     ..._mStaticPara(
       'Sisi, wanandoa, tunakubali kwa hiari na kwa moyo mmoja kuingia katika ndoa hii kwa mapenzi, heshima na ushirikiano. Tunajitolea kuwa wapenzi, washirika na msaada wa maisha yote, tukifuata maadili ya familia, desturi zetu na mafundisho mema kwa ajili ya mustakabali bora.',
       cx,
-      0.430,
+      0.388,
       cw,
-      0.108,
+      0.078,
       ink: ink,
-      fontSize: 11.5,
+      fontSize: 10.5,
     ),
-    ..._mOrnamentRule(0.20, 0.542, 0.60, ink: ink),
-    ..._mPill('MASHAHIDI', 0.564, 0.22, 0.56, ink: ink),
-    ..._mCertWitnessCol('mume', cx, 0.604, colW, ink: ink, fill: ink, textColor: 0xFFFFFFFF),
-    ..._mCertWitnessCol('mke', cx + colW + 0.04, 0.604, colW, ink: ink, fill: ink, textColor: 0xFFFFFFFF),
-    ..._mPill('SAHIHI ZA WANANDOA', 0.718, 0.18, 0.64, ink: ink),
-    _mLockedText('Mume', x: cx, y: 0.758, w: colW, h: 0.018, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'mume_h'),
-    _mLockedText('Mke', x: cx + colW + 0.04, y: 0.758, w: colW, h: 0.018, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'mke_h'),
-    ..._mInlineSign('mchumba_mume', cx, 0.782, colW, ink: ink),
-    ..._mInlineSign('mchumba_mke', cx + colW + 0.04, 0.782, colW, ink: ink),
-    ..._mPill('MWANDISHI / MSIMAMIZI', 0.824, 0.16, 0.68, ink: ink),
-    ..._mLabelLine('Jina:', 'mwandishi', cx, 0.864, 0.36, ink: ink, fontSize: 10, startText: '[Jina]'),
-    ..._mInlineSign('witness_mume_2', cx + 0.38, 0.864, 0.42, ink: ink),
-    ..._mNgmyMark(0.900, ink: ink),
+    ..._mOrnamentRule(0.22, 0.470, 0.56, ink: ink),
+    ..._mPill('MASHAHIDI', 0.490, 0.26, 0.48, ink: ink),
+    ..._mChevronHeader('Shahidi wa Mume', cx, 0.528, colW, fill: ink, textColor: 0xFFFFFFFF),
+    ..._mChevronHeader('Shahidi wa Mke', right, 0.528, colW, fill: ink, textColor: 0xFFFFFFFF),
+    ..._mLabelLine('Jina:', 'witness_mume_1_name', cx, 0.564, colW, ink: ink, fontSize: 10, startText: ''),
+    ..._mLabelLine('Jina:', 'witness_mke_1_name', right, 0.564, colW, ink: ink, fontSize: 10, startText: ''),
+    ..._mInlineSign('witness_mume_1', cx, 0.596, colW, ink: ink),
+    ..._mInlineSign('witness_mke_1', right, 0.596, colW, ink: ink),
+    ..._mPill('SAHIHI ZA WANANDOA', 0.640, 0.20, 0.60, ink: ink),
+    _mLockedText('Mume', x: cx, y: 0.678, w: colW, h: 0.016, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'mume_h'),
+    _mLockedText('Mke', x: right, y: 0.678, w: colW, h: 0.016, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'mke_h'),
+    ..._mInlineSign('mchumba_mume', cx, 0.700, colW, ink: ink),
+    ..._mInlineSign('mchumba_mke', right, 0.700, colW, ink: ink),
+    ..._mPill('MWANDISHI / MSIMAMIZI', 0.744, 0.18, 0.64, ink: ink),
+    ..._mLabelLine('Jina:', 'mwandishi', cx, 0.784, 0.26, ink: ink, fontSize: 10, startText: ''),
+    ..._mInlineSign('witness_mume_2', cx + 0.27, 0.784, 0.26, ink: ink),
+    ..._mLabelLine('Tarehe:', 'mchumba_mume_tarehe', cx + 0.54, 0.784, 0.24, ink: ink, fontSize: 10, startText: ''),
+    ..._mNgmyMark(0.830, ink: ink),
   ];
 }
 

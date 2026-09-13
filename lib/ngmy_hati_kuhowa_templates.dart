@@ -536,7 +536,75 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
   ),
 ];
 
-const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = kNgmyHatiKuhowaYesterdayTemplates;
+/// Five extra papers for Hati ya Kuhowa / Kuhowesha — same fields and
+/// paragraph under the title, with stronger gold edge decoration.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeTemplates = [
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_filigree',
+    name: 'Dhahabu ya Filigree',
+    description: 'Mpaka wa dhahabu mara tatu · pembe za mapambo.',
+    paperStyle: NgmyMarriagePaperStyle.goldFiligree,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFD4AF37,
+    bannerFill: 0xFF8B6914,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFFD4AF37), Color(0xFF8B6914)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_laurel',
+    name: 'Taji ya Dhahabu',
+    description: 'Majani ya dhahabu kando · almasi kwenye pembe.',
+    paperStyle: NgmyMarriagePaperStyle.goldLaurel,
+    background: 0xFFFFFDF8,
+    ink: 0xFF3A2415,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF7A5C14,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFDF8), Color(0xFFC9A227), Color(0xFF7A5C14)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_crest',
+    name: 'Muhuri wa Dhahabu',
+    description: 'Medali za dhahabu kwenye pembe · shanga za lulu.',
+    paperStyle: NgmyMarriagePaperStyle.goldCrest,
+    background: 0xFFFFF8EC,
+    ink: 0xFF4A3410,
+    accent: 0xFFD4AF37,
+    bannerFill: 0xFF6B4F12,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFF8EC), Color(0xFFD4AF37), Color(0xFF6B4F12)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_ribbon',
+    name: 'Utepe wa Dhahabu',
+    description: 'Pembe za bluu na dhahabu · almasi kati ya kila upande.',
+    paperStyle: NgmyMarriagePaperStyle.goldRibbon,
+    background: 0xFFFFFEFB,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFEFB), Color(0xFF12213D), Color(0xFFC9A227)],
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_gold_baroque',
+    name: 'Ukanda wa Dhahabu',
+    description: 'Ukanda mzito wa dhahabu · rosette kwenye pembe.',
+    paperStyle: NgmyMarriagePaperStyle.goldBaroque,
+    background: 0xFFFFF6E4,
+    ink: 0xFF4A3410,
+    accent: 0xFFD4AF37,
+    bannerFill: 0xFF8B6914,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFF6E4), Color(0xFFD4AF37), Color(0xFF8B6914)],
+  ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
+  ...kNgmyHatiKuhowaYesterdayTemplates,
+  ...kNgmyHatiKuhowaGoldEdgeTemplates,
+];
 
 /// Newer papers kept so existing saved documents still resolve. They are
 /// not shown on Hati ya Kuhowa / Kuhowesha — those live on Hati ya Ndoa.
@@ -801,6 +869,7 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuho
       ? <List<NgmyHatiKuhowaTemplate>>[templates]
       : <List<NgmyHatiKuhowaTemplate>>[
           kNgmyHatiKuhowaYesterdayTemplates,
+          kNgmyHatiKuhowaGoldEdgeTemplates,
           kNgmyHatiKuhowaNewerTemplates,
           kNgmyHatiMalipoAwamuExtraTemplates,
         ];

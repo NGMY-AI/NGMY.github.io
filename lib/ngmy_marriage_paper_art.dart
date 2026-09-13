@@ -27,6 +27,11 @@ enum NgmyMarriagePaperStyle {
   certIvoryGreen,
   certIvoryRose,
   certIvoryNavyBar,
+  goldFiligree,
+  goldLaurel,
+  goldCrest,
+  goldRibbon,
+  goldBaroque,
 }
 
 final _paperCache = <NgmyMarriagePaperStyle, String>{};
@@ -88,6 +93,16 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
       return _certificatePaper(0xFFFFF8F5, 0xFFF8EEEA, 0xFFC9A227, 0xFF7A3B4A);
     case NgmyMarriagePaperStyle.certIvoryNavyBar:
       return _certificatePaper(0xFFFFFCF7, 0xFFF6F1E6, 0xFFC9A227, 0xFF12213D, topBar: 0xFF12213D);
+    case NgmyMarriagePaperStyle.goldFiligree:
+      return _goldFiligreePaper();
+    case NgmyMarriagePaperStyle.goldLaurel:
+      return _goldLaurelPaper();
+    case NgmyMarriagePaperStyle.goldCrest:
+      return _goldCrestPaper();
+    case NgmyMarriagePaperStyle.goldRibbon:
+      return _goldRibbonPaper();
+    case NgmyMarriagePaperStyle.goldBaroque:
+      return _goldBaroquePaper();
   }
 }
 
@@ -289,7 +304,18 @@ void _diamond(img.Image im, int cx, int cy, int size, int color, {bool fill = tr
   img.drawLine(im, x1: cx - size, y1: cy, x2: cx, y2: cy - size, color: _c(color), antialias: true);
 }
 
-/// Cream certificate sheet: thin gold double frame and navy/gold corner diamonds.
+void _certCorner(img.Image im, int x, int y, int dx, int dy, int navy, int gold) {
+  img.fillPolygon(im, vertices: [
+    img.Point(x.toDouble(), y.toDouble()),
+    img.Point((x + dx * 28).toDouble(), y.toDouble()),
+    img.Point(x.toDouble(), (y + dy * 28).toDouble()),
+  ], color: _c(navy));
+  _diamond(im, x + dx * 14, y + dy * 14, 6, gold);
+  _diamond(im, x + dx * 14, y + dy * 14, 3, navy);
+}
+
+/// Cream certificate sheet: gold double frame and navy/gold corner marks
+/// like the HATI YA NDOA sample.
 img.Image _certificatePaper(
   int paperTop,
   int paperBottom,
@@ -300,19 +326,171 @@ img.Image _certificatePaper(
   final im = img.Image(width: _w, height: _h);
   _vGradient(im, paperTop, paperBottom);
   _grainNoise(im, paperTop);
-  const inset = 22;
-  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 1.6);
-  _border(im, inset + 7, inset + 7, _w - (inset + 7) * 2, _h - (inset + 7) * 2, gold, 0.7);
+  const inset = 18;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
+  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, gold, 0.9);
   if (topBar != null) {
-    img.fillRect(im, x1: inset + 8, y1: inset + 8, x2: _w - inset - 9, y2: inset + 16, color: _c(topBar));
+    img.fillRect(im, x1: inset + 10, y1: inset + 10, x2: _w - inset - 11, y2: inset + 16, color: _c(topBar));
   }
-  final d = 8;
-  _diamond(im, inset + 18, inset + 18, d, ink);
-  _diamond(im, _w - inset - 18, inset + 18, d, ink);
-  _diamond(im, inset + 18, _h - inset - 18, d, ink);
-  _diamond(im, _w - inset - 18, _h - inset - 18, d, ink);
-  _diamond(im, inset + 18, inset + 18, 4, gold, fill: false);
-  _diamond(im, _w - inset - 18, inset + 18, 4, gold, fill: false);
+  _certCorner(im, inset, inset, 1, 1, ink, gold);
+  _certCorner(im, _w - inset, inset, -1, 1, ink, gold);
+  _certCorner(im, inset, _h - inset, 1, -1, ink, gold);
+  _certCorner(im, _w - inset, _h - inset, -1, -1, ink, gold);
+  _diamond(im, _w ~/ 2, _h ~/ 2, 46, 0xFFE8D5A0, fill: false);
+  _diamond(im, _w ~/ 2, _h ~/ 2, 8, gold, fill: false);
+  return im;
+}
+
+void _goldTick(img.Image im, int x, int y, int gold, {int size = 5}) {
+  _diamond(im, x, y, size, gold);
+}
+
+img.Image _goldFiligreePaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFBF3, 0xFFF4EAD4);
+  _grainNoise(im, 0xFFFFFBF3);
+  const gold = 0xFFD4AF37;
+  const deep = 0xFF8B6914;
+  _border(im, 10, 12, _w - 20, _h - 24, gold, 3.2);
+  _border(im, 18, 20, _w - 36, _h - 40, deep, 1.2);
+  _border(im, 24, 26, _w - 48, _h - 52, gold, 1.8);
+  void flourish(int x, int y, int dx, int dy) {
+    img.drawLine(im, x1: x, y1: y, x2: x + dx * 42, y2: y, color: _c(gold), antialias: true, thickness: 2.4);
+    img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * 42, color: _c(gold), antialias: true, thickness: 2.4);
+    img.drawLine(im, x1: x + dx * 12, y1: y + dy * 12, x2: x + dx * 34, y2: y + dy * 12, color: _c(deep), antialias: true, thickness: 1.2);
+    img.drawLine(im, x1: x + dx * 12, y1: y + dy * 12, x2: x + dx * 12, y2: y + dy * 34, color: _c(deep), antialias: true, thickness: 1.2);
+    _diamond(im, x + dx * 16, y + dy * 16, 8, gold);
+    _diamond(im, x + dx * 16, y + dy * 16, 4, deep);
+  }
+  flourish(24, 26, 1, 1);
+  flourish(_w - 24, 26, -1, 1);
+  flourish(24, _h - 26, 1, -1);
+  flourish(_w - 24, _h - 26, -1, -1);
+  for (var i = 56; i < _w - 56; i += 18) {
+    _goldTick(im, i, 16, gold, size: 3);
+    _goldTick(im, i, _h - 16, gold, size: 3);
+  }
+  for (var i = 56; i < _h - 56; i += 22) {
+    _goldTick(im, 16, i, gold, size: 3);
+    _goldTick(im, _w - 16, i, gold, size: 3);
+  }
+  return im;
+}
+
+img.Image _goldLaurelPaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFDF8, 0xFFF6EED8);
+  _grainNoise(im, 0xFFFFFDF8);
+  const gold = 0xFFC9A227;
+  const deep = 0xFF7A5C14;
+  _border(im, 16, 18, _w - 32, _h - 36, gold, 2.4);
+  _border(im, 24, 26, _w - 48, _h - 52, deep, 1.0);
+  void leaf(int x, int y, int dx, int dy) {
+    img.fillPolygon(im, vertices: [
+      img.Point(x.toDouble(), y.toDouble()),
+      img.Point((x + dx * 7).toDouble(), (y + dy * 3).toDouble()),
+      img.Point((x + dx * 14).toDouble(), y.toDouble()),
+      img.Point((x + dx * 7).toDouble(), (y - dy * 3).toDouble()),
+    ], color: _c(gold));
+  }
+  for (var x = 40; x < _w - 40; x += 16) {
+    leaf(x, 22, 1, 1);
+    leaf(x, _h - 22, 1, 1);
+  }
+  for (var y = 44; y < _h - 44; y += 18) {
+    leaf(22, y, 1, 1);
+    leaf(_w - 22, y, -1, 1);
+  }
+  _diamond(im, 28, 30, 9, gold);
+  _diamond(im, _w - 28, 30, 9, gold);
+  _diamond(im, 28, _h - 30, 9, gold);
+  _diamond(im, _w - 28, _h - 30, 9, gold);
+  return im;
+}
+
+img.Image _goldCrestPaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFF8EC, 0xFFF0E2C0);
+  _grainNoise(im, 0xFFFFF8EC);
+  const gold = 0xFFD4AF37;
+  const deep = 0xFF6B4F12;
+  const inset = 26;
+  _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
+  _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, deep, 0.9);
+  void crest(int cx, int cy) {
+    img.drawCircle(im, x: cx, y: cy, radius: 16, color: _c(gold), antialias: true);
+    img.drawCircle(im, x: cx, y: cy, radius: 11, color: _c(deep), antialias: true);
+    _diamond(im, cx, cy, 7, gold);
+    _diamond(im, cx, cy, 3, deep);
+  }
+  crest(inset, inset);
+  crest(_w - inset, inset);
+  crest(inset, _h - inset);
+  crest(_w - inset, _h - inset);
+  _beadRow(im, 12, 12, _w - 12, 12, gold, spacing: 16, radius: 3);
+  _beadRow(im, 12, _h - 12, _w - 12, _h - 12, gold, spacing: 16, radius: 3);
+  _beadRow(im, 12, 12, 12, _h - 12, gold, spacing: 18, radius: 3);
+  _beadRow(im, _w - 12, 12, _w - 12, _h - 12, gold, spacing: 18, radius: 3);
+  return im;
+}
+
+img.Image _goldRibbonPaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFFEFB, 0xFFF7EFD8);
+  _grainNoise(im, 0xFFFFFEFB);
+  const gold = 0xFFC9A227;
+  const navy = 0xFF12213D;
+  _border(im, 14, 16, _w - 28, _h - 32, gold, 2.2);
+  _border(im, 22, 24, _w - 44, _h - 48, gold, 1.0);
+  void ribbon(int x, int y, int dx, int dy) {
+    img.fillPolygon(im, vertices: [
+      img.Point(x.toDouble(), y.toDouble()),
+      img.Point((x + dx * 36).toDouble(), y.toDouble()),
+      img.Point(x.toDouble(), (y + dy * 36).toDouble()),
+    ], color: _c(navy));
+    img.fillPolygon(im, vertices: [
+      img.Point((x + dx * 6).toDouble(), (y + dy * 6).toDouble()),
+      img.Point((x + dx * 28).toDouble(), (y + dy * 6).toDouble()),
+      img.Point((x + dx * 6).toDouble(), (y + dy * 28).toDouble()),
+    ], color: _c(gold));
+    _diamond(im, x + dx * 14, y + dy * 14, 6, navy);
+  }
+  ribbon(14, 16, 1, 1);
+  ribbon(_w - 14, 16, -1, 1);
+  ribbon(14, _h - 16, 1, -1);
+  ribbon(_w - 14, _h - 16, -1, -1);
+  _diamond(im, _w ~/ 2, 20, 7, gold);
+  _diamond(im, _w ~/ 2, _h - 20, 7, gold);
+  _diamond(im, 18, _h ~/ 2, 7, gold);
+  _diamond(im, _w - 18, _h ~/ 2, 7, gold);
+  return im;
+}
+
+img.Image _goldBaroquePaper() {
+  final im = img.Image(width: _w, height: _h);
+  _vGradient(im, 0xFFFFF6E4, 0xFFEFE0B8);
+  _grainNoise(im, 0xFFFFF6E4);
+  const gold = 0xFFD4AF37;
+  const deep = 0xFF8B6914;
+  const band = 20;
+  img.fillRect(im, x1: 0, y1: 0, x2: _w - 1, y2: band, color: _c(gold));
+  img.fillRect(im, x1: 0, y1: _h - band, x2: _w - 1, y2: _h - 1, color: _c(gold));
+  img.fillRect(im, x1: 0, y1: 0, x2: band, y2: _h - 1, color: _c(gold));
+  img.fillRect(im, x1: _w - band, y1: 0, x2: _w - 1, y2: _h - 1, color: _c(gold));
+  img.fillRect(im, x1: 5, y1: 5, x2: _w - 6, y2: 9, color: _c(deep));
+  img.fillRect(im, x1: 5, y1: _h - 10, x2: _w - 6, y2: _h - 6, color: _c(deep));
+  img.fillRect(im, x1: 5, y1: 5, x2: 9, y2: _h - 6, color: _c(deep));
+  img.fillRect(im, x1: _w - 10, y1: 5, x2: _w - 6, y2: _h - 6, color: _c(deep));
+  _border(im, band + 8, band + 8, _w - (band + 8) * 2, _h - (band + 8) * 2, deep, 1.4);
+  void rosette(int cx, int cy) {
+    img.fillCircle(im, x: cx, y: cy, radius: 14, color: _c(deep), antialias: true);
+    img.fillCircle(im, x: cx, y: cy, radius: 10, color: _c(gold), antialias: true);
+    _diamond(im, cx, cy, 6, deep);
+  }
+  rosette(band, band);
+  rosette(_w - band, band);
+  rosette(band, _h - band);
+  rosette(_w - band, _h - band);
   return im;
 }
 

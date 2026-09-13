@@ -258,7 +258,7 @@ List<NgmySlideElement> _mNgmyMark(double y, {required int ink, int gold = _certG
   return [
     ..._mOrnamentRule(0.22, y, 0.56, gold: gold, ink: ink),
     _mLockedText('NGMY', x: 0.2, y: y + 0.016, w: 0.6, h: 0.022, fontSize: 13, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'ngmy_mark'),
-    _mLockedText('Nakalaya Hati', x: 0.2, y: y + 0.036, w: 0.6, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: gold, tag: 'ngmy_sub'),
+    _mLockedText('Nakala ya Hati', x: 0.2, y: y + 0.036, w: 0.6, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, align: TextAlign.center, color: gold, tag: 'ngmy_sub'),
   ];
 }
 
@@ -655,30 +655,9 @@ List<NgmySlideElement> _buildPage2Content(NgmyMarriagePaperTemplate tpl) {
 }
 
 List<NgmySlideElement> _layoutPage1(NgmyMarriagePaperTemplate tpl) {
-  switch (tpl.layoutKind) {
-    case NgmyMarriageLayoutKind.classic:
-      return _layoutClassicPage1(tpl);
-    case NgmyMarriageLayoutKind.ringsNdoa:
-      return _layoutRingsNdoaPage1(tpl);
-    case NgmyMarriageLayoutKind.coupleCards:
-      return _layoutCoupleCardsPage1(tpl);
-    case NgmyMarriageLayoutKind.kuhoweshaForm:
-      return _layoutKuhoweshaFormPage1(tpl);
-    case NgmyMarriageLayoutKind.mahariPande:
-      return _layoutMahariPandePage1(tpl);
-    case NgmyMarriageLayoutKind.familiaMti:
-      return _layoutFamiliaMtiPage1(tpl);
-    case NgmyMarriageLayoutKind.ndoaSafi:
-      return _layoutNdoaSafiPage1(tpl);
-    case NgmyMarriageLayoutKind.peteWide:
-      return _layoutPeteWidePage1(tpl);
-    case NgmyMarriageLayoutKind.muhuriCrest:
-      return _layoutMuhuriCrestPage1(tpl);
-    case NgmyMarriageLayoutKind.fomuWazi:
-      return _layoutFomuWaziPage1(tpl);
-    case NgmyMarriageLayoutKind.upendoOrnate:
-      return _layoutUpendoOrnatePage1(tpl);
-  }
+  // Every Hati ya Ndoa paper uses the same certificate the user sent:
+  // rings, pills, labeled lines, two-column witnesses, NGMY mark.
+  return _layoutRingsNdoaPage1(tpl);
 }
 
 List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
@@ -959,224 +938,36 @@ class _NgmyCertPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (tpl.layoutKind) {
-      case NgmyMarriageLayoutKind.classic:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('HATI YA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-            Text('KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 8),
-            _ribbon('UTANGULIZI'),
-            const SizedBox(height: 5),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.85),
-            const SizedBox(height: 8),
-            _ribbon('MAHARI'),
-            const SizedBox(height: 5),
-            ...List.generate(3, (_) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
-                  Container(width: 9, height: 9, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
-                  const SizedBox(width: 5),
-                  Expanded(child: _bar(h: 4)),
-                ]))),
-            const Spacer(),
-            _ribbon('MASHAHIDI'),
-            const SizedBox(height: 6),
-            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.ringsNdoa:
-        return Column(
-          children: [
-            _rings(),
-            const SizedBox(height: 4),
-            Text('HATI YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 12)),
-            Text('Makubaliano ya Ndoa', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            _pill('TAARIFA ZA WANANDOA'),
-            const SizedBox(height: 6),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.9),
-            const SizedBox(height: 3),
-            _bar(w: 0.7),
-            const SizedBox(height: 8),
-            _pill('TAMKO'),
-            const SizedBox(height: 5),
-            _bar(w: 1),
-            const SizedBox(height: 3),
-            _bar(w: 0.95),
-            const Spacer(),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
-            const SizedBox(height: 4),
-            Text('NGMY', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.coupleCards:
-        return Column(
-          children: [
-            _rings(size: 16),
-            Text('TAARIFA ZA WANANDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(border: Border.all(color: const Color(_certGold)), borderRadius: BorderRadius.circular(6)),
-              child: Row(children: [_person(female: false), const SizedBox(width: 6), Expanded(child: Column(children: [_bar(), const SizedBox(height: 3), _bar(w: 0.8)]))]),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(border: Border.all(color: const Color(_certGold)), borderRadius: BorderRadius.circular(6)),
-              child: Row(children: [_person(female: true), const SizedBox(width: 6), Expanded(child: Column(children: [_bar(), const SizedBox(height: 3), _bar(w: 0.8)]))]),
-            ),
-            const Spacer(),
-            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.kuhoweshaForm:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(children: [_rings(size: 16), const Spacer(), Container(width: 36, height: 14, decoration: BoxDecoration(border: Border.all(color: accent)))]),
-            const SizedBox(height: 6),
-            Text('HATI YA KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 10)),
-            const SizedBox(height: 6),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.9),
-            const SizedBox(height: 8),
-            _pill('NIMETOWEA'),
-            const SizedBox(height: 5),
-            ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: Row(children: [
-                  Text('${i + 1}.', style: TextStyle(color: ink, fontSize: 7, fontWeight: FontWeight.w800)),
-                  const SizedBox(width: 4),
-                  Expanded(child: _bar(h: 4)),
-                ]))),
-            const Spacer(),
-            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.mahariPande:
-        return Column(
-          children: [
-            Text('MASHUA / MAHARI', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 10)),
-            const SizedBox(height: 6),
-            _pill('SHARTI'),
-            const SizedBox(height: 6),
-            ...List.generate(4, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: _bar(w: 1 - i * 0.05))),
-            const Spacer(),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
-            const SizedBox(height: 4),
-            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.familiaMti:
-        return Column(
-          children: [
-            const Text('🌳', style: TextStyle(fontSize: 18)),
-            Text('SHERIA ZA FAMILIA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
-            const SizedBox(height: 6),
-            ...List.generate(5, (i) => Padding(padding: const EdgeInsets.only(bottom: 3), child: _bar(w: 0.95 - i * 0.04))),
-            const Spacer(),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
-          ],
-        );
-      case NgmyMarriageLayoutKind.ndoaSafi:
-        return Column(
-          children: [
-            Text('MAKUBALIANO YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
-            const SizedBox(height: 8),
-            Row(children: [
-              Expanded(child: Column(children: [_person(female: false), const SizedBox(height: 3), _bar(), const SizedBox(height: 2), _bar(w: 0.8)])),
-              const SizedBox(width: 8),
-              Expanded(child: Column(children: [_person(female: true), const SizedBox(height: 3), _bar(), const SizedBox(height: 2), _bar(w: 0.8)])),
-            ]),
-            const Spacer(),
-            _pill('MASHARTI'),
-          ],
-        );
-      case NgmyMarriageLayoutKind.peteWide:
-        return Column(
-          children: [
-            _rings(size: 30),
-            const SizedBox(height: 6),
-            Text('PETE ZA UMOJA', textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 8),
-            _bar(),
-            const SizedBox(height: 6),
-            _bar(w: 0.85),
-            const SizedBox(height: 6),
-            _bar(w: 0.7),
-            const Spacer(),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [_person(female: false), _person(female: true)]),
-          ],
-        );
-      case NgmyMarriageLayoutKind.muhuriCrest:
-        return Column(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_certGold), width: 1.6)),
-              child: Text('MUHURI', style: TextStyle(color: ink, fontSize: 5, fontWeight: FontWeight.w900)),
-            ),
-            const SizedBox(height: 6),
-            Text('HATI RASMI', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 8),
-            _pill('TAARIFA RASMI'),
-            const SizedBox(height: 6),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.9),
-            const SizedBox(height: 3),
-            _bar(w: 0.8),
-            const Spacer(),
-            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-      case NgmyMarriageLayoutKind.fomuWazi:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('FOMU YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-            const SizedBox(height: 6),
-            _pill('A. TAARIFA ZA MUME'),
-            const SizedBox(height: 4),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.85),
-            const SizedBox(height: 6),
-            _pill('B. TAARIFA ZA MKE'),
-            const SizedBox(height: 4),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.85),
-            const Spacer(),
-            _pill('C. MAHARI'),
-          ],
-        );
-      case NgmyMarriageLayoutKind.upendoOrnate:
-        return Column(
-          children: [
-            _rings(size: 18),
-            Text('UPENDO WA DHAHABU', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
-            const SizedBox(height: 8),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_person(female: false, size: 26), _person(female: true, size: 26)]),
-            const SizedBox(height: 8),
-            _bar(),
-            const SizedBox(height: 3),
-            _bar(w: 0.9),
-            const SizedBox(height: 8),
-            _pill('MAHARI YA UPENDO'),
-            const Spacer(),
-            Text(tpl.name, style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 8)),
-          ],
-        );
-    }
+    return Column(
+      children: [
+        _rings(),
+        const SizedBox(height: 4),
+        Text('HATI YA NDOA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 12)),
+        Text('Hati ya Makubaliano ya Ndoa', textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.7), fontSize: 7, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        _pill('TAARIFA ZA WANANDOA'),
+        const SizedBox(height: 6),
+        _bar(),
+        const SizedBox(height: 3),
+        _bar(w: 0.9),
+        const SizedBox(height: 3),
+        _bar(w: 0.7),
+        const SizedBox(height: 8),
+        _pill('TAMKO LA MAKUBALIANO'),
+        const SizedBox(height: 5),
+        _bar(w: 1),
+        const SizedBox(height: 3),
+        _bar(w: 0.95),
+        const SizedBox(height: 8),
+        _pill('MASHAHIDI'),
+        const Spacer(),
+        Text('NGMY', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 8)),
+        Text(tpl.name, style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 7)),
+      ],
+    );
   }
 }
+
 
 /// Every marriage paper is one page. Empty space is not stretched onto a second sheet.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
