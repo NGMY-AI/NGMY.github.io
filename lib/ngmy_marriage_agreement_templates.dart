@@ -324,6 +324,66 @@ const List<NgmyMarriagePaperTemplate> kNgmyMarriagePaperTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFFCF3), Color(0xFFA6843A), Color(0xFF6B4A12)],
   ),
+  NgmyMarriagePaperTemplate(
+    id: 'kente_sunset',
+    name: 'Kente ya Jua',
+    description: 'Mpaka wa mistari ya kente · dhahabu, kijani na nyekundu.',
+    paperStyle: NgmyMarriagePaperStyle.kenteSunset,
+    background: 0xFFFFF6E4,
+    ink: 0xFF3A2415,
+    accent: 0xFF1B5E20,
+    bannerFill: 0xFF1B5E20,
+    bannerText: 0xFFFFF6E4,
+    previewColors: [Color(0xFFFFF6E4), Color(0xFF1B5E20), Color(0xFFD4AF37)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'indigo_mudcloth',
+    name: 'Nguo ya Indigo',
+    description: 'Mpaka wa indigo na alama za almasi za dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.indigoMudcloth,
+    background: 0xFFF7F0E4,
+    ink: 0xFF1A237E,
+    accent: 0xFF1A237E,
+    bannerFill: 0xFF1A237E,
+    bannerText: 0xFFF7F0E4,
+    previewColors: [Color(0xFFF7F0E4), Color(0xFF1A237E), Color(0xFFC9A227)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'adinkra_royal',
+    name: 'Muhuri wa Adinkra',
+    description: 'Muhuri wa pembe · ngozi ya dhahabu na kahawia.',
+    paperStyle: NgmyMarriagePaperStyle.adinkraRoyal,
+    background: 0xFFFFF8EC,
+    ink: 0xFF6B3F1F,
+    accent: 0xFF8B5A2B,
+    bannerFill: 0xFF6B3F1F,
+    bannerText: 0xFFFFF8EC,
+    previewColors: [Color(0xFFFFF8EC), Color(0xFF6B3F1F), Color(0xFFD4AF37)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'nile_lotus',
+    name: 'Lotus ya Nile',
+    description: 'Maua ya lotus · teal ya Nile na dhahabu.',
+    paperStyle: NgmyMarriagePaperStyle.nileLotus,
+    background: 0xFFF4F7F4,
+    ink: 0xFF0F5C5C,
+    accent: 0xFF0F5C5C,
+    bannerFill: 0xFF0F5C5C,
+    bannerText: 0xFFF4F7F4,
+    previewColors: [Color(0xFFF4F7F4), Color(0xFF0F5C5C), Color(0xFFC9A227)],
+  ),
+  NgmyMarriagePaperTemplate(
+    id: 'shweshwe_ivory',
+    name: 'Shweshwe',
+    description: 'Mpaka wa almasi za indigo · pembe za terracotta.',
+    paperStyle: NgmyMarriagePaperStyle.shweshweIvory,
+    background: 0xFFF8F4EE,
+    ink: 0xFF1B2A4A,
+    accent: 0xFFC45C3E,
+    bannerFill: 0xFF1B2A4A,
+    bannerText: 0xFFF8F4EE,
+    previewColors: [Color(0xFFF8F4EE), Color(0xFF1B2A4A), Color(0xFFC45C3E)],
+  ),
 ];
 
 NgmyMarriagePaperTemplate? ngmyMarriageTemplateById(String id) {
@@ -493,9 +553,9 @@ List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
 /// content), just recolored per template.
 Widget ngmyMarriageTemplateLivePreview(String templateId) {
   final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
-  final bg = Color(tpl.background);
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
+  final paper = ngmyMarriagePaperPng(tpl.paperStyle);
   Widget bar({double w = 1, double h = 6}) => Align(
         alignment: Alignment.centerLeft,
         child: FractionallySizedBox(
@@ -509,50 +569,45 @@ Widget ngmyMarriageTemplateLivePreview(String templateId) {
         decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3)),
         child: Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 7, letterSpacing: 0.4)),
       );
-  return ColoredBox(
-    color: bg,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(border: Border.all(color: accent.withValues(alpha: 0.5), width: 5)),
-          ),
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Positioned.fill(
+        child: Image.memory(paper, fit: BoxFit.cover, gaplessPlayback: true, filterQuality: FilterQuality.medium),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('HATI YA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
+            Text('KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
+            const SizedBox(height: 10),
+            ribbon('UTANGULIZI'),
+            const SizedBox(height: 6),
+            bar(),
+            const SizedBox(height: 3),
+            bar(w: 0.85),
+            const SizedBox(height: 3),
+            bar(w: 0.9),
+            const SizedBox(height: 8),
+            ribbon('MAHARI'),
+            const SizedBox(height: 6),
+            ...List.generate(3, (_) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
+                  Container(width: 10, height: 10, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Expanded(child: bar(h: 5)),
+                ]))),
+            const Spacer(),
+            ribbon('MASHAHIDI'),
+            const SizedBox(height: 8),
+            Row(children: [Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))), const SizedBox(width: 6), Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1))))]),
+            const SizedBox(height: 6),
+            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 9)),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('HATI YA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-              Text('KUHOWESHA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 11)),
-              const SizedBox(height: 10),
-              ribbon('UTANGULIZI'),
-              const SizedBox(height: 6),
-              bar(),
-              const SizedBox(height: 3),
-              bar(w: 0.85),
-              const SizedBox(height: 3),
-              bar(w: 0.9),
-              const SizedBox(height: 8),
-              ribbon('MAHARI'),
-              const SizedBox(height: 6),
-              ...List.generate(3, (_) => Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
-                    Container(width: 10, height: 10, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Expanded(child: bar(h: 5)),
-                  ]))),
-              const Spacer(),
-              ribbon('MASHAHIDI'),
-              const SizedBox(height: 8),
-              Row(children: [Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))), const SizedBox(width: 6), Expanded(child: Container(height: 24, decoration: BoxDecoration(border: Border.all(color: accent, width: 1))))]),
-              const SizedBox(height: 6),
-              Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 9)),
-            ],
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 

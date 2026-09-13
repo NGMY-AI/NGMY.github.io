@@ -49,13 +49,15 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
 
   static const _inkChoices = [Color(0xFF111827), Color(0xFF1D4ED8), Color(0xFF7F1D1D), Color(0xFF14532D)];
   Color _inkColor = _inkChoices.first;
-  double _strokeWidth = 3.5;
+  double _strokeWidth = 5.2;
 
   @override
   void initState() {
     super.initState();
     _points = List<Offset?>.from(widget.initialPoints);
-    if (widget.initialStrokeWidth != null) _strokeWidth = widget.initialStrokeWidth!;
+    if (widget.initialStrokeWidth != null) {
+      _strokeWidth = widget.initialStrokeWidth!.clamp(_minStroke, _maxStroke);
+    }
     if (widget.initialInkColor != null) _inkColor = widget.initialInkColor!;
     // Forcing a landscape orientation lock here (via the browser's Screen
     // Orientation API on web) only actually works inside true browser
@@ -90,9 +92,9 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
     );
   }
 
-  static const _thicknessChoices = [2.2, 3.5, 5.2];
-  static const _minStroke = 1.0;
-  static const _maxStroke = 14.0;
+  static const _thicknessChoices = [5.2, 8.4, 12.0];
+  static const _minStroke = 5.2;
+  static const _maxStroke = 16.0;
   bool _sliderOpen = false;
 
   Widget _thicknessDot(double w) {
@@ -103,8 +105,8 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
         _sliderOpen = false;
       }),
       child: Container(
-        width: 28,
-        height: 28,
+        width: 34,
+        height: 34,
         margin: const EdgeInsets.symmetric(horizontal: 3),
         alignment: Alignment.center,
         decoration: BoxDecoration(
@@ -113,8 +115,8 @@ class _FullscreenSignatureDialogState extends State<_FullscreenSignatureDialog> 
           border: Border.all(color: selected ? const Color(0xFF10B981) : Colors.white24, width: selected ? 1.4 : 1),
         ),
         child: Container(
-          width: (w * 1.6).clamp(4.0, 11.0),
-          height: (w * 1.6).clamp(4.0, 11.0),
+          width: (w * 1.15).clamp(8.0, 18.0),
+          height: (w * 1.15).clamp(8.0, 18.0),
           decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
         ),
       ),
@@ -376,7 +378,7 @@ class NgmySignaturePainter extends CustomPainter {
     final fitted = liveDraw
         ? points.map((p) => p == null ? null : Offset(p.dx * size.width, p.dy * size.height)).toList()
         : fitSignatureToSize(points, size);
-    final stroke = (strokeWidthBase * (size.shortestSide / 280)).clamp(2.0, 8.0);
+    final stroke = (strokeWidthBase * (size.shortestSide / 280)).clamp(3.0, 28.0);
     final paint = Paint()
       ..color = color
       ..strokeWidth = stroke

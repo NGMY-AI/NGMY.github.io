@@ -149,7 +149,7 @@ Future<NgmySlidesSignatureResult?> ngmySlidesCaptureSignature(
   final points = <Offset?>[];
   Size? size;
   var color = initialInkColor ?? const Color(0xFF111827);
-  var strokeWidth = initialStrokeWidth ?? 3.5;
+  var strokeWidth = initialStrokeWidth ?? 5.2;
   await showNgmyFullscreenSignature(
     context,
     title: 'Sign document',
