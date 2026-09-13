@@ -56,25 +56,20 @@ void main() {
   test('Hati ya Kuhowa and Kuhowesha keep yesterday’s six papers plus five gold-edge papers', () {
     expect(kNgmyHatiKuhowaTemplates, hasLength(12));
     expect(
-      kNgmyHatiKuhowaTemplates.take(6).map((t) => t.id).toList(),
+      kNgmyHatiKuhowaTemplates.map((t) => t.id).toList(),
       [
         'kuhowa_elegant_navy',
         'kuhowa_elegant_gold',
-        'kuhowa_heritage_gold',
-        'kuhowa_heritage_crimson',
+        'kuhowa_gold_ribbon',
+        'kuhowa_gold_baroque',
         'kuhowa_elegant_emerald',
         'kuhowa_elegant_burgundy',
-      ],
-    );
-    expect(
-      kNgmyHatiKuhowaTemplates.skip(6).map((t) => t.id).toList(),
-      [
         'kuhowa_gold_filigree',
         'kuhowa_gold_laurel',
         'kuhowa_gold_crest',
-        'kuhowa_gold_ribbon',
-        'kuhowa_gold_baroque',
         'kuhowa_gold_star',
+        'kuhowa_heritage_gold',
+        'kuhowa_heritage_crimson',
       ],
     );
     for (final id in ['kuhowa_kente_sunset', 'kuhowa_rings_ndoa', 'kuhowa_upendo']) {

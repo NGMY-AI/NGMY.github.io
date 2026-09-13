@@ -461,7 +461,7 @@ List<NgmySlideElement> _hMwandishiBar(double x, double y, double w, {required in
 /// Yesterday's six papers — the only ones shown on Hati ya Kuhowa
 /// and Hati ya Kuhowesha. Newer cloth / certificate papers stay in
 /// [kNgmyHatiKuhowaNewerTemplates] so older saved documents still open.
-const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaNavyOnly = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_elegant_navy',
     name: 'Kuhowa — Bluu ya Kifalme',
@@ -474,6 +474,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFFEFB), Color(0xFF12213D), Color(0xFFB8860B)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaSecondSlot = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_elegant_gold',
     name: 'Kuhowa — Dhahabu',
@@ -486,6 +489,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFFCF3), Color(0xFFA6843A), Color(0xFF6B4A12)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaHeritageBottom = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_heritage_gold',
     name: 'Kuhowa — Hazina ya Dhahabu',
@@ -510,6 +516,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFAF0E6), Color(0xFF6B2A1E), Color(0xFFE0A458)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaElegantRest = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_elegant_emerald',
     name: 'Kuhowa — Zumaridi',
@@ -575,6 +584,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFF8EC), Color(0xFFD4AF37), Color(0xFF6B4F12)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaRow2 = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_gold_ribbon',
     name: 'Utepe wa Dhahabu',
@@ -599,6 +611,9 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFF6E4), Color(0xFFD4AF37), Color(0xFF8B6914)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldTail = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_gold_star',
     name: 'Nyota ya Dhahabu',
@@ -613,9 +628,28 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeTemplates = [
   ),
 ];
 
-const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
-  ...kNgmyHatiKuhowaYesterdayTemplates,
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
+  ...kNgmyHatiKuhowaNavyOnly,
+  ...kNgmyHatiKuhowaSecondSlot,
+  ...kNgmyHatiKuhowaHeritageBottom,
+  ...kNgmyHatiKuhowaElegantRest,
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaGoldEdgeAll = [
   ...kNgmyHatiKuhowaGoldEdgeTemplates,
+  ...kNgmyHatiKuhowaRow2,
+  ...kNgmyHatiKuhowaGoldTail,
+];
+
+/// Row 1: navy + gold. Row 2: Utepe + Ukanda. Heritage papers sit last.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
+  ...kNgmyHatiKuhowaNavyOnly,
+  ...kNgmyHatiKuhowaSecondSlot,
+  ...kNgmyHatiKuhowaRow2,
+  ...kNgmyHatiKuhowaElegantRest,
+  ...kNgmyHatiKuhowaGoldEdgeTemplates,
+  ...kNgmyHatiKuhowaGoldTail,
+  ...kNgmyHatiKuhowaHeritageBottom,
 ];
 
 /// Newer papers kept so existing saved documents still resolve. They are
@@ -881,7 +915,7 @@ NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuho
       ? <List<NgmyHatiKuhowaTemplate>>[templates]
       : <List<NgmyHatiKuhowaTemplate>>[
           kNgmyHatiKuhowaYesterdayTemplates,
-          kNgmyHatiKuhowaGoldEdgeTemplates,
+          kNgmyHatiKuhowaGoldEdgeAll,
           kNgmyHatiKuhowaNewerTemplates,
           kNgmyHatiMalipoAwamuExtraTemplates,
         ];

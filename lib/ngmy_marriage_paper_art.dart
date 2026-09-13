@@ -187,90 +187,83 @@ img.Image _elegantPaper(int paperTop, int paperBottom, int lineColor) {
   return im;
 }
 
-void _cornerL(img.Image im, int x, int y, int dx, int dy, int color, {int arm = 28, double thick = 2.2}) {
-  img.drawLine(im, x1: x, y1: y, x2: x + dx * arm, y2: y, color: _c(color), antialias: true, thickness: thick);
-  img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * arm, color: _c(color), antialias: true, thickness: thick);
+/// The Utepe wa Dhahabu corner: navy triangle, gold inner triangle, jewel.
+/// Variants keep that same cut, with different colors or extra gold marks.
+void _utepeCorner(
+  img.Image im,
+  int x,
+  int y,
+  int dx,
+  int dy, {
+  int outer = 0xFF12213D,
+  int inner = 0xFFC9A227,
+  int jewel = 0xFF12213D,
+  int size = 36,
+  bool armJewels = false,
+  bool goldTip = false,
+}) {
+  img.fillPolygon(im, vertices: [
+    img.Point(x.toDouble(), y.toDouble()),
+    img.Point((x + dx * size).toDouble(), y.toDouble()),
+    img.Point(x.toDouble(), (y + dy * size).toDouble()),
+  ], color: _c(outer));
+  final inset = (size * 0.17).round().clamp(5, 8);
+  final innerSize = (size * 0.78).round();
+  img.fillPolygon(im, vertices: [
+    img.Point((x + dx * inset).toDouble(), (y + dy * inset).toDouble()),
+    img.Point((x + dx * innerSize).toDouble(), (y + dy * inset).toDouble()),
+    img.Point((x + dx * inset).toDouble(), (y + dy * innerSize).toDouble()),
+  ], color: _c(inner));
+  _diamond(im, x + dx * (size * 0.39).round(), y + dy * (size * 0.39).round(), 6, jewel);
+  if (armJewels) {
+    _diamond(im, x + dx * (size - 7), y + dy * 3, 4, inner);
+    _diamond(im, x + dx * 3, y + dy * (size - 7), 4, inner);
+  }
+  if (goldTip) {
+    _diamond(im, x + dx * (size - 4), y, 5, inner);
+    _diamond(im, x, y + dy * (size - 4), 5, inner);
+  }
+}
+
+void _utepeCornersOn(
+  img.Image im, {
+  required int x,
+  required int y,
+  int outer = 0xFF12213D,
+  int inner = 0xFFC9A227,
+  int jewel = 0xFF12213D,
+  int size = 36,
+  bool armJewels = false,
+  bool goldTip = false,
+}) {
+  _utepeCorner(im, x, y, 1, 1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
+  _utepeCorner(im, _w - x, y, -1, 1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
+  _utepeCorner(im, x, _h - y, 1, -1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
+  _utepeCorner(im, _w - x, _h - y, -1, -1, outer: outer, inner: inner, jewel: jewel, size: size, armJewels: armJewels, goldTip: goldTip);
 }
 
 img.Image _withNavyBracketCorners(img.Image im) {
-  const gold = 0xFFD4AF37;
-  const navy = 0xFF12213D;
-  void mark(int x, int y, int dx, int dy) {
-    _cornerL(im, x, y, dx, dy, gold, arm: 32, thick: 2.6);
-    _cornerL(im, x + dx * 7, y + dy * 7, dx, dy, navy, arm: 18, thick: 1.4);
-    _diamond(im, x + dx * 14, y + dy * 14, 6, gold);
-  }
-  mark(20, 22, 1, 1);
-  mark(_w - 20, 22, -1, 1);
-  mark(20, _h - 22, 1, -1);
-  mark(_w - 20, _h - 22, -1, -1);
+  _utepeCornersOn(im, x: 14, y: 16, size: 34, armJewels: true);
   return im;
 }
 
 img.Image _withEmeraldFanCorners(img.Image im) {
-  const gold = 0xFFC9A227;
-  void fan(int cx, int cy, double base) {
-    for (var i = 0; i < 5; i++) {
-      final a = base + i * 0.28;
-      img.drawLine(
-        im,
-        x1: cx,
-        y1: cy,
-        x2: (cx + 22 * math.cos(a)).round(),
-        y2: (cy + 22 * math.sin(a)).round(),
-        color: _c(gold),
-        antialias: true,
-        thickness: 1.5,
-      );
-    }
-    _diamond(im, cx, cy, 5, gold);
-  }
-  fan(26, 28, 0);
-  fan(_w - 26, 28, math.pi / 2);
-  fan(26, _h - 28, -math.pi / 2);
-  fan(_w - 26, _h - 28, math.pi);
+  _utepeCornersOn(im, x: 14, y: 16, outer: 0xFF0E3B2E, inner: 0xFFC9A227, jewel: 0xFF0E3B2E, size: 34, goldTip: true);
   return im;
 }
 
 img.Image _withBurgundyScrollCorners(img.Image im) {
-  const gold = 0xFFD4AF37;
-  void scroll(int x, int y, int dx, int dy) {
-    img.drawCircle(im, x: x + dx * 10, y: y + dy * 10, radius: 10, color: _c(gold), antialias: true);
-    img.drawCircle(im, x: x + dx * 10, y: y + dy * 10, radius: 6, color: _c(gold), antialias: true);
-    _diamond(im, x + dx * 10, y + dy * 10, 4, gold);
-    img.drawLine(im, x1: x, y1: y + dy * 10, x2: x + dx * 26, y2: y + dy * 10, color: _c(gold), antialias: true, thickness: 1.6);
-    img.drawLine(im, x1: x + dx * 10, y1: y, x2: x + dx * 10, y2: y + dy * 26, color: _c(gold), antialias: true, thickness: 1.6);
-  }
-  scroll(22, 24, 1, 1);
-  scroll(_w - 22, 24, -1, 1);
-  scroll(22, _h - 24, 1, -1);
-  scroll(_w - 22, _h - 24, -1, -1);
+  _utepeCornersOn(im, x: 14, y: 16, outer: 0xFF4A0E1F, inner: 0xFFD4AF37, jewel: 0xFFFFF7F6, size: 34);
   return im;
 }
 
 img.Image _withHeritageGoldCorners(img.Image im) {
-  const gold = 0xFFD4AF37;
-  void mark(int x, int y) {
-    _diamond(im, x, y, 9, gold);
-    _diamond(im, x, y, 4, 0xFF5C3A1E);
-  }
-  mark(40, 42);
-  mark(_w - 40, 42);
-  mark(40, _h - 42);
-  mark(_w - 40, _h - 42);
+  _utepeCornersOn(im, x: 28, y: 28, outer: 0xFF5C3A1E, inner: 0xFFD4AF37, jewel: 0xFF5C3A1E, size: 32, armJewels: true);
   return im;
 }
 
 img.Image _withHeritageCrimsonCorners(img.Image im) {
-  const gold = 0xFFE0A458;
-  void mark(int x, int y, int dx, int dy) {
-    _cornerL(im, x, y, dx, dy, gold, arm: 22, thick: 2.0);
-    img.fillCircle(im, x: x + dx * 8, y: y + dy * 8, radius: 4, color: _c(gold), antialias: true);
-  }
-  mark(38, 40, 1, 1);
-  mark(_w - 38, 40, -1, 1);
-  mark(38, _h - 40, 1, -1);
-  mark(_w - 38, _h - 40, -1, -1);
+  _utepeCornersOn(im, x: 28, y: 28, outer: 0xFF6B2A1E, inner: 0xFFE0A458, jewel: 0xFF6B2A1E, size: 32, goldTip: true);
   return im;
 }
 
@@ -444,18 +437,7 @@ img.Image _goldFiligreePaper() {
   _border(im, 10, 12, _w - 20, _h - 24, gold, 3.2);
   _border(im, 18, 20, _w - 36, _h - 40, deep, 1.2);
   _border(im, 24, 26, _w - 48, _h - 52, gold, 1.8);
-  void flourish(int x, int y, int dx, int dy) {
-    img.drawLine(im, x1: x, y1: y, x2: x + dx * 42, y2: y, color: _c(gold), antialias: true, thickness: 2.4);
-    img.drawLine(im, x1: x, y1: y, x2: x, y2: y + dy * 42, color: _c(gold), antialias: true, thickness: 2.4);
-    img.drawLine(im, x1: x + dx * 12, y1: y + dy * 12, x2: x + dx * 34, y2: y + dy * 12, color: _c(deep), antialias: true, thickness: 1.2);
-    img.drawLine(im, x1: x + dx * 12, y1: y + dy * 12, x2: x + dx * 12, y2: y + dy * 34, color: _c(deep), antialias: true, thickness: 1.2);
-    _diamond(im, x + dx * 16, y + dy * 16, 8, gold);
-    _diamond(im, x + dx * 16, y + dy * 16, 4, deep);
-  }
-  flourish(24, 26, 1, 1);
-  flourish(_w - 24, 26, -1, 1);
-  flourish(24, _h - 26, 1, -1);
-  flourish(_w - 24, _h - 26, -1, -1);
+  _utepeCornersOn(im, x: 10, y: 12, outer: 0xFF12213D, inner: gold, jewel: deep, size: 38, armJewels: true);
   for (var i = 56; i < _w - 56; i += 18) {
     _goldTick(im, i, 16, gold, size: 3);
     _goldTick(im, i, _h - 16, gold, size: 3);
@@ -491,10 +473,7 @@ img.Image _goldLaurelPaper() {
     leaf(22, y, 1, 1);
     leaf(_w - 22, y, -1, 1);
   }
-  _diamond(im, 28, 30, 9, gold);
-  _diamond(im, _w - 28, 30, 9, gold);
-  _diamond(im, 28, _h - 30, 9, gold);
-  _diamond(im, _w - 28, _h - 30, 9, gold);
+  _utepeCornersOn(im, x: 16, y: 18, outer: 0xFF3A2415, inner: gold, jewel: 0xFF3A2415, size: 34, goldTip: true);
   return im;
 }
 
@@ -507,16 +486,7 @@ img.Image _goldCrestPaper() {
   const inset = 26;
   _border(im, inset, inset, _w - inset * 2, _h - inset * 2, gold, 2.0);
   _border(im, inset + 8, inset + 8, _w - (inset + 8) * 2, _h - (inset + 8) * 2, deep, 0.9);
-  void crest(int cx, int cy) {
-    img.drawCircle(im, x: cx, y: cy, radius: 16, color: _c(gold), antialias: true);
-    img.drawCircle(im, x: cx, y: cy, radius: 11, color: _c(deep), antialias: true);
-    _diamond(im, cx, cy, 7, gold);
-    _diamond(im, cx, cy, 3, deep);
-  }
-  crest(inset, inset);
-  crest(_w - inset, inset);
-  crest(inset, _h - inset);
-  crest(_w - inset, _h - inset);
+  _utepeCornersOn(im, x: 12, y: 12, outer: 0xFF12213D, inner: gold, jewel: deep, size: 36, armJewels: true);
   _beadRow(im, 12, 12, _w - 12, 12, gold, spacing: 16, radius: 3);
   _beadRow(im, 12, _h - 12, _w - 12, _h - 12, gold, spacing: 16, radius: 3);
   _beadRow(im, 12, 12, 12, _h - 12, gold, spacing: 18, radius: 3);
@@ -532,23 +502,7 @@ img.Image _goldRibbonPaper() {
   const navy = 0xFF12213D;
   _border(im, 14, 16, _w - 28, _h - 32, gold, 2.2);
   _border(im, 22, 24, _w - 44, _h - 48, gold, 1.0);
-  void ribbon(int x, int y, int dx, int dy) {
-    img.fillPolygon(im, vertices: [
-      img.Point(x.toDouble(), y.toDouble()),
-      img.Point((x + dx * 36).toDouble(), y.toDouble()),
-      img.Point(x.toDouble(), (y + dy * 36).toDouble()),
-    ], color: _c(navy));
-    img.fillPolygon(im, vertices: [
-      img.Point((x + dx * 6).toDouble(), (y + dy * 6).toDouble()),
-      img.Point((x + dx * 28).toDouble(), (y + dy * 6).toDouble()),
-      img.Point((x + dx * 6).toDouble(), (y + dy * 28).toDouble()),
-    ], color: _c(gold));
-    _diamond(im, x + dx * 14, y + dy * 14, 6, navy);
-  }
-  ribbon(14, 16, 1, 1);
-  ribbon(_w - 14, 16, -1, 1);
-  ribbon(14, _h - 16, 1, -1);
-  ribbon(_w - 14, _h - 16, -1, -1);
+  _utepeCornersOn(im, x: 14, y: 16, outer: navy, inner: gold, jewel: navy, size: 36);
   _diamond(im, _w ~/ 2, 20, 7, gold);
   _diamond(im, _w ~/ 2, _h - 20, 7, gold);
   _diamond(im, 18, _h ~/ 2, 7, gold);
@@ -572,15 +526,7 @@ img.Image _goldBaroquePaper() {
   img.fillRect(im, x1: 5, y1: 5, x2: 9, y2: _h - 6, color: _c(deep));
   img.fillRect(im, x1: _w - 10, y1: 5, x2: _w - 6, y2: _h - 6, color: _c(deep));
   _border(im, band + 8, band + 8, _w - (band + 8) * 2, _h - (band + 8) * 2, deep, 1.4);
-  void rosette(int cx, int cy) {
-    img.fillCircle(im, x: cx, y: cy, radius: 14, color: _c(deep), antialias: true);
-    img.fillCircle(im, x: cx, y: cy, radius: 10, color: _c(gold), antialias: true);
-    _diamond(im, cx, cy, 6, deep);
-  }
-  rosette(band, band);
-  rosette(_w - band, band);
-  rosette(band, _h - band);
-  rosette(_w - band, _h - band);
+  _utepeCornersOn(im, x: 0, y: 0, outer: 0xFF12213D, inner: gold, jewel: 0xFF12213D, size: 40, goldTip: true);
   return im;
 }
 
@@ -592,27 +538,7 @@ img.Image _goldStarPaper() {
   const navy = 0xFF12213D;
   _border(im, 16, 18, _w - 32, _h - 36, gold, 2.4);
   _border(im, 24, 26, _w - 48, _h - 52, navy, 0.9);
-  void star(int cx, int cy) {
-    for (var i = 0; i < 8; i++) {
-      final a = i * math.pi / 4;
-      img.drawLine(
-        im,
-        x1: cx,
-        y1: cy,
-        x2: (cx + 16 * math.cos(a)).round(),
-        y2: (cy + 16 * math.sin(a)).round(),
-        color: _c(gold),
-        antialias: true,
-        thickness: 1.8,
-      );
-    }
-    img.fillCircle(im, x: cx, y: cy, radius: 5, color: _c(navy), antialias: true);
-    _diamond(im, cx, cy, 4, gold);
-  }
-  star(28, 30);
-  star(_w - 28, 30);
-  star(28, _h - 30);
-  star(_w - 28, _h - 30);
+  _utepeCornersOn(im, x: 16, y: 18, outer: navy, inner: gold, jewel: navy, size: 36, goldTip: true);
   _diamond(im, _w ~/ 2, 22, 6, gold);
   _diamond(im, _w ~/ 2, _h - 22, 6, gold);
   return im;
