@@ -130,7 +130,7 @@ NgmySlideElement _mBgImage(String dataUrl) {
 
 /// A tap-to-fill blank with an underline — no visible label, used inline
 /// inside a running sentence (e.g. "Mimi ___, binti wa familia ya ___,").
-NgmySlideElement _mBlank(String key, double x, double y, double w, {int ink = 0xFF1A1208, double fontSize = 8.5, String startText = ''}) {
+NgmySlideElement _mBlank(String key, double x, double y, double w, {int ink = 0xFF1A1208, double fontSize = 8.5, String startText = '✚'}) {
   return NgmySlideElement(
     id: NgmySlidesTemplates.newId(),
     type: NgmySlideElementType.text,
@@ -174,9 +174,9 @@ List<NgmySlideElement> _mRun(List<NgmyMSeg> segs, double x, double y, {required 
       out.add(_mLockedText(s.text, x: cx, y: y, w: w, h: 0.02, fontSize: fontSize, fontWeight: FontWeight.w500, color: ink, tag: 'run_${cx}_$y'));
       cx += w;
     } else {
-      out.add(_mBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize));
+      out.add(_mBlank(s.blankKey!, cx, y - 0.002, s.blankW, ink: ink, fontSize: fontSize, startText: '✚'));
       out.add(_mBlankUnderline(cx, y, s.blankW));
-      cx += s.blankW + 0.008;
+      cx += s.blankW + 0.004;
     }
   }
   return out;
@@ -185,8 +185,8 @@ List<NgmySlideElement> _mRun(List<NgmyMSeg> segs, double x, double y, {required 
 /// A section-header ribbon (UTANGULIZI / MAHARI... / MASHAHIDI).
 List<NgmySlideElement> _mBanner(String text, double y, double x, double w, {required int fill, required int textColor}) {
   return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.036, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
-    _mLockedText(text, x: x, y: y + 0.004, w: w, h: 0.028, fontSize: 14, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.026, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'banner_$text'),
+    _mLockedText(text, x: x, y: y + 0.003, w: w, h: 0.020, fontSize: 11, fontWeight: FontWeight.w900, align: TextAlign.center, color: textColor, tag: 'banner_t_$text'),
   ];
 }
 
@@ -297,74 +297,74 @@ List<NgmySlideElement> _mStaticPara(String text, double x, double y, double w, d
 /// (pre-filled for the first four, blank for the rest so users can add more
 /// gift types), and an editable amount/description field.
 List<NgmySlideElement> _mMahariRow(int n, String emoji, String defaultName, String amountHint, double x, double y, double w, {required int ink, required int accent}) {
-  const circleD = 0.044;
-  final nameX = x + circleD + 0.055;
+  const circleD = 0.022;
+  final nameX = x + circleD + 0.040;
   final nameW = w * 0.33;
-  final amountX = nameX + nameW + 0.02;
+  final amountX = nameX + nameW + 0.016;
   final amountW = x + w - amountX;
   return [
-    _mLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y, w: circleD, h: circleD, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'mahari_c_$n'),
-    _mLockedText('$n', x: x, y: y + 0.004, w: circleD, h: circleD - 0.008, fontSize: 12, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFFFFFFF, tag: 'mahari_n_$n'),
-    _mLockedText(emoji, x: x + circleD + 0.006, y: y - 0.003, w: 0.045, h: circleD, fontSize: 17, tag: 'mahari_e_$n'),
-    _mBlank('mahari_${n}_name', nameX, y + 0.008, nameW, ink: ink, fontSize: 11.5, startText: defaultName),
-    _mBlankUnderline(nameX, y + 0.026, nameW),
-    _mBlank('mahari_${n}_amount', amountX, y + 0.008, amountW, ink: ink, fontSize: 10.5, startText: amountHint),
-    _mBlankUnderline(amountX, y + 0.026, amountW),
+    _mLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y + 0.002, w: circleD, h: circleD, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'mahari_c_$n'),
+    _mLockedText('$n', x: x, y: y + 0.004, w: circleD, h: 0.018, fontSize: 8, fontWeight: FontWeight.w900, align: TextAlign.center, color: 0xFFFFFFFF, tag: 'mahari_n_$n'),
+    _mLockedText(emoji, x: x + circleD + 0.004, y: y, w: 0.032, h: circleD, fontSize: 11, tag: 'mahari_e_$n'),
+    _mBlank('mahari_${n}_name', nameX, y + 0.002, nameW, ink: ink, fontSize: 9.5, startText: defaultName),
+    _mBlankUnderline(nameX, y + 0.018, nameW),
+    _mBlank('mahari_${n}_amount', amountX, y + 0.002, amountW, ink: ink, fontSize: 9, startText: amountHint),
+    _mBlankUnderline(amountX, y + 0.018, amountW),
   ];
 }
 
 /// One MASHAHIDI witness line — name + Sahihi (signature) + Tarehe.
 List<NgmySlideElement> _mWitnessRow(String side, int n, double x, double y, double w, {required int ink, required int accent}) {
   final signW = w * 0.44;
-  final dateX = x + signW + 0.03;
+  final dateX = x + signW + 0.02;
   final dateW = x + w - dateX;
   return [
-    _mLockedText('$n.', x: x, y: y, w: 0.036, h: 0.024, fontSize: 11, fontWeight: FontWeight.w800, color: accent, tag: 'wit_n_${side}_$n'),
-    _mBlank('witness_${side}_${n}_name', x + 0.036, y, w - 0.036, ink: ink, fontSize: 11, startText: '[Jina la shahidi]'),
-    _mBlankUnderline(x + 0.036, y + 0.022, w - 0.036),
-    _mLockedText('Sahihi:', x: x, y: y + 0.036, w: 0.11, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w600, color: ink, tag: 'wit_sl_${side}_$n'),
+    _mLockedText('$n.', x: x, y: y, w: 0.024, h: 0.018, fontSize: 8.5, fontWeight: FontWeight.w800, color: accent, tag: 'wit_n_${side}_$n'),
+    _mBlank('witness_${side}_${n}_name', x + 0.024, y, w - 0.024, ink: ink, fontSize: 9, startText: '✚'),
+    _mBlankUnderline(x + 0.024, y + 0.016, w - 0.024),
+    _mLockedText('Sahihi:', x: x, y: y + 0.026, w: 0.09, h: 0.016, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'wit_sl_${side}_$n'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.shape,
       shape: NgmySlideShapeKind.rectangle,
-      x: x + 0.1,
-      y: y + 0.032,
-      w: signW - 0.1,
-      h: 0.03,
+      x: x + 0.09,
+      y: y + 0.022,
+      w: signW - 0.09,
+      h: 0.024,
       fillColor: 0x00000000,
       strokeColor: 0x00000000,
       fileName: '${_kSign}witness_${side}_$n',
     ),
-    _mLockedText('Tarehe:', x: dateX, y: y + 0.036, w: 0.11, h: 0.02, fontSize: 9.5, fontWeight: FontWeight.w600, color: ink, tag: 'wit_dl_${side}_$n'),
-    _mBlank('witness_${side}_${n}_date', dateX + 0.1, y + 0.032, dateW - 0.1, ink: ink, fontSize: 9.5),
-    _mBlankUnderline(dateX + 0.1, y + 0.05, dateW - 0.1),
+    _mLockedText('Tarehe:', x: dateX, y: y + 0.026, w: 0.09, h: 0.016, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'wit_dl_${side}_$n'),
+    _mBlank('witness_${side}_${n}_date', dateX + 0.09, y + 0.024, dateW - 0.09, ink: ink, fontSize: 8, startText: '✚'),
+    _mBlankUnderline(dateX + 0.09, y + 0.038, dateW - 0.09),
   ];
 }
 
 /// MCHUMBA (MUME) / MCHUMBA (MKE) box — name, signature, date.
 List<NgmySlideElement> _mPartySignBox(String key, String label, double x, double y, double w, double h, {required int ink, required int accent}) {
   return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.3, tag: 'partybox_$key'),
-    _mLockedText(label, x: x, y: y + 0.014, w: w, h: 0.026, fontSize: 12.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'partybox_t_$key'),
-    _mLockedText('Jina:', x: x + 0.02, y: y + 0.055, w: 0.08, h: 0.022, fontSize: 10, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_jl_$key'),
-    _mBlank('${key}_jina', x + 0.095, y + 0.055, w - 0.115, ink: ink, fontSize: 10.5),
-    _mBlankUnderline(x + 0.095, y + 0.074, w - 0.115),
-    _mLockedText('Sahihi:', x: x + 0.02, y: y + 0.095, w: 0.09, h: 0.022, fontSize: 10, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_sl_$key'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: h, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'partybox_$key'),
+    _mLockedText(label, x: x, y: y + 0.006, w: w, h: 0.018, fontSize: 9.5, fontWeight: FontWeight.w900, align: TextAlign.center, color: accent, tag: 'partybox_t_$key'),
+    _mLockedText('Jina:', x: x + 0.012, y: y + 0.028, w: 0.07, h: 0.016, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_jl_$key'),
+    _mBlank('${key}_jina', x + 0.078, y + 0.026, w - 0.094, ink: ink, fontSize: 8.5, startText: '✚'),
+    _mBlankUnderline(x + 0.078, y + 0.042, w - 0.094),
+    _mLockedText('Sahihi:', x: x + 0.012, y: y + 0.054, w: 0.08, h: 0.016, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_sl_$key'),
     NgmySlideElement(
       id: NgmySlidesTemplates.newId(),
       type: NgmySlideElementType.shape,
       shape: NgmySlideShapeKind.rectangle,
-      x: x + 0.11,
-      y: y + 0.088,
-      w: w - 0.13,
-      h: 0.038,
+      x: x + 0.09,
+      y: y + 0.050,
+      w: w - 0.106,
+      h: 0.024,
       fillColor: 0x00000000,
       strokeColor: 0x00000000,
       fileName: '$_kSign$key',
     ),
-    _mLockedText('Tarehe:', x: x + 0.02, y: y + 0.14, w: 0.09, h: 0.022, fontSize: 10, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_dl_$key'),
-    _mBlank('${key}_tarehe', x + 0.11, y + 0.14, w - 0.13, ink: ink, fontSize: 10.5),
-    _mBlankUnderline(x + 0.11, y + 0.158, w - 0.13),
+    _mLockedText('Tarehe:', x: x + 0.012, y: y + 0.078, w: 0.08, h: 0.016, fontSize: 8, fontWeight: FontWeight.w600, color: ink, tag: 'partybox_dl_$key'),
+    _mBlank('${key}_tarehe', x + 0.09, y + 0.076, w - 0.106, ink: ink, fontSize: 8.5, startText: '✚'),
+    _mBlankUnderline(x + 0.09, y + 0.092, w - 0.106),
   ];
 }
 
@@ -382,13 +382,13 @@ List<NgmySlideElement> _mSeal(double cx, double cy, double d, {required int acce
 /// Footer bar — MWANDISHI (who wrote it) + MAELEZO YA ZIADA (extra notes).
 List<NgmySlideElement> _mFooter(double x, double y, double w, {required int ink, required int accent}) {
   return [
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.13, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'footer_box'),
-    _mLockedText('MWANDISHI:', x: x + 0.02, y: y + 0.014, w: w - 0.04, h: 0.02, fontSize: 10.5, fontWeight: FontWeight.w800, color: accent, tag: 'footer_wl'),
-    _mBlank('mwandishi', x + 0.02, y + 0.036, w - 0.04, ink: ink, fontSize: 11, startText: '[Jina la Mwandishi]'),
-    _mBlankUnderline(x + 0.02, y + 0.054, w - 0.04),
-    _mLockedText('MAELEZO YA ZIADA:', x: x + 0.02, y: y + 0.072, w: w - 0.04, h: 0.02, fontSize: 10.5, fontWeight: FontWeight.w800, color: accent, tag: 'footer_nl'),
-    _mBlank('maelezo_ziada', x + 0.02, y + 0.094, w - 0.04, ink: ink, fontSize: 10.5, startText: '[Maelezo mengine kama inahitajika]'),
-    _mBlankUnderline(x + 0.02, y + 0.112, w - 0.04),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: x, y: y, w: w, h: 0.078, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'footer_box'),
+    _mLockedText('MWANDISHI:', x: x + 0.014, y: y + 0.006, w: w - 0.028, h: 0.016, fontSize: 8.5, fontWeight: FontWeight.w800, color: accent, tag: 'footer_wl'),
+    _mBlank('mwandishi', x + 0.014, y + 0.022, w - 0.028, ink: ink, fontSize: 9, startText: '✚'),
+    _mBlankUnderline(x + 0.014, y + 0.036, w - 0.028),
+    _mLockedText('MAELEZO YA ZIADA:', x: x + 0.014, y: y + 0.044, w: w - 0.028, h: 0.014, fontSize: 8.5, fontWeight: FontWeight.w800, color: accent, tag: 'footer_nl'),
+    _mBlank('maelezo_ziada', x + 0.014, y + 0.056, w - 0.028, ink: ink, fontSize: 8.5, startText: '✚'),
+    _mBlankUnderline(x + 0.014, y + 0.070, w - 0.028),
   ];
 }
 
@@ -708,7 +708,7 @@ List<NgmySlideElement> _layoutPage2(NgmyMarriagePaperTemplate tpl) {
   }
 }
 
-/// Page 1 — title, TAREHE, UTANGULIZI, MAHARI / VITU VYA KUTOA.
+/// One page — title, intro frame, UTANGULIZI, MAHARI, MASHAHIDI, signs, footer.
 List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
   final ink = tpl.ink;
   final accent = tpl.accent;
@@ -716,21 +716,22 @@ List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
   const cw = 0.82;
   final out = <NgmySlideElement>[];
 
-  // Title + TAREHE box.
   out.addAll([
-    _mLockedText('HATI YA KUHOWESHA', x: cx, y: 0.032, w: cw, h: 0.05, fontSize: 24, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.68, y: 0.03, w: 0.23, h: 0.052, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'tarehe_box'),
-    _mLockedText('TAREHE:', x: 0.68, y: 0.036, w: 0.23, h: 0.016, fontSize: 8, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
-    _mBlank('tarehe', 0.685, 0.058, 0.22, ink: ink, fontSize: 8.5, startText: '__ / __ / __'),
-    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: 0.084, w: cw, h: 0.078, fillColor: 0x14C9A227, strokeColor: accent, strokeWidth: 1.3, tag: 'intro_frame'),
-    _mLockedText('(BARUA YA UCHUMBA)', x: cx, y: 0.088, w: cw, h: 0.022, fontSize: 12.5, fontWeight: FontWeight.w700, align: TextAlign.center, color: accent, tag: 'subtitle'),
+    _mLockedText('HATI YA KUHOWESHA', x: cx, y: 0.022, w: cw, h: 0.032, fontSize: 18, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * 0.22, y: 0.054, w: cw * 0.56, h: 0.0022, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.70, y: 0.020, w: 0.21, h: 0.032, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.0, tag: 'tarehe_box'),
+    _mLockedText('TAREHE:', x: 0.70, y: 0.022, w: 0.21, h: 0.012, fontSize: 7, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
+    _mBlank('tarehe', 0.705, 0.032, 0.20, ink: ink, fontSize: 8, startText: '__ / __ / __'),
+    // White frame sits below the title rule — not touching it, not gold-washed.
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: 0.068, w: cw, h: 0.052, fillColor: 0xFFFFFFFF, strokeColor: accent, strokeWidth: 1.1, tag: 'intro_frame'),
+    _mLockedText('(BARUA YA UCHUMBA)', x: cx, y: 0.070, w: cw, h: 0.016, fontSize: 9.5, fontWeight: FontWeight.w700, align: TextAlign.center, color: accent, tag: 'subtitle'),
     _mLockedText(
       'Kwa makubaliano ya pande zote mbili, tunatangaza rasmi uchumba huu mbele ya familia, mashahidi na jamii.',
-      x: cx + 0.016,
-      y: 0.110,
-      w: cw - 0.032,
-      h: 0.046,
-      fontSize: 11,
+      x: cx + 0.014,
+      y: 0.086,
+      w: cw - 0.028,
+      h: 0.030,
+      fontSize: 9,
       fontWeight: FontWeight.w600,
       align: TextAlign.center,
       color: ink,
@@ -738,62 +739,60 @@ List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
     ),
   ]);
 
-  // UTANGULIZI banner + intro paragraphs with inline blanks.
-  double y = 0.176;
+  double y = 0.128;
   out.addAll(_mBanner('UTANGULIZI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.05;
+  y += 0.032;
   out.addAll(_mRun([
     const NgmyMSeg.text('Mimi '),
-    const NgmyMSeg.blank('bride_name', 0.18),
+    const NgmyMSeg.blank('bride_name', 0.11),
     const NgmyMSeg.text(', binti wa familia ya '),
-    const NgmyMSeg.blank('bride_family', 0.2),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.042;
+    const NgmyMSeg.blank('bride_family', 0.12),
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.024;
   out.addAll(_mRun([
     const NgmyMSeg.text('Nyumba ya '),
-    const NgmyMSeg.blank('bride_house', 0.18),
+    const NgmyMSeg.blank('bride_house', 0.11),
     const NgmyMSeg.text(', ninathibitisha kwa hiari yangu kuwa'),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.042;
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.024;
   out.addAll(_mRun([
     const NgmyMSeg.text('nimemkubali '),
-    const NgmyMSeg.blank('groom_name', 0.18),
+    const NgmyMSeg.blank('groom_name', 0.11),
     const NgmyMSeg.text(', mwana wa familia ya '),
-    const NgmyMSeg.blank('groom_family', 0.2),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.042;
+    const NgmyMSeg.blank('groom_family', 0.12),
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.024;
   out.addAll(_mRun([
     const NgmyMSeg.text('Nyumba ya '),
-    const NgmyMSeg.blank('groom_house', 0.18),
+    const NgmyMSeg.blank('groom_house', 0.11),
     const NgmyMSeg.text(', kuwa mchumba wangu rasmi.'),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.044;
-  out.add(_mLockedShape(shape: NgmySlideShapeKind.line, x: cx + 0.2, y: y, w: cw - 0.4, h: 0.002, strokeColor: accent, strokeWidth: 1.2, tag: 'mid_rule'));
-  y += 0.03;
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.022;
+  out.add(_mLockedShape(shape: NgmySlideShapeKind.line, x: cx + 0.22, y: y, w: cw - 0.44, h: 0.002, strokeColor: accent, strokeWidth: 1.0, tag: 'mid_rule'));
+  y += 0.016;
   out.addAll(_mRun([
     const NgmyMSeg.text('Aidha, mimi '),
-    const NgmyMSeg.blank('groom_name2', 0.18),
+    const NgmyMSeg.blank('groom_name2', 0.11),
     const NgmyMSeg.text(', mwana wa familia ya '),
-    const NgmyMSeg.blank('groom_family2', 0.2),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.042;
+    const NgmyMSeg.blank('groom_family2', 0.12),
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.024;
   out.addAll(_mRun([
     const NgmyMSeg.text('Nyumba ya '),
-    const NgmyMSeg.blank('groom_house2', 0.18),
+    const NgmyMSeg.blank('groom_house2', 0.11),
     const NgmyMSeg.text(', ninathibitisha kuwa nimemchukua'),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.042;
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.024;
   out.addAll(_mRun([
-    const NgmyMSeg.blank('bride_name2', 0.18),
+    const NgmyMSeg.blank('bride_name2', 0.11),
     const NgmyMSeg.text(' kuwa mchumba wangu rasmi kwa nia ya kufunga ndoa.'),
-  ], cx, y, ink: ink, fontSize: 11.5));
-  y += 0.046;
+  ], cx, y, ink: ink, fontSize: 9.5));
+  y += 0.028;
 
-  // MAHARI / VITU VYA KUTOA.
   out.addAll(_mBanner('MAHARI / VITU VYA KUTOA', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
-  y += 0.05;
-  out.add(_mLockedText('Mchumba atatoa vitu vifuatavyo:', x: cx, y: y, w: cw, h: 0.022, fontSize: 11, fontWeight: FontWeight.w600, color: ink, tag: 'mahari_sub'));
-  y += 0.036;
+  y += 0.030;
+  out.add(_mLockedText('Mchumba atatoa vitu vifuatavyo:', x: cx, y: y, w: cw, h: 0.016, fontSize: 9, fontWeight: FontWeight.w600, color: ink, tag: 'mahari_sub'));
+  y += 0.020;
   const mahariRows = [
     ('👤', 'Kichwa cha Mtu', '[Kiasi cha Fedha (mfano: \$1,000)]'),
     ('🐐', 'Mbuzi', '[Idadi (mfano: 2)]'),
@@ -805,8 +804,34 @@ List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
   for (var i = 0; i < mahariRows.length; i++) {
     final (emoji, name, hint) = mahariRows[i];
     out.addAll(_mMahariRow(i + 1, emoji, name, hint, cx, y, cw, ink: ink, accent: accent));
-    y += 0.047;
+    y += 0.030;
   }
+  y += 0.008;
+
+  out.addAll(_mBanner('MASHAHIDI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
+  y += 0.030;
+  final colW = (cw - 0.03) / 2;
+  out.addAll([
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: y, w: colW, h: 0.020, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mume'),
+    _mLockedText('UPANDE WA MUME', x: cx, y: y + 0.002, w: colW, h: 0.016, fontSize: 8, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mume_t'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + colW + 0.03, y: y, w: colW, h: 0.020, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'wit_h_mke'),
+    _mLockedText('UPANDE WA MKE', x: cx + colW + 0.03, y: y + 0.002, w: colW, h: 0.016, fontSize: 8, fontWeight: FontWeight.w900, align: TextAlign.center, color: tpl.bannerText, tag: 'wit_h_mke_t'),
+  ]);
+  y += 0.026;
+  for (var n = 1; n <= 3; n++) {
+    out.addAll(_mWitnessRow('mume', n, cx, y, colW, ink: ink, accent: accent));
+    out.addAll(_mWitnessRow('mke', n, cx + colW + 0.03, y, colW, ink: ink, accent: accent));
+    y += 0.050;
+  }
+  y += 0.008;
+
+  const boxH = 0.108;
+  final boxW = cw * 0.40;
+  out.addAll(_mPartySignBox('mchumba_mume', 'MCHUMBA (MUME)', cx, y, boxW, boxH, ink: ink, accent: accent));
+  out.addAll(_mPartySignBox('mchumba_mke', 'MCHUMBA (MKE)', cx + cw - boxW, y, boxW, boxH, ink: ink, accent: accent));
+  out.addAll(_mSeal(0.5, y + boxH / 2, 0.10, accent: accent, ink: ink));
+  y += boxH + 0.010;
+  out.addAll(_mFooter(cx, y, cw, ink: ink, accent: accent));
 
   return out;
 }
@@ -1153,38 +1178,27 @@ class _NgmyCertPreview extends StatelessWidget {
   }
 }
 
-/// Classic / cloth papers stay two pages. The certificate layouts are one sheet.
+/// Every marriage paper is one page. Empty space is not stretched onto a second sheet.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {
   ngmyClearMarriagePaperCache();
   final tpl = ngmyMarriageTemplateById(templateId) ?? kNgmyMarriagePaperTemplates.first;
-  final single = tpl.layoutKind != NgmyMarriageLayoutKind.classic;
-
-  final page1 = NgmySlide(
-    id: NgmySlidesTemplates.newId(),
-    title: single ? 'Hati ya Ndoa' : 'Hati ya Kuhowesha — Uk. 1',
-    layout: NgmySlideLayout.blank,
-    background: tpl.background,
-    elements: _buildPage1Content(tpl),
-  );
-  final slides = <NgmySlide>[page1];
-  if (!single) {
-    slides.add(NgmySlide(
-      id: NgmySlidesTemplates.newId(),
-      title: 'Hati ya Kuhowesha — Uk. 2',
-      layout: NgmySlideLayout.blank,
-      background: tpl.background,
-      elements: _buildPage2Content(tpl),
-    ));
-  }
 
   return NgmySlideDeck(
     id: NgmySlidesTemplates.newId(),
-    name: single ? tpl.name : 'Hati ya Kuhowesha',
+    name: tpl.name,
     themeId: 'marriage_${tpl.id}',
     aspectRatio: NgmySlideAspectRatio.portrait916,
     deckKind: 'marriage_agreement',
     marriageState: state.trim().isEmpty ? null : state.trim(),
-    slides: slides,
+    slides: [
+      NgmySlide(
+        id: NgmySlidesTemplates.newId(),
+        title: 'Hati ya Ndoa',
+        layout: NgmySlideLayout.blank,
+        background: tpl.background,
+        elements: _buildPage1Content(tpl),
+      ),
+    ],
   );
 }
 

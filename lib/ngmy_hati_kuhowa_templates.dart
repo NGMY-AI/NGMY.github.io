@@ -368,12 +368,12 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
   final itemX = x + 0.042;
   final itemW = x + w - itemX;
   return [
-    _hLockedText('$n.', x: x, y: y, w: 0.038, h: 0.034, fontSize: 21, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
-    _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 21, startText: hint, align: TextAlign.left),
+    _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
+    _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 16, startText: hint, align: TextAlign.left),
     _hLockedShape(
       shape: NgmySlideShapeKind.line,
       x: itemX,
-      y: y + 0.002 + _hBlankH(21) + 0.002,
+      y: y + 0.002 + _hBlankH(16) + 0.002,
       w: itemW,
       h: 0.002,
       strokeColor: _softLine,
@@ -458,7 +458,10 @@ List<NgmySlideElement> _hMwandishiBar(double x, double y, double w, {required in
 // Agreement's elegant_navy / elegant_gold templates — the user asked for the
 // same paper design, just new content and new layout code.
 
-const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
+/// Yesterday's six papers — the only ones shown on Hati ya Kuhowa
+/// and Hati ya Kuhowesha. Newer cloth / certificate papers stay in
+/// [kNgmyHatiKuhowaNewerTemplates] so older saved documents still open.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaYesterdayTemplates = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_elegant_navy',
     name: 'Kuhowa — Bluu ya Kifalme',
@@ -531,6 +534,13 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFF7F6), Color(0xFF4A0E1F), Color(0xFFC9A227)],
   ),
+];
+
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = kNgmyHatiKuhowaYesterdayTemplates;
+
+/// Newer papers kept so existing saved documents still resolve. They are
+/// not shown on Hati ya Kuhowa / Kuhowesha — those live on Hati ya Ndoa.
+const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaNewerTemplates = [
   NgmyHatiKuhowaTemplate(
     id: 'kuhowa_kente_sunset',
     name: 'Kente ya Jua',
@@ -786,9 +796,18 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiMalipoAwamuTemplates = [
   ...kNgmyHatiMalipoAwamuExtraTemplates,
 ];
 
-NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuhowaTemplate> templates = kNgmyHatiKuhowaTemplates}) {
-  for (final t in templates) {
-    if (t.id == id) return t;
+NgmyHatiKuhowaTemplate? ngmyHatiKuhowaTemplateById(String id, {List<NgmyHatiKuhowaTemplate>? templates}) {
+  final lists = templates != null
+      ? <List<NgmyHatiKuhowaTemplate>>[templates]
+      : <List<NgmyHatiKuhowaTemplate>>[
+          kNgmyHatiKuhowaYesterdayTemplates,
+          kNgmyHatiKuhowaNewerTemplates,
+          kNgmyHatiMalipoAwamuExtraTemplates,
+        ];
+  for (final list in lists) {
+    for (final t in list) {
+      if (t.id == id) return t;
+    }
   }
   return null;
 }
@@ -906,18 +925,19 @@ List<NgmySlideElement> _layoutSingle(
   final ruleY = headingY + 0.054;
   out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * (1 - titleRuleWidthRatio) / 2, y: ruleY, w: cw * titleRuleWidthRatio, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
 
-  // UTANGULIZI — first sentence under the header, inside a gold frame.
-  double y = ruleY + 0.012;
-  const introH = 0.15;
+  // UTANGULIZI — paragraph under the title, in a white frame that sits
+  // clear of the title underline (not touching it).
+  double y = ruleY + 0.028;
+  const introH = 0.128;
   out.add(_hLockedShape(
     shape: NgmySlideShapeKind.rectangle,
-    x: cx - 0.008,
-    y: y - 0.008,
-    w: cw + 0.016,
-    h: introH + 0.016,
-    fillColor: 0x14C9A227,
+    x: cx - 0.006,
+    y: y - 0.004,
+    w: cw + 0.012,
+    h: introH + 0.010,
+    fillColor: 0xFFFFFFFF,
     strokeColor: accent,
-    strokeWidth: 1.35,
+    strokeWidth: 1.15,
     tag: 'intro_frame',
   ));
   out.add(_hParagraphField(
@@ -938,10 +958,6 @@ List<NgmySlideElement> _layoutSingle(
   // are trimmed slightly to give this back the room it needs without
   // pushing everything below off the bottom of the page.
   y += introAdvance;
-  // Extra breathing room so the (now shorter) NIMETOWA/NIMEPOKEYA CASH
-  // frame sits lower under the intro paragraph, per request to bring it
-  // down.
-  y += 0.016;
 
   // Gold (accent), not tpl.bannerFill — bannerFill is the template's dark
   // ink color for most templates, which made this frame the one dark box

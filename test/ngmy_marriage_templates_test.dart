@@ -53,40 +53,30 @@ void main() {
     }
   });
 
-  test('Hati ya Kuhowa picker keeps previous papers plus ten certificate layouts', () {
-    expect(kNgmyHatiKuhowaTemplates, hasLength(21));
-    for (final id in ['kuhowa_kente_sunset', 'kuhowa_indigo_mudcloth', 'kuhowa_adinkra_royal', 'kuhowa_nile_lotus', 'kuhowa_shweshwe_ivory']) {
-      expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: id);
-    }
-    const ids = [
-      'kuhowa_rings_ndoa',
-      'kuhowa_couple_taarifa',
-      'kuhowa_barua',
-      'kuhowa_mahari_pande',
-      'kuhowa_sheria_familia',
-      'kuhowa_ndoa_pamoja',
-      'kuhowa_pete_pana',
-      'kuhowa_muhuri',
-      'kuhowa_fomu',
-      'kuhowa_upendo',
-    ];
-    for (final id in ids) {
-      final tpl = ngmyHatiKuhowaTemplateById(id);
-      expect(tpl, isNotNull, reason: id);
-      expect(tpl!.layoutKind, isNot(NgmyHatiLayoutKind.classic), reason: id);
-      final deck = ngmyBuildHatiKuhowaDeck(templateId: id);
-      expect(deck.slides.single.elements.length, greaterThan(10), reason: id);
+  test('Hati ya Kuhowa and Kuhowesha pickers show only yesterday’s six papers', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(6));
+    expect(
+      kNgmyHatiKuhowaTemplates.map((t) => t.id).toList(),
+      [
+        'kuhowa_elegant_navy',
+        'kuhowa_elegant_gold',
+        'kuhowa_heritage_gold',
+        'kuhowa_heritage_crimson',
+        'kuhowa_elegant_emerald',
+        'kuhowa_elegant_burgundy',
+      ],
+    );
+    for (final id in ['kuhowa_kente_sunset', 'kuhowa_rings_ndoa', 'kuhowa_upendo']) {
+      expect(kNgmyHatiKuhowaTemplates.any((t) => t.id == id), isFalse, reason: id);
+      expect(ngmyHatiKuhowaTemplateById(id), isNotNull, reason: 'older saved $id still opens');
     }
   });
 
-  test('each new certificate is a single page that matches the sample structure', () {
-    const ids = ['rings_ndoa', 'couple_taarifa', 'barua_kuhowesha', 'mahari_pande', 'sheria_familia', 'ndoa_safi', 'pete_pana', 'muhuri_familia', 'fomu_wazi', 'upendo_dhahabu'];
-    for (final id in ids) {
-      final deck = ngmyBuildMarriageAgreementDeck(templateId: id);
-      expect(deck.slides, hasLength(1), reason: id);
-      expect(deck.slides[0].elements.length, greaterThan(20), reason: id);
+  test('every marriage template is a single page', () {
+    for (final tpl in kNgmyMarriagePaperTemplates) {
+      final deck = ngmyBuildMarriageAgreementDeck(templateId: tpl.id);
+      expect(deck.slides, hasLength(1), reason: tpl.id);
+      expect(deck.slides[0].elements.length, greaterThan(20), reason: tpl.id);
     }
-    final classic = ngmyBuildMarriageAgreementDeck(templateId: 'heritage_gold');
-    expect(classic.slides, hasLength(2));
   });
 }

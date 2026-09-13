@@ -16,7 +16,7 @@ List<NgmySlideElement> _mMahariList(double x, double y, double w, {required int 
   for (var i = 0; i < n; i++) {
     final (emoji, name, hint) = _kMahariItems[i];
     out.addAll(_mMahariRow(i + 1, emoji, name, hint, x, cy, w, ink: ink, accent: accent));
-    cy += 0.042;
+    cy += 0.030;
   }
   return out;
 }
@@ -32,7 +32,7 @@ List<NgmySlideElement> _layoutRingsNdoaPage1(NgmyMarriagePaperTemplate tpl) {
   final colW = (cw - 0.04) / 2;
   return [
     ..._mRings(0.41, 0.022, 0.070, ink: ink),
-    _mLockedText('HATI YA NDOA', x: cx, y: 0.092, w: cw, h: 0.052, fontSize: 34, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
+    _mLockedText('HATI YA NDOA', x: cx, y: 0.092, w: cw, h: 0.042, fontSize: 26, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
     _mLockedText('Hati ya Makubaliano ya Ndoa', x: cx, y: 0.144, w: cw, h: 0.020, fontSize: 13, fontWeight: FontWeight.w600, align: TextAlign.center, color: ink, tag: 'subtitle'),
     ..._mOrnamentRule(0.16, 0.168, 0.68, ink: ink),
     ..._mPill('TAARIFA ZA WANANDOA', 0.190, 0.18, 0.64, ink: ink),
@@ -122,27 +122,27 @@ List<NgmySlideElement> _layoutKuhoweshaFormPage1(NgmyMarriagePaperTemplate tpl) 
     ..._mOrnamentRule(0.20, 0.128, 0.60, ink: ink),
     ..._mRun([
       const NgmyMSeg.text('Mimi '),
-      const NgmyMSeg.blank('groom_name', 0.22),
+      const NgmyMSeg.blank('groom_name', 0.11),
       const NgmyMSeg.text(', wa jamaa ya '),
-      const NgmyMSeg.blank('groom_family', 0.20),
-    ], cx, 0.152, ink: ink, fontSize: 11),
+      const NgmyMSeg.blank('groom_family', 0.11),
+    ], cx, 0.148, ink: ink, fontSize: 10),
     ..._mRun([
       const NgmyMSeg.text('Nyumba ya '),
-      const NgmyMSeg.blank('groom_house', 0.20),
+      const NgmyMSeg.blank('groom_house', 0.11),
       const NgmyMSeg.text(', nimetowa mahari ya kuhoweya'),
-    ], cx, 0.186, ink: ink, fontSize: 11),
+    ], cx, 0.174, ink: ink, fontSize: 10),
     ..._mRun([
       const NgmyMSeg.text('kijana wangu '),
-      const NgmyMSeg.blank('groom_name2', 0.20),
+      const NgmyMSeg.blank('groom_name2', 0.11),
       const NgmyMSeg.text(' na '),
-      const NgmyMSeg.blank('bride_name', 0.20),
-    ], cx, 0.220, ink: ink, fontSize: 11),
+      const NgmyMSeg.blank('bride_name', 0.11),
+    ], cx, 0.200, ink: ink, fontSize: 10),
     ..._mRun([
       const NgmyMSeg.text('binti wa '),
-      const NgmyMSeg.blank('bride_family', 0.20),
+      const NgmyMSeg.blank('bride_family', 0.11),
       const NgmyMSeg.text(', Nyumba ya '),
-      const NgmyMSeg.blank('bride_house', 0.18),
-    ], cx, 0.254, ink: ink, fontSize: 11),
+      const NgmyMSeg.blank('bride_house', 0.10),
+    ], cx, 0.226, ink: ink, fontSize: 10),
     ..._mPill('NIMETOWEA', 0.292, 0.24, 0.52, ink: ink),
     _mLockedText('Vitu vifuatavyo vimetolewa:', x: cx, y: 0.330, w: cw, h: 0.018, fontSize: 11, fontWeight: FontWeight.w600, color: ink, tag: 'nim_sub'),
     ..._mMahariList(cx, 0.354, cw, ink: ink, accent: tpl.accent, count: 4),
