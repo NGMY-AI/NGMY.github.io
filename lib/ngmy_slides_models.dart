@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_slides_storage_idb_stub.dart' if (dart.library.html) 'ngmy_slides_storage_idb_web.dart';
+
 String _ngmySlideDecorationKey(TextDecoration decoration) {
   if (decoration == TextDecoration.underline) return 'underline';
   if (decoration == TextDecoration.lineThrough) return 'lineThrough';
@@ -193,7 +195,7 @@ class NgmySlideElement {
       color: (json['color'] as num?)?.toInt() ?? 0xFF111827,
       align: TextAlign.values[alignIndex.clamp(0, TextAlign.values.length - 1)],
       imageRef: json['imageRef']?.toString(),
-      shape: NgmySlideShapeKind.values.byName((json['shape'] ?? 'rectangle').toString()),
+      shape: _shapeFromJson(json['shape']),
       fillColor: (json['fillColor'] as num?)?.toInt() ?? 0xFF2563EB,
       strokeColor: (json['strokeColor'] as num?)?.toInt() ?? 0xFF1E40AF,
       strokeWidth: (json['strokeWidth'] as num?)?.toDouble() ?? 2,
@@ -221,6 +223,14 @@ NgmySlideElementType _elementTypeFromJson(Object? raw) {
     if (t.name == name) return t;
   }
   return NgmySlideElementType.text;
+}
+
+NgmySlideShapeKind _shapeFromJson(Object? raw) {
+  final name = (raw ?? 'rectangle').toString();
+  for (final s in NgmySlideShapeKind.values) {
+    if (s.name == name) return s;
+  }
+  return NgmySlideShapeKind.rectangle;
 }
 
 class NgmySlide {
@@ -942,31 +952,95 @@ class NgmySlidesTemplates {
 }
 
 class NgmySlidesStorage {
-  static String _prefsKey(String email) => 'ngmy_slides_decks_${email.toLowerCase().trim()}';
+  static final Map<String, String> _memoryJson = {};
 
-  static Future<List<NgmySlideDeck>> loadDecks(String email) async {
+  static String _emailKey(String email) => email.toLowerCase().trim();
+
+  static String _prefsKey(String email) => 'ngmy_slides_decks_${_emailKey(email)}';
+
+  /// Parses a saved library. One bad deck never wipes the rest.
+  static List<NgmySlideDeck> parseDecksJson(String raw) {
+    if (raw.trim().isEmpty) return [];
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_prefsKey(email));
-      if (raw == null || raw.trim().isEmpty) return [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) return [];
-      return decoded
-          .whereType<Map>()
-          .map((m) => NgmySlideDeck.fromJson(Map<String, dynamic>.from(m)))
-          .toList();
+      final decks = <NgmySlideDeck>[];
+      for (final item in decoded) {
+        if (item is! Map) continue;
+        try {
+          decks.add(NgmySlideDeck.fromJson(Map<String, dynamic>.from(item)));
+        } catch (_) {}
+      }
+      return decks;
     } catch (_) {
       return [];
     }
   }
 
-  static Future<void> saveDecks(String email, List<NgmySlideDeck> decks) async {
+  static List<NgmySlideDeck> mergeDecks(Iterable<NgmySlideDeck> primary, Iterable<NgmySlideDeck> extra) {
+    final byId = <String, NgmySlideDeck>{};
+    void take(NgmySlideDeck deck) {
+      if (deck.id.trim().isEmpty) return;
+      final have = byId[deck.id];
+      if (have == null || !have.updatedAt.isAfter(deck.updatedAt)) {
+        byId[deck.id] = deck.copy();
+      }
+    }
+
+    for (final d in primary) {
+      take(d);
+    }
+    for (final d in extra) {
+      take(d);
+    }
+    final out = byId.values.toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return out;
+  }
+
+  static List<NgmySlideDeck> _preferRicher(List<NgmySlideDeck> a, List<NgmySlideDeck> b) {
+    if (a.isEmpty) return b;
+    if (b.isEmpty) return a;
+    DateTime newest(List<NgmySlideDeck> xs) =>
+        xs.map((d) => d.updatedAt).reduce((x, y) => x.isAfter(y) ? x : y);
+    if (a.length != b.length) return a.length >= b.length ? a : b;
+    return newest(a).isAfter(newest(b)) ? a : b;
+  }
+
+  static Future<List<NgmySlideDeck>> loadDecks(String email) async {
+    final key = _emailKey(email);
+    List<NgmySlideDeck> fromRaw(String? raw) {
+      if (raw == null || raw.trim().isEmpty) return [];
+      return parseDecksJson(raw);
+    }
+
+    var idbDecks = <NgmySlideDeck>[];
+    try {
+      idbDecks = fromRaw(await ngmySlidesIdbGet(key));
+    } catch (_) {}
+
+    var prefsDecks = <NgmySlideDeck>[];
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-        _prefsKey(email),
-        jsonEncode(decks.map((d) => d.toJson()).toList()),
-      );
+      prefsDecks = fromRaw(prefs.getString(_prefsKey(email)));
+    } catch (_) {}
+
+    final memoryDecks = fromRaw(_memoryJson[key]);
+    final merged = mergeDecks(mergeDecks(idbDecks, prefsDecks), memoryDecks);
+    if (merged.isEmpty) return _preferRicher(_preferRicher(idbDecks, prefsDecks), memoryDecks);
+    return merged;
+  }
+
+  static Future<void> saveDecks(String email, List<NgmySlideDeck> decks) async {
+    final key = _emailKey(email);
+    final raw = jsonEncode(decks.map((d) => d.toJson()).toList());
+    _memoryJson[key] = raw;
+    try {
+      await ngmySlidesIdbPut(key, raw);
+    } catch (_) {}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey(email), raw);
     } catch (_) {}
   }
 }

@@ -58,7 +58,8 @@ class NgmySlidesStudioScreen extends StatefulWidget {
   State<NgmySlidesStudioScreen> createState() => _NgmySlidesStudioScreenState();
 }
 
-class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with SingleTickerProviderStateMixin {
+class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<NgmySlideDeck> _decks = [];
   NgmySlideDeck? _activeDeck;
   int _slideIndex = 0;
@@ -80,6 +81,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   final Map<String, TextEditingController> _notesControllers = {};
   String? _notesSlideId;
   bool _isDraft = false;
+  int _loadGen = 0;
   Set<String> _hiddenKiapoStates = {};
 
   late final AnimationController _framePulse;
@@ -87,6 +89,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
     unawaited(_loadDecks());
   }
@@ -97,18 +100,33 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     final stateChanged = oldWidget.memberState.trim().toLowerCase() != widget.memberState.trim().toLowerCase() ||
         oldWidget.registrarServingState.trim().toLowerCase() != widget.registrarServingState.trim().toLowerCase();
     if (stateChanged || oldWidget.userEmail != widget.userEmail) {
-      _activeDeck = null;
-      _isDraft = false;
-      _selectedElementId = null;
-      _editingTextId = null;
+      unawaited(_flushPersistedDecks(email: oldWidget.userEmail));
+      if (oldWidget.userEmail != widget.userEmail) {
+        _activeDeck = null;
+        _isDraft = false;
+        _selectedElementId = null;
+        _editingTextId = null;
+      }
       _loading = true;
       unawaited(_loadDecks());
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      unawaited(_flushPersistedDecks());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _autosaveTimer?.cancel();
+    unawaited(_flushPersistedDecks());
     _framePulse.dispose();
     for (final c in _textControllers.values) {
       c.dispose();
@@ -177,12 +195,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
   }
 
   Future<void> _loadDecks() async {
-    final decks = await NgmySlidesStorage.loadDecks(widget.userEmail);
-    _hiddenKiapoStates = await NgmyHatiKiapoHiddenPresentations.load(widget.userEmail);
+    final gen = ++_loadGen;
+    final email = widget.userEmail;
+    final loaded = await NgmySlidesStorage.loadDecks(email);
+    _hiddenKiapoStates = await NgmyHatiKiapoHiddenPresentations.load(email);
+    if (!mounted || gen != _loadGen) return;
+    var decks = NgmySlidesStorage.mergeDecks(loaded, _localLockedDecksToKeep());
     if (_hasCivicRegistryAccess) {
       final state = _kiapoStateForUser;
       if (state.isNotEmpty) {
         final kiapo = await NgmyHatiKiapoStore.loadForState(state);
+        if (!mounted || gen != _loadGen) return;
         if (kiapo != null) {
           decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
           if (!_isKiapoHiddenFromPresentations(state)) {
@@ -193,7 +216,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
     } else {
       decks.removeWhere((d) => ngmyIsHatiKiapoUongoziDeck(d.deckKind));
     }
-    if (!mounted) return;
     var assignedCodes = false;
     for (final deck in decks) {
       if (!ngmySlidesDeckUsesMarriageClaimCode(deck)) continue;
@@ -205,12 +227,47 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _decks = decks;
       _loading = false;
     });
-    if (assignedCodes) unawaited(_persistDecks());
+    if (assignedCodes || decks.length > loaded.length) unawaited(_persistDecks());
   }
 
-  Future<void> _persistDecks() async {
-    final personal = _decks.where((d) => !ngmyIsHatiKiapoUongoziDeck(d.deckKind)).toList();
-    await NgmySlidesStorage.saveDecks(widget.userEmail, personal);
+  List<NgmySlideDeck> _localLockedDecksToKeep() {
+    final keep = <NgmySlideDeck>[];
+    for (final d in _decks) {
+      if (d.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(d.deckKind)) keep.add(d);
+    }
+    final active = _activeDeck;
+    if (active != null && active.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
+      keep.add(active);
+    }
+    return keep;
+  }
+
+  void _rememberLockedDoc(NgmySlideDeck deck) {
+    if (!deck.isLockedTemplateDoc || ngmyIsHatiKiapoUongoziDeck(deck.deckKind)) return;
+    _ensureDeckClaimCode(deck);
+    final i = _decks.indexWhere((d) => d.id == deck.id);
+    if (i >= 0) {
+      _decks[i] = deck.copy();
+      _decks[i].updatedAt = DateTime.now();
+    } else {
+      _decks.insert(0, deck.copy());
+    }
+    _isDraft = false;
+  }
+
+  List<NgmySlideDeck> _personalDecksSnapshot() {
+    final active = _activeDeck;
+    if (active != null && active.isLockedTemplateDoc && !ngmyIsHatiKiapoUongoziDeck(active.deckKind)) {
+      _rememberLockedDoc(active);
+    }
+    return _decks.where((d) => !ngmyIsHatiKiapoUongoziDeck(d.deckKind)).map((d) => d.copy()).toList();
+  }
+
+  Future<void> _persistDecks() => _flushPersistedDecks();
+
+  Future<void> _flushPersistedDecks({String? email}) async {
+    final personal = _personalDecksSnapshot();
+    await NgmySlidesStorage.saveDecks(email ?? widget.userEmail, personal);
     final active = _activeDeck;
     if (active != null && ngmyIsHatiKiapoUongoziDeck(active.deckKind) && _canEditKiapoDeck(active)) {
       await NgmyHatiKiapoStore.save(active);
@@ -227,7 +284,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   void _scheduleAutosave() {
     _autosaveTimer?.cancel();
-    _autosaveTimer = Timer(const Duration(milliseconds: 600), () {
+    final delay = _activeDeck?.isLockedTemplateDoc == true
+        ? const Duration(milliseconds: 160)
+        : const Duration(milliseconds: 600);
+    _autosaveTimer = Timer(delay, () {
       unawaited(_persistDecks());
     });
   }
@@ -445,7 +505,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
 
   void _closeEditor() {
     _stopTextEditing(unfocus: true);
-    if (_isDraft) {
+    final active = _activeDeck;
+    if (active != null && active.isLockedTemplateDoc) {
+      _rememberLockedDoc(active);
+      unawaited(_persistDecks());
+    } else if (_isDraft) {
       setState(() {
         _activeDeck = null;
         _isDraft = false;
@@ -454,10 +518,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
         _clearTextControllers();
       });
       return;
+    } else {
+      unawaited(_persistDecks());
     }
-    unawaited(_persistDecks());
     setState(() {
       _activeDeck = null;
+      _isDraft = false;
       _selectedElementId = null;
       _editingTextId = null;
       _clearTextControllers();
@@ -497,13 +563,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen> with Si
       _activeDeck = openDeck.copy();
       _slideIndex = 0;
       _selectedElementId = null;
-      _isDraft = true;
+      _isDraft = !openDeck.isLockedTemplateDoc;
       _undo.clear();
       _redo.clear();
       _clearTextControllers();
       _syncTextControllersForCurrentSlide();
       _ribbonTab = 'Home';
     });
+    if (openDeck.isLockedTemplateDoc) {
+      _rememberLockedDoc(_activeDeck!);
+      unawaited(_persistDecks());
+    }
     if (!_isTransferredReadOnly(openDeck)) unawaited(_maybeShowMarriageHint());
     if (mounted &&
         !_isTransferredReadOnly(openDeck) &&
