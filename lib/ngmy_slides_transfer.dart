@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
+import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_communicate_sync_download_io.dart'
     if (dart.library.html) 'ngmy_communicate_sync_download_web.dart';
 import 'ngmy_db_relay.dart';
@@ -19,8 +20,44 @@ import 'ngmy_transfer_payments.dart';
 const String kNgmySlidesDeckBundleType = 'ngmy_slides_deck_v1';
 const String kNgmySlidesLibraryBundleType = 'ngmy_slides_library_v1';
 const String kNgmySlidesQrPrefixV2 = 'NGMYSLIDESYNC2';
+const String kNgmySlidesClaimPrefix = 'NGMYSLIDECODE';
 const int kNgmySlidesQrMaxUses = 25;
 const String _kSlidesQrStashSettingsKey = 'ngmy_slides_transfer_qr_stashes_v1';
+final RegExp kNgmySlidesMarriageClaimCodeRe = RegExp(r'^[A-Z]{2}\d{3}$');
+
+bool ngmySlidesDeckUsesMarriageClaimCode(NgmySlideDeck deck) => deck.isLockedTemplateDoc;
+
+String? ngmySlidesMarriageTransferState(List<NgmySlideDeck> decks) {
+  if (decks.isEmpty || !decks.every(ngmySlidesDeckUsesMarriageClaimCode)) return null;
+  for (final deck in decks) {
+    final state = (deck.marriageState ?? '').trim();
+    if (state.isNotEmpty) return state;
+  }
+  return '';
+}
+
+String ngmySlidesMarriageClaimPrefix(String state) =>
+    NgmyCivicRegistryStats.postalCodeForState(state);
+
+String? ngmySlidesNormalizeMarriageClaimCode(String raw) {
+  final t = raw.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  if (kNgmySlidesMarriageClaimCodeRe.hasMatch(t)) return t;
+  return null;
+}
+
+String ngmySlidesGenerateMarriageClaimCode(
+  String state, {
+  Set<String> taken = const {},
+  Random? random,
+}) {
+  final prefix = ngmySlidesMarriageClaimPrefix(state);
+  final r = random ?? Random.secure();
+  for (var i = 0; i < 80; i++) {
+    final code = '$prefix${r.nextInt(1000).toString().padLeft(3, '0')}';
+    if (!taken.contains(code)) return code;
+  }
+  return '$prefix${DateTime.now().millisecondsSinceEpoch.remainder(1000).toString().padLeft(3, '0')}';
+}
 
 const _slidesBlue = Color(0xFF2563EB);
 const _slidesBlueDark = Color(0xFF1D4ED8);
@@ -59,25 +96,50 @@ class NgmySlidesTransferQrStash {
     }
   }
 
-  static Future<({String qrPayload, String token})?> createFromShareJson(
+  static Future<({String qrPayload, String token, String? claimCode})?> createFromShareJson(
     String shareJson, {
     required String ownerEmail,
     required String bundleId,
+    String? marriageState,
   }) async {
     if (!await ngmyCanReachCloud()) return null;
     final json = shareJson.trim();
     if (json.isEmpty) return null;
     final token = _generateToken();
     final stashes = await _loadStashes();
+    String? claimCode;
+    if (marriageState != null) {
+      final taken = <String>{};
+      for (final row in stashes.values) {
+        if (row is! Map) continue;
+        final existing = ngmySlidesNormalizeMarriageClaimCode((row['claimCode'] ?? '').toString());
+        if (existing != null) taken.add(existing);
+      }
+      claimCode = ngmySlidesGenerateMarriageClaimCode(marriageState, taken: taken);
+    }
     stashes[token] = {
       'ownerEmail': ownerEmail.trim(),
       'bundleId': bundleId,
       'payload': base64Encode(utf8.encode(json)),
       'usesRemaining': kNgmySlidesQrMaxUses,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
+      if (claimCode != null) 'claimCode': claimCode,
+      if (claimCode != null) 'kind': 'marriage',
     };
     await _saveStashes(stashes);
-    return (qrPayload: '$kNgmySlidesQrPrefixV2|$token', token: token);
+    return (qrPayload: '$kNgmySlidesQrPrefixV2|$token', token: token, claimCode: claimCode);
+  }
+
+  static Future<String?> consumeClaimCode(String rawCode) async {
+    final code = ngmySlidesNormalizeMarriageClaimCode(rawCode);
+    if (code == null || !await ngmyCanReachCloud()) return null;
+    final stashes = await _loadStashes();
+    for (final e in stashes.entries) {
+      if (e.value is! Map) continue;
+      final existing = ngmySlidesNormalizeMarriageClaimCode((e.value['claimCode'] ?? '').toString());
+      if (existing == code) return consumeToken(e.key);
+    }
+    return null;
   }
 
   static Future<String?> consumeToken(String token) async {
@@ -147,25 +209,27 @@ String ngmySlidesShareJson({
 
 String ngmySlidesQrPayloadLite(String shareJson) => 'NGMY_SL:${base64Url.encode(utf8.encode(shareJson))}';
 
-Future<String> ngmySlidesQrPayloadForDisplay({
+Future<({String qrPayload, String? claimCode})> ngmySlidesQrPayloadForDisplay({
   required String ownerEmail,
   required String shareJson,
   required String bundleId,
+  String? marriageState,
 }) async {
   final stash = await NgmySlidesTransferQrStash.createFromShareJson(
     shareJson,
     ownerEmail: ownerEmail,
     bundleId: bundleId,
+    marriageState: marriageState,
   );
-  if (stash != null) return stash.qrPayload;
-  if (shareJson.length <= 1200) return ngmySlidesQrPayloadLite(shareJson);
-  return ngmySlidesQrPayloadLite(shareJson);
+  if (stash != null) return (qrPayload: stash.qrPayload, claimCode: stash.claimCode);
+  return (qrPayload: ngmySlidesQrPayloadLite(shareJson), claimCode: null);
 }
 
 bool ngmySlidesScanAcceptsPayload(String raw) {
   final t = raw.trim();
   if (t.isEmpty) return false;
   if (t.startsWith('$kNgmySlidesQrPrefixV2|')) return true;
+  if (t.startsWith('$kNgmySlidesClaimPrefix|')) return true;
   if (t.startsWith('NGMY_SL:')) return true;
   if (t.contains(kNgmySlidesDeckBundleType) || t.contains(kNgmySlidesLibraryBundleType)) return true;
   if (t.startsWith('{')) {
@@ -218,6 +282,24 @@ List<NgmySlideDeck> ngmySlidesDecksFromShareRaw(String raw) {
 
 Future<List<NgmySlideDeck>> ngmySlidesDecksFromShareRawAsync(String raw) async {
   var trimmed = raw.trim();
+  if (trimmed.startsWith('$kNgmySlidesClaimPrefix|')) {
+    final parts = trimmed.split('|');
+    if (parts.length >= 2) {
+      final json = await NgmySlidesTransferQrStash.consumeClaimCode(parts[1]);
+      if (json != null && json.trim().isNotEmpty) {
+        return ngmySlidesDecksFromShareRaw(json);
+      }
+    }
+    return [];
+  }
+  final typedCode = ngmySlidesNormalizeMarriageClaimCode(trimmed);
+  if (typedCode != null && !trimmed.contains('|') && !trimmed.startsWith('{')) {
+    final json = await NgmySlidesTransferQrStash.consumeClaimCode(typedCode);
+    if (json != null && json.trim().isNotEmpty) {
+      return ngmySlidesDecksFromShareRaw(json);
+    }
+    return [];
+  }
   if (trimmed.startsWith('$kNgmySlidesQrPrefixV2|')) {
     final parts = trimmed.split('|');
     if (parts.length >= 2) {
@@ -277,6 +359,53 @@ Future<String?> ngmyScanSlidesTransferQr(BuildContext context) {
     routeName: 'NgmySlidesTransferScan',
     fullscreenDialog: true,
   );
+}
+
+Future<String?> showNgmySlidesDocumentCodeDialog(BuildContext context) async {
+  final controller = TextEditingController();
+  final entered = await showDialog<String>(
+    context: context,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text('Enter document code'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          textCapitalization: TextCapitalization.characters,
+          maxLength: 6,
+          decoration: const InputDecoration(
+            hintText: 'GA847',
+            counterText: '',
+          ),
+          onSubmitted: (value) {
+            final code = ngmySlidesNormalizeMarriageClaimCode(value);
+            Navigator.pop(ctx, code);
+          },
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final code = ngmySlidesNormalizeMarriageClaimCode(controller.text);
+              Navigator.pop(ctx, code);
+            },
+            child: const Text('Transfer'),
+          ),
+        ],
+      );
+    },
+  );
+  controller.dispose();
+  if (entered == null) return null;
+  if (entered.isEmpty) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Use the 5-character code on the document QR, like GA847.')),
+      );
+    }
+    return null;
+  }
+  return entered;
 }
 
 Future<void> showNgmySlidesTransferHub(
@@ -395,7 +524,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
     if (imported.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not read that presentation QR.')),
+        const SnackBar(content: Text('Could not read that presentation QR or document code.')),
       );
       return;
     }
@@ -933,6 +1062,7 @@ class NgmySlidesTransferQrPage extends StatefulWidget {
 
 class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
   String? _payload;
+  String? _claimCode;
   String? _error;
 
   @override
@@ -947,13 +1077,17 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
           ? ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: widget.decks.first, allDecks: null)
           : ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: null, allDecks: widget.decks);
       final bundleId = widget.decks.length == 1 ? widget.decks.first.id : 'library_${widget.decks.length}';
-      final payload = await ngmySlidesQrPayloadForDisplay(
+      final created = await ngmySlidesQrPayloadForDisplay(
         ownerEmail: widget.ownerEmail,
         shareJson: shareJson,
         bundleId: bundleId,
+        marriageState: ngmySlidesMarriageTransferState(widget.decks),
       );
       if (!mounted) return;
-      setState(() => _payload = payload);
+      setState(() {
+        _payload = created.qrPayload;
+        _claimCode = created.claimCode;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'Could not create QR. Check your connection and try again.');
@@ -1040,7 +1174,47 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
                               padding: EdgeInsets.symmetric(vertical: 48),
                               child: CircularProgressIndicator(color: _slidesBlue),
                             )
-                          else
+                          else ...[
+                            if ((_claimCode ?? '').isNotEmpty) ...[
+                              const Text(
+                                'Document code',
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 6),
+                              GestureDetector(
+                                onTap: () async {
+                                  await Clipboard.setData(ClipboardData(text: _claimCode!));
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Document code copied.')),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFEFF6FF),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: _slidesBlue.withValues(alpha: 0.35)),
+                                  ),
+                                  child: Text(
+                                    _claimCode!,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 28,
+                                      letterSpacing: 4,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Share this code or the QR. The other phone taps search next to the flashlight.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
@@ -1050,6 +1224,7 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
                               ),
                               child: NgmyBrandedQrWidget(data: _payload!, large: true),
                             ),
+                          ],
                           const SizedBox(height: 14),
                           Text(
                             isCloud ? 'Cloud QR — scan on another phone with NGMY Slides open.' : 'Offline QR — keep both devices on the same network if scan fails.',
@@ -1097,6 +1272,13 @@ class _NgmySlidesTransferScanPageState extends State<NgmySlidesTransferScanPage>
     NgmyNavigator.pop(context, raw);
   }
 
+  Future<void> _enterDocumentCode() async {
+    if (_handled) return;
+    final entered = await showNgmySlidesDocumentCodeDialog(context);
+    if (entered == null || !mounted) return;
+    _accept('$kNgmySlidesClaimPrefix|$entered');
+  }
+
   void _onDetect(BarcodeCapture capture) {
     if (_handled) return;
     for (final barcode in capture.barcodes) {
@@ -1117,6 +1299,12 @@ class _NgmySlidesTransferScanPageState extends State<NgmySlidesTransferScanPage>
         foregroundColor: Colors.white,
         actions: [
           IconButton(
+            tooltip: 'Enter document code',
+            icon: const Icon(Icons.search_rounded),
+            onPressed: _enterDocumentCode,
+          ),
+          IconButton(
+            tooltip: _torchOn ? 'Flash off' : 'Flash on',
             icon: Icon(_torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded),
             onPressed: () async {
               await _camera.toggleTorch();
@@ -1153,7 +1341,7 @@ class _NgmySlidesTransferScanPageState extends State<NgmySlidesTransferScanPage>
                 border: Border.all(color: _slidesBlue.withValues(alpha: 0.45)),
               ),
               child: const Text(
-                'Point at a NGMY Slides transfer QR',
+                'Point at a NGMY Slides transfer QR, or tap search to enter the document code',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
               ),

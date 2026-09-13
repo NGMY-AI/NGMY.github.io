@@ -2029,9 +2029,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   }
 
   Widget _historyPanel() {
-    final wallet = widget.transactions
-        .where((t) => t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)
-        .toList()
+    final wallet = widget.transactions.where(_isGrowthIncomeHistoryRow).toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return Container(
       width: double.infinity,
@@ -2064,19 +2062,20 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 28),
               child: Text(
-                'No deposits or withdrawals yet.',
+                'No money recorded yet. Clock-in earnings, deposits, and withdrawals will show here.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700),
               ),
             )
           else
-            ...wallet.take(40).map((t) {
+            ...wallet.take(80).map((t) {
               final approved = t.status == TransactionStatus.approved;
               final pending = t.status == TransactionStatus.pending;
+              final outgoing = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove;
               final color = approved
-                  ? const Color(0xFF2EF6A3)
+                  ? (outgoing ? const Color(0xFFF87171) : const Color(0xFF2EF6A3))
                   : (pending ? Colors.orangeAccent : Colors.redAccent);
-              final sign = t.type == TransactionType.withdrawal ? '-' : '+';
+              final sign = outgoing ? '-' : '+';
               return Container(
                 margin: const EdgeInsets.only(bottom: 10),
                 padding: const EdgeInsets.all(12),
@@ -2092,7 +2091,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            t.type == TransactionType.deposit ? 'Deposit' : 'Withdrawal',
+                            _growthIncomeHistoryTitle(t),
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 2),
@@ -2111,7 +2110,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                       ),
                     ),
                     Text(
-                      '$sign\$${formatCurrency(t.amount)}',
+                      t.amount == 0 ? '—' : '$sign\$${formatCurrency(t.amount)}',
                       style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ],
@@ -2121,6 +2120,42 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
         ],
       ),
     );
+  }
+
+  bool _isGrowthIncomeHistoryRow(AppTransaction t) {
+    if (t.status == TransactionStatus.rejected) return false;
+    final details = (t.sourceDetails ?? '').toLowerCase();
+    if (details.contains('clock-in session started')) return false;
+    if (t.type == TransactionType.contribution) return false;
+    if (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) return true;
+    if (t.type == TransactionType.adminAdd || t.type == TransactionType.adminRemove) return true;
+    if (t.type == TransactionType.claim) return true;
+    if (t.type == TransactionType.reimbursement) {
+      return details.contains('clock-in') || t.amount > 0;
+    }
+    return false;
+  }
+
+  String _growthIncomeHistoryTitle(AppTransaction t) {
+    final details = (t.sourceDetails ?? '').toLowerCase();
+    if (details.contains('clock-in')) return 'Clock-in earnings';
+    if (details.contains('investment')) return 'Investment';
+    switch (t.type) {
+      case TransactionType.deposit:
+        return 'Deposit';
+      case TransactionType.withdrawal:
+        return 'Withdrawal';
+      case TransactionType.adminAdd:
+        return 'Added';
+      case TransactionType.adminRemove:
+        return 'Spent';
+      case TransactionType.claim:
+        return 'Claim';
+      case TransactionType.reimbursement:
+        return 'Earnings';
+      case TransactionType.contribution:
+        return 'Contribution';
+    }
   }
 
   Widget _viewTab(String label, int v) {

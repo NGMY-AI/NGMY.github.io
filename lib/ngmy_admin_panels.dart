@@ -169,11 +169,20 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
   List<AppTransaction> get _resolvedWallet => widget.allTransactions
-      .where((t) =>
-          (t.type == TransactionType.deposit ||
-              t.type == TransactionType.withdrawal ||
-              t.type == TransactionType.adminAdd) &&
-          t.status != TransactionStatus.pending)
+      .where((t) {
+        if (t.status == TransactionStatus.pending) return false;
+        if (t.type == TransactionType.deposit ||
+            t.type == TransactionType.withdrawal ||
+            t.type == TransactionType.adminAdd) {
+          return true;
+        }
+        if (t.type == TransactionType.reimbursement) {
+          final details = (t.sourceDetails ?? '').toLowerCase();
+          if (details.contains('clock-in session started')) return false;
+          return details.contains('clock-in');
+        }
+        return false;
+      })
       .toList()
     ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
@@ -228,7 +237,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
                   ? [_empty('No pending withdrawal requests.', isDark)]
                   : _pendingWithdrawals.map((t) => _withdrawalCard(t, isDark)).toList(),
               2 => _resolvedWallet.isEmpty && _archive.isEmpty
-                  ? [_empty('No completed wallet transactions yet.', isDark)]
+                  ? [_empty('No completed wallet, clock-in, or deposit history yet.', isDark)]
                   : [
                       Padding(
                         padding: const EdgeInsets.only(bottom: 10),

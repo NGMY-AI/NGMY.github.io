@@ -88,6 +88,21 @@ class NgmyCivicRegistryStats {
         .join(' ');
   }
 
+  /// USPS letters for a state name or abbreviation (`Georgia` / `ga` → `GA`).
+  static String postalCodeForState(String state) {
+    final raw = state.trim();
+    if (raw.isEmpty) return 'XX';
+    final lower = raw.toLowerCase();
+    final byName = _usStateCodeByName[lower];
+    if (byName != null) return byName;
+    for (final e in _usStateCodeByName.entries) {
+      if (e.value.toLowerCase() == lower) return e.value;
+    }
+    final letters = raw.toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+    if (letters.length >= 2) return letters.substring(0, 2);
+    return (letters + 'XX').substring(0, 2);
+  }
+
   /// Match "Georgia", "GA", etc. for roster / gate lookups.
   static String canonicalStateKey(String state) {
     final raw = state.trim().toLowerCase();
