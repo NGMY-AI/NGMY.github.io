@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_hati_kuhowa_templates.dart';
 import 'package:ngmy/ngmy_marriage_agreement_templates.dart';
 import 'package:ngmy/ngmy_marriage_paper_art.dart';
 
@@ -42,6 +43,29 @@ void main() {
       expect(tpl!.layoutKind, isNot(NgmyMarriageLayoutKind.classic), reason: id);
       final png = ngmyMarriagePaperPng(tpl.paperStyle);
       expect(png.length, greaterThan(800), reason: id);
+    }
+  });
+
+  test('Hati ya Kuhowa picker now includes ten certificate layouts', () {
+    expect(kNgmyHatiKuhowaTemplates, hasLength(16));
+    const ids = [
+      'kuhowa_rings_ndoa',
+      'kuhowa_couple_taarifa',
+      'kuhowa_barua',
+      'kuhowa_mahari_pande',
+      'kuhowa_sheria_familia',
+      'kuhowa_ndoa_pamoja',
+      'kuhowa_pete_pana',
+      'kuhowa_muhuri',
+      'kuhowa_fomu',
+      'kuhowa_upendo',
+    ];
+    for (final id in ids) {
+      final tpl = ngmyHatiKuhowaTemplateById(id);
+      expect(tpl, isNotNull, reason: id);
+      expect(tpl!.layoutKind, isNot(NgmyHatiLayoutKind.classic), reason: id);
+      final deck = ngmyBuildHatiKuhowaDeck(templateId: id);
+      expect(deck.slides.single.elements.length, greaterThan(10), reason: id);
     }
   });
 

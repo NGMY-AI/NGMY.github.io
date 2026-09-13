@@ -12,6 +12,20 @@ const String kNgmyHatiMalipoAwamuDeckKind = 'hati_malipo_awamu';
 /// Soft underlines — never dark/black (picker + print).
 const _softLine = 0xFFE2D8C8;
 
+enum NgmyHatiLayoutKind {
+  classic,
+  ringsNdoa,
+  coupleCards,
+  kuhoweshaForm,
+  mahariPande,
+  familiaMti,
+  ndoaSafi,
+  peteWide,
+  muhuriCrest,
+  fomuWazi,
+  upendoOrnate,
+}
+
 class NgmyHatiKuhowaTemplate {
   const NgmyHatiKuhowaTemplate({
     required this.id,
@@ -24,6 +38,7 @@ class NgmyHatiKuhowaTemplate {
     required this.bannerFill,
     required this.bannerText,
     required this.previewColors,
+    this.layoutKind = NgmyHatiLayoutKind.classic,
   });
 
   final String id;
@@ -36,6 +51,7 @@ class NgmyHatiKuhowaTemplate {
   final int bannerFill;
   final int bannerText;
   final List<Color> previewColors;
+  final NgmyHatiLayoutKind layoutKind;
 }
 
 // ── Low-level element builders ──────────────────────────────────────────────
@@ -96,6 +112,43 @@ NgmySlideElement _hWatermark(int ink) {
     rotation: -0.52,
     tag: 'watermark',
   );
+}
+
+const _hatiGold = 0xFFC9A227;
+const _hatiIvory = 0xFFFFFFF8;
+
+List<NgmySlideElement> _hRings(double cx, double cy, double d, {int gold = _hatiGold}) {
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.circle, x: cx - d * 0.42, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.0, tag: 'ring_l'),
+    _hLockedShape(shape: NgmySlideShapeKind.circle, x: cx + d * 0.06, y: cy, w: d, h: d, fillColor: 0x00000000, strokeColor: gold, strokeWidth: 2.0, tag: 'ring_r'),
+  ];
+}
+
+List<NgmySlideElement> _hPersonMark(double x, double y, double size, {required bool female, required int fill, int ring = _hatiGold}) {
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.circle, x: x, y: y, w: size, h: size, fillColor: _hatiIvory, strokeColor: ring, strokeWidth: 1.3, tag: 'ps_${female}_ring'),
+    _hLockedShape(shape: NgmySlideShapeKind.circle, x: x + size * 0.32, y: y + size * 0.16, w: size * 0.36, h: size * 0.36, fillColor: fill, strokeColor: fill, strokeWidth: 0, tag: 'ps_${female}_head'),
+    _hLockedShape(
+      shape: NgmySlideShapeKind.circle,
+      x: x + size * (female ? 0.12 : 0.18),
+      y: y + size * 0.50,
+      w: size * (female ? 0.76 : 0.64),
+      h: size * 0.46,
+      fillColor: fill,
+      strokeColor: fill,
+      strokeWidth: 0,
+      tag: 'ps_${female}_body',
+    ),
+  ];
+}
+
+List<NgmySlideElement> _hOrnamentRule(double x, double y, double w, {int gold = _hatiGold, int ink = 0xFF12213D}) {
+  final mid = x + w / 2;
+  return [
+    _hLockedShape(shape: NgmySlideShapeKind.line, x: x, y: y + 0.006, w: w * 0.40, h: 0.002, strokeColor: gold, strokeWidth: 1.0, tag: 'orn_l_$y'),
+    _hLockedShape(shape: NgmySlideShapeKind.hexagon, x: mid - 0.012, y: y, w: 0.024, h: 0.016, fillColor: ink, strokeColor: gold, strokeWidth: 0.9, tag: 'orn_c_$y'),
+    _hLockedShape(shape: NgmySlideShapeKind.line, x: mid + 0.018, y: y + 0.006, w: w * 0.40, h: 0.002, strokeColor: gold, strokeWidth: 1.0, tag: 'orn_r_$y'),
+  ];
 }
 
 NgmySlideElement _hLockedShape({
@@ -478,6 +531,136 @@ const List<NgmyHatiKuhowaTemplate> kNgmyHatiKuhowaTemplates = [
     bannerText: 0xFFFFFFFF,
     previewColors: [Color(0xFFFFF7F6), Color(0xFF4A0E1F), Color(0xFFC9A227)],
   ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_rings_ndoa',
+    name: 'Hati ya Ndoa',
+    description: 'Pete mbili · vichwa vya kidonge · hati rasmi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.ringsNdoa,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_couple_taarifa',
+    name: 'Taarifa za Wanandoa',
+    description: 'Picha ya mwanamume na mwanamke kila upande.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.coupleCards,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_barua',
+    name: 'Barua ya Kuhowesha',
+    description: 'Barua rasmi · pete · orodha ya vitu.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.kuhoweshaForm,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_mahari_pande',
+    name: 'Mahari ya Pande',
+    description: 'Masharti ya mahari · pande mbili.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF1A2744,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1A2744,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF1A2744), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.mahariPande,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_sheria_familia',
+    name: 'Sheria za Familia',
+    description: 'Mti wa familia · sheria za pamoja.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryGreen,
+    background: 0xFFFFFDF8,
+    ink: 0xFF1F4D3A,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1F4D3A,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFDF8), Color(0xFF1F4D3A), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.familiaMti,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_ndoa_pamoja',
+    name: 'Ndoa ya Pamoja',
+    description: 'Safu mbili · mume na mke.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.ndoaSafi,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_pete_pana',
+    name: 'Pete Pana',
+    description: 'Pete kubwa za dhahabu · nafasi wazi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF3A2A10,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFFC9A227,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFFC9A227), Color(0xFF3A2A10)],
+    layoutKind: NgmyHatiLayoutKind.peteWide,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_muhuri',
+    name: 'Muhuri wa Familia',
+    description: 'Muhuri mkubwa juu · fomu rasmi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavy,
+    background: 0xFFFFFBF3,
+    ink: 0xFF12213D,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF12213D,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFBF3), Color(0xFF12213D), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.muhuriCrest,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_fomu',
+    name: 'Fomu ya Ndoa',
+    description: 'Fomu yenye mistari · sehemu wazi.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryNavyBar,
+    background: 0xFFFFFCF7,
+    ink: 0xFF1A2744,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF1A2744,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFFCF7), Color(0xFF1A2744), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.fomuWazi,
+  ),
+  NgmyHatiKuhowaTemplate(
+    id: 'kuhowa_upendo',
+    name: 'Upendo wa Dhahabu',
+    description: 'Mapambo ya dhahabu · picha za wanandoa.',
+    paperStyle: NgmyMarriagePaperStyle.certIvoryRose,
+    background: 0xFFFFF8F5,
+    ink: 0xFF7A3B4A,
+    accent: 0xFFC9A227,
+    bannerFill: 0xFF7A3B4A,
+    bannerText: 0xFFFFFFFF,
+    previewColors: [Color(0xFFFFF8F5), Color(0xFF7A3B4A), Color(0xFFC9A227)],
+    layoutKind: NgmyHatiLayoutKind.upendoOrnate,
+  ),
 ];
 
 /// Four extra templates for "Hati ya Makubaliano ya Malipo ya Awamu" only —
@@ -618,27 +801,71 @@ List<NgmySlideElement> _layoutSingle(
   // top-left corner, opposite the TAREHE box below.
   out.add(_hWatermark(ink));
 
+  var headingY = titleY;
+  switch (tpl.layoutKind) {
+    case NgmyHatiLayoutKind.ringsNdoa:
+    case NgmyHatiLayoutKind.kuhoweshaForm:
+      out.addAll(_hRings(0.42, 0.016, 0.048));
+      headingY = 0.066;
+    case NgmyHatiLayoutKind.peteWide:
+      out.addAll(_hRings(0.38, 0.012, 0.072));
+      headingY = 0.082;
+    case NgmyHatiLayoutKind.coupleCards:
+    case NgmyHatiLayoutKind.ndoaSafi:
+    case NgmyHatiLayoutKind.upendoOrnate:
+      out.addAll(_hPersonMark(0.16, 0.018, 0.052, female: false, fill: ink));
+      out.addAll(_hPersonMark(0.79, 0.018, 0.052, female: true, fill: 0xFF7A3B4A));
+      headingY = 0.072;
+    case NgmyHatiLayoutKind.familiaMti:
+      out.add(_hLockedText('🌳', x: 0.42, y: 0.014, w: 0.16, h: 0.040, fontSize: 22, align: TextAlign.center, tag: 'tree'));
+      headingY = 0.056;
+    case NgmyHatiLayoutKind.muhuriCrest:
+      out.addAll([
+        _hLockedShape(shape: NgmySlideShapeKind.circle, x: 0.445, y: 0.012, w: 0.11, h: 0.062, fillColor: 0x00000000, strokeColor: _hatiGold, strokeWidth: 1.6, tag: 'crest_o'),
+        _hLockedShape(shape: NgmySlideShapeKind.circle, x: 0.458, y: 0.020, w: 0.084, h: 0.046, fillColor: 0x00000000, strokeColor: _hatiGold, strokeWidth: 1.0, tag: 'crest_i'),
+        _hLockedText('MUHURI', x: 0.445, y: 0.028, w: 0.11, h: 0.028, fontSize: 9, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'crest_t'),
+      ]);
+      headingY = 0.078;
+    case NgmyHatiLayoutKind.mahariPande:
+    case NgmyHatiLayoutKind.fomuWazi:
+      out.addAll(_hOrnamentRule(0.20, 0.018, 0.60, ink: ink));
+      headingY = 0.040;
+    case NgmyHatiLayoutKind.classic:
+      break;
+  }
+
   // Tarehe gets its own row, pushed close to the paper's actual gold
   // border on the right (not just the content margin) — it used to share
   // a row with the title and could crowd/overlap it. No frame.
   out.addAll(_hTareheBox(0.7, 0.026, 0.25, ink: ink, accent: accent));
-  out.add(_hLockedText(title, x: cx, y: titleY, w: cw, h: 0.06, fontSize: titleFontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
+  out.add(_hLockedText(title, x: cx, y: headingY, w: cw, h: 0.06, fontSize: titleFontSize, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'));
   // A single rule sitting right under the title, not far below it — same
   // tight spacing as the NIMETOWE item underlines. Wide enough to span
   // close to the title's own width on each side. (There used to be a
   // second, smaller line under this one — removed per request.)
-  out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * (1 - titleRuleWidthRatio) / 2, y: 0.09, w: cw * titleRuleWidthRatio, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
+  final ruleY = headingY + 0.054;
+  out.add(_hLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx + cw * (1 - titleRuleWidthRatio) / 2, y: ruleY, w: cw * titleRuleWidthRatio, h: 0.0026, fillColor: accent, strokeColor: accent, strokeWidth: 0, tag: 'title_rule_1'));
 
-  // UTANGULIZI — one wrapped paragraph field, reproduced verbatim. Word-wrap
-  // keeps every line flush from the left edge to the right edge of the
-  // paper automatically.
-  double y = 0.103;
+  // UTANGULIZI — first sentence under the header, inside a gold frame.
+  double y = ruleY + 0.012;
+  const introH = 0.15;
+  out.add(_hLockedShape(
+    shape: NgmySlideShapeKind.rectangle,
+    x: cx - 0.008,
+    y: y - 0.008,
+    w: cw + 0.016,
+    h: introH + 0.016,
+    fillColor: 0x14C9A227,
+    strokeColor: accent,
+    strokeWidth: 1.35,
+    tag: 'intro_frame',
+  ));
   out.add(_hParagraphField(
     'utangulizi',
     cx,
     y,
     cw,
-    0.15,
+    introH,
     ink: ink,
     fontSize: 19,
     startText: introText,
@@ -681,6 +908,14 @@ List<NgmySlideElement> _layoutSingle(
   // table (and everything below it: MWANDISHI bar, state box) up too,
   // since they're all positioned relative to this cumulative `y`.
   y += 0.046;
+  if (tpl.layoutKind == NgmyHatiLayoutKind.coupleCards ||
+      tpl.layoutKind == NgmyHatiLayoutKind.ndoaSafi ||
+      tpl.layoutKind == NgmyHatiLayoutKind.upendoOrnate ||
+      tpl.layoutKind == NgmyHatiLayoutKind.mahariPande) {
+    out.addAll(_hPersonMark(cx + 0.12, y - 0.008, 0.044, female: true, fill: 0xFF7A3B4A));
+    out.addAll(_hPersonMark(cx + cw - 0.164, y - 0.008, 0.044, female: false, fill: ink));
+    y += 0.012;
+  }
 
   // MASHAHIDI as one bordered table: a single outer frame around both
   // columns with one vertical line dividing UPANDE WA MKE from UPANDE WA
@@ -739,12 +974,11 @@ List<NgmySlideElement> _layoutSingle(
   return out;
 }
 
-/// Soft picker preview — one silhouette shared by both templates (same
-/// content), just recolored per template.
+/// Soft picker preview — unique chrome per certificate layout.
 Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
-  final bg = Color(tpl.background);
   final ink = Color(tpl.ink);
   final accent = Color(tpl.accent);
+  final paper = ngmyMarriagePaperPng(tpl.paperStyle);
   Widget bar({double w = 1, double h = 5}) => Align(
         alignment: Alignment.centerLeft,
         child: FractionallySizedBox(
@@ -758,56 +992,77 @@ Widget ngmyHatiKuhowaTemplateLivePreview(NgmyHatiKuhowaTemplate tpl) {
         decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3)),
         child: Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 6.5, letterSpacing: 0.4)),
       );
-  return ColoredBox(
-    color: bg,
-    child: Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(border: Border.all(color: accent.withValues(alpha: 0.5), width: 5)),
+  Widget rings({double size = 18}) => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_hatiGold), width: 1.5))),
+          Transform.translate(
+            offset: Offset(-size * 0.38, 0),
+            child: Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(_hatiGold), width: 1.5))),
           ),
+        ],
+      );
+  Widget person({required bool female, double size = 18}) {
+    final fill = female ? const Color(0xFF7A3B4A) : ink;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(_hatiIvory), border: Border.all(color: const Color(_hatiGold))),
+      child: Stack(alignment: Alignment.center, children: [
+        Positioned(top: size * 0.16, child: Container(width: size * 0.32, height: size * 0.32, decoration: BoxDecoration(color: fill, shape: BoxShape.circle))),
+        Positioned(bottom: size * 0.06, child: Container(width: size * (female ? 0.62 : 0.5), height: size * 0.32, decoration: BoxDecoration(color: fill, borderRadius: BorderRadius.circular(7)))),
+      ]),
+    );
+  }
+
+  final showPeople = tpl.layoutKind == NgmyHatiLayoutKind.coupleCards ||
+      tpl.layoutKind == NgmyHatiLayoutKind.ndoaSafi ||
+      tpl.layoutKind == NgmyHatiLayoutKind.upendoOrnate ||
+      tpl.layoutKind == NgmyHatiLayoutKind.mahariPande;
+  final showRings = tpl.layoutKind == NgmyHatiLayoutKind.ringsNdoa ||
+      tpl.layoutKind == NgmyHatiLayoutKind.peteWide ||
+      tpl.layoutKind == NgmyHatiLayoutKind.kuhoweshaForm;
+
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Positioned.fill(child: Image.memory(paper, fit: BoxFit.cover, gaplessPlayback: true, filterQuality: FilterQuality.medium)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (showRings) rings(size: tpl.layoutKind == NgmyHatiLayoutKind.peteWide ? 26 : 16),
+            if (tpl.layoutKind == NgmyHatiLayoutKind.familiaMti) const Text('🌳', textAlign: TextAlign.center, style: TextStyle(fontSize: 16)),
+            if (showPeople) Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [person(female: false), person(female: true)]),
+            Text('HATI YA KUHOWA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+              decoration: BoxDecoration(
+                color: const Color(0x14C9A227),
+                border: Border.all(color: accent, width: 1.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Column(children: [bar(), const SizedBox(height: 2.5), bar(w: 0.9), const SizedBox(height: 2.5), bar(w: 0.75)]),
+            ),
+            const SizedBox(height: 6),
+            ribbon('NIMETOWE'),
+            const SizedBox(height: 5),
+            ...List.generate(3, (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Row(children: [
+                    Container(width: 7, height: 7, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    Expanded(child: bar(h: 4)),
+                  ]),
+                )),
+            const Spacer(),
+            Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 8)),
+          ],
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('HATI YA KUHOWA', textAlign: TextAlign.center, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 9)),
-              const SizedBox(height: 8),
-              ribbon('UTANGULIZI'),
-              const SizedBox(height: 5),
-              bar(),
-              const SizedBox(height: 2.5),
-              bar(w: 0.85),
-              const SizedBox(height: 2.5),
-              bar(w: 0.9),
-              const SizedBox(height: 6),
-              ribbon('NIMETOWE'),
-              const SizedBox(height: 5),
-              ...List.generate(4, (i) => Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Row(children: [
-                      Container(width: 7, height: 7, decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
-                      const SizedBox(width: 4),
-                      Expanded(child: bar(h: 4)),
-                    ]),
-                  )),
-              const SizedBox(height: 6),
-              ribbon('MASHAHIDI'),
-              const SizedBox(height: 5),
-              Row(children: [
-                Expanded(child: Container(height: 20, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))),
-                const SizedBox(width: 4),
-                Expanded(child: Container(height: 20, decoration: BoxDecoration(border: Border.all(color: accent, width: 1)))),
-              ]),
-              const Spacer(),
-              Text(tpl.name, textAlign: TextAlign.center, style: TextStyle(color: ink.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 8)),
-            ],
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
@@ -1048,7 +1303,7 @@ class _NgmyHatiKuhowaTemplatePickerSheet extends StatelessWidget {
                           children: [
                             Text('Chagua muundo wa hati', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF12213D))),
                             const SizedBox(height: 2),
-                            Text(docLabel, style: const TextStyle(fontSize: 11.5, color: Color(0xFFB8860B), fontWeight: FontWeight.w700)),
+                            Text('$docLabel · ${templates.length} miundo', style: const TextStyle(fontSize: 11.5, color: Color(0xFFB8860B), fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),

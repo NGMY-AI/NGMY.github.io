@@ -97,6 +97,14 @@
       // newer build only actually takes over the next time this device
       // does a real fresh load with no live session to disrupt (new tab,
       // reinstall, or once a service-worker update naturally rolls in).
+      function isUserReload() {
+        try {
+          var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+          if (nav && nav.type === 'reload') return true;
+          if (performance.navigation && performance.navigation.type === 1) return true;
+        } catch (e) {}
+        return false;
+      }
       function checkForUpdate(opts) {
         var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -133,7 +141,7 @@
       // only actually takes over next time nothing is relying on the page's
       // in-memory state to begin with (a real fresh tab/reinstall) — never a
       // reload injected into a session that's already live.
-      checkForUpdate({ silent: true });
+      checkForUpdate({ silent: !isUserReload() });
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') checkForUpdate({ silent: true });
       });

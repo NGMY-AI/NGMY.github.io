@@ -642,14 +642,27 @@ List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
   // Title + TAREHE box.
   out.addAll([
     _mLockedText('HATI YA KUHOWESHA', x: cx, y: 0.032, w: cw, h: 0.05, fontSize: 24, fontWeight: FontWeight.w900, align: TextAlign.center, color: ink, tag: 'title'),
-    _mLockedText('(BARUA YA UCHUMBA)', x: cx, y: 0.088, w: cw, h: 0.026, fontSize: 12.5, fontWeight: FontWeight.w700, align: TextAlign.center, color: accent, tag: 'subtitle'),
     _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: 0.68, y: 0.03, w: 0.23, h: 0.052, fillColor: 0x00000000, strokeColor: accent, strokeWidth: 1.1, tag: 'tarehe_box'),
     _mLockedText('TAREHE:', x: 0.68, y: 0.036, w: 0.23, h: 0.016, fontSize: 8, fontWeight: FontWeight.w800, align: TextAlign.center, color: accent, tag: 'tarehe_lbl'),
     _mBlank('tarehe', 0.685, 0.058, 0.22, ink: ink, fontSize: 8.5, startText: '__ / __ / __'),
+    _mLockedShape(shape: NgmySlideShapeKind.rectangle, x: cx, y: 0.084, w: cw, h: 0.078, fillColor: 0x14C9A227, strokeColor: accent, strokeWidth: 1.3, tag: 'intro_frame'),
+    _mLockedText('(BARUA YA UCHUMBA)', x: cx, y: 0.088, w: cw, h: 0.022, fontSize: 12.5, fontWeight: FontWeight.w700, align: TextAlign.center, color: accent, tag: 'subtitle'),
+    _mLockedText(
+      'Kwa makubaliano ya pande zote mbili, tunatangaza rasmi uchumba huu mbele ya familia, mashahidi na jamii.',
+      x: cx + 0.016,
+      y: 0.110,
+      w: cw - 0.032,
+      h: 0.046,
+      fontSize: 11,
+      fontWeight: FontWeight.w600,
+      align: TextAlign.center,
+      color: ink,
+      tag: 'first_sentence',
+    ),
   ]);
 
   // UTANGULIZI banner + intro paragraphs with inline blanks.
-  double y = 0.128;
+  double y = 0.176;
   out.addAll(_mBanner('UTANGULIZI', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
   y += 0.05;
   out.addAll(_mRun([
@@ -698,16 +711,6 @@ List<NgmySlideElement> _layoutClassicPage1(NgmyMarriagePaperTemplate tpl) {
     const NgmyMSeg.text(' kuwa mchumba wangu rasmi kwa nia ya kufunga ndoa.'),
   ], cx, y, ink: ink, fontSize: 11.5));
   y += 0.046;
-  out.addAll(_mStaticPara(
-    'Kwa makubaliano ya pande zote mbili, tunatangaza rasmi uchumba huu mbele ya familia, mashahidi na jamii.',
-    cx,
-    y,
-    cw,
-    0.075,
-    ink: ink,
-    fontSize: 12,
-  ));
-  y += 0.086;
 
   // MAHARI / VITU VYA KUTOA.
   out.addAll(_mBanner('MAHARI / VITU VYA KUTOA', y, cx, cw, fill: tpl.bannerFill, textColor: tpl.bannerText));
@@ -1173,7 +1176,7 @@ class _NgmyMarriageTemplatePickerSheet extends StatelessWidget {
                           children: [
                             Text('Chagua muundo wa hati', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : const Color(0xFF1A1208))),
                             const SizedBox(height: 2),
-                            const Text('Hati ya Kuhowesha (Barua ya Uchumba)', style: TextStyle(fontSize: 11.5, color: Color(0xFF8B6914), fontWeight: FontWeight.w700)),
+                            Text('Hati ya Ndoa · ${kNgmyMarriagePaperTemplates.length} miundo', style: const TextStyle(fontSize: 11.5, color: Color(0xFF8B6914), fontWeight: FontWeight.w700)),
                           ],
                         ),
                       ),
