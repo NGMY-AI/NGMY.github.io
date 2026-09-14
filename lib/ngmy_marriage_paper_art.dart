@@ -103,13 +103,13 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.goldLaurel:
       return _withCenterMark(_goldLaurelPaper(), 2);
     case NgmyMarriagePaperStyle.goldCrest:
-      return _withCenterMark(_goldCrestPaper(), 0);
+      return _withCenterMark(_goldCrestPaper(), 3);
     case NgmyMarriagePaperStyle.goldRibbon:
       return _withCenterMark(_goldRibbonPaper(), 1);
     case NgmyMarriagePaperStyle.goldBaroque:
       return _withCenterMark(_goldBaroquePaper(), 2);
     case NgmyMarriagePaperStyle.goldStar:
-      return _withCenterMark(_goldStarPaper(), 0);
+      return _withCenterMark(_goldStarPaper(), 3);
   }
 }
 
@@ -435,18 +435,15 @@ void _goldTick(img.Image im, int x, int y, int gold, {int size = 5}) {
 }
 
 /// Faint center seals for Hati ya Kuhowa / Kuhowesha papers.
-/// 0 = the Ndoa diamond box, 1 = double-ring medallion, 2 = gold star burst.
+/// 0 = diamond box, 1 = double-ring medallion, 2 = gold star burst,
+/// 3 = Congo (DRC) country outline — geographic shape only, not the flag.
 img.Image _withCenterMark(img.Image im, int kind) {
   final cx = _w ~/ 2;
   final cy = _h ~/ 2;
   const gold = 0xFFD4AF37;
   const pale = 0xFFE8D5A0;
   const navy = 0xFF12213D;
-  switch (kind % 3) {
-    case 0:
-      _diamond(im, cx, cy, 46, pale, fill: false);
-      _diamond(im, cx, cy, 32, gold, fill: false);
-      _diamond(im, cx, cy, 8, gold, fill: false);
+  switch (kind) {
     case 1:
       img.drawCircle(im, x: cx, y: cy, radius: 38, color: _c(pale), antialias: true);
       img.drawCircle(im, x: cx, y: cy, radius: 30, color: _c(gold), antialias: true);
@@ -461,8 +458,91 @@ img.Image _withCenterMark(img.Image im, int kind) {
       }
       _diamond(im, cx, cy, 16, gold, fill: false);
       _diamond(im, cx, cy, 6, gold);
+    case 3:
+      _drawCongoCountryOutline(im, cx, cy, pale, gold);
+    default:
+      _diamond(im, cx, cy, 46, pale, fill: false);
+      _diamond(im, cx, cy, 32, gold, fill: false);
+      _diamond(im, cx, cy, 8, gold, fill: false);
   }
   return im;
+}
+
+/// Simplified north-up outline of the Democratic Republic of the Congo
+/// (country border shape only — no flag colors or corners).
+const List<(double, double)> _kCongoCountryUnit = [
+  // Atlantic tip (Kongo-Central), then clockwise
+  (0.00, 0.40),
+  (0.08, 0.36),
+  (0.14, 0.34),
+  (0.18, 0.28),
+  (0.20, 0.18),
+  (0.24, 0.10),
+  (0.32, 0.05),
+  (0.42, 0.02),
+  (0.54, 0.03),
+  (0.66, 0.06),
+  (0.78, 0.10),
+  (0.88, 0.16),
+  (0.94, 0.24),
+  (0.97, 0.34),
+  (0.96, 0.44),
+  (0.93, 0.54),
+  (0.94, 0.64),
+  (0.97, 0.74),
+  (0.92, 0.84),
+  (0.82, 0.92),
+  (0.70, 0.97),
+  (0.58, 0.95),
+  (0.46, 0.90),
+  (0.36, 0.84),
+  (0.30, 0.76),
+  (0.32, 0.66),
+  (0.28, 0.58),
+  (0.22, 0.54),
+  (0.14, 0.50),
+  (0.06, 0.46),
+];
+
+void _drawCongoCountryOutline(
+  img.Image im,
+  int cx,
+  int cy,
+  int pale,
+  int gold, {
+  double scale = 78,
+}) {
+  List<img.Point> pts(double s) {
+    return [
+      for (final p in _kCongoCountryUnit)
+        img.Point(
+          cx + (p.$1 - 0.5) * s * 1.05,
+          cy + (p.$2 - 0.5) * s * 1.15,
+        ),
+    ];
+  }
+
+  void strokeRing(List<img.Point> ring, int color, double thickness) {
+    for (var i = 0; i < ring.length; i++) {
+      final a = ring[i];
+      final b = ring[(i + 1) % ring.length];
+      img.drawLine(
+        im,
+        x1: a.x.round(),
+        y1: a.y.round(),
+        x2: b.x.round(),
+        y2: b.y.round(),
+        color: _c(color),
+        antialias: true,
+        thickness: thickness,
+      );
+    }
+  }
+
+  // Soft outer + stronger inner border — same weight language as the old diamond.
+  strokeRing(pts(scale + 6), pale, 2.2);
+  strokeRing(pts(scale), gold, 1.8);
+  _diamond(im, cx, cy, 5, gold);
 }
 
 img.Image _goldFiligreePaper() {
