@@ -366,43 +366,46 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 /// let users hide the (optional) 4th item.
 ///
 /// Row 1 (the money / "Kichwa cha Mtu" line) keeps a full-width underline,
-/// then places locked "AKUNA DENI" + a square green pre-ticked box under
-/// that line so the paper shows nothing is still owed.
+/// with locked "AKUNA DENI" + a square green pre-ticked box sitting on the
+/// same line above that underline (right side) so the paper shows nothing
+/// is still owed.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
-  final itemW = x + w - itemX;
   const paidGreen = 0xFF16A34A;
+  // On portrait 9:16, equal visual sides need h = w * (9/16).
+  const tickBoxW = 0.042;
+  const tickBoxH = tickBoxW * 9 / 16;
+  const labelW = 0.24;
+  final showAkunaDeni = n == 1;
+  final rightReserve = showAkunaDeni ? (0.012 + labelW + 0.010 + tickBoxW) : 0.0;
+  final itemW = (x + w - itemX - rightReserve).clamp(0.20, 1.0);
   final out = <NgmySlideElement>[
     _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
     _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 16, startText: hint, align: TextAlign.left),
+    // Full-width underline across the whole row (amount + AKUNA DENI area).
     _hLockedShape(
       shape: NgmySlideShapeKind.line,
       x: itemX,
       y: y + 0.002 + _hBlankH(16) + 0.002,
-      w: itemW,
+      w: x + w - itemX,
       h: 0.002,
       strokeColor: _softLine,
       strokeWidth: 0.8,
       tag: 'nim_ul_$n',
     ),
   ];
-  if (n == 1) {
-    // Sit under the full underline, right side — word + equal-side green box.
-    // On portrait 9:16, equal visual sides need h = w * (9/16).
-    const tickBoxW = 0.036;
-    const tickBoxH = tickBoxW * 9 / 16;
-    const labelW = 0.22;
-    final underY = y + 0.002 + _hBlankH(16) + 0.006;
-    final boxX = itemX + itemW - tickBoxW;
-    final labelX = boxX - labelW - 0.010;
+  if (showAkunaDeni) {
+    final labelX = itemX + itemW + 0.012;
+    final boxX = labelX + labelW + 0.008;
+    final boxY = y + 0.004;
     out.addAll([
       _hLockedText(
         'AKUNA DENI',
         x: labelX,
-        y: underY + 0.001,
+        y: y + 0.002,
         w: labelW,
-        h: 0.032,
-        fontSize: 16,
+        h: 0.034,
+        fontSize: 18,
         fontWeight: FontWeight.w900,
         align: TextAlign.right,
         color: paidGreen,
@@ -411,21 +414,21 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
       _hLockedShape(
         shape: NgmySlideShapeKind.rectangle,
         x: boxX,
-        y: underY,
+        y: boxY,
         w: tickBoxW,
         h: tickBoxH,
         fillColor: 0x00000000,
         strokeColor: paidGreen,
-        strokeWidth: 1.8,
+        strokeWidth: 2.0,
         tag: 'nim_akuna_box',
       ),
       _hLockedText(
         '✓',
         x: boxX,
-        y: underY - 0.002,
+        y: boxY - 0.003,
         w: tickBoxW,
-        h: tickBoxH + 0.004,
-        fontSize: 15,
+        h: tickBoxH + 0.006,
+        fontSize: 18,
         fontWeight: FontWeight.w900,
         align: TextAlign.center,
         color: paidGreen,
@@ -1142,8 +1145,7 @@ List<NgmySlideElement> _layoutSingle(
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
-    // Row 1 needs extra room for AKUNA DENI + green tick under the line.
-    y += i == 1 ? 0.066 : 0.04;
+    y += 0.04;
   }
   // Was 0.014 — tightened so the MASHAHIDI frame moves up, per request.
   y += 0.006;
