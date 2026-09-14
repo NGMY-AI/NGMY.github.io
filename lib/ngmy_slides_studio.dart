@@ -84,6 +84,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   int _loadGen = 0;
   Set<String> _hiddenKiapoStates = {};
 
+  /// Triple-quick-tap counter for showing/hiding Hati "AKUNA DENI" + tick box.
+  int _akunaDeniQuickTaps = 0;
+  DateTime? _akunaDeniQuickTapAt;
+
   late final AnimationController _framePulse;
 
   @override
@@ -2131,6 +2135,62 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     _mutate(() {
       _rememberFirstDocumentSignatureStyle(result);
       placed.imageRef = result.imageRef;
+      _selectedElementId = null;
+    });
+  }
+
+  static bool _isAkunaDeniHitTarget(NgmySlideElement e) {
+    final f = e.fileName;
+    return f == '${kMarriageLocked}_nim_akuna_deni' ||
+        f == '${kMarriageLocked}_nim_akuna_box' ||
+        f == '${kMarriageLocked}_nim_akuna_tick' ||
+        f == '${kMarriageLocked}_nim_akuna_hit';
+  }
+
+  void _onAkunaDeniQuickTap() {
+    if (_isTransferredReadOnly()) return;
+    final now = DateTime.now();
+    if (_akunaDeniQuickTapAt != null &&
+        now.difference(_akunaDeniQuickTapAt!) <= const Duration(milliseconds: 500)) {
+      _akunaDeniQuickTaps += 1;
+    } else {
+      _akunaDeniQuickTaps = 1;
+    }
+    _akunaDeniQuickTapAt = now;
+    if (_akunaDeniQuickTaps >= 3) {
+      _akunaDeniQuickTaps = 0;
+      _akunaDeniQuickTapAt = null;
+      _toggleAkunaDeniVisible();
+    }
+  }
+
+  /// Triple-quick-tap the green "AKUNA DENI" / tick to hide; triple-tap the
+  /// same spot again to bring them back.
+  void _toggleAkunaDeniVisible() {
+    final slide = _currentSlide;
+    if (slide == null) return;
+    const paidGreen = 0xFF16A34A;
+    NgmySlideElement? deni;
+    for (final e in slide.elements) {
+      if (e.fileName == '${kMarriageLocked}_nim_akuna_deni') {
+        deni = e;
+        break;
+      }
+    }
+    if (deni == null) return;
+    final hidden = ((deni.color >> 24) & 0xFF) == 0 || deni.text.trim().isEmpty;
+    _mutate(() {
+      for (final e in slide.elements) {
+        if (e.fileName == '${kMarriageLocked}_nim_akuna_deni') {
+          e.color = hidden ? paidGreen : 0x0016A34A;
+          e.text = hidden ? 'AKUNA DENI' : ' ';
+        } else if (e.fileName == '${kMarriageLocked}_nim_akuna_box') {
+          e.strokeColor = hidden ? paidGreen : 0x0016A34A;
+        } else if (e.fileName == '${kMarriageLocked}_nim_akuna_tick') {
+          e.color = hidden ? paidGreen : 0x0016A34A;
+          e.text = hidden ? '✓' : ' ';
+        }
+      }
       _selectedElementId = null;
     });
   }
@@ -4408,9 +4468,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final accentColor = isDesign ? const Color(0xFFF97316) : const Color(0xFF2563EB);
     final marriageField = marriage && ngmyMarriageElementIsField(e);
     final void Function()? onCanvasTap;
+    final akunaHit = marriage && _isAkunaDeniHitTarget(e);
     if (videoZone && ngmyKiapoHasVideo(e)) {
       // Defer to the embedded video player (play/pause).
       onCanvasTap = null;
+    } else if (akunaHit && !_isTransferredReadOnly()) {
+      onCanvasTap = _onAkunaDeniQuickTap;
     } else if (_isTransferredReadOnly()) {
       onCanvasTap = null;
     } else {
@@ -4437,6 +4500,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       width: e.w * cw,
       height: e.h * ch,
       child: GestureDetector(
+        behavior: akunaHit ? HitTestBehavior.opaque : HitTestBehavior.deferToChild,
         onTap: onCanvasTap,
         onLongPress: videoZone && ngmyKiapoHasVideo(e) && _canEditKiapoDeck()
             ? () => unawaited(_attachKiapoVideo(e))

@@ -369,14 +369,19 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 /// Row 1 (the money / "Kichwa cha Mtu" line) keeps a full-width underline,
 /// with locked "AKUNA DENI" + a square green pre-ticked box on the same
 /// single line (right side) — nothing wraps under anything else.
+///
+/// Amount text stays at the same 16pt as rows 2–4 (no auto-shrink). The
+/// green label is sized compactly so the amount field keeps nearly the
+/// same width as the other rows.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
   const paidGreen = 0xFF16A34A;
   // On portrait 9:16, equal visual sides need h = w * (9/16).
-  const tickBoxW = 0.046;
+  const tickBoxW = 0.036;
   const tickBoxH = tickBoxW * 9 / 16;
-  // Wide enough for "AKUNA DENI" at ~22pt without eating the amount field.
-  const labelW = 0.268;
+  // Compact label — wide enough for "AKUNA DENI" at 14pt without forcing
+  // the money blank to shrink below the 16pt used on rows 2–4.
+  const labelW = 0.152;
   final showAkunaDeni = n == 1;
   final rightReserve = showAkunaDeni ? (0.008 + labelW + 0.006 + tickBoxW) : 0.0;
   final itemW = (x + w - itemX - rightReserve).clamp(0.22, 1.0);
@@ -390,12 +395,7 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
     fontSize: 16,
     startText: hint,
     align: TextAlign.left,
-    autoShrinkFont: showAkunaDeni,
   );
-  if (showAkunaDeni) {
-    // Fit the money text to one line at build time (not only after edit).
-    ngmyMarriageAutoFitField(amountField, hint);
-  }
   final out = <NgmySlideElement>[
     _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
     amountField,
@@ -423,7 +423,7 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
         y: y + 0.002,
         w: labelW,
         h: lineH,
-        fontSize: 22,
+        fontSize: 14,
         fontWeight: FontWeight.w900,
         align: TextAlign.right,
         color: paidGreen,
@@ -446,11 +446,24 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
         y: boxY - 0.002,
         w: tickBoxW,
         h: tickBoxH + 0.004,
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: FontWeight.w900,
         align: TextAlign.center,
         color: paidGreen,
         tag: 'nim_akuna_tick',
+      ),
+      // Invisible hit pad covering words + box so triple-tap still works
+      // after the green marks are hidden (transparent).
+      _hLockedShape(
+        shape: NgmySlideShapeKind.rectangle,
+        x: labelX,
+        y: y + 0.002,
+        w: (boxX + tickBoxW) - labelX,
+        h: lineH,
+        fillColor: 0x00000000,
+        strokeColor: 0x00000000,
+        strokeWidth: 0,
+        tag: 'nim_akuna_hit',
       ),
     ]);
   }
@@ -1398,7 +1411,8 @@ const _kHatiKuhowaIntro = 'Mimi [Jina la Baba wa Mume], wa jamaa ya [Jina la Jam
 const String kNgmyHatiKuhowaIntroTemplate = _kHatiKuhowaIntro;
 
 const _kHatiKuhowaMahariItems = [
-  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
+  // Kept short enough to stay one line at 16pt beside AKUNA DENI.
+  'Kichwa cha Mtu: Dollar 20,000',
   'Mbuzi Mbili',
   'Ngyoka',
   'Mmoko',
@@ -1446,7 +1460,7 @@ const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba wa Binti], wa jamaa ya [Jina la
 const String kNgmyHatiKuhoweshaIntroTemplate = _kHatiKuhoweshaIntro;
 
 const _kHatiKuhoweshaMahariItems = [
-  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
+  'Kichwa cha Mtu: Dollar 20,000',
   'Mbuzi Wawili',
   'Ngyoka',
   'Mmoko',
