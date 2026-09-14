@@ -67,7 +67,8 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.elegantNavy:
       return _withCenterMark(_elegantOuterNavy(_elegantPaper(0xFFFFFEFB, 0xFFF8F5EE, 0xFFB8860B)), 0);
     case NgmyMarriagePaperStyle.elegantGold:
-      return _withCenterMark(_elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A), 1);
+      // No circle center seal — leave paper clean (triangles stay on other styles).
+      return _elegantPaper(0xFFFFFCF3, 0xFFF6EEDA, 0xFFA6843A);
     case NgmyMarriagePaperStyle.elegantEmerald:
       return _withCenterMark(_elegantOuterEmerald(_elegantPaper(0xFFF6FBF8, 0xFFEBF5EE, 0xFFB8965A)), 2);
     case NgmyMarriagePaperStyle.elegantBurgundy:
@@ -99,13 +100,14 @@ img.Image _renderPaper(NgmyMarriagePaperStyle style) {
     case NgmyMarriagePaperStyle.certIvoryNavyBar:
       return _certificatePaper(0xFFFFFCF7, 0xFFF6F1E6, 0xFFC9A227, 0xFF12213D, topBar: 0xFF12213D);
     case NgmyMarriagePaperStyle.goldFiligree:
-      return _withCenterMark(_goldFiligreePaper(), 1);
+      // Circle medallion removed — no center seal on this paper.
+      return _goldFiligreePaper();
     case NgmyMarriagePaperStyle.goldLaurel:
       return _withCenterMark(_goldLaurelPaper(), 2);
     case NgmyMarriagePaperStyle.goldCrest:
       return _withCenterMark(_goldCrestPaper(), 3);
     case NgmyMarriagePaperStyle.goldRibbon:
-      return _withCenterMark(_goldRibbonPaper(), 1);
+      return _goldRibbonPaper();
     case NgmyMarriagePaperStyle.goldBaroque:
       return _withCenterMark(_goldBaroquePaper(), 2);
     case NgmyMarriagePaperStyle.goldStar:
