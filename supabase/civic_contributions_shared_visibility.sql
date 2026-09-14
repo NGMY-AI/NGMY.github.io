@@ -202,7 +202,8 @@ returns boolean language sql stable as $$
     'civic_help_mode_settings',
     'civic_contribution_receipt_removed',
     'civic_deleted_contribution_ids',
-    'civic_help_campaign_spendings'
+    'civic_help_campaign_spendings',
+    'civic_user_groups_v1'
   );
 $$;
 

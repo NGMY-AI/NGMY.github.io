@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -37,20 +38,29 @@ Future<void> _copyGroupCodeSnack(BuildContext context, String code) async {
 
 List<NgmyCivicUserGroupLedgerEntry> _contributionsForMember(
   NgmyCivicUserGroup group,
-  String memberName,
-) {
+  String memberName, {
+  String email = '',
+}) {
   final key = memberName.trim().toLowerCase();
-  return group.ledger
-      .where(
-        (e) =>
-            e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
-            e.label.trim().toLowerCase() == key,
-      )
-      .toList();
+  final emailKey = email.toLowerCase().trim();
+  return group.ledger.where((e) {
+    if (e.kind != NgmyCivicUserGroupLedgerKind.contribution) return false;
+    if (e.label.trim().toLowerCase() == key) return true;
+    if (emailKey.isNotEmpty && e.memberEmail == emailKey) return true;
+    if (emailKey.isNotEmpty) {
+      final resolved = group.emailForMemberName(e.label);
+      return resolved != null && resolved.toLowerCase().trim() == emailKey;
+    }
+    return false;
+  }).toList();
 }
 
-double _contributionTotalForMember(NgmyCivicUserGroup group, String memberName) =>
-    _contributionsForMember(group, memberName)
+double _contributionTotalForMember(
+  NgmyCivicUserGroup group,
+  String memberName, {
+  String email = '',
+}) =>
+    _contributionsForMember(group, memberName, email: email)
         .fold<double>(0, (s, e) => s + e.amount);
 
 enum _MemberHistoryFilter { all, contributions, missed }
@@ -83,7 +93,7 @@ List<_MemberHistoryItem> _memberHistoryItems(
   String email,
 ) {
   final items = <_MemberHistoryItem>[
-    ..._contributionsForMember(group, name).map(
+    ..._contributionsForMember(group, name, email: email).map(
       (e) => _ContributionHistoryItem(at: e.at, entry: e),
     ),
     ...group.missedForMember(name, email).map(
@@ -174,12 +184,17 @@ class _NgmyCivicUserGroupsHubScreenState
   late final AnimationController _stagger;
   List<NgmyCivicUserGroup> _owned = [];
   List<NgmyCivicUserGroup> _joined = [];
+  Timer? _liveSync;
 
   @override
   void initState() {
     super.initState();
     _owned = NgmyCivicUserGroupsStore.cachedOwnedBy(widget.userEmail);
     _joined = NgmyCivicUserGroupsStore.cachedJoinedBy(widget.userEmail);
+    _liveSync = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      _reload();
+    });
     _bolt = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -201,6 +216,7 @@ class _NgmyCivicUserGroupsHubScreenState
 
   @override
   void dispose() {
+    _liveSync?.cancel();
     _bolt.dispose();
     _pulse.dispose();
     _orbit.dispose();
@@ -313,11 +329,26 @@ class _NgmyCivicUserGroupsHubScreenState
       );
       return;
     }
-    final joined = await NgmyCivicUserGroupsStore.joinByCode(
-      inviteCode: found.inviteCode,
-      email: widget.userEmail,
-      name: widget.userName,
-    );
+    NgmyCivicUserGroup? joined;
+    try {
+      joined = await NgmyCivicUserGroupsStore.joinByCode(
+        inviteCode: found.inviteCode,
+        email: widget.userEmail,
+        name: widget.userName,
+      );
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not join that group. $e')),
+      );
+      return;
+    }
     if (!mounted) return;
     if (joined == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1184,6 +1215,7 @@ class _NgmyCivicUserGroupHomeScreenState
   NgmyCivicUserGroup? _group;
   late final AnimationController _pulse;
   late final AnimationController _orbit;
+  Timer? _liveSync;
   int _tab = 0; // 0 ledger, 1 people, 2 invite
 
   bool get _isOwner =>
@@ -1202,11 +1234,16 @@ class _NgmyCivicUserGroupHomeScreenState
       vsync: this,
       duration: const Duration(seconds: 6),
     )..repeat();
+    _liveSync = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (!mounted) return;
+      _reload();
+    });
     _reload();
   }
 
   @override
   void dispose() {
+    _liveSync?.cancel();
     _pulse.dispose();
     _orbit.dispose();
     super.dispose();
@@ -1280,6 +1317,7 @@ class _NgmyCivicUserGroupHomeScreenState
                 _group!.helpModeActive
             ? _group!.helpCampaignId
             : '',
+        memberEmail: _group!.emailForMemberName(result.label) ?? '',
       ),
     );
     if (kind == NgmyCivicUserGroupLedgerKind.contribution &&
@@ -1294,7 +1332,21 @@ class _NgmyCivicUserGroupHomeScreenState
         );
       }
     }
-    await NgmyCivicUserGroupsStore.saveGroup(_group!);
+    try {
+      await NgmyCivicUserGroupsStore.saveGroup(_group!);
+    } on StateError catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save ledger. $e')),
+      );
+      return;
+    }
     await _reload();
   }
 
@@ -1311,7 +1363,21 @@ class _NgmyCivicUserGroupHomeScreenState
     if (updated == null || !mounted) return;
     if (_isOwner) {
       _group = updated;
-      await NgmyCivicUserGroupsStore.saveGroup(_group!);
+      try {
+        await NgmyCivicUserGroupsStore.saveGroup(_group!);
+      } on StateError catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save help mode. $e')),
+        );
+        return;
+      }
       await _reload();
     }
   }
@@ -1648,34 +1714,79 @@ class _NgmyCivicUserGroupHomeScreenState
               ),
             ),
             const SizedBox(height: 14),
-            if (_isOwner) ...[
-              _GlowButton(
-                label: 'Copy invite code',
-                icon: Icons.copy_rounded,
-                pulse: _pulse,
-                onTap: _copyCode,
-              ),
-              const SizedBox(height: 10),
-              _GlowButton(
-                label: 'Download QR',
-                icon: Icons.download_rounded,
-                pulse: _pulse,
-                outlined: true,
-                onTap: _downloadQr,
-              ),
-            ] else
-              const Text(
-                'Ask the owner for the code or QR to invite others.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38),
-              ),
+            _GlowButton(
+              label: 'Copy invite code',
+              icon: Icons.copy_rounded,
+              pulse: _pulse,
+              onTap: _copyCode,
+            ),
+            const SizedBox(height: 10),
+            _GlowButton(
+              label: 'Download QR',
+              icon: Icons.download_rounded,
+              pulse: _pulse,
+              outlined: true,
+              onTap: _downloadQr,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Share this code or QR so others can join from Lightning Groups.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white38, fontSize: 12),
+            ),
           ],
         );
       default:
         final entries = g.ledger;
+        final mine = _contributionsForMember(
+          g,
+          widget.userName,
+          email: widget.userEmail,
+        );
+        final myTotal = mine.fold<double>(0, (s, e) => s + e.amount);
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _kPanel,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBolt.withValues(alpha: 0.28)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_balance_wallet_outlined, color: _kBolt, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mine.isEmpty
+                              ? 'Your contributions: none yet'
+                              : 'Your contributions: \$${myTotal.toStringAsFixed(2)} (${mine.length})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Group spending: \$${g.totalSpending.toStringAsFixed(2)} · Balance \$${g.balance.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             if (entries.isEmpty)
               const Text('No contributions or spending yet.',
                   style: TextStyle(color: Colors.white38))
@@ -1769,7 +1880,7 @@ class _NgmyCivicUserGroupHomeScreenState
     required VoidCallback onTap,
     VoidCallback? onRemove,
   }) {
-    final total = _contributionTotalForMember(group, name);
+    final total = _contributionTotalForMember(group, name, email: email);
     final hasPaid = total > 0;
     final missedTotal = group.missedFor(name, email);
     final missedThisRound = group.helpModeActive &&
@@ -3101,7 +3212,7 @@ Future<void> _showLightningMemberProfileSheet(
   bool isOwner = false,
   Future<void> Function(String entryId)? onClearMissed,
 }) {
-  final contributions = _contributionsForMember(group, name);
+  final contributions = _contributionsForMember(group, name, email: email);
   final total = contributions.fold<double>(0, (s, e) => s + e.amount);
   final missedTotal = group.missedFor(name, email);
   final missedThisRound = group.helpModeActive &&
@@ -3224,7 +3335,7 @@ class _MemberProfileSheetBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredHistory;
-    final liveContributions = _contributionsForMember(group, name);
+    final liveContributions = _contributionsForMember(group, name, email: email);
     final liveTotal =
         liveContributions.fold<double>(0, (s, e) => s + e.amount);
     final liveMissedTotal = group.missedFor(name, email);
@@ -3962,7 +4073,14 @@ Future<NgmyCivicUserGroup?> _showLightningHelpModeSheet(
                     FilledButton(
                       onPressed: () {
                         applyFields();
-                        if (group.helpPurpose.trim().isEmpty) return;
+                        if (group.helpPurpose.trim().isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('Add what you are collecting for, then activate help mode.'),
+                            ),
+                          );
+                          return;
+                        }
                         group.activateHelpMode();
                         Navigator.pop(ctx, group);
                       },

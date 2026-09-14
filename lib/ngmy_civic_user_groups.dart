@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_settings_cloud.dart';
 
 const kNgmyCivicUserGroupQrPrefix = 'NGMY-GROUP:';
@@ -105,6 +106,7 @@ class NgmyCivicUserGroupLedgerEntry {
     required this.at,
     required this.byEmail,
     this.campaignId = '',
+    this.memberEmail = '',
   });
 
   final String id;
@@ -115,6 +117,7 @@ class NgmyCivicUserGroupLedgerEntry {
   final DateTime at;
   final String byEmail;
   final String campaignId;
+  final String memberEmail;
 
   static String _kindToJson(NgmyCivicUserGroupLedgerKind kind) {
     switch (kind) {
@@ -148,6 +151,7 @@ class NgmyCivicUserGroupLedgerEntry {
         'at': at.toUtc().toIso8601String(),
         'byEmail': byEmail,
         if (campaignId.isNotEmpty) 'campaignId': campaignId,
+        if (memberEmail.isNotEmpty) 'memberEmail': memberEmail,
       };
 
   factory NgmyCivicUserGroupLedgerEntry.fromJson(Map<String, dynamic> j) {
@@ -162,6 +166,7 @@ class NgmyCivicUserGroupLedgerEntry {
       at: DateTime.tryParse((j['at'] ?? '').toString()) ?? DateTime.now().toUtc(),
       byEmail: (j['byEmail'] ?? '').toString().toLowerCase().trim(),
       campaignId: (j['campaignId'] ?? '').toString().trim(),
+      memberEmail: (j['memberEmail'] ?? '').toString().toLowerCase().trim(),
     );
   }
 }
@@ -277,16 +282,18 @@ class NgmyCivicUserGroup {
 
   double get balance => totalContributions - totalSpending;
 
-  bool contributedToCampaign(String memberName, String campaignId) {
+  bool contributedToCampaign(String memberName, String campaignId, {String email = ''}) {
     final cid = campaignId.trim();
     if (cid.isEmpty) return false;
     final key = memberName.trim().toLowerCase();
-    return ledger.any(
-      (e) =>
-          e.kind == NgmyCivicUserGroupLedgerKind.contribution &&
-          e.campaignId == cid &&
-          e.label.trim().toLowerCase() == key,
-    );
+    final emailKey = email.toLowerCase().trim();
+    return ledger.any((e) {
+      if (e.kind != NgmyCivicUserGroupLedgerKind.contribution) return false;
+      if (e.campaignId != cid) return false;
+      if (e.label.trim().toLowerCase() == key) return true;
+      if (emailKey.isNotEmpty && e.memberEmail == emailKey) return true;
+      return false;
+    });
   }
 
   void saveHelpSettings({
@@ -542,6 +549,35 @@ abstract final class NgmyCivicUserGroupsStore {
   static String _newId() =>
       'cug_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 20)}';
 
+  static Future<Map<String, dynamic>?> _fetchCloudRoot() async {
+    final data = await ngmyCivicInvoke({'action': 'civicUserGroupsFetch'});
+    if (data != null && data['ok'] == true && data['value'] is Map) {
+      return Map<String, dynamic>.from(data['value'] as Map);
+    }
+    return ngmyFetchSettingsValueViaRest(settingsKey);
+  }
+
+  static Future<Map<String, dynamic>?> _persistCloudRoot(
+    Map<String, dynamic> root,
+  ) async {
+    final data = await ngmyCivicInvoke({
+      'action': 'civicUserGroupsPersist',
+      'value': root,
+    });
+    if (data != null && data['ok'] == true) {
+      if (data['value'] is Map) {
+        return Map<String, dynamic>.from(data['value'] as Map);
+      }
+      return root;
+    }
+    final err = (data?['error'] ?? '').toString().trim();
+    if (err.isNotEmpty) {
+      throw StateError(err);
+    }
+    final ok = await ngmyUpsertSettingsRowReliable(settingsKey, root);
+    return ok ? root : null;
+  }
+
   static Future<Map<String, dynamic>> _loadRoot() async {
     final prefs = await SharedPreferences.getInstance();
     Map<String, dynamic> local = {'groups': <String, dynamic>{}};
@@ -552,7 +588,7 @@ abstract final class NgmyCivicUserGroupsStore {
         if (decoded is Map) local = Map<String, dynamic>.from(decoded);
       } catch (_) {}
     }
-    final remote = await ngmyFetchSettingsValueViaRest(settingsKey);
+    final remote = await _fetchCloudRoot();
     if (remote != null) {
       await prefs.setString(_localKey, jsonEncode(remote));
       return remote;
@@ -564,7 +600,16 @@ abstract final class NgmyCivicUserGroupsStore {
     root['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_localKey, jsonEncode(root));
-    await ngmyUpsertSettingsRowReliable(settingsKey, root);
+    final saved = await _persistCloudRoot(root);
+    if (saved == null) {
+      throw StateError(
+        'Could not sync this group to the cloud. Check your connection and try again.',
+      );
+    }
+    await prefs.setString(_localKey, jsonEncode(saved));
+    final list = _groupsFromRoot(saved).values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    _setMemoryCache(list);
   }
 
   static Map<String, NgmyCivicUserGroup> _groupsFromRoot(Map<String, dynamic> root) {
@@ -600,6 +645,15 @@ abstract final class NgmyCivicUserGroupsStore {
   static Future<NgmyCivicUserGroup?> findByInviteCode(String code) async {
     final c = ngmyParseCivicUserGroupInviteCode(code) ?? code.trim().toUpperCase();
     if (c.isEmpty) return null;
+    final data = await ngmyCivicInvoke({
+      'action': 'civicUserGroupsFind',
+      'code': c,
+    });
+    if (data != null && data['ok'] == true && data['group'] is Map) {
+      return NgmyCivicUserGroup.fromJson(
+        Map<String, dynamic>.from(data['group'] as Map),
+      );
+    }
     final all = await loadAll();
     try {
       return all.firstWhere((g) => g.inviteCode == c);
@@ -634,6 +688,10 @@ abstract final class NgmyCivicUserGroupsStore {
     if (groups.values.any((g) => g.inviteCode == code)) {
       throw StateError('That group code is already taken. Try another.');
     }
+    final taken = await findByInviteCode(code);
+    if (taken != null) {
+      throw StateError('That group code is already taken. Try another.');
+    }
     final group = NgmyCivicUserGroup(
       id: _newId(),
       name: code,
@@ -645,8 +703,7 @@ abstract final class NgmyCivicUserGroupsStore {
     groups[group.id] = group;
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
-    _upsertMemoryGroup(group);
-    return group;
+    return cachedById(group.id) ?? group;
   }
 
   static Future<void> saveGroup(NgmyCivicUserGroup group) async {
@@ -655,7 +712,6 @@ abstract final class NgmyCivicUserGroupsStore {
     groups[group.id] = group;
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
-    _upsertMemoryGroup(group);
   }
 
   static void _upsertMemoryGroup(NgmyCivicUserGroup group) {
@@ -686,7 +742,26 @@ abstract final class NgmyCivicUserGroupsStore {
     required String email,
     required String name,
   }) async {
-    final group = await findByInviteCode(inviteCode);
+    final code =
+        ngmyParseCivicUserGroupInviteCode(inviteCode) ?? inviteCode.trim().toUpperCase();
+    if (code.isEmpty) return null;
+    final data = await ngmyCivicInvoke({
+      'action': 'civicUserGroupsJoin',
+      'code': code,
+      'name': name,
+    });
+    if (data != null && data['ok'] == true && data['group'] is Map) {
+      final group = NgmyCivicUserGroup.fromJson(
+        Map<String, dynamic>.from(data['group'] as Map),
+      );
+      await _mergeGroupIntoLocalPrefs(group);
+      return group;
+    }
+    final err = (data?['error'] ?? '').toString().trim();
+    if (err.isNotEmpty && err != 'Authentication required') {
+      throw StateError(err);
+    }
+    final group = await findByInviteCode(code);
     if (group == null) return null;
     final e = email.toLowerCase().trim();
     if (group.isMember(e)) return group;
@@ -698,7 +773,25 @@ abstract final class NgmyCivicUserGroupsStore {
       ),
     );
     await saveGroup(group);
-    return group;
+    return cachedById(group.id) ?? group;
+  }
+
+  static Future<void> _mergeGroupIntoLocalPrefs(NgmyCivicUserGroup group) async {
+    _upsertMemoryGroup(group);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      Map<String, dynamic> local = {'groups': <String, dynamic>{}};
+      final raw = prefs.getString(_localKey);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) local = Map<String, dynamic>.from(decoded);
+      }
+      final groups = _groupsFromRoot(local);
+      groups[group.id] = group;
+      local['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
+      local['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      await prefs.setString(_localKey, jsonEncode(local));
+    } catch (_) {}
   }
 
   static Future<bool> removeMember({
@@ -733,6 +826,7 @@ abstract final class NgmyCivicUserGroupsStore {
         note: 'Removed from group',
         at: DateTime.now().toUtc(),
         byEmail: (removedByEmail ?? '').toLowerCase().trim(),
+        memberEmail: e,
       ),
     );
     await saveGroup(group);

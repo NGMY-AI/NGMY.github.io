@@ -4895,6 +4895,298 @@ async function handleAdminUsersList(
   return networkFetchOk({ count: rows.length });
 }
 
+const CIVIC_USER_GROUPS_KEY = "civic_user_groups_v1";
+
+function civicGroupOwnerEmail(g: Record<string, unknown>): string {
+  return emailKey(String(g.ownerEmail ?? ""));
+}
+
+function civicGroupHasMember(g: Record<string, unknown>, email: string): boolean {
+  const want = emailKey(email);
+  if (!want) return false;
+  if (civicGroupOwnerEmail(g) === want) return true;
+  const members = Array.isArray(g.members) ? g.members : [];
+  return members.some((m) => {
+    if (!m || typeof m !== "object") return false;
+    return emailKey(String((m as Record<string, unknown>).email ?? "")) === want;
+  });
+}
+
+function civicGroupMemberEmail(m: unknown): string {
+  if (!m || typeof m !== "object") return "";
+  return emailKey(String((m as Record<string, unknown>).email ?? ""));
+}
+
+function civicGroupInviteCode(g: Record<string, unknown>): string {
+  return String(g.inviteCode ?? "").trim().toUpperCase();
+}
+
+function civicGroupMemberCount(g: Record<string, unknown>): number {
+  const emails = new Set<string>();
+  const owner = civicGroupOwnerEmail(g);
+  if (owner) emails.add(owner);
+  const members = Array.isArray(g.members) ? g.members : [];
+  for (const m of members) {
+    const e = civicGroupMemberEmail(m);
+    if (e) emails.add(e);
+  }
+  return emails.size;
+}
+
+function filterCivicUserGroupsForCaller(
+  value: Record<string, unknown>,
+  email: string,
+  isAdmin: boolean,
+): Record<string, unknown> {
+  const groups =
+    value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+  if (isAdmin) return { ...value, groups };
+  const mine: Record<string, unknown> = {};
+  const callerE = emailKey(email);
+  for (const [id, raw] of Object.entries(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupOwnerEmail(g) === callerE || civicGroupHasMember(g, callerE)) {
+      mine[id] = g;
+    }
+  }
+  return { ...value, groups: mine };
+}
+
+function mergeCivicGroupMembersPreserveJoiners(
+  prev: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): unknown[] {
+  const incomingMembers = Array.isArray(incoming.members) ? incoming.members : [];
+  const prevMembers = Array.isArray(prev.members) ? prev.members : [];
+  const prevRemovalIds = new Set<string>();
+  const prevLedger = Array.isArray(prev.ledger) ? prev.ledger : [];
+  for (const row of prevLedger) {
+    if (!row || typeof row !== "object") continue;
+    const e = row as Record<string, unknown>;
+    const kind = String(e.kind ?? "").toLowerCase();
+    if (kind === "member_removed" || kind === "removed") {
+      prevRemovalIds.add(String(e.id ?? ""));
+    }
+  }
+  const removedKeys = new Set<string>();
+  const incomingLedger = Array.isArray(incoming.ledger) ? incoming.ledger : [];
+  for (const row of incomingLedger) {
+    if (!row || typeof row !== "object") continue;
+    const e = row as Record<string, unknown>;
+    const kind = String(e.kind ?? "").toLowerCase();
+    if (kind !== "member_removed" && kind !== "removed") continue;
+    if (prevRemovalIds.has(String(e.id ?? ""))) continue;
+    const label = String(e.label ?? "").trim().toLowerCase();
+    const memberEmail = emailKey(String(e.memberEmail ?? ""));
+    if (label) removedKeys.add(label);
+    if (memberEmail) removedKeys.add(memberEmail);
+  }
+  const byEmail = new Map<string, unknown>();
+  for (const m of incomingMembers) {
+    const e = civicGroupMemberEmail(m);
+    if (e) byEmail.set(e, m);
+  }
+  for (const m of prevMembers) {
+    const e = civicGroupMemberEmail(m);
+    if (!e || byEmail.has(e)) continue;
+    const name = String((m as Record<string, unknown>).name ?? "").trim().toLowerCase();
+    if (removedKeys.has(e) || (name && removedKeys.has(name))) continue;
+    byEmail.set(e, m);
+  }
+  return [...byEmail.values()];
+}
+
+function mergeCivicUserGroupsBlob(
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+  caller: string,
+  isAdmin: boolean,
+): Record<string, unknown> {
+  const existingMap =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? { ...(existing.groups as Record<string, unknown>) }
+      : {};
+  const incomingMap =
+    incoming.groups && typeof incoming.groups === "object" && !Array.isArray(incoming.groups)
+      ? (incoming.groups as Record<string, unknown>)
+      : {};
+  const merged: Record<string, unknown> = { ...existingMap };
+  const callerE = emailKey(caller);
+
+  for (const [id, raw] of Object.entries(incomingMap)) {
+    if (!id || !raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    const prevRaw = existingMap[id];
+    const prev = prevRaw && typeof prevRaw === "object" ? prevRaw as Record<string, unknown> : null;
+    if (!prev) {
+      if (isAdmin || civicGroupOwnerEmail(g) === callerE) merged[id] = g;
+      continue;
+    }
+    if (isAdmin || civicGroupOwnerEmail(prev) === callerE) {
+      merged[id] = { ...g, members: mergeCivicGroupMembersPreserveJoiners(prev, g) };
+      continue;
+    }
+    if (civicGroupHasMember(g, callerE) && !civicGroupHasMember(prev, callerE)) {
+      const prevMembers = Array.isArray(prev.members) ? [...prev.members] : [];
+      const incomingMembers = Array.isArray(g.members) ? g.members : [];
+      const extra = incomingMembers.filter((m) => {
+        if (!m || typeof m !== "object") return false;
+        return emailKey(String((m as Record<string, unknown>).email ?? "")) === callerE;
+      });
+      merged[id] = { ...prev, members: [...prevMembers, ...extra] };
+    }
+  }
+
+  for (const id of Object.keys(existingMap)) {
+    if (id in incomingMap) continue;
+    const prev = existingMap[id];
+    if (!prev || typeof prev !== "object") continue;
+    if (isAdmin || civicGroupOwnerEmail(prev as Record<string, unknown>) === callerE) {
+      delete merged[id];
+    }
+  }
+
+  return { groups: merged, updatedAt: new Date().toISOString() };
+}
+
+async function handleCivicUserGroupsFetch(req: Request): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const value = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  return jsonOk({
+    ok: true,
+    value: filterCivicUserGroupsForCaller(value, email, role.isAdmin),
+  });
+}
+
+async function handleCivicUserGroupsFind(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const code = String(body.code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}[0-9]{1,5}$/.test(code) && !/^GRP-[A-Z0-9]{5,10}$/.test(code)) {
+    return jsonOk({ ok: false, error: "Invalid group code" }, 400);
+  }
+  const value = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const groups =
+    value.groups && typeof value.groups === "object" && !Array.isArray(value.groups)
+      ? (value.groups as Record<string, unknown>)
+      : {};
+  for (const raw of Object.values(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupInviteCode(g) !== code) continue;
+    return jsonOk({ ok: true, group: g, alreadyMember: civicGroupHasMember(g, email) });
+  }
+  return jsonOk({ ok: true, group: null, alreadyMember: false });
+}
+
+async function handleCivicUserGroupsJoin(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const code = String(body.code ?? "").trim().toUpperCase();
+  if (!/^[A-Z]{3}[0-9]{1,5}$/.test(code) && !/^GRP-[A-Z0-9]{5,10}$/.test(code)) {
+    return jsonOk({ ok: false, error: "Invalid group code" }, 400);
+  }
+  const displayName = String(body.name ?? "").trim() || email.split("@")[0] || "Member";
+  const existing = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const groups =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? { ...(existing.groups as Record<string, unknown>) }
+      : {};
+  let foundId = "";
+  let found: Record<string, unknown> | null = null;
+  for (const [id, raw] of Object.entries(groups)) {
+    if (!raw || typeof raw !== "object") continue;
+    const g = raw as Record<string, unknown>;
+    if (civicGroupInviteCode(g) === code) {
+      foundId = id;
+      found = g;
+      break;
+    }
+  }
+  if (!found || !foundId) return jsonOk({ ok: false, error: "No group found for that code." });
+  if (civicGroupHasMember(found, email)) {
+    return jsonOk({ ok: true, group: found, alreadyMember: true });
+  }
+  if (civicGroupMemberCount(found) >= 500) {
+    return jsonOk({ ok: false, error: "This group is full." }, 400);
+  }
+  const members = Array.isArray(found.members) ? [...found.members] : [];
+  members.push({
+    email: emailKey(email),
+    name: displayName,
+    joinedAt: new Date().toISOString(),
+    missed: 0,
+  });
+  const next = { ...found, members };
+  groups[foundId] = next;
+  const saved = await saveSettingsObject(admin, CIVIC_USER_GROUPS_KEY, {
+    groups,
+    updatedAt: new Date().toISOString(),
+  });
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({ ok: true, group: next, alreadyMember: true });
+}
+
+async function handleCivicUserGroupsPersist(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  const incoming =
+    body.value && typeof body.value === "object" && !Array.isArray(body.value)
+      ? (body.value as Record<string, unknown>)
+      : {};
+  const existing = await loadSettingsObject(admin, CIVIC_USER_GROUPS_KEY);
+  const existingGroups =
+    existing.groups && typeof existing.groups === "object" && !Array.isArray(existing.groups)
+      ? (existing.groups as Record<string, unknown>)
+      : {};
+  const incomingGroups =
+    incoming.groups && typeof incoming.groups === "object" && !Array.isArray(incoming.groups)
+      ? (incoming.groups as Record<string, unknown>)
+      : {};
+  for (const [id, raw] of Object.entries(incomingGroups)) {
+    if (!raw || typeof raw !== "object" || existingGroups[id]) continue;
+    const code = civicGroupInviteCode(raw as Record<string, unknown>);
+    if (!code) continue;
+    const clash = Object.entries(existingGroups).some(([eid, eraw]) => {
+      if (eid === id || !eraw || typeof eraw !== "object") return false;
+      return civicGroupInviteCode(eraw as Record<string, unknown>) === code;
+    });
+    if (clash) {
+      return jsonOk({ ok: false, error: "That group code is already taken. Try another." }, 409);
+    }
+  }
+  const merged = mergeCivicUserGroupsBlob(existing, incoming, email, role.isAdmin);
+  const saved = await saveSettingsObject(admin, CIVIC_USER_GROUPS_KEY, merged);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+  return jsonOk({
+    ok: true,
+    value: filterCivicUserGroupsForCaller(merged, email, role.isAdmin),
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -4941,6 +5233,10 @@ serve(async (req) => {
       cp: "civicRecoveryIssue",
       cq: "civicFetchRankings",
       cs: "civicDecideRegistrarApplication",
+      ct: "civicUserGroupsFetch",
+      cu: "civicUserGroupsPersist",
+      cv: "civicUserGroupsFind",
+      cw: "civicUserGroupsJoin",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -5139,6 +5435,26 @@ serve(async (req) => {
     }
     if (action === "civicAdminSettingsPersist") {
       return await handleCivicAdminSettingsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsFetch") {
+      const limited = await enforceRateLimit(req, "civic_groups", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsFetch(req);
+    }
+    if (action === "civicUserGroupsPersist") {
+      const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsPersist(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsFind") {
+      const limited = await enforceRateLimit(req, "civic_groups", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsFind(req, body as Record<string, unknown>);
+    }
+    if (action === "civicUserGroupsJoin") {
+      const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
+      if (limited) return limited;
+      return await handleCivicUserGroupsJoin(req, body as Record<string, unknown>);
     }
 
     if (action === "elevenlabsTts") {
