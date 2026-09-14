@@ -120,9 +120,11 @@ class NgmySlideElementView extends StatelessWidget {
           element.text.trim().toLowerCase() == 'click to edit text' ||
           element.text.trim().toLowerCase() == 'tap to edit text';
       final showHint = empty && showEmptyHint;
-      // Marriage blanks (compactText) stay one line and clip — otherwise
-      // long amount text paints into the AKUNA DENI gap and shows up when
-      // that green mark is triple-tap hidden.
+      // Only the short mahari amount blanks are single-line + clipped
+      // (so text cannot spill into the AKUNA DENI gap). Tall paragraph
+      // fields like the intro frame must keep wrapping — compactText alone
+      // is also used for those and must NOT force one line.
+      final clipSingleLine = compactText && element.fileName.contains('mahari_');
       child = GestureDetector(
         onTap: onTap,
         onDoubleTap: onDoubleTap,
@@ -135,9 +137,9 @@ class NgmySlideElementView extends StatelessWidget {
               : style,
           strutStyle: strut,
           textAlign: element.align,
-          softWrap: !compactText,
-          maxLines: compactText ? 1 : null,
-          overflow: compactText ? TextOverflow.clip : TextOverflow.visible,
+          softWrap: !clipSingleLine,
+          maxLines: clipSingleLine ? 1 : null,
+          overflow: clipSingleLine ? TextOverflow.clip : TextOverflow.visible,
         ),
       );
     }

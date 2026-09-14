@@ -323855,14 +323855,15 @@ else{s=d.r
 r=B.b.i(s)
 i=r.length===0||r.toLowerCase()==="click to edit text"||r.toLowerCase()==="tap to edit text"
 h=i&&f.as
-if(h)r="Tap to select \xb7 Edit to type"
-else r=i?"":s
+g=c&&B.b.q(d.db,"mahari_")
+if(h)c="Tap to select \xb7 Edit to type"
+else c=i?"":s
 s=B.b.gN(s)
-p=h?m.c5R(A.bk(d.Q).k(0.45),B.du):m
-o=d.as
-n=c?1:e
-g=c?B.eu:B.C5
-j=A.bo(B.cW,A.d(r,new A.cS("slide_txt_"+d.a+"_"+s,t.W),n,g,e,!c,l,p,o,e,e),B.E,!1,e,f.Q,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,f.z,e,e,e,e,e,e,!1,B.aN)}return new A.C(q,new A.c0(k,e,e,j,e),e)
+r=h?m.c5R(A.bk(d.Q).k(0.45),B.du):m
+p=d.as
+o=g?1:e
+n=g?B.eu:B.C5
+j=A.bo(B.cW,A.d(c,new A.cS("slide_txt_"+d.a+"_"+s,t.W),o,n,e,!g,l,r,p,e,e),B.E,!1,e,f.Q,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,e,f.z,e,e,e,e,e,e,!1,B.aN)}return new A.C(q,new A.c0(k,e,e,j,e),e)
 case 1:case 4:return f.bx5()
 case 3:return f.bKP()
 case 2:return A.bS(e,e,e,new A.aKc(d,e),B.h8)}},
