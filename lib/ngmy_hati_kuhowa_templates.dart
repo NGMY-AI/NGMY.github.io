@@ -370,22 +370,22 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 /// with locked "AKUNA DENI" + a square green pre-ticked box on the same
 /// single line (right side) — nothing wraps under anything else.
 ///
-/// Amount text stays at the same 16pt as rows 2–4 (no auto-shrink). The
-/// green label is sized compactly so the amount field keeps nearly the
-/// same width as the other rows.
+/// Amount text stays at the same 16pt as rows 2–4 (never auto-shrunk). The
+/// amount box is clipped so when AKUNA DENI is hidden, no spilled letters
+/// show in that right-hand gap.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
   const paidGreen = 0xFF16A34A;
   // On portrait 9:16, equal visual sides need h = w * (9/16).
-  const tickBoxW = 0.036;
+  const tickBoxW = 0.046;
   const tickBoxH = tickBoxW * 9 / 16;
-  // Compact label — wide enough for "AKUNA DENI" at 14pt without forcing
-  // the money blank to shrink below the 16pt used on rows 2–4.
-  const labelW = 0.152;
+  // Wide enough for "AKUNA DENI" at ~22pt (same size as before — do not shrink).
+  const labelW = 0.268;
   final showAkunaDeni = n == 1;
   final rightReserve = showAkunaDeni ? (0.008 + labelW + 0.006 + tickBoxW) : 0.0;
   final itemW = (x + w - itemX - rightReserve).clamp(0.22, 1.0);
-  final lineH = _hBlankH(16);
+  // Shared band so amount (16pt) and green (22pt) sit on the same underline.
+  final lineH = showAkunaDeni ? _hBlankH(22) : _hBlankH(16);
   final amountField = _hBlank(
     'mahari_$n',
     itemX,
@@ -396,6 +396,10 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
     startText: hint,
     align: TextAlign.left,
   );
+  if (showAkunaDeni) {
+    // Same vertical band as AKUNA DENI so both sit on one underline.
+    amountField.h = lineH;
+  }
   final out = <NgmySlideElement>[
     _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
     amountField,
@@ -414,16 +418,17 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
   if (showAkunaDeni) {
     final labelX = itemX + itemW + 0.008;
     final boxX = labelX + labelW + 0.004;
-    // Center the square tick on the same baseline band as the amount text.
-    final boxY = y + 0.002 + (lineH - tickBoxH) / 2;
+    // Center green words + tick on the same band as the amount text / underline.
+    final textY = y + 0.002;
+    final boxY = textY + (lineH - tickBoxH) / 2;
     out.addAll([
       _hLockedText(
         'AKUNA DENI',
         x: labelX,
-        y: y + 0.002,
+        y: textY,
         w: labelW,
         h: lineH,
-        fontSize: 14,
+        fontSize: 22,
         fontWeight: FontWeight.w900,
         align: TextAlign.right,
         color: paidGreen,
@@ -446,18 +451,17 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
         y: boxY - 0.002,
         w: tickBoxW,
         h: tickBoxH + 0.004,
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: FontWeight.w900,
         align: TextAlign.center,
         color: paidGreen,
         tag: 'nim_akuna_tick',
       ),
-      // Invisible hit pad covering words + box so triple-tap still works
-      // after the green marks are hidden (transparent).
+      // Hit pad so triple-tap still works after green is hidden.
       _hLockedShape(
         shape: NgmySlideShapeKind.rectangle,
         x: labelX,
-        y: y + 0.002,
+        y: textY,
         w: (boxX + tickBoxW) - labelX,
         h: lineH,
         fillColor: 0x00000000,
@@ -1411,8 +1415,7 @@ const _kHatiKuhowaIntro = 'Mimi [Jina la Baba wa Mume], wa jamaa ya [Jina la Jam
 const String kNgmyHatiKuhowaIntroTemplate = _kHatiKuhowaIntro;
 
 const _kHatiKuhowaMahariItems = [
-  // Kept short enough to stay one line at 16pt beside AKUNA DENI.
-  'Kichwa cha Mtu: Dollar 20,000',
+  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
   'Mbuzi Mbili',
   'Ngyoka',
   'Mmoko',
@@ -1460,7 +1463,7 @@ const _kHatiKuhoweshaIntro = 'Mimi [Jina la Baba wa Binti], wa jamaa ya [Jina la
 const String kNgmyHatiKuhoweshaIntroTemplate = _kHatiKuhoweshaIntro;
 
 const _kHatiKuhoweshaMahariItems = [
-  'Kichwa cha Mtu: Dollar 20,000',
+  'Kichwa cha Mtu: Dollar elfu ishirini (\$20,000)',
   'Mbuzi Wawili',
   'Ngyoka',
   'Mmoko',

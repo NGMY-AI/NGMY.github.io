@@ -2182,13 +2182,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     _mutate(() {
       for (final e in slide.elements) {
         if (e.fileName == '${kMarriageLocked}_nim_akuna_deni') {
+          // Keep the real words; only fade alpha so nothing else appears.
+          e.text = 'AKUNA DENI';
           e.color = hidden ? paidGreen : 0x0016A34A;
-          e.text = hidden ? 'AKUNA DENI' : ' ';
         } else if (e.fileName == '${kMarriageLocked}_nim_akuna_box') {
           e.strokeColor = hidden ? paidGreen : 0x0016A34A;
         } else if (e.fileName == '${kMarriageLocked}_nim_akuna_tick') {
+          e.text = '✓';
           e.color = hidden ? paidGreen : 0x0016A34A;
-          e.text = hidden ? '✓' : ' ';
         }
       }
       _selectedElementId = null;

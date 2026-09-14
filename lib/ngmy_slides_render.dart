@@ -120,6 +120,9 @@ class NgmySlideElementView extends StatelessWidget {
           element.text.trim().toLowerCase() == 'click to edit text' ||
           element.text.trim().toLowerCase() == 'tap to edit text';
       final showHint = empty && showEmptyHint;
+      // Marriage blanks (compactText) stay one line and clip — otherwise
+      // long amount text paints into the AKUNA DENI gap and shows up when
+      // that green mark is triple-tap hidden.
       child = GestureDetector(
         onTap: onTap,
         onDoubleTap: onDoubleTap,
@@ -132,8 +135,9 @@ class NgmySlideElementView extends StatelessWidget {
               : style,
           strutStyle: strut,
           textAlign: element.align,
-          softWrap: true,
-          overflow: TextOverflow.visible,
+          softWrap: !compactText,
+          maxLines: compactText ? 1 : null,
+          overflow: compactText ? TextOverflow.clip : TextOverflow.visible,
         ),
       );
     }
