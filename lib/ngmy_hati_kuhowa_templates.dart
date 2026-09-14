@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_marriage_markers.dart';
 import 'ngmy_marriage_paper_art.dart';
+import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_state_picker.dart';
 
@@ -366,27 +367,43 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 /// let users hide the (optional) 4th item.
 ///
 /// Row 1 (the money / "Kichwa cha Mtu" line) keeps a full-width underline,
-/// with locked "AKUNA DENI" + a square green pre-ticked box sitting on the
-/// same line above that underline (right side) so the paper shows nothing
-/// is still owed.
+/// with locked "AKUNA DENI" + a square green pre-ticked box on the same
+/// single line (right side) — nothing wraps under anything else.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
   const paidGreen = 0xFF16A34A;
   // On portrait 9:16, equal visual sides need h = w * (9/16).
-  const tickBoxW = 0.052;
+  const tickBoxW = 0.046;
   const tickBoxH = tickBoxW * 9 / 16;
-  const labelW = 0.36;
+  // Wide enough for "AKUNA DENI" at ~22pt without eating the amount field.
+  const labelW = 0.268;
   final showAkunaDeni = n == 1;
-  final rightReserve = showAkunaDeni ? (0.010 + labelW + 0.008 + tickBoxW) : 0.0;
-  final itemW = (x + w - itemX - rightReserve).clamp(0.18, 1.0);
+  final rightReserve = showAkunaDeni ? (0.008 + labelW + 0.006 + tickBoxW) : 0.0;
+  final itemW = (x + w - itemX - rightReserve).clamp(0.22, 1.0);
+  final lineH = _hBlankH(16);
+  final amountField = _hBlank(
+    'mahari_$n',
+    itemX,
+    y + 0.002,
+    itemW,
+    ink: ink,
+    fontSize: 16,
+    startText: hint,
+    align: TextAlign.left,
+    autoShrinkFont: showAkunaDeni,
+  );
+  if (showAkunaDeni) {
+    // Fit the money text to one line at build time (not only after edit).
+    ngmyMarriageAutoFitField(amountField, hint);
+  }
   final out = <NgmySlideElement>[
     _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
-    _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 16, startText: hint, align: TextAlign.left),
+    amountField,
     // Full-width underline across the whole row (amount + AKUNA DENI area).
     _hLockedShape(
       shape: NgmySlideShapeKind.line,
       x: itemX,
-      y: y + 0.002 + _hBlankH(16) + 0.002,
+      y: y + 0.002 + lineH + 0.002,
       w: x + w - itemX,
       h: 0.002,
       strokeColor: _softLine,
@@ -395,17 +412,18 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
     ),
   ];
   if (showAkunaDeni) {
-    final labelX = itemX + itemW + 0.010;
-    final boxX = labelX + labelW + 0.006;
-    final boxY = y + 0.001;
+    final labelX = itemX + itemW + 0.008;
+    final boxX = labelX + labelW + 0.004;
+    // Center the square tick on the same baseline band as the amount text.
+    final boxY = y + 0.002 + (lineH - tickBoxH) / 2;
     out.addAll([
       _hLockedText(
         'AKUNA DENI',
         x: labelX,
-        y: y - 0.002,
+        y: y + 0.002,
         w: labelW,
-        h: 0.042,
-        fontSize: 28,
+        h: lineH,
+        fontSize: 22,
         fontWeight: FontWeight.w900,
         align: TextAlign.right,
         color: paidGreen,
@@ -419,16 +437,16 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
         h: tickBoxH,
         fillColor: 0x00000000,
         strokeColor: paidGreen,
-        strokeWidth: 2.2,
+        strokeWidth: 2.0,
         tag: 'nim_akuna_box',
       ),
       _hLockedText(
         '✓',
         x: boxX,
-        y: boxY - 0.004,
+        y: boxY - 0.002,
         w: tickBoxW,
-        h: tickBoxH + 0.008,
-        fontSize: 22,
+        h: tickBoxH + 0.004,
+        fontSize: 18,
         fontWeight: FontWeight.w900,
         align: TextAlign.center,
         color: paidGreen,
@@ -1145,8 +1163,7 @@ List<NgmySlideElement> _layoutSingle(
   y += 0.03;
   for (var i = 1; i <= 4; i++) {
     out.addAll(_hNimetoweRow(i, mahariItems[i - 1], cx, y, cw, ink: ink, accent: accent));
-    // First row has larger AKUNA DENI — give it a touch more gap.
-    y += i == 1 ? 0.048 : 0.04;
+    y += 0.04;
   }
   // Was 0.014 — tightened so the MASHAHIDI frame moves up, per request.
   y += 0.006;
