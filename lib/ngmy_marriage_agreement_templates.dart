@@ -997,6 +997,37 @@ class _NgmyCertPreview extends StatelessWidget {
 }
 
 
+/// Re-stamp locked paper backgrounds so center-seal / Congo outline removals
+/// apply to already-saved marriage decks (PNG is baked into the deck).
+bool ngmyRefreshMarriageDeckPaperBackground(NgmySlideDeck deck) {
+  final themeId = deck.themeId;
+  NgmyMarriagePaperStyle? style;
+  if (themeId.startsWith('hati_kuhowa_')) {
+    style = ngmyHatiKuhowaTemplateById(themeId.substring('hati_kuhowa_'.length))?.paperStyle;
+  } else if (themeId.startsWith('hati_kuhoweya_')) {
+    style = ngmyHatiKuhowaTemplateById(themeId.substring('hati_kuhoweya_'.length))?.paperStyle;
+  } else if (themeId.startsWith('hati_malipo_awamu_')) {
+    final id = themeId.substring('hati_malipo_awamu_'.length);
+    style = ngmyHatiKuhowaTemplateById(id, templates: kNgmyHatiMalipoAwamuTemplates)?.paperStyle ??
+        ngmyHatiKuhowaTemplateById(id)?.paperStyle;
+  } else if (themeId.startsWith('marriage_')) {
+    style = ngmyMarriageTemplateById(themeId.substring('marriage_'.length))?.paperStyle;
+  }
+  if (style == null) return false;
+  ngmyClearMarriagePaperCache();
+  final url = ngmyMarriagePaperDataUrl(style);
+  var changed = false;
+  for (final slide in deck.slides) {
+    for (final e in slide.elements) {
+      if (e.fileName == '${_kLocked}_bg' && e.imageRef != url) {
+        e.imageRef = url;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
 /// Every marriage paper is one page. Papers and colors stay on the Ndoa
 /// certificate; only the framed intro words come from Hati ya Kuhowa.
 NgmySlideDeck ngmyBuildMarriageAgreementDeck({required String templateId, String state = ''}) {

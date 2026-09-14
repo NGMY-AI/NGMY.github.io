@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_hati_document_transfer.dart';
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
+import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
@@ -574,8 +575,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       if (!ok || !mounted) return;
     }
     final alreadySaved = _decks.any((d) => d.id == openDeck.id);
+    final working = openDeck.copy();
+    final paperUpdated =
+        working.isLockedTemplateDoc && ngmyRefreshMarriageDeckPaperBackground(working);
     setState(() {
-      _activeDeck = openDeck.copy();
+      _activeDeck = working;
       _slideIndex = 0;
       _selectedElementId = null;
       _isDraft = !alreadySaved;
@@ -585,6 +589,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       _syncTextControllersForCurrentSlide();
       _ribbonTab = 'Home';
     });
+    if (paperUpdated) {
+      final i = _decks.indexWhere((d) => d.id == working.id);
+      if (i >= 0) {
+        _decks[i] = working.copy();
+        unawaited(_persistDecks());
+      }
+    }
     if (!_isTransferredReadOnly(openDeck)) unawaited(_maybeShowMarriageHint());
     if (mounted &&
         !_isTransferredReadOnly(openDeck) &&
