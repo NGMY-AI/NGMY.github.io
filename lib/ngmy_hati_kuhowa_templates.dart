@@ -364,10 +364,19 @@ List<NgmySlideElement> _hTareheBox(double x, double y, double w, {required int i
 /// `nim_ul_$n` tag (instead of the generic coordinate-based one) so the
 /// editor can reliably find and remove one whole row by number — used to
 /// let users hide the (optional) 4th item.
+///
+/// Row 1 (the money / "Kichwa cha Mtu" line) also ends with locked
+/// "AKUNA DENI" and a larger pre-ticked checkbox so the paper shows that
+/// nothing is still owed.
 List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, double w, {required int ink, required int accent}) {
   final itemX = x + 0.042;
-  final itemW = x + w - itemX;
-  return [
+  final showAkunaDeni = n == 1;
+  // Room for "AKUNA DENI" + a clearly visible checked box on the same line.
+  const akunaLabelW = 0.152;
+  const tickBox = 0.034;
+  final rightReserve = showAkunaDeni ? (0.010 + akunaLabelW + 0.008 + tickBox) : 0.0;
+  final itemW = (x + w - itemX - rightReserve).clamp(0.20, 1.0);
+  final out = <NgmySlideElement>[
     _hLockedText('$n.', x: x, y: y + 0.004, w: 0.032, h: 0.022, fontSize: 13, fontWeight: FontWeight.w800, color: accent, tag: 'nim_n_$n'),
     _hBlank('mahari_$n', itemX, y + 0.002, itemW, ink: ink, fontSize: 16, startText: hint, align: TextAlign.left),
     _hLockedShape(
@@ -381,6 +390,49 @@ List<NgmySlideElement> _hNimetoweRow(int n, String hint, double x, double y, dou
       tag: 'nim_ul_$n',
     ),
   ];
+  if (showAkunaDeni) {
+    final akunaX = itemX + itemW + 0.010;
+    final boxX = akunaX + akunaLabelW + 0.004;
+    final boxY = y + 0.001;
+    out.addAll([
+      _hLockedText(
+        'AKUNA DENI',
+        x: akunaX,
+        y: y + 0.004,
+        w: akunaLabelW,
+        h: 0.026,
+        fontSize: 12,
+        fontWeight: FontWeight.w900,
+        align: TextAlign.right,
+        color: accent,
+        tag: 'nim_akuna_deni',
+      ),
+      _hLockedShape(
+        shape: NgmySlideShapeKind.rectangle,
+        x: boxX,
+        y: boxY,
+        w: tickBox,
+        h: tickBox * 1.05,
+        fillColor: 0x00000000,
+        strokeColor: accent,
+        strokeWidth: 1.6,
+        tag: 'nim_akuna_box',
+      ),
+      _hLockedText(
+        '✓',
+        x: boxX,
+        y: boxY + 0.001,
+        w: tickBox,
+        h: tickBox * 1.0,
+        fontSize: 18,
+        fontWeight: FontWeight.w900,
+        align: TextAlign.center,
+        color: accent,
+        tag: 'nim_akuna_tick',
+      ),
+    ]);
+  }
+  return out;
 }
 
 /// One MASHAHIDI witness line — name + Sahihi (signature), no date field.
