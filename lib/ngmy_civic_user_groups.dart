@@ -22,17 +22,17 @@ String ngmyCivicUserGroupQrPayload(String inviteCode) =>
     '$kNgmyCivicUserGroupQrPrefix${inviteCode.trim().toUpperCase()}';
 
 String? ngmyParseCivicUserGroupInviteCode(String raw) {
-  final text = raw.trim();
+  var text = raw.trim();
   if (text.isEmpty) return null;
-  final upper = text.toUpperCase();
+  var upper = text.toUpperCase();
   if (upper.startsWith(kNgmyCivicUserGroupQrPrefix)) {
-    final code = upper.substring(kNgmyCivicUserGroupQrPrefix.length).trim();
-    return code.isEmpty ? null : code;
+    upper = upper.substring(kNgmyCivicUserGroupQrPrefix.length).trim();
   }
-  final m = RegExp(r'^[A-Z]{3}[0-9]{1,5}$').firstMatch(upper);
-  if (m != null) return m.group(0);
-  final legacy = RegExp(r'^GRP-[A-Z0-9]{5,10}$').firstMatch(upper);
-  return legacy?.group(0);
+  final legacy = upper.replaceAll(RegExp(r'\s+'), '');
+  if (RegExp(r'^GRP-[A-Z0-9]{5,10}$').hasMatch(legacy)) return legacy;
+  final compact = upper.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  if (RegExp(kNgmyCivicUserGroupCodePattern).hasMatch(compact)) return compact;
+  return null;
 }
 
 class NgmyCivicUserGroupMember {
@@ -499,6 +499,10 @@ class NgmyCivicUserGroup {
 abstract final class NgmyCivicUserGroupsStore {
   static const settingsKey = 'civic_user_groups_v1';
   static const _localKey = 'ngmy_civic_user_groups_v1';
+  /// Uses the already-public essentials-code prefix so invite lookup works
+  /// with current RLS and dbRelay (no new Edge action required).
+  static const _inviteIndexPrefix = 'ngmy_essentials_code_v1_LGROUP_';
+  static const _inviteIndexKind = 'ngmy_lightning_group';
 
   static List<NgmyCivicUserGroup>? _memoryCache;
 
@@ -549,6 +553,72 @@ abstract final class NgmyCivicUserGroupsStore {
   static String _newId() =>
       'cug_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(1 << 20)}';
 
+  static String _inviteIndexKey(String code) =>
+      '$_inviteIndexPrefix${code.trim().toUpperCase()}';
+
+  static Future<NgmyCivicUserGroup?> _fetchInviteIndex(String code) async {
+    final c = ngmyParseCivicUserGroupInviteCode(code) ?? code.trim().toUpperCase();
+    if (c.isEmpty) return null;
+    try {
+      final value = await ngmyFetchSettingsValueViaRest(_inviteIndexKey(c));
+      if (value == null) return null;
+      if ((value['kind'] ?? '').toString() != _inviteIndexKind) return null;
+      final raw = value['group'];
+      if (raw is! Map) return null;
+      final group = NgmyCivicUserGroup.fromJson(Map<String, dynamic>.from(raw));
+      return group.id.isEmpty ? null : group;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> _publishInviteIndex(NgmyCivicUserGroup group) async {
+    final ok = await ngmyUpsertSettingsRowReliable(
+      _inviteIndexKey(group.inviteCode),
+      {
+        'kind': _inviteIndexKind,
+        'group': group.toJson(),
+        'updatedAt': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    if (!ok) {
+      throw StateError(
+        'Could not publish this group code. Check your connection and try again.',
+      );
+    }
+  }
+
+  static NgmyCivicUserGroup _preferRicher(
+    NgmyCivicUserGroup a,
+    NgmyCivicUserGroup b,
+  ) {
+    if (b.memberCount > a.memberCount) return b;
+    if (a.memberCount > b.memberCount) return a;
+    if (b.ledger.length > a.ledger.length) return b;
+    if (a.ledger.length > b.ledger.length) return a;
+    if (b.helpModeActive && !a.helpModeActive) return b;
+    return a;
+  }
+
+  static Future<Map<String, NgmyCivicUserGroup>> _hydrateFromInviteIndexes(
+    Map<String, NgmyCivicUserGroup> groups,
+  ) async {
+    final out = Map<String, NgmyCivicUserGroup>.from(groups);
+    for (final entry in groups.entries) {
+      final indexed = await _fetchInviteIndex(entry.value.inviteCode);
+      if (indexed == null) {
+        try {
+          await _publishInviteIndex(entry.value);
+        } catch (_) {}
+        continue;
+      }
+      final richer = _preferRicher(entry.value, indexed);
+      out[richer.id] = richer;
+      if (richer.id != entry.key) out.remove(entry.key);
+    }
+    return out;
+  }
+
   static Future<Map<String, dynamic>?> _fetchCloudRoot() async {
     final data = await ngmyCivicInvoke({'action': 'civicUserGroupsFetch'});
     if (data != null && data['ok'] == true && data['value'] is Map) {
@@ -564,14 +634,11 @@ abstract final class NgmyCivicUserGroupsStore {
       'action': 'civicUserGroupsPersist',
       'value': root,
     });
-    if (data != null && data['ok'] == true) {
-      if (data['value'] is Map) {
-        return Map<String, dynamic>.from(data['value'] as Map);
-      }
-      return root;
+    if (data != null && data['ok'] == true && data['value'] is Map) {
+      return Map<String, dynamic>.from(data['value'] as Map);
     }
     final err = (data?['error'] ?? '').toString().trim();
-    if (err.isNotEmpty) {
+    if (data != null && data['ok'] == false && err.contains('already taken')) {
       throw StateError(err);
     }
     final ok = await ngmyUpsertSettingsRowReliable(settingsKey, root);
@@ -588,26 +655,56 @@ abstract final class NgmyCivicUserGroupsStore {
         if (decoded is Map) local = Map<String, dynamic>.from(decoded);
       } catch (_) {}
     }
+    var root = local;
     final remote = await _fetchCloudRoot();
     if (remote != null) {
-      await prefs.setString(_localKey, jsonEncode(remote));
-      return remote;
+      final remoteGroups = _groupsFromRoot(remote);
+      final localGroups = _groupsFromRoot(local);
+      if (remoteGroups.isNotEmpty || localGroups.isEmpty) {
+        root = remote;
+        for (final e in localGroups.entries) {
+          remoteGroups.putIfAbsent(e.key, () => e.value);
+        }
+        if (remoteGroups.isNotEmpty) {
+          root = Map<String, dynamic>.from(remote);
+          root['groups'] = {
+            for (final e in remoteGroups.entries) e.key: e.value.toJson(),
+          };
+        }
+      } else {
+        root = local;
+      }
     }
-    return local;
+    final hydrated = await _hydrateFromInviteIndexes(_groupsFromRoot(root));
+    root = Map<String, dynamic>.from(root);
+    root['groups'] = {for (final e in hydrated.entries) e.key: e.value.toJson()};
+    await prefs.setString(_localKey, jsonEncode(root));
+    return root;
   }
 
   static Future<void> _saveRoot(Map<String, dynamic> root) async {
     root['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_localKey, jsonEncode(root));
-    final saved = await _persistCloudRoot(root);
-    if (saved == null) {
+    Map<String, dynamic>? saved;
+    try {
+      saved = await _persistCloudRoot(root);
+    } on StateError catch (e) {
+      if (e.message.contains('already taken')) rethrow;
+    }
+    final groups = _groupsFromRoot(saved ?? root);
+    if (groups.isEmpty) {
       throw StateError(
         'Could not sync this group to the cloud. Check your connection and try again.',
       );
     }
-    await prefs.setString(_localKey, jsonEncode(saved));
-    final list = _groupsFromRoot(saved).values.toList()
+    for (final group in groups.values) {
+      await _publishInviteIndex(group);
+    }
+    final stored = saved ?? root;
+    stored['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
+    await prefs.setString(_localKey, jsonEncode(stored));
+    final list = groups.values.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     _setMemoryCache(list);
   }
@@ -645,11 +742,13 @@ abstract final class NgmyCivicUserGroupsStore {
   static Future<NgmyCivicUserGroup?> findByInviteCode(String code) async {
     final c = ngmyParseCivicUserGroupInviteCode(code) ?? code.trim().toUpperCase();
     if (c.isEmpty) return null;
+    final indexed = await _fetchInviteIndex(c);
+    if (indexed != null) return indexed;
     final data = await ngmyCivicInvoke({
       'action': 'civicUserGroupsFind',
       'code': c,
     });
-    if (data != null && data['ok'] == true && data['group'] is Map) {
+    if (data != null && data.containsKey('group') && data['group'] is Map) {
       return NgmyCivicUserGroup.fromJson(
         Map<String, dynamic>.from(data['group'] as Map),
       );
@@ -703,15 +802,28 @@ abstract final class NgmyCivicUserGroupsStore {
     groups[group.id] = group;
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
+    await _publishInviteIndex(cachedById(group.id) ?? group);
     return cachedById(group.id) ?? group;
   }
 
   static Future<void> saveGroup(NgmyCivicUserGroup group) async {
     final root = await _loadRoot();
     final groups = _groupsFromRoot(root);
-    groups[group.id] = group;
+    groups[group.id] = _withPreservedMembers(group, groups[group.id]);
     root['groups'] = {for (final e in groups.entries) e.key: e.value.toJson()};
     await _saveRoot(root);
+  }
+
+  static NgmyCivicUserGroup _withPreservedMembers(
+    NgmyCivicUserGroup incoming,
+    NgmyCivicUserGroup? existing,
+  ) {
+    if (existing == null) return incoming;
+    final have = incoming.members.map((m) => m.email).toSet();
+    for (final m in existing.members) {
+      if (!have.contains(m.email)) incoming.members.add(m);
+    }
+    return incoming;
   }
 
   static void _upsertMemoryGroup(NgmyCivicUserGroup group) {
@@ -750,16 +862,18 @@ abstract final class NgmyCivicUserGroupsStore {
       'code': code,
       'name': name,
     });
-    if (data != null && data['ok'] == true && data['group'] is Map) {
+    if (data != null &&
+        data.containsKey('alreadyMember') &&
+        data['ok'] == true &&
+        data['group'] is Map) {
       final group = NgmyCivicUserGroup.fromJson(
         Map<String, dynamic>.from(data['group'] as Map),
       );
       await _mergeGroupIntoLocalPrefs(group);
+      try {
+        await _publishInviteIndex(group);
+      } catch (_) {}
       return group;
-    }
-    final err = (data?['error'] ?? '').toString().trim();
-    if (err.isNotEmpty && err != 'Authentication required') {
-      throw StateError(err);
     }
     final group = await findByInviteCode(code);
     if (group == null) return null;

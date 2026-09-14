@@ -13,6 +13,7 @@ void main() {
 
     test('parses typed codes and QR payloads', () {
       expect(ngmyParseCivicUserGroupInviteCode('abc12'), 'ABC12');
+      expect(ngmyParseCivicUserGroupInviteCode('abc 12'), 'ABC12');
       expect(
         ngmyParseCivicUserGroupInviteCode('NGMY-GROUP:XYZ99'),
         'XYZ99',
