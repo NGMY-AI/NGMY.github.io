@@ -463,9 +463,10 @@ img.Image _withCenterMark(img.Image im, int kind) {
     case 3:
       _drawCongoCountryOutline(im, cx, cy, pale, gold);
     default:
-      _diamond(im, cx, cy, 46, pale, fill: false);
-      _diamond(im, cx, cy, 32, gold, fill: false);
-      _diamond(im, cx, cy, 8, gold, fill: false);
+      // Smaller diamond center seal (was 46 / 32 / 8).
+      _diamond(im, cx, cy, 28, pale, fill: false);
+      _diamond(im, cx, cy, 20, gold, fill: false);
+      _diamond(im, cx, cy, 5, gold, fill: false);
   }
   return im;
 }

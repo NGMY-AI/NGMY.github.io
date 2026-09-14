@@ -82502,36 +82502,36 @@ c2.push(A.rS(c9,B.b6,b9,d0,B.R,0.03,0,"nimetowe_sub",0.82,0.09,p))
 p+=0.03
 for(k=1;k<=4;++k){o=c6[k-1]
 j=k===1
-i=B.l.O(0.7779999999999999-(j?0.304:0),0.2,1)
+i=B.l.O(0.7779999999999999-(j?0.43:0),0.18,1)
 l=""+k
-h=p+0.004
-g="nim_n_"+l
-f=Date.now()
-e=$.i8
-$.i8=e+1
-g=g.length===0?b4:b8+g
-d=p+0.002
-o=A.dS1("mahari_"+l,0.132,d,i,B.b6,!1,16,b9,o)
-c=B.l.O(0.0272,0.02,0.06)
-b="nim_ul_"+l
-a=Date.now()
-a0=$.i8
-$.i8=a0+1
-b=b.length===0?b4:b8+b
-a1=A.a([new A.fX(""+1000*f+"_"+e,B.cx,0.09,h,0.032,0.022,l+".",13,B.J,B.bg,B.ai,c0,B.b6,a9,B.b9,b2,b3,2,0,!1,g,0,B.c6,0),o,new A.fX(""+1000*a+"_"+a0,B.f6,0.132,d+c+0.002,0.7779999999999999,0.002,"",24,B.X,B.bg,B.ai,b6,B.b6,a9,B.es,0,b5,0.8,0,!1,b,0,B.c6,0)],c1)
-if(j){a2=0.132+i+0.012
-a3=a2+0.24+0.008
-o=Date.now()
-l=$.i8
-$.i8=l+1
+h="nim_n_"+l
 g=Date.now()
 f=$.i8
 $.i8=f+1
-e=Date.now()
-c=$.i8
-$.i8=c+1
-B.f.A(a1,A.a([new A.fX(""+1000*o+"_"+l,B.cx,a2,d,0.24,0.034,"AKUNA DENI",18,B.B,B.bg,B.ai,b7,B.dN,a9,B.b9,b2,b3,2,0,!1,"marriage_locked_nim_akuna_deni",0,B.c6,0),new A.fX(""+1000*g+"_"+f,B.f6,a3,h,0.042,0.023625,"",24,B.X,B.bg,B.ai,b6,B.b6,a9,B.b9,0,b7,2,0,!1,"marriage_locked_nim_akuna_box",0,B.c6,0),new A.fX(""+1000*e+"_"+c,B.cx,a3,h-0.003,0.042,0.029625,"\u2713",18,B.B,B.bg,B.ai,b7,B.Q,a9,B.b9,b2,b3,2,0,!1,"marriage_locked_nim_akuna_tick",0,B.c6,0)],c1))}B.f.A(c2,a1)
-p+=0.04}p+=0.006
+h=h.length===0?b4:b8+h
+e=p+0.002
+o=A.dS1("mahari_"+l,0.132,e,i,B.b6,!1,16,b9,o)
+d=B.l.O(0.0272,0.02,0.06)
+c="nim_ul_"+l
+b=Date.now()
+a=$.i8
+$.i8=a+1
+c=c.length===0?b4:b8+c
+a0=A.a([new A.fX(""+1000*g+"_"+f,B.cx,0.09,p+0.004,0.032,0.022,l+".",13,B.J,B.bg,B.ai,c0,B.b6,a9,B.b9,b2,b3,2,0,!1,h,0,B.c6,0),o,new A.fX(""+1000*b+"_"+a,B.f6,0.132,e+d+0.002,0.7779999999999999,0.002,"",24,B.X,B.bg,B.ai,b6,B.b6,a9,B.es,0,b5,0.8,0,!1,c,0,B.c6,0)],c1)
+if(j){a1=0.132+i+0.01
+a2=a1+0.36+0.006
+a3=p+0.001
+o=Date.now()
+l=$.i8
+$.i8=l+1
+h=Date.now()
+g=$.i8
+$.i8=g+1
+f=Date.now()
+e=$.i8
+$.i8=e+1
+B.f.A(a0,A.a([new A.fX(""+1000*o+"_"+l,B.cx,a1,p-0.002,0.36,0.042,"AKUNA DENI",28,B.B,B.bg,B.ai,b7,B.dN,a9,B.b9,b2,b3,2,0,!1,"marriage_locked_nim_akuna_deni",0,B.c6,0),new A.fX(""+1000*h+"_"+g,B.f6,a2,a3,0.052,0.029249999999999998,"",24,B.X,B.bg,B.ai,b6,B.b6,a9,B.b9,0,b7,2.2,0,!1,"marriage_locked_nim_akuna_box",0,B.c6,0),new A.fX(""+1000*f+"_"+e,B.cx,a2,a3-0.004,0.052,0.03725,"\u2713",22,B.B,B.bg,B.ai,b7,B.Q,a9,B.b9,b2,b3,2,0,!1,"marriage_locked_nim_akuna_tick",0,B.c6,0)],c1))}B.f.A(c2,a0)
+p+=j?0.048:0.04}p+=0.006
 B.f.A(c2,A.eDV("MASHAHIDI",p,0.09,0.82,c0))
 p+=0.046
 if(s===B.U_||s===B.U1||s===B.TZ||s===B.U0){s=p-0.008
@@ -92156,9 +92156,9 @@ A.hv(a,240,427,6,m,!0)
 break
 case 3:A.f6U(a,240,427,n,m)
 break
-default:A.hv(a,240,427,46,n,!1)
-A.hv(a,240,427,32,m,!1)
-A.hv(a,240,427,8,m,!1)}return a},
+default:A.hv(a,240,427,28,n,!1)
+A.hv(a,240,427,20,m,!1)
+A.hv(a,240,427,5,m,!1)}return a},
 f6U(a,b,c,d,e){var s=new A.dQT(b,c),r=new A.dQU(a)
 r.$3(s.$1(84),d,2.2)
 r.$3(s.$1(78),e,1.8)
