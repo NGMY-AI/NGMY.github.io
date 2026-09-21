@@ -43709,60 +43709,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
                     people += raw == null ? 1 : NgmyCivicRegistryMembers.familySizeOf(raw);
                   }
-                  final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-                  final mute = isDark ? Colors.white70 : const Color(0xFF64748B);
-                  Widget glassStat(String label, String value) {
-                    return Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.07 : 0.035),
-                          border: Border.all(
-                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.12),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withOpacity(isDark ? 0.04 : 0.55),
-                              blurRadius: 6,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                  final ink = isDark ? Colors.white70 : Colors.grey;
+                  Widget glassChip(String text) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.07 : 0.04),
+                        border: Border.all(
+                          color: (isDark ? Colors.white : Colors.black).withOpacity(0.10),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.3,
-                                color: mute,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: ink,
-                              ),
-                            ),
-                          ],
+                      ),
+                      child: Text(
+                        text,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: ink,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     );
                   }
 
-                  return Row(
+                  return Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      glassStat('Family', '${members.length}'),
-                      const SizedBox(width: 8),
-                      glassStat('Members', '$people'),
+                      glassChip('Family ${members.length}'),
+                      glassChip('Members $people'),
                     ],
                   );
                 },
