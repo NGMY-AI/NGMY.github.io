@@ -3028,9 +3028,9 @@ function appendProfileSelfUpdate(
 }
 
 /**
- * Family-size self-update match. Prefer name + phone + address; also accept
- * name + phone (same person as enroll duplicate-by-phone), since addresses
- * are often typed slightly differently than the registrar stored them.
+ * Family-size self-update match: first+last name + phone are required.
+ * Address is optional — when it also matches, prefer that row; never
+ * require address, and never match on address alone.
  */
 function findMemberByFirstLastAddressPhone(
   members: Record<string, unknown>[],
@@ -3043,22 +3043,23 @@ function findMemberByFirstLastAddressPhone(
 
   let byNamePhoneAddr: Record<string, unknown> | null = null;
   let byNamePhone: Record<string, unknown> | null = null;
-  let byNameAddr: Record<string, unknown> | null = null;
 
   for (const m of members) {
     if (!nameMatchesForSelfUpdate(fullName, String(m.fullName ?? ""))) continue;
     const mp = phoneDigits(String(m.phone ?? ""));
     const phoneOk = mp.length >= 7 && mp === ph;
-    const addrOk = addressesCompatible(homeAddress, String(m.homeAddress ?? ""));
-    if (phoneOk && addrOk) {
+    if (!phoneOk) continue;
+    const addrOk =
+      softNormAddress(homeAddress).length >= 8 &&
+      addressesCompatible(homeAddress, String(m.homeAddress ?? ""));
+    if (addrOk) {
       byNamePhoneAddr = m;
       break;
     }
-    if (phoneOk && !byNamePhone) byNamePhone = m;
-    if (addrOk && softNormAddress(homeAddress).length >= 8 && !byNameAddr) byNameAddr = m;
+    if (!byNamePhone) byNamePhone = m;
   }
 
-  return byNamePhoneAddr ?? byNamePhone ?? byNameAddr;
+  return byNamePhoneAddr ?? byNamePhone;
 }
 
 function stateCodePrefix(state: string): string {
@@ -4087,7 +4088,8 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
 
 /**
  * Existing members only — never creates a new enrollment.
- * - mode "family": match first+last name + home address + phone → update family size only
+ * - mode "family": match first+last name + phone → update family size only
+ *   (address is optional and never required; when it also matches it prefers that row)
  * - mode "profile": require Civic Registry ID (+ name must match that ID) → update
  *   address / phone / dob / family size (never the registered name). Max 2 updates / calendar year.
  */
@@ -4115,8 +4117,8 @@ async function handleCivicGuestSelfUpdate(body: Record<string, unknown>): Promis
   }
 
   if (mode === "family") {
-    if (!homeAddress || !phone) {
-      return jsonOk({ ok: false, error: "Name, address, and phone are required to update family size." }, 400);
+    if (!phone) {
+      return jsonOk({ ok: false, error: "Name and phone are required to update family size." }, 400);
     }
     if (!hasFamily || familyMembers < 1 || familyMembers > 99) {
       return jsonOk({ ok: false, error: "Family size must be 1–99." }, 400);
@@ -4191,7 +4193,7 @@ async function handleCivicGuestSelfUpdate(body: Record<string, unknown>): Promis
       return jsonOk({
         ok: false,
         error:
-          "No matching member found. First and last name, home address, and phone must match your existing Civic Registry record.",
+          "No matching member found. First and last name and phone must match your existing Civic Registry record.",
       }, 404);
     }
   }

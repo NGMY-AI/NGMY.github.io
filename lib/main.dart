@@ -43702,21 +43702,74 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         Row(
           children: [
             Expanded(
-              child: Text(
-                () {
+              child: Builder(
+                builder: (context) {
                   var people = 0;
                   for (final u in members) {
                     final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
                     people += raw == null ? 1 : NgmyCivicRegistryMembers.familySizeOf(raw);
                   }
-                  return 'Family ${members.length}  ·  Members $people';
-                }(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+                  final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+                  final mute = isDark ? Colors.white70 : const Color(0xFF64748B);
+                  Widget glassStat(String label, String value) {
+                    return Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: (isDark ? Colors.white : Colors.black).withOpacity(isDark ? 0.07 : 0.035),
+                          border: Border.all(
+                            color: (isDark ? Colors.white : Colors.black).withOpacity(0.12),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.white.withOpacity(isDark ? 0.04 : 0.55),
+                              blurRadius: 6,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              label,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                                color: mute,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w900,
+                                color: ink,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      glassStat('Family', '${members.length}'),
+                      const SizedBox(width: 8),
+                      glassStat('Members', '$people'),
+                    ],
+                  );
+                },
               ),
             ),
-            if (_canUseRegistrarToolsHere())
+            if (_canUseRegistrarToolsHere()) ...[
+              const SizedBox(width: 8),
               InkWell(
                 borderRadius: BorderRadius.circular(10),
                 onTap: () => _confirmClearMissed(members),
@@ -43730,6 +43783,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ]),
                 ),
               ),
+            ],
           ],
         ),
 
