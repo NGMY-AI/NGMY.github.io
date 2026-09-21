@@ -293,20 +293,15 @@ class NgmyCivicRegistryStats {
   }) {
     if (!isAuthorizedRegistrar) return false;
     final key = _emailKey(email);
+    // Only an approved application in this state counts — never fall back to
+    // user.state alone (deleted/revoked apps left the flag true and inflated slots).
     for (final a in applications) {
       if ((a['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
       final status = (a['status'] ?? '').toString().toLowerCase();
       if (status != 'approved') continue;
       if (NgmyCivicRegistryStats.statesMatch((a['state'] ?? '').toString(), state)) return true;
     }
-    // Home state from approved application — never treat a temporary
-    // viewing state (user.state after a switch) as registrar assignment.
-    final serving = registrarStateForUser(
-      email: email,
-      userState: userState,
-      applications: applications,
-    );
-    return NgmyCivicRegistryStats.statesMatch(serving, state);
+    return false;
   }
 
   static List<Map<String, dynamic>> approvedApplicationsForState(
@@ -365,8 +360,9 @@ class NgmyCivicRegistryStats {
   }
 
   /// Unique Authorized Registrars for [state]. Approved applications are the
-  /// source of truth so the 5-slot cap still holds when this device has no
-  /// user list. Civic Registry Admin / King do not consume a slot.
+  /// only source of truth for the 5-slot cap — never count stale
+  /// `isAuthorizedRegistrar` user flags after revoke/delete (those flags can
+  /// lag and make the UI show 4/5 when only 2 approved rows remain).
   static Set<String> activeRegistrarKeysInState({
     required String state,
     required List<Map<String, dynamic>> applications,
@@ -386,26 +382,6 @@ class NgmyCivicRegistryStats {
       if (key.isEmpty) continue;
       if (id.isNotEmpty) seenIds.add(id);
       keys.add(key);
-    }
-
-    for (final u in users) {
-      final isReg = (u as dynamic).isAuthorizedRegistrar == true;
-      if (!isReg) continue;
-      if (excludeRegistryAdmins && _isSlotExemptUser(u)) continue;
-      final email = _emailKey((u as dynamic).email.toString());
-      if (email.isEmpty) continue;
-      final key = 'em:$email';
-      if (keys.contains(key)) continue;
-      final userState = (u as dynamic).state.toString();
-      if (isRegistrarAssignedToState(
-        email: email,
-        userState: userState,
-        isAuthorizedRegistrar: true,
-        applications: applications,
-        state: state,
-      )) {
-        keys.add(key);
-      }
     }
     return keys;
   }

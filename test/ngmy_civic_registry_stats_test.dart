@@ -147,6 +147,28 @@ void main() {
     );
   });
 
+  test('stale user flags after delete do not inflate the AR count', () {
+    final apps = [
+      _app(email: 'still@georgia.org', status: 'approved'),
+      _app(email: 'also@georgia.org', status: 'approved'),
+    ];
+    final users = [
+      _user(email: 'still@georgia.org'),
+      _user(email: 'also@georgia.org'),
+      // Deleted applications left these flags true on the device.
+      _user(email: 'gone1@georgia.org'),
+      _user(email: 'gone2@georgia.org'),
+    ];
+    expect(
+      NgmyCivicRegistryStats.activeRegistrarsInState(
+        state: 'Georgia',
+        applications: apps,
+        users: users,
+      ),
+      2,
+    );
+  });
+
   test('masked approved rows still count toward the five-person cap', () {
     final apps = [
       for (var i = 1; i <= 5; i++)
