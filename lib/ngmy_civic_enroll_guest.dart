@@ -417,11 +417,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       });
       if (!result.ok) {
         if (result.duplicate != null) {
+          // Enroll already identified this person (phone and/or name+address).
+          // Pass Registry ID so family update cannot fail on a pickier rematch.
+          final dupId =
+              (result.duplicate!['registryId'] ?? '').toString().trim();
           final updated = await ngmyCivicGuestSelfUpdate({
             'mode': 'family',
             'fullName': fullName,
             'homeAddress': address,
             'phone': phone,
+            if (dupId.isNotEmpty) 'registryId': dupId,
             'familyMembers': familyMembers,
             'familyMales': males,
             'familyFemales': females,

@@ -2966,6 +2966,40 @@ function firstLastNameMatch(entered: string, registered: string): boolean {
   return a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
 }
 
+function nameMatchesForSelfUpdate(entered: string, registered: string): boolean {
+  if (firstLastNameMatch(entered, registered)) return true;
+  const a = normName(entered);
+  const b = normName(registered);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return namesCompatible(b, a) || namesCompatible(a, b);
+}
+
+/** Softer address compare — ignore punctuation / St vs Street / extra city-zip. */
+function softNormAddress(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(
+      /\b(street|st|avenue|ave|road|rd|boulevard|blvd|drive|dr|lane|ln|court|ct|circle|cir|apartment|apt|suite|ste|unit|north|south|east|west|n|s|e|w)\b/g,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function addressesCompatible(a: string, b: string): boolean {
+  const x = softNormAddress(a);
+  const y = softNormAddress(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (x.length >= 8 && y.length >= 8 && (x.includes(y) || y.includes(x))) return true;
+  const xt = x.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  const yt = y.split(" ").filter(Boolean).slice(0, 4).join(" ");
+  return xt.length >= 5 && xt === yt;
+}
+
 function profileSelfUpdatesThisYear(m: Record<string, unknown>): number {
   const raw = m.profileSelfUpdates;
   if (!Array.isArray(raw)) return 0;
@@ -2993,22 +3027,38 @@ function appendProfileSelfUpdate(
   m.profileSelfUpdates = prev.slice(-12);
 }
 
+/**
+ * Family-size self-update match. Prefer name + phone + address; also accept
+ * name + phone (same person as enroll duplicate-by-phone), since addresses
+ * are often typed slightly differently than the registrar stored them.
+ */
 function findMemberByFirstLastAddressPhone(
   members: Record<string, unknown>[],
   fullName: string,
   homeAddress: string,
   phone: string,
 ): Record<string, unknown> | null {
-  const addr = normAddress(homeAddress);
   const ph = phoneDigits(phone);
-  if (!addr || ph.length < 7) return null;
+  if (ph.length < 7) return null;
+
+  let byNamePhoneAddr: Record<string, unknown> | null = null;
+  let byNamePhone: Record<string, unknown> | null = null;
+  let byNameAddr: Record<string, unknown> | null = null;
+
   for (const m of members) {
-    if (!firstLastNameMatch(fullName, String(m.fullName ?? ""))) continue;
-    if (normAddress(String(m.homeAddress ?? "")) !== addr) continue;
-    if (phoneDigits(String(m.phone ?? "")) !== ph) continue;
-    return m;
+    if (!nameMatchesForSelfUpdate(fullName, String(m.fullName ?? ""))) continue;
+    const mp = phoneDigits(String(m.phone ?? ""));
+    const phoneOk = mp.length >= 7 && mp === ph;
+    const addrOk = addressesCompatible(homeAddress, String(m.homeAddress ?? ""));
+    if (phoneOk && addrOk) {
+      byNamePhoneAddr = m;
+      break;
+    }
+    if (phoneOk && !byNamePhone) byNamePhone = m;
+    if (addrOk && softNormAddress(homeAddress).length >= 8 && !byNameAddr) byNameAddr = m;
   }
-  return null;
+
+  return byNamePhoneAddr ?? byNamePhone ?? byNameAddr;
 }
 
 function stateCodePrefix(state: string): string {
@@ -4114,14 +4164,29 @@ async function handleCivicGuestSelfUpdate(body: Record<string, unknown>): Promis
     if (!target) {
       return jsonOk({ ok: false, error: "No Civic Registry member found for that ID." }, 404);
     }
-    if (!firstLastNameMatch(fullName, String(target.fullName ?? ""))) {
+    if (!nameMatchesForSelfUpdate(fullName, String(target.fullName ?? ""))) {
       return jsonOk({
         ok: false,
         error: "Name does not match that Civic Registry ID.",
       }, 403);
     }
   } else {
-    target = findMemberByFirstLastAddressPhone(members, fullName, homeAddress, phone);
+    // Prefer Registry ID when the enroll step already identified the person
+    // (duplicate-by-phone). Confirm with phone and/or name so we never update
+    // the wrong row if a bad ID is posted.
+    if (registryId) {
+      const byId = members.find((m) => civicIdsMatch(String(m.registryId ?? ""), registryId)) ?? null;
+      if (byId) {
+        const wantPh = phoneDigits(phone);
+        const gotPh = phoneDigits(String(byId.phone ?? ""));
+        const phoneOk = wantPh.length >= 7 && gotPh.length >= 7 && wantPh === gotPh;
+        const nameOk = nameMatchesForSelfUpdate(fullName, String(byId.fullName ?? ""));
+        if (phoneOk || nameOk) target = byId;
+      }
+    }
+    if (!target) {
+      target = findMemberByFirstLastAddressPhone(members, fullName, homeAddress, phone);
+    }
     if (!target) {
       return jsonOk({
         ok: false,
