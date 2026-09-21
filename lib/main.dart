@@ -43699,7 +43699,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         ],
 
         const SizedBox(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Showing ${members.length} member(s)', style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)), if (_canUseRegistrarToolsHere()) InkWell(borderRadius: BorderRadius.circular(10), onTap: () => _confirmClearMissed(members), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Row(children: const [Icon(Icons.cleaning_services, size: 12, color: Colors.red), SizedBox(width: 5), Text('Clear & Remove', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold))])))]),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                () {
+                  var people = 0;
+                  for (final u in members) {
+                    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+                    people += raw == null ? 1 : NgmyCivicRegistryMembers.familySizeOf(raw);
+                  }
+                  return 'Family ${members.length}  ·  Members $people';
+                }(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+            if (_canUseRegistrarToolsHere())
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _confirmClearMissed(members),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                  child: Row(children: const [
+                    Icon(Icons.cleaning_services, size: 12, color: Colors.red),
+                    SizedBox(width: 5),
+                    Text('Clear & Remove', style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold)),
+                  ]),
+                ),
+              ),
+          ],
+        ),
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
