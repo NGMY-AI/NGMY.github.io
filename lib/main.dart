@@ -2666,6 +2666,7 @@ void _applyRegistrarGrantsFromConfig(
   AppConfig config,
   List<UserData> users, {
   UserData? currentUser,
+  bool clearMissing = false,
 }) {
   void apply(UserData u) {
     final status = _registrarApplicationStatusForEmail(config, u.email);
@@ -2673,9 +2674,10 @@ void _applyRegistrarGrantsFromConfig(
       u.isAuthorizedRegistrar = true;
     } else if (status == 'revoked' || status == 'rejected') {
       u.isAuthorizedRegistrar = false;
+    } else if (status == null && clearMissing) {
+      // Authoritative edge list with no row = deleted / never approved.
+      u.isAuthorizedRegistrar = false;
     }
-    // No application row on this device: keep the cloud/user flag so a
-    // second phone does not strip Authorized Registrar access.
   }
 
   for (final u in users) {
@@ -2722,6 +2724,58 @@ Future<List<Map<String, dynamic>>> _fetchRemoteCivicRegistrarApplications() asyn
   } catch (e) {
     debugPrint('[config] fetch civicRegistrarApplications: $e');
     return const [];
+  }
+}
+
+Future<NgmyCivicRegistrarApplicationsFetch> _fetchCivicRegistrarApplicationsEdge() async {
+  try {
+    final email = ngmyCurrentAuthEmail();
+    if (email.isEmpty) return const NgmyCivicRegistrarApplicationsFetch();
+    return ngmyCivicFetchRegistrarApplications(email: email);
+  } catch (e) {
+    debugPrint('[config] fetch civicRegistrarApplications edge: $e');
+    return const NgmyCivicRegistrarApplicationsFetch();
+  }
+}
+
+void _mergeRegistrarApplicationsIntoConfig(AppConfig config, List<Map<String, dynamic>> remote) {
+  config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+    config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+    remote,
+  );
+}
+
+/// Edge admin/registrar fetch is authoritative — replace local list so deletes stick.
+void _applyEdgeRegistrarApplications(
+  AppConfig config,
+  NgmyCivicRegistrarApplicationsFetch fetch, {
+  List<UserData>? users,
+  UserData? currentUser,
+}) {
+  if (!fetch.ok) return;
+  if (fetch.authoritative) {
+    final localById = <String, Map<String, dynamic>>{};
+    for (final a in config.civicRegistrarApplications) {
+      final id = (a['id'] ?? '').toString().trim();
+      if (id.isNotEmpty) localById[id] = Map<String, dynamic>.from(a);
+    }
+    final next = <Map<String, dynamic>>[];
+    for (final raw in fetch.applications) {
+      final r = Map<String, dynamic>.from(raw);
+      final id = (r['id'] ?? '').toString().trim();
+      final local = id.isEmpty ? null : localById[id];
+      next.add(local == null ? r : _mergeRegistrarRemotePreservingLocalPii(local, r));
+    }
+    config.civicRegistrarApplications = next
+      ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
+    if (users != null) {
+      _applyRegistrarGrantsFromConfig(config, users, currentUser: currentUser, clearMissing: true);
+    }
+    return;
+  }
+  _mergeRegistrarApplicationsIntoConfig(config, fetch.applications);
+  if (users != null) {
+    _applyRegistrarGrantsFromConfig(config, users, currentUser: currentUser);
   }
 }
 
@@ -2974,13 +3028,6 @@ void _openCivicRegistryPinSheet(
   );
 }
 
-void _mergeRegistrarApplicationsIntoConfig(AppConfig config, List<Map<String, dynamic>> remote) {
-  config.civicRegistrarApplications = _mergeCivicRegistrarApplications(
-    config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-    remote,
-  );
-}
-
 Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
   final email = u.email.trim();
   if (email.isEmpty || !await ngmyCanReachCloud()) return;
@@ -3108,9 +3155,9 @@ Future<String?> _applyRegistrarApplicationDecision({
   if (remote == null) {
     await _persistCivicRegistrarApplications(config);
   }
-  final refreshed = await _fetchRemoteCivicRegistrarApplications();
-  if (refreshed.isNotEmpty) {
-    _mergeRegistrarApplicationsIntoConfig(config, refreshed);
+  final refreshed = await _fetchCivicRegistrarApplicationsEdge();
+  if (refreshed.ok) {
+    _applyEdgeRegistrarApplications(config, refreshed, users: allUsers);
   }
   await _syncRegistrarStateAfterConfigChange(config, allUsers);
   return pendingRevoke ? 'pendingRevoke' : null;
@@ -3706,10 +3753,17 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
 
   if (record.containsKey('civicRegistrarApplications')) {
     final remoteApps = _civicRegistrarApplicationsFromConfigValue(record['civicRegistrarApplications']);
-    next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
-      keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
-      remoteApps,
-    );
+    // Public config column is cleared by edge saves. An empty remote list is
+    // not authoritative — keep the local/edge-backed list as-is.
+    if (remoteApps.isNotEmpty) {
+      next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
+        keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
+        remoteApps,
+      );
+    } else {
+      next.civicRegistrarApplications =
+          keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
   } else if (keep.civicRegistrarApplications.isNotEmpty) {
     next.civicRegistrarApplications =
         keep.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
@@ -4819,6 +4873,11 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               // transition (see upsertInList), and any leftover row
                                               // would keep _registrarApplicationStatusForEmail
                                               // reporting revoked/rejected and blocking reapplication.
+                                              final deleteId = (app['id'] ?? '').toString().trim();
+                                              await ngmyCivicDeleteRegistrarApplication(
+                                                userEmail: email,
+                                                id: deleteId.isEmpty ? null : deleteId,
+                                              );
                                               config.civicRegistrarApplications = config.civicRegistrarApplications
                                                   .where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() != email)
                                                   .map((e) => Map<String, dynamic>.from(e))
@@ -4830,7 +4889,13 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 await _pushUserAuthorizedRegistrar(allUsers[userIndex]);
                                               }
                                               await NgmyCivicRegistrarApplication.clear(email);
+                                              // Persist remaining list without the deleted person;
+                                              // edge tombstone blocks stale devices from resurrecting.
                                               await _persistCivicRegistrarApplications(config);
+                                              final refreshed = await _fetchCivicRegistrarApplicationsEdge();
+                                              if (refreshed.ok) {
+                                                _applyEdgeRegistrarApplications(config, refreshed, users: allUsers);
+                                              }
                                               await _syncRegistrarStateAfterConfigChange(config, allUsers);
                                               onDataChanged();
                                               onParentSetState?.call();
@@ -10867,13 +10932,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } else {
           next.loanApplications = _mergeLoanApplicationsLists(keepLoans, next.loanApplications);
         }
-        if (next.civicRegistrarApplications.isEmpty && keepRegistrarApps.isNotEmpty) {
-          next.civicRegistrarApplications = keepRegistrarApps;
-        } else {
+        // civicRegistrarApplications live in edge settings — the public config
+        // column is intentionally emptied. Never resurrect from keep when empty.
+        if (next.civicRegistrarApplications.isNotEmpty) {
           next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
             keepRegistrarApps,
             next.civicRegistrarApplications,
           );
+        } else {
+          next.civicRegistrarApplications = keepRegistrarApps;
         }
         _mergeOperationalManagementListsIntoConfig(next, keepConfig);
         final remotePopups = (cfgMap['ngmyPopups'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -12238,13 +12305,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (next.helpHelperApplications.isEmpty && keepHelpApps.isNotEmpty) next.helpHelperApplications = keepHelpApps;
         if (next.helpRequests.isEmpty && keepHelpReqs.isNotEmpty) next.helpRequests = keepHelpReqs;
         if (next.helpBusinesses.isEmpty && keepHelpBiz.isNotEmpty) next.helpBusinesses = keepHelpBiz;
-        if (next.civicRegistrarApplications.isEmpty && keepRegistrarApps.isNotEmpty) {
-          next.civicRegistrarApplications = keepRegistrarApps;
-        } else {
+        // Edge-backed list: empty config column must not wipe or resurrect apps.
+        if (next.civicRegistrarApplications.isNotEmpty) {
           next.civicRegistrarApplications = _mergeCivicRegistrarApplications(
             keepRegistrarApps,
             next.civicRegistrarApplications,
           );
+        } else {
+          next.civicRegistrarApplications = keepRegistrarApps;
         }
         final keepPopups = List<Map<String, dynamic>>.from(_config.ngmyPopups.map((e) => Map<String, dynamic>.from(e)));
         final keepVideoPopups = List<Map<String, dynamic>>.from(_config.ngmyVideoPopups.map((e) => Map<String, dynamic>.from(e)));
@@ -12796,15 +12864,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     // Never revive a registrar grant from stale local state. The approved
     // application list is authoritative for revoke, restore, and delete.
     final registrarStatus = _registrarApplicationStatusForEmail(_config, remote.email);
-    if (registrarStatus == 'revoked' || registrarStatus == 'rejected') {
+    if (registrarStatus == 'revoked' || registrarStatus == 'rejected' || registrarStatus == null) {
       remote.isAuthorizedRegistrar = false;
-    } else if (registrarStatus == 'approved' ||
-        remote.isAuthorizedRegistrar ||
-        local.isAuthorizedRegistrar ||
-        NgmyCivicRegistrarSession.isKnownRegistrar(remote.email)) {
+    } else if (registrarStatus == 'approved') {
       remote.isAuthorizedRegistrar = true;
     } else {
-      remote.isAuthorizedRegistrar = _hasEffectiveRegistrarAccess(_config, remote);
+      remote.isAuthorizedRegistrar = false;
     }
     _preserveRegistryEnrollmentFromLocal(local, remote);
   }
@@ -12848,13 +12913,21 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final registrarEmail = _currentUser?.email ?? emailKey;
         if (registrarEmail.trim().isNotEmpty) {
           final registrarFetch = await ngmyCivicFetchRegistrarApplications(email: registrarEmail);
-          _mergeRegistrarApplicationsIntoConfig(_config, registrarFetch.applications);
-          if (_currentUser != null &&
-              (registrarFetch.isRegistrar || registrarFetch.isAdmin)) {
-            _currentUser!.isAuthorizedRegistrar = true;
-          }
-          _applyRegistrarGrantsFromConfig(_config, _allUsers, currentUser: _currentUser);
-          if (_currentUser?.isAuthorizedRegistrar == true) {
+          _applyEdgeRegistrarApplications(
+            _config,
+            registrarFetch,
+            users: _allUsers,
+            currentUser: _currentUser,
+          );
+          if (_currentUser != null) {
+            final status = _registrarApplicationStatusForEmail(_config, _currentUser!.email);
+            if (status == 'approved') {
+              _currentUser!.isAuthorizedRegistrar = true;
+            } else if (status == 'revoked' || status == 'rejected' || status == null) {
+              _currentUser!.isAuthorizedRegistrar = false;
+            } else if (!registrarFetch.isRegistrar && !registrarFetch.isAdmin) {
+              _currentUser!.isAuthorizedRegistrar = false;
+            }
             unawaited(_pushUserAuthorizedRegistrar(_currentUser!));
           }
         }
@@ -32241,7 +32314,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         local,
       );
     }
-    _mergeRegistrarApplicationsIntoConfig(widget.config, await _fetchRemoteCivicRegistrarApplications());
+    final edge = await _fetchCivicRegistrarApplicationsEdge();
+    if (edge.ok) {
+      _applyEdgeRegistrarApplications(widget.config, edge);
+    }
     if (local != null) {
       widget.config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
         widget.config.civicRegistrarApplications,
@@ -32253,15 +32329,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (latest != null) {
       await NgmyCivicRegistrarApplication.save(email, latest);
       _localRegistrarBackup = latest;
+    } else {
+      await NgmyCivicRegistrarApplication.clear(email);
+      _localRegistrarBackup = null;
     }
     final status = latest == null
         ? null
         : (latest['status'] ?? 'pending').toString().toLowerCase();
-    if (status == 'approved' || NgmyCivicRegistrarSession.isKnownRegistrar(email)) {
+    if (status == 'approved') {
       widget.user.isAuthorizedRegistrar = true;
       unawaited(_pushUserAuthorizedRegistrar(widget.user));
-    } else if (status == 'revoked' || status == 'rejected') {
+    } else {
       widget.user.isAuthorizedRegistrar = false;
+      if (status == 'revoked' || status == 'rejected' || status == null) {
+        unawaited(_pushUserAuthorizedRegistrar(widget.user));
+      }
     }
     if (_hasRegistrarAccess() && !_isGlobalCivicRegistryAdmin()) {
       final home = _registrarHomeState();

@@ -478,12 +478,17 @@ class NgmyCivicRegistrarApplicationsFetch {
     this.isRegistrar = false,
     this.isAdmin = false,
     this.registrarState = '',
+    this.authoritative = false,
+    this.ok = false,
   });
 
   final List<Map<String, dynamic>> applications;
   final bool isRegistrar;
   final bool isAdmin;
   final String registrarState;
+  /// True when edge returned admin/registrar full list — replace local, don't union.
+  final bool authoritative;
+  final bool ok;
 }
 
 /// Last civicFetchRegistrarApplications role for the signed-in email.
@@ -523,6 +528,8 @@ Future<NgmyCivicRegistrarApplicationsFetch> ngmyCivicFetchRegistrarApplications(
   if (data == null || data['ok'] != true || data['networkEmpty'] == true) {
     return const NgmyCivicRegistrarApplicationsFetch();
   }
+  final view = (data['view'] ?? '').toString().toLowerCase().trim();
+  final authoritative = view == 'admin' || view == 'registrar';
   final combined = NgmyCivicRegistrarApplication.combineNetworkAndOwn(
     network: data['applications'] is List ? data['applications'] as List : const [],
     own: data['myApplications'] is List ? data['myApplications'] as List : const [],
@@ -532,6 +539,8 @@ Future<NgmyCivicRegistrarApplicationsFetch> ngmyCivicFetchRegistrarApplications(
     isRegistrar: data['isRegistrar'] == true,
     isAdmin: data['isAdmin'] == true,
     registrarState: (data['registrarState'] ?? '').toString(),
+    authoritative: authoritative,
+    ok: true,
   );
   if (key.isNotEmpty) NgmyCivicRegistrarSession.apply(key, fetch);
   return fetch;
@@ -545,6 +554,18 @@ Future<bool> ngmyCivicPersistRegistrarApplications({
     'action': 'civicPersistRegistrarApplications',
     'email': email.trim().toLowerCase(),
     'applications': applications,
+  });
+  return data != null && data['ok'] == true;
+}
+
+Future<bool> ngmyCivicDeleteRegistrarApplication({
+  String? userEmail,
+  String? id,
+}) async {
+  final data = await ngmyCivicInvoke({
+    'action': 'civicDeleteRegistrarApplication',
+    if ((userEmail ?? '').trim().isNotEmpty) 'userEmail': userEmail!.trim().toLowerCase(),
+    if ((id ?? '').trim().isNotEmpty) 'id': id!.trim(),
   });
   return data != null && data['ok'] == true;
 }

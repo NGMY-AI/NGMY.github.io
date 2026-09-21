@@ -219,10 +219,13 @@ class NgmyCivicRegistrarApplication {
     bool cloudSaysRegistrar = false,
   }) {
     if (isRevokedForEmail(applications, email)) return false;
+    if (isRejectedForEmail(applications, email)) return false;
     if (localBackup != null && _statusOf(localBackup) == 'revoked') return false;
-    if (userFlag || cloudSaysRegistrar) return true;
+    if (localBackup != null && _statusOf(localBackup) == 'rejected') return false;
     if (isApprovedForEmail(applications, email)) return true;
     if (localBackup != null && _statusOf(localBackup) == 'approved') return true;
+    // Only trust flags when there is no application row denying access.
+    if (userFlag || cloudSaysRegistrar) return true;
     return false;
   }
 
@@ -331,8 +334,23 @@ class NgmyCivicRegistrarApplication {
     if (local == null) return list.map((e) => Map<String, dynamic>.from(e)).toList();
     final key = _emailKey(email);
     final existingIdx = list.indexWhere((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == key);
-    if (existingIdx == -1) return upsertInList(list, local);
-    final existingTs = _rowTimestamp(list[existingIdx]);
+    if (existingIdx == -1) {
+      // Do not resurrect a deleted cloud row from a stale device backup.
+      final localStatus = _statusOf(local);
+      if (localStatus == 'approved' || localStatus == 'revoked' || localStatus == 'rejected') {
+        return list.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+      return upsertInList(list, local);
+    }
+    final existing = list[existingIdx];
+    final existingStatus = _statusOf(existing);
+    final localStatus = _statusOf(local);
+    // Cloud revoke/reject always wins over a stale local approved/pending backup.
+    if ((existingStatus == 'revoked' || existingStatus == 'rejected') &&
+        localStatus != existingStatus) {
+      return list.map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    final existingTs = _rowTimestamp(existing);
     final localTs = _rowTimestamp(local);
     if (localTs == null) return list.map((e) => Map<String, dynamic>.from(e)).toList();
     if (existingTs != null && !localTs.isAfter(existingTs)) {

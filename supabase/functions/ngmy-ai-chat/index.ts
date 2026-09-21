@@ -1397,6 +1397,11 @@ const CIVIC_MEMBERS_KEY = "civic_registry_members";
 const CIVIC_PINS_KEY = "civic_registry_pins";
 const CIVIC_REGISTRAR_APPS_KEY = "civic_registrar_applications";
 
+type CivicRegistrarAppsStore = {
+  applications: Record<string, unknown>[];
+  deleted: { id: string; email: string; deletedAt: string }[];
+};
+
 type CivicRole = {
   email: string;
   isAdmin: boolean;
@@ -1665,6 +1670,79 @@ function protectDualRevokeOnPersist(
       revokedBy: prev.revokedBy,
     };
   });
+}
+
+function registrarAppDecisionMs(row: Record<string, unknown>): number {
+  const raw = String(row.updatedAt ?? row.revokedAt ?? row.reviewedAt ?? row.createdAt ?? "").trim();
+  if (!raw) return 0;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Never let a stale device persist flip a newer revoke/reject back to approved,
+ * and never resurrect tombstoned application ids/emails.
+ */
+function protectRegistrarStatusRegression(
+  current: Record<string, unknown>[],
+  incoming: Record<string, unknown>[],
+  deleted: { id: string; email: string; deletedAt: string }[],
+): Record<string, unknown>[] {
+  const deletedIds = new Set(deleted.map((d) => d.id).filter(Boolean));
+  const deletedEmails = new Set(deleted.map((d) => emailKey(d.email)).filter(Boolean));
+  const out: Record<string, unknown>[] = [];
+  for (const row of incoming) {
+    const id = String(row.id ?? "").trim();
+    const em = emailKey(String(row.userEmail ?? row.email ?? ""));
+    if ((id && deletedIds.has(id)) || (em && deletedEmails.has(em))) {
+      // Allow a brand-new pending re-application after delete (new id, pending).
+      const st = String(row.status ?? "").toLowerCase();
+      if (!(st === "pending" && id && !deletedIds.has(id))) continue;
+    }
+    const prev = current.find((a) => {
+      const pid = String(a.id ?? "").trim();
+      if (id && pid === id) return true;
+      if (em && emailKey(String(a.userEmail ?? a.email ?? "")) === em) return true;
+      return false;
+    });
+    if (!prev) {
+      out.push(row);
+      continue;
+    }
+    const prevStatus = String(prev.status ?? "").toLowerCase();
+    const nextStatus = String(row.status ?? "").toLowerCase();
+    const prevMs = registrarAppDecisionMs(prev);
+    const nextMs = registrarAppDecisionMs(row);
+    // Stale approved must not overwrite a newer/equal revoke or reject.
+    if (
+      (prevStatus === "revoked" || prevStatus === "rejected") &&
+      nextStatus === "approved" &&
+      nextMs <= prevMs
+    ) {
+      out.push({ ...prev });
+      continue;
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+function normalizeRegistrarDeleted(raw: unknown): { id: string; email: string; deletedAt: string }[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { id: string; email: string; deletedAt: string }[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const id = String(row.id ?? "").trim();
+    const email = emailKey(String(row.email ?? row.userEmail ?? ""));
+    const deletedAt = String(row.deletedAt ?? "").trim() || new Date().toISOString();
+    const key = id || (email ? `em:${email}` : "");
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ id, email, deletedAt });
+  }
+  return out.slice(-200);
 }
 
 function preserveApplicantIdentityOnIncoming(
@@ -2310,12 +2388,6 @@ async function resolveCivicRole(
       ) {
         role.isAdmin = true;
       }
-      // Fallback when applications list is missing/stale but the user row is flagged.
-      if (userRow.isAuthorizedRegistrar === true) {
-        role.isRegistrar = true;
-        const st = String(userRow.state ?? "").trim();
-        if (st) role.registrarState = displayStateName(st);
-      }
     }
   } catch (_) {
     // columns may vary — try a narrower select
@@ -2332,17 +2404,47 @@ async function resolveCivicRole(
   }
 
   try {
-    const apps = await loadRegistrarApplications(admin);
-    let best: Record<string, unknown> | null = null;
-    for (const a of apps) {
+    const store = await loadRegistrarApplicationsStore(admin);
+    let bestApproved: Record<string, unknown> | null = null;
+    let terminalDenied = false;
+    for (const a of store.applications) {
       if (emailKey(String(a.userEmail ?? a.email ?? "")) !== key) continue;
-      if (String(a.status ?? "").toLowerCase() !== "approved") continue;
-      best = a;
+      const st = String(a.status ?? "").toLowerCase();
+      if (st === "revoked" || st === "rejected") {
+        terminalDenied = true;
+        continue;
+      }
+      if (st === "approved") bestApproved = a;
     }
-    if (best) {
+    if (bestApproved) {
       role.isRegistrar = true;
-      const st = String(best.state ?? "").trim();
+      const st = String(bestApproved.state ?? "").trim();
       if (st) role.registrarState = displayStateName(st);
+    } else if (terminalDenied) {
+      role.isRegistrar = false;
+      // Keep the users table in sync so phones stop treating them as registrar.
+      await applyRegistrarFlagToUser(admin, key, false);
+    } else {
+      // No application row: trust user flag only when not tombstoned.
+      const tombstoned = store.deleted.some((d) => emailKey(d.email) === key);
+      if (!tombstoned) {
+        try {
+          const { data: userRow } = await admin
+            .from("users")
+            .select("isAuthorizedRegistrar,state")
+            .eq("email", key)
+            .maybeSingle();
+          if (userRow?.isAuthorizedRegistrar === true) {
+            role.isRegistrar = true;
+            const st = String(userRow.state ?? "").trim();
+            if (st) role.registrarState = displayStateName(st);
+          }
+        } catch (_) {
+          // ignore
+        }
+      } else {
+        await applyRegistrarFlagToUser(admin, key, false);
+      }
     }
   } catch (_) {
     // ignore
@@ -2351,9 +2453,9 @@ async function resolveCivicRole(
   return role;
 }
 
-async function loadRegistrarApplications(
+async function loadRegistrarApplicationsStore(
   admin: NonNullable<ReturnType<typeof adminClient>>,
-): Promise<Record<string, unknown>[]> {
+): Promise<CivicRegistrarAppsStore> {
   try {
     const { data: settingsRow } = await admin
       .from("ngmy_settings")
@@ -2363,11 +2465,16 @@ async function loadRegistrarApplications(
     const value = settingsRow?.value;
     if (value && typeof value === "object" && !Array.isArray(value)) {
       const raw = (value as Record<string, unknown>).applications;
+      const deleted = normalizeRegistrarDeleted((value as Record<string, unknown>).deleted);
       if (Array.isArray(raw)) {
-        return raw
-          .filter((e) => e && typeof e === "object" && !Array.isArray(e))
-          .map((e) => ({ ...(e as Record<string, unknown>) }));
+        return {
+          applications: raw
+            .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+            .map((e) => ({ ...(e as Record<string, unknown>) })),
+          deleted,
+        };
       }
+      return { applications: [], deleted };
     }
   } catch (_) {
     // fall through
@@ -2380,25 +2487,51 @@ async function loadRegistrarApplications(
       .maybeSingle();
     const apps = cfg?.civicRegistrarApplications;
     if (Array.isArray(apps)) {
-      return apps
-        .filter((e) => e && typeof e === "object" && !Array.isArray(e))
-        .map((e) => ({ ...(e as Record<string, unknown>) }));
+      return {
+        applications: apps
+          .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+          .map((e) => ({ ...(e as Record<string, unknown>) })),
+        deleted: [],
+      };
     }
   } catch (_) {
     // ignore
   }
-  return [];
+  return { applications: [], deleted: [] };
+}
+
+async function loadRegistrarApplications(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+): Promise<Record<string, unknown>[]> {
+  const store = await loadRegistrarApplicationsStore(admin);
+  return store.applications;
 }
 
 async function saveRegistrarApplications(
   admin: NonNullable<ReturnType<typeof adminClient>>,
   applications: Record<string, unknown>[],
+  deleted: { id: string; email: string; deletedAt: string }[] = [],
 ): Promise<{ ok: boolean; error?: string }> {
+  const prev = await loadRegistrarApplicationsStore(admin);
+  const mergedDeleted = normalizeRegistrarDeleted([...prev.deleted, ...deleted]);
+  // Drop tombstones for emails that now have a live pending/approved row (re-apply).
+  const liveEmails = new Set(
+    applications
+      .map((a) => emailKey(String(a.userEmail ?? a.email ?? "")))
+      .filter(Boolean),
+  );
+  const liveIds = new Set(applications.map((a) => String(a.id ?? "").trim()).filter(Boolean));
+  const keptDeleted = mergedDeleted.filter((d) => {
+    if (d.id && liveIds.has(d.id)) return false;
+    if (d.email && liveEmails.has(d.email)) return false;
+    return true;
+  });
   const { error } = await admin.from("ngmy_settings").upsert(
     {
       key: CIVIC_REGISTRAR_APPS_KEY,
       value: {
         applications,
+        deleted: keptDeleted,
         savedAt: new Date().toISOString(),
       },
       updated_at: new Date().toISOString(),
@@ -2406,7 +2539,7 @@ async function saveRegistrarApplications(
     { onConflict: "key" },
   );
   if (error) return { ok: false, error: error.message };
-  // Keep public config empty
+  // Keep public config empty — devices must use edge fetch, not config union.
   await admin.from("config").upsert({
     id: "1",
     civicRegistrarApplications: [],
@@ -2500,13 +2633,28 @@ async function handleCivicPersistRegistrarApplications(
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
   const incoming = asMemberList(body.applications); // reuse list helper
-  const current = await loadRegistrarApplications(admin);
+  const store = await loadRegistrarApplicationsStore(admin);
+  const current = store.applications;
+  const extraDeleted: { id: string; email: string; deletedAt: string }[] = [];
+  const now = new Date().toISOString();
 
   let next = current;
   if (role.isAdmin) {
     // Incoming list is source of truth for which rows exist, but never
     // let a masked reviewer copy overwrite the applicant's real email.
     if (Array.isArray(body.applications)) {
+      const incomingIds = new Set(
+        incoming.map((a) => String(a.id ?? "").trim()).filter(Boolean),
+      );
+      for (const row of current) {
+        const id = String(row.id ?? "").trim();
+        if (!id || incomingIds.has(id)) continue;
+        extraDeleted.push({
+          id,
+          email: emailKey(String(row.userEmail ?? row.email ?? "")),
+          deletedAt: now,
+        });
+      }
       next = overlayRegistrarAppsOnCurrent(current, incoming);
     }
   } else if (role.isRegistrar && role.registrarState) {
@@ -2515,6 +2663,18 @@ async function handleCivicPersistRegistrarApplications(
     const kept = current.filter((a) => canonicalStateKey(String(a.state ?? "")) !== home);
     const currentHome = current.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
     const homeIncoming = incoming.filter((a) => canonicalStateKey(String(a.state ?? "")) === home);
+    const homeIncomingIds = new Set(
+      homeIncoming.map((a) => String(a.id ?? "").trim()).filter(Boolean),
+    );
+    for (const row of currentHome) {
+      const id = String(row.id ?? "").trim();
+      if (!id || homeIncomingIds.has(id)) continue;
+      extraDeleted.push({
+        id,
+        email: emailKey(String(row.userEmail ?? row.email ?? "")),
+        deletedAt: now,
+      });
+    }
     next = [...kept, ...overlayRegistrarAppsOnCurrent(currentHome, homeIncoming)];
   } else {
     // Member may only upsert their own pending application row(s)
@@ -2528,10 +2688,79 @@ async function handleCivicPersistRegistrarApplications(
 
   next = limitNewRegistrarApprovals(current, next);
   next = protectDualRevokeOnPersist(current, next, role.isAdmin);
+  next = protectRegistrarStatusRegression(current, next, [
+    ...store.deleted,
+    ...extraDeleted,
+  ]);
 
-  const saved = await saveRegistrarApplications(admin, next);
+  const saved = await saveRegistrarApplications(admin, next, extraDeleted);
   if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
   return jsonOk({ ok: true, count: next.length });
+}
+
+async function handleCivicDeleteRegistrarApplication(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const role = await resolveCivicRole(admin, email);
+  if (!role.isAdmin && !role.isRegistrar) {
+    return jsonOk({ error: "Forbidden" }, 403);
+  }
+
+  const targetEmail = emailKey(String(body.userEmail ?? body.email ?? ""));
+  const targetId = String(body.id ?? "").trim();
+  if (!targetEmail && !targetId) {
+    return jsonOk({ error: "userEmail or id required" }, 400);
+  }
+
+  const store = await loadRegistrarApplicationsStore(admin);
+  const removing = store.applications.filter((a) => {
+    const id = String(a.id ?? "").trim();
+    const em = emailKey(String(a.userEmail ?? a.email ?? ""));
+    if (targetId && id === targetId) return true;
+    if (targetEmail && em === targetEmail) return true;
+    return false;
+  });
+  if (removing.length === 0) {
+    return jsonOk({ ok: true, deleted: 0 });
+  }
+
+  if (!role.isAdmin) {
+    for (const row of removing) {
+      if (!statesMatch(role.registrarState, String(row.state ?? ""))) {
+        return jsonOk({ error: "Forbidden" }, 403);
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const deleted = removing.map((row) => ({
+    id: String(row.id ?? "").trim(),
+    email: emailKey(String(row.userEmail ?? row.email ?? "")),
+    deletedAt: now,
+  }));
+  const removeIds = new Set(deleted.map((d) => d.id).filter(Boolean));
+  const removeEmails = new Set(deleted.map((d) => d.email).filter(Boolean));
+  const next = store.applications.filter((a) => {
+    const id = String(a.id ?? "").trim();
+    const em = emailKey(String(a.userEmail ?? a.email ?? ""));
+    if (id && removeIds.has(id)) return false;
+    if (em && removeEmails.has(em)) return false;
+    return true;
+  });
+
+  const saved = await saveRegistrarApplications(admin, next, deleted);
+  if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+
+  for (const em of removeEmails) {
+    await applyRegistrarFlagToUser(admin, em, false);
+  }
+
+  return jsonOk({ ok: true, deleted: removing.length });
 }
 
 async function applyRegistrarFlagToUser(
@@ -5534,6 +5763,7 @@ serve(async (req) => {
       cv: "civicUserGroupsFind",
       cw: "civicUserGroupsJoin",
       cx: "civicGuestSelfUpdate",
+      cy: "civicDeleteRegistrarApplication",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -5712,6 +5942,9 @@ serve(async (req) => {
     }
     if (action === "civicDecideRegistrarApplication") {
       return await handleCivicDecideRegistrarApplication(req, body as Record<string, unknown>);
+    }
+    if (action === "civicDeleteRegistrarApplication") {
+      return await handleCivicDeleteRegistrarApplication(req, body as Record<string, unknown>);
     }
     if (action === "privateListsFetch") {
       return await handlePrivateListsFetch(req, body as Record<string, unknown>);
