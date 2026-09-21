@@ -2958,6 +2958,59 @@ function findDuplicateMember(
   return null;
 }
 
+/** First + last name must match (middle names optional). */
+function firstLastNameMatch(entered: string, registered: string): boolean {
+  const a = normName(entered).split(" ").filter(Boolean);
+  const b = normName(registered).split(" ").filter(Boolean);
+  if (a.length < 2 || b.length < 2) return false;
+  return a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
+}
+
+function profileSelfUpdatesThisYear(m: Record<string, unknown>): number {
+  const raw = m.profileSelfUpdates;
+  if (!Array.isArray(raw)) return 0;
+  const year = new Date().getUTCFullYear();
+  let n = 0;
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const at = String((entry as Record<string, unknown>).at ?? "").trim();
+    if (!at) continue;
+    const d = new Date(at);
+    if (!Number.isNaN(d.getTime()) && d.getUTCFullYear() === year) n += 1;
+  }
+  return n;
+}
+
+function appendProfileSelfUpdate(
+  m: Record<string, unknown>,
+  fields: string[],
+): void {
+  const prev = Array.isArray(m.profileSelfUpdates)
+    ? [...(m.profileSelfUpdates as unknown[])]
+    : [];
+  prev.push({ at: new Date().toISOString(), fields });
+  // Keep the list small — only need recent years for the twice/year check.
+  m.profileSelfUpdates = prev.slice(-12);
+}
+
+function findMemberByFirstLastAddressPhone(
+  members: Record<string, unknown>[],
+  fullName: string,
+  homeAddress: string,
+  phone: string,
+): Record<string, unknown> | null {
+  const addr = normAddress(homeAddress);
+  const ph = phoneDigits(phone);
+  if (!addr || ph.length < 7) return null;
+  for (const m of members) {
+    if (!firstLastNameMatch(fullName, String(m.fullName ?? ""))) continue;
+    if (normAddress(String(m.homeAddress ?? "")) !== addr) continue;
+    if (phoneDigits(String(m.phone ?? "")) !== ph) continue;
+    return m;
+  }
+  return null;
+}
+
 function stateCodePrefix(state: string): string {
   return US_STATE_PREFIX[canonicalStateKey(state)] ?? "XX";
 }
@@ -3979,6 +4032,175 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
     email: guestEmail,
     state,
     memberCount: verifyMembers.length,
+  });
+}
+
+/**
+ * Existing members only — never creates a new enrollment.
+ * - mode "family": match first+last name + home address + phone → update family size only
+ * - mode "profile": require Civic Registry ID (+ name must match that ID) → update
+ *   address / phone / dob / family size (never the registered name). Max 2 updates / calendar year.
+ */
+async function handleCivicGuestSelfUpdate(body: Record<string, unknown>): Promise<Response> {
+  const mode = String(body.mode ?? "family").trim().toLowerCase() === "profile"
+    ? "profile"
+    : "family";
+  const fullName = String(body.fullName ?? "").trim();
+  const phone = String(body.phone ?? "").trim();
+  const homeAddress = String(body.homeAddress ?? body.address ?? "").trim();
+  const registryId = String(body.registryId ?? "").trim();
+  const dob = String(body.dob ?? "").trim();
+  const familyRaw = body.familyMembers;
+  const hasFamily = familyRaw !== undefined && familyRaw !== null && String(familyRaw).trim() !== "";
+  const familyMembers = hasFamily ? (Number(familyRaw) || 0) : 0;
+  const malesRaw = body.familyMales;
+  const femalesRaw = body.familyFemales;
+  const hasMales = malesRaw !== undefined && malesRaw !== null && String(malesRaw).trim() !== "";
+  const hasFemales = femalesRaw !== undefined && femalesRaw !== null && String(femalesRaw).trim() !== "";
+  const familyMales = hasMales ? (Number(malesRaw) || 0) : 0;
+  const familyFemales = hasFemales ? (Number(femalesRaw) || 0) : 0;
+
+  if (!fullName || !RegExp(/^\S+\s+\S+/).test(fullName)) {
+    return jsonOk({ ok: false, error: "First and last name are required." }, 400);
+  }
+
+  if (mode === "family") {
+    if (!homeAddress || !phone) {
+      return jsonOk({ ok: false, error: "Name, address, and phone are required to update family size." }, 400);
+    }
+    if (!hasFamily || familyMembers < 1 || familyMembers > 99) {
+      return jsonOk({ ok: false, error: "Family size must be 1–99." }, 400);
+    }
+    if (!hasMales || !hasFemales) {
+      return jsonOk({ ok: false, error: "Male and female counts are required." }, 400);
+    }
+    if (familyMales + familyFemales !== familyMembers) {
+      return jsonOk({ ok: false, error: "familyMales + familyFemales must equal familyMembers" }, 400);
+    }
+  } else {
+    if (!registryId) {
+      return jsonOk({
+        ok: false,
+        error: "Civic Registry ID is required to update address, phone, or birthday.",
+      }, 400);
+    }
+    if (hasFamily) {
+      if (familyMembers < 1 || familyMembers > 99) {
+        return jsonOk({ ok: false, error: "Family size must be 1–99." }, 400);
+      }
+      if (hasMales && hasFemales && familyMales + familyFemales !== familyMembers) {
+        return jsonOk({ ok: false, error: "familyMales + familyFemales must equal familyMembers" }, 400);
+      }
+    }
+    if (dob && !/^\d{2}\/\d{2}\/\d{4}$/.test(dob)) {
+      return jsonOk({ ok: false, error: "Birthday must be MM/DD/YYYY." }, 400);
+    }
+    if (!homeAddress && !phone && !dob && !hasFamily) {
+      return jsonOk({ ok: false, error: "Nothing to update." }, 400);
+    }
+  }
+
+  const admin = adminClient();
+  if (!admin) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+
+  const latest = await loadCivicPayload(admin);
+  const members = asMemberList(latest.members);
+  const removed = asMemberList(latest.removed);
+  const deceased = asMemberList(latest.deceased);
+
+  let target: Record<string, unknown> | null = null;
+  if (mode === "profile") {
+    target = members.find((m) => civicIdsMatch(String(m.registryId ?? ""), registryId)) ?? null;
+    if (!target) {
+      return jsonOk({ ok: false, error: "No Civic Registry member found for that ID." }, 404);
+    }
+    if (!firstLastNameMatch(fullName, String(target.fullName ?? ""))) {
+      return jsonOk({
+        ok: false,
+        error: "Name does not match that Civic Registry ID.",
+      }, 403);
+    }
+  } else {
+    target = findMemberByFirstLastAddressPhone(members, fullName, homeAddress, phone);
+    if (!target) {
+      return jsonOk({
+        ok: false,
+        error:
+          "No matching member found. First and last name, home address, and phone must match your existing Civic Registry record.",
+      }, 404);
+    }
+  }
+
+  if (profileSelfUpdatesThisYear(target) >= 2) {
+    return jsonOk({
+      ok: false,
+      error: "You can only update your Civic Registry info twice per year.",
+      limitReached: true,
+      updatesThisYear: 2,
+    }, 429);
+  }
+
+  const fieldsChanged: string[] = [];
+  if (mode === "family") {
+    target.familyMembers = familyMembers;
+    target.familyMales = familyMales;
+    target.familyFemales = familyFemales;
+    fieldsChanged.push("familyMembers", "familyMales", "familyFemales");
+  } else {
+    if (homeAddress) {
+      target.homeAddress = homeAddress;
+      fieldsChanged.push("homeAddress");
+    }
+    if (phone) {
+      const digits = phoneDigits(phone);
+      if (digits.length < 7) {
+        return jsonOk({ ok: false, error: "Phone must be 7–15 digits." }, 400);
+      }
+      target.phone = digits;
+      fieldsChanged.push("phone");
+    }
+    if (dob) {
+      target.dob = dob;
+      fieldsChanged.push("dob");
+    }
+    if (hasFamily) {
+      target.familyMembers = familyMembers;
+      fieldsChanged.push("familyMembers");
+      if (hasMales) {
+        target.familyMales = familyMales;
+        fieldsChanged.push("familyMales");
+      }
+      if (hasFemales) {
+        target.familyFemales = familyFemales;
+        fieldsChanged.push("familyFemales");
+      }
+    }
+  }
+
+  // Never rewrite the registered name on self-update.
+  target.updatedAt = new Date().toISOString();
+  appendProfileSelfUpdate(target, fieldsChanged);
+
+  const rid = String(target.registryId ?? "").trim().toUpperCase();
+  const nextMembers = members.map((m) =>
+    civicIdsMatch(String(m.registryId ?? ""), rid) ? target! : m,
+  );
+
+  const saved = await saveCivicPayload(admin, {
+    members: nextMembers,
+    removed,
+    deceased,
+    source: "guest_self_update",
+  });
+  if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
+
+  return jsonOk({
+    ok: true,
+    updated: true,
+    mode,
+    registryId: String(target.registryId ?? ""),
+    fields: fieldsChanged,
+    updatesThisYear: profileSelfUpdatesThisYear(target),
   });
 }
 
@@ -5237,6 +5459,7 @@ serve(async (req) => {
       cu: "civicUserGroupsPersist",
       cv: "civicUserGroupsFind",
       cw: "civicUserGroupsJoin",
+      cx: "civicGuestSelfUpdate",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -5384,6 +5607,11 @@ serve(async (req) => {
       const limited = await enforceRateLimit(req, "civic_enroll", clientIp(req), 8, 3600);
       if (limited) return limited;
       return await handleCivicGuestEnroll(body as Record<string, unknown>);
+    }
+    if (action === "civicGuestSelfUpdate") {
+      const limited = await enforceRateLimit(req, "civic_self_update", clientIp(req), 12, 3600);
+      if (limited) return limited;
+      return await handleCivicGuestSelfUpdate(body as Record<string, unknown>);
     }
     if (action === "civicPublicCatalog") {
       const limited = await enforceRateLimit(req, "civic_catalog", clientIp(req), 60, 60);

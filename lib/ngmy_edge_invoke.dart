@@ -36,6 +36,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'civicMarkDeceased': 'c7',
   'civicPersistRoster': 'c8',
   'civicGuestEnroll': 'c9',
+  'civicGuestSelfUpdate': 'cx',
   'civicPublicCatalog': 'ca',
   'civicFetchRegistryPins': 'cb',
   'civicSaveRegistryPins': 'cc',

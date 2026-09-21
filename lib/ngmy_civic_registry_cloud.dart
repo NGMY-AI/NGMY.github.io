@@ -405,6 +405,34 @@ Future<({bool ok, String? registryId, String? error, Map<String, dynamic>? dupli
   return result;
 }
 
+/// Existing member self-update (family size by match, or profile fields via Registry ID).
+/// Never creates a new Civic Registry enrollment.
+Future<({bool ok, String? registryId, String? error, bool limitReached})> ngmyCivicGuestSelfUpdate(
+  Map<String, dynamic> fields,
+) async {
+  final data = await ngmyCivicInvokeAnon({
+    'action': 'civicGuestSelfUpdate',
+    ...fields,
+  });
+  if (data == null) {
+    return (ok: false, registryId: null, error: 'Could not reach server', limitReached: false);
+  }
+  if (data['ok'] == true) {
+    return (
+      ok: true,
+      registryId: (data['registryId'] ?? '').toString().trim(),
+      error: null,
+      limitReached: false,
+    );
+  }
+  return (
+    ok: false,
+    registryId: null,
+    error: _civicCloudError(data, 'Update failed'),
+    limitReached: data['limitReached'] == true,
+  );
+}
+
 Future<({String global, Map<String, String> byState})> ngmyCivicFetchRegistryPins({
   required String email,
 }) async {

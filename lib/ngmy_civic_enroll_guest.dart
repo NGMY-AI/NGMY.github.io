@@ -98,6 +98,12 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   bool _selfEnrollOpen = true;
   String? _loadError;
   String? _registryId;
+  /// false = new enrollment, true = update existing member (never creates).
+  bool _updateMode = false;
+  /// Set after triple-tapping the NGMY logo + entering a valid-looking Registry ID.
+  String _unlockedRegistryId = '';
+  int _logoTapCount = 0;
+  DateTime? _logoTapAt;
 
   Map<String, List<String>> _citiesByState = const {};
   List<String> _legacyCities = const [];
@@ -118,6 +124,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _familyMembersC = TextEditingController();
   final _familyMalesC = TextEditingController();
   final _familyFemalesC = TextEditingController();
+  final _dobC = TextEditingController();
+  final _registryIdC = TextEditingController();
 
   late final AnimationController _pulse;
   late final AnimationController _shimmer;
@@ -151,6 +159,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     _familyMembersC.dispose();
     _familyMalesC.dispose();
     _familyFemalesC.dispose();
+    _dobC.dispose();
+    _registryIdC.dispose();
     super.dispose();
   }
 
@@ -282,6 +292,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
 
   Future<void> _submit() async {
     if (_submitting) return;
+    if (_updateMode) {
+      await _submitUpdate();
+      return;
+    }
     final fullName = _nameC.text.trim();
     final address = _addressC.text.trim();
     // The field shows dashes (123-456-7890); the registry stores digits only,
@@ -374,7 +388,8 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           final parts = <String>[if (name.isNotEmpty) name else 'Mwanachama'];
           if (id.isNotEmpty) parts.add('ID $id');
           _toast(
-            'Tayari umesajiliwa — jina + anwani, au simu inafanana (${parts.join(' · ')}).',
+            'Tayari umesajiliwa — jina + anwani, au simu inafanana (${parts.join(' · ')}).\n'
+            'Ikiwa unataka kusasisha ukubwa wa familia, chagua "Sasisha".',
           );
         } else {
           _toast(result.error ?? 'Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
@@ -397,6 +412,180 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       setState(() => _submitting = false);
       _toast('Usajili umeshindikana. Tafadhali jaribu tena.');
     }
+  }
+
+  Future<void> _submitUpdate() async {
+    if (_submitting) return;
+    final fullName = _nameC.text.trim();
+    final address = _addressC.text.trim();
+    final phone = ngmyPhoneDigits(_phoneC.text);
+    final familyRaw = _familyMembersC.text.trim();
+    final familyMembers = int.tryParse(familyRaw) ?? 0;
+    final malesRaw = _familyMalesC.text.trim();
+    final femalesRaw = _familyFemalesC.text.trim();
+    final males = malesRaw.isEmpty ? 0 : (int.tryParse(malesRaw) ?? -1);
+    final females = femalesRaw.isEmpty ? 0 : (int.tryParse(femalesRaw) ?? -1);
+    final dob = _dobC.text.trim();
+    final unlockedId = _unlockedRegistryId.trim();
+    final profileMode = unlockedId.isNotEmpty;
+
+    if (fullName.isEmpty || !RegExp(r'^\S+\s+\S+').hasMatch(fullName)) {
+      _toast('Andika jina la kwanza na jina la mwisho (lazima lifanane na sajili).');
+      return;
+    }
+
+    if (!profileMode) {
+      // Family-size path: name + address + phone must match an existing record.
+      if (address.isEmpty) {
+        _toast('Anwani ya nyumbani inahitajika (lazima ifanane na sajili).');
+        return;
+      }
+      if (phone.isEmpty || !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+        _toast('Nambari ya simu inahitajika (lazima ifanane na sajili).');
+        return;
+      }
+      if (familyRaw.isEmpty || familyMembers < 1 || familyMembers > 99) {
+        _toast('Andika ukubwa wa familia (1–99).');
+        return;
+      }
+      if (malesRaw.isEmpty || femalesRaw.isEmpty || males < 0 || females < 0) {
+        _toast('Wanaume (M) na wanawake (F) wanahitajika.');
+        return;
+      }
+      if (males + females != familyMembers) {
+        _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
+        return;
+      }
+    } else {
+      if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
+        _toast('Tarehe ya kuzaliwa iwe MM/DD/YYYY.');
+        return;
+      }
+      if (phone.isNotEmpty && !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+        _toast('Nambari ya simu iwe tarakimu 7–15.');
+        return;
+      }
+      if (familyRaw.isNotEmpty) {
+        if (familyMembers < 1 || familyMembers > 99) {
+          _toast('Andika ukubwa wa familia (1–99).');
+          return;
+        }
+        if (malesRaw.isNotEmpty && femalesRaw.isNotEmpty && males + females != familyMembers) {
+          _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
+          return;
+        }
+      }
+      if (address.isEmpty && phone.isEmpty && dob.isEmpty && familyRaw.isEmpty) {
+        _toast('Andika kitu cha kusasisha (anwani, simu, tarehe, au familia).');
+        return;
+      }
+    }
+
+    setState(() => _submitting = true);
+    try {
+      final fields = <String, dynamic>{
+        'mode': profileMode ? 'profile' : 'family',
+        'fullName': fullName,
+        if (address.isNotEmpty) 'homeAddress': address,
+        if (phone.isNotEmpty) 'phone': phone,
+        if (profileMode) 'registryId': unlockedId,
+        if (dob.isNotEmpty) 'dob': dob,
+        if (familyRaw.isNotEmpty) 'familyMembers': familyMembers,
+        if (malesRaw.isNotEmpty) 'familyMales': males,
+        if (femalesRaw.isNotEmpty) 'familyFemales': females,
+      };
+      final result = await ngmyCivicGuestSelfUpdate(fields);
+      if (!result.ok) {
+        _toast(
+          result.limitReached
+              ? 'Unaweza kusasisha mara 2 tu kwa mwaka. / You can only update twice per year.'
+              : (result.error ?? 'Haikuweza kusasisha. Jaribu tena.'),
+        );
+        setState(() => _submitting = false);
+        return;
+      }
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _done = true;
+        _registryId = result.registryId ?? unlockedId;
+        _members = const [];
+      });
+    } catch (e) {
+      debugPrint('[civic_guest] update: $e');
+      ngmyInvalidateCloudReachabilityCache();
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _toast('Sasisho limeshindikana. Tafadhali jaribu tena.');
+    }
+  }
+
+  void _onLogoTap() {
+    final now = DateTime.now();
+    if (_logoTapAt != null && now.difference(_logoTapAt!) <= const Duration(milliseconds: 500)) {
+      _logoTapCount += 1;
+    } else {
+      _logoTapCount = 1;
+    }
+    _logoTapAt = now;
+    if (_logoTapCount < 3) return;
+    _logoTapCount = 0;
+    _logoTapAt = null;
+    unawaited(_promptRegistryIdUnlock());
+  }
+
+  Future<void> _promptRegistryIdUnlock() async {
+    _registryIdC.text = _unlockedRegistryId;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        title: const Text('Civic Registry ID', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Weka nambari yako ya sajili ili kusasisha anwani, simu, au tarehe ya kuzaliwa.\n'
+              'Enter your Civic Registry ID to update address, phone, or birthday. '
+              '(Jina halibadilishwi. Max 2 updates / year.)',
+              style: TextStyle(color: _kMuted, height: 1.35, fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _registryIdC,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(
+                labelText: 'Registry ID',
+                labelStyle: TextStyle(color: _kMuted),
+                enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: _kMuted)),
+                focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _kAccent)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Unlock', style: TextStyle(color: _kAccent, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final id = _registryIdC.text.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (id.length < 6) {
+      _toast('Registry ID si sahihi.');
+      return;
+    }
+    setState(() {
+      _unlockedRegistryId = id;
+      _updateMode = true;
+    });
+    _toast('Unlocked — unaweza kusasisha anwani, simu, tarehe, au familia (si jina).');
   }
 
   void _toast(String msg) {
@@ -526,7 +715,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           ),
           Positioned(
             right: -2,
-            child: Container(
+            child: GestureDetector(
+              onTap: _onLogoTap,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
               width: logoSize,
               height: logoSize,
               decoration: BoxDecoration(
@@ -580,6 +772,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   ),
                 ),
               ),
+            ),
             ),
           ),
         ],
@@ -739,9 +932,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white),
                 )
-              : const Text(
-                  'Kamilisha usajili',
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white, letterSpacing: 0.35),
+              : Text(
+                  _updateMode
+                      ? (_unlockedRegistryId.isNotEmpty ? 'Sasisha taarifa' : 'Sasisha ukubwa wa familia')
+                      : 'Kamilisha usajili',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: Colors.white, letterSpacing: 0.35),
                 ),
         ),
       ),
@@ -907,16 +1102,20 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                         },
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Umesajiliwa',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+                      Text(
+                        _updateMode ? 'Imesasishwa' : 'Umesajiliwa',
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        _registryId == null || _registryId!.isEmpty
-                            ? 'Maelezo yako yamehifadhiwa katika Sajili ya Wananchi.\nYour enrollment is saved in Civic Registry.'
-                            : 'Nambari ya sajili: $_registryId\nMaelezo yako yamehifadhiwa.\nYour enrollment is saved — Registry ID: $_registryId',
+                        _updateMode
+                            ? (_registryId == null || _registryId!.isEmpty
+                                ? 'Taarifa zako zimesasishwa katika Sajili ya Wananchi.\nYour Civic Registry info was updated.'
+                                : 'Nambari ya sajili: $_registryId\nTaarifa zimesasishwa.\nYour Civic Registry info was updated.')
+                            : (_registryId == null || _registryId!.isEmpty
+                                ? 'Maelezo yako yamehifadhiwa katika Sajili ya Wananchi.\nYour enrollment is saved in Civic Registry.'
+                                : 'Nambari ya sajili: $_registryId\nMaelezo yako yamehifadhiwa.\nYour enrollment is saved — Registry ID: $_registryId'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 15, height: 1.45, color: _kMuted),
                       ),
@@ -946,13 +1145,30 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   animation: Listenable.merge([_pulse, _shimmer]),
                   builder: (context, child) => _mottoBadge(Curves.easeInOut.transform(_pulse.value), _shimmer.value),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
+                _modeToggle(),
+                if (_updateMode) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _unlockedRegistryId.isEmpty
+                        ? 'Sasisha ukubwa wa familia: jina (kwanza + mwisho), anwani, na simu lazima zifanane na sajili. Mara 2 / mwaka.\n'
+                            'Update family size only — name, address, and phone must match your existing record.'
+                        : 'Unlocked ID $_unlockedRegistryId — unaweza kusasisha anwani, simu, tarehe, au familia (si jina). Mara 2 / mwaka.',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.62),
+                      fontSize: 12,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
                 _glassField(
                   child: TextField(
                     controller: _nameC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     textCapitalization: TextCapitalization.words,
-                    decoration: _dec('Jina kamili'),
+                    decoration: _dec(_updateMode ? 'Jina kamili (lazima lifanane — halibadilishwi)' : 'Jina kamili'),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -960,7 +1176,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                   child: TextField(
                     controller: _addressC,
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
-                    decoration: _dec('Anwani ya nyumbani'),
+                    decoration: _dec(
+                      _updateMode && _unlockedRegistryId.isNotEmpty
+                          ? 'Anwani mpya (optional)'
+                          : 'Anwani ya nyumbani',
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -970,9 +1190,24 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
                     keyboardType: TextInputType.phone,
                     inputFormatters: const [NgmyPhoneDashFormatter()],
-                    decoration: _dec('Nambari ya simu').copyWith(hintText: '123-456-7890'),
+                    decoration: _dec(
+                      _updateMode && _unlockedRegistryId.isNotEmpty
+                          ? 'Simu mpya (optional)'
+                          : 'Nambari ya simu',
+                    ).copyWith(hintText: '123-456-7890'),
                   ),
                 ),
+                if (_updateMode && _unlockedRegistryId.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _glassField(
+                    child: TextField(
+                      controller: _dobC,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16),
+                      keyboardType: TextInputType.datetime,
+                      decoration: _dec('Tarehe ya kuzaliwa (MM/DD/YYYY)').copyWith(hintText: '01/15/1990'),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 _glassField(
                   child: Padding(
@@ -991,7 +1226,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                         const SizedBox(height: 10),
                         _familySoftField(
                           controller: _familyMembersC,
-                          label: 'Jumla (idadi) *',
+                          label: _updateMode && _unlockedRegistryId.isNotEmpty ? 'Jumla (idadi)' : 'Jumla (idadi) *',
                         ),
                         const SizedBox(height: 8),
                         Row(
@@ -999,14 +1234,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyMalesC,
-                                label: 'Wanaume (M) *',
+                                label: _updateMode && _unlockedRegistryId.isNotEmpty ? 'Wanaume (M)' : 'Wanaume (M) *',
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: _familySoftField(
                                 controller: _familyFemalesC,
-                                label: 'Wanawake (F) *',
+                                label: _updateMode && _unlockedRegistryId.isNotEmpty ? 'Wanawake (F)' : 'Wanawake (F) *',
                               ),
                             ),
                           ],
@@ -1024,27 +1259,29 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                _glassField(
-                  child: InkWell(
-                    onTap: _pickState,
-                    borderRadius: BorderRadius.circular(16),
-                    child: InputDecorator(
-                      decoration: _dec('Jimbo'),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _selectedState,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                if (!_updateMode) ...[
+                  const SizedBox(height: 12),
+                  _glassField(
+                    child: InkWell(
+                      onTap: _pickState,
+                      borderRadius: BorderRadius.circular(16),
+                      child: InputDecorator(
+                        decoration: _dec('Jimbo'),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _selectedState,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16),
+                              ),
                             ),
-                          ),
-                          Icon(Icons.expand_more_rounded, size: 22, color: Colors.white.withValues(alpha: 0.55)),
-                        ],
+                            Icon(Icons.expand_more_rounded, size: 22, color: Colors.white.withValues(alpha: 0.55)),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 18),
                 AnimatedBuilder(
                   animation: Listenable.merge([_pulse, _shimmer]),
@@ -1055,6 +1292,48 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _modeToggle() {
+    Widget chip(String label, bool selected, VoidCallback onTap) {
+      return Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: selected ? _kAccent.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
+              border: Border.all(
+                color: selected ? _kAccent.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: selected ? Colors.white : _kMuted,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        chip('Jisajili', !_updateMode, () {
+          if (_updateMode) setState(() => _updateMode = false);
+        }),
+        const SizedBox(width: 8),
+        chip('Sasisha', _updateMode, () {
+          if (!_updateMode) setState(() => _updateMode = true);
+        }),
+      ],
     );
   }
 }
