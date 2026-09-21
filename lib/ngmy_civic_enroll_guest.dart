@@ -384,9 +384,11 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
           if (dob.isNotEmpty) 'dob': dob,
         });
         if (!updated.ok) {
+          // After two self-updates this year, treat like already enrolled —
+          // do not offer a separate "limit" message on this public link.
           _toast(
             updated.limitReached
-                ? 'Unaweza kusasisha mara 2 tu kwa mwaka. / You can only update twice per year.'
+                ? 'Tayari umesajiliwa — jina + anwani, au simu inafanana.'
                 : (updated.error ?? 'Haikuweza kusasisha. Jaribu tena.'),
           );
           setState(() => _submitting = false);
@@ -417,37 +419,35 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       });
       if (!result.ok) {
         if (result.duplicate != null) {
-          // Enroll already identified this person (phone and/or name+address).
-          // Pass Registry ID so family update cannot fail on a pickier rematch.
-          final dupId =
-              (result.duplicate!['registryId'] ?? '').toString().trim();
-          final updated = await ngmyCivicGuestSelfUpdate({
-            'mode': 'family',
-            'fullName': fullName,
-            'homeAddress': address,
-            'phone': phone,
-            if (dupId.isNotEmpty) 'registryId': dupId,
-            'familyMembers': familyMembers,
-            'familyMales': males,
-            'familyFemales': females,
-          });
-          if (updated.ok) {
-            if (!mounted) return;
-            setState(() {
-              _submitting = false;
-              _done = true;
-              _registryId = updated.registryId ??
-                  (result.duplicate!['registryId'] ?? '').toString().trim();
-              _members = const [];
+          // Existing member: allow family-size self-update at most twice/year.
+          // After that, behave like normal enrollment — already-enrolled only.
+          final dup = result.duplicate!;
+          final dupId = (dup['registryId'] ?? '').toString().trim();
+          final canSelfUpdate = dup['canSelfUpdate'] != false;
+          if (canSelfUpdate) {
+            final updated = await ngmyCivicGuestSelfUpdate({
+              'mode': 'family',
+              'fullName': fullName,
+              'homeAddress': address,
+              'phone': phone,
+              if (dupId.isNotEmpty) 'registryId': dupId,
+              'familyMembers': familyMembers,
+              'familyMales': males,
+              'familyFemales': females,
             });
-            return;
+            if (updated.ok) {
+              if (!mounted) return;
+              setState(() {
+                _submitting = false;
+                _done = true;
+                _registryId = updated.registryId ?? dupId;
+                _members = const [];
+              });
+              return;
+            }
+            // Limit hit or rematch failed → same already-enrolled message.
           }
-          _toast(
-            updated.limitReached
-                ? 'Unaweza kusasisha mara 2 tu kwa mwaka. / You can only update twice per year.'
-                : (updated.error ??
-                    'Tayari umesajiliwa — jina + anwani, au simu inafanana.'),
-          );
+          _toast('Tayari umesajiliwa — jina + anwani, au simu inafanana.');
         } else {
           _toast(result.error ?? 'Haikuweza kuhifadhi usajili. Angalia muunganisho wako kisha jaribu tena.');
         }

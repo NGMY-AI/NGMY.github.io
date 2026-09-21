@@ -4003,11 +4003,15 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
 
   const dup = findDuplicateMember(members, fullName, homeAddress, phone);
   if (dup) {
+    const updatesThisYear = profileSelfUpdatesThisYear(dup);
     return jsonOk({
       error: "Already enrolled",
       duplicate: {
         fullName: String(dup.fullName ?? ""),
         registryId: String(dup.registryId ?? ""),
+        updatesThisYear,
+        // Family self-update from this link is allowed at most twice per year.
+        canSelfUpdate: updatesThisYear < 2,
       },
       ok: false,
     }, 409);
@@ -4045,11 +4049,14 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const latestDeceased = asMemberList(latest.deceased);
   const dup2 = findDuplicateMember(latestMembers, fullName, homeAddress, phone);
   if (dup2) {
+    const updatesThisYear = profileSelfUpdatesThisYear(dup2);
     return jsonOk({
       error: "Already enrolled",
       duplicate: {
         fullName: String(dup2.fullName ?? ""),
         registryId: String(dup2.registryId ?? ""),
+        updatesThisYear,
+        canSelfUpdate: updatesThisYear < 2,
       },
       ok: false,
     }, 409);
