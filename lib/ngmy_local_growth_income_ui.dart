@@ -909,13 +909,26 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       return user.todayClockInEarned.clamp(0, goal).toDouble();
     }
     final noon = DateTime(now.year, now.month, now.day, 12);
-    final midnight = DateTime(now.year, now.month, now.day);
+    final start = user.clockInStartTime!.isUtc
+        ? user.clockInStartTime!.toLocal()
+        : user.clockInStartTime!;
     if (!now.isBefore(noon)) return goal;
-    if (!now.isAfter(midnight)) return user.todayClockInEarned.clamp(0, goal).toDouble();
-    const windowMs = 12 * 60 * 60 * 1000;
-    final elapsedMs = now.difference(midnight).inMilliseconds.clamp(0, windowMs);
+    // Money starts at $0 the moment they clock in — never count pre-clock time.
+    if (!now.isAfter(start)) return 0;
+    final windowMs = noon.difference(start).inMilliseconds;
+    if (windowMs <= 0) return goal;
+    final elapsedMs = now.difference(start).inMilliseconds.clamp(0, windowMs);
     final live = goal * (elapsedMs / windowMs);
-    return live.clamp(user.todayClockInEarned, goal).toDouble();
+    return live.clamp(0.0, goal).toDouble();
+  }
+
+  static String _formatTxnDateTime(DateTime raw) {
+    final t = raw.isUtc ? raw.toLocal() : raw;
+    final h24 = t.hour;
+    final h12 = h24 == 0 ? 12 : (h24 > 12 ? h24 - 12 : h24);
+    final ampm = h24 >= 12 ? 'PM' : 'AM';
+    final min = t.minute.toString().padLeft(2, '0');
+    return '${t.month}/${t.day}/${t.year} · $h12:$min $ampm';
   }
 
   @override
@@ -1290,7 +1303,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : t.type.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w800)),
-                Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                Text(_formatTxnDateTime(t.timestamp), style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
@@ -2093,6 +2106,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                           Text(
                             _growthIncomeHistoryTitle(t),
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _LocalGrowthHomeTab._formatTxnDateTime(t.timestamp),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 2),
                           Text(

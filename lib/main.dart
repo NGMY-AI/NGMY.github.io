@@ -6376,17 +6376,18 @@ double _ngmyClockInProgressOneMinute(DateTime? clockInStart) {
 }
 
 /// Progress toward full daily earnings at 12:00 PM (0.0–1.0).
-/// Always uses midnight → midday (12 hours). Clocking in later does not
-/// speed the count up — the money still finishes at noon at the same pace.
+/// Starts at $0 when the user clocks in and reaches the full goal at noon —
+/// never pretends money already accrued before clock-in.
 double _ngmyClockInProgressToNoon(DateTime? clockInStart) {
   if (clockInStart == null) return 0.0;
   final now = DateTime.now();
   final noon = _ngmyTodayNoon(now);
-  final midnight = DateTime(now.year, now.month, now.day);
+  final start = clockInStart.isUtc ? clockInStart.toLocal() : clockInStart;
   if (!now.isBefore(noon)) return 1.0;
-  if (now.isBefore(midnight)) return 0.0;
-  const windowMs = 12 * 60 * 60 * 1000;
-  final elapsedMs = now.difference(midnight).inMilliseconds;
+  if (!now.isAfter(start)) return 0.0;
+  final windowMs = noon.difference(start).inMilliseconds;
+  if (windowMs <= 0) return 1.0;
+  final elapsedMs = now.difference(start).inMilliseconds;
   if (elapsedMs <= 0) return 0.0;
   return (elapsedMs / windowMs).clamp(0.0, 1.0);
 }
