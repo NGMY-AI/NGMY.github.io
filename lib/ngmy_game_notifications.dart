@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
-const int kNgmyGameNotificationMax = 99;
+const int kNgmyGameNotificationMax = 50;
 const Duration kNgmyGameNotificationRetention = Duration(days: 5);
 const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
@@ -75,6 +75,8 @@ class NgmyGameNotification {
 }
 
 class NgmyGameNotifications {
+  /// Keep newest first. Drop expired rows and anything past [kNgmyGameNotificationMax]
+  /// so the oldest notification is deleted completely (local + cloud on save).
   static List<NgmyGameNotification> _prune(List<NgmyGameNotification> items) {
     final cutoff = DateTime.now().subtract(kNgmyGameNotificationRetention);
     final fresh = items.where((e) => !e.timestamp.isBefore(cutoff)).toList()
@@ -218,6 +220,7 @@ class NgmyGameNotifications {
       txnId: txnId,
     );
     items.insert(0, entry);
+    // _saveMerged → _prune drops the oldest when over max, then overwrites cloud.
     await _saveMerged(key, items);
   }
 
@@ -294,17 +297,17 @@ Future<void> showNgmyGameReceiptSheet(
                     child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Game Receipts',
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                         ),
                         Text(
-                          'Wins & losses · last 5 days · max 99 · syncs across devices',
-                          style: TextStyle(color: Colors.white60, fontSize: 11),
+                          'Wins & losses · last 5 days · max $kNgmyGameNotificationMax · oldest removed when full',
+                          style: const TextStyle(color: Colors.white60, fontSize: 11),
                         ),
                       ],
                     ),
