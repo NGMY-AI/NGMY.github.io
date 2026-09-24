@@ -396,6 +396,43 @@ class NgmyLocalGrowthIncomeStore {
     return true;
   }
 
+  /// True when today's Growth Income clock-in session already finished and paid.
+  static bool sessionCompleteToday(UserData user, DateTime now) {
+    return sameCalendarDay(user.lastClockInEarningsDate, now) && user.todayClockInEarned > 0.0001;
+  }
+
+  /// Live $ accrued from clock-in → 12:00 PM (or today's settled total after payout).
+  /// Shared by the home tile, water circle, and noon settlement ticker.
+  static double liveEarningsTowardNoon(UserData user, DateTime now) {
+    final goal = user.todayDailyGoal;
+    if (goal <= 0) return 0;
+    if (!user.isClockedIn || user.clockInStartTime == null) {
+      if (sessionCompleteToday(user, now)) {
+        return user.todayClockInEarned.clamp(0.0, goal).toDouble();
+      }
+      return 0;
+    }
+    final noon = DateTime(now.year, now.month, now.day, 12);
+    final start = user.clockInStartTime!.isUtc
+        ? user.clockInStartTime!.toLocal()
+        : user.clockInStartTime!;
+    if (!now.isBefore(noon)) return goal;
+    // Money starts at $0 the moment they clock in — never count pre-clock time.
+    if (!now.isAfter(start)) return 0;
+    final windowMs = noon.difference(start).inMilliseconds;
+    if (windowMs <= 0) return goal;
+    final elapsedMs = now.difference(start).inMilliseconds.clamp(0, windowMs);
+    final live = goal * (elapsedMs / windowMs);
+    return live.clamp(0.0, goal).toDouble();
+  }
+
+  /// 0.0–1.0 fill for the Growth Income water circle.
+  static double progressTowardNoon(UserData user, DateTime now) {
+    final goal = user.todayDailyGoal;
+    if (goal <= 0) return 0;
+    return (liveEarningsTowardNoon(user, now) / goal).clamp(0.0, 1.0);
+  }
+
   /// Local equivalent of main.dart:5067 _ngmyApplyMidnightClockReset, merged
   /// with settling the previous day's earnings (the real app's payout is
   /// server-scheduled; this runs the equivalent settlement on-device).

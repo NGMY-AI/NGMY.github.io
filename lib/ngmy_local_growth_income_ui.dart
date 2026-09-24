@@ -159,16 +159,25 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     if (goal <= 0) return;
     final noon = DateTime(now.year, now.month, now.day, 12);
     final reachedNoon = !now.isBefore(noon);
-    if (!reachedNoon && user.currentTodayEarnings < goal - 0.0001) {
+    // Use the same clock-in→noon accrual shown in the circle so water never
+    // stalls mid-session while the ticker waits on a different formula.
+    final live = NgmyLocalGrowthIncomeStore.liveEarningsTowardNoon(user, now);
+    if (!reachedNoon && live < goal - 0.0001) {
       if (mounted) setState(() {});
       return;
     }
     final payoutId =
         'local_clockin_payout_${user.email}_${user.clockInStartTime!.millisecondsSinceEpoch}';
     if (_transactions.any((t) => t.id == payoutId)) {
-      user.isClockedIn = false;
-      user.clockInStartTime = null;
-      user.clockInPenaltyPercent = 0;
+      // Already paid — keep the bowl full/gold for the rest of the day.
+      setState(() {
+        user.isClockedIn = false;
+        user.clockInStartTime = null;
+        user.clockInPenaltyPercent = 0;
+        user.lastClockInDate = now;
+        user.lastClockInEarningsDate = now;
+        user.todayClockInEarned = goal;
+      });
       return;
     }
     final earned = goal;
@@ -197,8 +206,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         type: TransactionType.reimbursement,
         method: PaymentMethod.system,
         sourceDetails: 'Clock-in daily earnings (local)',
-        status: TransactionStatus.approved,
         timestamp: now,
+        status: TransactionStatus.approved,
       ),
     );
   }
@@ -671,7 +680,13 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _toast('Clock-in opens Monday through Friday.');
       return;
     }
-    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now)) {
+    // Hard stop after midday — clock-in after 12:00 PM would instantly pay out.
+    if (!NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now)) {
+      _toast('Today\'s session ended at 12:00 PM. Come back tomorrow morning.');
+      return;
+    }
+    if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now) &&
+        user.todayClockInEarned > 0) {
       _toast('Today has already been completed. Come back tomorrow.');
       return;
     }
@@ -902,25 +917,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
   final VoidCallback onOpenHelper;
   final VoidCallback onOpenGameCenter;
 
-  double _liveEarningsAt(DateTime now) {
-    final goal = user.todayDailyGoal;
-    if (goal <= 0) return 0;
-    if (!user.isClockedIn || user.clockInStartTime == null) {
-      return user.todayClockInEarned.clamp(0, goal).toDouble();
-    }
-    final noon = DateTime(now.year, now.month, now.day, 12);
-    final start = user.clockInStartTime!.isUtc
-        ? user.clockInStartTime!.toLocal()
-        : user.clockInStartTime!;
-    if (!now.isBefore(noon)) return goal;
-    // Money starts at $0 the moment they clock in — never count pre-clock time.
-    if (!now.isAfter(start)) return 0;
-    final windowMs = noon.difference(start).inMilliseconds;
-    if (windowMs <= 0) return goal;
-    final elapsedMs = now.difference(start).inMilliseconds.clamp(0, windowMs);
-    final live = goal * (elapsedMs / windowMs);
-    return live.clamp(0.0, goal).toDouble();
-  }
+  double _liveEarningsAt(DateTime now) =>
+      NgmyLocalGrowthIncomeStore.liveEarningsTowardNoon(user, now);
 
   static String _formatTxnDateTime(DateTime raw) {
     final t = raw.isUtc ? raw.toLocal() : raw;
@@ -940,7 +938,13 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     const glassGreen = Color(0xFF2EF6A3);
     final recent = transactions.take(3).toList();
     final active = user.activeInvestment;
+    final now = DateTime.now();
     final clockedIn = user.isClockedIn;
+    final sessionComplete = NgmyLocalGrowthIncomeStore.sessionCompleteToday(user, now);
+    final canClockIn = active != null &&
+        !clockedIn &&
+        !sessionComplete &&
+        NgmyLocalGrowthIncomeStore.isClockInWindowOpen(now);
     final dailyGoal = user.todayDailyGoal;
 
     return ColoredBox(
@@ -979,7 +983,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                       value: '\$${formatCurrency(_liveEarningsAt(snapshot.data ?? DateTime.now()))}',
                       valueColor: glassGreen,
                       card: card,
-                      onTap: () => unawaited(onClockIn()),
+                      onTap: canClockIn ? () => unawaited(onClockIn()) : null,
                     ),
                   ),
                 ),
@@ -1002,6 +1006,8 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               profileDisplayName: profileDisplayName,
               dailyGoal: dailyGoal,
               clockedIn: clockedIn,
+              sessionComplete: sessionComplete,
+              canClockIn: canClockIn,
               hasPlan: active != null,
               green: glassGreen,
               card: card,
@@ -1322,6 +1328,8 @@ class _LocalClockInShowcase extends StatefulWidget {
     required this.profileDisplayName,
     required this.dailyGoal,
     required this.clockedIn,
+    required this.sessionComplete,
+    required this.canClockIn,
     required this.hasPlan,
     required this.green,
     required this.card,
@@ -1332,6 +1340,9 @@ class _LocalClockInShowcase extends StatefulWidget {
   final String profileDisplayName;
   final double dailyGoal;
   final bool clockedIn;
+  /// Today's session finished at noon — keep bowl full and gold until midnight.
+  final bool sessionComplete;
+  final bool canClockIn;
   final bool hasPlan;
   final Color green;
   final Color card;
@@ -1366,14 +1377,18 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
 
   @override
   Widget build(BuildContext context) {
+    // Gold while filling AND after noon payout so the bowl stays full/gold.
+    final filledGold = widget.clockedIn || widget.sessionComplete;
     final status = widget.clockedIn
         ? 'COUNTING TO 12 PM'
-        : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN');
+        : (widget.sessionComplete
+            ? 'SESSION COMPLETE'
+            : (widget.hasPlan ? 'CLOCK IN' : 'NO PLAN'));
     final name = widget.profileDisplayName.trim().isEmpty ? 'Member' : widget.profileDisplayName.trim().toUpperCase();
-    final accent = widget.clockedIn ? _gold : widget.green;
+    final accent = filledGold ? _gold : widget.green;
 
     return InkWell(
-      onTap: widget.clockedIn ? null : () => unawaited(widget.onClockIn()),
+      onTap: widget.canClockIn ? () => unawaited(widget.onClockIn()) : null,
       borderRadius: BorderRadius.circular(32),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 520),
@@ -1383,17 +1398,17 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: widget.clockedIn
+            colors: filledGold
                 ? const [Color(0xFF2A2210), Color(0xFF16120A), Color(0xFF0C1016)]
                 : const [Color(0xFF1A2330), Color(0xFF12161E), Color(0xFF0C1016)],
           ),
           border: Border.all(
-            color: (widget.clockedIn ? _goldLight : const Color(0xFF67E8F9)).withValues(alpha: 0.28),
+            color: (filledGold ? _goldLight : const Color(0xFF67E8F9)).withValues(alpha: 0.28),
             width: 1.4,
           ),
           boxShadow: [
             BoxShadow(
-              color: (widget.clockedIn ? _gold : const Color(0xFF22D3EE)).withValues(alpha: 0.16),
+              color: (filledGold ? _gold : const Color(0xFF22D3EE)).withValues(alpha: 0.16),
               blurRadius: 28,
               offset: const Offset(0, 12),
             ),
@@ -1402,7 +1417,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            if (widget.clockedIn) ...[
+            if (filledGold) ...[
               Positioned(right: -24, top: -30, child: _glowBlob(_goldLight, 130)),
               Positioned(left: -28, bottom: -36, child: _glowBlob(_gold, 140)),
             ] else ...[
@@ -1453,7 +1468,10 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
               builder: (context, snapshot) {
                 final now = snapshot.data ?? DateTime.now();
                 final live = widget.liveEarningsAt(now);
-                final progress = widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0);
+                // After noon settlement keep the bowl maxed so gold fill never drops.
+                final progress = widget.sessionComplete
+                    ? 1.0
+                    : (widget.dailyGoal <= 0 ? 0.0 : (live / widget.dailyGoal).clamp(0.0, 1.0));
                 return AnimatedBuilder(
                   animation: Listenable.merge([_waveCtrl, _smokeCtrl]),
                   builder: (context, _) {
@@ -1465,7 +1483,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                           alignment: Alignment.center,
                           clipBehavior: Clip.none,
                           children: [
-                            if (widget.clockedIn)
+                            if (filledGold)
                               ...List.generate(7, (i) {
                                 final t = (_smokeCtrl.value + i * 0.14) % 1.0;
                                 final drift = math.sin((_smokeCtrl.value * math.pi * 2) + i) * 18;
@@ -1498,7 +1516,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                               painter: _ClockInCirclePainter(
                                 progress: progress,
                                 wave: _waveCtrl.value,
-                                clockedIn: widget.clockedIn,
+                                clockedIn: filledGold,
                                 accent: accent,
                                 goldLight: _goldLight,
                                 goldDeep: _goldDeep,
@@ -1516,13 +1534,15 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    widget.clockedIn ? Icons.local_fire_department_rounded : Icons.fingerprint_rounded,
-                                    color: widget.clockedIn ? _goldLight : const Color(0xFF67E8F9),
+                                    filledGold ? Icons.local_fire_department_rounded : Icons.fingerprint_rounded,
+                                    color: filledGold ? _goldLight : const Color(0xFF67E8F9),
                                     size: 26,
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    widget.clockedIn ? 'FILLING TO 12 PM' : 'DAILY EARNINGS',
+                                    widget.clockedIn
+                                        ? 'FILLING TO 12 PM'
+                                        : (widget.sessionComplete ? 'FULL DAY EARNED' : 'DAILY EARNINGS'),
                                     style: TextStyle(
                                       color: Colors.white.withValues(alpha: 0.62),
                                       fontSize: 9,
@@ -1532,9 +1552,9 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '\$${formatCurrency(live)}',
+                                    '\$${formatCurrency(widget.sessionComplete && widget.dailyGoal > 0 ? widget.dailyGoal : live)}',
                                     style: TextStyle(
-                                      color: widget.clockedIn ? _goldLight : Colors.white,
+                                      color: filledGold ? _goldLight : Colors.white,
                                       fontSize: 28,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: -0.6,
@@ -1551,7 +1571,7 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                                     child: Text(
                                       status,
                                       style: TextStyle(
-                                        color: widget.clockedIn ? _goldLight : const Color(0xFFA5F3FC),
+                                        color: filledGold ? _goldLight : const Color(0xFFA5F3FC),
                                         fontSize: 9,
                                         fontWeight: FontWeight.w900,
                                         letterSpacing: 1.1,
