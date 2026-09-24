@@ -138,11 +138,12 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     super.dispose();
   }
 
-  /// Same-day completion: when the local clock-in goal is reached, stack the
-  /// payout into balance immediately (not only on next-day rollover).
+  /// Same-day completion: pay only if the user actually clocked in before noon.
+  /// No clock-in / no session start ⇒ $0 — never auto-pay at midday.
   void _tickLocalClockInEarnings() {
     final user = _user;
     if (user == null || !mounted) return;
+    // No active session ⇒ nothing to settle (missed days stay unpaid).
     if (!user.isClockedIn || user.clockInStartTime == null) return;
     final now = DateTime.now();
     if (!NgmyLocalGrowthIncomeStore.sameCalendarDay(user.clockInStartTime, now)) {
@@ -152,7 +153,18 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           _publishAppBalance(user.accountBalance, allowDecrease: false);
         });
         unawaited(_persist(bumpWalletRevision: true, syncBalance: true, allowDecrease: false));
+      } else if (mounted) {
+        setState(() {});
       }
+      return;
+    }
+    final start = user.clockInStartTime!.isUtc
+        ? user.clockInStartTime!.toLocal()
+        : user.clockInStartTime!;
+    // Defense: never pay a session that did not start before midday.
+    if (!NgmyLocalGrowthIncomeStore.startedBeforeNoon(start)) {
+      setState(() => NgmyLocalGrowthIncomeStore.clearUnpayableSession(user));
+      unawaited(_persist(bumpWalletRevision: false));
       return;
     }
     final goal = user.todayDailyGoal;

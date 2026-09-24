@@ -396,13 +396,31 @@ class NgmyLocalGrowthIncomeStore {
     return true;
   }
 
+  /// True when [start] is strictly before that calendar day's 12:00 PM.
+  /// Growth Income only pays sessions the user started before midday —
+  /// no clock-in by noon means $0 for that day (never auto-paid).
+  static bool startedBeforeNoon(DateTime start) {
+    final local = start.isUtc ? start.toLocal() : start;
+    final noon = DateTime(local.year, local.month, local.day, 12);
+    return local.isBefore(noon);
+  }
+
   /// True when today's Growth Income clock-in session already finished and paid.
   static bool sessionCompleteToday(UserData user, DateTime now) {
     return sameCalendarDay(user.lastClockInEarningsDate, now) && user.todayClockInEarned > 0.0001;
   }
 
+  /// Drop invalid / post-noon sessions without paying. Callers must never invent
+  /// a payout when the user never clocked in before midday.
+  static void clearUnpayableSession(UserData user) {
+    user.isClockedIn = false;
+    user.clockInStartTime = null;
+    user.clockInPenaltyPercent = 0;
+  }
+
   /// Live $ accrued from clock-in → 12:00 PM (or today's settled total after payout).
   /// Shared by the home tile, water circle, and noon settlement ticker.
+  /// Returns 0 when the user never started a session (no free / automatic pay).
   static double liveEarningsTowardNoon(UserData user, DateTime now) {
     final goal = user.todayDailyGoal;
     if (goal <= 0) return 0;
@@ -412,10 +430,12 @@ class NgmyLocalGrowthIncomeStore {
       }
       return 0;
     }
-    final noon = DateTime(now.year, now.month, now.day, 12);
     final start = user.clockInStartTime!.isUtc
         ? user.clockInStartTime!.toLocal()
         : user.clockInStartTime!;
+    // Post-noon "sessions" are invalid and never accrue.
+    if (!startedBeforeNoon(start)) return 0;
+    final noon = DateTime(now.year, now.month, now.day, 12);
     if (!now.isBefore(noon)) return goal;
     // Money starts at $0 the moment they clock in — never count pre-clock time.
     if (!now.isAfter(start)) return 0;
@@ -433,44 +453,57 @@ class NgmyLocalGrowthIncomeStore {
     return (liveEarningsTowardNoon(user, now) / goal).clamp(0.0, 1.0);
   }
 
-  /// Local equivalent of main.dart:5067 _ngmyApplyMidnightClockReset, merged
-  /// with settling the previous day's earnings (the real app's payout is
-  /// server-scheduled; this runs the equivalent settlement on-device).
-  /// Call this once when the local screen loads/resumes, before any other
-  /// clock-in logic runs.
+  /// Settles a prior-day session that the user actually started before noon.
+  /// Does nothing (and never pays) when they never clocked in.
   /// Returns true when a clock-in payout transaction was added.
   static bool applyDailyRollover(UserData user, List<AppTransaction> transactions) {
     final now = DateTime.now();
     var addedPayout = false;
     if (user.isClockedIn && user.clockInStartTime != null && !sameCalendarDay(user.clockInStartTime, now)) {
-      final earned = user.todayDailyGoal;
-      if (earned > 0) {
-        final txn = AppTransaction(
-          id: 'local_clockin_payout_${user.email}_${user.clockInStartTime!.millisecondsSinceEpoch}',
-          userEmail: user.email,
-          amount: earned,
-          type: TransactionType.reimbursement,
-          method: PaymentMethod.system,
-          sourceDetails: 'Clock-in daily earnings (local)',
-          status: TransactionStatus.approved,
-          timestamp: now,
-        );
-        applyTransaction(user, txn);
-        user.totalProfit += earned;
-        if (user.activeInvestment != null) {
-          user.activeInvestment!.totalEarned += earned;
-          user.activeInvestment!.daysClockedIn += 1;
+      final start = user.clockInStartTime!.isUtc
+          ? user.clockInStartTime!.toLocal()
+          : user.clockInStartTime!;
+      final payoutId =
+          'local_clockin_payout_${user.email}_${user.clockInStartTime!.millisecondsSinceEpoch}';
+      final alreadyPaid = transactions.any((t) => t.id == payoutId);
+      // Only pay if they really started before midday that day.
+      if (!alreadyPaid && startedBeforeNoon(start)) {
+        final earned = user.todayDailyGoal;
+        if (earned > 0) {
+          final txn = AppTransaction(
+            id: payoutId,
+            userEmail: user.email,
+            amount: earned,
+            type: TransactionType.reimbursement,
+            method: PaymentMethod.system,
+            sourceDetails: 'Clock-in daily earnings (local)',
+            status: TransactionStatus.approved,
+            timestamp: now,
+          );
+          applyTransaction(user, txn);
+          user.totalProfit += earned;
+          if (user.activeInvestment != null) {
+            user.activeInvestment!.totalEarned += earned;
+            user.activeInvestment!.daysClockedIn += 1;
+          }
+          transactions.add(txn);
+          addedPayout = true;
+          user.lastClockInEarningsDate = start;
+          user.todayClockInEarned = earned;
         }
-        transactions.add(txn);
-        addedPayout = true;
       }
-      user.lastClockInEarningsDate = user.clockInStartTime;
-      user.isClockedIn = false;
-      user.clockInStartTime = null;
-      user.clockInPenaltyPercent = 0;
+      // Always clear the leftover session — missed / invalid days pay $0.
+      clearUnpayableSession(user);
     }
     if (user.lastClockInEarningsDate != null && !sameCalendarDay(user.lastClockInEarningsDate, now)) {
       user.todayClockInEarned = 0;
+    }
+    // Same-day leftover that started at/after noon: drop it, never pay.
+    if (user.isClockedIn &&
+        user.clockInStartTime != null &&
+        sameCalendarDay(user.clockInStartTime, now) &&
+        !startedBeforeNoon(user.clockInStartTime!)) {
+      clearUnpayableSession(user);
     }
     return addedPayout;
   }
