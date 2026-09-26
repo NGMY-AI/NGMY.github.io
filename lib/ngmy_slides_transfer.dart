@@ -26,6 +26,18 @@ const int kNgmySlidesMarriageClaimMaxUses = 2;
 const String _kSlidesQrStashSettingsKey = 'ngmy_slides_transfer_qr_stashes_v1';
 final RegExp kNgmySlidesMarriageClaimCodeRe = RegExp(r'^[A-Z]{2}\d{3}$');
 
+/// Same accounts as `kNgmyAdminEmails` in main.dart. A transfer from one of
+/// these accounts unlocks editing on the received document.
+const Set<String> kNgmySlidesAdminEmails = {
+  'kbpabloqr@gmail.com',
+  'ngumoyaking@gmail.com',
+  'appbusiness321@gmail.com',
+  'appbusiness84@gmail.com',
+};
+
+bool ngmySlidesOwnerIsAdmin(String email) =>
+    kNgmySlidesAdminEmails.contains(email.toLowerCase().trim());
+
 bool ngmySlidesDeckUsesMarriageClaimCode(NgmySlideDeck deck) => deck.isLockedTemplateDoc;
 
 String? ngmySlidesMarriageTransferState(List<NgmySlideDeck> decks) {
@@ -157,10 +169,13 @@ class NgmySlidesTransferQrStash {
       row['payload'] = base64Encode(utf8.encode(json));
       row['ownerEmail'] = ownerEmail.trim();
       row['updatedAt'] = DateTime.now().toUtc().toIso8601String();
+      if (ngmySlidesOwnerIsAdmin(ownerEmail)) row['sharedByAdmin'] = true;
       if (claimCode != null) {
         row['claimCode'] = claimCode;
         row['kind'] = 'marriage';
-        row['usesRemaining'] = (row['usesRemaining'] as num?)?.toInt() ?? kNgmySlidesMarriageClaimMaxUses;
+        row['usesRemaining'] = kNgmySlidesMarriageClaimMaxUses;
+      } else {
+        row['usesRemaining'] = kNgmySlidesQrMaxUses;
       }
       stashes[e.key] = row;
       await _saveStashes(stashes);
@@ -174,6 +189,7 @@ class NgmySlidesTransferQrStash {
       'payload': base64Encode(utf8.encode(json)),
       'usesRemaining': claimCode != null ? kNgmySlidesMarriageClaimMaxUses : kNgmySlidesQrMaxUses,
       'createdAt': DateTime.now().toUtc().toIso8601String(),
+      if (ngmySlidesOwnerIsAdmin(ownerEmail)) 'sharedByAdmin': true,
       if (claimCode != null) 'claimCode': claimCode,
       if (claimCode != null) 'kind': 'marriage',
     };
@@ -219,6 +235,17 @@ class NgmySlidesTransferQrStash {
       return null;
     }
     if (jsonText.trim().isEmpty) return null;
+    final owner = (row['ownerEmail'] ?? '').toString();
+    if (ngmySlidesOwnerIsAdmin(owner) || row['sharedByAdmin'] == true) {
+      try {
+        final decoded = jsonDecode(jsonText);
+        if (decoded is Map) {
+          final marked = Map<String, dynamic>.from(decoded);
+          marked['sharedByAdmin'] = true;
+          jsonText = jsonEncode(marked);
+        }
+      } catch (_) {}
+    }
     final nextUses = uses - 1;
     final isMarriage = (row['kind'] ?? '').toString() == 'marriage' ||
         ngmySlidesNormalizeMarriageClaimCode((row['claimCode'] ?? '').toString()) != null;
@@ -400,25 +427,26 @@ Future<List<NgmySlideDeck>> ngmySlidesDecksFromShareRawAsync(String raw) async {
 
 List<NgmySlideDeck> _decksFromBundleMap(Map<String, dynamic> map) {
   final type = (map['type'] ?? '').toString();
+  final fromAdmin = map['sharedByAdmin'] == true ||
+      ngmySlidesOwnerIsAdmin((map['ownerEmail'] ?? '').toString());
   if (type == kNgmySlidesDeckBundleType) {
     final deckRaw = map['deck'];
     if (deckRaw is! Map) return [];
     return [
       ngmySlidesDeckCopyForImport(
         NgmySlideDeck.fromJson(Map<String, dynamic>.from(deckRaw)),
-        sharedByAdmin: map['sharedByAdmin'] == true,
+        sharedByAdmin: fromAdmin,
       ),
     ];
   }
   if (type == kNgmySlidesLibraryBundleType) {
     final list = map['decks'];
     if (list is! List) return [];
-    final sharedByAdmin = map['sharedByAdmin'] == true;
     return list
         .whereType<Map>()
         .map((m) => ngmySlidesDeckCopyForImport(
               NgmySlideDeck.fromJson(Map<String, dynamic>.from(m)),
-              sharedByAdmin: sharedByAdmin,
+              sharedByAdmin: fromAdmin,
             ))
         .toList();
   }
@@ -443,22 +471,15 @@ NgmySlideDeck ngmySlidesDeckCopyForImport(
     }
   }
   final deck = NgmySlideDeck.fromJson(Map<String, dynamic>.from(json));
-  // Only an admin transfer unlocks editing, and only on that marriage document,
-  // for the same 4 hours as a fresh payment.
-  if (sharedByAdmin && _adminShareGrantsEdit(deck.deckKind)) {
+  // A document that came from an admin can be edited for 4 hours, the same
+  // window as a fresh marriage payment. That applies to this copy only.
+  if (sharedByAdmin) {
     deck.adminShareEditUntil = DateTime.now()
         .toUtc()
         .add(const Duration(hours: 4))
         .toIso8601String();
   }
   return deck;
-}
-
-bool _adminShareGrantsEdit(String? deckKind) {
-  return deckKind == 'marriage_agreement' ||
-      deckKind == 'hati_kuhowa' ||
-      deckKind == 'hati_kuhoweya' ||
-      deckKind == 'hati_malipo_awamu';
 }
 
 Future<List<NgmySlideDeck>?> ngmyPickAndParseSlidesBackup() async {

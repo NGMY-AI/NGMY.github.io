@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -124,6 +125,21 @@ void main() {
       ),
       sharedByAdmin: true,
     );
-    expect(slides.adminShareEditUntil, isNull);
+    expect(slides.adminShareEditOpen, isTrue);
+
+    final fromAdminEmail = ngmySlidesDecksFromShareRaw(jsonEncode({
+      'type': kNgmySlidesDeckBundleType,
+      'ownerEmail': 'kbpabloqr@gmail.com',
+      'deck': _marriage(code: 'GA300').toJson(),
+    }));
+    expect(fromAdminEmail.single.adminShareEditOpen, isTrue);
+
+    final fromMember = ngmySlidesDecksFromShareRaw(jsonEncode({
+      'type': kNgmySlidesDeckBundleType,
+      'ownerEmail': 'member@example.com',
+      'deck': _marriage(code: 'GA301').toJson(),
+    }));
+    expect(fromMember.single.transferReceived, isTrue);
+    expect(fromMember.single.adminShareEditOpen, isFalse);
   });
 }

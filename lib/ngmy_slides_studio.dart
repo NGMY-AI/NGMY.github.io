@@ -3258,10 +3258,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           children: [
             Column(
               children: [
-                if (!editing &&
-                    _activeDeck != null &&
-                    _activeDeck!.adminShareEditOpen &&
-                    NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
+                if (!editing && _activeDeck != null && _activeDeck!.adminShareEditOpen)
                   NgmyMarriageSessionTimerBar(
                     email: widget.userEmail,
                     isAdmin: false,
