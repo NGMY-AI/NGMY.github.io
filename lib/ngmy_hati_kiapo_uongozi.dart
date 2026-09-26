@@ -659,6 +659,7 @@ NgmySlideDeck ngmyEnsureHatiKiapoLayout(NgmySlideDeck deck) {
     marriageState: deck.marriageState ?? state,
     transferClaimCode: deck.transferClaimCode,
     transferReceived: deck.transferReceived,
+    adminShareEditUntil: deck.adminShareEditUntil,
     signatureStrokeWidth: deck.signatureStrokeWidth,
     signatureInkColor: deck.signatureInkColor,
     kiapoSignedAt: deck.kiapoSignedAt,

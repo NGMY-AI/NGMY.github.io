@@ -239,22 +239,26 @@ class NgmySlidesTransferQrStash {
 Map<String, dynamic> ngmySlidesDeckShareBundle({
   required String ownerEmail,
   required NgmySlideDeck deck,
+  bool sharedByAdmin = false,
 }) =>
     {
       'type': kNgmySlidesDeckBundleType,
       'ownerEmail': ownerEmail.trim(),
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      if (sharedByAdmin) 'sharedByAdmin': true,
       'deck': deck.toJson(),
     };
 
 Map<String, dynamic> ngmySlidesLibraryShareBundle({
   required String ownerEmail,
   required List<NgmySlideDeck> decks,
+  bool sharedByAdmin = false,
 }) =>
     {
       'type': kNgmySlidesLibraryBundleType,
       'ownerEmail': ownerEmail.trim(),
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
+      if (sharedByAdmin) 'sharedByAdmin': true,
       'decks': decks.map((d) => d.toJson()).toList(),
     };
 
@@ -262,11 +266,20 @@ String ngmySlidesShareJson({
   required String ownerEmail,
   required NgmySlideDeck? deck,
   required List<NgmySlideDeck>? allDecks,
+  bool sharedByAdmin = false,
 }) {
   if (deck != null) {
-    return jsonEncode(ngmySlidesDeckShareBundle(ownerEmail: ownerEmail, deck: deck));
+    return jsonEncode(ngmySlidesDeckShareBundle(
+      ownerEmail: ownerEmail,
+      deck: deck,
+      sharedByAdmin: sharedByAdmin,
+    ));
   }
-  return jsonEncode(ngmySlidesLibraryShareBundle(ownerEmail: ownerEmail, decks: allDecks ?? []));
+  return jsonEncode(ngmySlidesLibraryShareBundle(
+    ownerEmail: ownerEmail,
+    decks: allDecks ?? [],
+    sharedByAdmin: sharedByAdmin,
+  ));
 }
 
 String ngmySlidesQrPayloadLite(String shareJson) => 'NGMY_SL:${base64Url.encode(utf8.encode(shareJson))}';
@@ -390,33 +403,62 @@ List<NgmySlideDeck> _decksFromBundleMap(Map<String, dynamic> map) {
   if (type == kNgmySlidesDeckBundleType) {
     final deckRaw = map['deck'];
     if (deckRaw is! Map) return [];
-    return [ngmySlidesDeckCopyForImport(NgmySlideDeck.fromJson(Map<String, dynamic>.from(deckRaw)))];
+    return [
+      ngmySlidesDeckCopyForImport(
+        NgmySlideDeck.fromJson(Map<String, dynamic>.from(deckRaw)),
+        sharedByAdmin: map['sharedByAdmin'] == true,
+      ),
+    ];
   }
   if (type == kNgmySlidesLibraryBundleType) {
     final list = map['decks'];
     if (list is! List) return [];
+    final sharedByAdmin = map['sharedByAdmin'] == true;
     return list
         .whereType<Map>()
-        .map((m) => ngmySlidesDeckCopyForImport(NgmySlideDeck.fromJson(Map<String, dynamic>.from(m))))
+        .map((m) => ngmySlidesDeckCopyForImport(
+              NgmySlideDeck.fromJson(Map<String, dynamic>.from(m)),
+              sharedByAdmin: sharedByAdmin,
+            ))
         .toList();
   }
   return [];
 }
 
-NgmySlideDeck ngmySlidesDeckCopyForImport(NgmySlideDeck imported) {
+NgmySlideDeck ngmySlidesDeckCopyForImport(
+  NgmySlideDeck imported, {
+  bool sharedByAdmin = false,
+}) {
   final json = imported.toJson();
   json['id'] = NgmySlidesTemplates.newId();
   final name = imported.name.trim();
   json['name'] = name.isEmpty ? 'Shared presentation' : name;
   json['transferReceived'] = true;
   json.remove('transferClaimCode');
+  json.remove('adminShareEditUntil');
   final slides = json['slides'];
   if (slides is List) {
     for (final s in slides) {
       if (s is Map) s['id'] = NgmySlidesTemplates.newId();
     }
   }
-  return NgmySlideDeck.fromJson(Map<String, dynamic>.from(json));
+  final deck = NgmySlideDeck.fromJson(Map<String, dynamic>.from(json));
+  // Only an admin transfer unlocks editing, and only on that marriage document,
+  // for the same 4 hours as a fresh payment.
+  if (sharedByAdmin && _adminShareGrantsEdit(deck.deckKind)) {
+    deck.adminShareEditUntil = DateTime.now()
+        .toUtc()
+        .add(const Duration(hours: 4))
+        .toIso8601String();
+  }
+  return deck;
+}
+
+bool _adminShareGrantsEdit(String? deckKind) {
+  return deckKind == 'marriage_agreement' ||
+      deckKind == 'hati_kuhowa' ||
+      deckKind == 'hati_kuhoweya' ||
+      deckKind == 'hati_malipo_awamu';
 }
 
 Future<List<NgmySlideDeck>?> ngmyPickAndParseSlidesBackup() async {
@@ -567,6 +609,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
         builder: (_) => NgmySlidesTransferQrPage(
           ownerEmail: widget.ownerEmail,
           decks: decks,
+          isAdmin: widget.isAdmin,
           title: _bundleLabel,
         ),
       ),
@@ -609,8 +652,18 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
     );
     if (!ok || !mounted) return;
     final json = decks.length == 1
-        ? ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: decks.first, allDecks: null)
-        : ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: null, allDecks: decks);
+        ? ngmySlidesShareJson(
+            ownerEmail: widget.ownerEmail,
+            deck: decks.first,
+            allDecks: null,
+            sharedByAdmin: widget.isAdmin,
+          )
+        : ngmySlidesShareJson(
+            ownerEmail: widget.ownerEmail,
+            deck: null,
+            allDecks: decks,
+            sharedByAdmin: widget.isAdmin,
+          );
     final safe = decks.length == 1
         ? decks.first.name.replaceAll(RegExp(r'[^\w\-.]+'), '_')
         : 'ngmy_slides_library';
@@ -1113,11 +1166,13 @@ class NgmySlidesTransferQrPage extends StatefulWidget {
     required this.ownerEmail,
     required this.decks,
     required this.title,
+    this.isAdmin = false,
   });
 
   final String ownerEmail;
   final List<NgmySlideDeck> decks;
   final String title;
+  final bool isAdmin;
 
   @override
   State<NgmySlidesTransferQrPage> createState() => _NgmySlidesTransferQrPageState();
@@ -1137,8 +1192,18 @@ class _NgmySlidesTransferQrPageState extends State<NgmySlidesTransferQrPage> {
   Future<void> _load() async {
     try {
       final shareJson = widget.decks.length == 1
-          ? ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: widget.decks.first, allDecks: null)
-          : ngmySlidesShareJson(ownerEmail: widget.ownerEmail, deck: null, allDecks: widget.decks);
+          ? ngmySlidesShareJson(
+              ownerEmail: widget.ownerEmail,
+              deck: widget.decks.first,
+              allDecks: null,
+              sharedByAdmin: widget.isAdmin,
+            )
+          : ngmySlidesShareJson(
+              ownerEmail: widget.ownerEmail,
+              deck: null,
+              allDecks: widget.decks,
+              sharedByAdmin: widget.isAdmin,
+            );
       final bundleId = widget.decks.length == 1 ? widget.decks.first.id : 'library_${widget.decks.length}';
       if (widget.decks.length == 1 && ngmySlidesDeckUsesMarriageClaimCode(widget.decks.first)) {
         ngmySlidesAssignMarriageClaimCode(widget.decks.first);

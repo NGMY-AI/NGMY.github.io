@@ -2009,11 +2009,15 @@ class NgmyMarriageSessionTimerBar extends StatefulWidget {
     super.key,
     required this.email,
     required this.isAdmin,
+    this.until,
     this.onExpired,
   });
 
   final String email;
   final bool isAdmin;
+  /// When set, counts down to this instant instead of the paid marriage session.
+  /// Used for the 4-hour window on a document an admin transferred.
+  final DateTime? until;
   final VoidCallback? onExpired;
 
   @override
@@ -2049,12 +2053,18 @@ class _NgmyMarriageSessionTimerBarState
       if (mounted) setState(() => _remaining = const Duration(hours: 999));
       return;
     }
-    final left = await NgmyStripePayments.marriageSessionRemaining(
-      widget.email,
-    );
+    final override = widget.until;
+    final Duration rem;
+    if (override != null) {
+      rem = override.difference(DateTime.now());
+    } else {
+      final left = await NgmyStripePayments.marriageSessionRemaining(
+        widget.email,
+      );
+      rem = left ?? Duration.zero;
+    }
     if (!mounted) return;
-    final rem = left ?? Duration.zero;
-    setState(() => _remaining = rem);
+    setState(() => _remaining = rem.isNegative ? Duration.zero : rem);
     if (rem <= Duration.zero && !_firedExpired) {
       _firedExpired = true;
       widget.onExpired?.call();

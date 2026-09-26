@@ -328,6 +328,7 @@ class NgmySlideDeck {
     this.marriageState,
     this.transferClaimCode,
     this.transferReceived = false,
+    this.adminShareEditUntil,
     this.signatureStrokeWidth,
     this.signatureInkColor,
     this.kiapoSignedAt,
@@ -350,6 +351,10 @@ class NgmySlideDeck {
   String? transferClaimCode;
   /// True when this copy arrived by QR or document code — no paywall, signatures locked.
   bool transferReceived;
+  /// UTC timestamp. Set only when an admin transferred this marriage document.
+  /// Until then the recipient can edit this document (and write its partner)
+  /// for the same 4 hours as a fresh payment. Other documents stay locked.
+  String? adminShareEditUntil;
   /// Ink stroke width chosen on the document's first signature — reused as
   /// the default for every later signature box on this deck.
   double? signatureStrokeWidth;
@@ -359,6 +364,19 @@ class NgmySlideDeck {
   String? kiapoSignedAt;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
+
+  DateTime? get adminShareEditUntilAt {
+    final raw = adminShareEditUntil?.trim() ?? '';
+    if (raw.isEmpty) return null;
+    return DateTime.tryParse(raw);
+  }
+
+  /// Admin transfer grants a timed edit window on this document only.
+  bool get adminShareEditOpen {
+    final until = adminShareEditUntilAt;
+    if (until == null) return false;
+    return DateTime.now().isBefore(until.toLocal());
+  }
 
   /// Any "locked template" document (Marriage Agreement, Hati ya Kuhowa,
   /// and future document categories) — these share the tap-to-fill-only
@@ -384,6 +402,7 @@ class NgmySlideDeck {
         marriageState: marriageState,
         transferClaimCode: transferClaimCode,
         transferReceived: transferReceived,
+        adminShareEditUntil: adminShareEditUntil,
         signatureStrokeWidth: signatureStrokeWidth,
         signatureInkColor: signatureInkColor,
         kiapoSignedAt: kiapoSignedAt,
@@ -402,6 +421,8 @@ class NgmySlideDeck {
         if (transferClaimCode != null && transferClaimCode!.trim().isNotEmpty)
           'transferClaimCode': transferClaimCode,
         if (transferReceived) 'transferReceived': true,
+        if (adminShareEditUntil != null && adminShareEditUntil!.trim().isNotEmpty)
+          'adminShareEditUntil': adminShareEditUntil,
         if (signatureStrokeWidth != null) 'signatureStrokeWidth': signatureStrokeWidth,
         if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
         if (kiapoSignedAt != null && kiapoSignedAt!.trim().isNotEmpty) 'kiapoSignedAt': kiapoSignedAt,
@@ -419,6 +440,7 @@ class NgmySlideDeck {
         marriageState: json['marriageState']?.toString(),
         transferClaimCode: json['transferClaimCode']?.toString(),
         transferReceived: json['transferReceived'] == true,
+        adminShareEditUntil: json['adminShareEditUntil']?.toString(),
         signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         kiapoSignedAt: json['kiapoSignedAt']?.toString(),

@@ -100,5 +100,30 @@ void main() {
     final restored = NgmySlideDeck.fromJson(copy.toJson());
     expect(restored.transferReceived, isTrue);
     expect(restored.transferClaimCode, isNull);
+    expect(restored.adminShareEditOpen, isFalse);
+  });
+
+  test('only an admin share unlocks a 4-hour edit window on that marriage document', () {
+    final regular = ngmySlidesDeckCopyForImport(_marriage(code: 'GA100'));
+    expect(regular.transferReceived, isTrue);
+    expect(regular.adminShareEditUntil, isNull);
+    expect(regular.adminShareEditOpen, isFalse);
+
+    final fromAdmin = ngmySlidesDeckCopyForImport(_marriage(code: 'GA200'), sharedByAdmin: true);
+    expect(fromAdmin.adminShareEditOpen, isTrue);
+    final until = fromAdmin.adminShareEditUntilAt!;
+    final left = until.difference(DateTime.now());
+    expect(left.inMinutes, greaterThan(3 * 60 + 50));
+    expect(left.inHours, lessThanOrEqualTo(4));
+
+    final slides = ngmySlidesDeckCopyForImport(
+      NgmySlideDeck(
+        id: 's1',
+        name: 'Class deck',
+        slides: const [],
+      ),
+      sharedByAdmin: true,
+    );
+    expect(slides.adminShareEditUntil, isNull);
   });
 }

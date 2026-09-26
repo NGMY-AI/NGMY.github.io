@@ -168,8 +168,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   bool _isKiapoHiddenFromPresentations(String state) =>
       _hiddenKiapoStates.contains(state.trim().toLowerCase());
 
-  bool _isTransferredReadOnly([NgmySlideDeck? deck]) =>
-      (deck ?? _activeDeck)?.transferReceived == true;
+  bool _isTransferredReadOnly([NgmySlideDeck? deck]) {
+    final d = deck ?? _activeDeck;
+    if (d?.transferReceived != true) return false;
+    // Admin-shared marriage documents stay editable for the paid-session window.
+    if (d!.adminShareEditOpen) return false;
+    return true;
+  }
 
   void _toastTransferredReadOnly() {
     if (!mounted) return;
@@ -651,6 +656,26 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       ),
     );
     if (!mounted) return;
+    _closeEditor();
+  }
+
+  Future<void> _onAdminShareEditExpired() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit window ended'),
+        content: const Text(
+          'Your 4-hour window to edit this admin-shared document has ended. You can still view, print, or download it.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() {});
     _closeEditor();
   }
 
@@ -1441,6 +1466,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       } else {
         final i = _decks.indexWhere((d) => d.id == dest.id);
         if (i >= 0) _decks[i] = dest;
+      }
+      if (source.adminShareEditOpen) {
+        // The second document written from an admin share stays editable
+        // for the same remaining window — and only that document.
+        dest.adminShareEditUntil = source.adminShareEditUntil;
+        dest.transferReceived = true;
       }
       if (openAfter == true) {
         _activeDeck = dest.copy();
@@ -2978,11 +3009,15 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       },
     );
     if (action == null || !mounted) return;
-    if (action == 'rename' || action == 'duplicate' || action == 'transfer_hati') {
+    if (action == 'rename' || action == 'duplicate') {
       if (deck.transferReceived) {
         _toastTransferredReadOnly();
         return;
       }
+    }
+    if (action == 'transfer_hati' && deck.transferReceived && !deck.adminShareEditOpen) {
+      _toastTransferredReadOnly();
+      return;
     }
     if (action == 'pdf') {
       try {
@@ -3224,6 +3259,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             Column(
               children: [
                 if (!editing &&
+                    _activeDeck != null &&
+                    _activeDeck!.adminShareEditOpen &&
+                    NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
+                  NgmyMarriageSessionTimerBar(
+                    email: widget.userEmail,
+                    isAdmin: false,
+                    until: _activeDeck!.adminShareEditUntilAt,
+                    onExpired: _onAdminShareEditExpired,
+                  )
+                else if (!editing &&
                     _activeDeck != null &&
                     !_isTransferredReadOnly() &&
                     NgmyStripePayments.marriageDocDeckKind(_activeDeck!.deckKind))
@@ -5326,7 +5371,9 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                 const SizedBox(height: 14),
                                 if (deck.transferReceived) ...[
                                   Text(
-                                    'Received copy · print or download only',
+                                    deck.adminShareEditOpen
+                                        ? 'Shared by admin · editable for 4 hours'
+                                        : 'Received copy · print or download only',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       color: _accent.first.withValues(alpha: 0.9),
@@ -5343,7 +5390,8 @@ class _DeckActionsDialogState extends State<_DeckActionsDialog> with TickerProvi
                                   tint: const Color(0xFF3B82F6),
                                   enter: _stagger(0),
                                 ),
-                                if (!deck.transferReceived && ngmyHatiIsTransferableDeck(deck)) ...[
+                                if ((!deck.transferReceived || deck.adminShareEditOpen) &&
+                                    ngmyHatiIsTransferableDeck(deck)) ...[
                                   const SizedBox(height: 6),
                                   _DeckActionTile(
                                     icon: Icons.swap_horiz_rounded,
