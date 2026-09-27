@@ -10,8 +10,10 @@ Completer<void>? _ngmySupabaseReady;
 
 /// Called from main() after Supabase.initialize succeeds or fails.
 void ngmyMarkSupabaseReady() {
-  final c = _ngmySupabaseReady;
-  if (c != null && !c.isCompleted) c.complete();
+  // Create the completer if nobody has waited yet — otherwise a mark that
+  // lands first is lost and every later waiter sits out the full timeout.
+  final c = _ngmySupabaseReady ??= Completer<void>();
+  if (!c.isCompleted) c.complete();
 }
 
 /// Ensures background Supabase init had time to finish before login queries.

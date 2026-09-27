@@ -57,9 +57,27 @@ class NgmyWalletDecisionLedger {
   }
 
   /// Local + cloud merged (higher status rank wins per id).
+  static Future<Map<String, int>>? _cloudInFlight;
+  static Map<String, int>? _cloudRecent;
+  static DateTime? _cloudRecentAt;
+
+  /// Startup paths call this back-to-back; share one cloud read for a few seconds.
+  static Future<Map<String, int>> _cloudShared() {
+    final at = _cloudRecentAt;
+    final recent = _cloudRecent;
+    if (recent != null && at != null && DateTime.now().difference(at) < const Duration(seconds: 5)) {
+      return Future.value(recent);
+    }
+    return _cloudInFlight ??= loadFromCloud().then((v) {
+      _cloudRecent = v;
+      _cloudRecentAt = DateTime.now();
+      return v;
+    }).whenComplete(() => _cloudInFlight = null);
+  }
+
   static Future<Map<String, int>> loadMerged() async {
     final local = await load();
-    final cloud = await loadFromCloud();
+    final cloud = await _cloudShared();
     final merged = <String, int>{...cloud};
     for (final e in local.entries) {
       final existing = merged[e.key];
