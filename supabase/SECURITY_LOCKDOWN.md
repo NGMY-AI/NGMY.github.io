@@ -50,6 +50,12 @@ Verify: anon `GET` of `civic_registry_members` is empty; anon select of `civicRe
 
 See also `CIVIC_REGISTRY_LOCK.md`.
 
+## 5b. Full security audit hardening (2026-09-27)
+
+1. Run `supabase/security_audit_hardening.sql` in SQL Editor.
+2. Run `supabase/security_rls_tests.sql` — every line should print `PASS`, then `ROLLBACK`.
+3. Redeploy **bright-handler** from `supabase/functions/ngmy-ai-chat/index.ts` (claim-token rows move to service-role single-key lookup so share/QR redeem still works after the vault is removed from public REST).
+
 ## 6. Rate limits + remaining hardening
 
 1. Redeploy **bright-handler** from `supabase/functions/ngmy-ai-chat/index.ts`.

@@ -102,9 +102,6 @@ class NgmyCloudPolicy {
     // Public prefixes win even if the slug happens to contain "email"/"phone".
     if (k.startsWith('ngmy_menu_pub_')) return true;
     if (k.startsWith('ngmy_bio_pub_')) return true;
-    if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
-    if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
-    if (k.startsWith('ngmy_essentials_code_v1_')) return true;
     if (settingsKeyNetworkSensitive(k)) return false;
     const exact = {
       'ngmy_popups',
@@ -116,7 +113,6 @@ class NgmyCloudPolicy {
       'home_vote_ad_campaign',
       'ngmy_menu_publish_registry',
       'ngmy_bio_publish_registry',
-      'ngmy_slides_transfer_qr_stashes_v1',
     };
     if (exact.contains(k)) return true;
     return false;
@@ -148,9 +144,15 @@ class NgmyCloudPolicy {
       'media_virtual_profiles',
       'ngmy_family_tree_backup_codes_v1',
       'ngmy_family_tree_qr_stashes_v1',
+      'ngmy_slides_transfer_qr_stashes_v1',
+      'ngmy_worksheet_project_qr_stashes_v1',
     };
     if (exact.contains(k)) return true;
     if (k.startsWith('civic_')) return true;
+    if (k.startsWith('ngmy_doc_share_stash_v2_')) return true;
+    if (k.startsWith('ngmy_doc_share_code_v2_')) return true;
+    if (k.startsWith('ngmy_essentials_code_v1_')) return true;
+    if (k.startsWith('ngmy_refcode_')) return true;
     if (k.startsWith('ngmy_gi_account_wallet_v1_')) return true;
     if (k.contains('email') || k.contains('phone') || k.contains('password')) return true;
     return false;

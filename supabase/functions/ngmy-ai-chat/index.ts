@@ -1271,6 +1271,35 @@ function redactSettingsRow(realKey: string | null, row: unknown): unknown {
   return row;
 }
 
+/** Share/claim vaults — never listed via public REST. Single-key relay uses service role. */
+function isClaimSettingsKey(key: string): boolean {
+  const k = key.trim();
+  if (!k) return false;
+  const exact = new Set([
+    "ngmy_slides_transfer_qr_stashes_v1",
+    "ngmy_family_tree_qr_stashes_v1",
+    "ngmy_worksheet_project_qr_stashes_v1",
+    "ngmy_family_tree_backup_codes_v1",
+    "ngmy_communicate_backup_codes_v1",
+  ]);
+  if (exact.has(k)) return true;
+  const prefixes = [
+    "ngmy_doc_share_stash_v2_",
+    "ngmy_doc_share_code_v2_",
+    "ngmy_essentials_code_v1_",
+    "ngmy_local_growth_income_stash_v1_",
+    "ngmy_local_growth_income_code_v1_",
+    "ngmy_local_deposit_qr_v1_",
+    "ngmy_local_deposit_code_v1_",
+    "ngmy_local_deposit_inbox_v1_",
+    "ngmy_refcode_",
+    "ngmy_transfer_relay_v1_",
+    "ngmy_transfer_v1_",
+    "ngmy_transfer_signal_v1_",
+  ];
+  return prefixes.some((p) => k.startsWith(p));
+}
+
 function relayClientFor(req: Request) {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1283,8 +1312,8 @@ function relayClientFor(req: Request) {
 }
 
 async function handleDbRelay(req: Request, body: Record<string, unknown>): Promise<Response> {
-  const client = relayClientFor(req);
-  if (!client) return jsonOk({ error: "Server misconfigured" }, 500);
+  const caller = relayClientFor(req);
+  if (!caller) return jsonOk({ error: "Server misconfigured" }, 500);
 
   const tableCode = String(body.t ?? "");
   const table = RELAY_TABLE_CODES[tableCode];
@@ -1297,6 +1326,13 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     if (!settingsRealKey) return jsonOk({ error: "Unknown settings key" }, 400);
     eq["key"] = settingsRealKey;
   }
+
+  // Claim tokens / transfer vaults are locked from public REST listing. The
+  // caller already named one key, so service role can fetch that row only.
+  const client =
+    table === "ngmy_settings" && settingsRealKey && isClaimSettingsKey(settingsRealKey)
+      ? (adminClient() ?? caller)
+      : caller;
 
   const op = String(body.op ?? "s");
 
