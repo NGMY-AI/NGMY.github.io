@@ -1,0 +1,1 @@
+void ngmyNetTraceSink(String line) {}

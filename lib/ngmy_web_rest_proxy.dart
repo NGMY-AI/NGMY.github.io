@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'ngmy_edge_web_flags_stub.dart' if (dart.library.html) 'ngmy_edge_web_flags_web.dart';
+import 'ngmy_net_trace.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_web_api_base.dart';
 
@@ -15,14 +17,14 @@ String _ngmyWebBasePath() {
 /// Public REST URL — web uses [/api/rest/v1], native uses Supabase directly.
 Uri ngmySupabaseRestUri(String pathAndQuery) {
   final trimmed = pathAndQuery.startsWith('/') ? pathAndQuery : '/$pathAndQuery';
-  if (!kIsWeb) {
+  if (!kIsWeb || ngmyWebUseDirectEdge()) {
     return Uri.parse('${kNgmySupabaseUrl.trim()}/rest/v1$trimmed');
   }
   return Uri.parse('${Uri.base.origin}${_ngmyWebBasePath()}$kNgmyRestPublicPath$trimmed');
 }
 
 bool _shouldProxySupabaseRest(Uri uri) {
-  if (!kIsWeb) return false;
+  if (!kIsWeb || ngmyWebUseDirectEdge()) return false;
   final base = kNgmySupabaseUrl.trim();
   if (base.isEmpty) return false;
   final upstream = Uri.parse(base);
@@ -43,6 +45,10 @@ class NgmyWebRestProxyClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    ngmyNetTrace(
+      ngmyNetTraceKindForUri(request.url),
+      '${request.method} ${ngmyNetTraceLabelForUri(request.url)}',
+    );
     if (_shouldProxySupabaseRest(request.url)) {
       final proxied = _proxiedRestUri(request.url);
       if (request is http.Request) {

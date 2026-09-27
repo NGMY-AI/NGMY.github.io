@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'ngmy_network_resilience_io.dart' if (dart.library.html) 'ngmy_network_resilience_io_stub.dart';
+import 'ngmy_net_trace.dart';
 import 'ngmy_offline.dart';
 import 'ngmy_supabase_config.dart';
 
@@ -36,11 +37,19 @@ Future<bool> ngmyCanReachCloud() async {
       DateTime.now().difference(_lastReachableAt!) < const Duration(seconds: 20)) {
     return true;
   }
-  final ok = await _probeReachability();
-  _lastReachable = ok;
-  _lastReachableAt = DateTime.now();
-  return ok;
+  final inFlight = _probeInFlight;
+  if (inFlight != null) return inFlight;
+  final probe = _probeReachability().then((ok) {
+    _lastReachable = ok;
+    _lastReachableAt = DateTime.now();
+    return ok;
+  }).whenComplete(() => _probeInFlight = null);
+  _probeInFlight = probe;
+  return probe;
 }
+
+/// Startup callers arrive together; they share one probe instead of each firing its own.
+Future<bool>? _probeInFlight;
 
 Map<String, String> get _ngmySupabaseProbeHeaders => {
       'apikey': kNgmySupabaseAnonKey,
@@ -51,6 +60,7 @@ Map<String, String> get _ngmySupabaseProbeHeaders => {
 Future<bool> _probeSupabaseRest() async {
   try {
     final uri = Uri.parse('${kNgmySupabaseUrl}/rest/v1/config?select=id&limit=1');
+    ngmyNetTrace('PROBE', 'GET config reachability');
     final resp = await http.get(uri, headers: _ngmySupabaseProbeHeaders).timeout(kNgmyReachabilityTimeout);
     if (resp.statusCode >= 200 && resp.statusCode < 500) return true;
     debugPrint('[ngmy] supabase probe status ${resp.statusCode}');

@@ -892,11 +892,17 @@ Future<void> ngmyHydrateCivicSelfEnrollmentFromAllBackups(AppConfig config) asyn
     debugPrint('[civic self enrollment] hydrate from config: $e');
   }
   // Write-only scrub: replace any legacy cities/rooms blob with flag-only (no GET).
+  // Admin-owned row: only a signed-in admin writes it, once per app session —
+  // this hydrate runs on every config refresh, including for signed-out visitors.
+  if (_ngmyCivicSelfEnrollmentScrubbed || !ngmyEmailIsAdmin(ngmyCurrentAuthEmail())) return;
+  _ngmyCivicSelfEnrollmentScrubbed = true;
   unawaited(ngmyUpsertSettingsRowReliable(
     _kNgmyCivicSelfEnrollmentSettingsKey,
     NgmyCivicSelfEnrollment.payload(config),
   ));
 }
+
+bool _ngmyCivicSelfEnrollmentScrubbed = false;
 
 Future<bool> ngmyPersistCivicSelfEnrollmentSettings(AppConfig config) async {
   ngmyAdminConfigMutationAt = DateTime.now();

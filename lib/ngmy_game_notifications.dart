@@ -180,20 +180,42 @@ class NgmyGameNotifications {
   }
 
   /// Merge local + cloud receipts (preserves original timestamps across devices).
-  static Future<void> syncFromCloud(String email) async {
+  static final Map<String, Future<void>> _syncInFlight = {};
+  static final Map<String, DateTime> _lastSyncAt = {};
+  static const Duration _kPassiveSyncMinGap = Duration(minutes: 2);
+
+  /// [force] false is for passive callers (badge rebuilds): at most one cloud
+  /// round-trip per [_kPassiveSyncMinGap]. User actions keep the default.
+  static Future<void> syncFromCloud(String email, {bool force = true}) {
     final key = _emailKey(email);
-    if (key.isEmpty) return;
+    if (key.isEmpty) return Future.value();
+    final running = _syncInFlight[key];
+    if (running != null) return running;
+    final last = _lastSyncAt[key];
+    if (!force && last != null && DateTime.now().difference(last) < _kPassiveSyncMinGap) {
+      return Future.value();
+    }
+    _lastSyncAt[key] = DateTime.now();
+    final job = _syncFromCloudNow(key).whenComplete(() => _syncInFlight.remove(key));
+    _syncInFlight[key] = job;
+    return job;
+  }
+
+  static String _listJson(List<NgmyGameNotification> items) =>
+      jsonEncode(items.map((e) => e.toJson()).toList());
+
+  static Future<void> _syncFromCloudNow(String key) async {
     final local = await _loadRaw(key);
     final cloud = await _loadFromCloud(key);
     if (cloud.isEmpty && local.isEmpty) return;
     final merged = _prune(_mergeReceiptLists(local, cloud));
-    final localPruned = _prune(local);
-    final localJson = jsonEncode(localPruned.map((e) => e.toJson()).toList());
-    final mergedJson = jsonEncode(merged.map((e) => e.toJson()).toList());
-    if (localJson != mergedJson) {
+    final mergedJson = _listJson(merged);
+    if (_listJson(_prune(local)) != mergedJson) {
       await _saveLocal(key, merged);
     }
-    await _pushToCloud(key, merged);
+    if (_listJson(_prune(cloud)) != mergedJson) {
+      await _pushToCloud(key, merged);
+    }
   }
 
   static Future<void> record({
@@ -225,7 +247,7 @@ class NgmyGameNotifications {
   }
 
   static Future<int> countFor(String email) async {
-    await syncFromCloud(email);
+    await syncFromCloud(email, force: false);
     final list = await listFor(email, syncCloud: false);
     return list.length;
   }

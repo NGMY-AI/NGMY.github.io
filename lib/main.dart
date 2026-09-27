@@ -7462,13 +7462,41 @@ Future<bool> _supabaseStorageObjectExists(String bucket, String path) async {
   }
 }
 
-Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
-  if (!rawUrl.startsWith('supabase://')) return rawUrl;
+/// True while the tab/app is hidden — background polls skip their tick.
+bool ngmyAppInBackground() {
+  final s = WidgetsBinding.instance.lifecycleState;
+  return s == AppLifecycleState.hidden || s == AppLifecycleState.paused || s == AppLifecycleState.detached;
+}
+
+/// Signed URLs are valid 30 days; reuse one for a day so rebuilds neither
+/// re-sign (Storage POST) nor re-download the image under a fresh URL.
+const Duration _kNgmySignedUrlReuse = Duration(hours: 24);
+const Duration _kNgmySignedUrlFailureBackoff = Duration(minutes: 5);
+final Map<String, ({String url, DateTime until})> _ngmySignedUrlCache = {};
+final Map<String, Future<String>> _ngmySignedUrlInFlight = {};
+
+Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) {
+  if (!rawUrl.startsWith('supabase://')) return Future.value(rawUrl);
+  final hit = _ngmySignedUrlCache[rawUrl];
+  if (hit != null && DateTime.now().isBefore(hit.until)) return Future.value(hit.url);
+  final running = _ngmySignedUrlInFlight[rawUrl];
+  if (running != null) return running;
+  final job = _resolveSupabaseStorageUrlUncached(rawUrl)
+      .whenComplete(() => _ngmySignedUrlInFlight.remove(rawUrl));
+  _ngmySignedUrlInFlight[rawUrl] = job;
+  return job;
+}
+
+Future<String> _resolveSupabaseStorageUrlUncached(String rawUrl) async {
   final ref = _parseSupabaseStorageRef(rawUrl);
   if (ref == null) return rawUrl;
 
   final cacheKey = _supabaseStorageCacheKey(ref.bucket, ref.path);
   if (_ngmyMissingStoragePaths.contains(cacheKey)) return '';
+
+  void remember(String url, Duration ttl) {
+    _ngmySignedUrlCache[rawUrl] = (url: url, until: DateTime.now().add(ttl));
+  }
 
   final storage = Supabase.instance.client.storage.from(ref.bucket);
   final publicUrl = storage.getPublicUrl(ref.path);
@@ -7478,7 +7506,10 @@ Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
     final signed = await storage
         .createSignedUrl(ref.path, 60 * 60 * 24 * 30)
         .timeout(const Duration(seconds: 8));
-    if (signed.isNotEmpty) return signed;
+    if (signed.isNotEmpty) {
+      remember(signed, _kNgmySignedUrlReuse);
+      return signed;
+    }
   } catch (e) {
     if (_isStorageNotFoundError(e)) {
       _ngmyMissingStoragePaths.add(cacheKey);
@@ -7492,6 +7523,7 @@ Future<String> _resolveSupabaseStorageUrlResilient(String rawUrl) async {
     }
   }
 
+  remember(publicUrl, _kNgmySignedUrlFailureBackoff);
   return publicUrl;
 }
 
@@ -9608,8 +9640,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_currentUser == null || !NgmyCloudPolicy.persistTransactionsToCloud) return;
     if (!NgmyFeatureSyncSession.growthIncomeUserActive) return;
     unawaited(_refreshUserTransactionsFromCloud(force: true));
-    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // Each tick downloads the user's full ledger + approved contributions, so
+    // keep it slow and skip hidden tabs; own writes already update locally.
+    _userTxnSyncTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused) return;
+      if (ngmyAppInBackground()) return;
       if (!NgmyFeatureSyncSession.growthIncomeUserActive) {
         _userTxnSyncTimer?.cancel();
         return;
@@ -9628,6 +9663,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_currentUser == null) return;
     _currentUserPullTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
+      if (ngmyAppInBackground()) return;
       unawaited(_refreshCurrentUserFromCloud());
     });
   }
@@ -31499,10 +31535,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       }());
       unawaited(_refreshCivicStateAccess());
     });
-    // Keep state-wide activate/deactivate changes close to live on every
-    // device, even though regular-user Supabase Realtime is intentionally off.
-    _helpModePoll = Timer.periodic(const Duration(seconds: 5), (_) {
+    // Live changes arrive through the help-mode broadcast channel; this poll
+    // only catches a missed broadcast, so it stays slow and skips hidden tabs.
+    _helpModePoll = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
+      if (ngmyAppInBackground()) return;
       unawaited(_refreshCivicHelpModeSettingsOnly());
     });
     _membersCloudPoll = Timer.periodic(const Duration(minutes: 2), (_) {

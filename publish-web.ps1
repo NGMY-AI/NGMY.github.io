@@ -139,21 +139,20 @@ $swTemplate = Join-Path $PSScriptRoot "web\ngmy_service_worker.js"
 $swOut = Join-Path $PSScriptRoot "docs\ngmy_service_worker.js"
 $docsPath = Join-Path $PSScriptRoot "docs"
 if (Test-Path $swTemplate) {
-    $urlSet = [System.Collections.Generic.HashSet[string]]::new()
-    [void]$urlSet.Add('./')
-    [void]$urlSet.Add('./index.html')
-    Get-ChildItem $docsPath -Recurse -File | ForEach-Object {
+    $revs = [ordered]@{}
+    Get-ChildItem $docsPath -Recurse -File | Sort-Object FullName | ForEach-Object {
         if ($_.Name -eq 'ngmy_service_worker.js') { return }
+        if ($_.Extension -eq '.symbols' -or $_.Name -eq 'NOTICES') { return }
         $rel = $_.FullName.Substring($docsPath.Length).Replace('\', '/')
         if ($rel.StartsWith('/')) { $rel = $rel.Substring(1) }
-        [void]$urlSet.Add("./$rel")
+        $revs["./$rel"] = (Get-FileHash $_.FullName -Algorithm MD5).Hash.Substring(0, 16).ToLower()
     }
-    $jsonUrls = (($urlSet | Sort-Object) | ForEach-Object { "'$_'" }) -join ","
+    if ($revs.Contains('./index.html')) { $revs['./'] = $revs['./index.html'] }
     $sw = Get-Content $swTemplate -Raw
     $sw = $sw.Replace('__NGMY_DEPLOY_ID__', $DeployId)
-    $sw = $sw.Replace('__NGMY_PRECACHE_URLS__', "[$jsonUrls]")
+    $sw = $sw.Replace('__NGMY_PRECACHE_REVS__', ($revs | ConvertTo-Json -Compress))
     Set-Content -Path $swOut -Value $sw -Encoding UTF8
-    Write-Host "  Wrote ngmy_service_worker.js ($($urlSet.Count) precache URLs)" -ForegroundColor DarkGray
+    Write-Host "  Wrote ngmy_service_worker.js ($($revs.Count) revisioned URLs; boot shell precached)" -ForegroundColor DarkGray
 } else {
     Write-Warning "Missing web/ngmy_service_worker.js - offline cache not generated."
 }

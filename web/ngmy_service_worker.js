@@ -144,7 +144,56 @@ async function ngmyProxyApiRest(request) {
   return res;
 }
 
-const PRECACHE_URLS = __NGMY_PRECACHE_URLS__;
+/** './path' -> content hash for every published file. Unchanged files are copied
+ *  from the previous deploy's cache instead of being downloaded again. */
+const PRECACHE_REVS = __NGMY_PRECACHE_REVS__;
+const PRECACHE_URLS = Object.keys(PRECACHE_REVS);
+const REV_HEADER = 'x-ngmy-rev';
+
+function relFromUrl(url) {
+  var path = url.pathname || '/';
+  var base = SCOPE_PATH.endsWith('/') ? SCOPE_PATH : SCOPE_PATH + '/';
+  if (path.indexOf(base) === 0) path = path.substring(base.length);
+  else if (path.charAt(0) === '/') path = path.substring(1);
+  return './' + path;
+}
+
+function revForUrl(url) {
+  return PRECACHE_REVS[relFromUrl(url)] || '';
+}
+
+/** Stores [res] tagged with its deploy content hash so later deploys can reuse it. */
+async function putWithRev(cache, key, res) {
+  var url = new URL(typeof key === 'string' ? key : key.url, self.location.href);
+  var rev = revForUrl(url);
+  if (!rev) return cache.put(key, res);
+  var headers = new Headers(res.headers);
+  headers.set(REV_HEADER, rev);
+  var tagged = new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: headers,
+  });
+  return cache.put(key, tagged);
+}
+
+/** Copies entries whose content hash is unchanged from older NGMY caches. */
+async function reuseUnchangedFromOldCaches(cache) {
+  var keys = (await caches.keys()).filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME);
+  for (var k of keys) {
+    var old = await caches.open(k);
+    var reqs = await old.keys();
+    for (var req of reqs) {
+      var url = new URL(req.url);
+      var want = revForUrl(url);
+      if (!want) continue;
+      var hit = await old.match(req);
+      if (!hit || hit.headers.get(REV_HEADER) !== want) continue;
+      if (await cache.match(req)) continue;
+      await cache.put(req, hit);
+    }
+  }
+}
 
 const CRITICAL_OFFLINE_URLS = [
   './',
@@ -264,9 +313,10 @@ async function offlineDocumentAnyCache() {
 
 async function precacheUrl(cache, url) {
   try {
+    if (await cache.match(url)) return true;
     const res = await fetch(new Request(url, { cache: 'reload' }));
     if (res && res.ok) {
-      await cache.put(url, res.clone());
+      await putWithRev(cache, url, res);
       return true;
     }
   } catch (e) {
@@ -279,14 +329,19 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
+      try {
+        await reuseUnchangedFromOldCaches(cache);
+      } catch (e) {
+        ngmySwQuiet('[ngmy-sw] reuse old cache', e);
+      }
+      // Only the boot shell is downloaded up front. Everything else (advisor
+      // photos, other wasm variants, twemoji, …) is cached the first time the
+      // app requests it — precaching all published files cost ~100 MB and
+      // ~390 requests on every first visit and every deploy.
       const allCritical = CRITICAL_OFFLINE_URLS.concat(criticalPartUrls());
       for (const url of allCritical) {
         await precacheUrl(cache, url);
       }
-      const rest = PRECACHE_URLS.filter(
-        (u) => allCritical.indexOf(u) === -1,
-      );
-      await Promise.allSettled(rest.map((url) => precacheUrl(cache, url)));
       await cacheAbsoluteShell(cache);
       await self.skipWaiting();
     })(),
@@ -550,16 +605,9 @@ self.addEventListener('fetch', (event) => {
         isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
 
       // Cache-first for shell assets — required for iOS offline (onLine is unreliable).
+      // No background re-fetch: this cache is per deploy, so a cached asset is
+      // already the current build's file (re-fetching re-downloaded ~30 MB per load).
       if (shellAsset && cached) {
-        if (self.navigator.onLine) {
-          event.waitUntil(
-            fetch(event.request)
-              .then((res) => {
-                if (res && res.status === 200) return cache.put(event.request, res.clone());
-              })
-              .catch(() => {}),
-          );
-        }
         return cached;
       }
 
@@ -629,22 +677,13 @@ self.addEventListener('fetch', (event) => {
       }
 
       if (cached) {
-        if (self.navigator.onLine) {
-          event.waitUntil(
-            fetch(event.request)
-              .then((res) => {
-                if (res && res.status === 200) return cache.put(event.request, res.clone());
-              })
-              .catch(() => {}),
-          );
-        }
         return cached;
       }
 
       try {
         const res = await fetch(event.request);
         if (res && res.status === 200) {
-          cache.put(event.request, res.clone());
+          event.waitUntil(putWithRev(cache, event.request, res.clone()).catch(() => {}));
         }
         return res;
       } catch (_) {

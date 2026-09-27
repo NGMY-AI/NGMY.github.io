@@ -121,7 +121,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_load());
     });
-    _balancePoll = Timer.periodic(const Duration(seconds: 8), (_) {
+    // Each pull is a wallet fetch plus deposit-status fetches; resume also pulls.
+    _balancePoll = Timer.periodic(const Duration(seconds: 30), (_) {
+      final s = WidgetsBinding.instance.lifecycleState;
+      if (s == AppLifecycleState.hidden || s == AppLifecycleState.paused) return;
       unawaited(_pullCloudWallet());
     });
     _earningsTick = Timer.periodic(const Duration(seconds: 2), (_) {

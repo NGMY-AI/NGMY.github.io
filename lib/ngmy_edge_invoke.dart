@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_edge_web_flags_stub.dart' if (dart.library.html) 'ngmy_edge_web_flags_web.dart';
+import 'ngmy_net_trace.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_web_api_base.dart';
@@ -200,12 +202,22 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     Map<String, dynamic>? parsed;
     for (final url in urls) {
       if (!seen.add(url)) continue;
+      ngmyNetTrace(
+        'EDGE',
+        '${ngmyNetTraceEdgeLabel(body, anonymous: anonymous)}${seen.length > 1 ? ' [fallback]' : ''}',
+      );
       try {
         response = await http
             .post(Uri.parse(url), headers: headers, body: payload)
             .timeout(timeout);
         parsed = _parseEdgeBody(response.body);
         if (parsed != null) break;
+        // Only a missing proxy (static host 404/405) justifies retrying the same
+        // upstream directly; a real server error would just be sent twice.
+        if (response.statusCode != 404 && response.statusCode != 405) break;
+      } on TimeoutException catch (e) {
+        debugPrint('[edge] invoke $url: $e');
+        break;
       } catch (e) {
         debugPrint('[edge] invoke $url: $e');
       }
