@@ -251,12 +251,24 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     });
   }
 
-  String get _coverageSummary {
+  List<String> get _coverageTitles {
     final titles = <String>[];
     for (final c in NgmyHouseInsurance.coveredCategories) {
       if (_selectedCoverage.contains(c.id)) titles.add(c.title);
     }
-    return titles.join(', ');
+    return titles;
+  }
+
+  String get _coverageSummary => _coverageTitles.join(', ');
+
+  String get _housePlanLine {
+    final fee = NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig);
+    final until = widget.appConfig == null
+        ? null
+        : NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail);
+    final feeBit = '\$${fee.toStringAsFixed(0)} for 30 days';
+    if (until == null) return feeBit;
+    return '$feeBit · covered until ${until.month}/${until.day}/${until.year}';
   }
 
   bool get _houseSubscribed =>
@@ -488,6 +500,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       preferredSchedule: _preferredScheduleC.text,
       urgency: _urgencyC.text,
       coverageSummary: _coverageSummary,
+      coverageItems: _coverageTitles,
+      housePlanLine: _housePlanLine,
       notes: _notesC.text,
       qty: _qtyC.text,
       price: _priceC.text,

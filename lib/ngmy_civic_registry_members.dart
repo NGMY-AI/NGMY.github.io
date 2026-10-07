@@ -172,17 +172,62 @@ class NgmyCivicRegistryMembers {
     return total;
   }
 
-  static bool isRemoved(dynamic config, {String email = '', String registryId = ''}) {
+  static bool _matchesIdentity(
+    Map<String, dynamic> row,
+    String email,
+    String registryId, {
+    bool includeSnapshot = true,
+  }) {
     final key = emailKey(email);
-    final rid = registryId.trim().toUpperCase();
-    if (key.isEmpty && rid.isEmpty) return false;
-    for (final row in removedFrom(config)) {
-      final e = emailKey((row['email'] ?? '').toString());
-      final id = (row['registryId'] ?? '').toString().trim().toUpperCase();
-      if (key.isNotEmpty && e == key) return true;
-      if (rid.isNotEmpty && id == rid) return true;
+    final wantId = registryId.trim();
+    final e = emailKey((row['email'] ?? '').toString());
+    final id = (row['registryId'] ?? '').toString();
+    if (key.isNotEmpty && e.isNotEmpty && e == key) return true;
+    if (wantId.isNotEmpty && id.isNotEmpty && NgmyCivicWalletIdentity.idsEqual(id, wantId)) {
+      return true;
+    }
+    if (includeSnapshot && row['snapshot'] is Map) {
+      return _matchesIdentity(
+        Map<String, dynamic>.from(row['snapshot'] as Map),
+        email,
+        registryId,
+        includeSnapshot: false,
+      );
     }
     return false;
+  }
+
+  static bool isRemoved(dynamic config, {String email = '', String registryId = ''}) {
+    if (emailKey(email).isEmpty && registryId.trim().isEmpty) return false;
+    for (final row in removedFrom(config)) {
+      if (_matchesIdentity(row, email, registryId)) return true;
+    }
+    return false;
+  }
+
+  /// Deleted and deceased members stay off Rankings even when a cached
+  /// cloud board still has their name.
+  static bool isHiddenFromRankings(dynamic config, {String email = '', String registryId = ''}) {
+    if (emailKey(email).isEmpty && registryId.trim().isEmpty) return false;
+    if (isRemoved(config, email: email, registryId: registryId)) return true;
+    if (isDeceased(config, email: email, registryId: registryId)) return true;
+    for (final row in deceasedFrom(config)) {
+      if (_matchesIdentity(row, email, registryId)) return true;
+    }
+    return false;
+  }
+
+  static List<Map<String, dynamic>> withoutRemovedFromRankings(
+    dynamic config,
+    List<Map<String, dynamic>> rows,
+  ) {
+    return rows.where((row) {
+      return !isHiddenFromRankings(
+        config,
+        email: (row['email'] ?? '').toString(),
+        registryId: (row['registryId'] ?? '').toString(),
+      );
+    }).toList();
   }
 
   static bool isDeceased(dynamic config, {String email = '', String registryId = ''}) {
@@ -2697,7 +2742,7 @@ class NgmyCivicRegistryMembers {
 
   static Future<void> saveRankingsCache(String state, List<Map<String, dynamic>> members) async {
     final st = NgmyCivicRegistryStats.canonicalStateKey(state);
-    if (st.isEmpty || members.isEmpty) return;
+    if (st.isEmpty) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_rankingsCacheKey);
@@ -2706,7 +2751,11 @@ class NgmyCivicRegistryMembers {
         final decoded = jsonDecode(raw);
         if (decoded is Map) map.addAll(Map<String, dynamic>.from(decoded));
       }
-      map[st] = members.map((e) => Map<String, dynamic>.from(e)).toList();
+      if (members.isEmpty) {
+        map.remove(st);
+      } else {
+        map[st] = members.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
       await prefs.setString(_rankingsCacheKey, jsonEncode(map));
     } catch (_) {}
   }

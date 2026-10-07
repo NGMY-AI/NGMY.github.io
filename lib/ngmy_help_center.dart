@@ -271,6 +271,90 @@ class NgmyHelpCenterConfig {
     return 'https://wa.me/$digits$params';
   }
 
+  String _houseLine(String label, String value) {
+    final v = value.trim();
+    if (v.isEmpty) return '';
+    return '$label\n$v';
+  }
+
+  String _houseInsuranceWhatsAppMessage({
+    required String reference,
+    required String clientName,
+    required String clientEmail,
+    required String clientPhone,
+    required List<String> coverageItems,
+    required String coverageSummary,
+    required String housePlanLine,
+    required String serviceAddress,
+    required String fixtureType,
+    required String jobDescription,
+    required String problemDetails,
+    required String urgency,
+    required String preferredSchedule,
+    required String notes,
+  }) {
+    final services = coverageItems.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (services.isEmpty && coverageSummary.trim().isNotEmpty) {
+      services.addAll(coverageSummary.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+    }
+    final who = clientName.trim().isEmpty ? 'Member' : clientName.trim();
+    final buf = StringBuffer()
+      ..writeln('*NGMY House + Insurance*')
+      ..writeln('Covered home visit')
+      ..writeln()
+      ..writeln('*Request*')
+      ..writeln(reference)
+      ..writeln()
+      ..writeln('*Member*')
+      ..writeln(who);
+    if (clientPhone.trim().isNotEmpty) buf.writeln(clientPhone.trim());
+    if (clientEmail.trim().isNotEmpty) buf.writeln(clientEmail.trim());
+    final plan = housePlanLine.trim().isEmpty ? '\$50 for 30 days' : housePlanLine.trim();
+    buf
+      ..writeln()
+      ..writeln('*Subscription*')
+      ..writeln(plan);
+    if (services.isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln('*Chosen services*');
+      for (var i = 0; i < services.length; i++) {
+        buf.writeln('${i + 1}. ${services[i]}');
+      }
+    }
+    final visit = <String>[
+      _houseLine('Address', serviceAddress),
+      _houseLine('Area', fixtureType),
+      _houseLine('When', preferredSchedule),
+      _houseLine('How urgent', urgency),
+    ].where((e) => e.isNotEmpty).toList();
+    if (visit.isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln('*Visit*');
+      for (final block in visit) {
+        buf.writeln(block);
+      }
+    }
+    final problem = problemDetails.trim().isNotEmpty ? problemDetails.trim() : jobDescription.trim();
+    if (problem.isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln('*The problem*')
+        ..writeln(problem);
+    }
+    if (notes.trim().isNotEmpty) {
+      buf
+        ..writeln()
+        ..writeln('*Notes*')
+        ..writeln(notes.trim());
+    }
+    buf
+      ..writeln()
+      ..writeln('Please confirm this covered visit. Thank you.');
+    return buf.toString().trim();
+  }
+
   String buildRequestMessage({
     required NgmyHelpCenterService service,
     required String clientName,
@@ -294,6 +378,8 @@ class NgmyHelpCenterConfig {
     String preferredSchedule = '',
     String urgency = '',
     String coverageSummary = '',
+    List<String> coverageItems = const [],
+    String housePlanLine = '',
     String notes = '',
     String? qty,
     String? price,
@@ -304,6 +390,24 @@ class NgmyHelpCenterConfig {
     final isGeneral = ngmyHelpCenterIsGeneralHelp(service);
     final isDelivery = ngmyHelpCenterIsMovingDelivery(service);
     final isHouse = ngmyHelpCenterIsHouseFixture(service);
+    if (isHouse) {
+      return _houseInsuranceWhatsAppMessage(
+        reference: ref,
+        clientName: clientName,
+        clientEmail: clientEmail,
+        clientPhone: clientPhone,
+        coverageItems: coverageItems,
+        coverageSummary: coverageSummary,
+        housePlanLine: housePlanLine,
+        serviceAddress: serviceAddress,
+        fixtureType: fixtureType,
+        jobDescription: jobDescription,
+        problemDetails: problemDetails,
+        urgency: urgency,
+        preferredSchedule: preferredSchedule,
+        notes: notes,
+      );
+    }
     final buf = StringBuffer()
       ..writeln('*${supportName.trim().isEmpty ? 'NGMY Help Request' : supportName.trim()}*')
       ..writeln('━━━━━━━━━━━━━━━━')
@@ -346,14 +450,6 @@ class NgmyHelpCenterConfig {
           buf.writeln('Est. delivery fee: Quote on WhatsApp (10 miles or less)');
         }
       }
-    } else if (isHouse) {
-      if (coverageSummary.trim().isNotEmpty) buf.writeln('Coverage chosen: ${coverageSummary.trim()}');
-      if (serviceAddress.trim().isNotEmpty) buf.writeln('Service address: ${serviceAddress.trim()}');
-      if (fixtureType.trim().isNotEmpty) buf.writeln('Fixture / area: ${fixtureType.trim()}');
-      if (jobDescription.trim().isNotEmpty) buf.writeln('Job description: ${jobDescription.trim()}');
-      if (problemDetails.trim().isNotEmpty) buf.writeln('Problem details: ${problemDetails.trim()}');
-      if (urgency.trim().isNotEmpty) buf.writeln('Urgency: ${urgency.trim()}');
-      if (preferredSchedule.trim().isNotEmpty) buf.writeln('Preferred schedule: ${preferredSchedule.trim()}');
     } else {
       if (jobDescription.trim().isNotEmpty) buf.writeln('Job description: ${jobDescription.trim()}');
       final q = qty ?? service.defaultQty;
@@ -365,7 +461,7 @@ class NgmyHelpCenterConfig {
         ..writeln('Est. total: \$${total.toStringAsFixed(2)}');
     }
 
-    if (!isMoney && !isGeneral && !isDelivery && !isHouse && service.description.trim().isNotEmpty) {
+    if (!isMoney && !isGeneral && !isDelivery && service.description.trim().isNotEmpty) {
       buf.writeln('Details: ${service.description.trim()}');
     }
     if (notes.trim().isNotEmpty) buf.writeln('Notes: ${notes.trim()}');
@@ -374,9 +470,7 @@ class NgmyHelpCenterConfig {
         ? 'Please process this money transfer request. I understand the NGMY service fee applies (\$2 under \$30, otherwise 7%). I paid via Cash App.'
         : isDelivery
             ? 'Please confirm this moving/delivery request. Thank you!'
-            : isHouse
-                ? 'Please confirm this home repair request. Thank you!'
-                : 'Please contact me about this service. Thank you!');
+            : 'Please contact me about this service. Thank you!');
     return buf.toString().trim();
   }
 

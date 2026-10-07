@@ -34166,6 +34166,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
       }
     } catch (_) {}
+    _sharedDirectoryRows = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
+      widget.config,
+      _sharedDirectoryRows,
+    );
+    _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
+    unawaited(NgmyCivicRegistryMembers.saveRankingsCache(_selectedState, _sharedDirectoryRows));
     return membersCloudOk && userCloudOk;
   }
 
@@ -40764,7 +40770,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 if (giftPending != null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('${u.fullName ?? u.username} helped first 3 times in a row — admin can grant a present!'),
+                                      content: Text('${u.fullName ?? u.username} contributed first 3 times in a row. Open Helper Gifts to send a money card for one store.'),
                                       backgroundColor: const Color(0xFFEC4899),
                                       duration: const Duration(seconds: 5),
                                     ),
@@ -42806,7 +42812,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final cached = await NgmyCivicRegistryMembers.loadRankingsCache(wanted);
       if (cached.isNotEmpty && mounted && gen == _sharedDirectoryLoadGen) {
         setState(() {
-          _sharedDirectoryRows = _unionRankingRows(_sharedDirectoryRows, cached);
+          _sharedDirectoryRows = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
+            widget.config,
+            _unionRankingRows(_sharedDirectoryRows, cached),
+          );
           _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
           _sharedDirectoryState = wanted;
         });
@@ -42829,7 +42838,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (mounted) setState(() => _sharedDirectoryLoading = false);
         return;
       }
-      final merged = _unionRankingRows(_sharedDirectoryRows, rankings.members);
+      final merged = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
+        widget.config,
+        _unionRankingRows(_sharedDirectoryRows, rankings.members),
+      );
       setState(() {
         _sharedDirectoryRows = merged;
         _sharedDirectoryUsers = _usersFromDirectoryRows(merged);
@@ -42846,13 +42858,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   /// Same people as the Members tab, plus anyone already saved from cloud
   /// rankings. A refresh must never blank a list that already had names.
+  bool _stillOnRankings(UserData u) => !NgmyCivicRegistryMembers.isHiddenFromRankings(
+        widget.config,
+        email: u.email,
+        registryId: u.registryId ?? '',
+      );
+
   List<UserData> _rankingsEnrolled() {
     final local = _dedupeRankingUsers(
       _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
           .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+          .where(_stillOnRankings)
           .toList(),
     );
-    final shared = _dedupeRankingUsers(_sharedDirectoryUsers);
+    final shared = _dedupeRankingUsers(_sharedDirectoryUsers.where(_stillOnRankings).toList());
     if (local.isEmpty) return shared;
     if (shared.isEmpty) return local;
     return _dedupeRankingUsers([...local, ...shared]);
@@ -48886,7 +48905,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        if (_canSell || widget.user.isAdmin)
+        if (_canSell)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: GestureDetector(
@@ -48904,7 +48923,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   shape: BoxShape.circle,
                   boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))],
                 ),
-                child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 21),
+                child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 22),
               ),
             ),
           ),
@@ -51494,6 +51513,20 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             icon: const Icon(Icons.qr_code_scanner_rounded, color: _storePurple, size: 22),
             onPressed: () => openNgmyBarcodeScanner(context),
           ),
+          if (_canSell)
+            IconButton(
+              tooltip: 'Scan gift QR',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+              icon: const Icon(Icons.qr_code_2_rounded, color: Color(0xFFEC4899), size: 22),
+              onPressed: () => showNgmyHelperGiftStoreRedeemSheet(
+                context: context,
+                config: widget.config,
+                storeOwnerEmail: widget.user.email,
+                storeOwnerName: widget.user.username,
+                onDataChanged: widget.onDataChanged,
+              ),
+            ),
           Container(
             height: 36,
             width: 1,

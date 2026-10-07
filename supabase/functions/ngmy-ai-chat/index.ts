@@ -2224,12 +2224,31 @@ function mergeMemberLists(
   return [...byKey.values()];
 }
 
-function tombstoneRowKey(r: Record<string, unknown>): string {
-  const em = emailKey(String(r.email ?? ""));
-  if (em && !isRedactedCivicValue(em)) return `em:${em}`;
-  const rid = String(r.registryId ?? "").trim().toUpperCase();
-  if (rid) return `id:${rid}`;
-  return "";
+/** Email, registry id, and digit key so a ranking row without an email still matches a delete. */
+function identityKeys(row: Record<string, unknown>): string[] {
+  const keys: string[] = [];
+  const add = (k: string) => {
+    if (k && keys.indexOf(k) < 0) keys.push(k);
+  };
+  const visit = (src: Record<string, unknown>) => {
+    const em = emailKey(String(src.email ?? ""));
+    if (em && !isRedactedCivicValue(em)) add(`em:${em}`);
+    const linked = emailKey(String(src.linkedAppEmail ?? ""));
+    if (linked && !isRedactedCivicValue(linked)) add(`em:${linked}`);
+    for (const field of ["registryId", "previousRegistryId"]) {
+      const rid = String(src[field] ?? "").trim();
+      if (!rid) continue;
+      add(`id:${rid.toUpperCase()}`);
+      const person = rankingPersonKey({ registryId: rid, email: em });
+      if (person) add(`rk:${person}`);
+    }
+  };
+  visit(row);
+  const snap = row.snapshot;
+  if (snap && typeof snap === "object" && !Array.isArray(snap)) {
+    visit(snap as Record<string, unknown>);
+  }
+  return keys;
 }
 
 /** Keep live roster rows that are not superseded by delete/deceased tombstones. */
@@ -2238,42 +2257,35 @@ function filterTombstonedMembers(
   removed: Record<string, unknown>[],
   deceased: Record<string, unknown>[],
 ): Record<string, unknown>[] {
-  const tombstones = new Map<string, Record<string, unknown>>();
+  const removedAtByKey = new Map<string, number>();
   for (const r of removed) {
-    const key = tombstoneRowKey(r);
-    if (!key) continue;
-    const prev = tombstones.get(key);
-    if (!prev) {
-      tombstones.set(key, r);
-      continue;
+    const at = Date.parse(String(r.removedAt ?? "")) || 0;
+    for (const key of identityKeys(r)) {
+      const prev = removedAtByKey.get(key) ?? 0;
+      if (at >= prev) removedAtByKey.set(key, at);
     }
-    const a = Date.parse(String(prev.removedAt ?? "")) || 0;
-    const b = Date.parse(String(r.removedAt ?? "")) || 0;
-    if (b >= a) tombstones.set(key, r);
   }
 
   const deceasedKeys = new Set<string>();
   for (const d of deceased) {
-    const key = tombstoneRowKey(d);
-    if (key) deceasedKeys.add(key);
-    const snap = d.snapshot && typeof d.snapshot === "object"
-      ? (d.snapshot as Record<string, unknown>)
-      : null;
-    if (snap) {
-      const sk = memberRowKey(snap);
-      if (sk) deceasedKeys.add(sk);
-    }
+    for (const key of identityKeys(d)) deceasedKeys.add(key);
   }
 
   return members.filter((m) => {
-    const key = memberRowKey(m);
-    if (!key) return true;
-    if (deceasedKeys.has(key)) return false;
+    const keys = identityKeys(m);
+    if (keys.length === 0) return true;
+    if (keys.some((k) => deceasedKeys.has(k))) return false;
 
-    const tomb = tombstones.get(key);
-    if (!tomb) return true;
+    let removedAt = 0;
+    let hit = false;
+    for (const key of keys) {
+      const at = removedAtByKey.get(key);
+      if (at == null) continue;
+      hit = true;
+      if (at > removedAt) removedAt = at;
+    }
+    if (!hit) return true;
 
-    const removedAt = Date.parse(String(tomb.removedAt ?? "")) || 0;
     const restoredAt = Date.parse(String(m.restoredAt ?? "")) || 0;
 
     // Only an explicit restore / re-enroll brings a deleted member back.
@@ -3809,7 +3821,14 @@ async function handleCivicFetchRankings(
     }
   }
   const board = rankingBoardFromPayload(payload, state) ?? [];
-  const members = rankingSnapshotFrom(mergeMemberLists(live, board), state);
+  const members = rankingSnapshotFrom(
+    filterTombstonedMembers(
+      mergeMemberLists(live, board),
+      asMemberList(payload.removed),
+      asMemberList(payload.deceased),
+    ),
+    state,
+  );
   return jsonOk({
     ok: true,
     state: displayStateName(state),
@@ -4114,9 +4133,7 @@ async function handleCivicPersistRoster(
       removed,
       deceased,
     );
-    if (union.length > 0) {
-      rankingByState[snapKey] = rankingSnapshotFrom(union, snapState);
-    }
+    rankingByState[snapKey] = rankingSnapshotFrom(union, snapState);
   }
 
   const saved = await saveCivicPayload(admin, { members, removed, deceased, rankingByState });

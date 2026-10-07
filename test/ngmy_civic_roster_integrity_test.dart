@@ -376,4 +376,18 @@ void main() {
     NgmyCivicRegistryMembers.applyLiveRankingCounters(config, const [], state: 'Georgia');
     expect(NgmyCivicRegistryMembers.findByRegistryId(config, 'GA1111111')?['helps'], 0);
   });
+
+  test('a deleted member drops out of rankings even with a masked id', () {
+    final config = _RosterConfig();
+    NgmyCivicRegistryMembers.upsert(
+      config,
+      _member(email: 'ada@example.com', registryId: 'GA6250732', fullName: 'Ada Lovelace'),
+    );
+    NgmyCivicRegistryMembers.softDeleteByRegistryId(config, 'GA6250732');
+    final visible = NgmyCivicRegistryMembers.withoutRemovedFromRankings(config, [
+      {'fullName': 'Ada Lovelace', 'registryId': '**6250732', 'state': 'Georgia', 'helps': 4},
+      {'fullName': 'Grace Hopper', 'registryId': 'GA7777777', 'state': 'Georgia', 'helps': 1},
+    ]);
+    expect(visible.map((e) => e['fullName']).toList(), ['Grace Hopper']);
+  });
 }

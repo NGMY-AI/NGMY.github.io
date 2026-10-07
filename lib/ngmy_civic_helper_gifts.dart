@@ -439,7 +439,7 @@ class NgmyCivicHelperGifts {
     required String storeListingId,
     required String grantedBy,
   }) async {
-    if (amount <= 0 || giftName.trim().isEmpty || storeAddress.trim().isEmpty) return null;
+    if (amount <= 0 || giftName.trim().isEmpty || storeSellerEmail.trim().isEmpty) return null;
     final token = _generateGiftToken();
     final qrPayload = '$kNgmyHelperGiftQrPrefix|$token';
     final now = DateTime.now().toUtc().toIso8601String();
@@ -537,10 +537,21 @@ class NgmyCivicHelperGifts {
     }
     final owner = storeOwnerEmail.toLowerCase().trim();
     final locked = gift.storeSellerEmail;
-    if (locked.isNotEmpty && locked != owner) {
+    if (owner.isEmpty) {
+      return (ok: false, message: 'Sign in as the store owner to scan this gift.', gift: gift);
+    }
+    if (locked.isEmpty) {
       return (
         ok: false,
-        message: 'This gift is for ${gift.storeSellerName.isEmpty ? gift.storeAddress : gift.storeSellerName}. Sign in as that store owner to redeem.',
+        message: 'This gift is not locked to a store. Ask the admin to choose an NGMY store.',
+        gift: gift,
+      );
+    }
+    if (locked != owner) {
+      final where = gift.storeSellerName.isEmpty ? gift.storeAddress : gift.storeSellerName;
+      return (
+        ok: false,
+        message: 'This money card is only for $where. Another store cannot redeem it.',
         gift: gift,
       );
     }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_civic_helper_gifts.dart';
+import 'ngmy_nav.dart';
 
 /// Admin sheet: pick a beautiful present style, name, amount, and store address, then grant.
 Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
@@ -134,8 +137,8 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                 TextField(
                   controller: nameC,
                   decoration: InputDecoration(
-                    labelText: 'What are you giving them?',
-                    hintText: 'e.g. Grocery credit, tools kit',
+                    labelText: 'Money card name',
+                    hintText: 'e.g. Grocery money card',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
@@ -144,8 +147,8 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                   controller: amountC,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: 'Amount (\$)',
-                    hintText: 'Store credit amount',
+                    labelText: 'Money on the card (\$)',
+                    hintText: 'Amount the store will see',
                     prefixText: '\$ ',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                   ),
@@ -154,7 +157,7 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                 Text('REDEEM AT NGMY STORE', style: TextStyle(fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
                 const SizedBox(height: 6),
                 Text(
-                  'Pick a store address. The helper shows their gift QR; the store owner scans it and honors the amount.',
+                  'This sends a money card with a QR. Pick the one NGMY store that can scan it. Other stores cannot redeem it.',
                   style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                 ),
                 const SizedBox(height: 8),
@@ -212,12 +215,15 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                       : () async {
                           final amount = double.tryParse(amountC.text.trim()) ?? 0;
                           final name = nameC.text.trim();
-                          final opt = storeOptions.cast<Map<String, dynamic>?>().firstWhere(
-                                (o) => o?['id'] == selectedListingId,
-                                orElse: () => storeOptions.isNotEmpty ? storeOptions.first : null,
-                              );
-                          if (name.isEmpty || amount <= 0 || opt == null) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Enter gift name, amount, and pick a store.')));
+                          Map<String, dynamic>? opt;
+                          for (final o in storeOptions) {
+                            if (o['id'] == selectedListingId) opt = o;
+                          }
+                          final seller = (opt?['sellerEmail'] ?? '').toString().trim();
+                          if (name.isEmpty || amount <= 0 || opt == null || seller.isEmpty) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Enter the card name, the amount, and the NGMY store that can spend it.')),
+                            );
                             return;
                           }
                           final gift = await onGrant(
@@ -238,7 +244,7 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   icon: const Icon(Icons.send_rounded),
-                  label: const Text('Send present to helper', style: TextStyle(fontWeight: FontWeight.w900)),
+                  label: const Text('Send money card', style: TextStyle(fontWeight: FontWeight.w900)),
                 ),
               ],
             ),
@@ -285,7 +291,7 @@ Future<void> showNgmyHelperGiftReceivedDialog(BuildContext context, NgmyHelperGi
             const SizedBox(height: 4),
             Text(gift.giftName, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontWeight: FontWeight.w700, fontSize: 15)),
             const SizedBox(height: 4),
-            Text('\$${gift.amount.toStringAsFixed(2)} store credit', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
+            Text('\$${gift.amount.toStringAsFixed(2)} money card', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 26)),
             const SizedBox(height: 10),
             Container(
               padding: const EdgeInsets.all(12),
@@ -294,7 +300,7 @@ Future<void> showNgmyHelperGiftReceivedDialog(BuildContext context, NgmyHelperGi
             ),
             const SizedBox(height: 10),
             Text(
-              'Show this QR at:\n${gift.storeAddress}',
+              'Only this store can scan this card:\n${gift.storeAddress}',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 12, height: 1.35, fontWeight: FontWeight.w600),
             ),
@@ -332,7 +338,95 @@ Future<void> showNgmyHelperGiftReceivedDialog(BuildContext context, NgmyHelperGi
   );
 }
 
-/// Store owner redeem sheet — paste/scan helper gift QR and honor the amount.
+Future<String?> _scanHelperGiftQr(BuildContext context) {
+  if (!barcode_platform.ngmyBarcodeUseCamera) return Future.value(null);
+  return NgmyNavigator.push<String>(
+    context,
+    const _NgmyHelperGiftScanPage(),
+    routeName: 'NgmyHelperGiftScan',
+    fullscreenDialog: true,
+  );
+}
+
+class _NgmyHelperGiftScanPage extends StatefulWidget {
+  const _NgmyHelperGiftScanPage();
+
+  @override
+  State<_NgmyHelperGiftScanPage> createState() => _NgmyHelperGiftScanPageState();
+}
+
+class _NgmyHelperGiftScanPageState extends State<_NgmyHelperGiftScanPage> {
+  final MobileScannerController _camera = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    facing: CameraFacing.back,
+    formats: const [BarcodeFormat.qrCode],
+  );
+  bool _handled = false;
+
+  @override
+  void dispose() {
+    _camera.dispose();
+    super.dispose();
+  }
+
+  void _accept(String raw) {
+    if (_handled || !mounted) return;
+    final token = NgmyCivicHelperGifts.parseTokenFromPayload(raw);
+    if (token == null) return;
+    _handled = true;
+    NgmyNavigator.pop(context, raw.trim());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0B1220),
+        foregroundColor: Colors.white,
+        title: const Text('Scan gift QR'),
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          MobileScanner(
+            controller: _camera,
+            onDetect: (capture) {
+              for (final barcode in capture.barcodes) {
+                final raw = (barcode.rawValue ?? barcode.displayValue ?? '').trim();
+                if (raw.isEmpty) continue;
+                _accept(raw);
+                return;
+              }
+            },
+          ),
+          Center(
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: const Color(0xFFEC4899), width: 3),
+              ),
+            ),
+          ),
+          const Positioned(
+            left: 24,
+            right: 24,
+            bottom: 36,
+            child: Text(
+              'Point the camera at the member’s money-card QR.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Store owner redeem sheet — scan the helper gift QR and honor the amount.
 Future<void> showNgmyHelperGiftStoreRedeemSheet({
   required BuildContext context,
   required dynamic config,
@@ -362,13 +456,39 @@ Future<void> showNgmyHelperGiftStoreRedeemSheet({
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Scan helper gift QR', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                Text('Scan money card', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                 const SizedBox(height: 6),
                 Text(
-                  'Paste the NGMY helper gift code from the customer\'s phone. You\'ll see the amount to honor in-store.',
+                  'Scan the member’s QR. You only see the amount if the admin chose your store.',
                   style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
                 ),
                 const SizedBox(height: 12),
+                if (barcode_platform.ngmyBarcodeUseCamera)
+                  FilledButton.icon(
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            final raw = await _scanHelperGiftQr(ctx);
+                            if (raw == null || raw.trim().isEmpty) return;
+                            codeC.text = raw.trim();
+                            setST(() => busy = true);
+                            final token = NgmyCivicHelperGifts.parseTokenFromPayload(codeC.text) ?? codeC.text.trim();
+                            final g = await NgmyCivicHelperGifts.loadGiftByToken(token, config: config);
+                            setST(() {
+                              busy = false;
+                              peeked = g;
+                              message = g == null ? 'Gift not found.' : null;
+                            });
+                          },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFEC4899),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.qr_code_2_rounded),
+                    label: const Text('Scan QR code', style: TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                if (barcode_platform.ngmyBarcodeUseCamera) const SizedBox(height: 10),
                 TextField(
                   controller: codeC,
                   decoration: InputDecoration(
@@ -394,7 +514,7 @@ Future<void> showNgmyHelperGiftStoreRedeemSheet({
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(peeked!.giftName, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                        Text('\$${peeked!.amount.toStringAsFixed(2)} credit', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF059669))),
+                        Text('\$${peeked!.amount.toStringAsFixed(2)} on this card', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22, color: Color(0xFF059669))),
                         Text('For: ${peeked!.fullName}', style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54)),
                         if (peeked!.redeemed) const Text('Already redeemed', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w800)),
                       ],
@@ -505,7 +625,7 @@ class NgmyHelperGiftAdminBanner extends StatelessWidget {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                     const Text(
-                      'First helper 3 times in a row — tap to grant a gift',
+                      'First helper 3 times in a row — tap to send a money card',
                       style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ],
