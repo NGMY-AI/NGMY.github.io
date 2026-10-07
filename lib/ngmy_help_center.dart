@@ -40,10 +40,17 @@ bool ngmyHelpCenterIsMovingDelivery(NgmyHelpCenterService service) =>
     service.name.toLowerCase().contains('moving') ||
     service.name.toLowerCase().contains('delivery');
 
-bool ngmyHelpCenterIsHouseFixture(NgmyHelpCenterService service) =>
-    service.id == 'house_fixture' ||
-    service.name.toLowerCase().contains('house fixture') ||
-    service.name.toLowerCase().contains('home repair');
+bool ngmyHelpCenterIsHouseFixture(NgmyHelpCenterService service) {
+  final id = service.id.toLowerCase().trim();
+  final name = service.name.toLowerCase().trim();
+  return id == 'house_fixture' ||
+      id.contains('house') ||
+      name.contains('house fixture') ||
+      name.contains('home repair') ||
+      name.contains('house insurance') ||
+      name.contains('house fix') ||
+      (name.contains('house') && (name.contains('fix') || name.contains('repair') || name.contains('fixture')));
+}
 
 IconData ngmyHelpCenterServiceIcon(NgmyHelpCenterService service) {
   if (ngmyHelpCenterIsSendMoney(service)) return Icons.attach_money_rounded;
@@ -208,7 +215,18 @@ class NgmyHelpCenterConfig {
 
   factory NgmyHelpCenterConfig.defaults() => NgmyHelpCenterConfig(services: defaultServices());
 
-  List<NgmyHelpCenterService> activeServices() => services.where((s) => s.enabled && s.name.trim().isNotEmpty).toList();
+  List<NgmyHelpCenterService> activeServices() {
+    final active = services.where((s) => s.enabled && s.name.trim().isNotEmpty).toList();
+    // Always keep House Fixture available so Free House Insurance stays reachable
+    // even when an older cloud Help Center config omitted it.
+    final hasHouse = active.any(ngmyHelpCenterIsHouseFixture);
+    if (!hasHouse) {
+      final defaults = defaultServices();
+      final house = defaults.firstWhere((s) => s.id == 'house_fixture');
+      return [house, ...active];
+    }
+    return active;
+  }
 
   String digitsPhone() => phone.replaceAll(RegExp(r'[^\d+]'), '');
 

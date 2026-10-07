@@ -531,6 +531,40 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
                           children: [
                             _enterBlock(begin: 0.0, end: 0.35, child: _posterCard(isDark)),
+                            if (widget.appConfig != null && widget.user != null && widget.onCharge != null) ...[
+                              const SizedBox(height: 14),
+                              _enterBlock(
+                                begin: 0.05,
+                                end: 0.4,
+                                child: NgmyHouseInsuranceCard(
+                                  isDark: isDark,
+                                  active: NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail),
+                                  monthlyFee: NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig),
+                                  accessUntil: NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail),
+                                  onSubscribe: () async {
+                                    for (final s in services) {
+                                      if (ngmyHelpCenterIsHouseFixture(s)) {
+                                        _selectService(s);
+                                        break;
+                                      }
+                                    }
+                                    final ok = await NgmyHouseInsurance.confirmAndChargeMonthly(
+                                      context: context,
+                                      user: widget.user,
+                                      config: widget.appConfig,
+                                      onCharge: widget.onCharge!,
+                                      onDataChanged: widget.onDataChanged ?? () {},
+                                      onPersistConfig: widget.onPersistConfig ?? () async => true,
+                                    );
+                                    if (ok && mounted) {
+                                      setState(() {});
+                                      _snack('House Insurance is active — you\'re covered for small fixes!');
+                                    }
+                                  },
+                                  onViewCoverage: () => showNgmyHouseInsuranceCoverageSheet(context, isDark: isDark),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 22),
                             _enterBlock(begin: 0.12, end: 0.48, child: _stepsRow(isDark)),
                             const SizedBox(height: 22),
@@ -739,6 +773,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   Widget _serviceGridTile(NgmyHelpCenterService s, bool isDark) {
     final selected = _selected?.id == s.id;
     final isMoney = ngmyHelpCenterIsSendMoney(s);
+    final isHouse = ngmyHelpCenterIsHouseFixture(s);
     return AnimatedScale(
       scale: selected ? 1.04 : 1.0,
       duration: const Duration(milliseconds: 240),
@@ -756,61 +791,95 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               borderRadius: BorderRadius.circular(18),
               gradient: selected
                   ? LinearGradient(colors: [_accent.withOpacity(0.22), _accent2.withOpacity(0.18)])
-                  : null,
-              color: selected ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-              border: Border.all(color: selected ? _accent.withOpacity(0.65) : (isDark ? Colors.white12 : Colors.black12), width: selected ? 1.6 : 1),
+                  : (isHouse
+                      ? LinearGradient(colors: [
+                          const Color(0xFF0F766E).withOpacity(isDark ? 0.35 : 0.12),
+                          const Color(0xFF1D4ED8).withOpacity(isDark ? 0.28 : 0.10),
+                        ])
+                      : null),
+              color: selected || isHouse ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
+              border: Border.all(
+                color: selected
+                    ? _accent.withOpacity(0.65)
+                    : (isHouse ? const Color(0xFF0EA5E9) : (isDark ? Colors.white12 : Colors.black12)),
+                width: selected || isHouse ? 1.6 : 1,
+              ),
               boxShadow: selected ? [BoxShadow(color: _accent.withOpacity(0.22), blurRadius: 16)] : null,
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Stack(
               children: [
-                AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, __) => Transform.scale(
-                    scale: selected ? 1.0 + _pulse.value * 0.04 : 1.0,
+                if (isHouse)
+                  Positioned(
+                    top: 0,
+                    right: 0,
                     child: Container(
-                      width: 46,
-                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        gradient: LinearGradient(
-                          colors: isMoney
-                              ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                              : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
-                        ),
-                        boxShadow: selected
-                            ? [BoxShadow(color: _accent.withOpacity(0.35 + _pulse.value * 0.2), blurRadius: 12)]
-                            : null,
+                        gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF0EA5E9)]),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
+                      child: const Text('\$50/mo', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  s.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                ),
-                if (s.description.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    s.description,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 9, height: 1.2, color: isDark ? Colors.white60 : Colors.black54),
-                  ),
-                ],
-                AnimatedOpacity(
-                  opacity: selected ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
-                  ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _pulse,
+                      builder: (_, __) => Transform.scale(
+                        scale: selected ? 1.0 + _pulse.value * 0.04 : 1.0,
+                        child: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(14),
+                            gradient: LinearGradient(
+                              colors: isHouse
+                                  ? [const Color(0xFF0F766E), const Color(0xFF1D4ED8)]
+                                  : isMoney
+                                      ? [const Color(0xFF059669), const Color(0xFF10B981)]
+                                      : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
+                            ),
+                            boxShadow: selected
+                                ? [BoxShadow(color: _accent.withOpacity(0.35 + _pulse.value * 0.2), blurRadius: 12)]
+                                : null,
+                          ),
+                          child: Icon(isHouse ? Icons.shield_moon_rounded : ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      isHouse ? 'House + Insurance' : s.name,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isHouse
+                          ? 'Free House Insurance \$50/mo'
+                          : (s.description.isEmpty ? 'Tap to open' : s.description),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9,
+                        height: 1.2,
+                        fontWeight: isHouse ? FontWeight.w800 : FontWeight.w600,
+                        color: isHouse ? const Color(0xFF0EA5E9) : (isDark ? Colors.white60 : Colors.black54),
+                      ),
+                    ),
+                    AnimatedOpacity(
+                      opacity: selected ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 6),
+                        child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
