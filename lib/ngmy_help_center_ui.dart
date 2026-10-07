@@ -820,9 +820,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     final isMoney = ngmyHelpCenterIsSendMoney(s);
     final isHouse = ngmyHelpCenterIsHouseFixture(s);
     final name = isHouse ? 'House + Insurance' : s.name;
-    final description = isHouse
-        ? '\$50/mo coverage'
-        : (s.description.isEmpty ? 'Tap to open' : s.description);
+    final description = s.description.trim();
     final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : Colors.black54;
     return Material(
@@ -839,11 +837,13 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               width: 1,
             ),
           ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Center(
-                child: Container(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
@@ -856,41 +856,26 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                   ),
                   child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
                 ),
-              ),
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 22,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(
-                        name,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: titleColor),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: muted),
-                    ),
-                  ],
+                const SizedBox(height: 10),
+                Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, height: 1.15, color: titleColor),
                 ),
-              ),
-              if (selected)
-                const Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
-                ),
-            ],
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, height: 1.25, fontWeight: FontWeight.w500, color: muted),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
