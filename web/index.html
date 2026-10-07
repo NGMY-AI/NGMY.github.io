@@ -861,7 +861,7 @@
 
         if (err) err.style.display = "flex";
 
-        if (msgEl) msgEl.textContent = msg || "NGMY could not load. Library and school Wi-Fi often block apps — try mobile data or home internet.";
+        if (msgEl) msgEl.textContent = msg || "NGMY could not start. Tap Reload.";
 
       }
 
@@ -1001,8 +1001,48 @@
       ];
 
       function showBootstrapError(hint) {
-        var msg = hint || 'NGMY could not load. Open once with good internet (mobile data works). Library and school Wi-Fi often block login — try home internet or cellular data.';
+        var msg = hint || 'NGMY could not start. Tap Reload. If you are offline, open once on home internet and wait for the home screen.';
         window.__ngmyShowLoadError && window.__ngmyShowLoadError(msg);
+      }
+
+      function bootstrapLooksValid(code) {
+        if (!code || code.indexOf('_flutter.loader') === -1) return false;
+        if (code.indexOf('async load({){') !== -1) return false;
+        try {
+          new Function(code);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function recoverBrokenShell() {
+        try {
+          if (sessionStorage.getItem('ngmy_boot_recover') === deployId) {
+            showBootstrapError('NGMY could not start. Tap Reload. Your connection is fine — a saved copy of the app was damaged. If Reload does not work, clear website data for this site and open it again.');
+            return Promise.resolve();
+          }
+          sessionStorage.setItem('ngmy_boot_recover', deployId);
+        } catch (e) {}
+        var clearSw = ('serviceWorker' in navigator)
+          ? navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            }).catch(function () {})
+          : Promise.resolve();
+        return clearSw.then(function () {
+          if (!('caches' in window)) return;
+          return caches.keys().then(function (keys) {
+            return Promise.all(keys.filter(function (k) {
+              return k.indexOf('ngmy') === 0;
+            }).map(function (k) { return caches.delete(k); }));
+          });
+        }).then(function () {
+          var url = new URL(location.href);
+          url.searchParams.set('ngmy_recover', deployId);
+          location.replace(url.toString());
+        }).catch(function () {
+          location.reload();
+        });
       }
 
       function pathFromUrl(src) {
@@ -1248,6 +1288,7 @@
         }).then(function (bootHit) {
           if (!bootHit) throw new Error('bootstrap missing');
           return bootHit.text().then(function (code) {
+            if (!bootstrapLooksValid(code)) return recoverBrokenShell();
             return injectBootstrap(code);
           });
         }).catch(function () {
@@ -1262,6 +1303,7 @@
         loadAttempts += 1;
         fetchBootstrapText('flutter_bootstrap.js?v=' + deployId)
           .then(function (code) {
+            if (!bootstrapLooksValid(code)) return recoverBrokenShell();
             return injectBootstrap(code);
           })
           .catch(function () {
@@ -1292,14 +1334,14 @@
         }
 
         var bootTimer = setTimeout(function () {
-          showBootstrapError('NGMY is still loading. If you are on school or library Wi-Fi, try home internet or mobile data, then tap Reload.');
+          showBootstrapError('NGMY is still loading. Tap Reload. If you are offline, connect once and wait for the home screen.');
         }, 180000);
 
         var bootstrapTimer = setTimeout(function () {
           if (!window._flutter || !window._flutter.loader) {
             showBootstrapError(window.__NGMY_IN_APP_BROWSER__
               ? 'This in-app browser is taking too long. Tap Reload, or tap the menu and choose Open in Safari / Chrome.'
-              : 'NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open again on home Wi-Fi or mobile data.');
+              : 'NGMY engine failed to start. Tap Reload. If this keeps happening, clear website data for ngmy.org and open the site again.');
           }
         }, 25000);
 

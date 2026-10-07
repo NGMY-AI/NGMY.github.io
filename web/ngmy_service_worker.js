@@ -604,6 +604,15 @@ self.addEventListener('fetch', (event) => {
       const shellAsset =
         isAppShellAsset(url) || isCriticalScript(url) || isCriticalFont(url);
 
+      // A previous publisher corrupted flutter_bootstrap.js into
+      // `async load({){`. Never serve that cached copy.
+      if (shellAsset && cached && /flutter_bootstrap\.js$/i.test(url.pathname)) {
+        try {
+          const probe = await cached.clone().text();
+          if (probe.indexOf('async load({){') !== -1) cached = null;
+        } catch (_) {}
+      }
+
       // Cache-first for shell assets — required for iOS offline (onLine is unreliable).
       // No background re-fetch: this cache is per deploy, so a cached asset is
       // already the current build's file (re-fetching re-downloaded ~30 MB per load).

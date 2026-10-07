@@ -99,8 +99,13 @@ if (Test-Path $manifestPath) {
 $bootPath = Join-Path $PSScriptRoot "docs\flutter_bootstrap.js"
 if (Test-Path $bootPath) {
     $boot = Get-Content $bootPath -Raw
-    $boot = $boot -replace ',\{\}', ''
+    # Only strip a real object literal (`serviceWorkerSettings: { ... }`).
+    # Never match minified `serviceWorkerSettings:e`, and never delete `,{}` —
+    # both of those turn the loader into invalid `async load({){`.
     $boot = $boot -replace '(?s)\s*serviceWorkerSettings:\s*\{[^}]*\}\s*,?', ''
+    if ($boot -match 'async load\(\{\)\{') {
+        throw "flutter_bootstrap.js is invalid (async load({){). Refusing to publish."
+    }
     Set-Content -Path $bootPath -Value $boot -Encoding UTF8 -NoNewline
     Write-Host "  Patched flutter_bootstrap.js (disabled Flutter unregister-only worker)" -ForegroundColor DarkGray
 }

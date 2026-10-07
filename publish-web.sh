@@ -75,8 +75,10 @@ EOF
 fi
 
 if [[ -f docs/flutter_bootstrap.js ]]; then
-  sed -i 's/,{}//g' docs/flutter_bootstrap.js
-  sed -i 's/serviceWorkerSettings:[^{]*{[^}]*},*//g' docs/flutter_bootstrap.js
+  # Do not regex-strip serviceWorkerSettings. Flutter's minified loader is
+  # `async load({serviceWorkerSettings:e,...}={})` and a broad replace turns
+  # that into invalid `async load({){`, which shows the Wi-Fi error on every
+  # network. Only rewrite the empty load() call Flutter emits before our patch.
   if grep -q '_flutter.loader.load({});' docs/flutter_bootstrap.js; then
     python3 - <<'PY'
 from pathlib import Path
@@ -98,6 +100,13 @@ boot = boot.replace("_flutter.loader.load({});", loader)
 Path("docs/flutter_bootstrap.js").write_text(boot)
 PY
   fi
+  if grep -q 'async load({){' docs/flutter_bootstrap.js; then
+    echo "flutter_bootstrap.js is invalid (async load({){). Refusing to publish." >&2
+    exit 1
+  fi
+  if command -v node >/dev/null 2>&1; then
+    node --check docs/flutter_bootstrap.js
+  fi
 fi
 
 rm -f docs/flutter_service_worker.js
@@ -106,22 +115,33 @@ SW_TEMPLATE="web/ngmy_service_worker.js"
 SW_OUT="docs/ngmy_service_worker.js"
 if [[ -f "$SW_TEMPLATE" ]]; then
   python3 - <<PY
-import json
+import hashlib
 from pathlib import Path
 
 deploy_id = "$DEPLOY_ID"
 template = Path("$SW_TEMPLATE").read_text()
 docs = Path("docs")
-urls = {"./", "./index.html"}
-for p in docs.rglob("*"):
-    if p.is_file() and p.name != "ngmy_service_worker.js":
-        rel = "./" + p.relative_to(docs).as_posix()
-        urls.add(rel)
-json_urls = ", ".join(json.dumps(u) for u in sorted(urls))
-sw = template.replace("__NGMY_DEPLOY_ID__", deploy_id).replace("__NGMY_PRECACHE_URLS__", f"[{json_urls}]")
+revs = {}
+for p in sorted(docs.rglob("*")):
+    if not p.is_file():
+        continue
+    if p.name == "ngmy_service_worker.js" or p.name == "NOTICES" or p.suffix == ".symbols":
+        continue
+    rel = "./" + p.relative_to(docs).as_posix()
+    digest = hashlib.md5(p.read_bytes()).hexdigest()[:16]
+    revs[rel] = digest
+if "./index.html" in revs:
+    revs["./"] = revs["./index.html"]
+import json
+sw = template.replace("__NGMY_DEPLOY_ID__", deploy_id).replace("__NGMY_PRECACHE_REVS__", json.dumps(revs, separators=(",", ":")))
+if "__NGMY_PRECACHE_REVS__" in sw or "__NGMY_DEPLOY_ID__" in sw:
+    raise SystemExit("service worker template placeholders were not filled")
 Path("$SW_OUT").write_text(sw)
-print(f"  Wrote ngmy_service_worker.js ({len(urls)} precache URLs)")
+print(f"  Wrote ngmy_service_worker.js ({len(revs)} revisioned URLs)")
 PY
+  if command -v node >/dev/null 2>&1; then
+    node --check docs/ngmy_service_worker.js
+  fi
 fi
 
 MAIN_SIZE=$(wc -c < docs/main.dart.js 2>/dev/null || echo 0)
