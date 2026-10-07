@@ -14,6 +14,7 @@ import 'ngmy_help_center_send_money_delivery_status.dart';
 import 'ngmy_help_center_send_money_receipt.dart';
 import 'ngmy_help_center_send_money_receipt_templates.dart';
 import 'ngmy_help_center_send_money_store.dart';
+import 'ngmy_house_insurance.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_qr_download.dart';
 
@@ -30,6 +31,11 @@ class NgmyHelpCenterScreen extends StatefulWidget {
     this.clientEmail = '',
     this.clientPhone = '',
     this.isAdmin = false,
+    this.appConfig,
+    this.user,
+    this.onCharge,
+    this.onDataChanged,
+    this.onPersistConfig,
   });
 
   final Map<String, dynamic> configMap;
@@ -37,6 +43,12 @@ class NgmyHelpCenterScreen extends StatefulWidget {
   final String clientEmail;
   final String clientPhone;
   final bool isAdmin;
+  /// Optional live AppConfig for Free House Insurance subscription.
+  final dynamic appConfig;
+  final dynamic user;
+  final Future<bool> Function(double amount, String description)? onCharge;
+  final VoidCallback? onDataChanged;
+  final Future<bool> Function()? onPersistConfig;
 
   @override
   State<NgmyHelpCenterScreen> createState() => _NgmyHelpCenterScreenState();
@@ -981,6 +993,29 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             _deliveryFeeBox(isDark),
           ] else if (_isHouseFixture) ...[
             const SizedBox(height: 10),
+            if (widget.appConfig != null && widget.user != null && widget.onCharge != null) ...[
+              NgmyHouseInsuranceCard(
+                isDark: isDark,
+                active: NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail),
+                monthlyFee: NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig),
+                accessUntil: NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail),
+                onSubscribe: () async {
+                  final ok = await NgmyHouseInsurance.confirmAndChargeMonthly(
+                    context: context,
+                    user: widget.user,
+                    config: widget.appConfig,
+                    onCharge: widget.onCharge!,
+                    onDataChanged: widget.onDataChanged ?? () {},
+                    onPersistConfig: widget.onPersistConfig ?? () async => true,
+                  );
+                  if (ok && mounted) {
+                    setState(() {});
+                    _snack('House Insurance is active — you\'re covered for small fixes!');
+                  }
+                },
+                onViewCoverage: () => showNgmyHouseInsuranceCoverageSheet(context, isDark: isDark),
+              ),
+            ],
             Text(
               'Tell us about the repair — the more detail, the faster we can help.',
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),

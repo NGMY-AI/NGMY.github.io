@@ -789,6 +789,9 @@ class NgmyCivicRegistryMembers {
       if (!next.containsKey('profileFlags') || next['profileFlags'] == null) {
         next['profileFlags'] = keep['profileFlags'] ?? const <String, dynamic>{};
       }
+      next['firstHelperStreak'] = next['firstHelperStreak'] ?? keep['firstHelperStreak'] ?? 0;
+      next['lastFirstHelperCampaignId'] =
+          (next['lastFirstHelperCampaignId'] ?? keep['lastFirstHelperCampaignId'] ?? '').toString();
       NgmyCivicRegistryAccess.mergeInto(next, keep);
       next['updatedAt'] = now;
       members[idx] = next;

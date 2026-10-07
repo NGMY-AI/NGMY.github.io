@@ -50,6 +50,9 @@ import 'ngmy_local_bio_guest.dart';
 import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
+import 'ngmy_house_insurance.dart';
+import 'ngmy_civic_helper_gifts.dart';
+import 'ngmy_civic_helper_gift_ui.dart';
 import 'ngmy_translate_payments.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_session.dart';
@@ -1837,6 +1840,13 @@ class AppConfig {
   /// Monthly wallet fee for G-Services repair estimates (photo → price). 0 = free.
   double repairEstimateMonthlyFee;
   Map<String, String> repairEstimateAccessUntilByEmail;
+  /// Monthly wallet fee for Help Center Free House Insurance (default \$50). 0 = free.
+  double houseInsuranceMonthlyFee;
+  Map<String, String> houseInsuranceAccessUntilByEmail;
+  /// Civic Registry: pending admin gift grants for 3-in-a-row first helpers.
+  List<Map<String, dynamic>> civicHelperGiftPending;
+  /// Civic Registry: granted helper gifts (user inbox + store redeem).
+  List<Map<String, dynamic>> civicHelperGiftInbox;
   /// Free message translations per week in Document Scanner (0 = unlimited).
   int translateWeeklyFreeLimit;
   /// Wallet fee to unlock unlimited translations for the rest of the week.
@@ -1966,6 +1976,10 @@ class AppConfig {
     Map<String, String>? appStudioAiAccessUntilByEmail,
     this.repairEstimateMonthlyFee = NgmyRepairEstimatePayments.defaultMonthlyFee,
     Map<String, String>? repairEstimateAccessUntilByEmail,
+    this.houseInsuranceMonthlyFee = NgmyHouseInsurance.defaultMonthlyFee,
+    Map<String, String>? houseInsuranceAccessUntilByEmail,
+    List<Map<String, dynamic>>? civicHelperGiftPending,
+    List<Map<String, dynamic>>? civicHelperGiftInbox,
     this.translateWeeklyFreeLimit = NgmyTranslatePayments.defaultWeeklyFreeLimit,
     this.translateWeeklyUnlockFee = NgmyTranslatePayments.defaultWeeklyUnlockFee,
     Map<String, String>? translateWeekPassByEmail,
@@ -2021,6 +2035,9 @@ class AppConfig {
         appStudioCloudAccessUntilByEmail = appStudioCloudAccessUntilByEmail ?? const {},
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
         repairEstimateAccessUntilByEmail = repairEstimateAccessUntilByEmail ?? const {},
+        houseInsuranceAccessUntilByEmail = houseInsuranceAccessUntilByEmail ?? const {},
+        civicHelperGiftPending = civicHelperGiftPending ?? const [],
+        civicHelperGiftInbox = civicHelperGiftInbox ?? const [],
         translateWeekPassByEmail = translateWeekPassByEmail ?? const {},
         communicateAccessUntilByEmail = communicateAccessUntilByEmail ?? const {},
         documentScanAccessUntilByEmail = documentScanAccessUntilByEmail ?? const {},
@@ -2129,6 +2146,10 @@ class AppConfig {
     'appStudioAiAccessUntilByEmail': appStudioAiAccessUntilByEmail,
     'repairEstimateMonthlyFee': repairEstimateMonthlyFee,
     'repairEstimateAccessUntilByEmail': repairEstimateAccessUntilByEmail,
+    'houseInsuranceMonthlyFee': houseInsuranceMonthlyFee,
+    'houseInsuranceAccessUntilByEmail': houseInsuranceAccessUntilByEmail,
+    'civicHelperGiftPending': civicHelperGiftPending,
+    'civicHelperGiftInbox': civicHelperGiftInbox,
     'translateWeeklyFreeLimit': translateWeeklyFreeLimit,
     'translateWeeklyUnlockFee': translateWeeklyUnlockFee,
     'translateWeekPassByEmail': translateWeekPassByEmail,
@@ -2281,6 +2302,14 @@ class AppConfig {
     appStudioAiAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['appStudioAiAccessUntilByEmail']),
     repairEstimateMonthlyFee: (json['repairEstimateMonthlyFee'] as num?)?.toDouble() ?? NgmyRepairEstimatePayments.defaultMonthlyFee,
     repairEstimateAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['repairEstimateAccessUntilByEmail']),
+    houseInsuranceMonthlyFee: (json['houseInsuranceMonthlyFee'] as num?)?.toDouble() ?? NgmyHouseInsurance.defaultMonthlyFee,
+    houseInsuranceAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['houseInsuranceAccessUntilByEmail']),
+    civicHelperGiftPending: List<Map<String, dynamic>>.from(
+      (json['civicHelperGiftPending'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
+    civicHelperGiftInbox: List<Map<String, dynamic>>.from(
+      (json['civicHelperGiftInbox'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
+    ),
     translateWeeklyFreeLimit: (json['translateWeeklyFreeLimit'] as num?)?.toInt() ?? NgmyTranslatePayments.defaultWeeklyFreeLimit,
     translateWeeklyUnlockFee: (json['translateWeeklyUnlockFee'] as num?)?.toDouble() ?? NgmyTranslatePayments.defaultWeeklyUnlockFee,
     translateWeekPassByEmail: _familyTreePhotoAccessFromJson(json['translateWeekPassByEmail']),
@@ -3991,6 +4020,34 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.repairEstimateAccessUntilByEmail.isNotEmpty) {
     next.repairEstimateAccessUntilByEmail = Map<String, String>.from(keep.repairEstimateAccessUntilByEmail);
+  }
+  if (record.containsKey('houseInsuranceMonthlyFee') && !ngmyShouldDeferRemoteConfigOverwrite()) {
+    final v = record['houseInsuranceMonthlyFee'];
+    if (v is num && v >= 0) next.houseInsuranceMonthlyFee = v.toDouble();
+  } else {
+    next.houseInsuranceMonthlyFee = keep.houseInsuranceMonthlyFee;
+  }
+  if (record.containsKey('houseInsuranceAccessUntilByEmail') && record['houseInsuranceAccessUntilByEmail'] is Map) {
+    next.houseInsuranceAccessUntilByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['houseInsuranceAccessUntilByEmail']),
+      ...keep.houseInsuranceAccessUntilByEmail,
+    };
+  } else if (keep.houseInsuranceAccessUntilByEmail.isNotEmpty) {
+    next.houseInsuranceAccessUntilByEmail = Map<String, String>.from(keep.houseInsuranceAccessUntilByEmail);
+  }
+  if (record.containsKey('civicHelperGiftPending') && record['civicHelperGiftPending'] is List) {
+    next.civicHelperGiftPending = List<Map<String, dynamic>>.from(
+      (record['civicHelperGiftPending'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  } else if (keep.civicHelperGiftPending.isNotEmpty) {
+    next.civicHelperGiftPending = List<Map<String, dynamic>>.from(keep.civicHelperGiftPending);
+  }
+  if (record.containsKey('civicHelperGiftInbox') && record['civicHelperGiftInbox'] is List) {
+    next.civicHelperGiftInbox = List<Map<String, dynamic>>.from(
+      (record['civicHelperGiftInbox'] as List).map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  } else if (keep.civicHelperGiftInbox.isNotEmpty) {
+    next.civicHelperGiftInbox = List<Map<String, dynamic>>.from(keep.civicHelperGiftInbox);
   }
   if (record.containsKey('translateWeeklyFreeLimit') && !ngmyShouldDeferRemoteConfigOverwrite()) {
     final v = record['translateWeeklyFreeLimit'];
@@ -9315,6 +9372,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
@@ -13093,6 +13151,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
       await NgmyAppStudioAccess.hydrate(_config);
       await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+      await NgmyCivicHelperGifts.hydrateFromCloud(_config);
       await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
       await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
       await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
@@ -13188,6 +13247,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
@@ -13484,6 +13544,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
             await NgmyAppStudioAccess.hydrate(_config);
             await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
+            await NgmyCivicHelperGifts.hydrateFromCloud(_config);
             await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
             await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
             await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
@@ -21974,9 +22035,111 @@ class _AdminDashboardState extends State<AdminDashboard> {
     NgmyFeatureSyncSession.enterAdminDashboard();
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     Future.microtask(() => unawaited(_pullAdminCloudData()));
+    Future.microtask(() => unawaited(_notifyAdminHelperGiftPendingOnOpen()));
     _adminRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       unawaited(_pullAdminCloudData());
     });
+  }
+
+  Future<void> _notifyAdminHelperGiftPendingOnOpen() async {
+    await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+    if (!mounted) return;
+    final open = NgmyCivicHelperGifts.openPending(widget.config);
+    if (open.isEmpty) return;
+    setState(() {});
+    final first = open.first;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          open.length == 1
+              ? '${first.fullName} helped first 3 times in a row — grant a present!'
+              : '${open.length} helpers earned presents — tap Helper Gifts to grant.',
+        ),
+        backgroundColor: const Color(0xFFEC4899),
+        duration: const Duration(seconds: 7),
+        action: SnackBarAction(
+          label: 'Grant',
+          textColor: Colors.white,
+          onPressed: () => unawaited(_openHelperGiftPendingSheet()),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openHelperGiftPendingSheet() async {
+    final open = NgmyCivicHelperGifts.openPending(widget.config);
+    if (open.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No pending helper gifts right now.')));
+      return;
+    }
+    if (!mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: isDark ? const Color(0xFF0B1220) : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              Text('Helper presents to grant', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+              const SizedBox(height: 6),
+              Text('These members helped first 3 times in a row.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
+              const SizedBox(height: 12),
+              for (final p in open)
+                Card(
+                  child: ListTile(
+                    leading: const Text('🎁', style: TextStyle(fontSize: 26)),
+                    title: Text(p.fullName, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    subtitle: Text('${p.email}\nID: ${p.registryId.isEmpty ? '—' : p.registryId} · ${p.city} ${p.state}'.trim()),
+                    isThreeLine: true,
+                    trailing: const Icon(Icons.card_giftcard_rounded),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final gift = await showNgmyHelperGiftGrantSheet(
+                        context: context,
+                        pending: p,
+                        storeListings: widget.config.storeListings,
+                        onGrant: ({
+                          required String giftName,
+                          required double amount,
+                          required String styleId,
+                          required String storeAddress,
+                          required String storeSellerEmail,
+                          required String storeSellerName,
+                          required String storeListingId,
+                        }) async {
+                          return NgmyCivicHelperGifts.grantGift(
+                            config: widget.config,
+                            pending: p,
+                            giftName: giftName,
+                            amount: amount,
+                            styleId: styleId,
+                            storeAddress: storeAddress,
+                            storeSellerEmail: storeSellerEmail,
+                            storeSellerName: storeSellerName,
+                            storeListingId: storeListingId,
+                            grantedBy: widget.user.email,
+                          );
+                        },
+                      );
+                      if (gift != null && mounted) {
+                        widget.onDataChanged();
+                        setState(() {});
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Present sent to ${gift.fullName} — \$${gift.amount.toStringAsFixed(2)} at ${gift.storeAddress}')),
+                        );
+                      }
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -22239,7 +22402,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
               subtitle: 'Command center for registry, payments & pop-ups',
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 12),
+          NgmyHelperGiftAdminBanner(
+            pendingCount: NgmyCivicHelperGifts.openPendingCount(widget.config),
+            onOpen: () => unawaited(_openHelperGiftPendingSheet()),
+          ),
+          const SizedBox(height: 10),
           Text('Management', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink, letterSpacing: 0.2)),
           const SizedBox(height: 4),
           Text('Tap a tile to open tools', style: TextStyle(fontSize: 12, color: mute, fontWeight: FontWeight.w600)),
@@ -22258,8 +22426,17 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 const Color(0xFF7C3AED),
                 () => unawaited(_openCivicRegistryAdmin(isDark)),
                 isDark,
-                badgeCount: registrarPending,
+                badgeCount: registrarPending + NgmyCivicHelperGifts.openPendingCount(widget.config),
                 animDelayMs: 40,
+              ),
+              _menuFrame(
+                'Helper Gifts',
+                Icons.card_giftcard_rounded,
+                const Color(0xFFEC4899),
+                () => unawaited(_openHelperGiftPendingSheet()),
+                isDark,
+                badgeCount: NgmyCivicHelperGifts.openPendingCount(widget.config),
+                animDelayMs: 50,
               ),
               _menuFrame(
                 'Civic Voting',
@@ -29229,6 +29406,24 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                             clientEmail: widget.user.email,
                             clientPhone: widget.user.phone,
                             isAdmin: widget.user.isAdmin,
+                            appConfig: widget.config,
+                            user: widget.user,
+                            onCharge: (amount, description) async => ngmyChargeUserWallet(
+                              user: widget.user,
+                              allUsers: widget.allUsers,
+                              amount: amount,
+                              description: description,
+                              onAddTransaction: widget.onAddTransaction,
+                              transactions: widget.allTransactions,
+                            ),
+                            onDataChanged: widget.onDataChanged,
+                            onPersistConfig: () async {
+                              try {
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('app_config', jsonEncode(widget.config.toJson()));
+                              } catch (_) {}
+                              return true;
+                            },
                           ),
                           routeName: 'NgmyHelpCenterScreen',
                         ),
@@ -31529,6 +31724,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       unawaited(_maybePromptCivicIdPhoto());
       unawaited(_ensureUniqueRegistryIdsDeferred());
       unawaited(_refreshCivicHelpModeAndContributions());
+      unawaited(_maybeShowHelperGiftsInbox());
       unawaited(() async {
         await _mergeCivicRegistryPinsIntoConfig(widget.config);
         if (mounted) setState(() {});
@@ -31653,6 +31849,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     } catch (e) {
       debugPrint('[help mode] broadcast: $e');
     }
+  }
+
+  Future<void> _maybeShowHelperGiftsInbox() async {
+    await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+    if (!mounted) return;
+    final gifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, widget.user.email)
+        .where((g) => !g.redeemed)
+        .toList();
+    if (gifts.isEmpty) return;
+    await showNgmyHelperGiftReceivedDialog(context, gifts.first);
   }
 
   Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
@@ -40456,6 +40662,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               // Keep civic money list in sync instantly so Remove /
                               // deactivate / receipts see this contribution immediately
                               // (do not wait on a cloud round-trip).
+                              // Detect first-helper before this tx lands in lists.
+                              final someoneAlreadyHelpedFirst = !isUpdate && (
+                                _communityContributions.any((t) {
+                                  if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+                                  if (t.id == tx.id) return false;
+                                  final meta = _decodeContributionMeta(t);
+                                  return (meta['campaignId'] ?? '').toString() == campaignId;
+                                }) ||
+                                widget.allTransactions.any((t) {
+                                  if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) return false;
+                                  if (t.id == tx.id) return false;
+                                  final meta = _decodeContributionMeta(t);
+                                  return (meta['campaignId'] ?? '').toString() == campaignId;
+                                })
+                              );
+                              final isFirstInCampaign = !isUpdate && !someoneAlreadyHelpedFirst;
                               setState(() {
                                 if (!isUpdate) u.helps += 1;
                                 _communityContributions = [
@@ -40463,6 +40685,39 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   tx,
                                 ];
                               });
+                              NgmyHelperGiftPending? giftPending;
+                              if (!isUpdate) {
+                                try {
+                                  final member = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+                                      NgmyCivicRegistryMembers.buildRecord(
+                                        email: u.email,
+                                        fullName: u.fullName ?? u.username,
+                                        dob: u.dob ?? '',
+                                        idType: u.idType ?? '',
+                                        homeAddress: u.homeAddress ?? '',
+                                        phone: u.phone,
+                                        city: u.city ?? '',
+                                        room: u.room ?? '',
+                                        state: u.state,
+                                        registryId: u.registryId ?? '',
+                                        helps: u.helps,
+                                        missed: u.missed,
+                                      );
+                                  giftPending = NgmyCivicHelperGifts.recordFirstHelperContribution(
+                                    config: widget.config,
+                                    memberRecord: member,
+                                    campaignId: campaignId,
+                                    isFirstInCampaign: isFirstInCampaign,
+                                  );
+                                  NgmyCivicRegistryMembers.upsert(widget.config, member);
+                                  unawaited(ngmyPersistCivicRegistryMembers(widget.config));
+                                  if (giftPending != null) {
+                                    unawaited(NgmyCivicHelperGifts.persistCloud(widget.config));
+                                  }
+                                } catch (e) {
+                                  debugPrint('[civic helper streak] $e');
+                                }
+                              }
                               // Update an already-open state case/budget from
                               // local truth before waiting on the cloud.
                               NgmyCivicWalletRefresh.notify();
@@ -40492,6 +40747,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                       : Colors.orange,
                                 ),
                                 );
+                                if (giftPending != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('${u.fullName ?? u.username} helped first 3 times in a row — admin can grant a present!'),
+                                      backgroundColor: const Color(0xFFEC4899),
+                                      duration: const Duration(seconds: 5),
+                                    ),
+                                  );
+                                } else if (isFirstInCampaign) {
+                                  final streak = (NgmyCivicRegistryMembers.findByEmail(widget.config, u.email)?['firstHelperStreak'] as num?)?.toInt() ?? 0;
+                                  if (streak > 0 && streak < 3) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('First helper! Streak: $streak/3')),
+                                    );
+                                  }
+                                }
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -44622,6 +44893,52 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             style: TextStyle(fontSize: 10, color: muted),
           ),
         ],
+        Builder(
+          builder: (_) {
+            final myGifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, widget.user.email);
+            if (myGifts.isEmpty) return const SizedBox.shrink();
+            final openGift = myGifts.firstWhere((g) => !g.redeemed, orElse: () => myGifts.first);
+            return Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => showNgmyHelperGiftReceivedDialog(context, openGift),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899)]),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text('🎁', style: TextStyle(fontSize: 26)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                openGift.redeemed ? 'Your helper presents' : 'You have a present!',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+                              ),
+                              Text(
+                                '${openGift.giftName} · \$${openGift.amount.toStringAsFixed(2)} — tap to show store QR',
+                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.qr_code_2_rounded, color: Colors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
         const SizedBox(height: 22),
         if (waitingOnDirectory) ...[
           _rankingsEmptyBox('Loading members…', isDark),
@@ -48555,6 +48872,28 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        if (_canSell || widget.user.isAdmin)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GestureDetector(
+              onTap: () => showNgmyHelperGiftStoreRedeemSheet(
+                context: context,
+                config: widget.config,
+                storeOwnerEmail: widget.user.email,
+                storeOwnerName: widget.user.username,
+                onDataChanged: widget.onDataChanged,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899)]),
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: const Color(0xFFEC4899).withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 3))],
+                ),
+                child: const Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 21),
+              ),
+            ),
+          ),
         GestureDetector(
           onTap: _showSellerInbox,
           child: Stack(
