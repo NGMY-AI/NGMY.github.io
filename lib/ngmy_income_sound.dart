@@ -20,6 +20,7 @@ class NgmyIncomeSound {
   static bool _webAudioUnlocked = false;
   static const _prefPlayedKeys = 'ngmy_income_sound_played_keys';
   static final Set<String> _playedDedupeKeys = {};
+  static bool _playedKeysLoaded = false;
 
   static const _candidateFiles = [
     'income_cash.mp3',
@@ -77,6 +78,22 @@ class NgmyIncomeSound {
             if (s.isNotEmpty) _playedDedupeKeys.add(s);
           }
         }
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _ensurePlayedKeysLoaded() async {
+    if (_playedKeysLoaded) return;
+    _playedKeysLoaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefPlayedKeys);
+      if (raw == null || raw.trim().isEmpty) return;
+      final list = jsonDecode(raw);
+      if (list is! List) return;
+      for (final e in list) {
+        final s = e.toString().trim();
+        if (s.isNotEmpty) _playedDedupeKeys.add(s);
       }
     } catch (_) {}
   }
@@ -144,12 +161,14 @@ class NgmyIncomeSound {
       await unlockForWebUserGesture();
     }
 
+    await _ensurePlayedKeysLoaded();
     final key = dedupeKey?.trim();
-    if (!force && key != null && key.isNotEmpty) {
+    if (force && (key == null || key.isEmpty)) {
+      // No stable id — play once for this call.
+    }
+    // Same earning must not chime again on refresh, even when force is set.
+    if (key != null && key.isNotEmpty) {
       if (_playedDedupeKeys.contains(key)) return;
-      _playedDedupeKeys.add(key);
-      unawaited(_persistPlayedKeys());
-    } else if (key != null && key.isNotEmpty) {
       _playedDedupeKeys.add(key);
       unawaited(_persistPlayedKeys());
     }

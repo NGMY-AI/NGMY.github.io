@@ -393,6 +393,16 @@ const INDEX_CANDIDATES = [
 ];
 
 async function cacheLookup(request) {
+  const current = await caches.open(CACHE_NAME);
+  const exact = await current.match(request);
+  if (exact) return exact;
+  const loose = await current.match(request, { ignoreSearch: true });
+  if (loose) return loose;
+  // Shell scripts must come from this deploy's cache. Searching every old
+  // cache made phones keep the previous main.dart.js after a refresh.
+  let url;
+  try { url = new URL(request.url); } catch (_) { url = null; }
+  if (url && isCriticalScript(url)) return undefined;
   const hit = await caches.match(request);
   if (hit) return hit;
   return caches.match(request, { ignoreSearch: true });

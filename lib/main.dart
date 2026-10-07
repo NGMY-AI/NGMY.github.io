@@ -1037,6 +1037,11 @@ void ngmySyncUserBalanceAfterWalletDecision(
   }
 }
 
+bool ngmyIsAutomaticClockOrCrownEarning(AppTransaction t) {
+  final sd = (t.sourceDetails ?? '').toLowerCase();
+  return sd.contains('clock-in') || sd.contains('crown daily reward');
+}
+
 bool ngmyTransactionCountsAsIncome(AppTransaction t) {
   if (t.status != TransactionStatus.approved) return false;
   if (!_ngmyTxnIncreasesBalance(t)) return false;
@@ -1048,6 +1053,7 @@ bool ngmyTransactionCountsAsIncome(AppTransaction t) {
 
 void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = true}) {
   if (!ngmyTransactionCountsAsIncome(t)) return;
+  if (ngmyIsAutomaticClockOrCrownEarning(t)) return;
   unawaited(NgmyIncomeSound.playForUser(
     beneficiaryEmail: t.userEmail,
     amount: t.amount,
@@ -6511,11 +6517,6 @@ void _ngmyTryCrownDailyPayAtNoon(
       status: TransactionStatus.approved,
       timestamp: now,
     ),
-  );
-  ngmyPlayIncomeSoundForAmount(
-    beneficiaryEmail: user.email,
-    amount: amount,
-    dedupeKey: _ngmyCrownPayTransactionId(user.email, now),
   );
 }
 
@@ -12023,9 +12024,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _notifyTransactionEvent(AppTransaction t, {bool statusChanged = false}) async {
     if (_ngmyIsClockInSessionStartTransaction(t)) return;
     if (ngmyIsGameSpendTransaction(t)) return;
-    if (kNgmySuppressClockInPopups) {
+    if (kNgmySuppressClockInPopups || ngmyIsAutomaticClockOrCrownEarning(t)) {
       final sd = (t.sourceDetails ?? '').toLowerCase();
-      if (sd.contains('clock-in')) return;
+      if (sd.contains('clock-in') || sd.contains('crown daily reward')) return;
     }
     final currentEmail = _currentUser?.email.toLowerCase().trim();
     if (currentEmail == null || currentEmail.isEmpty) return;
@@ -12849,7 +12850,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           }
         });
         final statusChanged = previous != null && previous!.status != tx.status;
-        if (previous == null || statusChanged) {
+        if ((previous == null || statusChanged) && !ngmyIsAutomaticClockOrCrownEarning(tx)) {
           unawaited(_notifyTransactionEvent(tx, statusChanged: statusChanged));
         }
         final becameApproved = tx.status == TransactionStatus.approved &&
@@ -12873,7 +12874,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (_currentUser != null && _currentUser!.email.toLowerCase().trim() == userKey) {
             _currentUser = _allUsers[userIdx];
           }
-        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx)) {
+        } else if (becameApproved && ngmyTransactionCountsAsIncome(tx) && !ngmyIsAutomaticClockOrCrownEarning(tx)) {
           ngmyDeliverTransactionAlerts(tx);
         }
         if (userIdx >= 0 &&
@@ -14385,14 +14386,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     unawaited(_persistLocalOnly());
                     if (mounted) setState(() {});
                   }
-                  if (t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t)) {
+                  if (!exists && t.status == TransactionStatus.approved && ngmyTransactionCountsAsIncome(t) && !ngmyIsAutomaticClockOrCrownEarning(t)) {
                     ngmyDeliverTransactionAlerts(t);
                   }
                   if (t.status == TransactionStatus.pending &&
                       (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal)) {
                     unawaited(_notifyAdminAboutPendingTransaction(t));
                   }
-                  if (!_ngmyIsClockInSessionStartTransaction(t)) {
+                  if (!exists && !_ngmyIsClockInSessionStartTransaction(t) && !ngmyIsAutomaticClockOrCrownEarning(t)) {
                     unawaited(_notifyTransactionEvent(t));
                   }
                 },
@@ -16186,6 +16187,8 @@ int? _ngmySessionMainTabIdx;
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _idx = 0; Timer? _t; int _syncCounter = 0; int _missPolicyCounter = 0;
+  bool _crownPayInFlight = false;
+  String _crownPayDayKey = '';
   Timer? _metricsDebounce;
 
   static void clearSessionTab() => _ngmySessionMainTabIdx = null;
@@ -16769,14 +16772,35 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _evaluateClockInMissPolicy();
       }
       if (_ngmyIsPastNoon(now)) {
-        final crown = widget.user.crownBadge.trim().toLowerCase();
-        if ((crown == 'king' || crown == 'queen') &&
-            !_ngmyHasCrownPayForDay(widget.user.email, userTx, now)) {
-          _ngmyTryCrownDailyPayAtNoon(widget.user, userTx, widget.onAddTransaction);
-          widget.onDataChanged();
-        }
+        unawaited(_grantCrownDailyPayOnce(userTx));
       }
     });
+  }
+
+  /// King/Queen $1 at noon is recorded once per day. Refresh must not pay or notify again.
+  Future<void> _grantCrownDailyPayOnce(List<AppTransaction> userTx) async {
+    if (_crownPayInFlight) return;
+    final now = DateTime.now();
+    if (!_ngmyIsPastNoon(now)) return;
+    final crown = widget.user.crownBadge.trim().toLowerCase();
+    if (crown != 'king' && crown != 'queen') return;
+    final email = widget.user.email.toLowerCase().trim();
+    if (email.isEmpty) return;
+    final day = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    if (_crownPayDayKey == day) return;
+    final prefKey = 'ngmy_crown_paid_${email}_$day';
+    _crownPayInFlight = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final already = prefs.getBool(prefKey) == true || _ngmyHasCrownPayForDay(email, userTx, now);
+      await prefs.setBool(prefKey, true);
+      _crownPayDayKey = day;
+      if (already || !mounted) return;
+      _ngmyTryCrownDailyPayAtNoon(widget.user, _userClockInTransactions(), widget.onAddTransaction);
+      widget.onDataChanged();
+    } finally {
+      _crownPayInFlight = false;
+    }
   }
 
   void _evaluateClockInMissPolicy() {

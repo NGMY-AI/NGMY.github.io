@@ -1327,11 +1327,42 @@
         }
       }
 
+      function bustStaleServiceWorker() {
+        if (!('serviceWorker' in navigator)) return false;
+        var controller = navigator.serviceWorker.controller;
+        if (!controller) return false;
+        var scriptV = '';
+        try { scriptV = new URL(controller.scriptURL).searchParams.get('v') || ''; } catch (e) {}
+        if (scriptV === deployId) return false;
+        var key = 'ngmy_sw_bust_' + deployId;
+        try {
+          if (sessionStorage.getItem(key) === '1') return false;
+        } catch (e2) {}
+        var finished = false;
+        var done = function () {
+          if (finished) return;
+          finished = true;
+          try { sessionStorage.setItem(key, '1'); } catch (e3) {}
+          location.reload();
+        };
+        setTimeout(done, 4000);
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          return Promise.all(regs.map(function (r) { return r.unregister(); }));
+        }).then(function () {
+          if (!('caches' in window)) return;
+          return caches.keys().then(function (keys) {
+            return Promise.all(keys.filter(function (k) { return k.indexOf('ngmy-pwa-') === 0; }).map(function (k) { return caches.delete(k); }));
+          });
+        }).then(done).catch(done);
+        return true;
+      }
+
       function startApp() {
         if (window.__NGMY_PAY_RETURN_ONLY__) {
           showPayReturnDone();
           return;
         }
+        if (bustStaleServiceWorker()) return;
 
         var bootTimer = setTimeout(function () {
           showBootstrapError('NGMY is still loading. Tap Reload. If you are offline, connect once and wait for the home screen.');
