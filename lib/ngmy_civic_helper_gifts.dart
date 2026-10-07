@@ -1,0 +1,604 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_network_resilience.dart';
+
+/// QR prefix for Civic Registry helper gifts redeemable at NGMY Store.
+const String kNgmyHelperGiftQrPrefix = 'NGMYHELPERGIFT1';
+
+const String kNgmyHelperGiftPendingSettingsKey = 'civic_helper_gift_pending_v1';
+const String kNgmyHelperGiftPendingPrefsKey = 'ngmy_civic_helper_gift_pending_v1';
+const String kNgmyHelperGiftInboxSettingsKey = 'civic_helper_gift_inbox_v1';
+const String kNgmyHelperGiftInboxPrefsKey = 'ngmy_civic_helper_gift_inbox_v1';
+
+String _giftStashKey(String token) => 'ngmy_helper_gift_qr_v1_${token.trim()}';
+
+String _generateGiftToken() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  final r = Random.secure();
+  return 'HG${List.generate(10, (_) => chars[r.nextInt(chars.length)]).join()}';
+}
+
+/// Beautiful present styles the admin can grant after a 3-in-a-row first-helper streak.
+class NgmyHelperGiftStyle {
+  const NgmyHelperGiftStyle({
+    required this.id,
+    required this.label,
+    required this.emoji,
+    required this.accent,
+    required this.accent2,
+    required this.icon,
+  });
+
+  final String id;
+  final String label;
+  final String emoji;
+  final Color accent;
+  final Color accent2;
+  final IconData icon;
+}
+
+const List<NgmyHelperGiftStyle> kNgmyHelperGiftStyles = [
+  NgmyHelperGiftStyle(id: 'gold_envelope', label: 'Gold Envelope', emoji: '✉️', accent: Color(0xFFF59E0B), accent2: Color(0xFFB45309), icon: Icons.mail_rounded),
+  NgmyHelperGiftStyle(id: 'rose_envelope', label: 'Rose Envelope', emoji: '💌', accent: Color(0xFFEC4899), accent2: Color(0xFFBE185D), icon: Icons.mark_email_unread_rounded),
+  NgmyHelperGiftStyle(id: 'birthday', label: 'Birthday Present', emoji: '🎂', accent: Color(0xFF8B5CF6), accent2: Color(0xFF6D28D9), icon: Icons.cake_rounded),
+  NgmyHelperGiftStyle(id: 'gift_box', label: 'Gift Box', emoji: '🎁', accent: Color(0xFFEF4444), accent2: Color(0xFFB91C1C), icon: Icons.card_giftcard_rounded),
+  NgmyHelperGiftStyle(id: 'trophy', label: 'Champion Trophy', emoji: '🏆', accent: Color(0xFFEAB308), accent2: Color(0xFFA16207), icon: Icons.emoji_events_rounded),
+  NgmyHelperGiftStyle(id: 'sparkle', label: 'Sparkle Surprise', emoji: '✨', accent: Color(0xFF06B6D4), accent2: Color(0xFF0E7490), icon: Icons.auto_awesome_rounded),
+  NgmyHelperGiftStyle(id: 'crown', label: 'Crown Parcel', emoji: '👑', accent: Color(0xFFF97316), accent2: Color(0xFFC2410C), icon: Icons.workspace_premium_rounded),
+  NgmyHelperGiftStyle(id: 'heart', label: 'Heart Package', emoji: '💝', accent: Color(0xFFF43F5E), accent2: Color(0xFFBE123C), icon: Icons.favorite_rounded),
+];
+
+NgmyHelperGiftStyle ngmyHelperGiftStyleById(String id) {
+  return kNgmyHelperGiftStyles.firstWhere(
+    (s) => s.id == id,
+    orElse: () => kNgmyHelperGiftStyles.first,
+  );
+}
+
+/// Pending admin alert when a member is first helper 3 campaigns in a row.
+class NgmyHelperGiftPending {
+  const NgmyHelperGiftPending({
+    required this.id,
+    required this.email,
+    required this.fullName,
+    required this.registryId,
+    required this.phone,
+    required this.state,
+    required this.city,
+    required this.streak,
+    required this.createdAt,
+    this.granted = false,
+    this.notified = false,
+  });
+
+  final String id;
+  final String email;
+  final String fullName;
+  final String registryId;
+  final String phone;
+  final String state;
+  final String city;
+  final int streak;
+  final String createdAt;
+  final bool granted;
+  final bool notified;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'email': email,
+        'fullName': fullName,
+        'registryId': registryId,
+        'phone': phone,
+        'state': state,
+        'city': city,
+        'streak': streak,
+        'createdAt': createdAt,
+        'granted': granted,
+        'notified': notified,
+      };
+
+  factory NgmyHelperGiftPending.fromMap(Map<String, dynamic> map) => NgmyHelperGiftPending(
+        id: (map['id'] ?? '').toString(),
+        email: (map['email'] ?? '').toString().toLowerCase().trim(),
+        fullName: (map['fullName'] ?? '').toString(),
+        registryId: (map['registryId'] ?? '').toString(),
+        phone: (map['phone'] ?? '').toString(),
+        state: (map['state'] ?? '').toString(),
+        city: (map['city'] ?? '').toString(),
+        streak: (map['streak'] as num?)?.toInt() ?? 3,
+        createdAt: (map['createdAt'] ?? '').toString(),
+        granted: map['granted'] == true,
+        notified: map['notified'] == true,
+      );
+
+  NgmyHelperGiftPending copyWith({bool? granted, bool? notified}) => NgmyHelperGiftPending(
+        id: id,
+        email: email,
+        fullName: fullName,
+        registryId: registryId,
+        phone: phone,
+        state: state,
+        city: city,
+        streak: streak,
+        createdAt: createdAt,
+        granted: granted ?? this.granted,
+        notified: notified ?? this.notified,
+      );
+}
+
+/// Gift granted to a helper — includes store QR redeem payload.
+class NgmyHelperGift {
+  const NgmyHelperGift({
+    required this.id,
+    required this.email,
+    required this.fullName,
+    required this.giftName,
+    required this.amount,
+    required this.styleId,
+    required this.storeAddress,
+    required this.storeSellerEmail,
+    required this.storeSellerName,
+    required this.storeListingId,
+    required this.qrPayload,
+    required this.token,
+    required this.createdAt,
+    required this.grantedBy,
+    this.redeemed = false,
+    this.redeemedAt = '',
+    this.redeemedByStore = '',
+  });
+
+  final String id;
+  final String email;
+  final String fullName;
+  final String giftName;
+  final double amount;
+  final String styleId;
+  final String storeAddress;
+  final String storeSellerEmail;
+  final String storeSellerName;
+  final String storeListingId;
+  final String qrPayload;
+  final String token;
+  final String createdAt;
+  final String grantedBy;
+  final bool redeemed;
+  final String redeemedAt;
+  final String redeemedByStore;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'email': email,
+        'fullName': fullName,
+        'giftName': giftName,
+        'amount': amount,
+        'styleId': styleId,
+        'storeAddress': storeAddress,
+        'storeSellerEmail': storeSellerEmail,
+        'storeSellerName': storeSellerName,
+        'storeListingId': storeListingId,
+        'qrPayload': qrPayload,
+        'token': token,
+        'createdAt': createdAt,
+        'grantedBy': grantedBy,
+        'redeemed': redeemed,
+        'redeemedAt': redeemedAt,
+        'redeemedByStore': redeemedByStore,
+      };
+
+  factory NgmyHelperGift.fromMap(Map<String, dynamic> map) => NgmyHelperGift(
+        id: (map['id'] ?? '').toString(),
+        email: (map['email'] ?? '').toString().toLowerCase().trim(),
+        fullName: (map['fullName'] ?? '').toString(),
+        giftName: (map['giftName'] ?? 'Helper Gift').toString(),
+        amount: (map['amount'] as num?)?.toDouble() ?? 0,
+        styleId: (map['styleId'] ?? 'gold_envelope').toString(),
+        storeAddress: (map['storeAddress'] ?? '').toString(),
+        storeSellerEmail: (map['storeSellerEmail'] ?? '').toString().toLowerCase().trim(),
+        storeSellerName: (map['storeSellerName'] ?? '').toString(),
+        storeListingId: (map['storeListingId'] ?? '').toString(),
+        qrPayload: (map['qrPayload'] ?? '').toString(),
+        token: (map['token'] ?? '').toString(),
+        createdAt: (map['createdAt'] ?? '').toString(),
+        grantedBy: (map['grantedBy'] ?? '').toString(),
+        redeemed: map['redeemed'] == true,
+        redeemedAt: (map['redeemedAt'] ?? '').toString(),
+        redeemedByStore: (map['redeemedByStore'] ?? '').toString(),
+      );
+}
+
+/// Tracks first-helper streaks and manages gift pending/inbox + QR redeem.
+class NgmyCivicHelperGifts {
+  static List<NgmyHelperGiftPending> pendingFromConfig(dynamic config) {
+    final raw = (config as dynamic).civicHelperGiftPending;
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static void setPending(dynamic config, List<NgmyHelperGiftPending> items) {
+    (config as dynamic).civicHelperGiftPending = items.map((e) => e.toMap()).toList();
+  }
+
+  static List<NgmyHelperGift> inboxFromConfig(dynamic config) {
+    final raw = (config as dynamic).civicHelperGiftInbox;
+    if (raw is! List) return [];
+    return raw
+        .whereType<Map>()
+        .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static void setInbox(dynamic config, List<NgmyHelperGift> items) {
+    (config as dynamic).civicHelperGiftInbox = items.map((e) => e.toMap()).toList();
+  }
+
+  static List<NgmyHelperGiftPending> openPending(dynamic config) =>
+      pendingFromConfig(config).where((p) => !p.granted).toList();
+
+  static int openPendingCount(dynamic config) => openPending(config).length;
+
+  static List<NgmyHelperGift> giftsForEmail(dynamic config, String email) {
+    final key = email.toLowerCase().trim();
+    return inboxFromConfig(config).where((g) => g.email == key).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  /// Call when a member is recorded as a contribution in an active help campaign.
+  /// Returns a new pending alert if streak reaches 3, otherwise null.
+  static NgmyHelperGiftPending? recordFirstHelperContribution({
+    required dynamic config,
+    required Map<String, dynamic> memberRecord,
+    required String campaignId,
+    required bool isFirstInCampaign,
+  }) {
+    if (campaignId.isEmpty) return null;
+    final email = (memberRecord['email'] ?? '').toString().toLowerCase().trim();
+    if (email.isEmpty) return null;
+
+    var streak = (memberRecord['firstHelperStreak'] as num?)?.toInt() ?? 0;
+    final lastCampaign = (memberRecord['lastFirstHelperCampaignId'] ?? '').toString();
+
+    if (!isFirstInCampaign) {
+      memberRecord['firstHelperStreak'] = 0;
+      // Keep last campaign id so we don't falsely continue a streak later.
+      return null;
+    }
+
+    // Already counted this campaign as first.
+    if (lastCampaign == campaignId) {
+      return null;
+    }
+
+    streak = streak + 1;
+    memberRecord['firstHelperStreak'] = streak;
+    memberRecord['lastFirstHelperCampaignId'] = campaignId;
+
+    if (streak < 3 || streak % 3 != 0) return null;
+
+    final pending = NgmyHelperGiftPending(
+      id: 'hgpend_${DateTime.now().millisecondsSinceEpoch}_$email',
+      email: email,
+      fullName: (memberRecord['fullName'] ?? email).toString(),
+      registryId: (memberRecord['registryId'] ?? '').toString(),
+      phone: (memberRecord['phone'] ?? '').toString(),
+      state: (memberRecord['state'] ?? '').toString(),
+      city: (memberRecord['city'] ?? '').toString(),
+      streak: streak,
+      createdAt: DateTime.now().toUtc().toIso8601String(),
+    );
+    final list = pendingFromConfig(config);
+    // Avoid duplicate open pending for same email.
+    if (list.any((p) => !p.granted && p.email == email)) return null;
+    list.insert(0, pending);
+    setPending(config, list);
+    return pending;
+  }
+
+  static Future<void> persistPendingLocal(dynamic config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kNgmyHelperGiftPendingPrefsKey,
+        jsonEncode({'items': pendingFromConfig(config).map((e) => e.toMap()).toList()}),
+      );
+    } catch (e) {
+      debugPrint('[helper gifts] pending local: $e');
+    }
+  }
+
+  static Future<void> persistInboxLocal(dynamic config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        kNgmyHelperGiftInboxPrefsKey,
+        jsonEncode({'items': inboxFromConfig(config).map((e) => e.toMap()).toList()}),
+      );
+    } catch (e) {
+      debugPrint('[helper gifts] inbox local: $e');
+    }
+  }
+
+  static Future<void> hydrateFromLocal(dynamic config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pendingRaw = prefs.getString(kNgmyHelperGiftPendingPrefsKey);
+      if (pendingRaw != null && pendingRaw.trim().isNotEmpty) {
+        final decoded = jsonDecode(pendingRaw);
+        if (decoded is Map && decoded['items'] is List) {
+          setPending(
+            config,
+            (decoded['items'] as List)
+                .whereType<Map>()
+                .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
+                .toList(),
+          );
+        }
+      }
+      final inboxRaw = prefs.getString(kNgmyHelperGiftInboxPrefsKey);
+      if (inboxRaw != null && inboxRaw.trim().isNotEmpty) {
+        final decoded = jsonDecode(inboxRaw);
+        if (decoded is Map && decoded['items'] is List) {
+          setInbox(
+            config,
+            (decoded['items'] as List)
+                .whereType<Map>()
+                .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
+                .toList(),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[helper gifts] hydrate local: $e');
+    }
+  }
+
+  static Future<bool> persistCloud(dynamic config) async {
+    await persistPendingLocal(config);
+    await persistInboxLocal(config);
+    if (!await ngmyCanReachCloud()) return false;
+    final now = DateTime.now().toUtc().toIso8601String();
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': kNgmyHelperGiftPendingSettingsKey,
+          'value': {'items': pendingFromConfig(config).map((e) => e.toMap()).toList()},
+          'updated_at': now,
+        },
+        {
+          'key': kNgmyHelperGiftInboxSettingsKey,
+          'value': {'items': inboxFromConfig(config).map((e) => e.toMap()).toList()},
+          'updated_at': now,
+        },
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+      return true;
+    } catch (e) {
+      debugPrint('[helper gifts] cloud persist: $e');
+      return false;
+    }
+  }
+
+  static Future<void> hydrateFromCloud(dynamic config) async {
+    await hydrateFromLocal(config);
+    if (!await ngmyCanReachCloud()) return;
+    try {
+      final pendingRow = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', kNgmyHelperGiftPendingSettingsKey)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      final pendingValue = pendingRow?['value'];
+      if (pendingValue is Map && pendingValue['items'] is List) {
+        setPending(
+          config,
+          (pendingValue['items'] as List)
+              .whereType<Map>()
+              .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
+              .toList(),
+        );
+      }
+      final inboxRow = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', kNgmyHelperGiftInboxSettingsKey)
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      final inboxValue = inboxRow?['value'];
+      if (inboxValue is Map && inboxValue['items'] is List) {
+        setInbox(
+          config,
+          (inboxValue['items'] as List)
+              .whereType<Map>()
+              .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
+              .toList(),
+        );
+      }
+    } catch (e) {
+      debugPrint('[helper gifts] cloud hydrate: $e');
+    }
+  }
+
+  static Future<NgmyHelperGift?> grantGift({
+    required dynamic config,
+    required NgmyHelperGiftPending pending,
+    required String giftName,
+    required double amount,
+    required String styleId,
+    required String storeAddress,
+    required String storeSellerEmail,
+    required String storeSellerName,
+    required String storeListingId,
+    required String grantedBy,
+  }) async {
+    if (amount <= 0 || giftName.trim().isEmpty || storeAddress.trim().isEmpty) return null;
+    final token = _generateGiftToken();
+    final qrPayload = '$kNgmyHelperGiftQrPrefix|$token';
+    final now = DateTime.now().toUtc().toIso8601String();
+    final gift = NgmyHelperGift(
+      id: 'hgift_${DateTime.now().millisecondsSinceEpoch}',
+      email: pending.email,
+      fullName: pending.fullName,
+      giftName: giftName.trim(),
+      amount: amount,
+      styleId: styleId,
+      storeAddress: storeAddress.trim(),
+      storeSellerEmail: storeSellerEmail.toLowerCase().trim(),
+      storeSellerName: storeSellerName.trim(),
+      storeListingId: storeListingId,
+      qrPayload: qrPayload,
+      token: token,
+      createdAt: now,
+      grantedBy: grantedBy.toLowerCase().trim(),
+    );
+
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _giftStashKey(token),
+          'value': gift.toMap(),
+          'updated_at': now,
+        },
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+    } catch (e) {
+      debugPrint('[helper gifts] stash create: $e');
+      // Still keep local inbox so the feature works offline-ish.
+    }
+
+    final inbox = inboxFromConfig(config);
+    inbox.insert(0, gift);
+    setInbox(config, inbox);
+
+    final pendingList = pendingFromConfig(config);
+    final idx = pendingList.indexWhere((p) => p.id == pending.id);
+    if (idx >= 0) {
+      pendingList[idx] = pending.copyWith(granted: true, notified: true);
+      setPending(config, pendingList);
+    }
+
+    await persistCloud(config);
+    return gift;
+  }
+
+  static String? parseTokenFromPayload(String raw) {
+    final t = raw.trim();
+    if (t.startsWith('$kNgmyHelperGiftQrPrefix|')) {
+      return t.substring(kNgmyHelperGiftQrPrefix.length + 1).trim();
+    }
+    if (t.startsWith('HG') && t.length >= 8) return t;
+    return null;
+  }
+
+  static Future<NgmyHelperGift?> loadGiftByToken(String token, {dynamic config}) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('ngmy_settings')
+          .select()
+          .eq('key', _giftStashKey(token))
+          .maybeSingle()
+          .timeout(kNgmyCloudLoadTimeout);
+      final value = row?['value'];
+      if (value is Map) return NgmyHelperGift.fromMap(Map<String, dynamic>.from(value));
+    } catch (e) {
+      debugPrint('[helper gifts] load token: $e');
+    }
+    if (config != null) {
+      for (final g in inboxFromConfig(config)) {
+        if (g.token == token) return g;
+      }
+    }
+    return null;
+  }
+
+  static Future<({bool ok, String message, NgmyHelperGift? gift})> redeemAtStore({
+    required dynamic config,
+    required String qrOrToken,
+    required String storeOwnerEmail,
+    required String storeOwnerName,
+  }) async {
+    final token = parseTokenFromPayload(qrOrToken);
+    if (token == null || token.isEmpty) {
+      return (ok: false, message: 'Not a valid NGMY helper gift QR.', gift: null);
+    }
+    final gift = await loadGiftByToken(token, config: config);
+    if (gift == null) {
+      return (ok: false, message: 'Gift not found.', gift: null);
+    }
+    if (gift.redeemed) {
+      return (ok: false, message: 'This gift was already redeemed.', gift: gift);
+    }
+    final owner = storeOwnerEmail.toLowerCase().trim();
+    final locked = gift.storeSellerEmail;
+    if (locked.isNotEmpty && locked != owner) {
+      return (
+        ok: false,
+        message: 'This gift is for ${gift.storeSellerName.isEmpty ? gift.storeAddress : gift.storeSellerName}. Sign in as that store owner to redeem.',
+        gift: gift,
+      );
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final updated = NgmyHelperGift(
+      id: gift.id,
+      email: gift.email,
+      fullName: gift.fullName,
+      giftName: gift.giftName,
+      amount: gift.amount,
+      styleId: gift.styleId,
+      storeAddress: gift.storeAddress,
+      storeSellerEmail: gift.storeSellerEmail,
+      storeSellerName: gift.storeSellerName,
+      storeListingId: gift.storeListingId,
+      qrPayload: gift.qrPayload,
+      token: gift.token,
+      createdAt: gift.createdAt,
+      grantedBy: gift.grantedBy,
+      redeemed: true,
+      redeemedAt: now,
+      redeemedByStore: owner.isEmpty ? storeOwnerName : owner,
+    );
+
+    try {
+      await Supabase.instance.client.from('ngmy_settings').upsert([
+        {
+          'key': _giftStashKey(token),
+          'value': updated.toMap(),
+          'updated_at': now,
+        },
+      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
+    } catch (e) {
+      debugPrint('[helper gifts] redeem stash: $e');
+    }
+
+    final inbox = inboxFromConfig(config);
+    final idx = inbox.indexWhere((g) => g.token == token || g.id == gift.id);
+    if (idx >= 0) {
+      inbox[idx] = updated;
+    } else {
+      inbox.insert(0, updated);
+    }
+    setInbox(config, inbox);
+    await persistCloud(config);
+    return (
+      ok: true,
+      message: 'Redeemed \$${updated.amount.toStringAsFixed(2)} — ${updated.giftName}. Give the member store credit for that amount.',
+      gift: updated,
+    );
+  }
+
+  static void markPendingNotified(dynamic config, String pendingId) {
+    final list = pendingFromConfig(config);
+    final idx = list.indexWhere((p) => p.id == pendingId);
+    if (idx < 0) return;
+    list[idx] = list[idx].copyWith(notified: true);
+    setPending(config, list);
+  }
+}

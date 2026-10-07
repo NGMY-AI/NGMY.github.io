@@ -175,7 +175,7 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'house_fixture',
           name: 'House Fixture',
-          description: 'Repairs, installs, and home fixes',
+          description: 'Repairs + Free House Insurance (\$50/mo)',
           icon: 'home_repair_service',
           defaultPrice: '150',
           defaultQty: '1',
