@@ -259,11 +259,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     return titles.join(', ');
   }
 
+  bool get _houseSubscribed =>
+      widget.appConfig != null &&
+      NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail);
+
   Future<void> _payHouseInsuranceStripe() async {
-    if (_selectedCoverage.isEmpty) {
-      _snack('Choose at least one coverage first.');
-      return;
-    }
     if (!NgmyStripePayments.hasCheckoutLink(NgmyStripeProduct.houseInsurance)) {
       _snack('Card checkout is not linked yet. Use Cash App to send the \$${NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig).toStringAsFixed(0)}.');
       return;
@@ -278,15 +278,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
     if (ok && mounted) {
       setState(() {});
-      _snack('House Insurance is active for the coverages you chose.');
+      _snack('You\'re subscribed. Choose a service, then Send on WhatsApp.');
     }
   }
 
   Future<void> _payHouseInsuranceCashApp() async {
-    if (_selectedCoverage.isEmpty) {
-      _snack('Choose at least one coverage first.');
-      return;
-    }
     final url = _cfg.resolvedCashAppUrl();
     if (url.isEmpty) {
       _snack('Cash App is not configured yet.');
@@ -307,7 +303,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     if (!mounted) return;
     if (ok) {
       setState(() {});
-      _snack('House Insurance is active for the coverages you chose.');
+      _snack('You\'re subscribed. Choose a service, then Send on WhatsApp.');
     } else {
       _snack('Payment was not confirmed. House Insurance stays off until Cash App is sent.');
     }
@@ -461,10 +457,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           (double.tryParse(_mileageC.text.trim()) ?? 0) > 0;
     }
     if (_isHouseFixture) {
-      return _serviceAddressC.text.trim().isNotEmpty &&
-          _fixtureTypeC.text.trim().isNotEmpty &&
-          _jobDescC.text.trim().length >= 8 &&
-          _problemDetailsC.text.trim().isNotEmpty;
+      return _houseSubscribed && _selectedCoverage.isNotEmpty;
     }
     return true;
   }
@@ -540,7 +533,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       } else if (_isMovingDelivery) {
         _snack('Enter pickup address, delivery address, and mileage.');
       } else if (_isHouseFixture) {
-        _snack('Enter service address, fixture type, job description, and problem details.');
+        _snack(_houseSubscribed
+            ? 'Choose a service first. Then Send on WhatsApp turns on.'
+            : 'Subscribe first. Send on WhatsApp stays off until you pay.');
       } else {
         _snack('Complete your request first.');
       }
@@ -570,7 +565,9 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       } else if (_isMovingDelivery) {
         _snack('Enter pickup address, delivery address, and mileage.');
       } else if (_isHouseFixture) {
-        _snack('Enter service address, fixture type, job description, and problem details.');
+        _snack(_houseSubscribed
+            ? 'Choose a service first. Then Send on WhatsApp turns on.'
+            : 'Subscribe first. Send on WhatsApp stays off until you pay.');
       } else {
         _snack('Complete your request first.');
       }
@@ -842,11 +839,11 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               width: 1,
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-            child: Column(
-              children: [
-                Container(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Container(
                   width: 46,
                   height: 46,
                   decoration: BoxDecoration(
@@ -859,37 +856,41 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                   ),
                   child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 28,
-                  child: Text(
-                    name,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: titleColor),
-                  ),
+              ),
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 22,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        name,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: titleColor),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: muted),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 22,
-                  child: Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: muted),
-                  ),
+              ),
+              if (selected)
+                const Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
                 ),
-                const Spacer(),
-                SizedBox(
-                  height: 16,
-                  child: selected
-                      ? const Icon(Icons.check_circle_rounded, size: 16, color: _accent)
-                      : const SizedBox.shrink(),
-                ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
@@ -1072,7 +1073,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             if (widget.appConfig != null) ...[
               NgmyHouseInsuranceCard(
                 isDark: isDark,
-                active: NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail),
+                active: _houseSubscribed,
                 monthlyFee: NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig),
                 accessUntil: NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail),
                 selectedIds: _selectedCoverage,
@@ -1083,22 +1084,16 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               ),
               const SizedBox(height: 14),
             ],
-            Text(
-              'Tell us about the repair — the more detail, the faster we can help.',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),
-            ),
-            const SizedBox(height: 10),
-            _textField('Service address *', _serviceAddressC, isDark, maxLines: 2, onChanged: (_) => _touchForm(), hint: 'Where the work needs to be done'),
-            const SizedBox(height: 10),
-            _textField('Fixture / area *', _fixtureTypeC, isDark, onChanged: (_) => _touchForm(), hint: 'e.g. Kitchen faucet, bathroom tile, outlet'),
-            const SizedBox(height: 10),
-            _textField('Job description *', _jobDescC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What work do you need done?'),
-            const SizedBox(height: 10),
-            _textField('Problem details *', _problemDetailsC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What is broken, leaking, or not working?'),
-            const SizedBox(height: 10),
-            _textField('Urgency (optional)', _urgencyC, isDark, onChanged: (_) => _touchForm(), hint: 'e.g. Emergency, this week, flexible'),
-            const SizedBox(height: 10),
-            _textField('Preferred date / time (optional)', _preferredScheduleC, isDark, onChanged: (_) => _touchForm(), hint: 'When works best for you?'),
+            if (_houseSubscribed && _selectedCoverage.isNotEmpty) ...[
+              Text(
+                'Service selected. Tap Send on WhatsApp. Add details if you want them in the message.',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+              ),
+              const SizedBox(height: 10),
+              _textField('Service address (optional)', _serviceAddressC, isDark, maxLines: 2, onChanged: (_) => _touchForm(), hint: 'Where the work needs to be done'),
+              const SizedBox(height: 10),
+              _textField('Problem details (optional)', _problemDetailsC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What is broken, leaking, or not working?'),
+            ],
           ] else ...[
             const SizedBox(height: 10),
             _textField('Job description', _jobDescC, isDark, maxLines: 3, onChanged: (_) => _touchForm(), hint: 'What needs to be done?'),
@@ -1142,9 +1137,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                 ? (_cashAppOpened
                     ? 'Cash App opened — tap Send on WhatsApp to finish.'
                     : 'Step 1: Pay on Cash App · Step 2: Send on WhatsApp turns on after payment.')
-                : _canContactWhatsApp
-                    ? 'All set — tap Send on WhatsApp or Call.'
-                    : 'Fill in every required field (*) to turn on Send on WhatsApp.',
+                : _isHouseFixture
+                    ? (_houseSubscribed
+                        ? (_selectedCoverage.isEmpty
+                            ? 'Choose a service. Send on WhatsApp turns on after you pick one.'
+                            : 'All set — tap Send on WhatsApp.')
+                        : 'Subscribe first. Send on WhatsApp stays off until you pay.')
+                    : _canContactWhatsApp
+                        ? 'All set — tap Send on WhatsApp or Call.'
+                        : 'Fill in every required field (*) to turn on Send on WhatsApp.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 9, color: isDark ? Colors.white38 : Colors.black45, height: 1.3),
           ),
@@ -1348,6 +1349,17 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 'Send on WhatsApp unlocks after you tap Pay on Cash App.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309)),
+              ),
+            ),
+          if (_isHouseFixture && !_canContactWhatsApp)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _houseSubscribed
+                    ? 'Choose a service first. Then Send on WhatsApp turns on.'
+                    : 'Subscribe first. Send on WhatsApp stays off until you pay.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309)),
               ),

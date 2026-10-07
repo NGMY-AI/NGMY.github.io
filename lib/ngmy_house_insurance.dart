@@ -226,19 +226,18 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
     final untilLabel = accessUntil == null
         ? ''
         : 'Covered until ${accessUntil!.month}/${accessUntil!.day}/${accessUntil!.year}';
-    final canPay = !active && selectedIds.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'CHOOSE COVERAGE',
+          active ? 'CHOOSE A SERVICE' : 'SUBSCRIBE FIRST',
           style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: muted),
         ),
         const SizedBox(height: 4),
         Text(
           active
-              ? 'Your plan is active. Tap a box to change what it covers.'
-              : 'Tap the boxes you want. Then pay $feeLabel with card or Cash App.',
+              ? 'Pick the service you need. Then tap Send on WhatsApp.'
+              : 'Pay $feeLabel with Stripe or Cash App. Services and Send on WhatsApp stay off until you pay.',
           style: TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w600, color: titleColor),
         ),
         if (untilLabel.isNotEmpty) ...[
@@ -246,6 +245,7 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
           Text(untilLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF0F766E))),
         ],
         const SizedBox(height: 10),
+        if (active)
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -312,32 +312,17 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
             );
           },
         ),
-        const SizedBox(height: 10),
-        if (active)
-          Container(
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: const Color(0xFF0F766E).withValues(alpha: isDark ? 0.25 : 0.1),
-              border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.4)),
-            ),
-            child: Text(
-              'Covered this month',
-              style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F766E)),
-            ),
-          )
-        else
+        if (!active) ...[
+          const SizedBox(height: 10),
           SizedBox(
             height: 46,
             child: Row(
               children: [
                 Expanded(
                   child: FilledButton(
-                    onPressed: canPay ? onPayStripe : null,
+                    onPressed: onPayStripe,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF635BFF),
-                      disabledBackgroundColor: const Color(0xFF635BFF).withValues(alpha: 0.35),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -347,10 +332,9 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton(
-                    onPressed: canPay ? onPayCashApp : null,
+                    onPressed: onPayCashApp,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF00D632),
-                      disabledBackgroundColor: const Color(0xFF00D632).withValues(alpha: 0.35),
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -360,15 +344,7 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
               ],
             ),
           ),
-        if (!active && selectedIds.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              'Select at least one coverage to pay.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted),
-            ),
-          ),
+        ],
         if (cashAppTag.isNotEmpty && !active)
           Padding(
             padding: const EdgeInsets.only(top: 4),
