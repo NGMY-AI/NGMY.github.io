@@ -1843,6 +1843,8 @@ class AppConfig {
   /// Monthly wallet fee for Help Center Free House Insurance (default \$50). 0 = free.
   double houseInsuranceMonthlyFee;
   Map<String, String> houseInsuranceAccessUntilByEmail;
+  /// Comma-separated coverage ids chosen for House Insurance, keyed by email.
+  Map<String, String> houseInsuranceCoverageByEmail;
   /// Civic Registry: pending admin gift grants for 3-in-a-row first helpers.
   List<Map<String, dynamic>> civicHelperGiftPending;
   /// Civic Registry: granted helper gifts (user inbox + store redeem).
@@ -1978,6 +1980,7 @@ class AppConfig {
     Map<String, String>? repairEstimateAccessUntilByEmail,
     this.houseInsuranceMonthlyFee = NgmyHouseInsurance.defaultMonthlyFee,
     Map<String, String>? houseInsuranceAccessUntilByEmail,
+    Map<String, String>? houseInsuranceCoverageByEmail,
     List<Map<String, dynamic>>? civicHelperGiftPending,
     List<Map<String, dynamic>>? civicHelperGiftInbox,
     this.translateWeeklyFreeLimit = NgmyTranslatePayments.defaultWeeklyFreeLimit,
@@ -2036,6 +2039,7 @@ class AppConfig {
         appStudioAiAccessUntilByEmail = appStudioAiAccessUntilByEmail ?? const {},
         repairEstimateAccessUntilByEmail = repairEstimateAccessUntilByEmail ?? const {},
         houseInsuranceAccessUntilByEmail = houseInsuranceAccessUntilByEmail ?? const {},
+        houseInsuranceCoverageByEmail = houseInsuranceCoverageByEmail ?? const {},
         civicHelperGiftPending = civicHelperGiftPending ?? const [],
         civicHelperGiftInbox = civicHelperGiftInbox ?? const [],
         translateWeekPassByEmail = translateWeekPassByEmail ?? const {},
@@ -2148,6 +2152,7 @@ class AppConfig {
     'repairEstimateAccessUntilByEmail': repairEstimateAccessUntilByEmail,
     'houseInsuranceMonthlyFee': houseInsuranceMonthlyFee,
     'houseInsuranceAccessUntilByEmail': houseInsuranceAccessUntilByEmail,
+    'houseInsuranceCoverageByEmail': houseInsuranceCoverageByEmail,
     'civicHelperGiftPending': civicHelperGiftPending,
     'civicHelperGiftInbox': civicHelperGiftInbox,
     'translateWeeklyFreeLimit': translateWeeklyFreeLimit,
@@ -2304,6 +2309,7 @@ class AppConfig {
     repairEstimateAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['repairEstimateAccessUntilByEmail']),
     houseInsuranceMonthlyFee: (json['houseInsuranceMonthlyFee'] as num?)?.toDouble() ?? NgmyHouseInsurance.defaultMonthlyFee,
     houseInsuranceAccessUntilByEmail: _familyTreePhotoAccessFromJson(json['houseInsuranceAccessUntilByEmail']),
+    houseInsuranceCoverageByEmail: _familyTreePhotoAccessFromJson(json['houseInsuranceCoverageByEmail']),
     civicHelperGiftPending: List<Map<String, dynamic>>.from(
       (json['civicHelperGiftPending'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
     ),
@@ -4034,6 +4040,14 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
     };
   } else if (keep.houseInsuranceAccessUntilByEmail.isNotEmpty) {
     next.houseInsuranceAccessUntilByEmail = Map<String, String>.from(keep.houseInsuranceAccessUntilByEmail);
+  }
+  if (record.containsKey('houseInsuranceCoverageByEmail') && record['houseInsuranceCoverageByEmail'] is Map) {
+    next.houseInsuranceCoverageByEmail = {
+      ..._familyTreePhotoAccessFromJson(record['houseInsuranceCoverageByEmail']),
+      ...keep.houseInsuranceCoverageByEmail,
+    };
+  } else if (keep.houseInsuranceCoverageByEmail.isNotEmpty) {
+    next.houseInsuranceCoverageByEmail = Map<String, String>.from(keep.houseInsuranceCoverageByEmail);
   }
   if (record.containsKey('civicHelperGiftPending') && record['civicHelperGiftPending'] is List) {
     next.civicHelperGiftPending = List<Map<String, dynamic>>.from(

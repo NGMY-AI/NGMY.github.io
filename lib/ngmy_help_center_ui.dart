@@ -16,6 +16,7 @@ import 'ngmy_help_center_send_money_receipt_templates.dart';
 import 'ngmy_help_center_send_money_store.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_qr_download.dart';
 
 const _accent = Color(0xFF00E5FF);
@@ -82,6 +83,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   late final AnimationController _enter;
   String _reference = '';
   bool _cashAppOpened = false;
+  final Set<String> _selectedCoverage = {};
   NgmyHelpCenterSenderInfo _savedSender = const NgmyHelpCenterSenderInfo();
   List<NgmyHelpCenterSavedRecipient> _savedRecipients = const [];
   String _receiptTemplateId = 'modern';
@@ -228,8 +230,87 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       _preferredScheduleC.clear();
       _urgencyC.clear();
       _cashAppOpened = false;
+      _selectedCoverage
+        ..clear()
+        ..addAll(
+          ngmyHelpCenterIsHouseFixture(s)
+              ? NgmyHouseInsurance.coverageFor(widget.appConfig, widget.clientEmail)
+              : const <String>[],
+        );
       _reference = 'HC-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}${DateTime.now().day.toString().padLeft(2, '0')}-${1000 + DateTime.now().millisecond % 9000}';
     });
+  }
+
+  void _toggleCoverage(String id) {
+    setState(() {
+      if (_selectedCoverage.contains(id)) {
+        _selectedCoverage.remove(id);
+      } else {
+        _selectedCoverage.add(id);
+      }
+    });
+  }
+
+  String get _coverageSummary {
+    final titles = <String>[];
+    for (final c in NgmyHouseInsurance.coveredCategories) {
+      if (_selectedCoverage.contains(c.id)) titles.add(c.title);
+    }
+    return titles.join(', ');
+  }
+
+  Future<void> _payHouseInsuranceStripe() async {
+    if (_selectedCoverage.isEmpty) {
+      _snack('Choose at least one coverage first.');
+      return;
+    }
+    if (!NgmyStripePayments.hasCheckoutLink(NgmyStripeProduct.houseInsurance)) {
+      _snack('Card checkout is not linked yet. Use Cash App to send the \$${NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig).toStringAsFixed(0)}.');
+      return;
+    }
+    final ok = await NgmyHouseInsurance.payWithStripe(
+      context: context,
+      email: widget.clientEmail,
+      coverageIds: _selectedCoverage,
+      config: widget.appConfig,
+      onDataChanged: widget.onDataChanged ?? () {},
+      onPersistConfig: widget.onPersistConfig ?? () async => true,
+    );
+    if (ok && mounted) {
+      setState(() {});
+      _snack('House Insurance is active for the coverages you chose.');
+    }
+  }
+
+  Future<void> _payHouseInsuranceCashApp() async {
+    if (_selectedCoverage.isEmpty) {
+      _snack('Choose at least one coverage first.');
+      return;
+    }
+    final url = _cfg.resolvedCashAppUrl();
+    if (url.isEmpty) {
+      _snack('Cash App is not configured yet.');
+      return;
+    }
+    final fee = NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig);
+    final ok = await NgmyHouseInsurance.payWithCashApp(
+      context: context,
+      cashAppUrl: url,
+      cashAppTag: _cfg.cashAppDisplayTag(),
+      amount: fee,
+      email: widget.clientEmail,
+      coverageIds: _selectedCoverage,
+      config: widget.appConfig,
+      onDataChanged: widget.onDataChanged ?? () {},
+      onPersistConfig: widget.onPersistConfig ?? () async => true,
+    );
+    if (!mounted) return;
+    if (ok) {
+      setState(() {});
+      _snack('House Insurance is active for the coverages you chose.');
+    } else {
+      _snack('Payment was not confirmed. House Insurance stays off until Cash App is sent.');
+    }
   }
 
   bool get _isSendMoney => _selected != null && ngmyHelpCenterIsSendMoney(_selected!);
@@ -413,6 +494,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       problemDetails: _problemDetailsC.text,
       preferredSchedule: _preferredScheduleC.text,
       urgency: _urgencyC.text,
+      coverageSummary: _coverageSummary,
       notes: _notesC.text,
       qty: _qtyC.text,
       price: _priceC.text,
@@ -531,40 +613,6 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                           padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
                           children: [
                             _enterBlock(begin: 0.0, end: 0.35, child: _posterCard(isDark)),
-                            if (widget.appConfig != null && widget.user != null && widget.onCharge != null) ...[
-                              const SizedBox(height: 14),
-                              _enterBlock(
-                                begin: 0.05,
-                                end: 0.4,
-                                child: NgmyHouseInsuranceCard(
-                                  isDark: isDark,
-                                  active: NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail),
-                                  monthlyFee: NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig),
-                                  accessUntil: NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail),
-                                  onSubscribe: () async {
-                                    for (final s in services) {
-                                      if (ngmyHelpCenterIsHouseFixture(s)) {
-                                        _selectService(s);
-                                        break;
-                                      }
-                                    }
-                                    final ok = await NgmyHouseInsurance.confirmAndChargeMonthly(
-                                      context: context,
-                                      user: widget.user,
-                                      config: widget.appConfig,
-                                      onCharge: widget.onCharge!,
-                                      onDataChanged: widget.onDataChanged ?? () {},
-                                      onPersistConfig: widget.onPersistConfig ?? () async => true,
-                                    );
-                                    if (ok && mounted) {
-                                      setState(() {});
-                                      _snack('House Insurance is active — you\'re covered for small fixes!');
-                                    }
-                                  },
-                                  onViewCoverage: () => showNgmyHouseInsuranceCoverageSheet(context, isDark: isDark),
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 22),
                             _enterBlock(begin: 0.12, end: 0.48, child: _stepsRow(isDark)),
                             const SizedBox(height: 22),
@@ -774,112 +822,71 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     final selected = _selected?.id == s.id;
     final isMoney = ngmyHelpCenterIsSendMoney(s);
     final isHouse = ngmyHelpCenterIsHouseFixture(s);
-    return AnimatedScale(
-      scale: selected ? 1.04 : 1.0,
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOutBack,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _selectService(s),
-          borderRadius: BorderRadius.circular(18),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 240),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              gradient: selected
-                  ? LinearGradient(colors: [_accent.withOpacity(0.22), _accent2.withOpacity(0.18)])
-                  : (isHouse
-                      ? LinearGradient(colors: [
-                          const Color(0xFF0F766E).withOpacity(isDark ? 0.35 : 0.12),
-                          const Color(0xFF1D4ED8).withOpacity(isDark ? 0.28 : 0.10),
-                        ])
-                      : null),
-              color: selected || isHouse ? null : (isDark ? Colors.white.withOpacity(0.05) : Colors.white),
-              border: Border.all(
-                color: selected
-                    ? _accent.withOpacity(0.65)
-                    : (isHouse ? const Color(0xFF0EA5E9) : (isDark ? Colors.white12 : Colors.black12)),
-                width: selected || isHouse ? 1.6 : 1,
-              ),
-              boxShadow: selected ? [BoxShadow(color: _accent.withOpacity(0.22), blurRadius: 16)] : null,
+    final name = isHouse ? 'House + Insurance' : s.name;
+    final description = isHouse
+        ? '\$50/mo coverage'
+        : (s.description.isEmpty ? 'Tap to open' : s.description);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : Colors.black54;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _selectService(s),
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+            border: Border.all(
+              color: selected ? _accent.withOpacity(0.85) : (isDark ? Colors.white12 : Colors.black12),
+              width: 1,
             ),
-            child: Stack(
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+            child: Column(
               children: [
-                if (isHouse)
-                  Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF0EA5E9)]),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('\$50/mo', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w900)),
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: LinearGradient(
+                      colors: isMoney
+                          ? [const Color(0xFF059669), const Color(0xFF10B981)]
+                          : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
                     ),
                   ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (_, __) => Transform.scale(
-                        scale: selected ? 1.0 + _pulse.value * 0.04 : 1.0,
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: LinearGradient(
-                              colors: isHouse
-                                  ? [const Color(0xFF0F766E), const Color(0xFF1D4ED8)]
-                                  : isMoney
-                                      ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                                      : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
-                            ),
-                            boxShadow: selected
-                                ? [BoxShadow(color: _accent.withOpacity(0.35 + _pulse.value * 0.2), blurRadius: 12)]
-                                : null,
-                          ),
-                          child: Icon(isHouse ? Icons.shield_moon_rounded : ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isHouse ? 'House + Insurance' : s.name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isHouse
-                          ? 'Free House Insurance \$50/mo'
-                          : (s.description.isEmpty ? 'Tap to open' : s.description),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        height: 1.2,
-                        fontWeight: isHouse ? FontWeight.w800 : FontWeight.w600,
-                        color: isHouse ? const Color(0xFF0EA5E9) : (isDark ? Colors.white60 : Colors.black54),
-                      ),
-                    ),
-                    AnimatedOpacity(
-                      opacity: selected ? 1 : 0,
-                      duration: const Duration(milliseconds: 200),
-                      child: const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Icon(Icons.check_circle_rounded, size: 16, color: _accent),
-                      ),
-                    ),
-                  ],
+                  child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 28,
+                  child: Text(
+                    name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, height: 1.15, color: titleColor),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 22,
+                  child: Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 9, height: 1.2, fontWeight: FontWeight.w600, color: muted),
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  height: 16,
+                  child: selected
+                      ? const Icon(Icons.check_circle_rounded, size: 16, color: _accent)
+                      : const SizedBox.shrink(),
                 ),
               ],
             ),
@@ -1062,28 +1069,19 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             _deliveryFeeBox(isDark),
           ] else if (_isHouseFixture) ...[
             const SizedBox(height: 10),
-            if (widget.appConfig != null && widget.user != null && widget.onCharge != null) ...[
+            if (widget.appConfig != null) ...[
               NgmyHouseInsuranceCard(
                 isDark: isDark,
                 active: NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail),
                 monthlyFee: NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig),
                 accessUntil: NgmyHouseInsurance.accessUntil(widget.appConfig, widget.clientEmail),
-                onSubscribe: () async {
-                  final ok = await NgmyHouseInsurance.confirmAndChargeMonthly(
-                    context: context,
-                    user: widget.user,
-                    config: widget.appConfig,
-                    onCharge: widget.onCharge!,
-                    onDataChanged: widget.onDataChanged ?? () {},
-                    onPersistConfig: widget.onPersistConfig ?? () async => true,
-                  );
-                  if (ok && mounted) {
-                    setState(() {});
-                    _snack('House Insurance is active — you\'re covered for small fixes!');
-                  }
-                },
-                onViewCoverage: () => showNgmyHouseInsuranceCoverageSheet(context, isDark: isDark),
+                selectedIds: _selectedCoverage,
+                onToggleCoverage: _toggleCoverage,
+                onPayStripe: () => _payHouseInsuranceStripe(),
+                onPayCashApp: () => _payHouseInsuranceCashApp(),
+                cashAppTag: _cfg.cashAppDisplayTag(),
               ),
+              const SizedBox(height: 14),
             ],
             Text(
               'Tell us about the repair — the more detail, the faster we can help.',

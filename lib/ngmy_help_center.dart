@@ -293,6 +293,7 @@ class NgmyHelpCenterConfig {
     String problemDetails = '',
     String preferredSchedule = '',
     String urgency = '',
+    String coverageSummary = '',
     String notes = '',
     String? qty,
     String? price,
@@ -346,6 +347,7 @@ class NgmyHelpCenterConfig {
         }
       }
     } else if (isHouse) {
+      if (coverageSummary.trim().isNotEmpty) buf.writeln('Coverage chosen: ${coverageSummary.trim()}');
       if (serviceAddress.trim().isNotEmpty) buf.writeln('Service address: ${serviceAddress.trim()}');
       if (fixtureType.trim().isNotEmpty) buf.writeln('Fixture / area: ${fixtureType.trim()}');
       if (jobDescription.trim().isNotEmpty) buf.writeln('Job description: ${jobDescription.trim()}');

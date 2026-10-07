@@ -40,6 +40,7 @@ const PRODUCT_SLUGS = new Set([
   "slides_studio",
   "device_transfer",
   "state_registrar",
+  "house_insurance",
 ]);
 
 const STATE_REGISTRAR_SETTINGS_KEY = "civic_state_registrar_subscriptions";

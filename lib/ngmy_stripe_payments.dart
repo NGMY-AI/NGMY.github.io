@@ -31,6 +31,7 @@ enum NgmyStripeProduct {
   stateRegistrar,
   civicUserGroupExtra,
   civicUserGroupMembers,
+  houseInsurance,
 }
 
 class NgmyStripePayments {
@@ -73,6 +74,9 @@ class NgmyStripePayments {
       'https://buy.stripe.com/test_ngmy_civic_user_group_extra';
   static const String civicUserGroupMembersUrl =
       'https://buy.stripe.com/test_ngmy_civic_user_group_members';
+  /// Live Payment Link for House Insurance (\$50 / 30 days). Empty until the
+  /// Stripe Dashboard link is pasted here — Cash App still collects the fee.
+  static const String houseInsuranceUrl = '';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -152,6 +156,8 @@ class NgmyStripePayments {
         return 'civic_user_group_extra';
       case NgmyStripeProduct.civicUserGroupMembers:
         return 'civic_user_group_members';
+      case NgmyStripeProduct.houseInsurance:
+        return 'house_insurance';
     }
   }
 
@@ -195,6 +201,8 @@ class NgmyStripePayments {
         return NgmyStripeProduct.civicUserGroupExtra;
       case 'civic_user_group_members':
         return NgmyStripeProduct.civicUserGroupMembers;
+      case 'house_insurance':
+        return NgmyStripeProduct.houseInsurance;
       default:
         return null;
     }
@@ -240,7 +248,18 @@ class NgmyStripePayments {
         return civicUserGroupExtraUrl;
       case NgmyStripeProduct.civicUserGroupMembers:
         return civicUserGroupMembersUrl;
+      case NgmyStripeProduct.houseInsurance:
+        return houseInsuranceUrl;
     }
+  }
+
+  /// True when this product has a real Stripe Payment Link, not a placeholder.
+  static bool hasCheckoutLink(NgmyStripeProduct product) {
+    final url = checkoutUrl(product);
+    if (!url.startsWith('https://buy.stripe.com/')) return false;
+    if (url.contains('test_ngmy')) return false;
+    final id = url.substring('https://buy.stripe.com/'.length);
+    return id.isNotEmpty && !id.contains(' ');
   }
 
   /// Stripe only allows [A-Za-z0-9_-] in client_reference_id, so the account email
@@ -328,6 +347,8 @@ class NgmyStripePayments {
         return 499;
       case NgmyStripeProduct.civicUserGroupMembers:
         return 299;
+      case NgmyStripeProduct.houseInsurance:
+        return 5000;
     }
   }
 
@@ -401,6 +422,8 @@ class NgmyStripePayments {
         return const [Color(0xFF67E8F9), Color(0xFF0E7490)]; // lightning cyan
       case NgmyStripeProduct.civicUserGroupMembers:
         return const [Color(0xFFA5F3FC), Color(0xFF155E75)]; // bolt ice
+      case NgmyStripeProduct.houseInsurance:
+        return const [Color(0xFF5EEAD4), Color(0xFF0F766E)]; // house teal
     }
   }
 
@@ -445,6 +468,8 @@ class NgmyStripePayments {
         return const Color(0xFFECFEFF);
       case NgmyStripeProduct.civicUserGroupMembers:
         return const Color(0xFFCFFAFE);
+      case NgmyStripeProduct.houseInsurance:
+        return const Color(0xFFCCFBF1);
     }
   }
 
@@ -502,6 +527,8 @@ class NgmyStripePayments {
         return 'Extra Civic Group';
       case NgmyStripeProduct.civicUserGroupMembers:
         return 'Group 100+ Members';
+      case NgmyStripeProduct.houseInsurance:
+        return 'House Insurance';
     }
   }
 
@@ -545,6 +572,8 @@ class NgmyStripePayments {
         return Icons.bolt_rounded;
       case NgmyStripeProduct.civicUserGroupMembers:
         return Icons.groups_rounded;
+      case NgmyStripeProduct.houseInsurance:
+        return Icons.home_repair_service_rounded;
     }
   }
 
@@ -588,6 +617,8 @@ class NgmyStripePayments {
         return 'Create an additional lightning Civic Group beyond your one free owned group (30 days).';
       case NgmyStripeProduct.civicUserGroupMembers:
         return 'Unlock more than 100 members in your lightning Civic Group (30 days).';
+      case NgmyStripeProduct.houseInsurance:
+        return '\$50 for 30 days of the home-fix coverages you choose.';
     }
   }
 
@@ -1076,6 +1107,7 @@ class NgmyStripePayments {
     NgmyStripeProduct product, {
     String scope = '',
   }) async {
+    if (!hasCheckoutLink(product)) return;
     await _setPendingCheckout(email, product, scope: scope);
     ngmyLaunchPaymentCheckout(checkoutUrlFor(email, product, scope: scope));
   }

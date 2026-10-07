@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import 'ngmy_music_payments.dart';
+import 'ngmy_stripe_payments.dart';
 
 /// Free House Insurance — \$50/month subscription for covered small home fixes.
 /// Categories can be expanded later; this ships a starter covered-fix list.
@@ -55,6 +56,40 @@ class NgmyHouseInsurance {
     return DateTime.tryParse(untilRaw);
   }
 
+  static Map<String, String> _coverageMap(dynamic config) {
+    try {
+      final raw = (config as dynamic).houseInsuranceCoverageByEmail;
+      if (raw is Map) {
+        return raw.map((k, v) => MapEntry(k.toString(), v.toString()));
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  static void _setCoverageMap(dynamic config, Map<String, String> map) {
+    try {
+      (config as dynamic).houseInsuranceCoverageByEmail = map;
+    } catch (_) {}
+  }
+
+  static List<String> coverageFor(dynamic config, String email) {
+    final raw = _coverageMap(config)[_key(email)] ?? '';
+    return raw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+  }
+
+  static void setCoverage(dynamic config, String email, Iterable<String> ids) {
+    final key = _key(email);
+    if (key.isEmpty) return;
+    final map = Map<String, String>.from(_coverageMap(config));
+    final clean = ids.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList();
+    if (clean.isEmpty) {
+      map.remove(key);
+    } else {
+      map[key] = clean.join(',');
+    }
+    _setCoverageMap(config, map);
+  }
+
   static void grantMonthly(dynamic config, String email, {int days = 30}) {
     final key = _key(email);
     if (key.isEmpty) return;
@@ -65,46 +100,100 @@ class NgmyHouseInsurance {
     _setAccessMap(config, map);
   }
 
-  static Future<bool> confirmAndChargeMonthly({
-    required BuildContext context,
-    required dynamic user,
+  static Future<bool> activateAfterPayment({
     required dynamic config,
-    required Future<bool> Function(double amount, String description) onCharge,
+    required String email,
+    required Iterable<String> coverageIds,
     required VoidCallback onDataChanged,
     required Future<bool> Function() onPersistConfig,
   }) async {
-    if ((user as dynamic).isAdmin == true) {
-      grantMonthly(config, ((user as dynamic).email as String?) ?? '');
-      onDataChanged();
-      await onPersistConfig();
-      return true;
-    }
-    final fee = monthlyFeeFromConfig(config);
-    final email = ((user as dynamic).email as String?) ?? '';
-    if (fee <= 0 || hasActiveSubscription(config, email)) return true;
-
-    final charged = await NgmyMusicPayments.confirmAndCharge(
-      context: context,
-      user: user,
-      config: config,
-      amount: fee,
-      title: 'Free House Insurance — monthly',
-      message:
-          'Subscribe for \$${fee.toStringAsFixed(2)}/month. '
-          'NGMY helps cover small home fixes from the covered list — '
-          'faucets, outlets, doors, caulk, shelves, and more. '
-          'File a House Fixture claim anytime while active.',
-      onCharge: onCharge,
-    );
-    if (!charged) return false;
     grantMonthly(config, email);
+    setCoverage(config, email, coverageIds);
     onDataChanged();
-    await onPersistConfig();
+    return onPersistConfig();
+  }
+
+  /// Opens Stripe checkout for the \$50 plan. Returns false when the Payment
+  /// Link is not in the app yet, or the buyer closes checkout.
+  static Future<bool> payWithStripe({
+    required BuildContext context,
+    required String email,
+    required Iterable<String> coverageIds,
+    required dynamic config,
+    required VoidCallback onDataChanged,
+    required Future<bool> Function() onPersistConfig,
+  }) async {
+    if (!NgmyStripePayments.hasCheckoutLink(NgmyStripeProduct.houseInsurance)) {
+      return false;
+    }
+    final paid = await NgmyStripePayments.ensurePaid(
+      context: context,
+      product: NgmyStripeProduct.houseInsurance,
+      email: email,
+      isAdmin: false,
+      title: 'House Insurance',
+      message: '\$50 for 30 days of the coverages you selected.',
+    );
+    if (!paid) return false;
+    await activateAfterPayment(
+      config: config,
+      email: email,
+      coverageIds: coverageIds,
+      onDataChanged: onDataChanged,
+      onPersistConfig: onPersistConfig,
+    );
+    return true;
+  }
+
+  /// Opens Cash App with the monthly amount filled in, then records the plan
+  /// after the buyer confirms they sent it.
+  static Future<bool> payWithCashApp({
+    required BuildContext context,
+    required String cashAppUrl,
+    required String cashAppTag,
+    required double amount,
+    required String email,
+    required Iterable<String> coverageIds,
+    required dynamic config,
+    required VoidCallback onDataChanged,
+    required Future<bool> Function() onPersistConfig,
+  }) async {
+    final base = cashAppUrl.trim();
+    if (base.isEmpty) return false;
+    final amountText = amount == amount.roundToDouble()
+        ? amount.toStringAsFixed(0)
+        : amount.toStringAsFixed(2);
+    final payUrl = base.endsWith('/') ? '$base$amountText' : '$base/$amountText';
+    final opened = await launchUrl(Uri.parse(payUrl), mode: LaunchMode.externalApplication);
+    if (!opened || !context.mounted) return false;
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Did you send it on Cash App?'),
+        content: Text(
+          'Cash App should be open to send \$$amountText to $cashAppTag. '
+          'Tap “I sent it” after the payment goes through.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not yet')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('I sent \$$amountText')),
+        ],
+      ),
+    );
+    if (sent != true) return false;
+    await activateAfterPayment(
+      config: config,
+      email: email,
+      coverageIds: coverageIds,
+      onDataChanged: onDataChanged,
+      onPersistConfig: onPersistConfig,
+    );
     return true;
   }
 }
 
-/// Beautiful subscribe card shown inside Help Center → House Fixture.
+/// Coverage choices plus Stripe and Cash App pay buttons. Every coverage box
+/// is the same height so the row stays aligned.
 class NgmyHouseInsuranceCard extends StatelessWidget {
   const NgmyHouseInsuranceCard({
     super.key,
@@ -112,223 +201,184 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
     required this.active,
     required this.monthlyFee,
     this.accessUntil,
-    required this.onSubscribe,
-    this.onViewCoverage,
+    required this.selectedIds,
+    required this.onToggleCoverage,
+    required this.onPayStripe,
+    required this.onPayCashApp,
+    this.cashAppTag = '',
   });
 
   final bool isDark;
   final bool active;
   final double monthlyFee;
   final DateTime? accessUntil;
-  final VoidCallback onSubscribe;
-  final VoidCallback? onViewCoverage;
+  final Set<String> selectedIds;
+  final ValueChanged<String> onToggleCoverage;
+  final VoidCallback onPayStripe;
+  final VoidCallback onPayCashApp;
+  final String cashAppTag;
 
   @override
   Widget build(BuildContext context) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : Colors.black54;
+    final feeLabel = '\$${monthlyFee.toStringAsFixed(0)}';
     final untilLabel = accessUntil == null
         ? ''
-        : 'Active until ${accessUntil!.month}/${accessUntil!.day}/${accessUntil!.year}';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: active
-              ? [const Color(0xFF059669), const Color(0xFF0EA5E9)]
-              : [const Color(0xFF0F766E), const Color(0xFF1D4ED8), const Color(0xFF7C3AED)],
+        : 'Covered until ${accessUntil!.month}/${accessUntil!.day}/${accessUntil!.year}';
+    final canPay = !active && selectedIds.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'CHOOSE COVERAGE',
+          style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: muted),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0EA5E9).withValues(alpha: 0.35),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Icon(Icons.home_work_rounded, size: 120, color: Colors.white.withValues(alpha: 0.08)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.shield_moon_rounded, color: Colors.white, size: 26),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            active ? 'HOUSE INSURANCE ACTIVE' : 'FREE HOUSE INSURANCE',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.85),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            active ? 'You\'re covered' : '\$${monthlyFee.toStringAsFixed(0)} / month',
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, height: 1.1),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  active
-                      ? 'File a House Fixture request below — small covered repairs are on us while your plan is active.'
-                      : 'Subscribe and we help fix small household issues from our covered list. Cancel anytime by letting the month expire.',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.92), fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600),
-                ),
-                if (untilLabel.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(untilLabel, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w700)),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (!active)
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: onSubscribe,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF0F766E),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: const Text('Subscribe \$50/mo', style: TextStyle(fontWeight: FontWeight.w900)),
-                        ),
-                      )
-                    else
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-                          ),
-                          child: const Text('Covered this month', textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: onViewCoverage,
-                      style: TextButton.styleFrom(foregroundColor: Colors.white),
-                      child: const Text('Coverage', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> showNgmyHouseInsuranceCoverageSheet(BuildContext context, {required bool isDark}) async {
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
-      return Container(
-        margin: const EdgeInsets.fromLTRB(12, 48, 12, 12),
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        const SizedBox(height: 4),
+        Text(
+          active
+              ? 'Your plan is active. Tap a box to change what it covers.'
+              : 'Tap the boxes you want. Then pay $feeLabel with card or Cash App.',
+          style: TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w600, color: titleColor),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.verified_user_rounded, color: Color(0xFF0EA5E9)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'What Free House Insurance covers',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+        if (untilLabel.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(untilLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF0F766E))),
+        ],
+        const SizedBox(height: 10),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: NgmyHouseInsurance.coveredCategories.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            mainAxisExtent: 78,
+          ),
+          itemBuilder: (_, i) {
+            final c = NgmyHouseInsurance.coveredCategories[i];
+            final on = selectedIds.contains(c.id);
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => onToggleCoverage(c.id),
+                borderRadius: BorderRadius.circular(14),
+                child: Ink(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                    border: Border.all(
+                      color: on ? const Color(0xFF0EA5E9) : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                      width: 1,
+                    ),
                   ),
-                ),
-                IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
-              ],
-            ),
-            Text(
-              'Small household fixes — not major remodel or appliance replacement. Full category list can be expanded anytime.',
-              style: TextStyle(fontSize: 12, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
-            ),
-            const SizedBox(height: 12),
-            Flexible(
-              child: ListView.separated(
-                shrinkWrap: true,
-                itemCount: NgmyHouseInsurance.coveredCategories.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final c = NgmyHouseInsurance.coveredCategories[i];
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC),
-                      border: Border.all(color: isDark ? Colors.white10 : const Color(0xFFE2E8F0)),
-                    ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                     child: Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0EA5E9).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(c.icon, color: const Color(0xFF0EA5E9), size: 22),
+                        Icon(
+                          on ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                          size: 20,
+                          color: on ? const Color(0xFF0EA5E9) : muted,
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(c.title, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                              Text(c.detail, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
+                              Text(
+                                c.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12, height: 1.15, fontWeight: FontWeight.w800, color: titleColor),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                c.detail,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 10, color: muted),
+                              ),
                             ],
                           ),
                         ),
                       ],
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
-      );
-    },
-  );
+        const SizedBox(height: 10),
+        if (active)
+          Container(
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFF0F766E).withValues(alpha: isDark ? 0.25 : 0.1),
+              border: Border.all(color: const Color(0xFF0F766E).withValues(alpha: 0.4)),
+            ),
+            child: Text(
+              'Covered this month',
+              style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F766E)),
+            ),
+          )
+        else
+          SizedBox(
+            height: 46,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: canPay ? onPayStripe : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF635BFF),
+                      disabledBackgroundColor: const Color(0xFF635BFF).withValues(alpha: 0.35),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text('Stripe $feeLabel', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: canPay ? onPayCashApp : null,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF00D632),
+                      disabledBackgroundColor: const Color(0xFF00D632).withValues(alpha: 0.35),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text('Cash App $feeLabel', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (!active && selectedIds.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Select at least one coverage to pay.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted),
+            ),
+          ),
+        if (cashAppTag.isNotEmpty && !active)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Cash App sends to $cashAppTag',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, color: muted),
+            ),
+          ),
+      ],
+    );
+  }
 }
