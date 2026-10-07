@@ -29391,8 +29391,8 @@ class _NgmyHubScreenState extends State<NgmyHubScreen> with SingleTickerProvider
                         ),
                       ),
                       _hubBox(
-                        'Help Center',
-                        Icons.support_agent_rounded,
+                        'Help + Insurance',
+                        Icons.shield_moon_rounded,
                         helpColors,
                         pulse,
                         scan,
