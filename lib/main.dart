@@ -31853,6 +31853,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   List<Map<String, dynamic>> _sharedDirectoryRows = [];
   String _sharedDirectoryState = '';
   bool _sharedDirectoryLoading = false;
+  String _sharedDirectoryError = '';
   int _sharedDirectoryLoadGen = 0;
   /// Optimistic during the 2-month state trial so AR tools do not flash away.
   bool _civicStateAccessOk = true;
@@ -32754,6 +32755,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     setState(() {
       _selectedState = state;
+      _resetSharedDirectoryForState(state);
       _registryUnlocked = true;
     });
     unawaited(_refreshCivicStateAccess());
@@ -32793,6 +32795,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   Future<bool> _applyCivicStateChange(String newState) async {
     final from = _selectedState;
     if (from.trim().toLowerCase() == newState.trim().toLowerCase()) return true;
+    final registrarAwayFromHome = _hasRegistrarAccess() &&
+        !_isGlobalCivicRegistryAdmin() &&
+        !NgmyCivicRegistryStats.statesMatch(newState, _registrarHomeState());
+    if (registrarAwayFromHome) {
+      final verified = await _verifyRegistrarDestinationState(newState);
+      if (!verified) return false;
+    } else if (!_hasRegistrarAccess() && !_isGlobalCivicRegistryAdmin()) {
+      // A state switch always requires a fresh full verification. Cached
+      // access may open the current state after refresh, but cannot silently
+      // carry a normal member into another state.
+      await civicRegistryClearUnlockForState(widget.user.email, state: newState);
+    }
     final ok = NgmyCivicStateSwitches.tryConsumeSwitch(
       isAdmin: widget.user.isAdmin,
       isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
@@ -32840,6 +32854,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       setState(() {
         widget.user.state = newState;
         _selectedState = newState;
+        _resetSharedDirectoryForState(newState);
         _selectedCity = 'All Cities';
         _selectedRoom = 'All Rooms';
         _registryUnlocked = true;
@@ -32872,6 +32887,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         // the member was already verified for.
         setState(() {
           _selectedState = newState;
+          _resetSharedDirectoryForState(newState);
           _selectedCity = 'All Cities';
           _selectedRoom = 'All Rooms';
           _registryUnlocked = false;
@@ -32887,6 +32903,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       // persisted with the switch allowance and controls receipt visibility.
       widget.user.state = newState;
       _selectedState = newState;
+      _resetSharedDirectoryForState(newState);
       _selectedCity = 'All Cities';
       _selectedRoom = 'All Rooms';
       _registryUnlocked = true;
@@ -37112,6 +37129,105 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       if (picked == null || !mounted) return;
       await _applyCivicStateChange(picked);
     }());
+  }
+
+  /// Authorized Registrars may inspect another state's public directory, but
+  /// the server requires that state's code outside their home state. The old
+  /// switch bypassed every gate for registrars, then Rankings called the
+  /// server without a pinSig and got 403 — leaving the previous state's names
+  /// on screen or an empty board.
+  Future<bool> _verifyRegistrarDestinationState(String state) async {
+    final passwordC = TextEditingController();
+    var busy = false;
+    var error = '';
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => StatefulBuilder(
+        builder: (dctx, setDialogState) => AlertDialog(
+          title: Text('Enter $state state code'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Before changing state, enter that state’s Civic Registry code. '
+                'Your Authorized Registrar management tools stay limited to your home state.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordC,
+                autofocus: true,
+                obscureText: true,
+                enabled: !busy,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'State code',
+                  errorText: error.isEmpty ? null : error,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.pop(dctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final pin = passwordC.text.trim();
+                      if (pin.isEmpty) {
+                        setDialogState(() => error = 'Enter the state code.');
+                        return;
+                      }
+                      setDialogState(() {
+                        busy = true;
+                        error = '';
+                      });
+                      await _ensureCivicCloudSessionInteractive(
+                        reason: 'Connect this phone so the $state state code can be verified.',
+                      );
+                      final verified = await ngmyCivicVerifyStatePin(
+                        email: widget.user.email,
+                        state: state,
+                        pin: pin,
+                      );
+                      if (!dctx.mounted) return;
+                      if (!verified.ok || (verified.pinSig ?? '').trim().isEmpty) {
+                        setDialogState(() {
+                          busy = false;
+                          error = verified.error ?? 'Incorrect state code.';
+                        });
+                        return;
+                      }
+                      await civicRegistrySaveServerUnlock(
+                        widget.user.email,
+                        state: state,
+                        pinSig: verified.pinSig!,
+                      );
+                      if (dctx.mounted) Navigator.pop(dctx, true);
+                    },
+              child: Text(busy ? 'Checking…' : 'Verify & Change'),
+            ),
+          ],
+        ),
+      ),
+    );
+    passwordC.dispose();
+    return ok == true;
+  }
+
+  void _resetSharedDirectoryForState(String state) {
+    final wanted = state.trim();
+    if (NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, wanted)) return;
+    _sharedDirectoryLoadGen++;
+    _sharedDirectoryRows = [];
+    _sharedDirectoryUsers = [];
+    _sharedDirectoryState = wanted;
+    _sharedDirectoryLoading = true;
+    _sharedDirectoryError = '';
   }
 
   /// The state whose help mode this viewer sees/controls — King/Admin
@@ -43095,6 +43211,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return byKey.values.toList();
   }
 
+  List<UserData> _rankingUsersForSelectedState(Iterable<UserData> users) =>
+      users
+          .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
+          .toList();
+
   UserData _preferRankingUser(UserData a, UserData b) {
     final aCanon = NgmyCivicWalletIdentity.isCanonicalRegistryId(a.registryId ?? '');
     final bCanon = NgmyCivicWalletIdentity.isCanonicalRegistryId(b.registryId ?? '');
@@ -43238,36 +43359,64 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       return;
     }
     final email = _civicRankingsFetchEmail();
-    final gen = ++_sharedDirectoryLoadGen;
     final wanted = _selectedState.trim();
-    if (_sharedDirectoryState != wanted || _sharedDirectoryRows.isEmpty) {
+    if (!NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, wanted)) {
+      setState(() => _resetSharedDirectoryForState(wanted));
+    }
+    final gen = ++_sharedDirectoryLoadGen;
+    if (_sharedDirectoryRows.isEmpty) {
       final cached = await NgmyCivicRegistryMembers.loadRankingsCache(wanted);
       if (cached.isNotEmpty && mounted && gen == _sharedDirectoryLoadGen) {
         setState(() {
           _sharedDirectoryRows = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
             widget.config,
-            _unionRankingRows(_sharedDirectoryRows, cached),
+            cached,
           );
           _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
           _sharedDirectoryState = wanted;
         });
       }
     }
-    if (mounted) setState(() => _sharedDirectoryLoading = _sharedDirectoryUsers.isEmpty);
+    if (mounted) {
+      setState(() {
+        _sharedDirectoryLoading = _sharedDirectoryUsers.isEmpty;
+        _sharedDirectoryError = '';
+      });
+    }
     try {
       final rawPin = email.isEmpty
           ? ''
           : ((await civicRegistryStoredPinSig(email, state: wanted)) ?? '');
       final pin = civicRegistryPinSigIsServerIssued(rawPin) ? rawPin : '';
-      final rankings = await ngmyCivicFetchRankings(
-        email: email,
-        state: wanted,
-        pinSig: pin,
-      );
+      ({bool ok, List<Map<String, dynamic>> members, String? error}) rankings =
+          (ok: false, members: const <Map<String, dynamic>>[], error: null);
+      for (var attempt = 0; attempt < 3; attempt++) {
+        rankings = await ngmyCivicFetchRankings(
+          email: email,
+          state: wanted,
+          pinSig: pin,
+        );
+        if (rankings.ok) break;
+        if (attempt < 2) {
+          await Future<void>.delayed(Duration(milliseconds: 350 * (attempt + 1)));
+        }
+      }
       if (!mounted || gen != _sharedDirectoryLoadGen) return;
       if (_selectedState.trim() != wanted) return;
-      if (!rankings.ok || rankings.members.isEmpty) {
-        if (mounted) setState(() => _sharedDirectoryLoading = false);
+      if (!rankings.ok) {
+        setState(() {
+          _sharedDirectoryLoading = false;
+          _sharedDirectoryError = rankings.error ?? 'Could not load $wanted rankings.';
+        });
+        return;
+      }
+      if (rankings.members.isEmpty) {
+        setState(() {
+          _sharedDirectoryLoading = false;
+          _sharedDirectoryError = _sharedDirectoryUsers.isEmpty
+              ? 'The server returned no registered members for $wanted.'
+              : '';
+        });
         return;
       }
       final merged = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
@@ -43279,6 +43428,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _sharedDirectoryUsers = _usersFromDirectoryRows(merged);
         _sharedDirectoryState = wanted;
         _sharedDirectoryLoading = false;
+        _sharedDirectoryError = '';
       });
       unawaited(NgmyCivicRegistryMembers.saveRankingsCache(wanted, merged));
     } finally {
@@ -43303,7 +43453,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           .where(_stillOnRankings)
           .toList(),
     );
-    final shared = _dedupeRankingUsers(_sharedDirectoryUsers.where(_stillOnRankings).toList());
+    final shared = !NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState)
+        ? <UserData>[]
+        : _dedupeRankingUsers(
+            _rankingUsersForSelectedState(_sharedDirectoryUsers)
+                .where(_stillOnRankings)
+                .toList(),
+          );
     if (local.isEmpty) return shared;
     if (shared.isEmpty) return local;
     return _dedupeRankingUsers([...local, ...shared]);
@@ -45411,6 +45567,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         const SizedBox(height: 22),
         if (waitingOnDirectory) ...[
           _rankingsEmptyBox('Loading members…', isDark),
+          const SizedBox(height: 22),
+        ],
+        if (!waitingOnDirectory && enrolled.isEmpty && _sharedDirectoryError.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.orange.withOpacity(0.45)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  _sharedDirectoryError,
+                  style: TextStyle(color: isDark ? Colors.orange.shade200 : Colors.orange.shade900),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => unawaited(_loadSharedCivicDirectory()),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text('Retry $st rankings'),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 22),
         ],
         _rankingsCategoryHeader(
