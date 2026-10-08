@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_tool_intent.dart';
 
@@ -17,8 +18,14 @@ fill a form, check an account, shop, read news, or use any web app, reply like a
 
 Use a real https URL. Optional "label" is shown under Browser in chat (keep it short).
 For directions use maps; for NGMY features inside this app use open_tool (video_studio, phone_unlock, swahili_school, etc.) — same JSON block.
-You cannot literally click inside their browser — you open the link for them and guide them step by step in your words.
-Never tell them to install a separate "agent browser" — NGMY shows the page in chat.
+The site opens ONLY inside the small Browser port above the chat box (never the whole app). Drive that port with:
+
+[[NGMY_BROWSER_CMD]]
+[{"op":"navigate","url":"https://example.com/login","label":"Signing in"}]
+[[/NGMY_BROWSER_CMD]]
+
+Ops: navigate (url, optional label), back, forward, reload, click_text, click_selector.
+Use navigate to open/change pages; click_text when they say tap Demo or Sign in.
 
 MESSAGE REACTIONS — React to THEIR last message like a real person (not every text). When they share good news, say something sweet,
 agree to a plan, thank you, or deserve encouragement, append ONE emoji reaction on their message:
@@ -33,6 +40,7 @@ Do not write "I reacted with…" — use the tag silently.
 class NgmyAdvisorParsedReply {
   final String text;
   final List<NgmyPhoneAction> actions;
+  final List<NgmyAdvisorBrowserCommand> browserCommands;
   final String reactionEmoji;
   final String browserUrl;
   final String browserLabel;
@@ -40,6 +48,7 @@ class NgmyAdvisorParsedReply {
   const NgmyAdvisorParsedReply({
     required this.text,
     this.actions = const [],
+    this.browserCommands = const [],
     this.reactionEmoji = '',
     this.browserUrl = '',
     this.browserLabel = '',
@@ -50,6 +59,36 @@ final _reactTag = RegExp(
   r'\[\[NGMY_REACT_USER\]\]\s*([^\s\[\]]{1,8})\s*\[\[/NGMY_REACT_USER\]\]',
   multiLine: true,
 );
+
+final _browserCmdTag = RegExp(
+  r'\[\[NGMY_BROWSER_CMD\]\]\s*([\s\S]*?)\s*\[\[/NGMY_BROWSER_CMD\]\]',
+  multiLine: true,
+);
+
+List<NgmyAdvisorBrowserCommand> ngmyParseAdvisorBrowserCommands(String raw) {
+  final out = <NgmyAdvisorBrowserCommand>[];
+  final match = _browserCmdTag.firstMatch(raw);
+  if (match == null) return out;
+  try {
+    final decoded = jsonDecode(match.group(1)!.trim());
+    if (decoded is List) {
+      for (final item in decoded) {
+        if (item is Map) {
+          final cmd = NgmyAdvisorBrowserCommand.fromJson(Map<String, dynamic>.from(item));
+          if (cmd != null) out.add(cmd);
+        }
+      }
+    } else if (decoded is Map) {
+      final cmd = NgmyAdvisorBrowserCommand.fromJson(Map<String, dynamic>.from(decoded));
+      if (cmd != null) out.add(cmd);
+    }
+  } catch (e) {
+    debugPrint('[advisor] browser cmd parse: $e');
+  }
+  return out;
+}
+
+String ngmyStripAdvisorBrowserCommandTags(String raw) => raw.replaceAll(_browserCmdTag, '').trim();
 
 const _allowedReactions = {'❤️', '💕', '🥰', '👍', '😂', '🙏', '🔥', '✨', '💖', '😊', '🎉'};
 
@@ -68,6 +107,8 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
 }) {
   var text = raw.trim();
   var reaction = '';
+  final browserCommands = ngmyParseAdvisorBrowserCommands(text);
+  text = ngmyStripAdvisorBrowserCommandTags(text);
 
   final reactMatch = _reactTag.firstMatch(text);
   if (reactMatch != null) {
@@ -107,14 +148,25 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
     }
   }
 
+  for (final cmd in browserCommands) {
+    if ((cmd.op == 'navigate' || cmd.op == 'open') && browserUrl.isEmpty) {
+      browserUrl = _normalizeUrl(cmd.url ?? '');
+      browserLabel = (cmd.label ?? '').trim();
+    }
+  }
+
   return NgmyAdvisorParsedReply(
     text: text,
     actions: actions,
+    browserCommands: browserCommands,
     reactionEmoji: reaction,
     browserUrl: browserUrl,
     browserLabel: browserLabel,
   );
 }
+
+List<NgmyPhoneAction> ngmyAdvisorPhoneActionsForChips(List<NgmyPhoneAction> actions) =>
+    actions.where((a) => a.type != 'open_url' && a.type != 'maps').toList();
 
 String _normalizeUrl(String url) {
   var u = url.trim();

@@ -11,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
 import 'ngmy_advisor_browser_card.dart';
+import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
@@ -3588,6 +3589,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _busy = false;
   bool _loaded = false;
   String? _activityCaption;
+  final _browserSession = NgmyAdvisorBrowserSession();
   /// Outbound texts waiting for an AI reply (never drop while busy).
   final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
@@ -3761,8 +3763,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       onPersistConfig: widget.onPersistConfig,
     );
     _sessionStart = DateTime.now();
+    _browserSession.addListener(_onBrowserSessionChanged);
     _load();
     _tickTimer();
+  }
+
+  void _onBrowserSessionChanged() {
+    if (mounted) setState(() {});
   }
 
   /// Free advisor minutes are only spent while this chat is genuinely in front of
@@ -3860,6 +3867,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _usedSeconds = used;
       _loaded = true;
     });
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      final m = _messages[i];
+      if (m['role'] != 'ai') continue;
+      final url = (m['browserUrl'] ?? '').trim();
+      if (url.isEmpty) continue;
+      final label = (m['browserLabel'] ?? '').trim();
+      unawaited(_browserSession.open(url, label: label.isEmpty ? null : label));
+      break;
+    }
     if (_isTranslator && _translatorNativeLang.isEmpty && mounted) {
       await _pickTranslatorLanguages(required: true);
     }
@@ -3941,6 +3957,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   @override
   void dispose() {
+    _browserSession.removeListener(_onBrowserSessionChanged);
     _cancelRomanticNudge();
     _flushSessionTime();
     WidgetsBinding.instance.removeObserver(this);
@@ -4459,6 +4476,21 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<void> _tapAdvisorPhoneAction(NgmyPhoneAction action) async {
     if (!mounted) return;
+    if (action.type == 'open_url') {
+      final url = (action.fields['url'] ?? '').trim();
+      if (url.isNotEmpty) {
+        await _browserSession.open(url, label: action.fields['label']);
+      }
+      return;
+    }
+    if (action.type == 'maps') {
+      final q = (action.fields['query'] ?? action.fields['address'] ?? '').trim();
+      if (q.isNotEmpty) {
+        final mapsUrl = 'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(q)}';
+        await _browserSession.open(mapsUrl, label: action.fields['label'] ?? 'Maps');
+      }
+      return;
+    }
     final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
     if (!ok || !mounted) return;
     final result = await ngmyRunPhoneAction(
@@ -4488,14 +4520,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     var phoneActionsJson = '';
     var reactionEmoji = '';
 
+    var browserCommands = const <NgmyAdvisorBrowserCommand>[];
     if (parseExtrasForUserText != null && parseExtrasForUserText.trim().isNotEmpty && photo.isEmpty) {
       final parsed = ngmyParseAdvisorAssistantReply(body, userMessage: parseExtrasForUserText);
       body = parsed.text.trim();
       browserUrl = parsed.browserUrl;
       browserLabel = parsed.browserLabel;
       reactionEmoji = parsed.reactionEmoji;
-      if (parsed.actions.isNotEmpty) {
-        phoneActionsJson = ngmyAdvisorPhoneActionsToJson(parsed.actions);
+      browserCommands = parsed.browserCommands;
+      final chipActions = ngmyAdvisorPhoneActionsForChips(parsed.actions);
+      if (chipActions.isNotEmpty) {
+        phoneActionsJson = ngmyAdvisorPhoneActionsToJson(chipActions);
       }
     }
 
@@ -4506,6 +4541,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
     if (reactionEmoji.isNotEmpty) {
       await _applyReactionToLatestUser(reactionEmoji);
+    }
+
+    if (browserUrl.isNotEmpty) {
+      await _browserSession.open(browserUrl, label: browserLabel.isEmpty ? null : browserLabel);
+    }
+    if (browserCommands.isNotEmpty) {
+      await _browserSession.applyCommands(browserCommands);
     }
 
     if (photo.isNotEmpty) {
@@ -5218,7 +5260,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  return SizedBox(height: bottomClearance);
+                  final browserPad = _browserSession.visible ? _browserSession.previewHeight + 96 : 0.0;
+                  return SizedBox(height: bottomClearance + browserPad);
                 }
                 final slot = i - 1;
                 if (_busy && slot == 0) {
@@ -5241,12 +5284,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 final user = m['role'] == 'user';
                 final msgText = (m['text'] ?? '').toString();
                 final reaction = (m['reaction'] ?? '').toString();
-                final browserUrl = (m['browserUrl'] ?? '').toString();
-                final browserLabel = (m['browserLabel'] ?? '').toString();
                 final allPhoneActions = user ? const <NgmyPhoneAction>[] : ngmyAdvisorPhoneActionsFromRow(m);
-                final phoneActions = browserUrl.trim().isNotEmpty
-                    ? allPhoneActions.where((a) => a.type != 'open_url').toList()
-                    : allPhoneActions;
+                final phoneActions = ngmyAdvisorPhoneActionsForChips(allPhoneActions);
                 final bubble = Container(
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -5326,13 +5365,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     crossAxisAlignment: user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
                       bubbleStack,
-                      if (!user && browserUrl.isNotEmpty)
-                        NgmyAdvisorBrowserCard(
-                          url: browserUrl,
-                          label: browserLabel.isNotEmpty ? browserLabel : null,
-                          isDark: isDark,
-                          viewKeySeed: msgIndex,
-                        ),
                       if (!user && phoneActions.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, left: 4),
@@ -5442,6 +5474,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    NgmyAdvisorBrowserPanel(
+                      session: _browserSession,
+                      isDark: isDark,
+                      advisorName: ngmyAdvisorFirstName(widget.profile.name),
+                    ),
                     if (_isDebater)
                       ngmyDebateChatToolbar(
                         isDark: isDark,
