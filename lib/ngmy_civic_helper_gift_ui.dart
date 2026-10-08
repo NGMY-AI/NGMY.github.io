@@ -235,7 +235,16 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                             storeSellerName: opt['sellerName'] as String,
                             storeListingId: opt['id'] as String,
                           );
-                          if (gift != null && ctx.mounted) Navigator.pop(ctx, gift);
+                          if (gift != null && ctx.mounted) {
+                            Navigator.pop(ctx, gift);
+                          } else if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(
+                                content: Text('Money card was not sent. The server did not confirm the gift — try again.'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
                         },
                   style: FilledButton.styleFrom(
                     backgroundColor: style.accent,

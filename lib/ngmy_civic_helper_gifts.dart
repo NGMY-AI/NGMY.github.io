@@ -4,9 +4,8 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'ngmy_network_resilience.dart';
+import 'ngmy_edge_invoke.dart';
 
 /// QR prefix for Civic Registry helper gifts redeemable at NGMY Store.
 const String kNgmyHelperGiftQrPrefix = 'NGMYHELPERGIFT1';
@@ -16,7 +15,15 @@ const String kNgmyHelperGiftPendingPrefsKey = 'ngmy_civic_helper_gift_pending_v1
 const String kNgmyHelperGiftInboxSettingsKey = 'civic_helper_gift_inbox_v1';
 const String kNgmyHelperGiftInboxPrefsKey = 'ngmy_civic_helper_gift_inbox_v1';
 
-String _giftStashKey(String token) => 'ngmy_helper_gift_qr_v1_${token.trim()}';
+Future<Map<String, dynamic>?> _helperGiftEdge(
+  String op, {
+  Map<String, dynamic> fields = const {},
+}) =>
+    ngmyEdgeInvoke({
+      'action': 'civicHelperGifts',
+      'op': op,
+      ...fields,
+    });
 
 String _generateGiftToken() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -252,6 +259,27 @@ class NgmyCivicHelperGifts {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
+  /// A streak means consecutive campaigns, not merely any three campaigns.
+  /// When a new campaign gets its first helper, everyone except that person
+  /// loses an older first-helper streak.
+  static void resetOtherFirstHelperStreaks({
+    required dynamic config,
+    required String winnerEmail,
+  }) {
+    final raw = (config as dynamic).civicRegistryMembers;
+    if (raw is! List) return;
+    final winner = winnerEmail.toLowerCase().trim();
+    final next = <Map<String, dynamic>>[];
+    for (final item in raw.whereType<Map>()) {
+      final row = Map<String, dynamic>.from(item);
+      if ((row['email'] ?? '').toString().toLowerCase().trim() != winner) {
+        row['firstHelperStreak'] = 0;
+      }
+      next.add(row);
+    }
+    (config as dynamic).civicRegistryMembers = next;
+  }
+
   /// Call when a member is recorded as a contribution in an active help campaign.
   /// Returns a new pending alert if streak reaches 3, otherwise null.
   static NgmyHelperGiftPending? recordFirstHelperContribution({
@@ -364,22 +392,13 @@ class NgmyCivicHelperGifts {
   static Future<bool> persistCloud(dynamic config) async {
     await persistPendingLocal(config);
     await persistInboxLocal(config);
-    if (!await ngmyCanReachCloud()) return false;
-    final now = DateTime.now().toUtc().toIso8601String();
     try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': kNgmyHelperGiftPendingSettingsKey,
-          'value': {'items': pendingFromConfig(config).map((e) => e.toMap()).toList()},
-          'updated_at': now,
-        },
-        {
-          'key': kNgmyHelperGiftInboxSettingsKey,
-          'value': {'items': inboxFromConfig(config).map((e) => e.toMap()).toList()},
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-      return true;
+      var ok = true;
+      for (final pending in openPending(config)) {
+        final data = await _helperGiftEdge('pending', fields: {'pending': pending.toMap()});
+        ok = ok && data?['ok'] == true;
+      }
+      return ok;
     } catch (e) {
       debugPrint('[helper gifts] cloud persist: $e');
       return false;
@@ -388,40 +407,31 @@ class NgmyCivicHelperGifts {
 
   static Future<void> hydrateFromCloud(dynamic config) async {
     await hydrateFromLocal(config);
-    if (!await ngmyCanReachCloud()) return;
     try {
-      final pendingRow = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', kNgmyHelperGiftPendingSettingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final pendingValue = pendingRow?['value'];
-      if (pendingValue is Map && pendingValue['items'] is List) {
+      final data = await _helperGiftEdge('fetch');
+      if (data == null || data['ok'] != true) return;
+      final pendingItems = data['pending'];
+      if (pendingItems is List) {
         setPending(
           config,
-          (pendingValue['items'] as List)
+          pendingItems
               .whereType<Map>()
               .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
               .toList(),
         );
       }
-      final inboxRow = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', kNgmyHelperGiftInboxSettingsKey)
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final inboxValue = inboxRow?['value'];
-      if (inboxValue is Map && inboxValue['items'] is List) {
+      final inboxItems = data['inbox'];
+      if (inboxItems is List) {
         setInbox(
           config,
-          (inboxValue['items'] as List)
+          inboxItems
               .whereType<Map>()
               .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
               .toList(),
         );
       }
+      await persistPendingLocal(config);
+      await persistInboxLocal(config);
     } catch (e) {
       debugPrint('[helper gifts] cloud hydrate: $e');
     }
@@ -460,17 +470,16 @@ class NgmyCivicHelperGifts {
       grantedBy: grantedBy.toLowerCase().trim(),
     );
 
-    try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _giftStashKey(token),
-          'value': gift.toMap(),
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-    } catch (e) {
-      debugPrint('[helper gifts] stash create: $e');
-      // Still keep local inbox so the feature works offline-ish.
+    final saved = await _helperGiftEdge(
+      'grant',
+      fields: {
+        'pendingId': pending.id,
+        'gift': gift.toMap(),
+      },
+    );
+    if (saved == null || saved['ok'] != true) {
+      debugPrint('[helper gifts] grant refused: ${saved?['error'] ?? 'Could not reach server'}');
+      return null;
     }
 
     final inbox = inboxFromConfig(config);
@@ -484,7 +493,8 @@ class NgmyCivicHelperGifts {
       setPending(config, pendingList);
     }
 
-    await persistCloud(config);
+    await persistPendingLocal(config);
+    await persistInboxLocal(config);
     return gift;
   }
 
@@ -499,13 +509,8 @@ class NgmyCivicHelperGifts {
 
   static Future<NgmyHelperGift?> loadGiftByToken(String token, {dynamic config}) async {
     try {
-      final row = await Supabase.instance.client
-          .from('ngmy_settings')
-          .select()
-          .eq('key', _giftStashKey(token))
-          .maybeSingle()
-          .timeout(kNgmyCloudLoadTimeout);
-      final value = row?['value'];
+      final data = await _helperGiftEdge('lookup', fields: {'token': token.trim()});
+      final value = data?['gift'];
       if (value is Map) return NgmyHelperGift.fromMap(Map<String, dynamic>.from(value));
     } catch (e) {
       debugPrint('[helper gifts] load token: $e');
@@ -556,38 +561,21 @@ class NgmyCivicHelperGifts {
       );
     }
 
-    final now = DateTime.now().toUtc().toIso8601String();
-    final updated = NgmyHelperGift(
-      id: gift.id,
-      email: gift.email,
-      fullName: gift.fullName,
-      giftName: gift.giftName,
-      amount: gift.amount,
-      styleId: gift.styleId,
-      storeAddress: gift.storeAddress,
-      storeSellerEmail: gift.storeSellerEmail,
-      storeSellerName: gift.storeSellerName,
-      storeListingId: gift.storeListingId,
-      qrPayload: gift.qrPayload,
-      token: gift.token,
-      createdAt: gift.createdAt,
-      grantedBy: gift.grantedBy,
-      redeemed: true,
-      redeemedAt: now,
-      redeemedByStore: owner.isEmpty ? storeOwnerName : owner,
+    final data = await _helperGiftEdge(
+      'redeem',
+      fields: {
+        'token': token,
+        'storeOwnerName': storeOwnerName,
+      },
     );
-
-    try {
-      await Supabase.instance.client.from('ngmy_settings').upsert([
-        {
-          'key': _giftStashKey(token),
-          'value': updated.toMap(),
-          'updated_at': now,
-        },
-      ], onConflict: 'key').timeout(kNgmyCloudWriteTimeout);
-    } catch (e) {
-      debugPrint('[helper gifts] redeem stash: $e');
+    if (data == null || data['ok'] != true || data['gift'] is! Map) {
+      return (
+        ok: false,
+        message: (data?['error'] ?? 'Could not redeem this gift with the server.').toString(),
+        gift: gift,
+      );
     }
+    final updated = NgmyHelperGift.fromMap(Map<String, dynamic>.from(data['gift'] as Map));
 
     final inbox = inboxFromConfig(config);
     final idx = inbox.indexWhere((g) => g.token == token || g.id == gift.id);
@@ -597,7 +585,7 @@ class NgmyCivicHelperGifts {
       inbox.insert(0, updated);
     }
     setInbox(config, inbox);
-    await persistCloud(config);
+    await persistInboxLocal(config);
     return (
       ok: true,
       message: 'Redeemed \$${updated.amount.toStringAsFixed(2)} — ${updated.giftName}. Give the member store credit for that amount.',

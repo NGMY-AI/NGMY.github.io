@@ -5089,6 +5089,167 @@ async function saveSettingsObject(
   return { ok: true };
 }
 
+const CIVIC_HELPER_GIFT_PENDING_KEY = "civic_helper_gift_pending_v1";
+const CIVIC_HELPER_GIFT_INBOX_KEY = "civic_helper_gift_inbox_v1";
+const CIVIC_HELPER_GIFT_STASH_PREFIX = "ngmy_helper_gift_qr_v1_";
+
+function helperGiftItems(value: Record<string, unknown>): Record<string, unknown>[] {
+  return Array.isArray(value.items)
+    ? value.items
+      .filter((e) => e && typeof e === "object" && !Array.isArray(e))
+      .map((e) => ({ ...(e as Record<string, unknown>) }))
+    : [];
+}
+
+async function handleCivicHelperGifts(
+  req: Request,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  const email = await requireJwtEmail(req);
+  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  const admin = adminClient();
+  if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+  const op = String(body.op ?? "fetch").trim().toLowerCase();
+  const role = await resolveCivicRole(admin, email);
+
+  if (op === "fetch") {
+    const pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    if (role.isAdmin) {
+      return jsonOk({ ok: true, pending, inbox });
+    }
+    return jsonOk({
+      ok: true,
+      pending: [],
+      inbox: inbox.filter((g) => emailKey(String(g.email ?? "")) === email),
+    });
+  }
+
+  if (op === "pending") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+    }
+    const raw = body.pending;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Pending helper gift required" }, 400);
+    }
+    const pending = { ...(raw as Record<string, unknown>) };
+    const id = String(pending.id ?? "").trim();
+    const recipient = emailKey(String(pending.email ?? ""));
+    const state = String(pending.state ?? "").trim();
+    const streak = Number(pending.streak ?? 0);
+    if (!id || !recipient || !state || !Number.isFinite(streak) || streak < 3) {
+      return jsonOk({ error: "Invalid helper gift alert" }, 400);
+    }
+    if (!role.isAdmin && !statesMatch(role.registrarState, state)) {
+      return jsonOk({ error: "A registrar may report helper streaks only for their home state" }, 403);
+    }
+    pending.email = recipient;
+    pending.granted = false;
+    const current = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const index = current.findIndex((p) => String(p.id ?? "") === id);
+    if (index >= 0) current[index] = { ...current[index], ...pending };
+    else if (!current.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)) {
+      current.unshift(pending);
+    }
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: current });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not notify admin" }, 500);
+    return jsonOk({ ok: true });
+  }
+
+  const token = String(
+    body.token ??
+      ((body.gift && typeof body.gift === "object" && !Array.isArray(body.gift))
+        ? (body.gift as Record<string, unknown>).token
+        : "") ??
+      "",
+  ).trim();
+  if (!token.startsWith("HG") || token.length < 8) {
+    return jsonOk({ error: "Invalid helper gift token" }, 400);
+  }
+  const stashKey = `${CIVIC_HELPER_GIFT_STASH_PREFIX}${token}`;
+
+  if (op === "grant") {
+    if (!role.isAdmin) return jsonOk({ error: "Admin required" }, 403);
+    const pendingId = String(body.pendingId ?? "").trim();
+    const rawGift = body.gift;
+    if (!pendingId || !rawGift || typeof rawGift !== "object" || Array.isArray(rawGift)) {
+      return jsonOk({ error: "Pending alert and gift are required" }, 400);
+    }
+    const pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const pendingIndex = pending.findIndex((p) => String(p.id ?? "") === pendingId && p.granted !== true);
+    if (pendingIndex < 0) return jsonOk({ error: "This helper reward is no longer pending" }, 409);
+    const gift = { ...(rawGift as Record<string, unknown>) };
+    const recipient = emailKey(String(pending[pendingIndex].email ?? ""));
+    const amount = Number(gift.amount ?? 0);
+    const storeEmail = emailKey(String(gift.storeSellerEmail ?? ""));
+    if (
+      !recipient ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 10000 ||
+      !storeEmail ||
+      String(gift.giftName ?? "").trim().length === 0
+    ) {
+      return jsonOk({ error: "Invalid money card" }, 400);
+    }
+    gift.email = recipient;
+    gift.token = token;
+    gift.qrPayload = `NGMYHELPERGIFT1|${token}`;
+    gift.storeSellerEmail = storeEmail;
+    gift.grantedBy = email;
+    gift.redeemed = false;
+    const stashSaved = await saveSettingsObject(admin, stashKey, gift);
+    if (!stashSaved.ok) return jsonOk({ error: stashSaved.error ?? "Could not create gift QR" }, 500);
+
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    const giftId = String(gift.id ?? "").trim();
+    const existing = inbox.findIndex((g) =>
+      String(g.token ?? "") === token || (giftId && String(g.id ?? "") === giftId)
+    );
+    if (existing >= 0) inbox[existing] = gift;
+    else inbox.unshift(gift);
+    const inboxSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items: inbox });
+    if (!inboxSaved.ok) return jsonOk({ error: inboxSaved.error ?? "Could not deliver gift" }, 500);
+
+    pending[pendingIndex] = { ...pending[pendingIndex], granted: true, notified: true };
+    const pendingSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: pending });
+    if (!pendingSaved.ok) return jsonOk({ error: pendingSaved.error ?? "Could not close reward alert" }, 500);
+    return jsonOk({ ok: true, gift });
+  }
+
+  const gift = await loadSettingsObject(admin, stashKey);
+  if (!gift.token) return jsonOk({ error: "Gift not found" }, 404);
+  const lockedStore = emailKey(String(gift.storeSellerEmail ?? ""));
+  if (!role.isAdmin && lockedStore !== email) {
+    return jsonOk({ error: "This money card belongs to another NGMY store" }, 403);
+  }
+  if (op === "lookup") return jsonOk({ ok: true, gift });
+
+  if (op === "redeem") {
+    if (gift.redeemed === true) return jsonOk({ error: "This gift was already redeemed", gift }, 409);
+    const updated = {
+      ...gift,
+      redeemed: true,
+      redeemedAt: new Date().toISOString(),
+      redeemedByStore: email,
+    };
+    const stashSaved = await saveSettingsObject(admin, stashKey, updated);
+    if (!stashSaved.ok) return jsonOk({ error: stashSaved.error ?? "Could not redeem gift" }, 500);
+    const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+    const index = inbox.findIndex((g) =>
+      String(g.token ?? "") === token || String(g.id ?? "") === String(gift.id ?? "")
+    );
+    if (index >= 0) inbox[index] = updated;
+    else inbox.unshift(updated);
+    const inboxSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items: inbox });
+    if (!inboxSaved.ok) return jsonOk({ error: inboxSaved.error ?? "Could not update gift inbox" }, 500);
+    return jsonOk({ ok: true, gift: updated });
+  }
+
+  return jsonOk({ error: "Unknown helper gift operation" }, 400);
+}
+
 function rowTouchesEmail(row: Record<string, unknown>, email: string): boolean {
   const want = emailKey(email);
   if (!want) return false;
@@ -5998,6 +6159,7 @@ serve(async (req) => {
       co: "civicRecoveryRemove",
       cp: "civicRecoveryIssue",
       cq: "civicFetchRankings",
+      cr: "civicHelperGifts",
       cs: "civicDecideRegistrarApplication",
       ct: "civicUserGroupsFetch",
       cu: "civicUserGroupsPersist",
@@ -6118,6 +6280,9 @@ serve(async (req) => {
     }
     if (action === "civicFetchRankings") {
       return await handleCivicFetchRankings(req, body as Record<string, unknown>);
+    }
+    if (action === "civicHelperGifts") {
+      return await handleCivicHelperGifts(req, body as Record<string, unknown>);
     }
     if (action === "civicNationwideStats") {
       return await handleCivicNationwideStats(req);
