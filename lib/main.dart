@@ -13341,6 +13341,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
       await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
       await NgmyCivicHelperGifts.hydrateFromCloud(_config);
+      NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(_config);
+      NgmyAdminLiveRefresh.notify();
       await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
       await ngmyHydrateHelpCenterHubFromAllBackups(_config);
       await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -16789,6 +16791,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _checkAdminHelperGiftPopups() async {
     if (!_isSessionAdmin) return;
+    if (ngmyHelperGiftAdminPopupIsOpen) return;
+    await ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers);
     await ngmyCheckAdminHelperGiftPopupsNow(
       context: context,
       config: widget.config,
@@ -16799,8 +16803,26 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Pending helper gifts hydrate after the shell paints — retry so the admin
+  /// sees the celebration card as soon as roster data arrives.
+  Future<void> _bootstrapAdminHelperGiftPopups() async {
+    if (!_isSessionAdmin) return;
+    for (var attempt = 0; attempt < 30; attempt++) {
+      if (!mounted) return;
+      if (ngmyHelperGiftAdminPopupIsOpen) return;
+      await ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers);
+      await _checkAdminHelperGiftPopups();
+      if (ngmyHelperGiftAdminPopupIsOpen) return;
+      if (NgmyCivicHelperGifts.openPending(widget.config).isNotEmpty) return;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+    }
+  }
+
   void _onAdminLiveRefresh() {
     if (!mounted) return;
+    if (_isSessionAdmin) {
+      unawaited(_checkAdminHelperGiftPopups());
+    }
     final mountedAt = _mainShellMountedAt;
     if (mountedAt != null && DateTime.now().difference(mountedAt) < const Duration(seconds: 10)) {
       return;
@@ -16871,7 +16893,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ngmyStartCashierReminderWatcher(widget.user.email);
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email)));
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ngmyCheckCashierRemindersNow(userEmail: widget.user.email)));
-    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkAdminHelperGiftPopups()));
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_bootstrapAdminHelperGiftPopups()));
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: widget.user.email,
