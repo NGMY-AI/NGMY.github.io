@@ -114,8 +114,22 @@ class NgmyCommunicateMemoryStore {
     required String role,
     required String text,
     String? imageB64,
+    String? reaction,
+    String? browserUrl,
+    String? browserLabel,
+    String? phoneActions,
   }) async =>
-      appendWithMime(email, profileId, role: role, text: text, imageB64: imageB64);
+      appendWithMime(
+        email,
+        profileId,
+        role: role,
+        text: text,
+        imageB64: imageB64,
+        reaction: reaction,
+        browserUrl: browserUrl,
+        browserLabel: browserLabel,
+        phoneActions: phoneActions,
+      );
 
   static Future<void> appendWithMime(
     String email,
@@ -124,6 +138,10 @@ class NgmyCommunicateMemoryStore {
     required String text,
     String? imageB64,
     String imageMime = 'image/jpeg',
+    String? reaction,
+    String? browserUrl,
+    String? browserLabel,
+    String? phoneActions,
   }) async {
     if (profileId.trim().isEmpty) return;
     final storeEmail = _storageEmail(email);
@@ -138,6 +156,13 @@ class NgmyCommunicateMemoryStore {
           'text': trimmed,
           'at': DateTime.now().toUtc().toIso8601String(),
         };
+        _attachAdvisorMeta(
+          row,
+          reaction: reaction,
+          browserUrl: browserUrl,
+          browserLabel: browserLabel,
+          phoneActions: phoneActions,
+        );
         if (img.isNotEmpty) {
           final imageId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);
           final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
@@ -169,6 +194,55 @@ class NgmyCommunicateMemoryStore {
       } catch (e2) {
         debugPrint('[communicate] append fallback failed: $e2');
       }
+    }
+  }
+
+  /// Stamp an emoji reaction on the most recent user message in this thread.
+  static Future<void> setReactionOnLastUser(
+    String email,
+    String profileId,
+    String emoji,
+  ) async {
+    final e = emoji.trim();
+    if (profileId.trim().isEmpty || e.isEmpty) return;
+    final storeEmail = _storageEmail(email);
+    try {
+      await _serialized(() async {
+        final list = await _loadUnlocked(storeEmail, profileId);
+        for (var i = list.length - 1; i >= 0; i--) {
+          if (list[i]['role']?.toString() != 'user') continue;
+          list[i] = Map<String, dynamic>.from(list[i])..['reaction'] = e;
+          await _saveAllUnlocked(storeEmail, profileId, list);
+          return;
+        }
+      });
+    } catch (err) {
+      debugPrint('[communicate] setReactionOnLastUser: $err');
+    }
+  }
+
+  static void _attachAdvisorMeta(
+    Map<String, dynamic> row, {
+    String? reaction,
+    String? browserUrl,
+    String? browserLabel,
+    String? phoneActions,
+  }) {
+    void put(String key, String? value) {
+      final v = (value ?? '').trim();
+      if (v.isNotEmpty) row[key] = v;
+    }
+
+    put('reaction', reaction);
+    put('browserUrl', browserUrl);
+    put('browserLabel', browserLabel);
+    put('phoneActions', phoneActions);
+  }
+
+  static void _copyAdvisorMeta(Map<String, dynamic> from, Map<String, dynamic> to) {
+    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions']) {
+      final v = (from[key] ?? '').toString().trim();
+      if (v.isNotEmpty) to[key] = v;
     }
   }
 
@@ -254,6 +328,7 @@ class NgmyCommunicateMemoryStore {
       if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
       final mime = (m['imageMime'] ?? '').toString().trim();
       if (mime.isNotEmpty) row['imageMime'] = mime;
+      _copyAdvisorMeta(m, row);
       cleaned.add(row);
     }
     return cleaned;
@@ -283,6 +358,7 @@ class NgmyCommunicateMemoryStore {
       }
       final mime = (m['imageMime'] ?? '').toString().trim();
       if (mime.isNotEmpty) row['imageMime'] = mime;
+      _copyAdvisorMeta(m, row);
       slim.add(row);
     }
     final prefs = await SharedPreferences.getInstance();
