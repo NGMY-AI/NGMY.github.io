@@ -69,6 +69,7 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
     if ((label ?? '').trim().isNotEmpty) _label = label!.trim();
     _visible = true;
     _errorMessage = '';
+    _loadState = NgmyAdvisorBrowserLoadState.loading;
     notifyListeners();
     _scheduleLoad(force: force || !sameUrl);
   }
