@@ -56,6 +56,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'civicRecoveryRemove': 'co',
   'civicRecoveryIssue': 'cp',
   'civicFetchRankings': 'cq',
+  'civicHelperGifts': 'cr',
   'civicDecideRegistrarApplication': 'cs',
   'civicUserGroupsFetch': 'ct',
   'civicUserGroupsPersist': 'cu',

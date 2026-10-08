@@ -39369,15 +39369,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             ),
                             child: Column(
                               children: [
-                                _recordRow('Full Name', fullName.isEmpty ? 'N/A' : fullName, isDark),
+                                _recordRow('Full Name', fullName.isEmpty ? 'N/A' : fullName, isDark, copyable: true),
                                 _recordDivider(isDark),
-                                _recordRow('Registry ID', registryId.isEmpty ? 'N/A' : registryId, isDark),
+                                _recordRow('Registry ID', registryId.isEmpty ? 'N/A' : registryId, isDark, copyable: true),
                                 _recordDivider(isDark),
-                                _recordRow('Date of Birth', dob.isEmpty ? 'N/A' : dob, isDark),
+                                _recordRow('Date of Birth', dob.isEmpty ? 'N/A' : dob, isDark, copyable: true),
                                 _recordDivider(isDark),
                                 _recordRow('Date of Death', deathLabel, isDark),
                                 _recordDivider(isDark),
-                                _recordRow('ID Type', idType.isEmpty ? 'N/A' : idType, isDark),
+                                _recordRow('ID Type', idType.isEmpty ? 'N/A' : idType, isDark, copyable: true),
                                 _recordDivider(isDark),
                                 _recordRow('State / City / Room', '$state / $city / $room', isDark),
                               ],
@@ -39889,13 +39889,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                           ),
                           child: Column(
                             children: [
-                              _recordRow('Full Name', u.fullName ?? u.username, isDark),
+                              _recordRow('Full Name', u.fullName ?? u.username, isDark, copyable: true),
                               _recordDivider(isDark),
-                              _recordRow('Registry ID', u.registryId ?? 'N/A', isDark),
+                              _recordRow('Registry ID', u.registryId ?? 'N/A', isDark, copyable: true),
                               _recordDivider(isDark),
-                              _recordRow('Date of Birth', u.dob ?? 'N/A', isDark),
+                              _recordRow('Date of Birth', u.dob ?? 'N/A', isDark, copyable: true),
                               _recordDivider(isDark),
-                              _recordRow('ID Type', u.idType ?? 'N/A', isDark),
+                              _recordRow('ID Type', u.idType ?? 'N/A', isDark, copyable: true),
                               _recordDivider(isDark),
                               _recordRow('State / City / Room', '${u.state} / ${u.city ?? 'N/A'} / ${u.room ?? 'N/A'}', isDark),
                             ],
@@ -40287,7 +40287,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Widget _recordRow(String label, String value, bool isDark) {
+  Widget _recordRow(String label, String value, bool isDark, {bool copyable = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -40315,6 +40315,34 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
               ),
             ),
           ),
+          if (copyable &&
+              (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) &&
+              value.trim().isNotEmpty &&
+              value != 'N/A')
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                tooltip: 'Copy $label',
+                icon: Icon(
+                  Icons.copy_rounded,
+                  size: 15,
+                  color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                ),
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: value));
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$label copied'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -41250,6 +41278,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               NgmyHelperGiftPending? giftPending;
                               if (!isUpdate) {
                                 try {
+                                  if (isFirstInCampaign) {
+                                    NgmyCivicHelperGifts.resetOtherFirstHelperStreaks(
+                                      config: widget.config,
+                                      winnerEmail: u.email,
+                                    );
+                                  }
                                   final member = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
                                       NgmyCivicRegistryMembers.buildRecord(
                                         email: u.email,
@@ -45621,6 +45655,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   Colors.green,
                   isDark,
                   helps: _effectiveHelpsForRanking(e.value, st),
+                  showTrophy: true,
                 ),
               ),
 
@@ -45779,7 +45814,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Widget _civicRankCard(int rank, UserData u, Color bg, Color accent, bool isDark, {int? helps}) {
+  Widget _rankingTrophy(int rank) {
+    final style = switch (rank) {
+      1 => (emoji: '🏆', label: 'CHAMPION', color: const Color(0xFFF59E0B), size: 28.0),
+      2 => (emoji: '🥈', label: '2ND PLACE', color: const Color(0xFF94A3B8), size: 24.0),
+      3 => (emoji: '🥉', label: '3RD PLACE', color: const Color(0xFFB45309), size: 22.0),
+      _ => (emoji: '', label: '', color: Colors.transparent, size: 0.0),
+    };
+    if (style.emoji.isEmpty) return const SizedBox.shrink();
+    return Semantics(
+      label: style.label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: style.color.withOpacity(0.14),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: style.color.withOpacity(0.55)),
+        ),
+        child: Text(style.emoji, style: TextStyle(fontSize: style.size)),
+      ),
+    );
+  }
+
+  Widget _civicRankCard(
+    int rank,
+    UserData u,
+    Color bg,
+    Color accent,
+    bool isDark, {
+    int? helps,
+    bool showTrophy = false,
+  }) {
     final raw = NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId ?? '') ??
         NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
     final resolved = raw != null
@@ -45823,6 +45888,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (showTrophy && rank <= 3) ...[
+                _rankingTrophy(rank),
+                const SizedBox(height: 4),
+              ],
               Text('$helpCount helps', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.green)),
               Text('${u.missed} missed', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red)),
             ],
