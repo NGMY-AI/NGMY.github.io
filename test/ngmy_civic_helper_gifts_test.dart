@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_civic_helper_gift_ui.dart';
 import 'package:ngmy/ngmy_civic_helper_gifts.dart';
 
 class _GiftConfig {
@@ -90,6 +91,33 @@ void main() {
     expect(NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config), 1);
     expect(NgmyCivicHelperGifts.openPendingCount(config), 1);
     expect(NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config), 0);
+  });
+
+  test('store picker lists stores not product titles', () {
+    final stores = ngmyHelperGiftStoreOptions([
+      {
+        'title': 'Blue Sneakers',
+        'sellerEmail': 'shop@example.com',
+        'sellerName': 'Downtown NGMY',
+        'storeName': 'Downtown NGMY',
+        'address': '100 Main St',
+      },
+      {
+        'title': 'Red Hat',
+        'sellerEmail': 'shop@example.com',
+        'sellerName': 'Downtown NGMY',
+        'storeName': 'Downtown NGMY',
+      },
+      {
+        'title': 'Other Item',
+        'sellerEmail': 'other@example.com',
+        'storeName': 'Westside Market',
+      },
+    ]);
+    expect(stores.length, 2);
+    expect(stores.any((s) => s['title'] == 'Downtown NGMY'), isTrue);
+    expect(stores.any((s) => s['title'] == 'Westside Market'), isTrue);
+    expect(stores.any((s) => s['title'] == 'Blue Sneakers'), isFalse);
   });
 
   test('gift QR accepts only the helper-gift prefix or token', () {

@@ -19,6 +19,41 @@ const String kNgmyHelperGiftPendingSettingsKey = 'civic_helper_gift_pending_v1';
 const String kNgmyHelperGiftPendingPrefsKey = 'ngmy_civic_helper_gift_pending_v1';
 const String kNgmyHelperGiftInboxSettingsKey = 'civic_helper_gift_inbox_v1';
 const String kNgmyHelperGiftInboxPrefsKey = 'ngmy_civic_helper_gift_inbox_v1';
+const String kNgmyHelperGiftAdminPopupEnabledKey = 'ngmy_helper_gift_admin_popup_enabled_v1';
+
+/// Admin can disable full-screen helper reward pop-ups (see Helper Gifts hub).
+class NgmyHelperGiftAdminPopupSettings {
+  static Future<bool> isEnabled() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(kNgmyHelperGiftAdminPopupEnabledKey) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> setEnabled(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(kNgmyHelperGiftAdminPopupEnabledKey, enabled);
+    } catch (_) {}
+  }
+}
+
+List<Color> ngmyHelperGiftStateGradient(String state) {
+  const palettes = <List<Color>>[
+    [Color(0xFF1E3A8A), Color(0xFF3B82F6), Color(0xFF60A5FA)],
+    [Color(0xFF065F46), Color(0xFF059669), Color(0xFF34D399)],
+    [Color(0xFF7C2D12), Color(0xFFEA580C), Color(0xFFFB923C)],
+    [Color(0xFF581C87), Color(0xFF9333EA), Color(0xFFC084FC)],
+    [Color(0xFF831843), Color(0xFFDB2777), Color(0xFFF472B6)],
+    [Color(0xFF134E4A), Color(0xFF0D9488), Color(0xFF2DD4BF)],
+    [Color(0xFF713F12), Color(0xFFD97706), Color(0xFFFBBF24)],
+    [Color(0xFF312E81), Color(0xFF4F46E5), Color(0xFF818CF8)],
+  ];
+  final key = state.trim().isEmpty ? 'Nationwide' : state.trim();
+  return palettes[key.hashCode.abs() % palettes.length];
+}
 
 Future<Map<String, dynamic>?> _helperGiftEdge(
   String op, {
