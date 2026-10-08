@@ -1451,7 +1451,10 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
       const email = await requireJwtEmail(req);
       if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
       const role = await resolveCivicRole(admin, email);
-      if (!role.isAdmin && !role.isRegistrar) return jsonOk({ error: "Not allowed" }, 403);
+      if (!role.isAdmin && !role.isRegistrar) {
+        const detail = await registrarRefusalDetail(admin, email);
+        return jsonOk({ error: `Not allowed: ${maskEmailNetwork(email)} (${detail})` }, 403);
+      }
       client = admin;
     }
   }
@@ -2809,6 +2812,69 @@ async function handleCivicFetchRegistrarApplications(
   });
 }
 
+const REGISTRAR_DECISION_FIELDS = [
+  "reviewedAt",
+  "reviewedBy",
+  "revokedAt",
+  "revokedBy",
+  "revokeVotes",
+  "revokeRequestedBy",
+  "revokeRequestedAt",
+  "rejectionReason",
+];
+
+/** A member's own row: pending when new, otherwise the status the server already holds. */
+function memberOwnedRegistrarRow(
+  incoming: Record<string, unknown>,
+  current: Record<string, unknown>[],
+): Record<string, unknown> {
+  const id = String(incoming.id ?? "").trim();
+  const prev = id ? current.find((a) => String(a.id ?? "").trim() === id) : undefined;
+  const row: Record<string, unknown> = { ...incoming };
+  for (const f of REGISTRAR_DECISION_FIELDS) delete row[f];
+  if (prev) {
+    for (const f of REGISTRAR_DECISION_FIELDS) {
+      if (prev[f] !== undefined) row[f] = prev[f];
+    }
+    row.status = String(prev.status ?? "pending");
+    if (prev.updatedAt !== undefined) row.updatedAt = prev.updatedAt;
+    return row;
+  }
+  row.status = "pending";
+  delete row.updatedAt;
+  return row;
+}
+
+/** What the server holds for this account, for a 403 that names the fix. */
+async function registrarRefusalDetail(
+  admin: NonNullable<ReturnType<typeof adminClient>>,
+  email: string,
+): Promise<string> {
+  try {
+    const store = await loadRegistrarApplicationsStore(admin);
+    const mine = store.applications.filter((a) =>
+      emailKey(String(a.userEmail ?? a.email ?? "")) === email
+    );
+    if (mine.length === 0) {
+      const tombstoned = store.deleted.some((d) => emailKey(d.email) === email);
+      return tombstoned
+        ? "its registrar application was deleted on the server; a new request must be approved"
+        : "no registrar application exists for it on the server";
+    }
+    let best = mine[0];
+    for (const a of mine) {
+      if (registrarAppDecisionMs(a) >= registrarAppDecisionMs(best)) best = a;
+    }
+    const st = String(best.status ?? "pending").toLowerCase();
+    const state = displayStateName(String(best.state ?? "")) || "its state";
+    if (st === "pending") return `its ${state} registrar request is still pending approval`;
+    if (st === "revoked" || st === "rejected") return `its ${state} registrar access is ${st}`;
+    return `its ${state} registrar application is ${st}`;
+  } catch (_) {
+    return "no approved registrar application was found for it";
+  }
+}
+
 async function handleCivicPersistRegistrarApplications(
   req: Request,
   body: Record<string, unknown>,
@@ -2863,8 +2929,13 @@ async function handleCivicPersistRegistrarApplications(
     }
     next = [...kept, ...overlayRegistrarAppsOnCurrent(currentHome, homeIncoming)];
   } else {
-    // Member may only upsert their own pending application row(s)
-    const mineIncoming = incoming.filter((a) => emailKey(String(a.userEmail ?? "")) === email);
+    // Member may only upsert their own pending application row(s). The
+    // status is never theirs to set: a phone that still holds an old
+    // "approved" copy must not be able to re-approve itself, and a row the
+    // server already decided keeps that decision.
+    const mineIncoming = incoming
+      .filter((a) => emailKey(String(a.userEmail ?? "")) === email)
+      .map((a) => memberOwnedRegistrarRow(a, current));
     if (mineIncoming.length === 0) {
       return jsonOk({ error: "Forbidden" }, 403);
     }
@@ -5413,8 +5484,9 @@ async function handleCivicAdminSettingsPersist(
     // Say which account was checked. "Not allowed" alone could not tell a
     // registrar that the phone is signed in to a different email than the
     // one that was approved.
+    const detail = await registrarRefusalDetail(admin, email);
     return jsonOk({
-      error: `Not allowed: ${maskEmailNetwork(email)} has no approved registrar or admin role on the server`,
+      error: `Not allowed: ${maskEmailNetwork(email)} has no approved registrar or admin role on the server (${detail})`,
     }, 403);
   }
 

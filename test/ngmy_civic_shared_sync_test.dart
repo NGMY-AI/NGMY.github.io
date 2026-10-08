@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/main.dart';
 import 'package:ngmy/ngmy_ai_client.dart';
+import 'package:ngmy/ngmy_civic_registrar_application.dart';
 import 'package:ngmy/ngmy_civic_state_wallet.dart';
 import 'package:ngmy/ngmy_edge_invoke.dart';
 
@@ -627,5 +628,164 @@ void main() {
   test('session report masks emails', () {
     expect(ngmyMaskEmailForReport('Registrar@Gmail.com'), 'r***@gmail.com');
     expect(ngmyMaskEmailForReport(''), '(none)');
+  });
+
+  group('own registrar rows follow the server', () {
+    const me = 'ar@example.com';
+    Map<String, dynamic> row(String id, String status, {String state = 'Alabama', String? at}) => {
+          'id': id,
+          'userEmail': me,
+          'fullName': 'Alabama Registrar',
+          'state': state,
+          'status': status,
+          'createdAt': '2026-09-01T00:00:00Z',
+          if (at != null) 'updatedAt': at,
+        };
+    final other = <String, dynamic>{
+      'id': 'ga1',
+      'userEmail': 'ga@example.com',
+      'state': 'Georgia',
+      'status': 'approved',
+      'createdAt': '2026-08-01T00:00:00Z',
+    };
+
+    test('a phone-only approval becomes a fresh pending request', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: [other, row('old', 'approved', at: '2026-09-02T00:00:00Z')],
+        email: me,
+        serverRows: [other],
+        localBackup: row('old', 'approved', at: '2026-09-02T00:00:00Z'),
+        now: '2026-10-08T15:00:00Z',
+        reapplicationId: 'new1',
+      );
+      expect(rec.reappliedFromStaleApproval, isTrue);
+      expect(rec.resubmit, isNotNull);
+      expect(rec.resubmit!['status'], 'pending');
+      expect(rec.resubmit!['id'], 'new1');
+      expect(rec.resubmit!['reappliedFrom'], 'old');
+      expect(rec.resubmit!['createdAt'], '2026-10-08T15:00:00Z');
+      expect(rec.resubmit!.containsKey('updatedAt'), isFalse);
+      expect(rec.own!['status'], 'pending');
+      expect(
+        NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me),
+        isFalse,
+      );
+      expect(rec.list.where((a) => a['id'] == 'ga1').length, 1);
+    });
+
+    test('a server approval replaces whatever the phone held', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: [row('p1', 'pending')],
+        email: me,
+        serverRows: [row('p1', 'approved', at: '2026-09-05T00:00:00Z')],
+        localBackup: row('p1', 'pending'),
+      );
+      expect(rec.resubmit, isNull);
+      expect(rec.reappliedFromStaleApproval, isFalse);
+      expect(rec.own!['status'], 'approved');
+      expect(NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me), isTrue);
+    });
+
+    test('a server revoke wins over a stale local approval', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: [row('p1', 'approved', at: '2026-09-02T00:00:00Z')],
+        email: me,
+        serverRows: [row('p1', 'revoked', at: '2026-09-09T00:00:00Z')],
+        localBackup: row('p1', 'approved', at: '2026-09-02T00:00:00Z'),
+      );
+      expect(rec.resubmit, isNull);
+      expect(rec.own!['status'], 'revoked');
+      expect(NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me), isFalse);
+    });
+
+    test('a pending request the server never received is sent again', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: const [],
+        email: me,
+        serverRows: const [],
+        localBackup: row('p1', 'pending'),
+      );
+      expect(rec.resubmit!['id'], 'p1');
+      expect(rec.resubmit!['status'], 'pending');
+      expect(rec.reappliedFromStaleApproval, isFalse);
+    });
+
+    test('nothing anywhere leaves a plain member who can apply', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: [other],
+        email: me,
+        serverRows: [other],
+      );
+      expect(rec.own, isNull);
+      expect(rec.resubmit, isNull);
+      expect(rec.list.length, 1);
+    });
+
+    test('the reviewer decision counts only once the server holds it', () {
+      final approvedOnServer = [row('p1', 'approved', at: '2026-10-08T15:00:00Z')];
+      expect(
+        NgmyCivicRegistrarApplication.serverConfirmsDecision(approvedOnServer, email: me, status: 'approved', id: 'p1'),
+        isTrue,
+      );
+      expect(
+        NgmyCivicRegistrarApplication.serverConfirmsDecision([row('p1', 'pending')], email: me, status: 'approved', id: 'p1'),
+        isFalse,
+      );
+      expect(
+        NgmyCivicRegistrarApplication.serverConfirmsDecision(const [], email: me, status: 'approved', id: 'p1'),
+        isFalse,
+      );
+      expect(
+        NgmyCivicRegistrarApplication.serverConfirmsDecision(
+          [row('p1', 'approved')..['revokeVotes'] = ['ga@example.com']],
+          email: me,
+          status: 'revoked',
+          id: 'p1',
+          pendingRevoke: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('the 403 report says what the server holds and who fixes it', () {
+      final pending = NgmyCivicRegistrarApplication.describeServerView(
+        fetched: true,
+        isRegistrar: false,
+        isAdmin: false,
+        ownRows: [row('p1', 'pending')],
+        email: me,
+      );
+      expect(pending.summary, contains('Alabama registrar request is PENDING'));
+      expect(pending.advice, contains('tap Approve'));
+
+      final none = NgmyCivicRegistrarApplication.describeServerView(
+        fetched: true,
+        isRegistrar: false,
+        isAdmin: false,
+        ownRows: const [],
+        email: me,
+      );
+      expect(none.summary, contains('no registrar application exists'));
+      expect(none.advice, contains('sent to the King/Admin automatically'));
+
+      final revoked = NgmyCivicRegistrarApplication.describeServerView(
+        fetched: true,
+        isRegistrar: false,
+        isAdmin: false,
+        ownRows: [row('p1', 'revoked', at: '2026-09-09T00:00:00Z')],
+        email: me,
+      );
+      expect(revoked.summary, contains('REVOKED'));
+      expect(revoked.advice, contains('Restore Access'));
+
+      final offline = NgmyCivicRegistrarApplication.describeServerView(
+        fetched: false,
+        isRegistrar: false,
+        isAdmin: false,
+        ownRows: const [],
+        email: me,
+      );
+      expect(offline.summary, contains('could not be fetched'));
+    });
   });
 }

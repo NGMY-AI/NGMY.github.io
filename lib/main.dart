@@ -2826,6 +2826,30 @@ void _applyEdgeRegistrarApplications(
   }
 }
 
+/// Sends the signed-in member's own request straight to the server. Unlike
+/// [_persistCivicRegistrarApplications] it does not wait on the anon REST
+/// reachability probe, which fails on the web app while /api/sync works —
+/// a re-sent request that never leaves the phone cannot be approved.
+Future<bool> _pushOwnRegistrarRequest(AppConfig config, String email, Map<String, dynamic> row) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app_config', jsonEncode(config.toJson()));
+  } catch (e) {
+    debugPrint('[registrar] local config save: $e');
+  }
+  final key = email.trim().toLowerCase();
+  if (key.isEmpty) return false;
+  if (ngmyCurrentAuthEmail().isEmpty) {
+    await ngmyEnsurePrivilegedCloudSession(force: true);
+  }
+  final ok = await ngmyCivicPersistRegistrarApplications(
+    email: key,
+    applications: [Map<String, dynamic>.from(row)],
+  );
+  debugPrint('[registrar] own request push: ${ok ? 'ok' : 'failed'} [$ngmyEdgeLastTransportNote]');
+  return ok;
+}
+
 Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -2835,7 +2859,9 @@ Future<bool> _persistCivicRegistrarApplications(AppConfig config) async {
   }
   await _persistManagementOperationalListsLocal(config);
   final email = ngmyCurrentAuthEmail();
-  if (email.isEmpty || !await ngmyCanReachCloud()) return false;
+  // No anon REST reachability probe here: it fails on the web app while
+  // /api/sync works, and a skipped push left approvals on one phone only.
+  if (email.isEmpty) return false;
   return ngmyCivicPersistRegistrarApplications(
     email: email,
     applications: config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -3114,8 +3140,22 @@ Future<String?> _applyRegistrarApplicationDecision({
       )) {
     return '$appState already has $kNgmyMaxRegistrarsPerState authorized registrars.';
   }
+  // The server is the only place a registrar's access counts: Help Mode,
+  // members and cities are all written by it, and it checks only its own
+  // approved rows. A decision made with no session (or one the server never
+  // confirmed) used to be kept on the reviewer's phone as if it had
+  // happened, which left the registrar with "Not allowed" on every save.
+  if (ngmyCurrentAuthEmail().isEmpty) {
+    await ngmyEnsurePrivilegedCloudSession(force: true);
+  }
+  final snapshotApps = config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList();
+  final snapshotFlags = <String, ({bool registrar, String state})>{
+    for (final u in allUsers)
+      u.email.toLowerCase().trim(): (registrar: u.isAuthorizedRegistrar, state: u.state),
+  };
   Map<String, dynamic>? remote;
   var pendingRevoke = false;
+  String? serverError;
   if (id.isNotEmpty) {
     final decided = await ngmyCivicDecideRegistrarApplication(id: id, status: status);
     if (decided.capped) {
@@ -3126,6 +3166,8 @@ Future<String?> _applyRegistrarApplicationDecision({
       pendingRevoke = decided.pendingRevoke;
     } else if ((decided.error ?? '').trim().isNotEmpty && status == 'revoked') {
       return decided.error;
+    } else {
+      serverError = (decided.error ?? '').trim();
     }
   }
   final next = Map<String, dynamic>.from(app);
@@ -3200,9 +3242,44 @@ Future<String?> _applyRegistrarApplicationDecision({
     await NgmyCivicRegistrarApplication.save(email, Map<String, dynamic>.from(next));
   }
   if (remote == null) {
+    // Decide-by-id did not go through (no session, row never reached the
+    // server, …). Push the whole list, which creates the row when missing.
     await _persistCivicRegistrarApplications(config);
   }
   final refreshed = await _fetchCivicRegistrarApplicationsEdge();
+  if (remote == null && status != 'cancelRevoke') {
+    final confirmed = refreshed.ok &&
+        refreshed.authoritative &&
+        NgmyCivicRegistrarApplication.serverConfirmsDecision(
+          refreshed.applications,
+          email: email,
+          status: decidedStatus,
+          id: (next['id'] ?? '').toString(),
+          pendingRevoke: pendingRevoke,
+        );
+    if (!confirmed) {
+      config.civicRegistrarApplications = snapshotApps;
+      for (final u in allUsers) {
+        final prev = snapshotFlags[u.email.toLowerCase().trim()];
+        if (prev == null) continue;
+        u.isAuthorizedRegistrar = prev.registrar;
+        u.state = prev.state;
+      }
+      if (refreshed.ok) {
+        _applyEdgeRegistrarApplications(config, refreshed, users: allUsers);
+      }
+      await _syncRegistrarStateAfterConfigChange(config, allUsers);
+      final why = ngmyCurrentAuthEmail().isEmpty
+          ? 'this phone has no cloud sign-in for your account'
+          : (serverError ?? '').isNotEmpty
+              ? 'the server answered "$serverError"'
+              : !refreshed.ok
+                  ? 'the server could not be reached to confirm it'
+                  : 'the server did not record it';
+      return 'Not saved on the server — $why. Nothing was changed, because an approval that only lives on this '
+          'phone still leaves the registrar with "Not allowed" on every save. Connect and try again.';
+    }
+  }
   if (refreshed.ok) {
     _applyEdgeRegistrarApplications(config, refreshed, users: allUsers);
   }
@@ -4561,13 +4638,36 @@ void showNgmyCivicRegistrarApplicationsSheet(
   required UserData reviewer,
   required VoidCallback onDataChanged,
   VoidCallback? onParentSetState,
+  Future<bool> Function()? ensureCloudSession,
 }) {
+  // Every decision is made by the server, so the reviewer's phone must hold
+  // a session for the reviewer's email before Approve / Reject / Revoke.
+  Future<bool> connected() async {
+    if (ensureCloudSession != null) return ensureCloudSession();
+    if (ngmyCurrentAuthEmail().isNotEmpty) return true;
+    return ngmyEnsurePrivilegedCloudSession(force: true);
+  }
+
+  // Show the server's list, not a stale phone copy, so the reviewer sees the
+  // request that was re-sent and approves the row the server actually holds.
+  StateSetter? sheetSetState;
+  var sheetOpen = true;
+  unawaited(() async {
+    final fresh = await _fetchCivicRegistrarApplicationsEdge();
+    if (fresh.ok && fresh.authoritative) {
+      _applyEdgeRegistrarApplications(config, fresh, users: allUsers);
+      onDataChanged();
+      onParentSetState?.call();
+      if (sheetOpen) sheetSetState?.call(() {});
+    }
+  }());
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setST) {
+        sheetSetState = setST;
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final scope = _reviewerCivicStateScope(reviewer, config).trim();
         final apps = List<Map<String, dynamic>>.from(
@@ -4685,7 +4785,8 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                         Expanded(
                                           child: OutlinedButton(
                                             onPressed: () async {
-                                              await _applyRegistrarApplicationDecision(
+                                              await connected();
+                                              final err = await _applyRegistrarApplicationDecision(
                                                 config: config,
                                                 allUsers: allUsers,
                                                 app: app,
@@ -4695,6 +4796,9 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
+                                              if (err != null && ctx.mounted) {
+                                                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
+                                              }
                                             },
                                             child: const Text('Reject'),
                                           ),
@@ -4719,6 +4823,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
+                                              await connected();
                                               final err = await _applyRegistrarApplicationDecision(
                                                 config: config,
                                                 allUsers: allUsers,
@@ -4726,15 +4831,27 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 status: 'approved',
                                                 reviewer: reviewer,
                                               );
-                                              if (err != null) {
-                                                if (ctx.mounted) {
-                                                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(err)));
-                                                }
-                                                return;
-                                              }
                                               onDataChanged();
                                               onParentSetState?.call();
                                               setST(() {});
+                                              if (err != null) {
+                                                if (ctx.mounted) {
+                                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                                    SnackBar(content: Text(err), duration: const Duration(seconds: 10)),
+                                                  );
+                                                }
+                                                return;
+                                              }
+                                              if (ctx.mounted) {
+                                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                                  const SnackBar(
+                                                    content: Text(
+                                                      'Approved on the server. This registrar can now activate and deactivate Help Mode for everyone.',
+                                                    ),
+                                                    backgroundColor: Colors.green,
+                                                  ),
+                                                );
+                                              }
                                             },
                                             child: const Text('Approve'),
                                           ),
@@ -4788,6 +4905,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                       confirmingSecondVote: pendingRevoke && !alreadyVoted,
                                                     );
                                                     if (!confirmed) return;
+                                                    await connected();
                                                     final err = await _applyRegistrarApplicationDecision(
                                                       config: config,
                                                       allUsers: allUsers,
@@ -4838,6 +4956,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               const SizedBox(height: 8),
                                               TextButton(
                                                 onPressed: () async {
+                                                  await connected();
                                                   final err = await _applyRegistrarApplicationDecision(
                                                     config: config,
                                                     allUsers: allUsers,
@@ -4894,6 +5013,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                                 );
                                                 return;
                                               }
+                                              await connected();
                                               final err = await _applyRegistrarApplicationDecision(
                                                 config: config,
                                                 allUsers: allUsers,
@@ -4957,6 +5077,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
                                               // would keep _registrarApplicationStatusForEmail
                                               // reporting revoked/rejected and blocking reapplication.
                                               final deleteId = (app['id'] ?? '').toString().trim();
+                                              await connected();
                                               await ngmyCivicDeleteRegistrarApplication(
                                                 userEmail: email,
                                                 id: deleteId.isEmpty ? null : deleteId,
@@ -5013,7 +5134,7 @@ void showNgmyCivicRegistrarApplicationsSheet(
         );
       },
     ),
-  );
+  ).whenComplete(() => sheetOpen = false);
 }
 
 NgmyLoanConfigBridge ngmyLoanConfigBridge(AppConfig config) => NgmyLoanConfigBridge(
@@ -13058,6 +13179,24 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             users: _allUsers,
             currentUser: _currentUser,
           );
+          if (registrarFetch.ok && !registrarFetch.isAdmin && !registrarFetch.isRegistrar) {
+            // Own rows follow the server (see _hydrateRegistrarApplication):
+            // a phone-only approval must not survive login as registrar access
+            // the server will refuse on every save.
+            final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+              list: _config.civicRegistrarApplications,
+              email: registrarEmail,
+              serverRows: registrarFetch.applications,
+              localBackup: await NgmyCivicRegistrarApplication.load(registrarEmail),
+            );
+            _config.civicRegistrarApplications = rec.list;
+            if (rec.resubmit != null) {
+              await NgmyCivicRegistrarApplication.save(registrarEmail, rec.resubmit!);
+              unawaited(_pushOwnRegistrarRequest(_config, registrarEmail, rec.resubmit!));
+            } else if (rec.own == null) {
+              await NgmyCivicRegistrarApplication.clear(registrarEmail);
+            }
+          }
           if (_currentUser != null) {
             final status = _registrarApplicationStatusForEmail(_config, _currentUser!.email);
             if (status == 'approved') {
@@ -31982,6 +32121,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         onPressed: () => _openCivicHelpModeSyncDetails(activated: activated),
       ),
     ));
+    if (ngmyLastCivicHelpModeServerRefusedRegistrar) {
+      // The server does not hold this account's approval. Re-read our own
+      // application from the server: a stale local approval becomes a fresh
+      // request for the King/Admin instead of a toggle that can never save.
+      unawaited(_hydrateRegistrarApplication());
+    }
   }
 
   /// Asked at most once per app run so a registrar who taps "Not now" is
@@ -32760,10 +32905,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
     }
     final edge = await _fetchCivicRegistrarApplicationsEdge();
+    var reappliedFromStaleApproval = false;
     if (edge.ok) {
       _applyEdgeRegistrarApplications(widget.config, edge);
     }
-    if (local != null) {
+    if (edge.ok && !edge.isAdmin && !edge.isRegistrar) {
+      // The server answered that this account is not a registrar, so its
+      // rows for this email are the truth. A local approval the server never
+      // received only produced "Not allowed" on every Help Mode save while
+      // the phone kept showing the registrar tools; it becomes a fresh
+      // request the King/Admin can approve with one tap.
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: widget.config.civicRegistrarApplications,
+        email: email,
+        serverRows: edge.applications,
+        localBackup: local,
+      );
+      widget.config.civicRegistrarApplications = rec.list;
+      reappliedFromStaleApproval = rec.reappliedFromStaleApproval;
+      if (rec.resubmit != null) {
+        await NgmyCivicRegistrarApplication.save(email, rec.resubmit!);
+        _localRegistrarBackup = rec.resubmit;
+        unawaited(_pushOwnRegistrarRequest(widget.config, email, rec.resubmit!));
+      }
+    } else if (local != null) {
       widget.config.civicRegistrarApplications = NgmyCivicRegistrarApplication.mergeLocalIntoList(
         widget.config.civicRegistrarApplications,
         email,
@@ -32807,6 +32972,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _registryGateMessage = null;
       }
     });
+    if (reappliedFromStaleApproval) {
+      widget.onDataChanged();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          duration: const Duration(seconds: 12),
+          content: Text(
+            'Your Authorized Registrar approval was only saved on a phone, not on the server, so your saves '
+            'were refused. A new registrar request for ${widget.user.state.trim().isEmpty ? 'your state' : widget.user.state} '
+            'was just sent to the King/Admin — once they tap Approve, Help Mode and contributions save for everyone.',
+          ),
+        ));
+    }
     unawaited(_refreshCivicStateAccess(promptPaywall: false));
   }
 
@@ -33053,7 +33229,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         widget.config.civicRegistrarApplications.map((e) => Map<String, dynamic>.from(e)).toList(),
         app,
       );
-      final synced = await _persistCivicRegistrarApplications(widget.config);
+      var synced = await _persistCivicRegistrarApplications(widget.config);
+      if (!synced) {
+        synced = await _pushOwnRegistrarRequest(widget.config, widget.user.email, app);
+      }
       widget.onDataChanged();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -44787,6 +44966,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   allUsers: widget.allUsers,
                                   reviewer: widget.user,
                                   onDataChanged: widget.onDataChanged,
+                                  ensureCloudSession: () => _ensureCivicCloudSessionInteractive(
+                                    reason: 'Enter your NGMY password once so this decision is saved on the server, '
+                                        'not only on this phone.',
+                                  ),
                                 );
                               },
                               style: TextButton.styleFrom(

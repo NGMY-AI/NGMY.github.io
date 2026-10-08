@@ -359,6 +359,271 @@ class NgmyCivicRegistrarApplication {
     return upsertInList(list, local);
   }
 
+  static int _statusRank(String status) {
+    switch (status) {
+      case 'revoked':
+        return 3;
+      case 'rejected':
+        return 2;
+      case 'approved':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
+  /// The row that currently decides this person's access: newest by
+  /// decision time, with revoke/reject beating a same-time approval.
+  static Map<String, dynamic>? newestRowForEmail(
+    Iterable<Map<String, dynamic>> rows,
+    String email,
+  ) {
+    final key = _emailKey(email);
+    if (key.isEmpty) return null;
+    Map<String, dynamic>? best;
+    for (final raw in rows) {
+      if ((raw['userEmail'] ?? '').toString().toLowerCase().trim() != key) continue;
+      final row = Map<String, dynamic>.from(raw);
+      if (best == null) {
+        best = row;
+        continue;
+      }
+      final bt = _rowTimestamp(best);
+      final rt = _rowTimestamp(row);
+      if (bt != null && rt != null) {
+        if (rt.isAfter(bt)) {
+          best = row;
+        } else if (!bt.isAfter(rt) && _statusRank(_statusOf(row)) > _statusRank(_statusOf(best))) {
+          best = row;
+        }
+      } else if (rt != null) {
+        best = row;
+      } else if (bt == null && _statusRank(_statusOf(row)) > _statusRank(_statusOf(best))) {
+        best = row;
+      }
+    }
+    return best;
+  }
+
+  /// Turns a stale local approval into a fresh request the King/Admin can
+  /// approve with one tap. The old id is kept as [reappliedFrom] so the
+  /// reviewer sees it is a re-approval, not a stranger.
+  static Map<String, dynamic> pendingReapplicationFrom(
+    Map<String, dynamic> previous, {
+    String? at,
+    String? id,
+  }) {
+    final stamp = (at ?? '').trim().isEmpty ? DateTime.now().toUtc().toIso8601String() : at!.trim();
+    final next = Map<String, dynamic>.from(previous);
+    final previousId = (previous['id'] ?? '').toString().trim();
+    for (final f in [
+      'reviewedAt',
+      'reviewedBy',
+      'updatedAt',
+      'revokedAt',
+      'revokedBy',
+      'revokeVotes',
+      'revokeRequestedBy',
+      'revokeRequestedAt',
+      'rejectionReason',
+    ]) {
+      next.remove(f);
+    }
+    next['id'] = (id ?? '').trim().isNotEmpty
+        ? id!.trim()
+        : DateTime.now().microsecondsSinceEpoch.toString();
+    next['status'] = 'pending';
+    next['createdAt'] = stamp;
+    if (previousId.isNotEmpty) next['reappliedFrom'] = previousId;
+    final reason = (next['reason'] ?? '').toString().trim();
+    next['reason'] = reason.isEmpty
+        ? 'Re-approval: this registrar was approved on a phone but the approval never reached the server.'
+        : reason;
+    return next;
+  }
+
+  /// The server answered for the signed-in member, so its rows for that
+  /// email are the truth. Help Mode, members and cities are all written by
+  /// the server, which only checks its own approved rows — a phone that keeps
+  /// treating a stale local approval as real gets "Not allowed" on every save
+  /// while still showing the registrar tools.
+  ///
+  /// - Server rows for [email] replace every local row for that email.
+  /// - No server row + local pending request: the request is kept and must be
+  ///   sent again ([resubmit]).
+  /// - No server row + stale local approval: the approval is dropped and a
+  ///   fresh pending request is created for the King/Admin to approve
+  ///   ([resubmit], [reappliedFromStaleApproval]).
+  /// - Nothing anywhere: the person is a plain member and may apply.
+  static ({
+    List<Map<String, dynamic>> list,
+    Map<String, dynamic>? own,
+    Map<String, dynamic>? resubmit,
+    bool reappliedFromStaleApproval,
+  }) reconcileOwnRowsWithServer({
+    required List<Map<String, dynamic>> list,
+    required String email,
+    required List<Map<String, dynamic>> serverRows,
+    Map<String, dynamic>? localBackup,
+    String? now,
+    String? reapplicationId,
+  }) {
+    final key = _emailKey(email);
+    final others = list
+        .where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() != key)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (key.isEmpty) {
+      return (list: others, own: null, resubmit: null, reappliedFromStaleApproval: false);
+    }
+    final mine = serverRows
+        .where((a) => (a['userEmail'] ?? '').toString().toLowerCase().trim() == key)
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (mine.isNotEmpty) {
+      return (
+        list: [...others, ...mine],
+        own: newestRowForEmail(mine, key),
+        resubmit: null,
+        reappliedFromStaleApproval: false,
+      );
+    }
+    final backupStatus = localBackup == null ? '' : _statusOf(localBackup);
+    if (localBackup != null && backupStatus == 'pending') {
+      final pending = Map<String, dynamic>.from(localBackup);
+      return (
+        list: [...others, pending],
+        own: pending,
+        resubmit: pending,
+        reappliedFromStaleApproval: false,
+      );
+    }
+    Map<String, dynamic>? staleApproval;
+    if (localBackup != null && backupStatus == 'approved') {
+      staleApproval = localBackup;
+    } else {
+      final localRow = newestRowForEmail(list, key);
+      if (localRow != null && _statusOf(localRow) == 'approved') staleApproval = localRow;
+    }
+    if (staleApproval != null) {
+      final reapply = pendingReapplicationFrom(staleApproval, at: now, id: reapplicationId);
+      return (
+        list: [...others, reapply],
+        own: reapply,
+        resubmit: reapply,
+        reappliedFromStaleApproval: true,
+      );
+    }
+    return (list: others, own: null, resubmit: null, reappliedFromStaleApproval: false);
+  }
+
+  static String _shortDate(dynamic raw) {
+    final s = (raw ?? '').toString().trim();
+    if (s.isEmpty) return '';
+    final d = DateTime.tryParse(s)?.toLocal();
+    if (d == null) return s;
+    return '${d.month}/${d.day}/${d.year}';
+  }
+
+  /// One sentence of what the server believes about this account plus the
+  /// step that fixes it. Shown in the Help Mode sync report after a 403 so
+  /// the registrar and the King/Admin see the same fact instead of
+  /// "cloud sync failed".
+  static ({String summary, String advice}) describeServerView({
+    required bool fetched,
+    required bool isRegistrar,
+    required bool isAdmin,
+    required Iterable<Map<String, dynamic>> ownRows,
+    required String email,
+    String registrarState = '',
+  }) {
+    if (!fetched) {
+      return (
+        summary: 'Server view: could not be fetched (no answer from the server).',
+        advice: 'Tap Retry in Details. If the server keeps refusing, ask the King/Admin to approve your '
+            'registrar request again in Civic Registry → Registrar Requests.',
+      );
+    }
+    if (isAdmin) {
+      return (
+        summary: 'Server view: this account is an admin.',
+        advice: 'Tap Retry. If it repeats, the server function is out of date and must be redeployed.',
+      );
+    }
+    final row = newestRowForEmail(ownRows, email);
+    final state = (row?['state'] ?? registrarState).toString().trim();
+    final stateLabel = state.isEmpty ? '' : ' $state';
+    if (isRegistrar) {
+      return (
+        summary: 'Server view: Authorized Registrar${stateLabel.isEmpty ? '' : ' for$stateLabel'}, '
+            'but the save was still refused.',
+        advice: 'Tap Retry. If it repeats, the server function is out of date and must be redeployed.',
+      );
+    }
+    if (row == null) {
+      return (
+        summary: 'Server view: no registrar application exists for this account on the server, '
+            'so the server treats it as a regular member.',
+        advice: 'Open Civic Registry again — a new registrar request is sent to the King/Admin automatically — '
+            'then ask the King/Admin to tap Approve in Registrar Requests. Help Mode saves as soon as it is approved.',
+      );
+    }
+    final status = _statusOf(row);
+    switch (status) {
+      case 'pending':
+        final sent = _shortDate(row['createdAt']);
+        return (
+          summary: 'Server view: your$stateLabel registrar request is PENDING'
+              '${sent.isEmpty ? '' : ' (sent $sent)'}; it was never approved on the server.',
+          advice: 'Ask the King/Admin to tap Approve in Civic Registry → Registrar Requests. '
+              'Help Mode saves as soon as it is approved.',
+        );
+      case 'revoked':
+      case 'rejected':
+        final when = _shortDate(row['revokedAt'] ?? row['reviewedAt'] ?? row['updatedAt']);
+        return (
+          summary: 'Server view: your$stateLabel registrar access is ${status.toUpperCase()}'
+              '${when.isEmpty ? '' : ' (since $when)'}.',
+          advice: 'Ask the King/Admin to tap Restore Access in Civic Registry → Registrar Requests.',
+        );
+      default:
+        return (
+          summary: 'Server view: your$stateLabel registrar application is $status, '
+              'but the server still refused the save.',
+          advice: 'Tap Retry. If it repeats, the server function is out of date and must be redeployed.',
+        );
+    }
+  }
+
+  /// Did the server's authoritative list record the reviewer's decision?
+  /// A decision that only lives on the reviewer's phone is not a decision:
+  /// the registrar still gets "Not allowed" on every save.
+  static bool serverConfirmsDecision(
+    Iterable<Map<String, dynamic>> serverRows, {
+    required String email,
+    required String status,
+    String id = '',
+    bool pendingRevoke = false,
+  }) {
+    final wanted = status.toLowerCase().trim();
+    final rowId = id.trim();
+    Map<String, dynamic>? row;
+    if (rowId.isNotEmpty) {
+      for (final a in serverRows) {
+        if ((a['id'] ?? '').toString().trim() == rowId) {
+          row = Map<String, dynamic>.from(a);
+          break;
+        }
+      }
+    }
+    row ??= newestRowForEmail(serverRows, email);
+    if (row == null) return false;
+    final actual = _statusOf(row);
+    if (wanted == 'cancelrevoke') return actual == 'approved' && revokeVotesOf(row).isEmpty;
+    if (pendingRevoke) return actual == 'approved' && revokeVotesOf(row).isNotEmpty;
+    return actual == wanted;
+  }
+
   @Deprecated('Use mergeLocalIntoList')
   static List<Map<String, dynamic>> mergeLocalPendingIntoList(
     List<Map<String, dynamic>> list,

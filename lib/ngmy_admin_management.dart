@@ -1886,6 +1886,13 @@ class NgmyCivicHelpModeSyncReport {
 
 NgmyCivicHelpModeSyncReport? ngmyLastCivicHelpModeSyncReport;
 
+/// True after a save was refused with 403 and the server confirmed it does
+/// not hold an approved registrar row for the signed-in account. The Civic
+/// screen then re-reads its own application from the server so the phone
+/// stops showing registrar tools that cannot save, and files a fresh
+/// request for the King/Admin when the approval only ever lived locally.
+bool ngmyLastCivicHelpModeServerRefusedRegistrar = false;
+
 NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
   final e = error.toLowerCase().trim();
   if (e.isEmpty || e == 'no response' || e.contains('could not reach')) {
@@ -1923,7 +1930,8 @@ NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
       return (
         reason: 'the server does not list $account as an Authorized Registrar or admin',
         advice: 'Your registrar approval must exist on the server, not only on this phone. '
-            'Ask the King/Admin to re-approve your registrar request, or sign in with the approved account.',
+            'Ask the King/Admin to approve your registrar request in Civic Registry → Registrar Requests, '
+            'or sign in with the approved account.',
       );
     case NgmyCivicHelpModeSyncFailure.rateLimited:
       return (
@@ -2313,7 +2321,27 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   } else if (failure == NgmyCivicHelpModeSyncFailure.none) {
     failure = ngmyClassifyCivicHelpModeSyncError(lastError);
   }
-  final explanation = _civicHelpModeSyncExplanation(failure, lastError);
+  var explanation = _civicHelpModeSyncExplanation(failure, lastError);
+  if (failure == NgmyCivicHelpModeSyncFailure.notAllowed && ngmyCurrentAuthEmail().isNotEmpty) {
+    // The server decides registrar access from its own application list.
+    // Ask it what it holds for this account so the report names the exact
+    // step (approve / restore / re-request) instead of a generic refusal.
+    final serverEmail = ngmyCurrentAuthEmail();
+    final fetch = await ngmyCivicFetchRegistrarApplications(email: serverEmail);
+    final view = NgmyCivicRegistrarApplication.describeServerView(
+      fetched: fetch.ok,
+      isRegistrar: fetch.isRegistrar,
+      isAdmin: fetch.isAdmin,
+      ownRows: fetch.applications,
+      email: serverEmail,
+      registrarState: fetch.registrarState,
+    );
+    note(view.summary);
+    explanation = (reason: explanation.reason, advice: view.advice);
+    ngmyLastCivicHelpModeServerRefusedRegistrar = !fetch.ok || (!fetch.isRegistrar && !fetch.isAdmin);
+  } else {
+    ngmyLastCivicHelpModeServerRefusedRegistrar = false;
+  }
   note('Total time: ${DateTime.now().difference(startedAt).inMilliseconds}ms');
   ngmyLastCivicHelpModeSyncReport = NgmyCivicHelpModeSyncReport(
     ok: helpModeCloudOk,
