@@ -18,8 +18,17 @@ String ngmyCurrentAuthEmail() {
 }
 
 /// Shared Edge invoke for Civic Registry (role-filtered server APIs).
-Future<Map<String, dynamic>?> ngmyCivicInvoke(Map<String, dynamic> body) async {
-  return ngmyEdgeInvoke(body, timeout: _kCivicCloudTimeout);
+Future<Map<String, dynamic>?> ngmyCivicInvoke(
+  Map<String, dynamic> body, {
+  bool preferDirect = false,
+  bool fallbackOnTimeout = false,
+}) async {
+  return ngmyEdgeInvoke(
+    body,
+    timeout: _kCivicCloudTimeout,
+    preferDirect: preferDirect,
+    fallbackOnTimeout: fallbackOnTimeout,
+  );
 }
 
 /// Anonymous guest enroll (no JWT required).

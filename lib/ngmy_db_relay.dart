@@ -218,6 +218,8 @@ Future<bool> ngmyDbRelaySettingsUpsert(
   Map<String, dynamic> value, {
   String? updatedAt,
   Duration timeout = kNgmyCloudWriteTimeout,
+  bool preferDirect = false,
+  bool fallbackOnTimeout = false,
 }) async {
   final resolved = _resolveSettingsKey(key);
   if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
@@ -237,6 +239,8 @@ Future<bool> ngmyDbRelaySettingsUpsert(
       },
       anonymous: !_ngmyHasSession,
       timeout: timeout,
+      preferDirect: preferDirect,
+      fallbackOnTimeout: fallbackOnTimeout,
     ),
   );
   return true;

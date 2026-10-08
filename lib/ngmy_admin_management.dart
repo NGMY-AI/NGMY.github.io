@@ -1518,6 +1518,57 @@ Future<bool> ngmyPersistHelperAiSettings(AppConfig config) async {
   return cloudOk;
 }
 
+/// Shared help-mode JSON must stay small enough for the edge function.
+/// A receipt mirror of every contribution was being attached to Activate
+/// and Deactivate, and a body that large comes back as a failed save —
+/// the orange "cloud sync failed" bar — even when the campaign itself
+/// would have saved.
+const int kNgmyHelpModeCloudPayloadMaxBytes = 180000;
+
+Map<String, dynamic> ngmyHelpModeCloudPayload(
+  Map<String, dynamic> settings, {
+  List<Map<String, dynamic>> receipts = const [],
+  int maxBytes = kNgmyHelpModeCloudPayloadMaxBytes,
+}) {
+  final base = Map<String, dynamic>.from(settings)..remove('contributionReceipts');
+  if (receipts.isEmpty) return base;
+
+  Map<String, dynamic> withRows(List<Map<String, dynamic>> rows) => {
+        ...base,
+        'contributionReceipts': rows,
+      };
+
+  bool fits(Map<String, dynamic> payload) {
+    try {
+      return utf8.encode(jsonEncode(payload)).length <= maxBytes;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  if (fits(withRows(receipts))) return withRows(receipts);
+
+  final slim = receipts.map((raw) {
+    final row = Map<String, dynamic>.from(raw);
+    final details = row['sourceDetails'];
+    if (details == null) return row;
+    final text = details is String ? details : jsonEncode(details);
+    if (text.length > 400) row['sourceDetails'] = text.substring(0, 400);
+    return row;
+  }).toList();
+  var rows = slim;
+  while (rows.isNotEmpty && !fits(withRows(rows))) {
+    final keep = (rows.length * 0.6).floor();
+    if (keep <= 0 || keep >= rows.length) {
+      rows = const [];
+      break;
+    }
+    rows = rows.sublist(0, keep);
+  }
+  if (rows.isEmpty) return base;
+  return withRows(rows);
+}
+
 Map<String, dynamic> _civicHelpModeSettingsPayload(AppConfig config) => {
       'helpModeActive': config.helpModeActive,
       'helpPurpose': config.helpPurpose.trim(),
@@ -1781,27 +1832,46 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   NgmyAdminLiveRefresh.notify();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var helpModeCloudOk = false;
-  final payload = _civicHelpModeSettingsPayload(config);
-  final receipts = await _contributionReceiptMirrorForCloud(config);
-  if (receipts.isNotEmpty) payload['contributionReceipts'] = receipts;
+  // The app can look signed in from the on-device user cache while Supabase
+  // has no email JWT (local password match, or an anonymous storage sign-in).
+  // Both the service-role save and the registrar RLS save reject that, which
+  // is the orange "cloud sync failed" bar.
+  await ngmyEnsurePrivilegedCloudSession();
+  var lastError = '';
   final email = ngmyCurrentAuthEmail();
   // Always attempt the shared write. ngmyCanReachCloud() is a 3-second anon
   // REST probe that often fails on the web app while /api/sync still works.
   // Gating on it made Activate and Deactivate report "cloud sync failed"
   // without ever saving, so other phones never saw the campaign or its money.
   for (var attempt = 0; attempt < 2 && !helpModeCloudOk; attempt++) {
+    if (attempt > 0 &&
+        (ngmyCurrentAuthEmail().isEmpty || ngmyCloudErrorNeedsSessionRepair(lastError))) {
+      await ngmyEnsurePrivilegedCloudSession(force: true);
+    }
+    final receipts = await _contributionReceiptMirrorForCloud(config);
+    final payload = ngmyHelpModeCloudPayload(
+      _civicHelpModeSettingsPayload(config),
+      receipts: receipts,
+    );
+    final preferDirect = attempt > 0;
     helpModeCloudOk = await ngmyCivicAdminSettingsPersist(
-      email: email,
+      email: ngmyCurrentAuthEmail().isNotEmpty ? ngmyCurrentAuthEmail() : email,
       kind: 'civicHelpModeSettings',
       payload: payload,
+      preferDirect: preferDirect,
+      fallbackOnTimeout: true,
+      onError: (error) => lastError = error,
     );
     if (!helpModeCloudOk) {
       try {
         helpModeCloudOk = await ngmyDbRelaySettingsUpsert(
           _kNgmyCivicHelpModeSettingsKey,
           payload,
+          preferDirect: preferDirect,
+          fallbackOnTimeout: true,
         );
       } catch (e) {
+        lastError = e.toString();
         debugPrint('[civic help mode] shared relay save: $e');
       }
     }
@@ -1809,12 +1879,13 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
       await Future.delayed(const Duration(milliseconds: 500));
     }
   }
-  if (email.isNotEmpty) {
+  final signedInEmail = ngmyCurrentAuthEmail();
+  if (signedInEmail.isNotEmpty) {
     var spendOk = false;
     final spendItems = config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList();
     for (var attempt = 0; attempt < 2 && !spendOk; attempt++) {
       spendOk = await ngmyPrivateListsPersistHelpSpendings(
-        email: email,
+        email: signedInEmail,
         items: spendItems,
       );
       if (!spendOk) {

@@ -100,6 +100,9 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   List<dynamic>? cities,
   List<dynamic>? rooms,
   bool roomsExact = false,
+  bool preferDirect = false,
+  bool fallbackOnTimeout = false,
+  void Function(String error)? onError,
 }) async {
   final body = <String, dynamic>{
     'action': 'civicAdminSettingsPersist',
@@ -113,10 +116,14 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   if (cities != null) body['cities'] = cities;
   if (rooms != null) body['rooms'] = rooms;
   if (roomsExact) body['roomsExact'] = true;
-  final data = await ngmyCivicInvoke(body);
-  if (data != null && data['ok'] == true) return true;
-  debugPrint(
-    '[civic admin settings] persist $kind failed: ${data?['error'] ?? 'no response'}',
+  final data = await ngmyCivicInvoke(
+    body,
+    preferDirect: preferDirect,
+    fallbackOnTimeout: fallbackOnTimeout,
   );
+  if (data != null && data['ok'] == true) return true;
+  final error = (data?['error'] ?? 'no response').toString();
+  onError?.call(error);
+  debugPrint('[civic admin settings] persist $kind failed: $error');
   return false;
 }

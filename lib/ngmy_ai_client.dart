@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_ai_memory.dart';
@@ -797,6 +798,123 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyRegisterAppUs
     error: data['error']?.toString() ?? 'Signup failed',
     user: null,
   );
+}
+
+String _ngmySupabaseSessionEmail() {
+  try {
+    return Supabase.instance.client.auth.currentUser?.email?.toLowerCase().trim() ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+String _ngmyRememberedLoginEmail = '';
+String _ngmyRememberedLoginHash = '';
+DateTime? _ngmySessionRepairAt;
+bool _ngmySessionRepairOk = false;
+
+/// Keep the password hash that already lives on this device so a later cloud
+/// write can mint a real session. Local login used to skip that step.
+void ngmyRememberLoginCredentials(String email, String passwordHash) {
+  final key = email.trim().toLowerCase();
+  final hash = passwordHash.trim();
+  if (key.isEmpty || hash.isEmpty) return;
+  _ngmyRememberedLoginEmail = key;
+  _ngmyRememberedLoginHash = hash;
+}
+
+Future<({String email, String passwordHash})> _ngmyStoredLoginCredentials() async {
+  if (_ngmyRememberedLoginEmail.isNotEmpty && _ngmyRememberedLoginHash.isNotEmpty) {
+    return (email: _ngmyRememberedLoginEmail, passwordHash: _ngmyRememberedLoginHash);
+  }
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('current_user');
+    if (raw == null || raw.trim().isEmpty) return (email: '', passwordHash: '');
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return (email: '', passwordHash: '');
+    final email = (decoded['email'] ?? '').toString().trim().toLowerCase();
+    final hash = (decoded['passwordHash'] ?? decoded['password_hash'] ?? '').toString().trim();
+    if (email.isNotEmpty && hash.isNotEmpty) {
+      _ngmyRememberedLoginEmail = email;
+      _ngmyRememberedLoginHash = hash;
+    }
+    return (email: email, passwordHash: hash);
+  } catch (e) {
+    debugPrint('[ngmy-auth] read stored login: $e');
+    return (email: '', passwordHash: '');
+  }
+}
+
+bool _ngmySessionEmailMatches(String expected) {
+  final current = _ngmySupabaseSessionEmail();
+  if (current.isEmpty) return false;
+  if (expected.isEmpty) return true;
+  return current == expected;
+}
+
+/// Auth failures that mean the JWT is missing or anonymous, not "this
+/// registrar is forbidden".
+bool ngmyCloudErrorNeedsSessionRepair(String error) {
+  final e = error.toLowerCase();
+  return e.contains('sign in') ||
+      e.contains('authentication required') ||
+      e.contains('invalid jwt') ||
+      e.contains('jwt expired') ||
+      e.contains('not authenticated');
+}
+
+/// Help-mode and contribution writes need a Supabase session whose email
+/// matches the person using the app. A local password match, a restored
+/// cache, or an anonymous storage sign-in leaves the UI signed in while
+/// every shared write is rejected.
+Future<bool> ngmyEnsurePrivilegedCloudSession({bool force = false}) async {
+  final creds = await _ngmyStoredLoginCredentials();
+  final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  if (!force && _ngmySessionEmailMatches(creds.email)) {
+    try {
+      final client = Supabase.instance.client;
+      final session = client.auth.currentSession;
+      if (session != null) {
+        final expiresAt = session.expiresAt;
+        if (expiresAt == null || expiresAt <= nowSec + 90) {
+          await client.auth.refreshSession();
+        }
+        final fresh = client.auth.currentSession;
+        final token = fresh?.accessToken ?? '';
+        final freshExpiry = fresh?.expiresAt;
+        final usable = token.isNotEmpty && (freshExpiry == null || freshExpiry > nowSec + 30);
+        if (usable && _ngmySessionEmailMatches(creds.email)) return true;
+      }
+    } catch (e) {
+      debugPrint('[ngmy-auth] refresh before civic write: $e');
+    }
+  }
+  if (creds.email.isEmpty || creds.passwordHash.isEmpty) {
+    return _ngmySessionEmailMatches('');
+  }
+  final now = DateTime.now();
+  if (!force &&
+      _ngmySessionRepairAt != null &&
+      now.difference(_ngmySessionRepairAt!) < const Duration(seconds: 20)) {
+    return _ngmySessionRepairOk && _ngmySessionEmailMatches(creds.email);
+  }
+  _ngmySessionRepairAt = now;
+  try {
+    final verified = await ngmyVerifyPasswordLoginViaServer(
+      email: creds.email,
+      passwordHash: creds.passwordHash,
+    );
+    _ngmySessionRepairOk = verified.ok && _ngmySessionEmailMatches(creds.email);
+    if (!_ngmySessionRepairOk) {
+      debugPrint('[ngmy-auth] session repair failed: ${verified.error ?? 'no session'}');
+    }
+    return _ngmySessionRepairOk;
+  } catch (e) {
+    debugPrint('[ngmy-auth] session repair: $e');
+    _ngmySessionRepairOk = false;
+    return false;
+  }
 }
 
 /// Apply access/refresh tokens returned by bright-handler login/signup.

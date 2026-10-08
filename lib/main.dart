@@ -1652,6 +1652,9 @@ Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6
   // probe fails. That probe skips the write while the sync path still works,
   // which left money records on one phone.
   if (t.status == TransactionStatus.pending) return false;
+  if (t.type == TransactionType.contribution) {
+    await ngmyEnsurePrivilegedCloudSession();
+  }
   for (var i = 0; i < attempts; i++) {
     // Contributions reuse a stable transaction id when a registrar adds more
     // money. A status-only patch succeeds for that existing row but does not
@@ -7646,6 +7649,14 @@ String _mimeForImageExt(String ext) {
 Future<void> _ensureSupabaseSessionForStorage() async {
   final auth = Supabase.instance.client.auth;
   if (auth.currentSession != null) return;
+  // An anonymous JWT has no email. If someone is already using the app,
+  // that session makes every Civic Registry cloud write fail row-level
+  // security while the screen still shows them as signed in.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('current_user') ?? '';
+    if (raw.contains('@')) return;
+  } catch (_) {}
   try {
     await auth.signInAnonymously();
   } catch (e) {
@@ -9209,10 +9220,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           );
           if (index != -1) {
             ngmyClearStaleForceLogout(_allUsers[index]);
+            if (_allUsers[index].passwordHash.trim().isEmpty &&
+                localUser.passwordHash.trim().isNotEmpty) {
+              _allUsers[index].passwordHash = localUser.passwordHash;
+            }
             _currentUser = _allUsers[index];
           } else {
             _currentUser = localUser;
           }
+          ngmyRememberLoginCredentials(
+            _currentUser!.email,
+            _currentUser!.passwordHash,
+          );
           if (mounted) setState(() {});
           unawaited(_persistSessionImmediately());
           return;
@@ -9492,6 +9511,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
 
     if (_currentUser != null) {
+      ngmyRememberLoginCredentials(key, passwordHash);
+      if (ngmyCurrentAuthEmail() != key) {
+        await ngmyEnsurePrivilegedCloudSession();
+      }
       unawaited(_syncSessionFromCloudAfterLogin(key));
     }
 
@@ -9951,8 +9974,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ngmyClearStaleForceLogout(_currentUser);
         if (_currentUser != null) {
           _sessionBecameLiveAt = DateTime.now();
+          ngmyRememberLoginCredentials(_currentUser!.email, _currentUser!.passwordHash);
           await _clearLoggedOutFlag();
           unawaited(_persistSessionImmediately());
+          unawaited(ngmyEnsurePrivilegedCloudSession());
         }
       }
     } catch (e) {
@@ -14724,6 +14749,20 @@ class _AuthScreenState extends State<AuthScreen> {
       if (user.email.isNotEmpty && user.passwordHash.isNotEmpty && user.passwordHash == enteredHash) {
         setState(() => _authBusy = true);
         try {
+          // A matching hash on this phone used to skip the server entirely.
+          // The app looked signed in, but Supabase had no email JWT, so
+          // Activate / Deactivate Help Mode was rejected and showed
+          // "cloud sync failed" at the bottom of Civic Registry.
+          ngmyRememberLoginCredentials(email, enteredHash);
+          try {
+            await ngmyWaitForSupabaseReady();
+            await ngmyVerifyPasswordLoginViaServer(
+              email: email,
+              passwordHash: enteredHash,
+            );
+          } catch (e) {
+            debugPrint('[Login] session establish: $e');
+          }
           await widget.onAuthComplete(email, '', '', enteredHash, true);
         } finally {
           if (mounted) setState(() => _authBusy = false);

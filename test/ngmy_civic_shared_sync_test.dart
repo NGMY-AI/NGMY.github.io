@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/main.dart';
+import 'package:ngmy/ngmy_ai_client.dart';
 import 'package:ngmy/ngmy_civic_state_wallet.dart';
 
 void main() {
@@ -471,5 +474,49 @@ void main() {
     expect(merged, hasLength(1));
     expect(merged.single['id'], 'a');
     expect(merged.single['amount'], 25);
+  });
+
+  test('help mode cloud payload keeps the campaign when receipts are huge', () {
+    final settings = {
+      'helpModeByState': {
+        'alabama': {'active': true, 'purpose': 'MJENGO WA KANISA', 'cashApp': 'NGMYpay'},
+      },
+    };
+    final receipts = List<Map<String, dynamic>>.generate(
+      40,
+      (i) => {
+        'id': 'contrib-$i',
+        'amount': i + 1,
+        'sourceDetails': 'x' * 20000,
+      },
+    );
+    final payload = ngmyHelpModeCloudPayload(settings, receipts: receipts, maxBytes: 8000);
+    final encoded = utf8.encode(jsonEncode(payload));
+    expect(encoded.length, lessThanOrEqualTo(8000));
+    expect((payload['helpModeByState'] as Map)['alabama'], isNotNull);
+    final attached = payload['contributionReceipts'];
+    if (attached is List && attached.isNotEmpty) {
+      expect((attached.first['sourceDetails'] as String).length, lessThanOrEqualTo(400));
+    }
+  });
+
+  test('help mode cloud payload includes receipts that fit', () {
+    final payload = ngmyHelpModeCloudPayload(
+      {'helpState': 'Alabama'},
+      receipts: [
+        {'id': 'contrib-1', 'amount': 20, 'sourceDetails': '{"kind":"contribution"}'},
+      ],
+    );
+    expect(payload['helpState'], 'Alabama');
+    expect(payload['contributionReceipts'], hasLength(1));
+  });
+
+  test('session repair only retries on auth failures', () {
+    expect(ngmyCloudErrorNeedsSessionRepair('Please sign in again.'), isTrue);
+    expect(ngmyCloudErrorNeedsSessionRepair('Authentication required'), isTrue);
+    expect(
+      ngmyCloudErrorNeedsSessionRepair('new row violates row-level security policy'),
+      isFalse,
+    );
   });
 }

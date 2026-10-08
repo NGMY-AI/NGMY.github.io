@@ -167,6 +167,7 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
   bool anonymous = false,
   Duration timeout = kNgmyEdgeTimeout,
   bool preferDirect = false,
+  bool fallbackOnTimeout = false,
 }) async {
   final action = (body['action'] ?? 'chat').toString().trim();
   if (!anonymous && kNgmyEdgeFetchAckOnlyActions.contains(action)) {
@@ -217,7 +218,9 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
         if (response.statusCode != 404 && response.statusCode != 405) break;
       } on TimeoutException catch (e) {
         debugPrint('[edge] invoke $url: $e');
-        break;
+        // A hung same-origin proxy must not hide the direct function URL.
+        // Callers opt in: a blind retry can double-apply a non-idempotent action.
+        if (!fallbackOnTimeout) break;
       } catch (e) {
         debugPrint('[edge] invoke $url: $e');
       }
