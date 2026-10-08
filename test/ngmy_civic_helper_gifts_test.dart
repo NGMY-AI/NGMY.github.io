@@ -81,6 +81,17 @@ void main() {
     expect(config.civicRegistryMembers.last['firstHelperStreak'], 0);
   });
 
+  test('roster streak 3 creates a pending alert for the admin', () {
+    final config = _GiftConfig()
+      ..civicRegistryMembers = [
+        _member('helper@example.com', streak: 3),
+      ];
+
+    expect(NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config), 1);
+    expect(NgmyCivicHelperGifts.openPendingCount(config), 1);
+    expect(NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config), 0);
+  });
+
   test('gift QR accepts only the helper-gift prefix or token', () {
     expect(
       NgmyCivicHelperGifts.parseTokenFromPayload('NGMYHELPERGIFT1|HG23456789'),

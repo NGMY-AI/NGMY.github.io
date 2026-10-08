@@ -1240,6 +1240,8 @@ const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
   k50: "civic_contribution_receipt_removed",
   k51: "civic_deleted_contribution_ids",
   k52: "civic_help_campaign_spendings",
+  k53: "civic_helper_gift_pending_v1",
+  k54: "civic_helper_gift_inbox_v1",
 };
 
 // Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
@@ -1267,6 +1269,7 @@ const RELAY_SETTINGS_PREFIX_CODES: Record<string, string> = {
   d20: "ngmy_doc_share_my_code_lookup_v1_",
   d21: "ngmy_doc_share_my_code_user_v1_",
   d22: "ngmy_gi_account_wallet_v1_",
+  d23: "ngmy_helper_gift_qr_v1_",
 };
 
 function resolveRelaySettingsKey(skCode: string, suffix: string): string | null {
@@ -1454,6 +1457,45 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
       if (!role.isAdmin && !role.isRegistrar) {
         const detail = await registrarRefusalDetail(admin, email);
         return jsonOk({ error: `Not allowed: ${maskEmailNetwork(email)} (${detail})` }, 403);
+      }
+      client = admin;
+    }
+  }
+
+  const helperGiftRelayKey =
+    settingsRealKey === CIVIC_HELPER_GIFT_PENDING_KEY ||
+    settingsRealKey === CIVIC_HELPER_GIFT_INBOX_KEY ||
+    (settingsRealKey?.startsWith(CIVIC_HELPER_GIFT_STASH_PREFIX) ?? false);
+  if (table === "ngmy_settings" && helperGiftRelayKey) {
+    const admin = adminClient();
+    const email = await requireJwtEmail(req);
+    if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+    const role = await resolveCivicRole(admin, email);
+    if (op === "s") {
+      if (settingsRealKey === CIVIC_HELPER_GIFT_INBOX_KEY) {
+        const inbox = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY));
+        const filtered = role.isAdmin
+          ? inbox
+          : inbox.filter((g) => emailKey(String(g.email ?? "")) === email);
+        return jsonOk({ ok: true, data: { key: settingsRealKey, value: { items: filtered } } });
+      }
+      if (!role.isAdmin && !role.isRegistrar) {
+        return jsonOk({ ok: true, data: null });
+      }
+      client = admin;
+    } else if (op === "up" || op === "i" || op === "u") {
+      if (settingsRealKey === CIVIC_HELPER_GIFT_PENDING_KEY) {
+        if (!role.isAdmin && !role.isRegistrar) {
+          return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+        }
+      } else if (!role.isAdmin) {
+        const gift = settingsRealKey
+          ? await loadSettingsObject(admin, settingsRealKey)
+          : {};
+        const lockedStore = emailKey(String(gift.storeSellerEmail ?? ""));
+        if (lockedStore !== email) {
+          return jsonOk({ error: "Admin or assigned store required" }, 403);
+        }
       }
       client = admin;
     }
@@ -5612,11 +5654,20 @@ async function handleCivicAdminSettingsFetch(
     };
   }
 
+  const helperGiftPending = role.isAdmin
+    ? helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY))
+    : [];
+  const helperGiftInbox = role.isAdmin
+    ? helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY))
+    : [];
+
   // Return only shared synchronization state. Payment handles, phone numbers,
   // member emails, and unrelated settings never cross this endpoint.
   return jsonOk({
     ok: true,
     view: role.isAdmin ? "admin" : "registrar",
+    civicHelperGiftPending: helperGiftPending,
+    civicHelperGiftInbox: helperGiftInbox,
     civicHelpModeSettings: {
       helpModeByState: safeByState,
       helpCampaignClosures: Array.isArray(help.helpCampaignClosures)
@@ -5680,6 +5731,47 @@ async function handleCivicAdminSettingsPersist(
       delete withoutReceipts.contributionReceipts;
       saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, withoutReceipts);
     }
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelperGiftPending") {
+    if (!role.isAdmin && !role.isRegistrar) {
+      return jsonOk({ error: "Authorized Registrar or admin required" }, 403);
+    }
+    const raw = body.payload;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Pending helper gift required" }, 400);
+    }
+    const pending = { ...(raw as Record<string, unknown>) };
+    const id = String(pending.id ?? "").trim();
+    const recipient = emailKey(String(pending.email ?? ""));
+    const state = String(pending.state ?? "").trim();
+    const streak = Number(pending.streak ?? 0);
+    if (!id || !recipient || !state || !Number.isFinite(streak) || streak < 3) {
+      return jsonOk({ error: "Invalid helper gift alert" }, 400);
+    }
+    if (!role.isAdmin && !statesMatch(role.registrarState, state)) {
+      return jsonOk({ error: "A registrar may report helper streaks only for their home state" }, 403);
+    }
+    pending.email = recipient;
+    pending.granted = false;
+    const current = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const index = current.findIndex((p) => String(p.id ?? "") === id);
+    if (index >= 0) current[index] = { ...current[index], ...pending };
+    else if (!current.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)) {
+      current.unshift(pending);
+    }
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, { items: current });
+    if (!saved.ok) return jsonOk({ error: saved.error ?? "Could not notify admin" }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (kind === "civicHelperGiftInbox" && role.isAdmin) {
+    const raw = body.payload;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return jsonOk({ error: "Gift inbox payload required" }, 400);
+    }
+    const items = helperGiftItems(raw);
+    const saved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_INBOX_KEY, { items });
     if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
     return jsonOk({ ok: true });
   }
