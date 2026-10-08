@@ -66,7 +66,13 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
     }
 
     _url = u;
-    if ((label ?? '').trim().isNotEmpty) _label = label!.trim();
+    final nextLabel = (label ?? '').trim();
+    if (nextLabel.isNotEmpty) {
+      final looksLikeRefresh = RegExp(r'refresh', caseSensitive: false).hasMatch(nextLabel);
+      if (!(looksLikeRefresh && sameUrl)) {
+        _label = nextLabel;
+      }
+    }
     _visible = true;
     _errorMessage = '';
     _loadState = NgmyAdvisorBrowserLoadState.loading;
@@ -139,7 +145,9 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
         case 'navigate':
         case 'open':
           final u = _normalizeUrl(cmd.url ?? '');
-          if (u.isNotEmpty) await open(u, label: cmd.label);
+          if (u.isEmpty) break;
+          if (u == _url && _loadState == NgmyAdvisorBrowserLoadState.ready) break;
+          await open(u, label: cmd.label);
           break;
         case 'back':
           await _controller?.goBack();

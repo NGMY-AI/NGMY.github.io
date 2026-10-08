@@ -5,6 +5,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 
+import 'ngmy_advisor_browser_fetch.dart';
 import 'ngmy_advisor_browser_session.dart';
 
 class NgmyAdvisorEmbeddedBrowser extends StatefulWidget {
@@ -118,6 +119,15 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
       return;
     }
     _loadedUrl = url;
+    _armTimeout();
+    final html = await ngmyFetchAdvisorBrowserHtml(url);
+    if (html != null && html.trim().isNotEmpty) {
+      await _controller.loadHtmlString(html, baseUrl: '${uri.origin}/');
+      _loadTimeout?.cancel();
+      widget.session.markReady();
+      if (mounted) setState(() {});
+      return;
+    }
     await _controller.loadRequest(uri);
   }
 

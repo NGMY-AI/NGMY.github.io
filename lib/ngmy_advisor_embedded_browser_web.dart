@@ -4,6 +4,7 @@ import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_advisor_browser_fetch.dart';
 import 'ngmy_advisor_browser_session.dart';
 
 class NgmyAdvisorEmbeddedBrowser extends StatefulWidget {
@@ -26,6 +27,7 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   late final String _viewType;
   html.IFrameElement? _frame;
   Timer? _loadTimeout;
+  String _lastLoaded = '';
 
   @override
   void initState() {
@@ -49,6 +51,7 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
         ..style.height = '100%'
         ..style.overflow = 'hidden'
         ..style.backgroundColor = '#0f172a'
+        ..style.isolation = 'isolate'
         ..style.transform = 'translateZ(0)';
 
       _frame = html.IFrameElement()
@@ -65,10 +68,10 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
       _frame!.onLoad.listen((_) {
         _loadTimeout?.cancel();
         if (!mounted) return;
-        final src = (_frame?.src ?? '').trim();
-        if (src.isEmpty || src == 'about:blank') return;
-        widget.session.markReady();
-        setState(() {});
+        if (widget.session.loadState == NgmyAdvisorBrowserLoadState.loading) {
+          widget.session.markReady();
+          setState(() {});
+        }
       });
 
       shell.append(_frame!);
@@ -78,13 +81,13 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
 
   void _armTimeout() {
     _loadTimeout?.cancel();
-    _loadTimeout = Timer(const Duration(seconds: 18), () {
+    _loadTimeout = Timer(const Duration(seconds: 28), () {
       if (!mounted) return;
       if (widget.session.loadState == NgmyAdvisorBrowserLoadState.loading) {
         unawaited(resetToBlank());
         widget.session.markFailed(
-          'This site is taking too long or cannot run inside the mini browser. '
-          'Ask your advisor to walk you through it step by step.',
+          'This page could not load in the mini browser. '
+          'Ask your advisor to guide you step by step — chat still works.',
         );
         setState(() {});
       }
@@ -95,6 +98,9 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   Future<void> loadUrl(String url) async {
     final frame = _frame;
     if (frame == null) return;
+    if (_lastLoaded == url && widget.session.loadState == NgmyAdvisorBrowserLoadState.ready) {
+      return;
+    }
     final uri = Uri.tryParse(url);
     if (uri == null || uri.host.isEmpty) {
       widget.session.markFailed('Invalid link.');
@@ -105,9 +111,28 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
       return;
     }
 
+    _lastLoaded = url;
     _armTimeout();
     if (mounted) setState(() {});
-    frame.src = url;
+
+    final html = await ngmyFetchAdvisorBrowserHtml(url);
+    if (!mounted) return;
+
+    if (html != null && html.trim().isNotEmpty) {
+      frame.src = 'about:blank';
+      frame.srcdoc = html;
+      _loadTimeout?.cancel();
+      widget.session.markReady();
+      if (mounted) setState(() {});
+      return;
+    }
+
+    await resetToBlank();
+    widget.session.markFailed(
+      'Could not load this site in the mini browser yet. '
+      'Pull down to refresh NGMY, then try again — your chat is still safe.',
+    );
+    if (mounted) setState(() {});
   }
 
   @override
@@ -127,8 +152,11 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   @override
   Future<void> resetToBlank() async {
     _loadTimeout?.cancel();
+    _lastLoaded = '';
     final frame = _frame;
-    if (frame != null) frame.src = 'about:blank';
+    if (frame == null) return;
+    frame.removeAttribute('srcdoc');
+    frame.src = 'about:blank';
   }
 
   @override

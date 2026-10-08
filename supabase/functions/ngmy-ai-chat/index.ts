@@ -434,6 +434,60 @@ function jsonOk(payload: Record<string, unknown>, status = 200): Response {
   });
 }
 
+/** Fetches HTML for the advisor mini-browser (sites that block iframes). */
+async function handleAdvisorBrowserFrame(rawUrl: string): Promise<Response> {
+  let parsed: URL;
+  try {
+    parsed = new URL(String(rawUrl ?? "").trim());
+  } catch {
+    return jsonOk({ ok: false, error: "Invalid URL" }, 400);
+  }
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    return jsonOk({ ok: false, error: "Invalid URL protocol" }, 400);
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host === "ngmy.org" || host.endsWith(".ngmy.org")) {
+    return jsonOk({ ok: false, error: "Cannot embed NGMY inside the advisor browser." }, 400);
+  }
+
+  try {
+    const res = await fetch(parsed.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NGMYAdvisorBrowser/1.0)",
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+      },
+      redirect: "follow",
+    });
+    const ct = (res.headers.get("content-type") ?? "").toLowerCase();
+    if (!res.ok) {
+      return jsonOk({ ok: false, error: `Site returned HTTP ${res.status}` }, 502);
+    }
+    if (!ct.includes("html") && !ct.includes("text/plain")) {
+      return jsonOk({ ok: false, error: "This link is not an HTML page." }, 400);
+    }
+    let html = await res.text();
+    if (html.length > 1_200_000) {
+      html = html.substring(0, 1_200_000);
+    }
+    const baseHref = `${parsed.origin}/`;
+    const inject =
+      `<base href="${baseHref}" target="_self" />` +
+      `<meta name="referrer" content="no-referrer" />` +
+      `<meta name="viewport" content="width=device-width, initial-scale=1" />` +
+      `<script>(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a'):null;if(a&&a.target==='_top')a.target='_self';},true);})();</script>`;
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head[^>]*>/i, (m) => `${m}${inject}`);
+    } else if (/<html[^>]*>/i.test(html)) {
+      html = html.replace(/<html[^>]*>/i, (m) => `${m}<head>${inject}</head>`);
+    } else {
+      html = `<!DOCTYPE html><html><head>${inject}</head><body>${html}</body></html>`;
+    }
+    return jsonOk({ ok: true, html, finalUrl: res.url || parsed.toString() });
+  } catch (e) {
+    return jsonOk({ ok: false, error: String(e) }, 502);
+  }
+}
+
 function isNgmyAdminEmail(email: string): boolean {
   return NGMY_ADMIN_EMAILS.has(email.trim().toLowerCase());
 }
@@ -6271,6 +6325,7 @@ serve(async (req) => {
       m1: "resendEmail",
       i1: "geminiVirtualOutfit",
       i2: "pollinationsImage",
+      b1: "advisorBrowserFrame",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -6488,6 +6543,16 @@ serve(async (req) => {
       const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
       if (limited) return limited;
       return await handleCivicUserGroupsJoin(req, body as Record<string, unknown>);
+    }
+
+    if (action === "advisorBrowserFrame") {
+      const limited = await enforceRateLimit(req, "advisor_browser", clientIp(req), 40, 3600);
+      if (limited) return limited;
+      const url = String(body?.url ?? "").trim();
+      if (!url) {
+        return jsonOk({ ok: false, error: "url is required" }, 400);
+      }
+      return await handleAdvisorBrowserFrame(url);
     }
 
     if (action === "elevenlabsTts") {
