@@ -45816,22 +45816,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   Widget _rankingTrophy(int rank) {
     final style = switch (rank) {
-      1 => (emoji: '🏆', label: 'CHAMPION', color: const Color(0xFFF59E0B), size: 28.0),
-      2 => (emoji: '🥈', label: '2ND PLACE', color: const Color(0xFF94A3B8), size: 24.0),
-      3 => (emoji: '🥉', label: '3RD PLACE', color: const Color(0xFFB45309), size: 22.0),
-      _ => (emoji: '', label: '', color: Colors.transparent, size: 0.0),
+      1 => (emoji: '🏆', label: '1st place', size: 15.0),
+      2 => (emoji: '🥈', label: '2nd place', size: 13.0),
+      3 => (emoji: '🥉', label: '3rd place', size: 12.0),
+      _ => (emoji: '', label: '', size: 0.0),
     };
     if (style.emoji.isEmpty) return const SizedBox.shrink();
     return Semantics(
       label: style.label,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: style.color.withOpacity(0.14),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: style.color.withOpacity(0.55)),
-        ),
-        child: Text(style.emoji, style: TextStyle(fontSize: style.size)),
+      child: Text(
+        style.emoji,
+        style: TextStyle(fontSize: style.size, height: 1),
       ),
     );
   }
@@ -45860,7 +45855,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
     final id = (u.registryId ?? '—').trim();
     final helpCount = helps ?? u.helps;
-    return Container(
+    final card = Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -45888,16 +45883,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (showTrophy && rank <= 3) ...[
-                _rankingTrophy(rank),
-                const SizedBox(height: 4),
-              ],
               Text('$helpCount helps', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.green)),
               Text('${u.missed} missed', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red)),
             ],
           ),
         ],
       ),
+    );
+    if (!showTrophy || rank > 3) return card;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        card,
+        Positioned(
+          top: 4,
+          right: 8,
+          child: _rankingTrophy(rank),
+        ),
+      ],
     );
   }
 }
