@@ -7,6 +7,232 @@ import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platfor
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_nav.dart';
 
+/// NGMY **stores** only (one row per seller), not individual product listings.
+List<Map<String, dynamic>> ngmyHelperGiftStoreOptions(List<Map<String, dynamic>> storeListings) {
+  final bySeller = <String, Map<String, dynamic>>{};
+  for (final l in storeListings) {
+    final seller = (l['sellerEmail'] ?? '').toString().toLowerCase().trim();
+    if (seller.isEmpty) continue;
+    final storeName = [
+      l['storeName'],
+      l['shopName'],
+      l['businessName'],
+      l['sellerName'],
+      l['sellerDisplayName'],
+    ].map((e) => e.toString().trim()).firstWhere((s) => s.isNotEmpty, orElse: () => '');
+    final display = storeName.isNotEmpty ? storeName : seller.split('@').first;
+    final addr = (l['storeAddress'] ?? l['location'] ?? l['address'] ?? '').toString().trim();
+    final existing = bySeller[seller];
+    if (existing != null) {
+      if ((existing['address'] as String).isEmpty && addr.isNotEmpty) {
+        existing['address'] = addr;
+      }
+      continue;
+    }
+    bySeller[seller] = {
+      'id': 'store_$seller',
+      'title': display,
+      'address': addr.isEmpty ? 'Store location on file' : addr,
+      'sellerEmail': seller,
+      'sellerName': (l['sellerName'] ?? display).toString(),
+    };
+  }
+  final out = bySeller.values.toList()
+    ..sort((a, b) => (a['title'] as String).compareTo(b['title'] as String));
+  return out;
+}
+
+/// Admin hub: pending helpers + popup notification toggle.
+Future<void> showNgmyHelperGiftPendingHub({
+  required BuildContext context,
+  required dynamic config,
+  required List<Map<String, dynamic>> storeListings,
+  required String adminEmail,
+  required Future<NgmyHelperGift?> Function({
+    required NgmyHelperGiftPending pending,
+    required String giftName,
+    required double amount,
+    required String styleId,
+    required String storeAddress,
+    required String storeSellerEmail,
+    required String storeSellerName,
+    required String storeListingId,
+  }) onGrant,
+  VoidCallback? onChanged,
+}) async {
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  var popupEnabled = await NgmyHelperGiftAdminPopupSettings.isEnabled();
+  if (!context.mounted) return;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return StatefulBuilder(
+        builder: (ctx, setST) {
+          final open = NgmyCivicHelperGifts.openPending(config);
+          final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
+          return Container(
+            constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.92),
+            margin: const EdgeInsets.fromLTRB(8, 36, 8, 8),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(2))),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 8, 8),
+                  child: Row(
+                    children: [
+                      const Text('🎁', style: TextStyle(fontSize: 30)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Helper presents',
+                              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                            ),
+                            Text(
+                              'First helper 3 campaigns in a row',
+                              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
+                    ],
+                  ),
+                ),
+                SwitchListTile(
+                  title: Text('Reward pop-ups', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                  subtitle: Text(
+                    popupEnabled
+                        ? 'Full-screen alerts when you open the app (10s each, by state).'
+                        : 'Pop-ups off — pending rewards stay listed here.',
+                    style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                  ),
+                  value: popupEnabled,
+                  activeColor: const Color(0xFFEC4899),
+                  onChanged: (v) async {
+                    await NgmyHelperGiftAdminPopupSettings.setEnabled(v);
+                    setST(() => popupEnabled = v);
+                  },
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: open.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              'No pending helper rewards right now.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: isDark ? Colors.white54 : Colors.black45),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          itemCount: open.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (_, i) {
+                            final p = open[i];
+                            final colors = ngmyHelperGiftStateGradient(p.state);
+                            return Material(
+                              elevation: 0,
+                              color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(18),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(18),
+                                onTap: () async {
+                                  Navigator.pop(ctx);
+                                  final gift = await showNgmyHelperGiftGrantSheet(
+                                    context: context,
+                                    pending: p,
+                                    storeListings: storeListings,
+                                    onGrant: ({
+                                      required String giftName,
+                                      required double amount,
+                                      required String styleId,
+                                      required String storeAddress,
+                                      required String storeSellerEmail,
+                                      required String storeSellerName,
+                                      required String storeListingId,
+                                    }) =>
+                                        onGrant(
+                                      pending: p,
+                                      giftName: giftName,
+                                      amount: amount,
+                                      styleId: styleId,
+                                      storeAddress: storeAddress,
+                                      storeSellerEmail: storeSellerEmail,
+                                      storeSellerName: storeSellerName,
+                                      storeListingId: storeListingId,
+                                    ),
+                                  );
+                                  if (gift != null) onChanged?.call();
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(color: colors.last.withValues(alpha: 0.45)),
+                                  ),
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 52,
+                                        height: 52,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(14),
+                                          gradient: LinearGradient(colors: colors),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            p.state.trim().isEmpty ? '🏛' : p.state.trim().substring(0, 1).toUpperCase(),
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(p.fullName, style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                                            Text(
+                                              '${p.state.trim().isEmpty ? 'State' : p.state} · streak ${p.streak}',
+                                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+                                            ),
+                                            Text(p.email, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                          ],
+                                        ),
+                                      ),
+                                      Icon(Icons.chevron_right_rounded, color: colors.first),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+
 /// Admin sheet: pick a beautiful present style, name, amount, and store address, then grant.
 Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
   required BuildContext context,
@@ -27,24 +253,8 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
   final amountC = TextEditingController(text: '25');
   var styleId = kNgmyHelperGiftStyles.first.id;
   String? selectedListingId;
-
-  final storeOptions = <Map<String, dynamic>>[];
-  final seen = <String>{};
-  for (final l in storeListings) {
-    final addr = (l['location'] ?? l['address'] ?? '').toString().trim();
-    final seller = (l['sellerEmail'] ?? '').toString().toLowerCase().trim();
-    final title = (l['title'] ?? l['name'] ?? 'Store').toString();
-    if (addr.isEmpty && seller.isEmpty) continue;
-    final key = '$seller|$addr';
-    if (!seen.add(key)) continue;
-    storeOptions.add({
-      'id': (l['id'] ?? key).toString(),
-      'title': title,
-      'address': addr.isEmpty ? 'Address on file with seller' : addr,
-      'sellerEmail': seller,
-      'sellerName': (l['sellerName'] ?? seller).toString(),
-    });
-  }
+  final storeOptions = ngmyHelperGiftStoreOptions(storeListings);
+  final stateColors = ngmyHelperGiftStateGradient(pending.state);
 
   return showModalBottomSheet<NgmyHelperGift>(
     context: context,
@@ -57,36 +267,55 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
           final style = ngmyHelperGiftStyleById(styleId);
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.92),
-            margin: const EdgeInsets.fromLTRB(10, 40, 10, 10),
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+            margin: const EdgeInsets.fromLTRB(8, 36, 8, 8),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
             ),
             child: ListView(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
               children: [
-                Row(
-                  children: [
-                    Text(style.emoji, style: const TextStyle(fontSize: 28)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Grant a Present',
-                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A)),
-                          ),
-                          Text(
-                            '${pending.fullName} · 3 first-helps in a row',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-                          ),
-                        ],
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(colors: stateColors),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(style.emoji, style: const TextStyle(fontSize: 32)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pending.state.trim().isEmpty ? 'Helper reward' : pending.state.trim(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.6),
+                            ),
+                            Text(
+                              pending.fullName,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
+                            ),
+                            Text(
+                              '3 first-helps in a row',
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
-                  ],
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Money card',
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 ),
                 const SizedBox(height: 10),
                 _infoChip(isDark, 'Name', pending.fullName),
@@ -154,13 +383,13 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                   ),
                 ),
                 const SizedBox(height: 12),
-                Text('REDEEM AT NGMY STORE', style: TextStyle(fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
+                Text('NGMY STORE', style: TextStyle(fontSize: 10, letterSpacing: 1.4, fontWeight: FontWeight.w900, color: isDark ? Colors.white54 : Colors.black45)),
                 const SizedBox(height: 6),
                 Text(
-                  'This sends a money card with a QR. Pick the one NGMY store that can scan it. Other stores cannot redeem it.',
+                  'Choose the store name that will scan the QR. Only that store can redeem this card (not individual items).',
                   style: TextStyle(fontSize: 11, height: 1.35, color: isDark ? Colors.white60 : Colors.black54),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 if (storeOptions.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -170,44 +399,67 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
                       border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
                     ),
                     child: const Text(
-                      'No store listings with an address yet. Ask a store seller to publish a listing with their location, then come back.',
+                      'No NGMY stores on file yet. A store seller must have a seller account with listings, then come back.',
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                   )
                 else
-                  ...storeOptions.map((opt) {
-                    final selected = selectedListingId == opt['id'];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Material(
-                        color: selected ? style.accent.withValues(alpha: 0.14) : (isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC)),
-                        borderRadius: BorderRadius.circular(12),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(12),
-                          onTap: () => setST(() => selectedListingId = opt['id'] as String),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Row(
-                              children: [
-                                Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off, color: style.accent),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: storeOptions.map((opt) {
+                      final selected = selectedListingId == opt['id'];
+                      return SizedBox(
+                        width: (MediaQuery.of(ctx).size.width - 56) / 2,
+                        child: Material(
+                          color: selected ? stateColors.first.withValues(alpha: 0.12) : (isDark ? Colors.white.withValues(alpha: 0.04) : const Color(0xFFF8FAFC)),
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => setST(() => selectedListingId = opt['id'] as String),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: selected ? stateColors.first : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                                  width: selected ? 2 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Text(opt['title'] as String, style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                                      Text(opt['address'] as String, style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
-                                      Text(opt['sellerName'] as String, style: TextStyle(fontSize: 10, color: isDark ? Colors.white38 : Colors.black38)),
+                                      Icon(Icons.storefront_rounded, size: 20, color: selected ? stateColors.first : (isDark ? Colors.white54 : Colors.black45)),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          opt['title'] as String,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                  if ((opt['address'] as String).isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      opt['address'] as String,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontSize: 10, color: isDark ? Colors.white54 : Colors.black54),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    );
-                  }),
+                      );
+                    }).toList(),
+                  ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: storeOptions.isEmpty

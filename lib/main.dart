@@ -53,6 +53,7 @@ import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_civic_helper_gifts.dart';
+import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
 import 'ngmy_translate_payments.dart';
 import 'ngmy_game_nav.dart';
@@ -16513,6 +16514,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         unawaited(ngmyCheckMedicineRemindersNow(userEmail: widget.user.email));
         unawaited(ngmyCheckCashierRemindersNow(userEmail: widget.user.email));
         unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email));
+        unawaited(_checkAdminHelperGiftPopups());
       }
       if (_idx == 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -16759,6 +16761,44 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ngmyTakePendingCivicSelfEnrollmentOpen();
   }
 
+  bool get _isSessionAdmin => widget.user.isAdmin || ngmyEmailIsAdmin(widget.user.email);
+
+  Future<NgmyHelperGift?> _grantHelperGiftPending(
+    NgmyHelperGiftPending pending, {
+    required String giftName,
+    required double amount,
+    required String styleId,
+    required String storeAddress,
+    required String storeSellerEmail,
+    required String storeSellerName,
+    required String storeListingId,
+  }) {
+    return NgmyCivicHelperGifts.grantGift(
+      config: widget.config,
+      pending: pending,
+      giftName: giftName,
+      amount: amount,
+      styleId: styleId,
+      storeAddress: storeAddress,
+      storeSellerEmail: storeSellerEmail,
+      storeSellerName: storeSellerName,
+      storeListingId: storeListingId,
+      grantedBy: widget.user.email,
+    );
+  }
+
+  Future<void> _checkAdminHelperGiftPopups() async {
+    if (!_isSessionAdmin) return;
+    await ngmyCheckAdminHelperGiftPopupsNow(
+      context: context,
+      config: widget.config,
+      adminEmail: widget.user.email,
+      storeListings: widget.config.storeListings,
+      onDataChanged: widget.onDataChanged,
+      onGrant: _grantHelperGiftPending,
+    );
+  }
+
   void _onAdminLiveRefresh() {
     if (!mounted) return;
     final mountedAt = _mainShellMountedAt;
@@ -16831,6 +16871,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     ngmyStartCashierReminderWatcher(widget.user.email);
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ngmyCheckSwahiliWordRemindersNow(userEmail: widget.user.email)));
     WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(ngmyCheckCashierRemindersNow(userEmail: widget.user.email)));
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_checkAdminHelperGiftPopups()));
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: widget.user.email,
@@ -22262,103 +22303,74 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _notifyAdminHelperGiftPendingOnOpen() async {
-    await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
-    NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(widget.config);
     if (!mounted) return;
-    final open = NgmyCivicHelperGifts.openPending(widget.config);
-    if (open.isEmpty) return;
-    setState(() {});
-    final first = open.first;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          open.length == 1
-              ? '${first.fullName} helped first 3 times in a row — grant a present!'
-              : '${open.length} helpers earned presents — tap Helper Gifts to grant.',
-        ),
-        backgroundColor: const Color(0xFFEC4899),
-        duration: const Duration(seconds: 7),
-        action: SnackBarAction(
-          label: 'Grant',
-          textColor: Colors.white,
-          onPressed: () => unawaited(_openHelperGiftPendingSheet()),
-        ),
+    await ngmyCheckAdminHelperGiftPopupsNow(
+      context: context,
+      config: widget.config,
+      adminEmail: widget.user.email,
+      storeListings: widget.config.storeListings,
+      onDataChanged: () {
+        widget.onDataChanged();
+        if (mounted) setState(() {});
+      },
+      onGrant: (
+        NgmyHelperGiftPending pending, {
+        required String giftName,
+        required double amount,
+        required String styleId,
+        required String storeAddress,
+        required String storeSellerEmail,
+        required String storeSellerName,
+        required String storeListingId,
+      }) =>
+          NgmyCivicHelperGifts.grantGift(
+        config: widget.config,
+        pending: pending,
+        giftName: giftName,
+        amount: amount,
+        styleId: styleId,
+        storeAddress: storeAddress,
+        storeSellerEmail: storeSellerEmail,
+        storeSellerName: storeSellerName,
+        storeListingId: storeListingId,
+        grantedBy: widget.user.email,
       ),
     );
+    if (mounted) setState(() {});
   }
 
   Future<void> _openHelperGiftPendingSheet() async {
-    final open = NgmyCivicHelperGifts.openPending(widget.config);
-    if (open.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No pending helper gifts right now.')));
-      return;
-    }
     if (!mounted) return;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    await showModalBottomSheet<void>(
+    await showNgmyHelperGiftPendingHub(
       context: context,
-      backgroundColor: isDark ? const Color(0xFF0B1220) : Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              Text('Helper presents to grant', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-              const SizedBox(height: 6),
-              Text('These members helped first 3 times in a row.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54)),
-              const SizedBox(height: 12),
-              for (final p in open)
-                Card(
-                  child: ListTile(
-                    leading: const Text('🎁', style: TextStyle(fontSize: 26)),
-                    title: Text(p.fullName, style: const TextStyle(fontWeight: FontWeight.w800)),
-                    subtitle: Text('${p.email}\nID: ${p.registryId.isEmpty ? '—' : p.registryId} · ${p.city} ${p.state}'.trim()),
-                    isThreeLine: true,
-                    trailing: const Icon(Icons.card_giftcard_rounded),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      final gift = await showNgmyHelperGiftGrantSheet(
-                        context: context,
-                        pending: p,
-                        storeListings: widget.config.storeListings,
-                        onGrant: ({
-                          required String giftName,
-                          required double amount,
-                          required String styleId,
-                          required String storeAddress,
-                          required String storeSellerEmail,
-                          required String storeSellerName,
-                          required String storeListingId,
-                        }) async {
-                          return NgmyCivicHelperGifts.grantGift(
-                            config: widget.config,
-                            pending: p,
-                            giftName: giftName,
-                            amount: amount,
-                            styleId: styleId,
-                            storeAddress: storeAddress,
-                            storeSellerEmail: storeSellerEmail,
-                            storeSellerName: storeSellerName,
-                            storeListingId: storeListingId,
-                            grantedBy: widget.user.email,
-                          );
-                        },
-                      );
-                      if (gift != null && mounted) {
-                        widget.onDataChanged();
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Present sent to ${gift.fullName} — \$${gift.amount.toStringAsFixed(2)} at ${gift.storeAddress}')),
-                        );
-                      }
-                    },
-                  ),
-                ),
-            ],
-          ),
-        );
+      config: widget.config,
+      storeListings: widget.config.storeListings,
+      adminEmail: widget.user.email,
+      onGrant: ({
+        required NgmyHelperGiftPending pending,
+        required String giftName,
+        required double amount,
+        required String styleId,
+        required String storeAddress,
+        required String storeSellerEmail,
+        required String storeSellerName,
+        required String storeListingId,
+      }) =>
+          NgmyCivicHelperGifts.grantGift(
+        config: widget.config,
+        pending: pending,
+        giftName: giftName,
+        amount: amount,
+        styleId: styleId,
+        storeAddress: storeAddress,
+        storeSellerEmail: storeSellerEmail,
+        storeSellerName: storeSellerName,
+        storeListingId: storeListingId,
+        grantedBy: widget.user.email,
+      ),
+      onChanged: () {
+        widget.onDataChanged();
+        if (mounted) setState(() {});
       },
     );
   }
