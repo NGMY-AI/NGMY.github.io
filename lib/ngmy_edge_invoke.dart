@@ -96,6 +96,24 @@ const Set<String> kNgmyEdgeStripWhenAuthed = {
   'userEmail',
 };
 
+/// These calls *are* the login. The email in the body is the account being
+/// opened, not a duplicate of the current JWT. An anonymous storage session
+/// still has an access token; stripping the email here made password login
+/// and Help Mode session repair send a hash with no address, so the server
+/// rejected Activate and Deactivate.
+bool ngmyEdgeActionKeepsAccountFields(String action) {
+  switch (action) {
+    case 'verifyPasswordLogin':
+    case 'registerAppUser':
+    case 'passwordResetSendOtp':
+    case 'passwordResetVerifyOtp':
+    case 'passwordResetComplete':
+      return true;
+    default:
+      return false;
+  }
+}
+
 String ngmyEdgeDirectUrl() =>
     '${kNgmySupabaseUrl.trim()}/functions/v1/$kNgmySupabaseAiFunction';
 
@@ -137,16 +155,22 @@ Map<String, dynamic>? _parseEdgeBody(String raw) {
   return null;
 }
 
-Map<String, dynamic> ngmyEdgeWirePayload(Map<String, dynamic> body, {bool anonymous = false}) {
+Map<String, dynamic> ngmyEdgeWirePayload(
+  Map<String, dynamic> body, {
+  bool anonymous = false,
+  String? accessToken,
+}) {
   final out = Map<String, dynamic>.from(body);
   final action = (out.remove('action') ?? 'chat').toString().trim();
   out['a'] = kNgmyEdgeActionToWire[action] ?? action;
-  if (!anonymous) {
-    String token = '';
-    try {
-      token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
-    } catch (_) {
-      token = '';
+  if (!anonymous && !ngmyEdgeActionKeepsAccountFields(action)) {
+    var token = accessToken ?? '';
+    if (accessToken == null) {
+      try {
+        token = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+      } catch (_) {
+        token = '';
+      }
     }
     if (token.isNotEmpty) {
       for (final key in kNgmyEdgeStripWhenAuthed) {

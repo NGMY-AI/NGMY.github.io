@@ -22,10 +22,11 @@ Future<Map<String, dynamic>?> ngmyCivicInvoke(
   Map<String, dynamic> body, {
   bool preferDirect = false,
   bool fallbackOnTimeout = false,
+  Duration? timeout,
 }) async {
   return ngmyEdgeInvoke(
     body,
-    timeout: _kCivicCloudTimeout,
+    timeout: timeout ?? _kCivicCloudTimeout,
     preferDirect: preferDirect,
     fallbackOnTimeout: fallbackOnTimeout,
   );

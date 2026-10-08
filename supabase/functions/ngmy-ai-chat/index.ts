@@ -1300,6 +1300,83 @@ function isClaimSettingsKey(key: string): boolean {
   return prefixes.some((p) => k.startsWith(p));
 }
 
+const CIVIC_HELP_MODE_SAFE_BYTES = 120000;
+
+/** Drop a receipt mirror that is large enough to make the campaign save fail. */
+function slimCivicHelpModeDocument(value: Record<string, unknown>): Record<string, unknown> {
+  const copy: Record<string, unknown> = { ...value };
+  delete copy.helpCampaignSpendings;
+  const receipts = copy.contributionReceipts;
+  if (!Array.isArray(receipts) || receipts.length === 0) return copy;
+  try {
+    if (JSON.stringify(copy).length <= CIVIC_HELP_MODE_SAFE_BYTES) return copy;
+  } catch {
+    // Fall through and keep the campaign without the mirror.
+  }
+  delete copy.contributionReceipts;
+  return copy;
+}
+
+function mergeCivicHelpModeSave(
+  current: Record<string, unknown>,
+  incoming: Record<string, unknown>,
+): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = { ...incoming };
+  delete cleaned.helpCampaignSpendings;
+  delete cleaned.contributionReceipts;
+  const incomingByState =
+    cleaned.helpModeByState && typeof cleaned.helpModeByState === "object"
+      ? (cleaned.helpModeByState as Record<string, unknown>)
+      : {};
+  const existingByState =
+    current.helpModeByState && typeof current.helpModeByState === "object"
+      ? (current.helpModeByState as Record<string, unknown>)
+      : {};
+  const mergedByState: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(existingByState)) {
+    const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+    if (ck) mergedByState[ck] = v;
+  }
+  for (const [k, v] of Object.entries(incomingByState)) {
+    const ck = canonicalStateKey(k) || k.trim().toLowerCase();
+    if (ck) mergedByState[ck] = v;
+  }
+  cleaned.helpModeByState = mergedByState;
+  if (Array.isArray(cleaned.helpCampaignClosures) && Array.isArray(current.helpCampaignClosures)) {
+    const seen = new Set<string>();
+    const closures: unknown[] = [];
+    for (const row of [
+      ...(current.helpCampaignClosures as unknown[]),
+      ...(cleaned.helpCampaignClosures as unknown[]),
+    ]) {
+      if (!row || typeof row !== "object") continue;
+      const id = String((row as Record<string, unknown>).campaignId ?? "").trim();
+      const key = id || JSON.stringify(row);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      closures.push(row);
+    }
+    cleaned.helpCampaignClosures = closures;
+  }
+  const existingReceipts = Array.isArray(current.contributionReceipts)
+    ? current.contributionReceipts
+    : [];
+  if (existingReceipts.length === 0) return cleaned;
+  return slimCivicHelpModeDocument({ ...cleaned, contributionReceipts: existingReceipts });
+}
+
+function slimCivicHelpModeRow(row: unknown): unknown {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+  const record = row as Record<string, unknown>;
+  if (!record.value || typeof record.value !== "object" || Array.isArray(record.value)) {
+    return row;
+  }
+  return {
+    ...record,
+    value: slimCivicHelpModeDocument(record.value as Record<string, unknown>),
+  };
+}
+
 function relayClientFor(req: Request) {
   const url = Deno.env.get("SUPABASE_URL") ?? "";
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
@@ -1329,12 +1406,29 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
 
   // Claim tokens / transfer vaults are locked from public REST listing. The
   // caller already named one key, so service role can fetch that row only.
-  const client =
+  let client =
     table === "ngmy_settings" && settingsRealKey && isClaimSettingsKey(settingsRealKey)
       ? (adminClient() ?? caller)
       : caller;
 
   const op = String(body.op ?? "s");
+
+  // Help mode on/off must be readable by every member and writable by the
+  // registrar even when ngmy_settings RLS hides civic_help_mode_settings.
+  // An anonymous storage JWT has no email, so the user-scoped client sees
+  // zero rows and Activate/Deactivate looks like a failed cloud sync.
+  if (table === "ngmy_settings" && settingsRealKey === "civic_help_mode_settings") {
+    const admin = adminClient();
+    if (op === "s") {
+      if (admin) client = admin;
+    } else if (op === "up" || op === "i" || op === "u") {
+      const email = await requireJwtEmail(req);
+      if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+      const role = await resolveCivicRole(admin, email);
+      if (!role.isAdmin && !role.isRegistrar) return jsonOk({ error: "Not allowed" }, 403);
+      client = admin;
+    }
+  }
 
   const inFilter = body.in as Record<string, unknown[]> | undefined;
   const DB_RELAY_DEFAULT_LIMIT = 200;
@@ -1374,9 +1468,14 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     }
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
+    const redact = (row: unknown) => {
+      const redacted = redactSettingsRow(settingsRealKey, row);
+      if (settingsRealKey !== "civic_help_mode_settings") return redacted;
+      return slimCivicHelpModeRow(redacted);
+    };
     const data = Array.isArray(result.data)
-      ? result.data.map((r) => redactSettingsRow(settingsRealKey, r))
-      : redactSettingsRow(settingsRealKey, result.data);
+      ? result.data.map((r) => redact(r))
+      : redact(result.data);
     return jsonOk({ ok: true, data });
   }
 
@@ -1391,6 +1490,19 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     }
     if (table === "ngmy_settings" && eq["key"]) {
       for (const r of rows) r["key"] = eq["key"];
+    }
+    if (settingsRealKey === "civic_help_mode_settings") {
+      const admin = adminClient();
+      if (admin) {
+        const current = await loadSettingsObject(admin, "civic_help_mode_settings");
+        for (const r of rows) {
+          const incoming = r["value"];
+          const doc = incoming && typeof incoming === "object" && !Array.isArray(incoming)
+            ? (incoming as Record<string, unknown>)
+            : {};
+          r["value"] = mergeCivicHelpModeSave(current, doc);
+        }
+      }
     }
     const onConflict = body.onConflict ? String(body.onConflict) : undefined;
     const { error } =
@@ -5296,67 +5408,14 @@ async function handleCivicAdminSettingsPersist(
     const payload = (body.payload && typeof body.payload === "object")
       ? (body.payload as Record<string, unknown>)
       : {};
-    const cleaned = { ...payload };
-    delete cleaned.helpCampaignSpendings;
     const current = await loadSettingsObject(admin, CIVIC_HELP_MODE_KEY);
-    const incomingByState =
-      cleaned.helpModeByState && typeof cleaned.helpModeByState === "object"
-        ? (cleaned.helpModeByState as Record<string, unknown>)
-        : {};
-    const existingByState =
-      current.helpModeByState && typeof current.helpModeByState === "object"
-        ? (current.helpModeByState as Record<string, unknown>)
-        : {};
-    const mergedByState: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(existingByState)) {
-      const ck = canonicalStateKey(k) || k.trim().toLowerCase();
-      if (ck) mergedByState[ck] = v;
+    const merged = mergeCivicHelpModeSave(current, payload);
+    let saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, merged);
+    if (!saved.ok && merged.contributionReceipts) {
+      const withoutReceipts = { ...merged };
+      delete withoutReceipts.contributionReceipts;
+      saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, withoutReceipts);
     }
-    for (const [k, v] of Object.entries(incomingByState)) {
-      const ck = canonicalStateKey(k) || k.trim().toLowerCase();
-      if (ck) mergedByState[ck] = v;
-    }
-    cleaned.helpModeByState = mergedByState;
-    const incomingReceipts = Array.isArray(cleaned.contributionReceipts)
-      ? (cleaned.contributionReceipts as unknown[])
-      : [];
-    const existingReceipts = Array.isArray(current.contributionReceipts)
-      ? (current.contributionReceipts as unknown[])
-      : [];
-    if (incomingReceipts.length > 0 || existingReceipts.length > 0) {
-      const byId = new Map<string, Record<string, unknown>>();
-      const take = (row: unknown) => {
-        if (!row || typeof row !== "object" || Array.isArray(row)) return;
-        const rec = row as Record<string, unknown>;
-        const id = String(rec.id ?? "").trim();
-        if (!id) return;
-        const prev = byId.get(id);
-        const amt = Number(rec.amount ?? 0);
-        const prevAmt = prev ? Number(prev.amount ?? 0) : -1;
-        if (!prev || amt >= prevAmt) byId.set(id, rec);
-      };
-      for (const row of existingReceipts) take(row);
-      for (const row of incomingReceipts) take(row);
-      const mergedReceipts = [...byId.values()];
-      mergedReceipts.sort((a, b) =>
-        String(b.timestamp ?? "").localeCompare(String(a.timestamp ?? ""))
-      );
-      cleaned.contributionReceipts = mergedReceipts.slice(0, 1000);
-    }
-    if (Array.isArray(cleaned.helpCampaignClosures) && Array.isArray(current.helpCampaignClosures)) {
-      const seen = new Set<string>();
-      const closures: unknown[] = [];
-      for (const row of [...(current.helpCampaignClosures as unknown[]), ...(cleaned.helpCampaignClosures as unknown[])]) {
-        if (!row || typeof row !== "object") continue;
-        const id = String((row as Record<string, unknown>).campaignId ?? "").trim();
-        const key = id || JSON.stringify(row);
-        if (seen.has(key)) continue;
-        seen.add(key);
-        closures.push(row);
-      }
-      cleaned.helpCampaignClosures = closures;
-    }
-    const saved = await saveSettingsObject(admin, CIVIC_HELP_MODE_KEY, cleaned);
     if (!saved.ok) return jsonOk({ error: saved.error ?? "Save failed" }, 500);
     return jsonOk({ ok: true });
   }

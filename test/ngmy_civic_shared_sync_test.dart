@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/main.dart';
 import 'package:ngmy/ngmy_ai_client.dart';
 import 'package:ngmy/ngmy_civic_state_wallet.dart';
+import 'package:ngmy/ngmy_edge_invoke.dart';
 
 void main() {
   test('shared contribution merge keeps more than the former 400-row cap', () {
@@ -509,6 +510,48 @@ void main() {
     );
     expect(payload['helpState'], 'Alabama');
     expect(payload['contributionReceipts'], hasLength(1));
+  });
+
+  test('help mode toggle payload never carries receipts', () {
+    final payload = ngmyHelpModeToggleCloudPayload({
+      'helpModeByState': {
+        'alabama': {'active': true, 'purpose': 'MJENGO WA KANISA', 'cashApp': 'NGMYpay'},
+      },
+      'contributionReceipts': [
+        {'id': 'contrib-1', 'amount': 20, 'sourceDetails': 'x' * 5000},
+      ],
+      'helpCampaignSpendings': [
+        {'id': 'spend-1'},
+      ],
+    });
+    expect(payload.containsKey('contributionReceipts'), isFalse);
+    expect(payload.containsKey('helpCampaignSpendings'), isFalse);
+    expect((payload['helpModeByState'] as Map)['alabama'], isNotNull);
+  });
+
+  test('login keeps the account email even when a storage token exists', () {
+    final wire = ngmyEdgeWirePayload(
+      {
+        'action': 'verifyPasswordLogin',
+        'email': 'registrar@gmail.com',
+        'passwordHash': 'abc123',
+      },
+      accessToken: 'anonymous-storage-jwt',
+    );
+    expect(wire['a'], 'a3');
+    expect(wire['email'], 'registrar@gmail.com');
+    expect(wire['passwordHash'], 'abc123');
+
+    final settings = ngmyEdgeWirePayload(
+      {
+        'action': 'civicAdminSettingsPersist',
+        'email': 'registrar@gmail.com',
+        'kind': 'civicHelpModeSettings',
+      },
+      accessToken: 'real-user-jwt',
+    );
+    expect(settings.containsKey('email'), isFalse);
+    expect(settings['kind'], 'civicHelpModeSettings');
   });
 
   test('session repair only retries on auth failures', () {

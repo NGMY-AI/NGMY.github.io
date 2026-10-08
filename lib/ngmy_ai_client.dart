@@ -743,11 +743,17 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswor
   required String email,
   required String passwordHash,
 }) async {
-  final data = await _ngmyInvokeBrightHandler({
-    'action': 'verifyPasswordLogin',
-    'email': email.trim().toLowerCase(),
-    'passwordHash': passwordHash.trim(),
-  });
+  // Anonymous on purpose. A storage session has a JWT with no email; sending
+  // that token caused the client to drop the email and the server to reject
+  // the login, so Help Mode never got a session that can write the database.
+  final data = await ngmyEdgeInvoke(
+    {
+      'action': 'verifyPasswordLogin',
+      'email': email.trim().toLowerCase(),
+      'passwordHash': passwordHash.trim(),
+    },
+    anonymous: true,
+  );
   if (data == null) {
     return (ok: false, error: 'Could not reach login server.', user: null);
   }
@@ -774,13 +780,16 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyRegisterAppUs
   String username = '',
   String phone = '',
 }) async {
-  final data = await _ngmyInvokeBrightHandler({
-    'action': 'registerAppUser',
-    'email': email.trim().toLowerCase(),
-    'passwordHash': passwordHash.trim(),
-    'username': username.trim(),
-    'phone': phone.trim(),
-  });
+  final data = await ngmyEdgeInvoke(
+    {
+      'action': 'registerAppUser',
+      'email': email.trim().toLowerCase(),
+      'passwordHash': passwordHash.trim(),
+      'username': username.trim(),
+      'phone': phone.trim(),
+    },
+    anonymous: true,
+  );
   if (data == null) {
     return (ok: false, error: 'Could not reach signup server.', user: null);
   }

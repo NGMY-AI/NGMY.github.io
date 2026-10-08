@@ -102,6 +102,7 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   bool roomsExact = false,
   bool preferDirect = false,
   bool fallbackOnTimeout = false,
+  Duration? timeout,
   void Function(String error)? onError,
 }) async {
   final body = <String, dynamic>{
@@ -120,6 +121,7 @@ Future<bool> ngmyCivicAdminSettingsPersist({
     body,
     preferDirect: preferDirect,
     fallbackOnTimeout: fallbackOnTimeout,
+    timeout: timeout,
   );
   if (data != null && data['ok'] == true) return true;
   final error = (data?['error'] ?? 'no response').toString();
