@@ -25,6 +25,7 @@ import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_ai_client.dart';
+import 'ngmy_edge_invoke.dart' show ngmyEdgeLastTransportNote;
 import 'ngmy_civic_help_mode_storage.dart';
 import 'ngmy_elevenlabs_tts.dart';
 import 'ngmy_resend_email.dart';
@@ -31949,6 +31950,57 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
+  /// Green bar on success. On failure the orange bar names the cause and
+  /// offers Details (full report, Copy, Retry) instead of a bare
+  /// "cloud sync failed" that gave no way to tell what went wrong.
+  void _showCivicHelpModeSyncResult({
+    required bool cloudSaved,
+    required bool activated,
+  }) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    if (cloudSaved) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          activated
+              ? 'Help mode activated for everyone in $_selectedState.'
+              : 'Help mode deactivated for everyone in $_selectedState.',
+        ),
+        backgroundColor: Colors.green,
+      ));
+      return;
+    }
+    messenger.showSnackBar(SnackBar(
+      content: Text(ngmyCivicHelpModeSyncFailureMessage(activated: activated)),
+      backgroundColor: Colors.orange,
+      duration: const Duration(seconds: 12),
+      action: SnackBarAction(
+        label: 'Details',
+        textColor: Colors.black,
+        onPressed: () => _openCivicHelpModeSyncDetails(activated: activated),
+      ),
+    ));
+  }
+
+  Future<void> _openCivicHelpModeSyncDetails({required bool activated}) async {
+    if (!mounted) return;
+    final state = _selectedState;
+    await showNgmyCivicHelpModeSyncDetails(
+      context,
+      onRetry: () async {
+        final ok = await ngmyPersistCivicHelpModeSettings(widget.config);
+        if (ok) {
+          await _broadcastCivicHelpModeChanged(state);
+          if (mounted) {
+            _showCivicHelpModeSyncResult(cloudSaved: true, activated: activated);
+          }
+        }
+        return ok;
+      },
+    );
+  }
+
   Future<void> _maybeShowHelperGiftsInbox() async {
     await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
     if (!mounted) return;
@@ -38040,17 +38092,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     await _broadcastCivicHelpModeChanged(_selectedState);
                                   }
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          cloudSaved
-                                              ? 'Help mode deactivated for everyone in $_selectedState.'
-                                              : 'Help mode is off here, but cloud sync failed. Reconnect and deactivate again.',
-                                        ),
-                                        backgroundColor: cloudSaved
-                                            ? Colors.green
-                                            : Colors.orange,
-                                      ));
+                                    _showCivicHelpModeSyncResult(
+                                      cloudSaved: cloudSaved,
+                                      activated: false,
+                                    );
                                 }
                                 },
                                 style: OutlinedButton.styleFrom(
@@ -38146,18 +38191,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   await _broadcastCivicHelpModeChanged(_selectedState);
                                 }
                                 if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        cloudSaved
-                                            ? 'Help mode activated for everyone in $_selectedState.'
-                                            : 'Help mode is on here, but cloud sync failed. Reconnect and activate again.',
-                                      ),
-                                      backgroundColor: cloudSaved
-                                          ? Colors.green
-                                          : Colors.orange,
-                                    ));
-                              }
+                                  _showCivicHelpModeSyncResult(
+                                    cloudSaved: cloudSaved,
+                                    activated: true,
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF4F46E5),

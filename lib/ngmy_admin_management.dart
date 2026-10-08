@@ -1839,6 +1839,225 @@ Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
   }
 }
 
+/// Why the last Help Mode cloud save failed, in words a registrar can act on.
+enum NgmyCivicHelpModeSyncFailure {
+  none,
+  noSession,
+  notAllowed,
+  rateLimited,
+  timeout,
+  serverError,
+  unreachable,
+}
+
+/// Everything the last Help Mode save attempt learned, kept for the orange
+/// bar and its Details dialog. The old bar said only "cloud sync failed",
+/// which hid whether the device had no session, the server refused the
+/// account, or the request never arrived.
+class NgmyCivicHelpModeSyncReport {
+  NgmyCivicHelpModeSyncReport({
+    required this.ok,
+    required this.failure,
+    required this.reason,
+    required this.advice,
+    required this.lines,
+    required this.at,
+  });
+
+  final bool ok;
+  final NgmyCivicHelpModeSyncFailure failure;
+  /// One sentence for the snackbar.
+  final String reason;
+  /// What the registrar should do next.
+  final String advice;
+  /// Step-by-step log for the Details dialog.
+  final List<String> lines;
+  final DateTime at;
+
+  String get text => [
+        'NGMY Help Mode cloud sync report',
+        'Time: ${at.toLocal()}',
+        'Result: ${ok ? 'saved to cloud' : 'NOT saved — $reason'}',
+        if (!ok && advice.isNotEmpty) 'Next step: $advice',
+        '',
+        ...lines,
+      ].join('\n');
+}
+
+NgmyCivicHelpModeSyncReport? ngmyLastCivicHelpModeSyncReport;
+
+NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
+  final e = error.toLowerCase().trim();
+  if (e.isEmpty || e == 'no response' || e.contains('could not reach')) {
+    return NgmyCivicHelpModeSyncFailure.unreachable;
+  }
+  if (e.contains('too many') || e.contains('rate limit') || e.contains('429')) {
+    return NgmyCivicHelpModeSyncFailure.rateLimited;
+  }
+  if (e.contains('timed out') || e.contains('timeout')) {
+    return NgmyCivicHelpModeSyncFailure.timeout;
+  }
+  if (e.contains('not allowed') || e.contains('forbidden') || e.contains('row-level security')) {
+    return NgmyCivicHelpModeSyncFailure.notAllowed;
+  }
+  if (ngmyCloudErrorNeedsSessionRepair(error)) {
+    return NgmyCivicHelpModeSyncFailure.noSession;
+  }
+  return NgmyCivicHelpModeSyncFailure.serverError;
+}
+
+({String reason, String advice}) _civicHelpModeSyncExplanation(
+  NgmyCivicHelpModeSyncFailure failure,
+  String lastError,
+) {
+  final account = ngmyMaskEmailForReport(ngmyCurrentAuthEmail());
+  switch (failure) {
+    case NgmyCivicHelpModeSyncFailure.noSession:
+      return (
+        reason: 'this device has no cloud sign-in for your account',
+        advice: 'Sign out of NGMY, sign back in with your email and password, then tap Activate / Deactivate once more. '
+            'Details shows what the login server answered.',
+      );
+    case NgmyCivicHelpModeSyncFailure.notAllowed:
+      return (
+        reason: 'the server does not list $account as an Authorized Registrar or admin',
+        advice: 'Your registrar approval must exist on the server, not only on this phone. '
+            'Ask the King/Admin to re-approve your registrar request, or sign in with the approved account.',
+      );
+    case NgmyCivicHelpModeSyncFailure.rateLimited:
+      return (
+        reason: 'the server is rate-limiting sign-ins from this device',
+        advice: 'Wait 15 minutes without retrying, then tap again once.',
+      );
+    case NgmyCivicHelpModeSyncFailure.timeout:
+      return (
+        reason: 'the server did not answer in time',
+        advice: 'Check the connection and tap Retry in Details.',
+      );
+    case NgmyCivicHelpModeSyncFailure.unreachable:
+      return (
+        reason: 'the server could not be reached',
+        advice: 'Check Wi-Fi or data and tap Retry in Details.',
+      );
+    case NgmyCivicHelpModeSyncFailure.serverError:
+      return (
+        reason: 'the server rejected the save: ${lastError.isEmpty ? 'unknown error' : lastError}',
+        advice: 'Tap Retry in Details. If it repeats, send this report to support.',
+      );
+    case NgmyCivicHelpModeSyncFailure.none:
+      return (reason: '', advice: '');
+  }
+}
+
+/// Details dialog behind the orange bar: the full report, Copy, and Retry.
+Future<void> showNgmyCivicHelpModeSyncDetails(
+  BuildContext context, {
+  required Future<bool> Function() onRetry,
+}) async {
+  var retrying = false;
+  await showDialog<void>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) {
+        final report = ngmyLastCivicHelpModeSyncReport;
+        final text = report?.text ?? 'No Help Mode cloud save has run yet.';
+        return AlertDialog(
+          backgroundColor: const Color(0xFF14141C),
+          title: Row(
+            children: [
+              Icon(
+                report?.ok == true ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+                color: report?.ok == true ? Colors.greenAccent : Colors.orangeAccent,
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Help Mode cloud sync', style: TextStyle(color: Colors.white, fontSize: 17)),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (report != null && !report.ok) ...[
+                    Text(
+                      'Not saved to cloud: ${report.reason}.',
+                      style: const TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(report.advice, style: const TextStyle(color: Colors.white70, height: 1.3)),
+                    const SizedBox(height: 12),
+                  ],
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: SelectableText(
+                      text,
+                      style: const TextStyle(color: Colors.white70, fontSize: 11.5, fontFamily: 'monospace', height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: text));
+                if (ctx.mounted) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Report copied. Paste it to support.')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy_rounded, size: 16),
+              label: const Text('Copy'),
+            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ElevatedButton.icon(
+              onPressed: retrying
+                  ? null
+                  : () async {
+                      setDialogState(() => retrying = true);
+                      final ok = await onRetry();
+                      if (!ctx.mounted) return;
+                      setDialogState(() => retrying = false);
+                      if (ok) Navigator.pop(ctx);
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+              ),
+              icon: retrying
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(retrying ? 'Saving…' : 'Retry'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+/// Snackbar text for a failed Activate / Deactivate that names the cause.
+String ngmyCivicHelpModeSyncFailureMessage({required bool activated}) {
+  final report = ngmyLastCivicHelpModeSyncReport;
+  final verb = activated ? 'on' : 'off';
+  final again = activated ? 'activate' : 'deactivate';
+  if (report == null || report.ok) {
+    return 'Help mode is $verb here, but cloud sync failed. Reconnect and $again again.';
+  }
+  return 'Help mode is $verb here only — not saved to cloud: ${report.reason}. Tap Details.';
+}
+
 Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   // Marks "just mutated locally" so a concurrent/lagging remote fetch
   // (the 75s help-mode poll, or another device's stale read) defers
@@ -1846,10 +2065,20 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   // instead of silently reverting this activate/deactivate/save/spend.
   // See _applyCivicHelpModeSettingsPayload.
   ngmyAdminConfigMutationAt = DateTime.now();
+  final startedAt = DateTime.now();
+  final log = <String>[];
+  void note(String line) {
+    log.add(line);
+    debugPrint('[civic help mode sync] $line');
+  }
+
   await _persistCivicHelpModeSettingsLocal(config);
   await _persistCivicHelpCampaignSpendingsLocal(config);
   NgmyAdminLiveRefresh.notify();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
+  note('Saved on this device.');
+  note('App account: ${ngmyMaskEmailForReport(ngmyRememberedLoginEmail())}');
+  note('Before save: ${ngmySessionStateForReport()}');
   var helpModeCloudOk = false;
   // The app can look signed in from the on-device user cache while Supabase
   // has no email JWT (local password match, or an anonymous storage sign-in).
@@ -1857,7 +2086,15 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   // is the orange "cloud sync failed" bar. Force a fresh login only when
   // this device has no email session — a matching session is reused, and a
   // failed repair from the 30s poll must not block this toggle.
-  await ngmyEnsurePrivilegedCloudSession(force: ngmyCurrentAuthEmail().isEmpty);
+  var repairedThisCall = false;
+  if (ngmyCurrentAuthEmail().isEmpty) {
+    repairedThisCall = true;
+    final repaired = await ngmyEnsurePrivilegedCloudSession(force: true);
+    note('Session repair: ${repaired ? 'ok' : 'failed'} — $ngmyLastSessionRepairNote');
+    note('After repair: ${ngmySessionStateForReport()}');
+  } else {
+    await ngmyEnsurePrivilegedCloudSession();
+  }
   var lastError = '';
   final email = ngmyCurrentAuthEmail();
   // Campaign state only. Receipt mirrors are not loaded or attached here:
@@ -1868,10 +2105,17 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   // REST probe that often fails on the web app while /api/sync still works.
   // Gating on it made Activate and Deactivate report "cloud sync failed"
   // without ever saving, so other phones never saw the campaign or its money.
+  var failure = NgmyCivicHelpModeSyncFailure.none;
   for (var attempt = 0; attempt < 3 && !helpModeCloudOk; attempt++) {
     if (attempt > 0 &&
+        !repairedThisCall &&
         (ngmyCurrentAuthEmail().isEmpty || ngmyCloudErrorNeedsSessionRepair(lastError))) {
-      await ngmyEnsurePrivilegedCloudSession(force: true);
+      // One forced login per save. Each forced login is a password check on
+      // the server (10 per 15 minutes); three per tap used that up fast.
+      repairedThisCall = true;
+      final repaired = await ngmyEnsurePrivilegedCloudSession(force: true);
+      note('Session repair: ${repaired ? 'ok' : 'failed'} — $ngmyLastSessionRepairNote');
+      note('After repair: ${ngmySessionStateForReport()}');
     }
     final preferDirect = attempt > 0;
     // Edge save merges every state's campaign. Keep the wait short so a
@@ -1883,26 +2127,58 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
       payload: payload,
       preferDirect: preferDirect,
       fallbackOnTimeout: true,
-      timeout: const Duration(seconds: 8),
+      timeout: const Duration(seconds: 12),
       onError: (error) => lastError = error,
     );
-    if (!helpModeCloudOk) {
-      try {
-        helpModeCloudOk = await ngmyDbRelaySettingsUpsert(
-          _kNgmyCivicHelpModeSettingsKey,
-          payload,
-          preferDirect: preferDirect,
-          fallbackOnTimeout: true,
-        );
-      } catch (e) {
-        lastError = e.toString();
-        debugPrint('[civic help mode] shared relay save: $e');
+    note('Attempt ${attempt + 1} registrar save: ${helpModeCloudOk ? 'OK' : 'failed — $lastError'}'
+        ' [${ngmyEdgeLastTransportNote}]');
+    if (helpModeCloudOk) break;
+    failure = ngmyClassifyCivicHelpModeSyncError(lastError);
+    if (failure == NgmyCivicHelpModeSyncFailure.notAllowed) {
+      // A definite "this account may not do that" does not change on retry,
+      // and the direct settings write below is refused for the same account.
+      note('Server refused this account; not retrying.');
+      break;
+    }
+    try {
+      helpModeCloudOk = await ngmyDbRelaySettingsUpsert(
+        _kNgmyCivicHelpModeSettingsKey,
+        payload,
+        preferDirect: preferDirect,
+        fallbackOnTimeout: true,
+      );
+      note('Attempt ${attempt + 1} direct settings write: OK');
+    } catch (e) {
+      final relayError = e.toString();
+      note('Attempt ${attempt + 1} direct settings write: failed — $relayError [${ngmyEdgeLastTransportNote}]');
+      debugPrint('[civic help mode] shared relay save: $e');
+      // Keep the registrar-save error for classification unless the relay
+      // gave a more specific one; its RLS refusal is expected on servers
+      // that only accept registrar writes through the Edge handler.
+      if (ngmyClassifyCivicHelpModeSyncError(relayError) == NgmyCivicHelpModeSyncFailure.noSession) {
+        lastError = relayError;
+        failure = NgmyCivicHelpModeSyncFailure.noSession;
       }
     }
     if (!helpModeCloudOk && attempt < 2) {
       await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
     }
   }
+  if (helpModeCloudOk) {
+    failure = NgmyCivicHelpModeSyncFailure.none;
+  } else if (failure == NgmyCivicHelpModeSyncFailure.none) {
+    failure = ngmyClassifyCivicHelpModeSyncError(lastError);
+  }
+  final explanation = _civicHelpModeSyncExplanation(failure, lastError);
+  note('Total time: ${DateTime.now().difference(startedAt).inMilliseconds}ms');
+  ngmyLastCivicHelpModeSyncReport = NgmyCivicHelpModeSyncReport(
+    ok: helpModeCloudOk,
+    failure: failure,
+    reason: explanation.reason,
+    advice: explanation.advice,
+    lines: List<String>.unmodifiable(log),
+    at: DateTime.now(),
+  );
   final signedInEmail = ngmyCurrentAuthEmail();
   if (signedInEmail.isNotEmpty) {
     var spendOk = false;

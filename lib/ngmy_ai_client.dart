@@ -739,7 +739,8 @@ Future<bool> ngmyPersistAiApiKeyViaServer({
 
 /// Password login without downloading passwordHash to the browser.
 /// On success, establishes a real Supabase Auth session (required for RLS).
-Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswordLoginViaServer({
+Future<({bool ok, String? error, Map<String, dynamic>? user, String sessionError})>
+    ngmyVerifyPasswordLoginViaServer({
   required String email,
   required String passwordHash,
 }) async {
@@ -755,21 +756,28 @@ Future<({bool ok, String? error, Map<String, dynamic>? user})> ngmyVerifyPasswor
     anonymous: true,
   );
   if (data == null) {
-    return (ok: false, error: 'Could not reach login server.', user: null);
+    return (ok: false, error: 'Could not reach login server.', user: null, sessionError: '');
   }
   if (data['ok'] == true) {
     await ngmyApplyAuthSessionFromServer(data['session']);
     final user = data['user'];
+    // Newer servers explain why the password matched but no session was
+    // minted; older ones just send session: null.
+    final sessionError = (data['sessionError'] ?? '').toString().trim();
     return (
       ok: true,
       error: null,
       user: user is Map ? Map<String, dynamic>.from(user) : null,
+      sessionError: data['session'] is Map
+          ? sessionError
+          : (sessionError.isEmpty ? 'login response contained no session' : sessionError),
     );
   }
   return (
     ok: false,
     error: data['error']?.toString() ?? 'Login failed',
     user: null,
+    sessionError: '',
   );
 }
 
@@ -821,6 +829,58 @@ String _ngmyRememberedLoginEmail = '';
 String _ngmyRememberedLoginHash = '';
 DateTime? _ngmySessionRepairAt;
 bool _ngmySessionRepairOk = false;
+int _ngmySessionRepairFailures = 0;
+
+/// What the last session repair actually did, in plain words. Shown by the
+/// Help Mode sync report so "cloud sync failed" names the real cause
+/// (no saved password, login server rejected the password, login accepted
+/// but no session came back, rate limited, ...).
+String ngmyLastSessionRepairNote = '';
+DateTime? ngmyLastSessionRepairAt;
+
+/// Backoff for automatic (non-forced) repairs. The server allows 10 password
+/// checks per 15 minutes per account; a 30s poll that kept retrying a repair
+/// that cannot succeed used that allowance up, and then the registrar's own
+/// Activate tap was rate limited as well.
+Duration _ngmySessionRepairBackoff() {
+  if (_ngmySessionRepairFailures <= 0) return const Duration(seconds: 20);
+  if (_ngmySessionRepairFailures == 1) return const Duration(minutes: 1);
+  if (_ngmySessionRepairFailures == 2) return const Duration(minutes: 3);
+  return const Duration(minutes: 10);
+}
+
+/// The account this device believes is signed in (from the login cache).
+String ngmyRememberedLoginEmail() => _ngmyRememberedLoginEmail;
+
+/// Masked email for on-screen reports: `n***@gmail.com`.
+String ngmyMaskEmailForReport(String email) {
+  final e = email.trim().toLowerCase();
+  if (e.isEmpty) return '(none)';
+  final at = e.indexOf('@');
+  if (at <= 0) return '***';
+  return '${e.substring(0, 1)}***${e.substring(at)}';
+}
+
+/// Snapshot of the device's Supabase session for the sync report.
+String ngmySessionStateForReport() {
+  try {
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) return 'no Supabase session on this device';
+    final email = (session.user.email ?? '').trim();
+    final anonymous = session.user.isAnonymous;
+    final expiresAt = session.expiresAt;
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final expiry = expiresAt == null
+        ? 'no expiry'
+        : (expiresAt <= nowSec ? 'EXPIRED' : 'expires in ${((expiresAt - nowSec) / 60).ceil()} min');
+    if (anonymous || email.isEmpty) {
+      return 'anonymous Supabase session (no email — the server rejects every registrar write), $expiry';
+    }
+    return 'Supabase session for ${ngmyMaskEmailForReport(email)}, $expiry';
+  } catch (e) {
+    return 'session unavailable: $e';
+  }
+}
 
 /// Keep the password hash that already lives on this device so a later cloud
 /// write can mint a real session. Local login used to skip that step.
@@ -900,49 +960,105 @@ Future<bool> ngmyEnsurePrivilegedCloudSession({bool force = false}) async {
     }
   }
   if (creds.email.isEmpty || creds.passwordHash.isEmpty) {
+    ngmyLastSessionRepairNote = creds.email.isEmpty
+        ? 'skipped: no signed-in account saved on this device'
+        : 'skipped: no saved password for ${ngmyMaskEmailForReport(creds.email)} on this device — sign out and sign in with the password once';
+    ngmyLastSessionRepairAt = DateTime.now();
     return _ngmySessionEmailMatches('');
   }
   final now = DateTime.now();
-  if (!force &&
-      _ngmySessionRepairAt != null &&
-      now.difference(_ngmySessionRepairAt!) < const Duration(seconds: 20)) {
-    return _ngmySessionRepairOk && _ngmySessionEmailMatches(creds.email);
+  if (_ngmySessionRepairAt != null) {
+    final since = now.difference(_ngmySessionRepairAt!);
+    // Forced repairs (a registrar tapping Activate) only skip a repair that
+    // just ran; automatic ones back off after each failure.
+    final wait = force ? const Duration(seconds: 5) : _ngmySessionRepairBackoff();
+    if (since < wait) {
+      return _ngmySessionRepairOk && _ngmySessionEmailMatches(creds.email);
+    }
   }
   _ngmySessionRepairAt = now;
+  ngmyLastSessionRepairAt = now;
   try {
     final verified = await ngmyVerifyPasswordLoginViaServer(
       email: creds.email,
       passwordHash: creds.passwordHash,
     );
+    final sessionEmail = _ngmySupabaseSessionEmail();
     _ngmySessionRepairOk = verified.ok && _ngmySessionEmailMatches(creds.email);
-    if (!_ngmySessionRepairOk) {
-      debugPrint('[ngmy-auth] session repair failed: ${verified.error ?? 'no session'}');
+    if (_ngmySessionRepairOk) {
+      _ngmySessionRepairFailures = 0;
+      ngmyLastSessionRepairNote = 'ok: login server opened a session for ${ngmyMaskEmailForReport(sessionEmail)}';
+    } else {
+      _ngmySessionRepairFailures++;
+      if (!verified.ok) {
+        ngmyLastSessionRepairNote = 'login server rejected the saved password for '
+            '${ngmyMaskEmailForReport(creds.email)}: ${verified.error ?? 'unknown error'}';
+      } else if (sessionEmail.isEmpty) {
+        ngmyLastSessionRepairNote = 'login server accepted the password for '
+            '${ngmyMaskEmailForReport(creds.email)} but returned no usable session'
+            '${_ngmyLastSessionApplyError.isEmpty ? '' : ' ($_ngmyLastSessionApplyError)'}'
+            '${verified.sessionError.isEmpty ? '' : ' — server: ${verified.sessionError}'}';
+      } else {
+        ngmyLastSessionRepairNote = 'login server opened a session for '
+            '${ngmyMaskEmailForReport(sessionEmail)} but this device is signed in as '
+            '${ngmyMaskEmailForReport(creds.email)}';
+      }
+      debugPrint('[ngmy-auth] session repair failed: $ngmyLastSessionRepairNote');
     }
     return _ngmySessionRepairOk;
   } catch (e) {
     debugPrint('[ngmy-auth] session repair: $e');
+    _ngmySessionRepairFailures++;
     _ngmySessionRepairOk = false;
+    ngmyLastSessionRepairNote = 'login server unreachable: ${e.toString().split('\n').first}';
     return false;
   }
 }
 
+String _ngmyLastSessionApplyError = '';
+
 /// Apply access/refresh tokens returned by bright-handler login/signup.
 Future<void> ngmyApplyAuthSessionFromServer(dynamic session) async {
-  if (session is! Map) return;
+  _ngmyLastSessionApplyError = '';
+  if (session is! Map) {
+    _ngmyLastSessionApplyError = 'no session object in login response';
+    return;
+  }
   final refresh = session['refresh_token']?.toString().trim() ?? '';
   final access = session['access_token']?.toString().trim() ?? '';
-  if (refresh.isEmpty) return;
-  try {
-    final client = Supabase.instance.client;
-    // Prefer refresh-token session restore (stores JWT with email claim for RLS).
-    await client.auth.setSession(refresh);
-    // Some runtimes need an explicit access token refresh check.
-    if (client.auth.currentSession == null && access.isNotEmpty) {
-      await client.auth.setSession(refresh);
+  if (refresh.isEmpty) {
+    _ngmyLastSessionApplyError = 'login response had no refresh token';
+    return;
+  }
+  final client = Supabase.instance.client;
+  // The access token is freshly minted, so restoring from it directly skips
+  // the refresh-token exchange. That exchange is what used to fail here:
+  // the same refresh token presented twice (two tabs, PWA + browser, or a
+  // retry) is treated as token reuse and the whole session is revoked,
+  // which left the app looking signed in with no JWT behind it.
+  if (access.isNotEmpty) {
+    try {
+      await client.auth.setSession(refresh, accessToken: access);
+      if (client.auth.currentSession != null) {
+        debugPrint('[ngmy-auth] session established for ${client.auth.currentUser?.email}');
+        return;
+      }
+    } catch (e) {
+      debugPrint('[ngmy-auth] setSession(access) failed: $e');
+      _ngmyLastSessionApplyError = e.toString().split('\n').first;
     }
-    debugPrint('[ngmy-auth] session established for ${client.auth.currentUser?.email}');
+  }
+  try {
+    await client.auth.setSession(refresh);
+    if (client.auth.currentSession != null) {
+      _ngmyLastSessionApplyError = '';
+      debugPrint('[ngmy-auth] session established for ${client.auth.currentUser?.email}');
+    } else if (_ngmyLastSessionApplyError.isEmpty) {
+      _ngmyLastSessionApplyError = 'setSession returned no session';
+    }
   } catch (e) {
     debugPrint('[ngmy-auth] setSession failed: $e');
+    _ngmyLastSessionApplyError = e.toString().split('\n').first;
   }
 }
 
