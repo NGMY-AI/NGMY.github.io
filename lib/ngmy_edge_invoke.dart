@@ -114,6 +114,18 @@ bool ngmyEdgeActionKeepsAccountFields(String action) {
   }
 }
 
+/// One-line record of the most recent edge round trip, e.g.
+/// `civicAdminSettingsPersist via /api/sync → HTTP 403 in 812ms`. The Help
+/// Mode sync report shows it so a failed save names the real cause instead
+/// of a generic "cloud sync failed".
+String ngmyEdgeLastTransportNote = '';
+
+String _edgeUrlLabel(String url) {
+  if (url.contains(kNgmyEdgePublicPath)) return kNgmyEdgePublicPath;
+  if (url.contains('/functions/v1/')) return 'direct function';
+  return url;
+}
+
 String ngmyEdgeDirectUrl() =>
     '${kNgmySupabaseUrl.trim()}/functions/v1/$kNgmySupabaseAiFunction';
 
@@ -207,6 +219,8 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     final token = anonymous ? anonKey : await _freshAccessToken();
 
     if (!anonymous && token.isEmpty) {
+      ngmyEdgeLastTransportNote =
+          '$action skipped: no Supabase session on this device (no access token)';
       return {'ok': false, 'error': 'Please sign in again.'};
     }
 
@@ -225,30 +239,37 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     final seen = <String>{};
     http.Response? response;
     Map<String, dynamic>? parsed;
+    final notes = <String>[];
     for (final url in urls) {
       if (!seen.add(url)) continue;
       ngmyNetTrace(
         'EDGE',
         '${ngmyNetTraceEdgeLabel(body, anonymous: anonymous)}${seen.length > 1 ? ' [fallback]' : ''}',
       );
+      final started = DateTime.now();
+      String elapsed() => '${DateTime.now().difference(started).inMilliseconds}ms';
       try {
         response = await http
             .post(Uri.parse(url), headers: headers, body: payload)
             .timeout(timeout);
         parsed = _parseEdgeBody(response.body);
+        notes.add('${_edgeUrlLabel(url)} → HTTP ${response.statusCode} in ${elapsed()}');
         if (parsed != null) break;
         // Only a missing proxy (static host 404/405) justifies retrying the same
         // upstream directly; a real server error would just be sent twice.
         if (response.statusCode != 404 && response.statusCode != 405) break;
       } on TimeoutException catch (e) {
         debugPrint('[edge] invoke $url: $e');
+        notes.add('${_edgeUrlLabel(url)} → timed out after ${timeout.inSeconds}s');
         // A hung same-origin proxy must not hide the direct function URL.
         // Callers opt in: a blind retry can double-apply a non-idempotent action.
         if (!fallbackOnTimeout) break;
       } catch (e) {
         debugPrint('[edge] invoke $url: $e');
+        notes.add('${_edgeUrlLabel(url)} → network error in ${elapsed()}: ${e.toString().split('\n').first}');
       }
     }
+    ngmyEdgeLastTransportNote = '$action: ${notes.join('; ')}';
 
     if (parsed != null) {
       if (response?.statusCode == 401 && parsed['ok'] != true) {
@@ -269,6 +290,7 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     return null;
   } catch (e) {
     debugPrint('[edge] invoke: $e');
+    ngmyEdgeLastTransportNote = '$action: failed before send: ${e.toString().split('\n').first}';
     if (!kIsWeb) {
       try {
         final client = Supabase.instance.client;

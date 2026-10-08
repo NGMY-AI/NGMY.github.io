@@ -495,32 +495,56 @@ async function ensureAuthUser(admin: ReturnType<typeof createClient>, email: str
   console.error("[ngmy-auth] createUser:", error.message);
 }
 
-/** Issue a real Supabase Auth session for this email (JWT includes email for RLS). */
-async function issueAuthSessionForEmail(
+type MintedSession = { access_token: string; refresh_token: string };
+
+/** One magic-link mint. Returns the session or the reason it failed. */
+async function mintSessionViaLink(
   admin: ReturnType<typeof createClient>,
   email: string,
-): Promise<{ access_token: string; refresh_token: string } | null> {
-  await ensureAuthUser(admin, email);
+  type: "magiclink" | "recovery",
+): Promise<{ session: MintedSession | null; error: string }> {
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
-    type: "magiclink",
+    type,
     email,
   });
   const hashed = String(linkData?.properties?.hashed_token ?? "").trim();
   if (linkErr || !hashed) {
-    console.error("[ngmy-auth] generateLink:", linkErr?.message);
-    return null;
+    const reason = `generateLink(${type}): ${linkErr?.message ?? "no token"}`;
+    console.error("[ngmy-auth]", reason);
+    return { session: null, error: reason };
   }
   const { data: verified, error: verifyErr } = await admin.auth.verifyOtp({
     token_hash: hashed,
-    type: "email",
+    type: type === "recovery" ? "recovery" : "email",
   });
   const access = String(verified?.session?.access_token ?? "").trim();
   const refresh = String(verified?.session?.refresh_token ?? "").trim();
   if (verifyErr || !access || !refresh) {
-    console.error("[ngmy-auth] verifyOtp:", verifyErr?.message);
-    return null;
+    const reason = `verifyOtp(${type}): ${verifyErr?.message ?? "no session"}`;
+    console.error("[ngmy-auth]", reason);
+    return { session: null, error: reason };
   }
-  return { access_token: access, refresh_token: refresh };
+  return { session: { access_token: access, refresh_token: refresh }, error: "" };
+}
+
+/**
+ * Issue a real Supabase Auth session for this email (JWT includes email for
+ * RLS). The failure reason travels back to the app: a password that matches
+ * but no session is exactly the state where Help Mode looks signed in yet
+ * every registrar write is refused, and the app could not say why.
+ */
+async function issueAuthSessionForEmail(
+  admin: ReturnType<typeof createClient>,
+  email: string,
+): Promise<{ session: MintedSession | null; error: string }> {
+  await ensureAuthUser(admin, email);
+  const first = await mintSessionViaLink(admin, email, "magiclink");
+  if (first.session) return first;
+  // Second path through a different OTP type — a stale magiclink token or a
+  // one-type rate limit should not strand the account without a session.
+  const second = await mintSessionViaLink(admin, email, "recovery");
+  if (second.session) return second;
+  return { session: null, error: `${first.error}; ${second.error}` };
 }
 
 async function handleVerifyPasswordLogin(email: string, passwordHash: string): Promise<Response> {
@@ -556,7 +580,7 @@ async function handleVerifyPasswordLogin(email: string, passwordHash: string): P
     return jsonOk({ ok: false, error: "Invalid email or password" }, 401);
   }
 
-  const session = await issueAuthSessionForEmail(admin, String(row.email ?? key));
+  const minted = await issueAuthSessionForEmail(admin, String(row.email ?? key));
 
   // Never return passwordHash to the client.
   return jsonOk({
@@ -571,7 +595,8 @@ async function handleVerifyPasswordLogin(email: string, passwordHash: string): P
       accountBalance: Number(row.accountBalance ?? 0),
       canSellOnStore: Boolean(row.canSellOnStore),
     },
-    session: session,
+    session: minted.session,
+    ...(minted.session ? {} : { sessionError: minted.error }),
   });
 }
 
@@ -601,7 +626,7 @@ async function handleRegisterAppUser(body: Record<string, unknown>): Promise<Res
   }, { onConflict: "email" });
   if (upsertErr) return jsonOk({ error: upsertErr.message }, 500);
 
-  const session = await issueAuthSessionForEmail(admin, email);
+  const minted = await issueAuthSessionForEmail(admin, email);
   return jsonOk({
     ok: true,
     user: {
@@ -614,7 +639,8 @@ async function handleRegisterAppUser(body: Record<string, unknown>): Promise<Res
       accountBalance: 0,
       canSellOnStore: false,
     },
-    session,
+    session: minted.session,
+    ...(minted.session ? {} : { sessionError: minted.error }),
   });
 }
 
@@ -5384,7 +5410,12 @@ async function handleCivicAdminSettingsPersist(
   if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
   const role = await resolveCivicRole(admin, email);
   if (!role.isAdmin && !role.isRegistrar) {
-    return jsonOk({ error: "Not allowed" }, 403);
+    // Say which account was checked. "Not allowed" alone could not tell a
+    // registrar that the phone is signed in to a different email than the
+    // one that was approved.
+    return jsonOk({
+      error: `Not allowed: ${maskEmailNetwork(email)} has no approved registrar or admin role on the server`,
+    }, 403);
   }
 
   const kind = String(body.kind ?? "").trim();

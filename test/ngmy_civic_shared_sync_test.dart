@@ -562,4 +562,70 @@ void main() {
       isFalse,
     );
   });
+
+  test('help mode sync failures are classified by their real cause', () {
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('Please sign in again.'),
+      NgmyCivicHelpModeSyncFailure.noSession,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('Authentication required'),
+      NgmyCivicHelpModeSyncFailure.noSession,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('Not allowed: r***@gmail.com has no approved registrar or admin role on the server'),
+      NgmyCivicHelpModeSyncFailure.notAllowed,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('new row violates row-level security policy for table "ngmy_settings"'),
+      NgmyCivicHelpModeSyncFailure.notAllowed,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('Too many attempts. Try again later.'),
+      NgmyCivicHelpModeSyncFailure.rateLimited,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('TimeoutException after 0:00:12.000000: Future not completed'),
+      NgmyCivicHelpModeSyncFailure.timeout,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('no response'),
+      NgmyCivicHelpModeSyncFailure.unreachable,
+    );
+    expect(
+      ngmyClassifyCivicHelpModeSyncError('Server error (500). Try again.'),
+      NgmyCivicHelpModeSyncFailure.serverError,
+    );
+  });
+
+  test('orange bar names the cause and the report carries the attempt log', () {
+    ngmyLastCivicHelpModeSyncReport = NgmyCivicHelpModeSyncReport(
+      ok: false,
+      failure: NgmyCivicHelpModeSyncFailure.notAllowed,
+      reason: 'the server does not list r***@gmail.com as an Authorized Registrar or admin',
+      advice: 'Ask the King/Admin to re-approve your registrar request.',
+      lines: const ['Attempt 1 registrar save: failed — Not allowed [civicAdminSettingsPersist: /api/sync → HTTP 403 in 812ms]'],
+      at: DateTime.utc(2026, 10, 8, 14),
+    );
+    final message = ngmyCivicHelpModeSyncFailureMessage(activated: true);
+    expect(message, contains('not saved to cloud'));
+    expect(message, contains('Authorized Registrar'));
+    expect(message, contains('Details'));
+
+    final text = ngmyLastCivicHelpModeSyncReport!.text;
+    expect(text, contains('NOT saved'));
+    expect(text, contains('Next step: Ask the King/Admin'));
+    expect(text, contains('HTTP 403'));
+
+    ngmyLastCivicHelpModeSyncReport = null;
+    expect(
+      ngmyCivicHelpModeSyncFailureMessage(activated: false),
+      'Help mode is off here, but cloud sync failed. Reconnect and deactivate again.',
+    );
+  });
+
+  test('session report masks emails', () {
+    expect(ngmyMaskEmailForReport('Registrar@Gmail.com'), 'r***@gmail.com');
+    expect(ngmyMaskEmailForReport(''), '(none)');
+  });
 }
