@@ -45851,19 +45851,34 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Widget _rankingTrophy(int rank) {
+  Widget _rankingTrophy(int rank, bool isDark) {
     final style = switch (rank) {
-      1 => (emoji: '🏆', label: '1st place', size: 15.0),
-      2 => (emoji: '🥈', label: '2nd place', size: 13.0),
-      3 => (emoji: '🥉', label: '3rd place', size: 12.0),
+      1 => (emoji: '🏆', label: '1st place', size: 16.0),
+      2 => (emoji: '🥈', label: '2nd place', size: 14.0),
+      3 => (emoji: '🥉', label: '3rd place', size: 13.0),
       _ => (emoji: '', label: '', size: 0.0),
     };
     if (style.emoji.isEmpty) return const SizedBox.shrink();
     return Semantics(
       label: style.label,
-      child: Text(
-        style.emoji,
-        style: TextStyle(fontSize: style.size, height: 1),
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          style.emoji,
+          style: TextStyle(fontSize: style.size, height: 1),
+        ),
       ),
     );
   }
@@ -45928,16 +45943,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       ),
     );
     if (!showTrophy || rank > 3) return card;
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        card,
-        Positioned(
-          top: 4,
-          right: 8,
-          child: _rankingTrophy(rank),
-        ),
-      ],
+    // Badge sits on the top edge — half over the card, half above (verified-badge style).
+    return Padding(
+      padding: const EdgeInsets.only(top: 9),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          card,
+          Positioned(
+            top: -11,
+            right: 10,
+            child: _rankingTrophy(rank, isDark),
+          ),
+        ],
+      ),
     );
   }
 }
