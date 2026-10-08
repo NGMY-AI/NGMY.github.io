@@ -9531,12 +9531,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateHelpCenterHubFromAllBackups(_config);
     await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -13334,12 +13334,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
       await NgmyAppStudioAccess.hydrate(_config);
       await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-      await NgmyCivicHelperGifts.hydrateFromCloud(_config);
       await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
       await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
       await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
       await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
       await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+      await NgmyCivicHelperGifts.hydrateFromCloud(_config);
       await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
       await ngmyHydrateHelpCenterHubFromAllBackups(_config);
       await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -13430,12 +13430,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
     await NgmyAppStudioAccess.hydrate(_config);
     await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
     await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
     await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
     await ngmyHydrateCivicSelfEnrollmentFromAllBackups(_config);
     await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+    await NgmyCivicHelperGifts.hydrateFromCloud(_config);
     await ngmyHydrateCommunicateSettingsFromAllBackups(_config);
     await ngmyHydrateHelpCenterHubFromAllBackups(_config);
           await ngmyHydrateCommunicatePaymentsFromAllBackups(_config);
@@ -13720,6 +13720,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             await ngmyHydrateManagementListsFromAllBackups(_config);
           }
           await ngmyHydrateCivicRegistryMembersFromAllBackups(_config, _allUsers);
+          await NgmyCivicHelperGifts.hydrateFromCloud(_config);
           if (bootstrapAdmin) {
             await ngmyHydrateFamilyTreePaymentsFromAllBackups(_config);
             await ngmyHydrateInvoicePaymentsFromAllBackups(_config);
@@ -13727,7 +13728,6 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
             await ngmyHydrateAppStudioPaymentsFromAllBackups(_config);
             await NgmyAppStudioAccess.hydrate(_config);
             await ngmyHydrateRepairEstimatePaymentsFromAllBackups(_config);
-            await NgmyCivicHelperGifts.hydrateFromCloud(_config);
             await ngmyHydrateTranslatePaymentsFromAllBackups(_config);
             await ngmyHydrateDocumentScanPaymentsFromAllBackups(_config);
             await ngmyHydrateDocSharePaymentsFromAllBackups(_config);
@@ -22263,6 +22263,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Future<void> _notifyAdminHelperGiftPendingOnOpen() async {
     await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+    NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(widget.config);
     if (!mounted) return;
     final open = NgmyCivicHelperGifts.openPending(widget.config);
     if (open.isEmpty) return;
@@ -41308,7 +41309,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   NgmyCivicRegistryMembers.upsert(widget.config, member);
                                   unawaited(ngmyPersistCivicRegistryMembers(widget.config));
                                   if (giftPending != null) {
+                                    unawaited(NgmyCivicHelperGifts.persistPendingLocal(widget.config));
                                     unawaited(NgmyCivicHelperGifts.persistCloud(widget.config));
+                                    NgmyAdminLiveRefresh.notify();
                                   }
                                 } catch (e) {
                                   debugPrint('[civic helper streak] $e');

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -5,7 +6,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'ngmy_db_relay.dart';
 import 'ngmy_edge_invoke.dart';
+import 'ngmy_private_lists_cloud.dart';
 
 /// QR prefix for Civic Registry helper gifts redeemable at NGMY Store.
 const String kNgmyHelperGiftQrPrefix = 'NGMYHELPERGIFT1';
@@ -259,6 +264,92 @@ class NgmyCivicHelperGifts {
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }
 
+  static String? _sessionEmail() {
+    try {
+      return Supabase.instance.client.auth.currentUser?.email?.toLowerCase().trim();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<NgmyHelperGiftPending> _mergePendingLists(
+    List<NgmyHelperGiftPending> a,
+    List<NgmyHelperGiftPending> b,
+  ) {
+    final byId = <String, NgmyHelperGiftPending>{};
+    for (final p in [...a, ...b]) {
+      if (p.id.isEmpty) continue;
+      final existing = byId[p.id];
+      if (existing == null || p.createdAt.compareTo(existing.createdAt) >= 0) {
+        byId[p.id] = p;
+      }
+    }
+    final openByEmail = <String, NgmyHelperGiftPending>{};
+    final granted = <NgmyHelperGiftPending>[];
+    for (final p in byId.values) {
+      if (p.granted) {
+        granted.add(p);
+        continue;
+      }
+      final prev = openByEmail[p.email];
+      if (prev == null || p.createdAt.compareTo(prev.createdAt) > 0) {
+        openByEmail[p.email] = p;
+      }
+    }
+    final merged = [...openByEmail.values, ...granted]
+      ..sort((x, y) => y.createdAt.compareTo(x.createdAt));
+    return merged;
+  }
+
+  static List<NgmyHelperGift> _mergeInboxLists(
+    List<NgmyHelperGift> a,
+    List<NgmyHelperGift> b,
+  ) {
+    final byToken = <String, NgmyHelperGift>{};
+    for (final g in [...a, ...b]) {
+      final key = g.token.isNotEmpty ? g.token : g.id;
+      if (key.isEmpty) continue;
+      final existing = byToken[key];
+      if (existing == null || g.createdAt.compareTo(existing.createdAt) >= 0) {
+        byToken[key] = g;
+      }
+    }
+    return byToken.values.toList()..sort((x, y) => y.createdAt.compareTo(x.createdAt));
+  }
+
+  /// When roster streaks reached 3 on the server but the pending alert never
+  /// synced, rebuild open admin alerts from member records.
+  static int syncOpenPendingFromMemberStreaks(dynamic config) {
+    final raw = (config as dynamic).civicRegistryMembers;
+    if (raw is! List) return 0;
+    final list = pendingFromConfig(config);
+    var added = 0;
+    for (final item in raw.whereType<Map>()) {
+      final streak = (item['firstHelperStreak'] as num?)?.toInt() ?? 0;
+      if (streak < 3 || streak % 3 != 0) continue;
+      final email = (item['email'] ?? '').toString().toLowerCase().trim();
+      if (email.isEmpty) continue;
+      if (list.any((p) => !p.granted && p.email == email)) continue;
+      list.insert(
+        0,
+        NgmyHelperGiftPending(
+          id: 'hgpend_roster_${email}_$streak',
+          email: email,
+          fullName: (item['fullName'] ?? email).toString(),
+          registryId: (item['registryId'] ?? '').toString(),
+          phone: (item['phone'] ?? '').toString(),
+          state: (item['state'] ?? '').toString(),
+          city: (item['city'] ?? '').toString(),
+          streak: streak,
+          createdAt: DateTime.now().toUtc().toIso8601String(),
+        ),
+      );
+      added++;
+    }
+    if (added > 0) setPending(config, list);
+    return added;
+  }
+
   /// A streak means consecutive campaigns, not merely any three campaigns.
   /// When a new campaign gets its first helper, everyone except that person
   /// loses an older first-helper streak.
@@ -389,52 +480,143 @@ class NgmyCivicHelperGifts {
     }
   }
 
+  static Future<bool> _persistPendingSettingsCloud(dynamic config) async {
+    final payload = {'items': pendingFromConfig(config).map((e) => e.toMap()).toList()};
+    try {
+      await ngmyDbRelaySettingsUpsert(kNgmyHelperGiftPendingSettingsKey, payload);
+      return true;
+    } catch (e) {
+      debugPrint('[helper gifts] relay pending persist: $e');
+    }
+    final email = _sessionEmail();
+    if (email == null) return false;
+    var ok = false;
+    for (final pending in openPending(config)) {
+      final saved = await ngmyCivicAdminSettingsPersist(
+        email: email,
+        kind: 'civicHelperGiftPending',
+        payload: pending.toMap(),
+      );
+      ok = ok || saved;
+    }
+    return ok;
+  }
+
   static Future<bool> persistCloud(dynamic config) async {
     await persistPendingLocal(config);
     await persistInboxLocal(config);
     try {
-      var ok = true;
+      var edgeOk = false;
       for (final pending in openPending(config)) {
         final data = await _helperGiftEdge('pending', fields: {'pending': pending.toMap()});
-        ok = ok && data?['ok'] == true;
+        edgeOk = edgeOk || data?['ok'] == true;
       }
-      return ok;
+      if (edgeOk) return true;
+      return await _persistPendingSettingsCloud(config);
     } catch (e) {
       debugPrint('[helper gifts] cloud persist: $e');
-      return false;
+      return await _persistPendingSettingsCloud(config);
     }
   }
 
   static Future<void> hydrateFromCloud(dynamic config) async {
     await hydrateFromLocal(config);
+    final localPending = pendingFromConfig(config);
+    final localInbox = inboxFromConfig(config);
+    var remotePending = <NgmyHelperGiftPending>[];
+    var remoteInbox = <NgmyHelperGift>[];
+
     try {
       final data = await _helperGiftEdge('fetch');
-      if (data == null || data['ok'] != true) return;
-      final pendingItems = data['pending'];
-      if (pendingItems is List) {
-        setPending(
-          config,
-          pendingItems
+      if (data != null && data['ok'] == true) {
+        final pendingItems = data['pending'];
+        if (pendingItems is List) {
+          remotePending = pendingItems
               .whereType<Map>()
               .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
-              .toList(),
-        );
-      }
-      final inboxItems = data['inbox'];
-      if (inboxItems is List) {
-        setInbox(
-          config,
-          inboxItems
+              .toList();
+        }
+        final inboxItems = data['inbox'];
+        if (inboxItems is List) {
+          remoteInbox = inboxItems
               .whereType<Map>()
               .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
-              .toList(),
-        );
+              .toList();
+        }
       }
-      await persistPendingLocal(config);
-      await persistInboxLocal(config);
     } catch (e) {
-      debugPrint('[helper gifts] cloud hydrate: $e');
+      debugPrint('[helper gifts] edge hydrate: $e');
     }
+
+    if (remotePending.isEmpty) {
+      try {
+        final relay = await ngmyDbRelaySettingsFetch(kNgmyHelperGiftPendingSettingsKey);
+        final items = relay?['items'];
+        if (items is List) {
+          remotePending = items
+              .whereType<Map>()
+              .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('[helper gifts] relay pending hydrate: $e');
+      }
+    }
+
+    final email = _sessionEmail();
+    if (email != null) {
+      try {
+        final adminData = await ngmyCivicAdminSettingsFetch(email: email);
+        if (adminData != null && adminData['ok'] == true) {
+          final pendingItems = adminData['civicHelperGiftPending'];
+          if (pendingItems is List && pendingItems.isNotEmpty) {
+            remotePending = _mergePendingLists(
+              remotePending,
+              pendingItems
+                  .whereType<Map>()
+                  .map((e) => NgmyHelperGiftPending.fromMap(Map<String, dynamic>.from(e)))
+                  .toList(),
+            );
+          }
+          final inboxItems = adminData['civicHelperGiftInbox'];
+          if (inboxItems is List && inboxItems.isNotEmpty) {
+            remoteInbox = _mergeInboxLists(
+              remoteInbox,
+              inboxItems
+                  .whereType<Map>()
+                  .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
+                  .toList(),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('[helper gifts] admin settings hydrate: $e');
+      }
+    }
+
+    if (remoteInbox.isEmpty) {
+      try {
+        final relay = await ngmyDbRelaySettingsFetch(kNgmyHelperGiftInboxSettingsKey);
+        final items = relay?['items'];
+        if (items is List) {
+          remoteInbox = items
+              .whereType<Map>()
+              .map((e) => NgmyHelperGift.fromMap(Map<String, dynamic>.from(e)))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('[helper gifts] relay inbox hydrate: $e');
+      }
+    }
+
+    setPending(config, _mergePendingLists(localPending, remotePending));
+    setInbox(config, _mergeInboxLists(localInbox, remoteInbox));
+    final derived = syncOpenPendingFromMemberStreaks(config);
+    if (derived > 0) {
+      unawaited(persistCloud(config));
+    }
+    await persistPendingLocal(config);
+    await persistInboxLocal(config);
   }
 
   static Future<NgmyHelperGift?> grantGift({

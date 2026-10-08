@@ -94,6 +94,8 @@ const Map<String, String> kNgmySettingsKeyCodes = {
   'civic_contribution_receipt_removed': 'k50',
   'civic_deleted_contribution_ids': 'k51',
   'civic_help_campaign_spendings': 'k52',
+  'civic_helper_gift_pending_v1': 'k53',
+  'civic_helper_gift_inbox_v1': 'k54',
 };
 
 /// Dynamic key prefixes — the suffix (share code/token/base64 email) is sent
@@ -121,6 +123,7 @@ const Map<String, String> kNgmySettingsPrefixCodes = {
   'ngmy_doc_share_my_code_lookup_v1_': 'd20',
   'ngmy_doc_share_my_code_user_v1_': 'd21',
   'ngmy_gi_account_wallet_v1_': 'd22',
+  'ngmy_helper_gift_qr_v1_': 'd23',
 };
 
 ({String code, String? suffix})? _resolveSettingsKey(String key) {
