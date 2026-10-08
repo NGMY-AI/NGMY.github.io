@@ -1913,10 +1913,11 @@ NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
   final account = ngmyMaskEmailForReport(ngmyCurrentAuthEmail());
   switch (failure) {
     case NgmyCivicHelpModeSyncFailure.noSession:
+      final repair = ngmyLastSessionRepairNote.trim();
       return (
         reason: 'this device has no cloud sign-in for your account',
-        advice: 'Sign out of NGMY, sign back in with your email and password, then tap Activate / Deactivate once more. '
-            'Details shows what the login server answered.',
+        advice: 'Sign out of NGMY, sign back in with your email and password, then tap Activate / Deactivate once more.'
+            '${repair.isEmpty ? '' : ' Last login-server answer: $repair.'}',
       );
     case NgmyCivicHelpModeSyncFailure.notAllowed:
       return (
