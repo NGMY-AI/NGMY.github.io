@@ -8,6 +8,26 @@ import 'ngmy_nav.dart';
 
 bool _helperGiftAdminPopupOpen = false;
 
+bool get ngmyHelperGiftAdminPopupIsOpen => _helperGiftAdminPopupOpen;
+
+Future<BuildContext?> _waitForHelperGiftPopupContext({
+  BuildContext? preferred,
+  Duration timeout = const Duration(seconds: 20),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    if (_helperGiftAdminPopupOpen) return null;
+    final ctx = preferred ?? ngmyRootNavigatorKey.currentContext;
+    if (ctx != null && ctx.mounted && ngmyShouldAllowHelperGiftAdminPopup()) {
+      return ctx;
+    }
+    await Future.delayed(const Duration(milliseconds: 200));
+  }
+  final ctx = preferred ?? ngmyRootNavigatorKey.currentContext;
+  if (ctx != null && ctx.mounted) return ctx;
+  return null;
+}
+
 typedef NgmyHelperGiftGrantCallback = Future<NgmyHelperGift?> Function(
   NgmyHelperGiftPending pending, {
   required String giftName,
@@ -30,7 +50,6 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
 }) async {
   if (_helperGiftAdminPopupOpen) return;
   if (!await NgmyHelperGiftAdminPopupSettings.isEnabled()) return;
-  if (!ngmyShouldAllowGlobalInterrupt()) return;
 
   await NgmyCivicHelperGifts.hydrateFromCloud(config);
   NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config);
@@ -38,7 +57,7 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
   final pending = NgmyCivicHelperGifts.openPending(config);
   if (pending.isEmpty) return;
 
-  final ctx = context ?? ngmyRootNavigatorKey.currentContext;
+  final ctx = await _waitForHelperGiftPopupContext(preferred: context);
   if (ctx == null || !ctx.mounted) return;
 
   _helperGiftAdminPopupOpen = true;
