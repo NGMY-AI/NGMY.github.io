@@ -488,9 +488,10 @@ class NgmyCivicRegistrarApplication {
         reappliedFromStaleApproval: false,
       );
     }
-    final backupStatus = localBackup == null ? '' : _statusOf(localBackup);
-    if (localBackup != null && backupStatus == 'pending') {
-      final pending = Map<String, dynamic>.from(localBackup);
+    final localRow = localBackup ?? newestRowForEmail(list, key);
+    final localStatus = localRow == null ? '' : _statusOf(localRow);
+    if (localRow != null && localStatus == 'pending') {
+      final pending = Map<String, dynamic>.from(localRow);
       return (
         list: [...others, pending],
         own: pending,
@@ -498,15 +499,8 @@ class NgmyCivicRegistrarApplication {
         reappliedFromStaleApproval: false,
       );
     }
-    Map<String, dynamic>? staleApproval;
-    if (localBackup != null && backupStatus == 'approved') {
-      staleApproval = localBackup;
-    } else {
-      final localRow = newestRowForEmail(list, key);
-      if (localRow != null && _statusOf(localRow) == 'approved') staleApproval = localRow;
-    }
-    if (staleApproval != null) {
-      final reapply = pendingReapplicationFrom(staleApproval, at: now, id: reapplicationId);
+    if (localRow != null && localStatus == 'approved') {
+      final reapply = pendingReapplicationFrom(localRow, at: now, id: reapplicationId);
       return (
         list: [...others, reapply],
         own: reapply,
