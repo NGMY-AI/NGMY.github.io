@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
-import 'ngmy_medicine_reminder_service.dart' show ngmyShouldAllowGlobalInterrupt;
+import 'ngmy_overlay_guard.dart';
 import 'ngmy_nav.dart';
 
 bool _helperGiftAdminPopupOpen = false;
