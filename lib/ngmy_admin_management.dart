@@ -1828,11 +1828,26 @@ Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
     // Shared row. Do not skip this when the short REST probe fails — that
     // probe false-negatives while the same-origin sync path still works, and
     // skipping it left every other device on a stale help-mode copy.
-    final row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
+    var row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
+    if (row == null && ngmyCurrentAuthEmail().isEmpty && !_civicHelpModeReadForcedLoginThisRun) {
+      // The row is only readable with a signed-in email session. A device
+      // that still sits on an anonymous storage token gets nothing and the
+      // member never learns a campaign is on. One forced login per app run
+      // (this runs from the 75s poll; the server allows 10 logins per 15min).
+      _civicHelpModeReadForcedLoginThisRun = true;
+      final repaired = await ngmyEnsurePrivilegedCloudSession(force: true);
+      if (repaired && ngmyCurrentAuthEmail().isNotEmpty) {
+        row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
+      }
+    }
+    ngmyCivicHelpModeRowReadableByMember = row != null;
     if (row != null) {
       _applyCivicHelpModeSettingsPayload(config, row);
       await ngmyMergeSharedContributionReceiptsIntoLocal(config, row['contributionReceipts']);
       await _persistCivicHelpModeSettingsLocal(config);
+    } else {
+      debugPrint('[civic help mode] shared row not readable for '
+          '${ngmyMaskEmailForReport(ngmyCurrentAuthEmail())} [$ngmyEdgeLastTransportNote]');
     }
   } catch (e) {
     debugPrint('[civic help mode] shared cloud hydrate: $e');
@@ -1877,8 +1892,8 @@ class NgmyCivicHelpModeSyncReport {
   String get text => [
         'NGMY Help Mode cloud sync report',
         'Time: ${at.toLocal()}',
-        'Result: ${ok ? 'saved to cloud' : 'NOT saved — $reason'}',
-        if (!ok && advice.isNotEmpty) 'Next step: $advice',
+        'Result: ${ok ? (reason.isEmpty ? 'saved to cloud' : 'saved to cloud — $reason') : 'NOT saved — $reason'}',
+        if (advice.isNotEmpty) 'Next step: $advice',
         '',
         ...lines,
       ].join('\n');
@@ -1892,6 +1907,22 @@ NgmyCivicHelpModeSyncReport? ngmyLastCivicHelpModeSyncReport;
 /// stops showing registrar tools that cannot save, and files a fresh
 /// request for the King/Admin when the approval only ever lived locally.
 bool ngmyLastCivicHelpModeServerRefusedRegistrar = false;
+
+/// True when the last successful Help Mode save was read back with the
+/// registrar's own session and the server returned nothing: the database
+/// policy on `ngmy_settings` still limits `civic_help_mode_settings` to
+/// admin accounts, so regular members cannot see the campaign at all.
+bool ngmyLastCivicHelpModeHiddenFromMembers = false;
+
+const String kNgmyCivicHelpModeMembersHiddenAdvice =
+    'Members cannot see Help Mode until the admin updates the server: in Supabase run '
+    'supabase/civic_contributions_shared_visibility.sql (SQL Editor) or redeploy the bright-handler function '
+    'from supabase/functions/ngmy-ai-chat/index.ts. The app cannot read past the database policy by itself.';
+
+/// Member-facing proof that the shared Help Mode row is readable by this
+/// account. Null = not checked yet on this run.
+bool? ngmyCivicHelpModeRowReadableByMember;
+bool _civicHelpModeReadForcedLoginThisRun = false;
 
 NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
   final e = error.toLowerCase().trim();
@@ -2322,6 +2353,40 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
     failure = ngmyClassifyCivicHelpModeSyncError(lastError);
   }
   var explanation = _civicHelpModeSyncExplanation(failure, lastError);
+  if (helpModeCloudOk) {
+    // The save went through the server with service role, but members read
+    // the shared row with their own session. Read it back the same way: a
+    // registrar account that cannot see the row it just wrote proves that
+    // regular members cannot see this campaign either (the database policy
+    // still limits the row to admin accounts). The green bar then says so
+    // instead of claiming everyone can see it.
+    final checkEmail = ngmyCurrentAuthEmail();
+    final actorIsAdmin = checkEmail.isNotEmpty && ngmyEmailIsAdmin(checkEmail);
+    var visible = true;
+    var detail = '';
+    if (!actorIsAdmin) {
+      try {
+        final row = await ngmyDbRelaySettingsFetch(
+          _kNgmyCivicHelpModeSettingsKey,
+          timeout: const Duration(seconds: 8),
+        );
+        visible = row != null;
+        detail = visible ? 'readable with a signed-in member session' : 'the server returned no row for a non-admin session';
+      } catch (e) {
+        detail = 'could not verify — $e';
+      }
+    } else {
+      detail = 'skipped — an admin session can always read the row, so it cannot stand in for a member';
+    }
+    ngmyLastCivicHelpModeHiddenFromMembers = !visible;
+    note('Member visibility: ${visible ? 'OK' : 'HIDDEN'} — $detail');
+    if (!visible) {
+      explanation = (
+        reason: 'but regular members cannot see it yet (the server hides the shared Help Mode row from non-admin accounts)',
+        advice: kNgmyCivicHelpModeMembersHiddenAdvice,
+      );
+    }
+  }
   if (failure == NgmyCivicHelpModeSyncFailure.notAllowed && ngmyCurrentAuthEmail().isNotEmpty) {
     // The server decides registrar access from its own application list.
     // Ask it what it holds for this account so the report names the exact

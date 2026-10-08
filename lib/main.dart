@@ -32101,6 +32101,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     if (cloudSaved) {
+      if (ngmyLastCivicHelpModeHiddenFromMembers) {
+        // Saved on the server, but the read-back with this registrar's own
+        // session returned nothing: regular members cannot see it either.
+        messenger.showSnackBar(SnackBar(
+          content: Text(
+            activated
+                ? 'Help mode saved for $_selectedState, but the server still hides it from regular members. '
+                    'Tap Details for the one-time server update the admin must run.'
+                : 'Help mode turned off for $_selectedState and saved, but the server still hides Help Mode from regular members. '
+                    'Tap Details for the one-time server update the admin must run.',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 14),
+          action: SnackBarAction(
+            label: 'Details',
+            textColor: Colors.black,
+            onPressed: () => _openCivicHelpModeSyncDetails(activated: activated),
+          ),
+        ));
+        return;
+      }
       messenger.showSnackBar(SnackBar(
         content: Text(
           activated
@@ -32549,13 +32570,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   /// PIN / name / DOB / registry ID only after a state has an Authorized Registrar.
-  bool _stateRequiresMemberUnlock([String? state]) {
-    return NgmyCivicRegistryStats.stateHasAuthorizedRegistrar(
-      state: (state ?? _selectedState).trim(),
-      applications: widget.config.civicRegistrarApplications,
-      users: widget.allUsers,
-    );
-  }
+  /// Every state a member opens or switches to requires Verify your
+  /// membership (state PIN, name, date of birth, Registry ID). This used to
+  /// be skipped for any state this phone did not know had an Authorized
+  /// Registrar — and a member's phone only receives its own application
+  /// rows, so it knew none of them. Members could then change state freely
+  /// and read every state's roster without a PIN. Registrars, King and
+  /// Admin bypass through [_canBypassCivicGate].
+  bool _stateRequiresMemberUnlock([String? state]) => true;
 
   Future<NgmyCivicAccessStatus> _civicUnlockAccessStatus([String? state]) async {
     final stored = await civicRegistryStoredUnlockEntry(
@@ -32688,6 +32710,40 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
   }
 
+  /// Back on Verify your membership. A member who was switching state and
+  /// stopped returns to the state they were already verified for; a member
+  /// who was never verified anywhere leaves Civic Registry.
+  void _leaveCivicGate() {
+    final home = widget.user.state.trim();
+    if (home.isNotEmpty && !NgmyCivicRegistryStats.statesMatch(_selectedState, home)) {
+      setState(() {
+        _selectedState = home;
+        _selectedCity = 'All Cities';
+        _selectedRoom = 'All Rooms';
+        _registryGateMessage = null;
+        _unlockChecked = false;
+      });
+      unawaited(() async {
+        final held = await civicRegistryIsUnlocked(
+          widget.user.email,
+          state: home,
+          globalPin: widget.config.civicRegistryPin,
+          pinsByState: widget.config.civicRegistryPinsByState,
+        );
+        if (!mounted) return;
+        // Home not verified on this phone either: the gate stays, now for
+        // home, and the next Back leaves the screen.
+        setState(() {
+          _registryUnlocked = held;
+          _unlockChecked = true;
+        });
+        if (held) unawaited(_checkRegistryUnlock());
+      }());
+      return;
+    }
+    NgmyNavigator.pop(context);
+  }
+
   void _onRegistryUnlocked(String state) {
     _unlockCheckGen++;
     NgmyCivicStateSwitches.onGateUnlock(
@@ -32809,12 +32865,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
       if (!unlocked) {
         if (!mounted) return false;
+        // Show Verify your membership for the new state. The account's state
+        // is not changed here: it moves in _onRegistryUnlocked, only after the
+        // PIN, name, date of birth and Registry ID were accepted. Until then
+        // nothing from the new state is shown, and Back returns to the state
+        // the member was already verified for.
         setState(() {
-          widget.user.state = newState;
           _selectedState = newState;
           _selectedCity = 'All Cities';
           _selectedRoom = 'All Rooms';
           _registryUnlocked = false;
+          _registryGateMessage = null;
           if (_activeTab > 1) _activeTab = 0;
         });
         return false;
@@ -42575,7 +42636,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         removed: NgmyCivicRegistryMembers.removedFrom(widget.config)
             .where((m) => NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), _selectedState))
             .toList(),
-        onBack: () => NgmyNavigator.pop(context),
+        onBack: _leaveCivicGate,
         onUnlocked: _onRegistryUnlocked,
         // AR home / King / Admin never need PIN — picking home while on the
         // gate must dismiss verify membership immediately.

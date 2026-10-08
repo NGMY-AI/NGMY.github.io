@@ -625,6 +625,31 @@ void main() {
     );
   });
 
+  test('a saved campaign the server hides from members says so in the report', () {
+    final report = NgmyCivicHelpModeSyncReport(
+      ok: true,
+      failure: NgmyCivicHelpModeSyncFailure.none,
+      reason: 'but regular members cannot see it yet (the server hides the shared Help Mode row from non-admin accounts)',
+      advice: kNgmyCivicHelpModeMembersHiddenAdvice,
+      lines: const ['Member visibility: HIDDEN — the server returned no row for a non-admin session'],
+      at: DateTime.utc(2026, 10, 8, 16),
+    );
+    expect(report.text, contains('saved to cloud — but regular members cannot see it yet'));
+    expect(report.text, contains('Next step: Members cannot see Help Mode until the admin updates the server'));
+    expect(report.text, contains('civic_contributions_shared_visibility.sql'));
+
+    final plain = NgmyCivicHelpModeSyncReport(
+      ok: true,
+      failure: NgmyCivicHelpModeSyncFailure.none,
+      reason: '',
+      advice: '',
+      lines: const ['Member visibility: OK — readable with a signed-in member session'],
+      at: DateTime.utc(2026, 10, 8, 16),
+    );
+    expect(plain.text, contains('Result: saved to cloud\n'));
+    expect(plain.text, isNot(contains('Next step')));
+  });
+
   test('session report masks emails', () {
     expect(ngmyMaskEmailForReport('Registrar@Gmail.com'), 'r***@gmail.com');
     expect(ngmyMaskEmailForReport(''), '(none)');
