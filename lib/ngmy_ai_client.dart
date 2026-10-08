@@ -904,9 +904,9 @@ Future<({String email, String passwordHash})> _ngmyStoredLoginCredentials() asyn
     if (decoded is! Map) return (email: '', passwordHash: '');
     final email = (decoded['email'] ?? '').toString().trim().toLowerCase();
     final hash = (decoded['passwordHash'] ?? decoded['password_hash'] ?? '').toString().trim();
-    if (email.isNotEmpty && hash.isNotEmpty) {
+    if (email.isNotEmpty) {
       _ngmyRememberedLoginEmail = email;
-      _ngmyRememberedLoginHash = hash;
+      if (hash.isNotEmpty) _ngmyRememberedLoginHash = hash;
     }
     return (email: email, passwordHash: hash);
   } catch (e) {
@@ -1013,6 +1013,61 @@ Future<bool> ngmyEnsurePrivilegedCloudSession({bool force = false}) async {
     ngmyLastSessionRepairNote = 'login server unreachable: ${e.toString().split('\n').first}';
     return false;
   }
+}
+
+/// Interactive re-authentication for a device that is "signed in" from the
+/// local cache but has no Supabase session and no saved password hash (an
+/// old local login, an OAuth login, or a cache refreshed from the cloud,
+/// which never carries the hash). Verifies the password on the server, opens
+/// the email session, and stores the hash on this device so later repairs
+/// are silent.
+Future<({bool ok, String error})> ngmySignInForCloudSession({
+  required String email,
+  required String passwordHash,
+}) async {
+  final key = email.trim().toLowerCase();
+  final hash = passwordHash.trim();
+  if (key.isEmpty || hash.isEmpty) {
+    return (ok: false, error: 'Email and password are required.');
+  }
+  final verified = await ngmyVerifyPasswordLoginViaServer(email: key, passwordHash: hash);
+  ngmyLastSessionRepairAt = DateTime.now();
+  if (!verified.ok) {
+    ngmyLastSessionRepairNote = 'login server rejected the password typed for ${ngmyMaskEmailForReport(key)}: ${verified.error ?? 'unknown error'}';
+    return (ok: false, error: verified.error ?? 'Login failed');
+  }
+  final sessionEmail = _ngmySupabaseSessionEmail();
+  if (sessionEmail.isEmpty) {
+    final detail = [
+      if (_ngmyLastSessionApplyError.isNotEmpty) _ngmyLastSessionApplyError,
+      if (verified.sessionError.isNotEmpty) 'server: ${verified.sessionError}',
+    ].join('; ');
+    ngmyLastSessionRepairNote = 'login server accepted the password for ${ngmyMaskEmailForReport(key)} but returned no usable session${detail.isEmpty ? '' : ' ($detail)'}';
+    return (
+      ok: false,
+      error: 'Password accepted, but the login server returned no session${detail.isEmpty ? '.' : ': $detail'}',
+    );
+  }
+  ngmyRememberLoginCredentials(key, hash);
+  _ngmySessionRepairOk = true;
+  _ngmySessionRepairFailures = 0;
+  ngmyLastSessionRepairNote = 'ok: signed in on this device as ${ngmyMaskEmailForReport(sessionEmail)}';
+  // Persist the hash into the cached account so the next app start can
+  // repair the session without asking again.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('current_user');
+    if (raw != null && raw.trim().isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map && (decoded['email'] ?? '').toString().trim().toLowerCase() == key) {
+        final updated = Map<String, dynamic>.from(decoded)..['passwordHash'] = hash;
+        await prefs.setString('current_user', jsonEncode(updated));
+      }
+    }
+  } catch (e) {
+    debugPrint('[ngmy-auth] persist hash after cloud sign-in: $e');
+  }
+  return (ok: true, error: '');
 }
 
 String _ngmyLastSessionApplyError = '';

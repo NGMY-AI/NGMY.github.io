@@ -1915,8 +1915,8 @@ NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
     case NgmyCivicHelpModeSyncFailure.noSession:
       final repair = ngmyLastSessionRepairNote.trim();
       return (
-        reason: 'this device has no cloud sign-in for your account',
-        advice: 'Sign out of NGMY, sign back in with your email and password, then tap Activate / Deactivate once more.'
+        reason: 'this phone is not connected to your cloud account',
+        advice: 'Tap Connect & Retry and enter your NGMY password once; the save then runs again by itself.'
             '${repair.isEmpty ? '' : ' Last login-server answer: $repair.'}',
       );
     case NgmyCivicHelpModeSyncFailure.notAllowed:
@@ -1948,6 +1948,140 @@ NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
     case NgmyCivicHelpModeSyncFailure.none:
       return (reason: '', advice: '');
   }
+}
+
+/// In-place cloud sign-in. The device shows the account as signed in, but
+/// Supabase has no session and no password hash is saved, so nothing can be
+/// written for everyone. Asking for the password here replaces the old
+/// "sign out and sign in again" advice. Returns true once a session exists.
+Future<bool> showNgmyCloudSignInDialog(
+  BuildContext context, {
+  required String email,
+  required void Function(String passwordHash) onPasswordVerified,
+  String reason = '',
+}) async {
+  final passwordC = TextEditingController();
+  var busy = false;
+  var showPassword = false;
+  var error = '';
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) {
+        Future<void> submit() async {
+          final password = passwordC.text;
+          if (password.length < 6) {
+            setDialogState(() => error = 'Enter your NGMY password (at least 6 characters).');
+            return;
+          }
+          setDialogState(() {
+            busy = true;
+            error = '';
+          });
+          final hash = _hashPassword(password);
+          final signedIn = await ngmySignInForCloudSession(email: email, passwordHash: hash);
+          if (!ctx.mounted) return;
+          if (signedIn.ok) {
+            onPasswordVerified(hash);
+            Navigator.pop(ctx, true);
+            return;
+          }
+          setDialogState(() {
+            busy = false;
+            error = signedIn.error;
+          });
+        }
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF14141C),
+          title: const Row(
+            children: [
+              Icon(Icons.cloud_sync_rounded, color: Color(0xFF8B7CF6)),
+              SizedBox(width: 10),
+              Expanded(child: Text('Confirm your password', style: TextStyle(color: Colors.white, fontSize: 17))),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  reason.isNotEmpty
+                      ? reason
+                      : 'This phone is not connected to your NGMY cloud account yet, so changes stay on this phone only. Enter your password once to connect it.',
+                  style: const TextStyle(color: Colors.white70, height: 1.35),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.alternate_email_rounded, size: 16, color: Colors.white54),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(email, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: passwordC,
+                  obscureText: !showPassword,
+                  autofocus: true,
+                  enabled: !busy,
+                  style: const TextStyle(color: Colors.white),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => busy ? null : submit(),
+                  decoration: InputDecoration(
+                    labelText: 'NGMY password',
+                    labelStyle: const TextStyle(color: Colors.white60),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                    suffixIcon: IconButton(
+                      icon: Icon(showPassword ? Icons.visibility_off_rounded : Icons.visibility_rounded, color: Colors.white54),
+                      onPressed: () => setDialogState(() => showPassword = !showPassword),
+                    ),
+                  ),
+                ),
+                if (error.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Text(error, style: const TextStyle(color: Colors.orangeAccent, height: 1.3)),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: busy ? null : () => Navigator.pop(ctx, false),
+              child: const Text('Not now'),
+            ),
+            ElevatedButton.icon(
+              onPressed: busy ? null : submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+              ),
+              icon: busy
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.login_rounded, size: 16),
+              label: Text(busy ? 'Connecting…' : 'Connect'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+  passwordC.dispose();
+  return result == true;
 }
 
 /// Details dialog behind the orange bar: the full report, Copy, and Retry.
@@ -2038,8 +2172,17 @@ Future<void> showNgmyCivicHelpModeSyncDetails(
               ),
               icon: retrying
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.refresh_rounded, size: 16),
-              label: Text(retrying ? 'Saving…' : 'Retry'),
+                  : Icon(
+                      report?.failure == NgmyCivicHelpModeSyncFailure.noSession
+                          ? Icons.login_rounded
+                          : Icons.refresh_rounded,
+                      size: 16,
+                    ),
+              label: Text(
+                retrying
+                    ? 'Saving…'
+                    : (report?.failure == NgmyCivicHelpModeSyncFailure.noSession ? 'Connect & Retry' : 'Retry'),
+              ),
             ),
           ],
         );

@@ -31811,6 +31811,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         if (mounted) setState(() {});
       }());
       unawaited(_refreshCivicStateAccess());
+      unawaited(_promptCivicCloudSignInIfNeeded());
     });
     // Live changes arrive through the help-mode broadcast channel; this poll
     // only catches a missed broadcast, so it stays slow and skips hidden tabs.
@@ -31983,12 +31984,62 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     ));
   }
 
+  /// Asked at most once per app run so a registrar who taps "Not now" is
+  /// not nagged on every screen open; Activate / Deactivate ask again.
+  static bool _civicCloudSignInPromptedThisRun = false;
+
+  /// A Supabase session with this account's email, or false. Repairs
+  /// silently with the saved password hash first; when the device has none
+  /// (old local login, OAuth login, cache refreshed from the cloud) it asks
+  /// for the password in place. The old flow could only fail and tell the
+  /// registrar to sign out, which is what every "cloud sync failed" was.
+  Future<bool> _ensureCivicCloudSessionInteractive({String reason = ''}) async {
+    if (ngmyCurrentAuthEmail().isNotEmpty) {
+      await ngmyEnsurePrivilegedCloudSession();
+      if (ngmyCurrentAuthEmail().isNotEmpty) return true;
+    }
+    final silent = await ngmyEnsurePrivilegedCloudSession(force: true);
+    if (silent && ngmyCurrentAuthEmail().isNotEmpty) return true;
+    if (!mounted) return false;
+    final email = widget.user.email.trim().toLowerCase();
+    if (email.isEmpty) return false;
+    _civicCloudSignInPromptedThisRun = true;
+    return showNgmyCloudSignInDialog(
+      context,
+      email: email,
+      reason: reason,
+      onPasswordVerified: (hash) {
+        widget.user.passwordHash = hash;
+        for (final u in widget.allUsers) {
+          if (u.email.trim().toLowerCase() == email) u.passwordHash = hash;
+        }
+        widget.onDataChanged();
+      },
+    );
+  }
+
+  Future<void> _promptCivicCloudSignInIfNeeded() async {
+    if (_civicCloudSignInPromptedThisRun) return;
+    if (!_hasRegistrarAccess()) return;
+    // Give supabase_flutter a moment to restore a persisted session first.
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    if (!mounted || _civicCloudSignInPromptedThisRun) return;
+    if (ngmyCurrentAuthEmail().isNotEmpty) return;
+    await _ensureCivicCloudSessionInteractive(
+      reason: 'You are an Authorized Registrar, but this phone is not connected to your NGMY cloud account. '
+          'Enter your password once so Help Mode and contributions save for every member.',
+    );
+  }
+
   Future<void> _openCivicHelpModeSyncDetails({required bool activated}) async {
     if (!mounted) return;
     final state = _selectedState;
     await showNgmyCivicHelpModeSyncDetails(
       context,
       onRetry: () async {
+        await _ensureCivicCloudSessionInteractive(
+          reason: 'Enter your NGMY password once to connect this phone; the Help Mode save then runs again by itself.',
+        );
         final ok = await ngmyPersistCivicHelpModeSettings(widget.config);
         if (ok) {
           await _broadcastCivicHelpModeChanged(state);
@@ -38020,6 +38071,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     );
                                     return;
                                   }
+                                  // Connect this phone to the cloud account first so the
+                                  // shared write below has a session to use. Declining
+                                  // still deactivates locally and reports the failure.
+                                  await _ensureCivicCloudSessionInteractive(
+                                    reason: 'Enter your NGMY password once so deactivating Help Mode reaches every member.',
+                                  );
+                                  if (!ctx.mounted || !mounted) return;
                                   // Pin everything to _selectedState explicitly — the
                                   // state this button is actually deactivating — instead
                                   // of letting _activeHelpCampaignId()/
@@ -38145,6 +38203,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   );
                                   return;
                                 }
+                                // Connect this phone to the cloud account before the
+                                // shared write; declining still activates locally.
+                                await _ensureCivicCloudSessionInteractive(
+                                  reason: 'Enter your NGMY password once so Help Mode reaches every member in $_selectedState.',
+                                );
+                                if (!ctx.mounted || !mounted) return;
                                 final wasActive = widget.config.helpActiveFor(_selectedState);
                                 final previousPurpose = widget.config.helpPurposeFor(_selectedState).trim();
                                 final previousScopeType = widget.config.helpScopeTypeFor(_selectedState).trim();
