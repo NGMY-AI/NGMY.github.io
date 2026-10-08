@@ -16791,6 +16791,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _checkAdminHelperGiftPopups() async {
     if (!_isSessionAdmin) return;
+    if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
     if (ngmyHelperGiftAdminPopupIsOpen) return;
     await ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers);
     await ngmyCheckAdminHelperGiftPopupsNow(
@@ -16807,12 +16808,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   /// sees the celebration card as soon as roster data arrives.
   Future<void> _bootstrapAdminHelperGiftPopups() async {
     if (!_isSessionAdmin) return;
+    if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
     for (var attempt = 0; attempt < 30; attempt++) {
       if (!mounted) return;
+      if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
       if (ngmyHelperGiftAdminPopupIsOpen) return;
       await ngmyHydrateCivicRegistryMembersFromAllBackups(widget.config, widget.allUsers);
       await _checkAdminHelperGiftPopups();
       if (ngmyHelperGiftAdminPopupIsOpen) return;
+      if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
       if (NgmyCivicHelperGifts.openPending(widget.config).isNotEmpty) return;
       await Future<void>.delayed(const Duration(milliseconds: 350));
     }
@@ -39700,7 +39704,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(displayName, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink)),
+                          Text(
+                            _recordDisplayValue(displayName),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
+                          ),
                           const SizedBox(height: 10),
                           _recordRow('Username', usernameLabel.isEmpty ? 'N/A' : usernameLabel, isDark),
                           _recordDivider(isDark),
@@ -40322,18 +40331,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
+  String _recordDisplayValue(String value) {
+    return value.replaceAll(RegExp(r'[\r\n]+'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
   Widget _recordRow(String label, String value, bool isDark, {bool copyable = false}) {
+    final display = _recordDisplayValue(value);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 130,
             child: Text(
               label,
+              maxLines: 2,
               style: TextStyle(
                 fontSize: 11,
+                height: 1.25,
                 color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 fontWeight: FontWeight.w700,
               ),
@@ -40342,18 +40358,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              value,
+              display.isEmpty ? 'N/A' : display,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 13,
+                height: 1.25,
                 color: isDark ? Colors.white : const Color(0xFF0F172A),
               ),
             ),
           ),
           if (copyable &&
               (_hasRegistrarAccess() || _isGlobalCivicRegistryAdmin()) &&
-              value.trim().isNotEmpty &&
-              value != 'N/A')
+              display.isNotEmpty &&
+              display != 'N/A')
             SizedBox(
               width: 30,
               height: 30,
@@ -40367,7 +40387,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
                 ),
                 onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: value));
+                  await Clipboard.setData(ClipboardData(text: display));
                   if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

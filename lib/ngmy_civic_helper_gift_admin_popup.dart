@@ -10,6 +10,18 @@ bool _helperGiftAdminPopupOpen = false;
 
 bool get ngmyHelperGiftAdminPopupIsOpen => _helperGiftAdminPopupOpen;
 
+/// After the admin dismisses a helper-gift alert (X, Not now, or timer), do
+/// not show another until the app is fully closed and opened again.
+class NgmyHelperGiftAdminPopupSession {
+  static bool _dismissedUntilNextAppOpen = false;
+
+  static bool get isDismissedForAppSession => _dismissedUntilNextAppOpen;
+
+  static void markDismissedForAppSession() {
+    _dismissedUntilNextAppOpen = true;
+  }
+}
+
 Future<BuildContext?> _waitForHelperGiftPopupContext({
   BuildContext? preferred,
   Duration timeout = const Duration(seconds: 20),
@@ -49,6 +61,7 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
   VoidCallback? onDataChanged,
 }) async {
   if (_helperGiftAdminPopupOpen) return;
+  if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
   if (!await NgmyHelperGiftAdminPopupSettings.isEnabled()) return;
 
   await NgmyCivicHelperGifts.hydrateFromCloud(config);
@@ -69,21 +82,26 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
         return b.createdAt.compareTo(a.createdAt);
       });
 
-    for (final item in queue) {
-      if (!ctx.mounted) break;
-      if (!await NgmyHelperGiftAdminPopupSettings.isEnabled()) break;
-      if (NgmyCivicHelperGifts.openPending(config).every((p) => p.id != item.id || p.granted)) {
-        continue;
-      }
-      final granted = await showNgmyHelperGiftAdminCelebrationPopup(
-        ctx,
-        pending: item,
-        storeListings: storeListings,
-        onGrant: onGrant,
-      );
-      if (granted == true) {
-        onDataChanged?.call();
-      }
+    if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
+
+    final item = queue.firstWhere(
+      (p) => NgmyCivicHelperGifts.openPending(config).any((o) => o.id == p.id && !o.granted),
+      orElse: () => queue.first,
+    );
+    if (NgmyCivicHelperGifts.openPending(config).every((p) => p.id != item.id || p.granted)) {
+      return;
+    }
+
+    final granted = await showNgmyHelperGiftAdminCelebrationPopup(
+      ctx,
+      pending: item,
+      storeListings: storeListings,
+      onGrant: onGrant,
+    );
+    if (granted == true) {
+      onDataChanged?.call();
+    } else {
+      NgmyHelperGiftAdminPopupSession.markDismissedForAppSession();
     }
   } finally {
     _helperGiftAdminPopupOpen = false;
