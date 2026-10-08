@@ -1645,6 +1645,104 @@ Future<void> _persistCivicHelpModeSettingsLocal(AppConfig config) async {
   }
 }
 
+/// Approved contribution receipts carried inside the shared help-mode row so
+/// every device sees the money even when a transactions insert is blocked.
+const int kNgmySharedContributionReceiptCap = 1000;
+
+List<Map<String, dynamic>> ngmyMergeSharedContributionReceipts(
+  Iterable<Map<String, dynamic>> rows, {
+  Iterable<String> deletedIds = const [],
+  int maxCount = kNgmySharedContributionReceiptCap,
+}) {
+  final deleted = deletedIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+  final byId = <String, Map<String, dynamic>>{};
+  for (final raw in rows) {
+    final id = (raw['id'] ?? '').toString().trim();
+    if (id.isEmpty || deleted.contains(id)) continue;
+    final type = raw['type'];
+    final status = raw['status'];
+    final typeOk = type == TransactionType.contribution.index || type == TransactionType.contribution.name;
+    final statusOk = status == TransactionStatus.approved.index || status == TransactionStatus.approved.name;
+    if (!typeOk || !statusOk) continue;
+    final amount = raw['amount'];
+    final next = <String, dynamic>{
+      'id': id,
+      'userEmail': (raw['userEmail'] ?? raw['user_email'] ?? '').toString(),
+      'amount': amount is num ? amount : num.tryParse(amount?.toString() ?? '') ?? 0,
+      'type': TransactionType.contribution.index,
+      'method': raw['method'] is num ? raw['method'] : PaymentMethod.system.index,
+      'sourceDetails': raw['sourceDetails'] ?? raw['source_details'],
+      'status': TransactionStatus.approved.index,
+      'timestamp': (raw['timestamp'] ?? '').toString(),
+    };
+    final prev = byId[id];
+    if (prev == null) {
+      byId[id] = next;
+      continue;
+    }
+    final prevAmt = (prev['amount'] as num?)?.toDouble() ?? 0;
+    final nextAmt = (next['amount'] as num?)?.toDouble() ?? 0;
+    if (nextAmt >= prevAmt) byId[id] = next;
+  }
+  final list = byId.values.toList()
+    ..sort((a, b) => (b['timestamp'] ?? '').toString().compareTo((a['timestamp'] ?? '').toString()));
+  if (list.length <= maxCount) return list;
+  return list.sublist(0, maxCount);
+}
+
+Future<List<Map<String, dynamic>>> _readLocalContributionReceiptMaps() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_kNgmyCivicContributionsLocalPrefsKey);
+    if (raw == null || raw.trim().isEmpty) return const [];
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const [];
+    return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  } catch (e) {
+    debugPrint('[civic contributions local] read mirror: $e');
+    return const [];
+  }
+}
+
+Future<void> ngmyMergeSharedContributionReceiptsIntoLocal(
+  AppConfig config,
+  dynamic raw,
+) async {
+  if (raw is! List || raw.isEmpty) return;
+  final incoming = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e));
+  final local = await _readLocalContributionReceiptMaps();
+  final merged = ngmyMergeSharedContributionReceipts(
+    [...local, ...incoming],
+    deletedIds: config.civicDeletedContributionIds,
+  );
+  if (merged.isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kNgmyCivicContributionsLocalPrefsKey, jsonEncode(merged));
+  } catch (e) {
+    debugPrint('[civic contributions local] merge mirror: $e');
+  }
+}
+
+Future<List<Map<String, dynamic>>> _contributionReceiptMirrorForCloud(AppConfig config) async {
+  final local = await _readLocalContributionReceiptMaps();
+  var remote = const <Map<String, dynamic>>[];
+  try {
+    final row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
+    final raw = row?['contributionReceipts'];
+    if (raw is List) {
+      remote = raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+  } catch (e) {
+    debugPrint('[civic help mode] receipt mirror read: $e');
+    if (local.isEmpty) return const [];
+  }
+  return ngmyMergeSharedContributionReceipts(
+    [...remote, ...local],
+    deletedIds: config.civicDeletedContributionIds,
+  );
+}
+
 Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -1656,19 +1754,18 @@ Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
   } catch (e) {
     debugPrint('[civic help mode] local hydrate: $e');
   }
-  if (await ngmyCanReachCloud()) {
-    try {
-      // This row is deliberately shared by RLS with every authenticated user;
-      // the generic admin-only settings helper would leave other devices stale.
-      final row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey,
-      );
+  try {
+    // Shared row. Do not skip this when the short REST probe fails — that
+    // probe false-negatives while the same-origin sync path still works, and
+    // skipping it left every other device on a stale help-mode copy.
+    final row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
     if (row != null) {
-        _applyCivicHelpModeSettingsPayload(config, row);
-        await _persistCivicHelpModeSettingsLocal(config);
-      }
-    } catch (e) {
-      debugPrint('[civic help mode] shared cloud hydrate: $e');
+      _applyCivicHelpModeSettingsPayload(config, row);
+      await ngmyMergeSharedContributionReceiptsIntoLocal(config, row['contributionReceipts']);
+      await _persistCivicHelpModeSettingsLocal(config);
     }
+  } catch (e) {
+    debugPrint('[civic help mode] shared cloud hydrate: $e');
   }
 }
 
@@ -1684,84 +1781,96 @@ Future<bool> ngmyPersistCivicHelpModeSettings(AppConfig config) async {
   NgmyAdminLiveRefresh.notify();
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   var helpModeCloudOk = false;
-  if (await ngmyCanReachCloud()) {
-    final payload = _civicHelpModeSettingsPayload(config);
-    final email = ngmyCurrentAuthEmail();
+  final payload = _civicHelpModeSettingsPayload(config);
+  final receipts = await _contributionReceiptMirrorForCloud(config);
+  if (receipts.isNotEmpty) payload['contributionReceipts'] = receipts;
+  final email = ngmyCurrentAuthEmail();
+  // Always attempt the shared write. ngmyCanReachCloud() is a 3-second anon
+  // REST probe that often fails on the web app while /api/sync still works.
+  // Gating on it made Activate and Deactivate report "cloud sync failed"
+  // without ever saving, so other phones never saw the campaign or its money.
+  for (var attempt = 0; attempt < 2 && !helpModeCloudOk; attempt++) {
     helpModeCloudOk = await ngmyCivicAdminSettingsPersist(
       email: email,
-      kind: 'civicHelpModeSettings', payload: payload);
+      kind: 'civicHelpModeSettings',
+      payload: payload,
+    );
     if (!helpModeCloudOk) {
       try {
         helpModeCloudOk = await ngmyDbRelaySettingsUpsert(
           _kNgmyCivicHelpModeSettingsKey,
-        payload,
-      );
-    } catch (e) {
+          payload,
+        );
+      } catch (e) {
         debugPrint('[civic help mode] shared relay save: $e');
       }
     }
-    if (email.isNotEmpty) {
-      var spendOk = await ngmyPrivateListsPersistHelpSpendings(
+    if (!helpModeCloudOk && attempt == 0) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+  }
+  if (email.isNotEmpty) {
+    var spendOk = false;
+    final spendItems = config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList();
+    for (var attempt = 0; attempt < 2 && !spendOk; attempt++) {
+      spendOk = await ngmyPrivateListsPersistHelpSpendings(
         email: email,
-        items: config.helpCampaignSpendings.map((e) => Map<String, dynamic>.from(e)).toList(),
+        items: spendItems,
       );
       if (!spendOk) {
         try {
           spendOk = await ngmyDbRelaySettingsUpsert(
             _kNgmyCivicHelpCampaignSpendingsSettingsKey,
-            {
-              'items': config.helpCampaignSpendings
-                  .map((e) => Map<String, dynamic>.from(e))
-                  .toList(),
-            },
+            {'items': spendItems},
           );
         } catch (e) {
           debugPrint('[civic help spendings] shared relay save: $e');
-    }
-      }
-    }
-    try {
-      var row = <String, dynamic>{
-        'id': kNgmyConfigRowId,
-        'helpModeActive': config.helpModeActive,
-        'helpPurpose': config.helpPurpose,
-        'helpCashApp': config.helpCashApp,
-        'helpZelle': config.helpZelle,
-        'helpPhone': config.helpPhone,
-        'helpScopeType': config.helpScopeType,
-        'helpScopeValue': config.helpScopeValue,
-        'helpState': config.helpState,
-        'helpCampaignId': config.helpCampaignId,
-        'helpCampaignStartedAt': config.helpCampaignStartedAt,
-        'helpModeByState': config.helpModeByState,
-        'helpCampaignClosures': config.helpCampaignClosures,
-      };
-      for (var i = 0; i < 8; i++) {
-        try {
-          // See _upsertNgmySettingSafe — no timeout here meant a stalled
-          // connection could block Deactivate Help Mode's await forever.
-          await ngmyDbRelayUpsert('config', [row], timeout: kNgmyCloudWriteTimeout);
-          break;
-        } catch (e) {
-          final missing = _missingColumnFromPostgrestError(e);
-          if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
-            row = Map<String, dynamic>.from(row)..remove(missing);
-            if (row.length <= 1) break;
-            continue;
-          }
-          debugPrint('[civic help mode] config upsert: $e');
-          break;
         }
       }
-    } catch (e) {
-      debugPrint('[civic help mode] config save: $e');
     }
+  }
+  try {
+    var row = <String, dynamic>{
+      'id': kNgmyConfigRowId,
+      'helpModeActive': config.helpModeActive,
+      'helpPurpose': config.helpPurpose,
+      'helpCashApp': config.helpCashApp,
+      'helpZelle': config.helpZelle,
+      'helpPhone': config.helpPhone,
+      'helpScopeType': config.helpScopeType,
+      'helpScopeValue': config.helpScopeValue,
+      'helpState': config.helpState,
+      'helpCampaignId': config.helpCampaignId,
+      'helpCampaignStartedAt': config.helpCampaignStartedAt,
+      'helpModeByState': config.helpModeByState,
+      'helpCampaignClosures': config.helpCampaignClosures,
+    };
+    for (var i = 0; i < 8; i++) {
+      try {
+        // See _upsertNgmySettingSafe — no timeout here meant a stalled
+        // connection could block Deactivate Help Mode's await forever.
+        await ngmyDbRelayUpsert('config', [row], timeout: kNgmyCloudWriteTimeout);
+        break;
+      } catch (e) {
+        final missing = _missingColumnFromPostgrestError(e);
+        if (missing != null && missing.isNotEmpty && row.containsKey(missing)) {
+          row = Map<String, dynamic>.from(row)..remove(missing);
+          if (row.length <= 1) break;
+          continue;
+        }
+        debugPrint('[civic help mode] config upsert: $e');
+        break;
+      }
+    }
+  } catch (e) {
+    debugPrint('[civic help mode] config save: $e');
   }
   _scheduleOperationalConfigCloudPersist(config);
   await ngmyFlushCriticalConfigLocalAndCloud(config, cloud: false);
   // Spending/config fallbacks must not disguise a failed shared help-mode
   // write. Activate/deactivate callers use this result to tell registrars
   // whether every other device can receive the new state.
+  if (!helpModeCloudOk) ngmyInvalidateCloudReachabilityCache();
   return helpModeCloudOk;
 }
 
@@ -2213,7 +2322,7 @@ Future<void> _hydrateCivicHelpCampaignSpendingsLocal(AppConfig config) async {
 
 Future<void> ngmyHydrateCivicHelpCampaignSpendings(AppConfig config) async {
   await _hydrateCivicHelpCampaignSpendingsLocal(config);
-  if (ngmyCurrentAuthEmail().isEmpty || !await ngmyCanReachCloud()) return;
+  if (ngmyCurrentAuthEmail().isEmpty) return;
   try {
     final payload = await ngmyDbRelaySettingsFetch(
       _kNgmyCivicHelpCampaignSpendingsSettingsKey,

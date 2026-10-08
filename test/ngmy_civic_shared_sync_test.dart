@@ -428,4 +428,48 @@ void main() {
     expect(trip.map((e) => e.name).toSet(), {'Rice', 'Soap', 'Bags'});
     expect(snapshot.legend.where((e) => e.name == 'Fuel').single.color, isNot(trip.first.color));
   });
+
+  test('shared contribution mirror keeps the higher amount and drops deleted ids', () {
+    final merged = ngmyMergeSharedContributionReceipts(
+      [
+        {
+          'id': 'a',
+          'amount': 10,
+          'type': TransactionType.contribution.index,
+          'status': TransactionStatus.approved.index,
+          'timestamp': '2026-09-01T00:00:00Z',
+          'userEmail': 'a@example.com',
+        },
+        {
+          'id': 'a',
+          'amount': 25,
+          'type': TransactionType.contribution.index,
+          'status': TransactionStatus.approved.index,
+          'timestamp': '2026-09-02T00:00:00Z',
+          'userEmail': 'a@example.com',
+        },
+        {
+          'id': 'gone',
+          'amount': 5,
+          'type': TransactionType.contribution.index,
+          'status': TransactionStatus.approved.index,
+          'timestamp': '2026-09-03T00:00:00Z',
+          'userEmail': 'b@example.com',
+        },
+        {
+          'id': 'pending',
+          'amount': 5,
+          'type': TransactionType.contribution.index,
+          'status': TransactionStatus.pending.index,
+          'timestamp': '2026-09-03T00:00:00Z',
+          'userEmail': 'c@example.com',
+        },
+      ],
+      deletedIds: const ['gone'],
+    );
+
+    expect(merged, hasLength(1));
+    expect(merged.single['id'], 'a');
+    expect(merged.single['amount'], 25);
+  });
 }

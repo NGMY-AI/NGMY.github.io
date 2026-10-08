@@ -5317,6 +5317,32 @@ async function handleCivicAdminSettingsPersist(
       if (ck) mergedByState[ck] = v;
     }
     cleaned.helpModeByState = mergedByState;
+    const incomingReceipts = Array.isArray(cleaned.contributionReceipts)
+      ? (cleaned.contributionReceipts as unknown[])
+      : [];
+    const existingReceipts = Array.isArray(current.contributionReceipts)
+      ? (current.contributionReceipts as unknown[])
+      : [];
+    if (incomingReceipts.length > 0 || existingReceipts.length > 0) {
+      const byId = new Map<string, Record<string, unknown>>();
+      const take = (row: unknown) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return;
+        const rec = row as Record<string, unknown>;
+        const id = String(rec.id ?? "").trim();
+        if (!id) return;
+        const prev = byId.get(id);
+        const amt = Number(rec.amount ?? 0);
+        const prevAmt = prev ? Number(prev.amount ?? 0) : -1;
+        if (!prev || amt >= prevAmt) byId.set(id, rec);
+      };
+      for (const row of existingReceipts) take(row);
+      for (const row of incomingReceipts) take(row);
+      const mergedReceipts = [...byId.values()];
+      mergedReceipts.sort((a, b) =>
+        String(b.timestamp ?? "").localeCompare(String(a.timestamp ?? ""))
+      );
+      cleaned.contributionReceipts = mergedReceipts.slice(0, 1000);
+    }
     if (Array.isArray(cleaned.helpCampaignClosures) && Array.isArray(current.helpCampaignClosures)) {
       const seen = new Set<string>();
       const closures: unknown[] = [];

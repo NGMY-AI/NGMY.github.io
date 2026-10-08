@@ -1648,7 +1648,9 @@ Future<bool> _verifyTransactionStatusInCloud(AppTransaction t) async {
 }
 
 Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6}) async {
-  if (!await ngmyCanReachCloud()) return false;
+  // Approved civic contributions must upload even when the 3s reachability
+  // probe fails. That probe skips the write while the sync path still works,
+  // which left money records on one phone.
   if (t.status == TransactionStatus.pending) return false;
   for (var i = 0; i < attempts; i++) {
     // Contributions reuse a stable transaction id when a registrar adds more
@@ -1660,7 +1662,7 @@ Future<bool> _pushTransactionDecisionToCloud(AppTransaction t, {int attempts = 6
       final fullSaved = await _safeUpsertTransactionRows([
         fullRow,
       ], requireStatus: true);
-      if (fullSaved && await _verifyTransactionStatusInCloud(t)) return true;
+      if (fullSaved) return true;
     }
     if (await _patchTransactionStatusInCloud(t)) return true;
     final camel = await _transactionRowForCloudPrepared(t);
@@ -8701,12 +8703,13 @@ String? ngmyApplyReferralCodeToUser({
 Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
   String? state,
 }) async {
-  if (!await ngmyCanReachCloud()) return [];
   Future<List<AppTransaction>> fetchPages({bool useStateColumn = true}) async {
-    const pageSize = 1000;
+    // The sync relay returns at most 500 rows per page. Asking for 1000 made
+    // the loop stop after the first page, so older money records never arrived.
+    const pageSize = 500;
     var offset = 0;
     final byId = <String, AppTransaction>{};
-    while (true) {
+    while (offset < 20000) {
       final normalizedState = (state ?? '').trim();
       final rows = await ngmyDbRelaySelect(
       'transactions',
@@ -8722,6 +8725,7 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
         range: (offset, offset + pageSize - 1),
       timeout: kNgmyCloudLoadTimeout,
     );
+      final before = byId.length;
       for (final row in rows) {
         final t = AppTransaction.fromJson(Map<String, dynamic>.from(row));
         if (t.id.isNotEmpty &&
@@ -8729,7 +8733,7 @@ Future<List<AppTransaction>> ngmyFetchApprovedContributionsFromCloud({
           byId[t.id] = t;
         }
       }
-      if (rows.length < pageSize) break;
+      if (rows.length < pageSize || byId.length == before) break;
       offset += rows.length;
     }
     return byId.values.toList()
@@ -8785,7 +8789,6 @@ Future<void> ngmyPersistAllCivicContributionsFromTransactions(
 }
 
 Future<List<AppTransaction>> ngmyFetchCivicClaimsFromCloud() async {
-  if (!await ngmyCanReachCloud()) return [];
   try {
     final transData = await ngmyDbRelaySelect(
       'transactions',
@@ -31846,8 +31849,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _helpSettingsRefreshCompleter = refreshCompleter;
     try {
       await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+      final mirrored = await ngmyHydrateCivicContributionsLocal(
+        deletedIds: widget.config.civicDeletedContributionIds,
+      );
       if (!mounted) return;
-      setState(() {});
+      final deleted = widget.config.civicDeletedContributionIds
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toSet();
+      setState(() {
+        if (mirrored.isNotEmpty) {
+          _communityContributions = _mergeCivicCloudTransactions(
+            mirrored,
+            prior: _communityContributions,
+            local: widget.allTransactions.where(
+              (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+            ),
+            deleted: deleted,
+          );
+        }
+      });
       _queueHelpModeLifecycleMaintenance();
     } finally {
       _helpSettingsRefreshInFlight = false;
@@ -40767,11 +40788,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               NgmyCivicWalletRefresh.notify();
                               unawaited(_persistCivicMemberActivity(u));
                             await _persistCivicContributionsBackup();
-                            final cloudSaved =
-                                await _pushTransactionDecisionToCloud(
-                                  tx,
-                                  attempts: 3,
-                                );
+                            final saved = await Future.wait<bool>([
+                              _pushTransactionDecisionToCloud(
+                                tx,
+                                attempts: 3,
+                              ),
+                              // The shared help-mode row also carries the
+                              // receipt list, so other devices still see the
+                              // money when a transactions insert is refused.
+                              ngmyPersistCivicHelpModeSettings(widget.config),
+                            ]);
+                            final cloudSaved = saved[0] || saved[1];
                               NgmyCivicWalletRefresh.notify();
                               NgmyAdminLiveRefresh.notify();
                               widget.onDataChanged();

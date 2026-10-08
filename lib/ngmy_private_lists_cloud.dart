@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'ngmy_civic_registry_cloud.dart';
 
 /// Role-filtered private config lists (loans, games, help, jobs, store).
@@ -112,5 +114,9 @@ Future<bool> ngmyCivicAdminSettingsPersist({
   if (rooms != null) body['rooms'] = rooms;
   if (roomsExact) body['roomsExact'] = true;
   final data = await ngmyCivicInvoke(body);
-  return data != null && data['ok'] == true;
+  if (data != null && data['ok'] == true) return true;
+  debugPrint(
+    '[civic admin settings] persist $kind failed: ${data?['error'] ?? 'no response'}',
+  );
+  return false;
 }

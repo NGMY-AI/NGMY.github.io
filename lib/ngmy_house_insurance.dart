@@ -166,19 +166,10 @@ class NgmyHouseInsurance {
     final payUrl = base.endsWith('/') ? '$base$amountText' : '$base/$amountText';
     final opened = await launchUrl(Uri.parse(payUrl), mode: LaunchMode.externalApplication);
     if (!opened || !context.mounted) return false;
-    final sent = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Did you send it on Cash App?'),
-        content: Text(
-          'Cash App should be open to send \$$amountText to $cashAppTag. '
-          'Tap “I sent it” after the payment goes through.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not yet')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('I sent \$$amountText')),
-        ],
-      ),
+    final sent = await showNgmyCashAppPaymentConfirm(
+      context,
+      amountText: amountText,
+      cashAppTag: cashAppTag,
     );
     if (sent != true) return false;
     await activateAfterPayment(
@@ -189,6 +180,163 @@ class NgmyHouseInsurance {
       onPersistConfig: onPersistConfig,
     );
     return true;
+  }
+}
+
+/// Confirms a Cash App payment after the app opens. Styled like the rest of
+/// Help Center instead of a plain system alert.
+Future<bool?> showNgmyCashAppPaymentConfirm(
+  BuildContext context, {
+  required String amountText,
+  required String cashAppTag,
+}) {
+  return showGeneralDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black.withValues(alpha: 0.55),
+    transitionDuration: const Duration(milliseconds: 220),
+    pageBuilder: (ctx, _, __) {
+      return _NgmyCashAppConfirmCard(amountText: amountText, cashAppTag: cashAppTag);
+    },
+    transitionBuilder: (ctx, animation, _, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
+}
+
+class _NgmyCashAppConfirmCard extends StatelessWidget {
+  const _NgmyCashAppConfirmCard({
+    required this.amountText,
+    required this.cashAppTag,
+  });
+
+  final String amountText;
+  final String cashAppTag;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panel = isDark ? const Color(0xFF0C1220) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white70 : const Color(0xFF475569);
+    final tag = cashAppTag.trim().isEmpty ? r'$NGMYpay' : cashAppTag.trim();
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Material(
+              color: panel,
+              elevation: 18,
+              shadowColor: const Color(0xFF00D632).withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(28),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF00E676), Color(0xFF00C853)],
+                        ),
+                      ),
+                      child: const Icon(Icons.attach_money_rounded, color: Colors.white, size: 32),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'CASH APP',
+                      style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: 2.2,
+                        fontWeight: FontWeight.w900,
+                        color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Did you send it on Cash App?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 20, height: 1.15, fontWeight: FontWeight.w900, color: ink),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00D632).withValues(alpha: isDark ? 0.12 : 0.08),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF00D632).withValues(alpha: 0.35)),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '\$$amountText',
+                            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: ink, height: 1),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'to $tag',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Cash App should be open. Come back here and confirm after the payment goes through.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, height: 1.3, fontWeight: FontWeight.w600, color: muted),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF00D632),
+                          foregroundColor: const Color(0xFF052E16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: Text('I sent \$$amountText', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                      ),
+                    ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 40,
+                      child: TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: TextButton.styleFrom(
+                          foregroundColor: muted,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('Not yet', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
