@@ -3590,6 +3590,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _loaded = false;
   String? _activityCaption;
   final _browserSession = NgmyAdvisorBrowserSession();
+  double _browserLift = 0;
   /// Outbound texts waiting for an AI reply (never drop while busy).
   final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
@@ -3772,6 +3773,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (mounted) setState(() {});
   }
 
+  void _onBrowserLiftDelta(double dy) {
+    setState(() => _browserLift = (_browserLift - dy).clamp(0, 280));
+  }
+
   /// Free advisor minutes are only spent while this chat is genuinely in front of
   /// the user: app in the foreground and no other screen pushed over the chat.
   bool get _shouldCountTime {
@@ -3873,7 +3878,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final url = (m['browserUrl'] ?? '').trim();
       if (url.isEmpty) continue;
       final label = (m['browserLabel'] ?? '').trim();
-      unawaited(_browserSession.open(url, label: label.isEmpty ? null : label));
+      _browserSession.stage(url, label: label.isEmpty ? null : label);
       break;
     }
     if (_isTranslator && _translatorNativeLang.isEmpty && mounted) {
@@ -4543,11 +4548,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       await _applyReactionToLatestUser(reactionEmoji);
     }
 
-    if (browserUrl.isNotEmpty) {
+    if (browserUrl.isNotEmpty && browserUrl != _browserSession.url) {
       await _browserSession.open(browserUrl, label: browserLabel.isEmpty ? null : browserLabel);
     }
-    if (browserCommands.isNotEmpty) {
-      await _browserSession.applyCommands(browserCommands);
+    final browserCommandsFiltered = browserCommands.where((c) => c.op != 'reload').toList();
+    if (browserCommandsFiltered.isNotEmpty) {
+      await _browserSession.applyCommands(browserCommandsFiltered);
     }
 
     if (photo.isNotEmpty) {
@@ -5260,7 +5266,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  final browserPad = _browserSession.visible ? _browserSession.previewHeight + 96 : 0.0;
+                  final browserPad = _browserSession.visible
+                      ? _browserSession.previewHeight + 96 + _browserLift
+                      : 0.0;
                   return SizedBox(height: bottomClearance + browserPad);
                 }
                 final slot = i - 1;
@@ -5462,6 +5470,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               ),
             ),
           ),
+          if (_browserSession.visible)
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: composerBottom + 12 + _browserLift,
+              child: NgmyAdvisorBrowserPanel(
+                session: _browserSession,
+                isDark: isDark,
+                advisorName: ngmyAdvisorFirstName(widget.profile.name),
+                lift: _browserLift,
+                onLiftDelta: _onBrowserLiftDelta,
+              ),
+            ),
           Positioned(
             left: 0,
             right: 0,
@@ -5474,11 +5495,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    NgmyAdvisorBrowserPanel(
-                      session: _browserSession,
-                      isDark: isDark,
-                      advisorName: ngmyAdvisorFirstName(widget.profile.name),
-                    ),
                     if (_isDebater)
                       ngmyDebateChatToolbar(
                         isDark: isDark,

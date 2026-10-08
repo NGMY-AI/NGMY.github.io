@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
@@ -23,7 +25,8 @@ class NgmyAdvisorEmbeddedBrowser extends StatefulWidget {
 
 class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser> implements NgmyAdvisorBrowserController {
   late final WebViewController _controller;
-  var _loading = false;
+  Timer? _loadTimeout;
+  String _loadedUrl = '';
 
   @override
   void initState() {
@@ -34,6 +37,7 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
 
   @override
   void dispose() {
+    _loadTimeout?.cancel();
     widget.session.detachController(this);
     super.dispose();
   }
@@ -54,14 +58,29 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
       ..setBackgroundColor(const Color(0xFF0F172A))
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            if (!request.isMainFrame) return NavigationDecision.navigate;
+            final next = Uri.tryParse(request.url);
+            if (next != null && ngmyAdvisorBrowserBlocksHost(next.host)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onPageStarted: (_) {
-            if (mounted) setState(() => _loading = true);
+            _loadTimeout?.cancel();
+            _armTimeout();
+            if (mounted) setState(() {});
           },
           onPageFinished: (_) {
-            if (mounted) setState(() => _loading = false);
+            _loadTimeout?.cancel();
+            widget.session.markReady();
+            if (mounted) setState(() {});
           },
-          onWebResourceError: (_) {
-            if (mounted) setState(() => _loading = false);
+          onWebResourceError: (error) {
+            if (error.isForMainFrame != true) return;
+            _loadTimeout?.cancel();
+            widget.session.markFailed(error.description);
+            if (mounted) setState(() {});
           },
         ),
       );
@@ -73,11 +92,32 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
     return controller;
   }
 
+  void _armTimeout() {
+    _loadTimeout?.cancel();
+    _loadTimeout = Timer(const Duration(seconds: 18), () {
+      if (!mounted) return;
+      if (widget.session.loadState == NgmyAdvisorBrowserLoadState.loading) {
+        widget.session.markFailed('Page timed out in the mini browser.');
+        setState(() {});
+      }
+    });
+  }
+
   @override
   Future<void> loadUrl(String url) async {
     final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    if (mounted) setState(() => _loading = true);
+    if (uri == null || uri.host.isEmpty) {
+      widget.session.markFailed('Invalid link.');
+      return;
+    }
+    if (ngmyAdvisorBrowserBlocksHost(uri.host)) {
+      widget.session.markFailed('NGMY stays open — only the requested site loads here.');
+      return;
+    }
+    if (_loadedUrl == url && widget.session.loadState == NgmyAdvisorBrowserLoadState.ready) {
+      return;
+    }
+    _loadedUrl = url;
     await _controller.loadRequest(uri);
   }
 
@@ -88,7 +128,11 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   Future<void> goForward() => _controller.goForward();
 
   @override
-  Future<void> reload() => _controller.reload();
+  Future<void> resetToBlank() async {
+    _loadTimeout?.cancel();
+    _loadedUrl = '';
+    await _controller.loadRequest(Uri.parse('about:blank'));
+  }
 
   @override
   Future<void> clickByVisibleText(String text) async {
@@ -115,6 +159,9 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
 
   @override
   Widget build(BuildContext context) {
+    final loading = widget.session.loadState == NgmyAdvisorBrowserLoadState.loading;
+    final failed = widget.session.loadState == NgmyAdvisorBrowserLoadState.failed;
+
     return SizedBox(
       height: widget.height,
       width: double.infinity,
@@ -127,14 +174,38 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
               absorbing: !widget.interactive,
               child: WebViewWidget(controller: _controller),
             ),
-            if (_loading)
+            if (loading)
               const ColoredBox(
-                color: Color(0x66000000),
+                color: Color(0x88000000),
                 child: Center(
                   child: SizedBox(
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70),
+                  ),
+                ),
+              ),
+            if (failed)
+              ColoredBox(
+                color: const Color(0xEE0F172A),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, color: Colors.white54, size: 28),
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.session.errorMessage,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.35),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () => widget.session.retryLoad(),
+                        child: const Text('Try again'),
+                      ),
+                    ],
                   ),
                 ),
               ),

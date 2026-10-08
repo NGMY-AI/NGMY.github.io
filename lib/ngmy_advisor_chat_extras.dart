@@ -24,8 +24,9 @@ The site opens ONLY inside the small Browser port above the chat box (never the 
 [{"op":"navigate","url":"https://example.com/login","label":"Signing in"}]
 [[/NGMY_BROWSER_CMD]]
 
-Ops: navigate (url, optional label), back, forward, reload, click_text, click_selector.
+Ops: navigate (url, optional label), back, forward, click_text, click_selector.
 Use navigate to open/change pages; click_text when they say tap Demo or Sign in.
+Do NOT spam reload — never reload the same page twice in a row.
 
 MESSAGE REACTIONS — React to THEIR last message like a real person (not every text). When they share good news, say something sweet,
 agree to a plan, thank you, or deserve encouragement, append ONE emoji reaction on their message:
@@ -217,28 +218,11 @@ final _urlInText = RegExp(
 List<NgmyPhoneAction> ngmyInferOpenUrlActionsFromUserMessage(String userText) {
   final t = userText.trim();
   if (t.isEmpty) return const [];
-  final lower = t.toLowerCase();
-  final wantsWeb = RegExp(
-    r'\b(open|go to|visit|browse|website|web site|link|url|sign in|log in|login|checkout|account)\b',
-  ).hasMatch(lower);
-  if (!wantsWeb) return const [];
 
   final match = _urlInText.firstMatch(t);
   if (match != null) {
     final url = _normalizeUrl(match.group(1)!);
     return [NgmyPhoneAction(type: 'open_url', fields: {'url': url, 'label': 'Opening link'})];
-  }
-
-  // Common site names without full URL
-  final site = switch (true) {
-    _ when lower.contains('youtube') => 'https://www.youtube.com',
-    _ when lower.contains('google') && !lower.contains('maps') => 'https://www.google.com',
-    _ when lower.contains('facebook') => 'https://www.facebook.com',
-    _ when lower.contains('instagram') => 'https://www.instagram.com',
-    _ => '',
-  };
-  if (site.isNotEmpty) {
-    return [NgmyPhoneAction(type: 'open_url', fields: {'url': site, 'label': 'Opening site'})];
   }
   return const [];
 }

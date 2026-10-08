@@ -4,18 +4,22 @@ import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_embedded_browser.dart';
 
-/// In-chat browser port — clipped preview above composer; never full-app takeover.
+/// Draggable in-chat browser port — clipped preview; never full-app takeover.
 class NgmyAdvisorBrowserPanel extends StatefulWidget {
   const NgmyAdvisorBrowserPanel({
     super.key,
     required this.session,
     required this.isDark,
     required this.advisorName,
+    required this.lift,
+    required this.onLiftDelta,
   });
 
   final NgmyAdvisorBrowserSession session;
   final bool isDark;
   final String advisorName;
+  final double lift;
+  final ValueChanged<double> onLiftDelta;
 
   @override
   State<NgmyAdvisorBrowserPanel> createState() => _NgmyAdvisorBrowserPanelState();
@@ -44,42 +48,48 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
         : ngmyAdvisorBrowserHostLabel(widget.session.url);
     final fg = widget.isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = widget.isDark ? Colors.white60 : const Color(0xFF64748B);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(9),
+    return GestureDetector(
+      onVerticalDragUpdate: (d) => widget.onLiftDelta(d.delta.dy),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
+        child: Row(
+          children: [
+            Icon(Icons.drag_handle_rounded, color: muted, size: 20),
+            const SizedBox(width: 6),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0EA5E9).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Icon(Icons.language_rounded, color: Color(0xFF38BDF8), size: 18),
             ),
-            child: const Icon(Icons.language_rounded, color: Color(0xFF38BDF8), size: 18),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Browser', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: fg)),
-                Text(subtitle, style: TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Browser', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: fg)),
+                  Text(subtitle, style: TextStyle(fontSize: 11, color: muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'Bigger preview',
-            iconSize: 20,
-            onPressed: widget.session.cycleSize,
-            icon: Icon(Icons.open_in_full_rounded, color: muted),
-          ),
-          IconButton(
-            tooltip: 'Hide browser',
-            iconSize: 20,
-            onPressed: () => widget.session.hide(),
-            icon: Icon(Icons.close_rounded, color: muted),
-          ),
-        ],
+            IconButton(
+              tooltip: 'Bigger preview',
+              iconSize: 20,
+              onPressed: widget.session.cycleSize,
+              icon: Icon(Icons.open_in_full_rounded, color: muted),
+            ),
+            IconButton(
+              tooltip: 'Hide browser',
+              iconSize: 20,
+              onPressed: () => widget.session.hide(),
+              icon: Icon(Icons.close_rounded, color: muted),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -90,33 +100,62 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
       return const SizedBox.shrink();
     }
     final border = widget.isDark ? Colors.white12 : const Color(0xFFE2E8F0);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      decoration: BoxDecoration(
-        color: widget.isDark ? const Color(0xFF1A1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _header(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: NgmyAdvisorEmbeddedBrowser(
-              session: widget.session,
-              height: widget.session.previewHeight,
-              interactive: true,
+    final idle = widget.session.loadState == NgmyAdvisorBrowserLoadState.idle;
+
+    return Material(
+      elevation: 8,
+      shadowColor: Colors.black45,
+      borderRadius: BorderRadius.circular(16),
+      color: widget.isDark ? const Color(0xFF1A1F2E) : Colors.white,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _header(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: idle
+                  ? SizedBox(
+                      height: 120,
+                      width: double.infinity,
+                      child: ColoredBox(
+                        color: const Color(0xFF0F172A),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              ngmyAdvisorBrowserHostLabel(widget.session.url),
+                              style: const TextStyle(color: Colors.white70, fontSize: 12),
+                            ),
+                            const SizedBox(height: 10),
+                            FilledButton(
+                              onPressed: () => widget.session.startLoad(),
+                              child: const Text('Load in mini browser'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : NgmyAdvisorEmbeddedBrowser(
+                      key: const ValueKey('ngmy_advisor_embedded_browser'),
+                      session: widget.session,
+                      height: widget.session.previewHeight,
+                      interactive: true,
+                    ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-            child: Text(
-              '${widget.advisorName} uses this window while you keep chatting — tap enlarge to grow the preview.',
-              style: TextStyle(fontSize: 10, height: 1.3, color: widget.isDark ? Colors.white54 : Colors.black45),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Text(
+                'Drag the handle to move this window. Keep chatting — ${widget.advisorName} can guide you inside this site.',
+                style: TextStyle(fontSize: 10, height: 1.3, color: widget.isDark ? Colors.white54 : Colors.black45),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
