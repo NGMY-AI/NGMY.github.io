@@ -146,7 +146,7 @@ Future<void> showNgmyMedicineReminderAlert(
   if (_medicineAlertOpen) return;
   _medicineAlertOpen = true;
   try {
-    await showGeneralDialog<void>(
+    final taken = await showGeneralDialog<bool>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -156,10 +156,7 @@ Future<void> showNgmyMedicineReminderAlert(
         medicine: medicine,
         timeSlot: timeSlot,
         onDone: () async {
-          await _markFiredToday(userEmail, medicine.id, timeSlot);
-          if (ctx.mounted && Navigator.of(ctx, rootNavigator: true).canPop()) {
-            Navigator.of(ctx, rootNavigator: true).pop();
-          }
+          if (ctx.mounted) Navigator.of(ctx, rootNavigator: true).pop(true);
         },
       ),
       transitionBuilder: (ctx, anim, _, child) {
@@ -186,7 +183,16 @@ Future<void> showNgmyMedicineReminderAlert(
         );
       },
     );
-    await _markFiredToday(userEmail, medicine.id, timeSlot);
+    if (taken == true) {
+      await Future.wait([
+        _markFiredToday(userEmail, medicine.id, timeSlot),
+        ngmyMarkMedicineTaken(
+          userEmail: userEmail,
+          medicineId: medicine.id,
+          timeSlot: timeSlot,
+        ),
+      ]);
+    }
   } finally {
     _medicineAlertOpen = false;
   }
@@ -209,13 +215,10 @@ class _MedicineReminderOverlay extends StatefulWidget {
 
 class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
   static const _blockSeconds = 5;
-  /// Hold the "reminder complete" screen so it is readable (not a blink).
-  static const _completeHoldSeconds = 3;
   var _secondsLeft = _blockSeconds;
   var _canDismiss = false;
   var _finished = false;
   Timer? _timer;
-  Timer? _completeHoldTimer;
 
   @override
   void initState() {
@@ -228,13 +231,6 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
           _secondsLeft = 0;
           _canDismiss = true;
         });
-        _completeHoldTimer?.cancel();
-        _completeHoldTimer = Timer(
-          const Duration(seconds: _completeHoldSeconds),
-          () {
-            if (mounted && !_finished) unawaited(_finish());
-          },
-        );
         return;
       }
       setState(() => _secondsLeft--);
@@ -243,16 +239,18 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
 
   Future<void> _finish() async {
     if (_finished) return;
-    _finished = true;
     _timer?.cancel();
-    _completeHoldTimer?.cancel();
-    await widget.onDone();
+    try {
+      await widget.onDone();
+      _finished = true;
+    } catch (_) {
+      _finished = false;
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _completeHoldTimer?.cancel();
     super.dispose();
   }
 
@@ -268,7 +266,6 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final screenH = MediaQuery.sizeOf(context).height;
     return PopScope(
       canPop: _canDismiss,
       child: Stack(
@@ -284,10 +281,7 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(vertical: 32),
                   child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 380,
-                      maxHeight: screenH * 0.74,
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 380),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 22),
                       child: ngmyClipBackdrop(

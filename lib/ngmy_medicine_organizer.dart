@@ -26,6 +26,8 @@ class NgmyMedicineEntry {
     this.endDate,
     this.remindersEnabled = true,
     List<String>? reminderTimes,
+    this.lastTakenAt,
+    this.lastTakenSlot = '',
     DateTime? createdAt,
   })  : id = id ?? DateTime.now().microsecondsSinceEpoch.toString(),
         reminderTimes = List<String>.from(reminderTimes ?? const []),
@@ -42,6 +44,8 @@ class NgmyMedicineEntry {
   DateTime? endDate;
   bool remindersEnabled;
   List<String> reminderTimes;
+  DateTime? lastTakenAt;
+  String lastTakenSlot;
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() => {
@@ -56,6 +60,8 @@ class NgmyMedicineEntry {
         'reminderTimes': reminderTimes,
         if (startDate != null) 'startDate': startDate!.toUtc().toIso8601String(),
         if (endDate != null) 'endDate': endDate!.toUtc().toIso8601String(),
+        if (lastTakenAt != null) 'lastTakenAt': lastTakenAt!.toUtc().toIso8601String(),
+        if (lastTakenSlot.isNotEmpty) 'lastTakenSlot': lastTakenSlot,
         'createdAt': createdAt.toUtc().toIso8601String(),
       };
 
@@ -71,6 +77,8 @@ class NgmyMedicineEntry {
         reminderTimes: (json['reminderTimes'] as List?)?.map((e) => e.toString()).toList() ?? const [],
         startDate: DateTime.tryParse((json['startDate'] ?? '').toString()),
         endDate: DateTime.tryParse((json['endDate'] ?? '').toString()),
+        lastTakenAt: DateTime.tryParse((json['lastTakenAt'] ?? '').toString()),
+        lastTakenSlot: (json['lastTakenSlot'] ?? '').toString(),
         createdAt: DateTime.tryParse((json['createdAt'] ?? '').toString()) ?? DateTime.now(),
       );
 }
@@ -106,6 +114,31 @@ Future<void> ngmyImportMedicines({required String userEmail, required List<NgmyM
     byId[item.id] = item;
   }
   await _saveMedicines(userEmail, byId.values.toList());
+}
+
+/// Records a completed dose in the medicine itself so "Mark as taken" has a
+/// visible, durable result instead of only silencing today's reminder.
+Future<bool> ngmyMarkMedicineTaken({
+  required String userEmail,
+  required String medicineId,
+  required String timeSlot,
+  DateTime? takenAt,
+}) async {
+  final items = await _loadMedicines(userEmail);
+  final index = items.indexWhere((m) => m.id == medicineId);
+  if (index < 0) return false;
+  items[index]
+    ..lastTakenAt = (takenAt ?? DateTime.now()).toUtc()
+    ..lastTakenSlot = timeSlot.trim();
+  await _saveMedicines(userEmail, items);
+  return true;
+}
+
+bool ngmyMedicineWasTakenToday(NgmyMedicineEntry medicine, [DateTime? now]) {
+  final at = medicine.lastTakenAt?.toLocal();
+  if (at == null) return false;
+  final today = (now ?? DateTime.now()).toLocal();
+  return at.year == today.year && at.month == today.month && at.day == today.day;
 }
 
 List<String> ngmyDefaultMedicineReminderTimes(int timesPerDay) {
@@ -346,7 +379,7 @@ class _MedicinePlasticCard extends StatelessWidget {
         : ngmyDefaultMedicineReminderTimes(medicine.timesPerDay);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 168,
+      constraints: const BoxConstraints(minHeight: 168),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
@@ -470,6 +503,23 @@ class _MedicinePlasticCard extends StatelessWidget {
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(color: const Color(0xFF9D174D).withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 10.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                            if (ngmyMedicineWasTakenToday(medicine)) ...[
+                              const SizedBox(height: 5),
+                              Row(
+                                children: [
+                                  const Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF059669)),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      'Taken today${medicine.lastTakenSlot.isEmpty ? '' : ' · ${ngmyFormatMedicineClock(medicine.lastTakenSlot)}'}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(color: Color(0xFF047857), fontWeight: FontWeight.w900, fontSize: 10.5),
                                     ),
                                   ),
                                 ],
@@ -648,6 +698,8 @@ class _MedicineEditorPageState extends State<_MedicineEditorPage> {
         endDate: _endDate,
         remindersEnabled: _remindersEnabled,
         reminderTimes: List<String>.from(_reminderTimes),
+        lastTakenAt: widget.existing?.lastTakenAt,
+        lastTakenSlot: widget.existing?.lastTakenSlot ?? '',
         createdAt: widget.existing?.createdAt,
       ),
     );
