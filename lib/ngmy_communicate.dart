@@ -10,9 +10,14 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
+import 'ngmy_advisor_browser_card.dart';
+import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
+import 'ngmy_phone_action_ui.dart';
+import 'ngmy_phone_integrations.dart';
+import 'ngmy_register_ai_tools.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_bottom_nav_frame.dart';
@@ -3582,6 +3587,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   final List<Map<String, String>> _messages = [];
   bool _busy = false;
   bool _loaded = false;
+  String? _activityCaption;
   /// Outbound texts waiting for an AI reply (never drop while busy).
   final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
@@ -3714,6 +3720,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (_isTextCoach) {
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
     }
+    buf.writeln(ngmyAdvisorWebAndReactionContext(advisorName: widget.profile.name));
     if (ngmyAdvisorShouldWritePoetry(
       name: widget.profile.name,
       id: widget.profile.id,
@@ -3744,6 +3751,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ngmyRegisterAiAppTools(
+      context: () => context,
+      userEmail: _email,
+      user: widget.user,
+      config: widget.config,
+      onCharge: widget.onChargeWallet,
+      onDataChanged: widget.onDataChanged,
+      onPersistConfig: widget.onPersistConfig,
+    );
     _sessionStart = DateTime.now();
     _load();
     _tickTimer();
@@ -3835,6 +3851,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions']) {
+          final v = (m[key] ?? '').toString().trim();
+          if (v.isNotEmpty) row[key] = v;
+        }
         _messages.add(row);
       }
       _usedSeconds = used;
@@ -4422,17 +4442,72 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Persist advisor reply even if user left chat; notify when away.
   /// Empty text + no photo is rejected so typing never ends on a blank bubble.
   /// Returns true when a reply was accepted (UI and/or memory).
+  Future<void> _applyReactionToLatestUser(String emoji) async {
+    final e = emoji.trim();
+    if (e.isEmpty) return;
+    await NgmyCommunicateMemoryStore.setReactionOnLastUser(_email, widget.profile.id, e);
+    if (!mounted) return;
+    setState(() {
+      for (var i = _messages.length - 1; i >= 0; i--) {
+        if (_messages[i]['role'] == 'user') {
+          _messages[i] = Map<String, String>.from(_messages[i])..['reaction'] = e;
+          break;
+        }
+      }
+    });
+  }
+
+  Future<void> _tapAdvisorPhoneAction(NgmyPhoneAction action) async {
+    if (!mounted) return;
+    final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
+    if (!ok || !mounted) return;
+    final result = await ngmyRunPhoneAction(
+      action,
+      context: context,
+      skipConfirmation: true,
+      userEmail: _email,
+      isAdmin: _isAdmin,
+      config: widget.config,
+    );
+    if (!mounted || result == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(result), duration: const Duration(seconds: 2)),
+    );
+  }
+
   Future<bool> _deliverAiReply({
     required int sendGen,
     required String text,
     String? imageB64,
+    String? parseExtrasForUserText,
   }) async {
     final photo = (imageB64 ?? '').trim();
-    final body = text.trim();
+    var body = text.trim();
+    var browserUrl = '';
+    var browserLabel = '';
+    var phoneActionsJson = '';
+    var reactionEmoji = '';
+
+    if (parseExtrasForUserText != null && parseExtrasForUserText.trim().isNotEmpty && photo.isEmpty) {
+      final parsed = ngmyParseAdvisorAssistantReply(body, userMessage: parseExtrasForUserText);
+      body = parsed.text.trim();
+      browserUrl = parsed.browserUrl;
+      browserLabel = parsed.browserLabel;
+      reactionEmoji = parsed.reactionEmoji;
+      if (parsed.actions.isNotEmpty) {
+        phoneActionsJson = ngmyAdvisorPhoneActionsToJson(parsed.actions);
+      }
+    }
+
     if (body.isEmpty && photo.isEmpty) {
       debugPrint('[communicate] refused empty AI reply');
       return false;
     }
+
+    if (reactionEmoji.isNotEmpty) {
+      await _applyReactionToLatestUser(reactionEmoji);
+    }
+
     if (photo.isNotEmpty) {
       await NgmyCommunicateMemoryStore.append(
         _email,
@@ -4440,6 +4515,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         role: 'ai',
         text: body,
         imageB64: photo,
+        browserUrl: browserUrl,
+        browserLabel: browserLabel,
+        phoneActions: phoneActionsJson,
       );
     } else {
       await NgmyCommunicateMemoryStore.append(
@@ -4447,6 +4525,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         widget.profile.id,
         role: 'ai',
         text: body,
+        browserUrl: browserUrl,
+        browserLabel: browserLabel,
+        phoneActions: phoneActionsJson,
       );
     }
     final away = !mounted || sendGen != _sendGen;
@@ -4459,6 +4540,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
     final row = <String, String>{'role': 'ai', 'text': body};
     if (photo.isNotEmpty) row['imageB64'] = photo;
+    if (browserUrl.isNotEmpty) row['browserUrl'] = browserUrl;
+    if (browserLabel.isNotEmpty) row['browserLabel'] = browserLabel;
+    if (phoneActionsJson.isNotEmpty) row['phoneActions'] = phoneActionsJson;
     setState(() => _messages.add(row));
     _scrollBottom();
     return true;
@@ -4609,6 +4693,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final imageMime = job['imageMime'] ?? 'image/jpeg';
     final sendGen = ++_sendGen;
     var deliveredOk = false;
+    final userParse = text.isNotEmpty ? text : null;
+    if (mounted && ngmyUserMessageLooksLikeWebTask(text)) {
+      setState(() => _activityCaption = '${ngmyAdvisorFirstName(widget.profile.name)} is browsing…');
+    }
 
     final apiKey = await _resolveApiKey();
     if (apiKey.isEmpty) {
@@ -4673,7 +4761,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyAdvisorShortPingFallbackReply(userText: text, girl: girl, isBoss: _isBoss);
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         return;
       }
       final takenByOtherEarly = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
@@ -4723,7 +4811,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           gender: widget.profile.gender,
           partnerName: partner?['name'] ?? '',
         );
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         return;
       }
 
@@ -4860,7 +4948,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           takenByOther: takenByOther,
           partner: partner,
         );
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
       } else if (requestedImage && !canDateThisChatter) {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final extraCtx = await _advisorExtraContext(text, mem);
@@ -4879,7 +4967,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I keep this professional — I don\'t send personal pictures.';
         }
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
       } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
         if (takenByOther) {
           deliveredOk = await _deliverAiReply(
@@ -4909,7 +4997,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
           reply = 'I don\'t send pics like that unless we\'re official 😌';
         }
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         }
       } else if (wantsImage) {
         String? b64;
@@ -4984,7 +5072,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           final reply = cleaned.isNotEmpty
               ? cleaned
               : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         } else if (text.isNotEmpty &&
             ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) &&
             ngmyUserRequestedDailyQuote(text)) {
@@ -5001,7 +5089,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           final reply = cleaned.isNotEmpty
               ? cleaned
               : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         } else {
         final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem);
         final recentPhotos = _allowsPhotoUpload ? NgmyCommunicateMemoryStore.recentUserImages(mem) : const <NgmyAiImagePart>[];
@@ -5052,7 +5140,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final reply = cleaned.isNotEmpty
             ? cleaned
             : ngmyCommunicateAiFailureMessage(apiKey: apiKey, lastError: result.error);
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         }
       }
     } catch (e) {
@@ -5063,6 +5151,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ) ||
           deliveredOk;
     } finally {
+      if (mounted) setState(() => _activityCaption = null);
       // Never leave this job without a reply bubble.
       if (!deliveredOk && sendGen == _sendGen) {
         try {
@@ -5151,6 +5240,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                 final m = _messages[msgIndex];
                 final user = m['role'] == 'user';
                 final msgText = (m['text'] ?? '').toString();
+                final reaction = (m['reaction'] ?? '').toString();
+                final browserUrl = (m['browserUrl'] ?? '').toString();
+                final browserLabel = (m['browserLabel'] ?? '').toString();
+                final allPhoneActions = user ? const <NgmyPhoneAction>[] : ngmyAdvisorPhoneActionsFromRow(m);
+                final phoneActions = browserUrl.trim().isNotEmpty
+                    ? allPhoneActions.where((a) => a.type != 'open_url').toList()
+                    : allPhoneActions;
                 final bubble = Container(
                   margin: const EdgeInsets.only(top: 12),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -5208,12 +5304,45 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     ],
                   ),
                 );
+                final bubbleStack = Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _HoldToCopyBubble(
+                      copyText: msgText,
+                      onCopied: _copyChatText,
+                      child: bubble,
+                    ),
+                    if (user && reaction.isNotEmpty)
+                      Positioned(
+                        right: 4,
+                        bottom: -6,
+                        child: NgmyAdvisorMessageReactionBadge(emoji: reaction),
+                      ),
+                  ],
+                );
                 return Align(
                   alignment: user ? Alignment.centerRight : Alignment.centerLeft,
-                  child: _HoldToCopyBubble(
-                    copyText: msgText,
-                    onCopied: _copyChatText,
-                    child: bubble,
+                  child: Column(
+                    crossAxisAlignment: user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                    children: [
+                      bubbleStack,
+                      if (!user && browserUrl.isNotEmpty)
+                        NgmyAdvisorBrowserCard(
+                          url: browserUrl,
+                          label: browserLabel.isNotEmpty ? browserLabel : null,
+                          isDark: isDark,
+                          viewKeySeed: msgIndex,
+                        ),
+                      if (!user && phoneActions.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 4),
+                          child: ngmyPhoneActionChips(
+                            actions: phoneActions,
+                            isDark: isDark,
+                            onTap: _tapAdvisorPhoneAction,
+                          ),
+                        ),
+                    ],
                   ),
                 );
               },
@@ -5259,7 +5388,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    _isAdmin ? 'Unlimited chat' : passLabel,
+                                    _activityCaption ??
+                                        (_busy ? '${ngmyAdvisorFirstName(widget.profile.name)} is typing…' : null) ??
+                                        (_isAdmin ? 'Unlimited chat' : passLabel),
                                     style: TextStyle(color: panelFgMuted, fontSize: 10),
                                   ),
                                 ],
