@@ -358,6 +358,14 @@ const BROWSER_USE_API = "https://api.browser-use.com/api/v4";
 const ADVISOR_AGENT_RULES =
   "\n\nRULES (from the NGMY app — always follow):\n" +
   "- The user is watching this browser live and can tap into it at any time. Work quickly and finish the job.\n" +
+  "- DO EXACTLY WHAT WAS ASKED. If the user named a website (e.g. Zillow), use THAT site — search it with its own " +
+  "search box. If it blocks you (CAPTCHA, 'press and hold', access denied), say so plainly instead of silently " +
+  "switching; you may then add what you found on another reputable site, labeled as such. If no site was named, " +
+  "use the best-known site for the job.\n" +
+  "- The user types fast: read past typos (e.g. 'texs' = taxes) and use the recent chat context given above.\n" +
+  "- Close cookie banners / pop-ups and accept read-only terms needed to view public information.\n" +
+  "- Answer every part of the request (e.g. for a home: tax amounts by year, assessed value, sale history with dates " +
+  "and prices) and say which parts the site didn't show.\n" +
   "- SIGN-UPS: Use the details the user gave (email, name…). If they asked you to make the password, create a " +
   "strong one (14+ chars: upper, lower, number, symbol) and put it in your final summary so they can save it. " +
   "Accept normal terms of service when the user asked you to sign up.\n" +
@@ -429,13 +437,25 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const safeStart = startUrl ? advisorBrowseSafeUrl(startUrl) : null;
   const sessionId = String(body?.sessionId ?? "").trim();
   const prevTask = String(body?.prevTask ?? "").trim().slice(0, 1500);
+  // Recent things the user said in this chat (e.g. "open Zillow" two messages ago).
+  const recent = (Array.isArray(body?.recentUserMessages) ? body.recentUserMessages : [])
+    .map((m: unknown) => String(m ?? "").trim().slice(0, 400)).filter((m: string) => m).slice(-4);
+
   const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") +
-    (prevTask ? `Context — the previous task in this same browser was: "${prevTask}". The user's new message:\n` : "") +
-    task + ADVISOR_AGENT_RULES;
+    (recent.length ? `Recent chat from the user (oldest first), for context:\n- ${recent.join("\n- ")}\n` : "") +
+    (prevTask ? `Context — the previous task in this same browser was: "${prevTask}".\n` : "") +
+    `THE USER'S REQUEST NOW: ${task}` + ADVISOR_AGENT_RULES;
+  // Visible mouse pointer in the live view (NGMY Agent Cursor extension, if uploaded).
+  const cursorExt = await ensureCursorExtensionId();
+  const freshBrowser = () => ({
+    screenWidth: 1100,
+    screenHeight: 760,
+    ...(/^[0-9a-f-]{36}$/i.test(cursorExt) ? { extensionIds: [cursorExt] } : {}),
+  });
   const payload: Record<string, unknown> = {
     task: fullTask,
     maxCostUsd: 0.75,
-    browserSettings: { screenWidth: 1100, screenHeight: 760 },
+    browserSettings: freshBrowser(),
   };
   if (/^[0-9a-f-]{36}$/i.test(sessionId)) {
     payload.sessionId = sessionId;
@@ -445,6 +465,11 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   if ((r.status === 400 || r.status === 404) && payload.sessionId) {
     // Old browser expired — start fresh.
     delete payload.sessionId;
+    payload.browserSettings = freshBrowser();
+    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  }
+  if (r.status === 400 && payload.browserSettings && cursorExt) {
+    // Never let the cursor extension block a task — retry without it.
     payload.browserSettings = { screenWidth: 1100, screenHeight: 760 };
     r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   }
@@ -493,6 +518,49 @@ async function handleAgentPoll(req: Request, body: any): Promise<Response> {
     steps,
     nextAfter: evs.data?.nextAfter ?? maxId,
   });
+}
+
+// NGMY Agent Cursor extension (tools/agent-cursor-extension) — zipped + base64.
+// Bump the config key below whenever the extension changes so it is re-uploaded.
+const NGMY_CURSOR_EXTENSION_KEY = "cursor_extension_id_v1";
+const NGMY_CURSOR_EXTENSION_ZIP_B64 = "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";
+
+let cursorExtensionCache: string | null = null;
+
+/** Extension id for the visible mouse pointer — uploaded once with the server key, id kept
+ * in the server-only ngmy_agent_config table. Returns "" if anything fails (never blocks a task). */
+async function ensureCursorExtensionId(): Promise<string> {
+  if (cursorExtensionCache !== null) return cursorExtensionCache;
+  const envId = String(Deno.env.get("BROWSER_USE_CURSOR_EXTENSION_ID") ?? "").trim();
+  if (/^[0-9a-f-]{36}$/i.test(envId)) return (cursorExtensionCache = envId);
+  const db = adminClient();
+  try {
+    if (db) {
+      const { data } = await db.from("ngmy_agent_config").select("value").eq("key", NGMY_CURSOR_EXTENSION_KEY).maybeSingle();
+      const v = String(data?.value ?? "");
+      if (/^[0-9a-f-]{36}$/i.test(v)) return (cursorExtensionCache = v);
+    }
+    const bytes = Uint8Array.from(atob(NGMY_CURSOR_EXTENSION_ZIP_B64), (ch) => ch.charCodeAt(0));
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: "application/zip" }), "ngmy-agent-cursor.zip");
+    const res = await fetch(`${BROWSER_USE_API}/extensions`, {
+      method: "POST",
+      headers: { "X-Browser-Use-API-Key": browserUseKey() },
+      body: form,
+      signal: AbortSignal.timeout(30000),
+    });
+    const data: any = await res.json().catch(() => null);
+    const id = String(data?.id ?? "");
+    if ((res.status === 200 || res.status === 201) && /^[0-9a-f-]{36}$/i.test(id)) {
+      if (db) await db.from("ngmy_agent_config").upsert({ key: NGMY_CURSOR_EXTENSION_KEY, value: id, updated_at: new Date().toISOString() });
+      return (cursorExtensionCache = id);
+    }
+    console.log("[agent] cursor extension upload failed", res.status, browserUseError(res.status, data));
+  } catch (e) {
+    console.log("[agent] cursor extension error", String(e));
+  }
+  cursorExtensionCache = "";
+  return "";
 }
 
 async function handleAgentStop(body: any): Promise<Response> {
@@ -7697,7 +7765,8 @@ serve(async (req) => {
       if (limited) return limited;
       // Cheap authenticated call — confirms the key is accepted (never returns the key).
       const r = await browserUseFetch("/runs?limit=1");
-      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status });
+      const cursorReady = r.status === 200 ? !!(await ensureCursorExtensionId()) : false;
+      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady });
     }
 
     // Rendered picture of a page for the mini browser (sites that can't be re-hosted).

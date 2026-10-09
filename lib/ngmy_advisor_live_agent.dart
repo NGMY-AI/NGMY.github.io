@@ -110,6 +110,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     required String task,
     String? startUrl,
     bool continueSession = true,
+    List<String> recentUserMessages = const [],
   }) async {
     if (running) await stop();
     // A follow-up in the same browser needs the earlier task as context.
@@ -132,6 +133,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         if ((startUrl ?? '').isNotEmpty) 'startUrl': startUrl,
         if (continueSession && hasSession) 'sessionId': sessionId,
         if (prevTask.isNotEmpty) 'prevTask': prevTask,
+        if (recentUserMessages.isNotEmpty) 'recentUserMessages': recentUserMessages,
       },
       timeout: const Duration(seconds: 40),
     );

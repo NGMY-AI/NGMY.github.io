@@ -4892,7 +4892,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final taskText = continuing
             ? 'Continue the previous task in this same browser: "${_agentRun.task}". The user says: "$text"'
             : text;
-        final started = await _agentRun.start(task: taskText, startUrl: startUrl);
+        // Last few things they said (before this message) — e.g. "open Zillow" two texts ago.
+        final recentUser = _messages
+            .where((m) => m['role'] == 'user' && (m['text'] ?? '').trim().isNotEmpty)
+            .map((m) => m['text']!.trim())
+            .toList();
+        if (recentUser.isNotEmpty && recentUser.last == text) recentUser.removeLast();
+        final started = await _agentRun.start(
+          task: taskText,
+          startUrl: startUrl,
+          recentUserMessages: recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser,
+        );
         if (started == NgmyAgentStartResult.started) {
           if (_browserSession.visible) unawaited(_browserSession.hide());
           deliveredOk = await _deliverAiReply(

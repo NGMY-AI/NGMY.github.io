@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "NGMY Agent Cursor",
+  "version": "1.0.0",
+  "description": "Shows a visible mouse pointer, click ripples and typing hints so people can follow the NGMY advisor in the live browser.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["cursor.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ]
+}
