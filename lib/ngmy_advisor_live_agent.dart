@@ -29,7 +29,17 @@ final RegExp _agentAction = RegExp(
 );
 /// Requests that are clearly online tasks even without the word "website".
 final RegExp _agentSelfContained = RegExp(
-  r"\b(apply|application|enroll|admissions?|register for|sign up for|book (a|an|my)|order (a|an|my|some))\b",
+  r"\b(apply|application|enroll|admissions?|register for|sign up for|book (a|an|my)|order (a|an|my|some))\b"
+  // A car VIN (17 chars, no I/O/Q) — looking it up needs the web.
+  r"|\b(?=[A-HJ-NPR-Z0-9]*\d)[A-HJ-NPR-Z0-9]{17}\b"
+  r"|\b(open (it |that |this )?live|live browser|use (the|your) (live )?browser|search (it|this|that) (out|up)|look (it|this|that) up)\b",
+  caseSensitive: false,
+);
+/// "Find me information about X" style requests — a lookup the live browser can do.
+final RegExp _agentLookup = RegExp(
+  r"\b(look (it |this |that )?up|find out|search (it|this|that) (out|up)|(all )?(the )?info(rmation)? (about|on|for)|"
+  r"details (about|on|for)|history (of|for|on)|tell me (everything|all) about|open (it |that |this )?live|"
+  r"live browser|use (the|your) (live )?browser)\b",
   caseSensitive: false,
 );
 final RegExp _agentWebContext = RegExp(
@@ -37,7 +47,7 @@ final RegExp _agentWebContext = RegExp(
   caseSensitive: false,
 );
 final RegExp _agentContinue = RegExp(
-  r"^\s*(ok(ay)?[,!. ]*)?(continue|keep going|go ahead|go on|carry on|resume|i('?m| am) (logged|signed) in|i (logged|signed) in|done|finished|ready|next|try again|retry|do it( again)?)\b"
+  r"^\s*(ok(ay)?[,!. ]*)?(continue|keep going|go ahead|go on|carry on|resume|i('?m| am) (logged|signed) in|i (logged|signed) in|done|finished|ready|next|try again|retry|do it( again)?|refresh( the page| it)?|reload( the page| it)?)\b"
   r"|\b(you('re| are)? not (continuing|doing (it|anything)|working)|i don'?t see (it|anything|them|the (list|page|results))|nothing (is )?(happening|showing))\b",
   caseSensitive: false,
 );
@@ -52,7 +62,8 @@ final RegExp _agentContinue = RegExp(
   final t = text.trim();
   if (t.isEmpty) return null;
   if (hasLiveSession && _agentContinue.hasMatch(t)) return (url: null, continuing: true);
-  if (!_agentAction.hasMatch(t)) return null;
+  final isLookup = _agentLookup.hasMatch(t) && _agentSelfContained.hasMatch(t);
+  if (!_agentAction.hasMatch(t) && !isLookup) return null;
   final full = _agentUrl.firstMatch(t)?.group(0)?.replaceAll(RegExp(r'[).,!?]+$'), '');
   final bare = _agentDomain.firstMatch(t)?.group(0);
   final url = full ?? (bare != null && !bare.contains('@') ? 'https://$bare' : null);

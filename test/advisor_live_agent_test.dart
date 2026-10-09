@@ -18,6 +18,12 @@ void main() {
     expect(ngmyAdvisorAgentTaskIntent("I don't see it in the screen", hasLiveSession: true)?.continuing, isTrue);
     expect(ngmyAdvisorAgentTaskIntent("I don't see it in the screen"), isNull);
   });
+  test('VIN lookups and "open it live" start the live browser', () {
+    expect(ngmyAdvisorAgentTaskIntent('this is my car Vin 1FBZX2ZM9GKA78607 and I need all the information about this car and the mileage'), isNotNull);
+    expect(ngmyAdvisorAgentTaskIntent('open it live so you can search it out'), isNotNull);
+    expect(ngmyAdvisorAgentTaskIntent('refresh the page', hasLiveSession: true)?.continuing, isTrue);
+    expect(ngmyAdvisorAgentTaskIntent('tell me everything about your day'), isNull);
+  });
   test('continue after logging in', () {
     final c = ngmyAdvisorAgentTaskIntent('ok I logged in', hasLiveSession: true);
     expect(c?.continuing, isTrue);

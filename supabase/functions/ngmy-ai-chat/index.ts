@@ -367,6 +367,10 @@ const ADVISOR_AGENT_RULES =
   "use the best-known site for the job.\n" +
   "- The user types fast: read past typos (e.g. 'texs' = taxes) and use the recent chat context given above.\n" +
   "- Close cookie banners / pop-ups and accept read-only terms needed to view public information.\n" +
+  "- CAR VIN (17 characters): decode it on the official free NHTSA decoder " +
+  "(https://vpic.nhtsa.dot.gov/decoder/) for year, make, model, trim, engine and plant; check " +
+  "https://www.nhtsa.gov/recalls for open recalls; look for odometer/mileage readings on free history sites. " +
+  "If full mileage history is only in a paid report (Carfax / AutoCheck), say so instead of guessing.\n" +
   "- Answer every part of the request (e.g. for a home: tax amounts by year, assessed value, sale history with dates " +
   "and prices) and say which parts the site didn't show.\n" +
   "- SIGN-UPS: Use the details the user gave (email, name…). If they asked you to make the password, create a " +
