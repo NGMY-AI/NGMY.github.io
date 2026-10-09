@@ -127,6 +127,7 @@ class NgmyCommunicateMemoryStore {
     String? phoneActions,
     String? browserShotB64,
     String? kind,
+    String? resultJson,
   }) async =>
       appendWithMime(
         email,
@@ -140,6 +141,7 @@ class NgmyCommunicateMemoryStore {
         phoneActions: phoneActions,
         browserShotB64: browserShotB64,
         kind: kind,
+        resultJson: resultJson,
       );
 
   static Future<void> appendWithMime(
@@ -155,6 +157,7 @@ class NgmyCommunicateMemoryStore {
     String? phoneActions,
     String? browserShotB64,
     String? kind,
+    String? resultJson,
   }) async {
     if (profileId.trim().isEmpty) return;
     final storeEmail = _storageEmail(email);
@@ -177,6 +180,8 @@ class NgmyCommunicateMemoryStore {
           phoneActions: phoneActions,
         );
         final k = (kind ?? '').trim();
+        final rj = (resultJson ?? '').trim();
+        if (rj.isNotEmpty && rj.length < 60000) row['resultJson'] = rj;
         if (k.isNotEmpty) row['kind'] = k;
         final shot = (browserShotB64 ?? '').trim();
         if (shot.isNotEmpty) {
@@ -263,7 +268,7 @@ class NgmyCommunicateMemoryStore {
   }
 
   static void _copyAdvisorMeta(Map<String, dynamic> from, Map<String, dynamic> to) {
-    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'browserShotId', 'kind']) {
+    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'browserShotId', 'kind', 'resultJson']) {
       final v = (from[key] ?? '').toString().trim();
       if (v.isNotEmpty) to[key] = v;
     }

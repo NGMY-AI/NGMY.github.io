@@ -5,7 +5,6 @@
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_advisor_live_view.dart';
@@ -74,6 +73,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
   String status = '';
   String task = '';
   String? result;
+  /// The agent's answer as sections (title / summary / sections / notes / sources), when it gave one.
+  Map<String, dynamic>? structured;
   String? error;
   String startError = '';
   bool visible = false;
@@ -119,6 +120,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     this.task = task;
     status = 'starting';
     result = null;
+    structured = null;
     error = null;
     startError = '';
     steps.clear();
@@ -199,6 +201,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         if (next != null && next > _after) _after = next;
         status = (res['status'] ?? status).toString();
         result = res['result']?.toString();
+        final st = res['structured'];
+        if (st is Map) structured = Map<String, dynamic>.from(st);
         error = res['error']?.toString();
         _notify();
       }
@@ -266,12 +270,141 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
     ..writeln('LIVE BROWSER TASK — YOU just did this yourself in your live browser while they watched.')
     ..writeln('Task they gave you: ${run.task}')
     ..writeln('Outcome: ${run.status}${run.error != null && run.error!.isNotEmpty ? ' (error: ${run.error})' : ''}');
-  if ((run.result ?? '').trim().isNotEmpty) buf.writeln('Your notes from the browser:\n${run.result!.trim()}');
+  if ((run.result ?? '').trim().isNotEmpty) buf.writeln('What you found:\n${run.result!.trim()}');
   if (recent.isNotEmpty) buf.writeln('Steps you took: ${recent.map((s) => s.text).join(' → ')}');
-  buf.writeln('Tell them in your own voice what you did and what you found — exact numbers/names as seen. '
-      'Be truthful: if you stopped for a login or a final confirm/payment button, say exactly what they need '
-      'to do in the Browser window, then "tell me to continue". Never claim money was moved. 2–5 sentences.');
+  if (run.structured != null) {
+    buf.writeln('The full details are shown to them right below your message in a neat card with sections. '
+        'So write ONLY 1–2 short friendly sentences: the headline answer, and anything that needs them '
+        '(e.g. a site blocked you). Do NOT list the numbers again.');
+  } else {
+    buf.writeln('Tell them what you did and found. Put each fact on its own line like "Taxes 2025: \$1,234" — '
+        'short lines, no long paragraph.');
+  }
+  buf.writeln('Be truthful: if you stopped for a login or a final confirm/payment button, say what they need '
+      'to do in the Browser window, then "tell me to continue". Never claim money was moved.');
   return buf.toString();
+}
+
+// ── Result card (what the advisor found, in boxes) ─────────────────────────
+
+class NgmyAdvisorResultCard extends StatelessWidget {
+  const NgmyAdvisorResultCard({super.key, required this.data, this.onOpenSource});
+
+  final Map<String, dynamic> data;
+  final void Function(String url)? onOpenSource;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = '${data['title'] ?? ''}'.trim();
+    final summary = '${data['summary'] ?? ''}'.trim();
+    final sections = ((data['sections'] as List?) ?? const []).whereType<Map>().toList();
+    final notes = ((data['notes'] as List?) ?? const []).map((e) => '$e').where((e) => e.trim().isNotEmpty).toList();
+    final sources = ((data['sources'] as List?) ?? const []).whereType<Map>().toList();
+    const accents = [Color(0xFF60A5FA), Color(0xFF34D399), Color(0xFFFBBF24), Color(0xFFF472B6), Color(0xFFA78BFA)];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      width: MediaQuery.sizeOf(context).width * 0.86,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF15151B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title.isNotEmpty)
+            Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, height: 1.25)),
+          if (summary.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(summary, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 13.5, height: 1.4)),
+            ),
+          for (var i = 0; i < sections.length; i++) ...[
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C24),
+                borderRadius: BorderRadius.circular(14),
+                border: Border(left: BorderSide(color: accents[i % accents.length], width: 3)),
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '${sections[i]['heading'] ?? ''}',
+                    style: TextStyle(color: accents[i % accents.length], fontSize: 12.5, fontWeight: FontWeight.w800, letterSpacing: 0.3),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final r in ((sections[i]['rows'] as List?) ?? const []).whereType<Map>())
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Text('${r['label'] ?? ''}',
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 6,
+                            child: Text('${r['value'] ?? ''}',
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final n in notes)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text('• $n', style: const TextStyle(color: Color(0xFFFCD34D), fontSize: 12.5, height: 1.35)),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          if (sources.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final s in sources)
+                  ActionChip(
+                    avatar: const Icon(Icons.language_rounded, size: 15, color: Color(0xFF60A5FA)),
+                    label: Text(
+                      '${(s['name'] ?? '').toString().isNotEmpty ? s['name'] : Uri.tryParse('${s['url']}')?.host ?? 'Source'}',
+                      style: const TextStyle(fontSize: 11.5),
+                    ),
+                    onPressed: '${s['url'] ?? ''}'.isEmpty || onOpenSource == null ? null : () => onOpenSource!('${s['url']}'),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ── Full screen (can turn sideways like a video) ───────────────────────────

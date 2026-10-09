@@ -358,6 +358,9 @@ const BROWSER_USE_API = "https://api.browser-use.com/api/v4";
 const ADVISOR_AGENT_RULES =
   "\n\nRULES (from the NGMY app — always follow):\n" +
   "- The user is watching this browser live and can tap into it at any time. Work quickly and finish the job.\n" +
+  "- SPEED: take the shortest path. Go straight to the right URL when you can (e.g. a site's search-results URL " +
+  "with the query in it) instead of clicking through menus. Don't re-check things you already saw. Read the page " +
+  "content you need in one go, then finish — no extra browsing once you have the answer.\n" +
   "- DO EXACTLY WHAT WAS ASKED. If the user named a website (e.g. Zillow), use THAT site — search it with its own " +
   "search box. If it blocks you (CAPTCHA, 'press and hold', access denied), say so plainly instead of silently " +
   "switching; you may then add what you found on another reputable site, labeled as such. If no site was named, " +
@@ -380,7 +383,12 @@ const ADVISOR_AGENT_RULES =
   "- Do not change account settings or delete anything unless asked.\n" +
   "- TRADING / BETTING SITES: you may open them, read charts, prices and balances, and explain what you see — " +
   "but never place, open or close a trade or bet (demo or real). Tell the user what to tap themselves.\n" +
-  "- Finish with a short plain summary of what you did and what you saw (numbers, names, balances exactly as shown).";
+  "- FINAL ANSWER FORMAT: your final result must be ONLY a JSON object (no markdown, no extra text):\n" +
+  '{"title": "short title", "summary": "1-2 plain sentences", ' +
+  '"sections": [{"heading": "e.g. Property taxes", "rows": [{"label": "2025", "value": "$1,234"}]}], ' +
+  '"notes": ["anything missing, blocked or that needs the user"], "sources": [{"name": "site name", "url": "https://..."}]}\n' +
+  "  Group facts into clear sections (e.g. Overview, Estimates, Property taxes by year, Sale history, Details). " +
+  "Copy numbers, dates, names and balances exactly as shown on the page. Use an empty list when a part doesn't apply.";
 
 function browserUseKey(): string {
   return String(Deno.env.get("BROWSER_USE_API_KEY") ?? "").trim();
@@ -454,6 +462,10 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   });
   const payload: Record<string, unknown> = {
     task: fullTask,
+    // Same model as the default, but LOW reasoning effort per step — the default "high"
+    // made the pointer sit still for 5-10 s between actions.
+    model: "gpt-6-luna",
+    modelParams: { reasoning: { effort: "low" } },
     maxCostUsd: 0.75,
     browserSettings: freshBrowser(),
   };
@@ -468,6 +480,12 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     payload.browserSettings = freshBrowser();
     r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   }
+  if ((r.status === 400 || r.status === 422) && payload.model) {
+    // Speed setting rejected → fall back to Browser Use defaults rather than failing the task.
+    delete payload.model;
+    delete payload.modelParams;
+    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  }
   if (r.status === 400 && payload.browserSettings && cursorExt) {
     // Never let the cursor extension block a task — retry without it.
     payload.browserSettings = { screenWidth: 1100, screenHeight: 760 };
@@ -477,6 +495,42 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     return jsonOk({ ok: false, error: browserUseError(r.status, r.data) });
   }
   return jsonOk({ ok: true, runId: r.data?.id, sessionId: r.data?.sessionId, status: r.data?.status });
+}
+
+/** Parse the agent's JSON answer into a safe, size-limited card shape (or null). */
+function agentStructuredResult(raw: unknown): Record<string, unknown> | null {
+  let obj: any = raw;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    const start = s.indexOf("{"), end = s.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+      obj = JSON.parse(s.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+  if (!obj || typeof obj !== "object") return null;
+  const str = (v: unknown, n: number) => String(v ?? "").trim().slice(0, n);
+  const sections = (Array.isArray(obj.sections) ? obj.sections : []).slice(0, 12).map((sec: any) => ({
+    heading: str(sec?.heading, 80),
+    rows: (Array.isArray(sec?.rows) ? sec.rows : []).slice(0, 30).map((r: any) => ({
+      label: str(r?.label, 80),
+      value: str(r?.value, 300),
+    })).filter((r: any) => r.label || r.value),
+  })).filter((sec: any) => sec.heading || sec.rows.length);
+  const sources = (Array.isArray(obj.sources) ? obj.sources : []).slice(0, 6).map((x: any) => ({
+    name: str(x?.name, 80),
+    url: /^https?:\/\//.test(String(x?.url ?? "")) ? str(x.url, 500) : "",
+  })).filter((x: any) => x.name || x.url);
+  const out = {
+    title: str(obj.title, 120),
+    summary: str(obj.summary, 600),
+    sections,
+    notes: (Array.isArray(obj.notes) ? obj.notes : []).slice(0, 8).map((n: unknown) => str(n, 300)).filter(Boolean),
+    sources,
+  };
+  return out.title || out.summary || sections.length ? out : null;
 }
 
 async function handleAgentPoll(req: Request, body: any): Promise<Response> {
@@ -510,6 +564,7 @@ async function handleAgentPoll(req: Request, body: any): Promise<Response> {
     ok: true,
     status: run.data?.status,
     result: run.data?.result ?? (typeof run.data?.output === "string" ? run.data.output : null),
+    structured: agentStructuredResult(run.data?.result ?? run.data?.output),
     error: run.data?.error ?? null,
     costUsd: run.data?.totalCostUsd ?? null,
     sessionId: run.data?.sessionId ?? null,

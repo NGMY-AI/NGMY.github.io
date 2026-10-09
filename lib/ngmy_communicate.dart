@@ -3857,6 +3857,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             : 'I couldn\'t finish that one${(run.error ?? '').isNotEmpty ? ' — ${run.error}' : ''}. Want me to try again?';
       }
       await _deliverAiReply(sendGen: _sendGen, text: reply);
+      // The details, organized into boxes, right under the advisor's short message.
+      final st = run.structured;
+      if (st != null) {
+        final json = jsonEncode(st);
+        final title = '${st['title'] ?? ''}'.trim();
+        final cardText = '📋 ${title.isNotEmpty ? title : 'What I found'}';
+        await NgmyCommunicateMemoryStore.append(
+          _email,
+          widget.profile.id,
+          role: 'ai',
+          text: cardText,
+          kind: 'result',
+          resultJson: json,
+        );
+        if (mounted) {
+          setState(() => _messages.add({'role': 'ai', 'kind': 'result', 'text': cardText, 'resultJson': json}));
+          _scrollBottom();
+        }
+      }
     } catch (e) {
       debugPrint('[advisor-agent] finish reply: $e');
     }
@@ -3956,7 +3975,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
-        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64']) {
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson']) {
           final v = (m[key] ?? '').toString().trim();
           if (v.isNotEmpty) row[key] = v;
         }
@@ -5441,6 +5460,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   return const SizedBox.shrink();
                 }
                 final m = _messages[msgIndex];
+                if (m['kind'] == 'result' && (m['resultJson'] ?? '').isNotEmpty) {
+                  Map<String, dynamic>? data;
+                  try {
+                    final d = jsonDecode(m['resultJson']!);
+                    if (d is Map) data = Map<String, dynamic>.from(d);
+                  } catch (_) {}
+                  if (data != null) {
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: NgmyAdvisorResultCard(
+                        data: data,
+                        onOpenSource: (url) {
+                          _agentRun.hide();
+                          unawaited(_browserSession.open(url));
+                        },
+                      ),
+                    );
+                  }
+                }
                 if (m['kind'] == 'browser') {
                   final cardUrl = (m['browserUrl'] ?? '').trim();
                   final cardLabel = (m['browserLabel'] ?? '').trim();
