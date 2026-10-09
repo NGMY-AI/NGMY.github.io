@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
+import 'ngmy_advisor_dating.dart';
 import 'ngmy_advisor_browser_card.dart';
 import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_advisor_chat_extras.dart';
@@ -3632,6 +3633,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _busy = false;
   bool _loaded = false;
   String? _activityCaption;
+  /// Server's answer: is this advisor dating THIS user? (professional with everyone else)
+  NgmyAdvisorRelationship _relationship = const NgmyAdvisorRelationship('unknown');
+  /// One-time note for the reply after "will you date me" / a breakup.
+  String _datingNote = '';
   /// What the advisor just saw on the web for the message being answered.
   NgmyAdvisorBrowseResult? _pendingBrowse;
 
@@ -3828,6 +3833,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
     }
     buf.writeln(ngmyAdvisorWebAndReactionContext(advisorName: widget.profile.name));
+    // Professional with everyone except the one person they're dating.
+    if (!_relationship.datingYou) buf.writeln(ngmyAdvisorProfessionalBlock(_relationship));
+    if (_datingNote.isNotEmpty) buf.writeln(_datingNote);
     final seen = _pendingBrowse;
     if (seen != null) buf.writeln(ngmyAdvisorBrowsePromptBlock(seen));
     if (ngmyAdvisorShouldWritePoetry(
@@ -3974,9 +3982,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _load() async {
     await NgmyCommunicateTimeTracker.syncFromCloud(_email);
     unawaited(ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config));
-    await NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id);
+    // (Partners are decided by the server now — no guessing from chats on this phone.)
     var mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
-    if (ngmyCommunicateRoleIsRomantic(widget.profile.role)) {
+    final localPartner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+    if (ngmyCommunicateRoleIsRomantic(widget.profile.role) && ngmyCommunicateIsExclusivePartner(localPartner, _email)) {
       mem = await NgmyCommunicateRelationshipStore.injectMissYouCheckInsIfNeeded(
         profileId: widget.profile.id,
         chatterEmail: _email,
@@ -4504,6 +4513,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         cleaned = _trimOverlongTextReply(cleaned);
       }
     }
+    // Not their partner → no "love / honey / babe" or heart emojis, even if the AI slips.
+    if (!_relationship.datingYou) cleaned = ngmyStripPetNames(cleaned);
     return cleaned;
   }
 
@@ -4973,24 +4984,41 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final creds = ngmyParseAiCredentials(apiKey);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
-      // Keep partner sync fast — never block the reply for more than a couple seconds.
-      try {
-        await Future.wait([
-          NgmyCommunicateRelationshipStore.reconcilePartnerFromAllLocalChats(widget.profile.id),
-          NgmyCommunicateRelationshipStore.syncFromMemory(
-            widget.profile.id,
-            _email,
-            mem,
-            allowDating: ngmyCommunicateAdvisorCanDateChatter(
-              role: widget.profile.role,
-              name: widget.profile.name,
-              chatterIsBoss: _isBoss,
-              id: widget.profile.id,
-            ),
-          ),
-        ]).timeout(const Duration(seconds: 3));
-      } catch (e) {
-        debugPrint('[communicate] partner sync skipped: $e');
+      // Dating is decided by the SERVER for all users: professional by default, one partner per
+      // advisor, only when they clearly ask, 30 days of silence = breakup, 1-year wait, 2 chances.
+      _datingNote = '';
+      final datableRole = ngmyCommunicateAdvisorCanDateChatter(
+        role: widget.profile.role,
+        name: widget.profile.name,
+        chatterIsBoss: _isBoss,
+        id: widget.profile.id,
+      );
+      if (datableRole) {
+        var rel = await ngmyAdvisorRelationshipCall('relTouch', widget.profile.id);
+        if (text.isNotEmpty && !rel.datingYou && rel.state != 'unknown' && ngmyUserAsksToDate(text)) {
+          rel = await ngmyAdvisorRelationshipCall('relStart', widget.profile.id);
+          _datingNote = ngmyAdvisorDatingEventNote('ask', rel);
+        } else if (text.isNotEmpty && rel.datingYou && ngmyUserEndsRelationship(text)) {
+          rel = await ngmyAdvisorRelationshipCall('relEnd', widget.profile.id);
+          _datingNote = ngmyAdvisorDatingEventNote('end', rel);
+        }
+        if (rel.state != 'unknown') {
+          _relationship = rel;
+          // Mirror into the local store that the rest of this chat code reads.
+          await NgmyCommunicateRelationshipStore.clearPartner(widget.profile.id);
+          if (rel.datingYou) {
+            await NgmyCommunicateRelationshipStore.setPartner(widget.profile.id, email: _email, status: 'exclusive');
+          } else if (rel.state == 'taken') {
+            await NgmyCommunicateRelationshipStore.setPartner(
+              widget.profile.id,
+              email: 'someone-else@ngmy.invalid',
+              status: 'exclusive',
+            );
+          }
+        }
+      } else {
+        _relationship = const NgmyAdvisorRelationship('not_datable');
+        await NgmyCommunicateRelationshipStore.clearPartner(widget.profile.id, onlyIfEmail: _email);
       }
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
 
@@ -5075,7 +5103,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             'If they said "hi", say hi back or ask how they are — like a normal person. '
             'FORBIDDEN: "hey you", "hey yourself", "hi you", cold/dismissive openers, attitude, or sounding annoyed. '
             'Use natural openers like "Hi!", "Hey!", "Hello!" and ask how they are or what is going on. '
-            '${girl ? 'Warm and sweet — never rude. ' : 'Friendly and respectful — never rude. '}'
+            '${_relationship.datingYou ? (girl ? 'Warm and sweet — you are dating them. ' : 'Warm — you are dating them. ') : 'Friendly and professional — no flirting, no pet names. '}'
             'No asterisks, no paragraphs. They said: "$text"\nReply:';
         final result = await ngmyAiGenerateCommunicateFast(
           creds,
@@ -5094,7 +5122,6 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         return;
       }
-      final takenByOtherEarly = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       // Datable chats that already feel like dating unlock pics for that boyfriend/girlfriend.
       final canDateThisChatter = ngmyCommunicateAdvisorCanDateChatter(
         role: widget.profile.role,
@@ -5107,26 +5134,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         name: widget.profile.name,
         id: widget.profile.id,
       );
-      if (canDateThisChatter && !takenByOtherEarly && ngmyCommunicateMemoryLooksLikeDating(mem)) {
-        await NgmyCommunicateRelationshipStore.setPartner(
-          widget.profile.id,
-          email: _email,
-          status: 'exclusive',
-        );
-      }
-      // Pic request + dating pet names in this thread → stamp exclusive so a real photo can send.
-      if (canDateThisChatter &&
-          !takenByOtherEarly &&
-          text.isNotEmpty &&
-          ngmyUserRequestedChatImage(text) &&
-          RegExp(r'\b(babe|baby|my love|handsome|miss you|boyfriend|girlfriend)\b', caseSensitive: false)
-              .hasMatch('$text ${mem.map((m) => m['text'] ?? '').join(' ')}')) {
-        await NgmyCommunicateRelationshipStore.setPartner(
-          widget.profile.id,
-          email: _email,
-          status: 'exclusive',
-        );
-      }
+      // (Relationships are never started from "the chat feels romantic" any more — only the
+      // server decides, above, when they clearly ask and the advisor is single.)
       partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
       final isExclusivePartner = ngmyCommunicateIsExclusivePartner(partner, _email);
       final takenByOther = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);

@@ -1268,6 +1268,74 @@ async function handleTrading(req: Request, action: string, body: any): Promise<R
   return jsonOk({ ok: false, error: "Unknown trading action." }, 400);
 }
 
+// ── Advisor dating rules (server is the single source of truth) ─────────────
+const REL_INACTIVE_MS = 30 * 24 * 3600 * 1000; // no message from the partner for 30 days → breakup
+const REL_COOLDOWN_MS = 365 * 24 * 3600 * 1000; // after a breakup: wait 1 year
+const REL_MAX_CHANCES = 2; // first chance + one second chance
+
+/** Ends relationships whose partner hasn't written in 30 days. */
+async function relExpireInactive(db: any, advisorId: string) {
+  const cutoff = new Date(Date.now() - REL_INACTIVE_MS).toISOString();
+  await db.from("advisor_relationships")
+    .update({ status: "ended", ended_at: new Date().toISOString(), ended_reason: "no message for 30 days" })
+    .eq("advisor_id", advisorId).eq("status", "dating").lt("last_user_msg_at", cutoff);
+}
+
+/** What this user may do with this advisor right now. */
+async function relStatusFor(db: any, advisorId: string, email: string) {
+  await relExpireInactive(db, advisorId);
+  const { data: active } = await db.from("advisor_relationships").select("user_email,started_at,chance")
+    .eq("advisor_id", advisorId).eq("status", "dating").maybeSingle();
+  if (active && active.user_email === email) {
+    return { state: "dating_you", since: active.started_at, chance: active.chance };
+  }
+  const { data: history } = await db.from("advisor_relationships").select("chance,ended_at")
+    .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "ended").order("ended_at", { ascending: false });
+  const past = history ?? [];
+  if (past.length >= REL_MAX_CHANCES) return { state: "no_more_chances", relationships: past.length };
+  const lastEnd = past.length ? Date.parse(String(past[0].ended_at ?? "")) : 0;
+  if (lastEnd && Date.now() - lastEnd < REL_COOLDOWN_MS) {
+    return { state: "cooldown", availableAt: new Date(lastEnd + REL_COOLDOWN_MS).toISOString(), relationships: past.length };
+  }
+  // Never reveal who the partner is.
+  if (active) return { state: "taken" };
+  return { state: "single", nextChance: past.length + 1 };
+}
+
+async function handleAdvisorRelationship(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const limited = await enforceRateLimit(req, "advisor_rel", email, 600, 3600);
+  if (limited) return limited;
+  const advisorId = String(body?.advisorId ?? "").trim().slice(0, 120);
+  if (!advisorId) return jsonOk({ ok: false, error: "advisorId required" }, 400);
+
+  if (action === "relTouch") {
+    // The partner wrote — keeps the relationship alive.
+    await db.from("advisor_relationships").update({ last_user_msg_at: new Date().toISOString() })
+      .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "dating");
+    return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+  }
+  if (action === "relStart") {
+    const st: any = await relStatusFor(db, advisorId, email);
+    if (st.state !== "single") return jsonOk({ ok: true, started: false, ...st });
+    const { error } = await db.from("advisor_relationships").insert({
+      advisor_id: advisorId, user_email: email, status: "dating", chance: st.nextChance,
+    });
+    if (error) return jsonOk({ ok: true, started: false, state: "taken" }); // someone else got there first
+    return jsonOk({ ok: true, started: true, state: "dating_you", chance: st.nextChance });
+  }
+  if (action === "relEnd") {
+    await db.from("advisor_relationships")
+      .update({ status: "ended", ended_at: new Date().toISOString(), ended_reason: "breakup" })
+      .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "dating");
+    return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+  }
+  return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+}
+
 // ── Storage / database housekeeping (approved by the owner 2026-10-09) ──────
 // Runs at most every 6 h, in the background of normal requests:
 //  • Doc Share "My Code" cloud transfers nobody collected within 14 days (files + inbox entry)
@@ -7668,6 +7736,10 @@ serve(async (req) => {
       g2: "agentPoll",
       g3: "agentStop",
       g4: "agentStatus",
+      d1: "relStatus",
+      d2: "relTouch",
+      d3: "relStart",
+      d4: "relEnd",
       x1: "tradeAnalyze",
       x2: "tradeSummary",
       x3: "tradePaperOpen",
@@ -7919,6 +7991,10 @@ serve(async (req) => {
       ["tradeAnalyze", "tradeSummary", "tradePaperOpen", "tradePaperClose", "tradeHalt", "tradeRiskSet", "tradeReset"]
         .includes(action)) {
       return await handleTrading(req, action, body);
+    }
+
+    if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {
+      return await handleAdvisorRelationship(req, action, body);
     }
 
     // Live agent: advisor drives a real cloud browser; user watches the live view in chat.
