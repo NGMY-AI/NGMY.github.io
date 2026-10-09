@@ -357,12 +357,21 @@ const BROWSER_USE_API = "https://api.browser-use.com/api/v4";
 
 const ADVISOR_AGENT_RULES =
   "\n\nRULES (from the NGMY app — always follow):\n" +
-  "- The user is watching this browser live and can tap into it.\n" +
-  "- NEVER complete a payment, purchase, money transfer, withdrawal, deposit, trade, bet, or order that " +
-  "spends money. Go up to the final confirm button, stop, and report exactly what is ready for the user to confirm.\n" +
-  "- NEVER guess or invent passwords. If a login is needed and you are not logged in, stop and say: " +
+  "- The user is watching this browser live and can tap into it at any time. Work quickly and finish the job.\n" +
+  "- SIGN-UPS: Use the details the user gave (email, name…). If they asked you to make the password, create a " +
+  "strong one (14+ chars: upper, lower, number, symbol) and put it in your final summary so they can save it. " +
+  "Accept normal terms of service when the user asked you to sign up.\n" +
+  "- LOGINS: Never guess an existing password. If you need to log in, stop and say: " +
   "'Please log in in the browser window, then tell me to continue.'\n" +
-  "- Do not change account settings, passwords, or delete anything unless the task explicitly says so.\n" +
+  "- EMAIL / SMS CODES and CAPTCHAs: stop and ask the user to enter the code or solve it in the browser window.\n" +
+  "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
+  "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
+  "list what you filled; submit only when the user's message says to submit.\n" +
+  "- MONEY: Never complete a payment, purchase, transfer, withdrawal, deposit, or real-money trade/bet — even if asked. " +
+  "Get everything ready up to the final button, stop, and tell the user to tap it themselves in the browser window.\n" +
+  "- Do not change account settings or delete anything unless asked.\n" +
+  "- TRADING / BETTING SITES: you may open them, read charts, prices and balances, and explain what you see — " +
+  "but never place, open or close a trade or bet (demo or real). Tell the user what to tap themselves.\n" +
   "- Finish with a short plain summary of what you did and what you saw (numbers, names, balances exactly as shown).";
 
 function browserUseKey(): string {
@@ -419,8 +428,10 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const startUrl = String(body?.startUrl ?? "").trim();
   const safeStart = startUrl ? advisorBrowseSafeUrl(startUrl) : null;
   const sessionId = String(body?.sessionId ?? "").trim();
-
-  const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") + task + ADVISOR_AGENT_RULES;
+  const prevTask = String(body?.prevTask ?? "").trim().slice(0, 1500);
+  const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") +
+    (prevTask ? `Context — the previous task in this same browser was: "${prevTask}". The user's new message:\n` : "") +
+    task + ADVISOR_AGENT_RULES;
   const payload: Record<string, unknown> = {
     task: fullTask,
     maxCostUsd: 0.75,

@@ -5407,11 +5407,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemBuilder: (context, i) {
                 if (i == 0) {
                   final browserPad = _agentRun.visible
-                      ? (_agentRun.expanded
-                              ? (MediaQuery.sizeOf(context).height * 0.55).clamp(260.0, 560.0)
-                              : 230.0) +
-                          110 +
-                          _browserLift
+                      ? ngmyAdvisorLiveViewHeight(MediaQuery.sizeOf(context).width - 40) + 120 + _browserLift
                       : _browserSession.visible
                           ? _browserSession.previewHeight + 96 + _browserLift
                           : 0.0;
@@ -5644,6 +5640,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               child: NgmyAdvisorLivePanel(
                 run: _agentRun,
                 advisorName: ngmyAdvisorFirstName(widget.profile.name),
+                onDragDelta: (dy) => setState(
+                  () => _browserLift = (_browserLift - dy).clamp(0.0, MediaQuery.sizeOf(context).height * 0.45),
+                ),
               ),
             )
           else if (_browserSession.visible)

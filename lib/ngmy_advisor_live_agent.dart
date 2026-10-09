@@ -78,8 +78,12 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
   String startError = '';
   bool visible = false;
   bool expanded = false;
+  /// Full-screen viewer is open — the small panel hides its view (one connection at a time).
+  bool fullscreen = false;
   final List<NgmyAdvisorAgentStep> steps = [];
   int _after = 0;
+  // Keep ONE live connection per run — swapping the URL mid-run made the view reconnect.
+  bool _liveUrlLockedForRun = false;
   Timer? _poll;
   bool _polling = false;
   bool _disposed = false;
@@ -102,8 +106,15 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     return ok;
   }
 
-  Future<NgmyAgentStartResult> start({required String task, String? startUrl, bool continueSession = true}) async {
+  Future<NgmyAgentStartResult> start({
+    required String task,
+    String? startUrl,
+    bool continueSession = true,
+  }) async {
     if (running) await stop();
+    // A follow-up in the same browser needs the earlier task as context.
+    final prevTask = continueSession && hasSession ? this.task : '';
+    _liveUrlLockedForRun = false;
     this.task = task;
     status = 'starting';
     result = null;
@@ -120,6 +131,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         'task': task,
         if ((startUrl ?? '').isNotEmpty) 'startUrl': startUrl,
         if (continueSession && hasSession) 'sessionId': sessionId,
+        if (prevTask.isNotEmpty) 'prevTask': prevTask,
       },
       timeout: const Duration(seconds: 40),
     );
@@ -163,7 +175,10 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
       if (_disposed || id != runId) return;
       if (res != null && res['ok'] == true) {
         final lv = (res['liveUrl'] ?? '').toString();
-        if (lv.isNotEmpty) liveUrl = lv;
+        if (lv.isNotEmpty && (liveUrl.isEmpty || !_liveUrlLockedForRun)) {
+          if (lv != liveUrl) liveUrl = lv;
+          _liveUrlLockedForRun = true;
+        }
         final pu = (res['pageUrl'] ?? '').toString();
         if (pu.isNotEmpty) pageUrl = pu;
         final raw = res['steps'];
@@ -225,6 +240,11 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     _notify();
   }
 
+  void setFullscreen(bool v) {
+    fullscreen = v;
+    _notify();
+  }
+
   void _notify() {
     if (!_disposed) notifyListeners();
   }
@@ -252,13 +272,161 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   return buf.toString();
 }
 
+// ── Full screen (can turn sideways like a video) ───────────────────────────
+
+Future<void> ngmyOpenAdvisorLiveFullscreen(BuildContext context, NgmyAdvisorAgentRun run) async {
+  run.setFullscreen(true);
+  try {
+    await Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder<void>(
+        opaque: true,
+        pageBuilder: (_, _, _) => _NgmyAdvisorLiveFullscreen(run: run),
+        transitionsBuilder: (_, anim, _, child) => FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  } finally {
+    run.setFullscreen(false);
+  }
+}
+
+class _NgmyAdvisorLiveFullscreen extends StatefulWidget {
+  const _NgmyAdvisorLiveFullscreen({required this.run});
+  final NgmyAdvisorAgentRun run;
+
+  @override
+  State<_NgmyAdvisorLiveFullscreen> createState() => _NgmyAdvisorLiveFullscreenState();
+}
+
+class _NgmyAdvisorLiveFullscreenState extends State<_NgmyAdvisorLiveFullscreen> {
+  /// Rotate the view 90° so it fills the phone held sideways — works even when the app is
+  /// locked to portrait (iPhone home-screen app).
+  bool _sideways = true;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.run.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.run.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.run;
+    final size = MediaQuery.sizeOf(context);
+    final pad = MediaQuery.paddingOf(context);
+    // Already landscape (tablet / rotated device) → no need to rotate.
+    final rotate = _sideways && size.height > size.width;
+    final availW = size.width - pad.left - pad.right;
+    final availH = size.height - pad.top - pad.bottom;
+    // Long side along the view's width; keep the page's shape.
+    final longSide = rotate ? availH : availW;
+    final shortSide = rotate ? availW : availH;
+    var viewW = longSide;
+    var viewH = ngmyAdvisorLiveViewHeight(viewW);
+    if (viewH > shortSide) {
+      viewH = shortSide;
+      viewW = viewH / 0.66;
+    }
+    final view = SizedBox(
+      width: viewW,
+      height: viewH,
+      child: r.liveUrl.isEmpty
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF60A5FA)))
+          : NgmyAdvisorLiveView(key: ValueKey('fs-${r.liveUrl}'), url: r.liveUrl),
+    );
+
+    Widget controls(bool vertical) {
+      final children = <Widget>[
+        if (r.running)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(color: const Color(0xFFDC2626), borderRadius: BorderRadius.circular(6)),
+            child: const Text('LIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+          ),
+        IconButton(
+          tooltip: _sideways ? 'Upright' : 'Sideways',
+          onPressed: () => setState(() => _sideways = !_sideways),
+          icon: const Icon(Icons.screen_rotation_rounded, color: Colors.white),
+        ),
+        if (r.running)
+          IconButton(
+            tooltip: 'Stop',
+            onPressed: () => unawaited(r.stop()),
+            icon: const Icon(Icons.stop_circle_outlined, color: Color(0xFFF87171)),
+          ),
+        IconButton(
+          tooltip: 'Close',
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.close_rounded, color: Colors.white),
+        ),
+      ];
+      return vertical ? Column(mainAxisSize: MainAxisSize.min, children: children) : Row(mainAxisSize: MainAxisSize.min, children: children);
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            Center(child: rotate ? RotatedBox(quarterTurns: 1, child: view) : view),
+            // Controls sit on the free edge so they never cover the page.
+            if (rotate)
+              Positioned(left: 4, top: 8, child: RotatedBox(quarterTurns: 1, child: controls(false)))
+            else
+              Positioned(right: 8, top: 8, child: controls(false)),
+            if ((r.latestStep).isNotEmpty && r.running)
+              Positioned(
+                left: rotate ? null : 12,
+                right: rotate ? 4 : 12,
+                bottom: rotate ? null : 12,
+                top: rotate ? 60 : null,
+                child: RotatedBox(
+                  quarterTurns: rotate ? 1 : 0,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: const Color(0xCC111827), borderRadius: BorderRadius.circular(10)),
+                    child: Text(r.latestStep,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ── Live panel ─────────────────────────────────────────────────────────────
 
+/// Height of the live view for a given width — matches the cloud browser's shape
+/// (page + its tab/address bar) so there is no empty black area.
+double ngmyAdvisorLiveViewHeight(double width) => (width * 0.66).clamp(180.0, 900.0);
+
 class NgmyAdvisorLivePanel extends StatefulWidget {
-  const NgmyAdvisorLivePanel({super.key, required this.run, required this.advisorName});
+  const NgmyAdvisorLivePanel({
+    super.key,
+    required this.run,
+    required this.advisorName,
+    this.onDragDelta,
+  });
 
   final NgmyAdvisorAgentRun run;
   final String advisorName;
+  /// Vertical drag on the header (dy) — moves the panel up / down.
+  final ValueChanged<double>? onDragDelta;
 
   @override
   State<NgmyAdvisorLivePanel> createState() => _NgmyAdvisorLivePanelState();
@@ -301,19 +469,39 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
   @override
   Widget build(BuildContext context) {
     final r = widget.run;
-    final screenH = MediaQuery.sizeOf(context).height;
-    final viewH = r.expanded ? (screenH * 0.55).clamp(260.0, 560.0) : 230.0;
+    // Panel inner width ≈ screen − margins; height follows the page shape (no black gap).
+    final viewW = MediaQuery.sizeOf(context).width - 16 - 24;
+    final viewH = ngmyAdvisorLiveViewHeight(viewW);
     return Material(
       elevation: 10,
       shadowColor: Colors.black54,
       color: const Color(0xFF16161C),
       borderRadius: BorderRadius.circular(18),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 6, 12),
+        padding: const EdgeInsets.fromLTRB(12, 4, 6, 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
+            // Drag handle — slide the window up or down.
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (d) => widget.onDragDelta?.call(d.delta.dy),
+              child: SizedBox(
+                height: 14,
+                width: double.infinity,
+                child: Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragUpdate: (d) => widget.onDragDelta?.call(d.delta.dy),
+              child: Row(
               children: [
                 Container(
                   width: 34,
@@ -362,10 +550,9 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                     child: const Text('Stop', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
                 IconButton(
-                  tooltip: r.expanded ? 'Smaller' : 'Bigger',
-                  onPressed: r.toggleExpanded,
-                  icon: Icon(r.expanded ? Icons.close_fullscreen_rounded : Icons.open_in_full_rounded,
-                      color: Colors.white60, size: 20),
+                  tooltip: 'Full screen',
+                  onPressed: r.liveUrl.isEmpty ? null : () => ngmyOpenAdvisorLiveFullscreen(context, r),
+                  icon: const Icon(Icons.fullscreen_rounded, color: Colors.white70, size: 24),
                 ),
                 IconButton(
                   tooltip: 'Hide',
@@ -373,6 +560,7 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                   icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white60, size: 24),
                 ),
               ],
+            ),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -382,7 +570,14 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                 child: SizedBox(
                   height: viewH,
                   width: double.infinity,
-                  child: r.liveUrl.isNotEmpty
+                  child: r.liveUrl.isNotEmpty && r.fullscreen
+                      ? const ColoredBox(
+                          color: Color(0xFF0F172A),
+                          child: Center(
+                            child: Text('Watching in full screen', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                          ),
+                        )
+                      : r.liveUrl.isNotEmpty
                       ? NgmyAdvisorLiveView(key: ValueKey(r.liveUrl), url: r.liveUrl)
                       : ColoredBox(
                           color: const Color(0xFF0F172A),
