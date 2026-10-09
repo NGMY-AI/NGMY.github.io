@@ -58,12 +58,103 @@ List<Color> ngmyHelperGiftStateGradient(String state) {
 Future<Map<String, dynamic>?> _helperGiftEdge(
   String op, {
   Map<String, dynamic> fields = const {},
+  bool fallbackOnTimeout = false,
 }) =>
     ngmyEdgeInvoke({
       'action': 'civicHelperGifts',
       'op': op,
       ...fields,
-    });
+    }, fallbackOnTimeout: fallbackOnTimeout);
+
+Future<bool> _syncPendingAlertToServer(NgmyHelperGiftPending pending) async {
+  if (pending.granted) return true;
+  try {
+    final data = await _helperGiftEdge('pending', fields: {'pending': pending.toMap()});
+    return data?['ok'] == true;
+  } catch (e) {
+    debugPrint('[helper gifts] pending sync: $e');
+  }
+  try {
+    final relay = await ngmyDbRelaySettingsFetch(kNgmyHelperGiftPendingSettingsKey);
+    final items = relay?['items'];
+    final current = items is List
+        ? items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+    final snap = pending.toMap();
+    final id = (snap['id'] ?? '').toString();
+    final email = (snap['email'] ?? '').toString().toLowerCase().trim();
+    final idx = current.indexWhere((p) => (p['id'] ?? '').toString() == id);
+    if (idx >= 0) {
+      current[idx] = {...current[idx], ...snap, 'granted': false};
+    } else if (!current.any((p) => p['granted'] != true && (p['email'] ?? '').toString().toLowerCase().trim() == email)) {
+      current.insert(0, {...snap, 'granted': false});
+    }
+    await ngmyDbRelaySettingsUpsert(kNgmyHelperGiftPendingSettingsKey, {'items': current});
+    return true;
+  } catch (e) {
+    debugPrint('[helper gifts] pending relay sync: $e');
+    return false;
+  }
+}
+
+Future<bool> _grantGiftViaDbRelay({
+  required NgmyHelperGiftPending pending,
+  required NgmyHelperGift gift,
+  required String grantedByEmail,
+}) async {
+  try {
+    await _syncPendingAlertToServer(pending);
+    final recipient = pending.email.toLowerCase().trim();
+    final storeEmail = gift.storeSellerEmail.toLowerCase().trim();
+    if (recipient.isEmpty || storeEmail.isEmpty || gift.amount <= 0) return false;
+
+    final stashKey = 'ngmy_helper_gift_qr_v1_${gift.token}';
+    final cloudGift = {
+      ...gift.toMap(),
+      'email': recipient,
+      'storeSellerEmail': storeEmail,
+      'grantedBy': grantedByEmail.toLowerCase().trim(),
+      'qrPayload': '$kNgmyHelperGiftQrPrefix|${gift.token}',
+      'redeemed': false,
+    };
+    await ngmyDbRelaySettingsUpsert(stashKey, cloudGift);
+
+    final inboxWrap = await ngmyDbRelaySettingsFetch(kNgmyHelperGiftInboxSettingsKey);
+    final inboxItems = inboxWrap?['items'];
+    final inbox = inboxItems is List
+        ? inboxItems.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+    final existing = inbox.indexWhere(
+      (g) => (g['token'] ?? '').toString() == gift.token || (g['id'] ?? '').toString() == gift.id,
+    );
+    if (existing >= 0) {
+      inbox[existing] = cloudGift;
+    } else {
+      inbox.insert(0, cloudGift);
+    }
+    await ngmyDbRelaySettingsUpsert(kNgmyHelperGiftInboxSettingsKey, {'items': inbox});
+
+    final pendingWrap = await ngmyDbRelaySettingsFetch(kNgmyHelperGiftPendingSettingsKey);
+    final pendingItems = pendingWrap?['items'];
+    final pendingList = pendingItems is List
+        ? pendingItems.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : <Map<String, dynamic>>[];
+    var pendingIdx = pendingList.indexWhere((p) => (p['id'] ?? '').toString() == pending.id && p['granted'] != true);
+    if (pendingIdx < 0) {
+      pendingIdx = pendingList.indexWhere(
+        (p) => p['granted'] != true && (p['email'] ?? '').toString().toLowerCase().trim() == recipient,
+      );
+    }
+    if (pendingIdx >= 0) {
+      pendingList[pendingIdx] = {...pendingList[pendingIdx], 'granted': true, 'notified': true};
+      await ngmyDbRelaySettingsUpsert(kNgmyHelperGiftPendingSettingsKey, {'items': pendingList});
+    }
+    return true;
+  } catch (e) {
+    debugPrint('[helper gifts] relay grant: $e');
+    return false;
+  }
+}
 
 String _generateGiftToken() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -687,16 +778,26 @@ class NgmyCivicHelperGifts {
       grantedBy: grantedBy.toLowerCase().trim(),
     );
 
-    final saved = await _helperGiftEdge(
+    await _syncPendingAlertToServer(pending);
+
+    var saved = await _helperGiftEdge(
       'grant',
       fields: {
         'pendingId': pending.id,
+        'pending': pending.toMap(),
         'gift': gift.toMap(),
       },
+      fallbackOnTimeout: true,
     );
     if (saved == null || saved['ok'] != true) {
-      debugPrint('[helper gifts] grant refused: ${saved?['error'] ?? 'Could not reach server'}');
-      return null;
+      final err = (saved?['error'] ?? 'Could not reach server').toString();
+      debugPrint('[helper gifts] grant refused: $err');
+      final relayOk = await _grantGiftViaDbRelay(
+        pending: pending,
+        gift: gift,
+        grantedByEmail: grantedBy,
+      );
+      if (!relayOk) return null;
     }
 
     final inbox = inboxFromConfig(config);

@@ -5272,8 +5272,49 @@ async function handleCivicHelperGifts(
     if (!pendingId || !rawGift || typeof rawGift !== "object" || Array.isArray(rawGift)) {
       return jsonOk({ error: "Pending alert and gift are required" }, 400);
     }
-    const pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
-    const pendingIndex = pending.findIndex((p) => String(p.id ?? "") === pendingId && p.granted !== true);
+    let pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+    const giftRecipientHint = emailKey(String((rawGift as Record<string, unknown>).email ?? ""));
+
+    const findOpenPendingIndex = (): number => {
+      let idx = pending.findIndex((p) => String(p.id ?? "") === pendingId && p.granted !== true);
+      if (idx >= 0) return idx;
+      if (giftRecipientHint) {
+        idx = pending.findIndex(
+          (p) => p.granted !== true && emailKey(String(p.email ?? "")) === giftRecipientHint,
+        );
+      }
+      return idx;
+    };
+
+    let pendingIndex = findOpenPendingIndex();
+    if (pendingIndex < 0) {
+      const rawPending = body.pending;
+      if (rawPending && typeof rawPending === "object" && !Array.isArray(rawPending)) {
+        const snap = { ...(rawPending as Record<string, unknown>) };
+        const id = String(snap.id ?? pendingId).trim();
+        const recipient = emailKey(String(snap.email ?? giftRecipientHint));
+        const streak = Number(snap.streak ?? 0);
+        if (id && recipient && Number.isFinite(streak) && streak >= 3) {
+          snap.id = id;
+          snap.email = recipient;
+          snap.granted = false;
+          const existingIdx = pending.findIndex((p) => String(p.id ?? "") === id);
+          if (existingIdx >= 0) pending[existingIdx] = { ...pending[existingIdx], ...snap };
+          else if (
+            !pending.some((p) => p.granted !== true && emailKey(String(p.email ?? "")) === recipient)
+          ) {
+            pending.unshift(snap);
+          }
+          const pendingSaved = await saveSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY, {
+            items: pending,
+          });
+          if (pendingSaved.ok) {
+            pending = helperGiftItems(await loadSettingsObject(admin, CIVIC_HELPER_GIFT_PENDING_KEY));
+            pendingIndex = findOpenPendingIndex();
+          }
+        }
+      }
+    }
     if (pendingIndex < 0) return jsonOk({ error: "This helper reward is no longer pending" }, 409);
     const gift = { ...(rawGift as Record<string, unknown>) };
     const recipient = emailKey(String(pending[pendingIndex].email ?? ""));
