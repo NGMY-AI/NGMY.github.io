@@ -66,8 +66,9 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
 
   await NgmyCivicHelperGifts.hydrateFromCloud(config);
   NgmyCivicHelperGifts.syncOpenPendingFromMemberStreaks(config);
+  NgmyCivicHelperGifts.reconcilePendingWithInbox(config);
 
-  final pending = NgmyCivicHelperGifts.openPending(config);
+  final pending = NgmyCivicHelperGifts.openPendingNeedingAdminGrant(config);
   if (pending.isEmpty) return;
 
   final ctx = await _waitForHelperGiftPopupContext(preferred: context);
@@ -84,14 +85,9 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
 
     if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
 
-    final stillOpen = NgmyCivicHelperGifts.openPending(config);
-    final item = queue.firstWhere(
-      (p) => stillOpen.any((o) => o.id == p.id && !o.granted),
-      orElse: () => stillOpen.isNotEmpty ? stillOpen.first : queue.first,
-    );
-    if (stillOpen.every((p) => p.id != item.id || p.granted)) {
-      return;
-    }
+    final stillOpen = NgmyCivicHelperGifts.openPendingNeedingAdminGrant(config);
+    if (stillOpen.isEmpty) return;
+    final item = stillOpen.first;
 
     final granted = await showNgmyHelperGiftAdminCelebrationPopup(
       ctx,
@@ -100,8 +96,10 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
       onGrant: onGrant,
     );
     if (granted == true) {
-      NgmyCivicHelperGifts.markPendingNotified(config, item.id);
+      NgmyCivicHelperGifts.markAllPendingGrantedForRecipient(config, item.email);
+      NgmyCivicHelperGifts.reconcilePendingWithInbox(config);
       unawaited(NgmyCivicHelperGifts.persistPendingLocal(config));
+      unawaited(NgmyCivicHelperGifts.persistCloud(config));
       onDataChanged?.call();
     } else {
       NgmyHelperGiftAdminPopupSession.markDismissedForAppSession();

@@ -383,7 +383,61 @@ class NgmyCivicHelperGifts {
   static List<NgmyHelperGiftPending> openPending(dynamic config) =>
       pendingFromConfig(config).where((p) => !p.granted).toList();
 
-  static int openPendingCount(dynamic config) => openPending(config).length;
+  /// True when a money card was already sent — admin pop-up must not show again.
+  static bool recipientAlreadyHasMoneyCard(dynamic config, String email) {
+    final key = email.toLowerCase().trim();
+    if (key.isEmpty) return false;
+    if (giftsForEmail(config, key).any((g) => !g.redeemed)) return true;
+    if (pendingFromConfig(config).any((p) => p.email == key && p.granted)) return true;
+    return false;
+  }
+
+  /// Close stale pending rows once the member has a card in inbox.
+  static void reconcilePendingWithInbox(dynamic config) {
+    final inbox = inboxFromConfig(config);
+    final list = pendingFromConfig(config);
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      final p = list[i];
+      if (p.granted) continue;
+      final key = p.email.toLowerCase().trim();
+      final hasOpenCard = inbox.any((g) => g.email == key && !g.redeemed);
+      final hasNewerGift = inbox.any((g) {
+        if (g.email != key) return false;
+        final gc = DateTime.tryParse(g.createdAt);
+        final pc = DateTime.tryParse(p.createdAt);
+        if (gc == null || pc == null) return true;
+        return !gc.isBefore(pc);
+      });
+      if (hasOpenCard || hasNewerGift) {
+        list[i] = p.copyWith(granted: true, notified: true);
+        changed = true;
+      }
+    }
+    if (changed) setPending(config, list);
+  }
+
+  /// Pending alerts that still need an admin to send a money card.
+  static List<NgmyHelperGiftPending> openPendingNeedingAdminGrant(dynamic config) {
+    reconcilePendingWithInbox(config);
+    return openPending(config).where((p) => !recipientAlreadyHasMoneyCard(config, p.email)).toList();
+  }
+
+  static int openPendingCount(dynamic config) => openPendingNeedingAdminGrant(config).length;
+
+  static void markAllPendingGrantedForRecipient(dynamic config, String email) {
+    final key = email.toLowerCase().trim();
+    if (key.isEmpty) return;
+    final list = pendingFromConfig(config);
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].email == key && !list[i].granted) {
+        list[i] = list[i].copyWith(granted: true, notified: true);
+        changed = true;
+      }
+    }
+    if (changed) setPending(config, list);
+  }
 
   static List<NgmyHelperGift> giftsForEmail(dynamic config, String email) {
     final key = email.toLowerCase().trim();
@@ -411,20 +465,22 @@ class NgmyCivicHelperGifts {
         byId[p.id] = p;
       }
     }
-    final openByEmail = <String, NgmyHelperGiftPending>{};
-    final granted = <NgmyHelperGiftPending>[];
+    final byEmail = <String, List<NgmyHelperGiftPending>>{};
     for (final p in byId.values) {
-      if (p.granted) {
-        granted.add(p);
+      byEmail.putIfAbsent(p.email.toLowerCase().trim(), () => []).add(p);
+    }
+    final merged = <NgmyHelperGiftPending>[];
+    for (final group in byEmail.values) {
+      if (group.any((p) => p.granted)) {
+        for (final p in group) {
+          merged.add(p.granted ? p : p.copyWith(granted: true, notified: true));
+        }
         continue;
       }
-      final prev = openByEmail[p.email];
-      if (prev == null || p.createdAt.compareTo(prev.createdAt) > 0) {
-        openByEmail[p.email] = p;
-      }
+      group.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      merged.add(group.first);
     }
-    final merged = [...openByEmail.values, ...granted]
-      ..sort((x, y) => y.createdAt.compareTo(x.createdAt));
+    merged.sort((x, y) => y.createdAt.compareTo(x.createdAt));
     return merged;
   }
 
@@ -457,6 +513,7 @@ class NgmyCivicHelperGifts {
       final email = (item['email'] ?? '').toString().toLowerCase().trim();
       if (email.isEmpty) continue;
       if (list.any((p) => !p.granted && p.email == email)) continue;
+      if (recipientAlreadyHasMoneyCard(config, email)) continue;
       list.insert(
         0,
         NgmyHelperGiftPending(
@@ -738,6 +795,7 @@ class NgmyCivicHelperGifts {
 
     setPending(config, _mergePendingLists(localPending, remotePending));
     setInbox(config, _mergeInboxLists(localInbox, remoteInbox));
+    reconcilePendingWithInbox(config);
     final derived = syncOpenPendingFromMemberStreaks(config);
     if (derived > 0) {
       unawaited(persistCloud(config));
@@ -805,12 +863,8 @@ class NgmyCivicHelperGifts {
     inbox.insert(0, gift);
     setInbox(config, inbox);
 
-    final pendingList = pendingFromConfig(config);
-    final idx = pendingList.indexWhere((p) => p.id == pending.id);
-    if (idx >= 0) {
-      pendingList[idx] = pending.copyWith(granted: true, notified: true);
-      setPending(config, pendingList);
-    }
+    markAllPendingGrantedForRecipient(config, pending.email);
+    reconcilePendingWithInbox(config);
 
     await persistPendingLocal(config);
     unawaited(persistCloud(config));
