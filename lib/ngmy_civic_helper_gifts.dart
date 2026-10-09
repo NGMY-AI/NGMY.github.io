@@ -20,6 +20,7 @@ const String kNgmyHelperGiftPendingPrefsKey = 'ngmy_civic_helper_gift_pending_v1
 const String kNgmyHelperGiftInboxSettingsKey = 'civic_helper_gift_inbox_v1';
 const String kNgmyHelperGiftInboxPrefsKey = 'ngmy_civic_helper_gift_inbox_v1';
 const String kNgmyHelperGiftAdminPopupEnabledKey = 'ngmy_helper_gift_admin_popup_enabled_v1';
+const String kNgmyHelperGiftSeenTokensPrefsKey = 'ngmy_helper_gift_seen_tokens_v1';
 
 /// Admin can disable full-screen helper reward pop-ups (see Helper Gifts hub).
 class NgmyHelperGiftAdminPopupSettings {
@@ -812,6 +813,7 @@ class NgmyCivicHelperGifts {
     }
 
     await persistPendingLocal(config);
+    unawaited(persistCloud(config));
     await persistInboxLocal(config);
     return gift;
   }
@@ -904,6 +906,7 @@ class NgmyCivicHelperGifts {
     }
     setInbox(config, inbox);
     await persistInboxLocal(config);
+    await markGiftPopupSeen(token);
     return (
       ok: true,
       message: 'Redeemed \$${updated.amount.toStringAsFixed(2)} — ${updated.giftName}. Give the member store credit for that amount.',
@@ -918,4 +921,44 @@ class NgmyCivicHelperGifts {
     list[idx] = list[idx].copyWith(notified: true);
     setPending(config, list);
   }
+
+  static Future<Set<String>> _seenGiftTokens() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(kNgmyHelperGiftSeenTokensPrefsKey);
+      if (raw == null || raw.trim().isEmpty) return {};
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return {};
+      return decoded.map((e) => e.toString().trim()).where((t) => t.isNotEmpty).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  static Future<void> markGiftPopupSeen(String token) async {
+    final t = token.trim();
+    if (t.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final seen = await _seenGiftTokens();
+      seen.add(t);
+      await prefs.setString(kNgmyHelperGiftSeenTokensPrefsKey, jsonEncode(seen.toList()));
+    } catch (e) {
+      debugPrint('[helper gifts] mark seen: $e');
+    }
+  }
+
+  /// Unredeemed gifts the member has not acknowledged in a pop-up yet.
+  static Future<List<NgmyHelperGift>> giftsNeedingUserPopup(
+    dynamic config,
+    String email,
+  ) async {
+    final seen = await _seenGiftTokens();
+    return giftsForEmail(config, email)
+        .where((g) => !g.redeemed && g.token.isNotEmpty && !seen.contains(g.token))
+        .toList();
+  }
+
+  static int unredeemedGiftCount(dynamic config, String email) =>
+      giftsForEmail(config, email).where((g) => !g.redeemed).length;
 }

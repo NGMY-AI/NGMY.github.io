@@ -84,11 +84,12 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
 
     if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
 
+    final stillOpen = NgmyCivicHelperGifts.openPending(config);
     final item = queue.firstWhere(
-      (p) => NgmyCivicHelperGifts.openPending(config).any((o) => o.id == p.id && !o.granted),
-      orElse: () => queue.first,
+      (p) => stillOpen.any((o) => o.id == p.id && !o.granted),
+      orElse: () => stillOpen.isNotEmpty ? stillOpen.first : queue.first,
     );
-    if (NgmyCivicHelperGifts.openPending(config).every((p) => p.id != item.id || p.granted)) {
+    if (stillOpen.every((p) => p.id != item.id || p.granted)) {
       return;
     }
 
@@ -99,6 +100,8 @@ Future<void> ngmyCheckAdminHelperGiftPopupsNow({
       onGrant: onGrant,
     );
     if (granted == true) {
+      NgmyCivicHelperGifts.markPendingNotified(config, item.id);
+      unawaited(NgmyCivicHelperGifts.persistPendingLocal(config));
       onDataChanged?.call();
     } else {
       NgmyHelperGiftAdminPopupSession.markDismissedForAppSession();
