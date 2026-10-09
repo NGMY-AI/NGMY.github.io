@@ -127,6 +127,228 @@ async function geminiChat(
   throw new Error(lastErr);
 }
 
+// ── Advisor Browser ─────────────────────────────────────────────────────────
+// Read-only: looks at public pages / web search. Never logs in, clicks, or submits.
+
+type AdvisorBrowseResult = {
+  ok: boolean;
+  summary: string;
+  url: string;
+  title: string;
+  sources: { url: string; title: string }[];
+  screenshotBase64?: string;
+  error?: string;
+};
+
+/** Public http(s) only — blocks localhost / private network targets. */
+function advisorBrowseSafeUrl(raw: string): URL | null {
+  let s = raw.trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  const h = u.hostname.toLowerCase();
+  if (
+    h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") ||
+    h.endsWith(".internal") || h === "0.0.0.0" || h.startsWith("127.") ||
+    h.startsWith("10.") || h.startsWith("192.168.") || h.startsWith("169.254.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) || h.includes(":") || !h.includes(".")
+  ) {
+    return null;
+  }
+  return u;
+}
+
+/** Google grounding links are redirects — resolve to the real page URL. */
+async function advisorResolveRedirect(link: string): Promise<string> {
+  if (!link.includes("vertexaisearch.cloud.google.com")) return link;
+  try {
+    const res = await fetch(link, { method: "GET", redirect: "manual" });
+    const loc = res.headers.get("location");
+    try {
+      await res.body?.cancel();
+    } catch { /* ignore */ }
+    return loc && /^https?:\/\//i.test(loc) ? loc : link;
+  } catch {
+    return link;
+  }
+}
+
+function advisorHtmlToText(html: string): { title: string; text: string } {
+  const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
+  const text = html
+    .replace(/<(script|style|noscript|svg|head)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, " ")
+    .trim();
+  return { title, text };
+}
+
+async function advisorFetchPageText(u: URL): Promise<{ title: string; text: string } | null> {
+  try {
+    const res = await fetch(u.toString(), {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; NGMY-Advisor/1.0)",
+        "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+      },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return null;
+    const type = res.headers.get("content-type") ?? "";
+    if (!/text|html|xml|json/i.test(type)) return null;
+    const raw = (await res.text()).slice(0, 600000);
+    const out = advisorHtmlToText(raw);
+    return { title: out.title, text: out.text.slice(0, 14000) };
+  } catch {
+    return null;
+  }
+}
+
+async function advisorScreenshot(u: URL): Promise<string | undefined> {
+  try {
+    const shotUrl = `https://image.thum.io/get/width/1100/crop/760/noanimate/${u.toString()}`;
+    const res = await fetch(shotUrl, { signal: AbortSignal.timeout(15000) });
+    if (!res.ok) return undefined;
+    const type = res.headers.get("content-type") ?? "";
+    if (!type.startsWith("image/")) return undefined;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length < 4096 || buf.length > 3_500_000) return undefined;
+    return bytesToBase64(buf);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Gemini with Google Search + URL Context tools — the model actually reads the web. */
+async function advisorGeminiBrowse(
+  apiKey: string,
+  task: string,
+  url: string,
+): Promise<{ text: string; sources: { url: string; title: string }[] } | null> {
+  const prompt =
+    "You are the web-browsing hands of a chat advisor. Use your tools to actually look at the web.\n" +
+    (url ? `Open and read this page: ${url}\n` : "Search the web for what the user needs.\n") +
+    `User request: ${task || "Tell me what is on this page."}\n\n` +
+    "Report what you actually saw: the key facts, numbers, prices, dates, names and anything the user asked about. " +
+    "Plain text, no markdown, at most 170 words. If the page needs a login or you could not load it, say so plainly. " +
+    "Never invent content you did not see.\n" +
+    "On the very last line write: TITLE: <page or best source title>";
+  for (const model of ["gemini-2.5-flash", "gemini-2.0-flash"]) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: url ? [{ url_context: {} }, { google_search: {} }] : [{ google_search: {} }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
+          }),
+          signal: AbortSignal.timeout(28000),
+        },
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const cand = data?.candidates?.[0];
+      const parts = Array.isArray(cand?.content?.parts) ? cand.content.parts : [];
+      const text = parts.map((p: { text?: string }) => p?.text ?? "").join("").trim();
+      if (!text) continue;
+      const chunks = Array.isArray(cand?.groundingMetadata?.groundingChunks)
+        ? cand.groundingMetadata.groundingChunks
+        : [];
+      const sources: { url: string; title: string }[] = [];
+      for (const c of chunks) {
+        const uri = String(c?.web?.uri ?? "").trim();
+        if (!uri || sources.some((s) => s.url === uri)) continue;
+        sources.push({ url: uri, title: String(c?.web?.title ?? "").trim() });
+        if (sources.length >= 5) break;
+      }
+      return { text, sources };
+    } catch {
+      // try next model
+    }
+  }
+  return null;
+}
+
+async function advisorBrowse(apiKey: string, task: string, rawUrl: string): Promise<AdvisorBrowseResult> {
+  const target = rawUrl ? advisorBrowseSafeUrl(rawUrl) : null;
+  if (rawUrl && !target) {
+    return { ok: false, summary: "", url: "", title: "", sources: [], error: "That link can't be opened." };
+  }
+
+  let summary = "";
+  let title = "";
+  let sources: { url: string; title: string }[] = [];
+
+  const isGeminiKey = !!apiKey && !/^(sk-|pk-|openai:|anthropic:|claude:|compat:)/i.test(apiKey.trim());
+  const geminiKey = apiKey.trim().replace(/^(gemini:|google:)/i, "");
+  const browsed = isGeminiKey ? await advisorGeminiBrowse(geminiKey, task, target?.toString() ?? "") : null;
+  if (browsed) {
+    const lines = browsed.text.split("\n");
+    const titleIdx = lines.findIndex((l) => /^\s*TITLE:/i.test(l));
+    if (titleIdx >= 0) {
+      title = lines[titleIdx].replace(/^\s*TITLE:\s*/i, "").trim();
+      lines.splice(titleIdx, 1);
+    }
+    summary = lines.join("\n").trim();
+    sources = browsed.sources;
+  }
+
+  // Fallback: fetch the page ourselves so the advisor still sees real text.
+  if (!summary && target) {
+    const page = await advisorFetchPageText(target);
+    if (page && page.text) {
+      title = title || page.title;
+      summary = `PAGE TEXT (excerpt): ${page.text.slice(0, 5000)}`;
+    }
+  }
+
+  // Pick the page to show: the user's link, else the top search source.
+  let shown = target?.toString() ?? "";
+  if (!shown && sources.length > 0) {
+    shown = await advisorResolveRedirect(sources[0].url);
+    if (!title) title = sources[0].title;
+  }
+  const resolvedSources = await Promise.all(
+    sources.slice(0, 3).map(async (s) => ({ url: await advisorResolveRedirect(s.url), title: s.title })),
+  );
+  const shownSafe = shown ? advisorBrowseSafeUrl(shown) : null;
+  const screenshotBase64 = shownSafe ? await advisorScreenshot(shownSafe) : undefined;
+
+  if (!summary) {
+    return {
+      ok: false,
+      summary: "",
+      url: shownSafe?.toString() ?? "",
+      title,
+      sources: resolvedSources,
+      screenshotBase64,
+      error: "Could not read the page.",
+    };
+  }
+  return {
+    ok: true,
+    summary: summary.slice(0, 6000),
+    url: shownSafe?.toString() ?? "",
+    title: title.slice(0, 160),
+    sources: resolvedSources,
+    screenshotBase64,
+  };
+}
+
 async function openAiChat(
   apiKey: string,
   prompt: string,
@@ -436,15 +658,12 @@ function jsonOk(payload: Record<string, unknown>, status = 200): Response {
 
 /** Fetches HTML for the advisor mini-browser (sites that block iframes). */
 async function handleAdvisorBrowserFrame(rawUrl: string): Promise<Response> {
-  let parsed: URL;
-  try {
-    parsed = new URL(String(rawUrl ?? "").trim());
-  } catch {
-    return jsonOk({ ok: false, error: "Invalid URL" }, 400);
+  // Public sites only — never let the relay reach localhost / private network / cloud metadata.
+  const safe = advisorBrowseSafeUrl(String(rawUrl ?? ""));
+  if (!safe) {
+    return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
   }
-  if (!["http:", "https:"].includes(parsed.protocol)) {
-    return jsonOk({ ok: false, error: "Invalid URL protocol" }, 400);
-  }
+  const parsed: URL = safe;
   const host = parsed.hostname.toLowerCase();
   if (host === "ngmy.org" || host.endsWith(".ngmy.org")) {
     return jsonOk({ ok: false, error: "Cannot embed NGMY inside the advisor browser." }, 400);
@@ -457,7 +676,12 @@ async function handleAdvisorBrowserFrame(rawUrl: string): Promise<Response> {
         Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
       },
       redirect: "follow",
+      signal: AbortSignal.timeout(15000),
     });
+    // A redirect could land on a private address — re-check where we ended up.
+    if (res.url && !advisorBrowseSafeUrl(res.url)) {
+      return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
+    }
     const ct = (res.headers.get("content-type") ?? "").toLowerCase();
     if (!res.ok) {
       return jsonOk({ ok: false, error: `Site returned HTTP ${res.status}` }, 502);
@@ -469,12 +693,28 @@ async function handleAdvisorBrowserFrame(rawUrl: string): Promise<Response> {
     if (html.length > 1_200_000) {
       html = html.substring(0, 1_200_000);
     }
-    const baseHref = `${parsed.origin}/`;
+    // Base on the FINAL page URL so relative links on deep pages resolve correctly.
+    const baseHref = (res.url || parsed.toString()).replace(/"/g, "%22");
+    // Bridge: link taps go back to the app (re-loaded through this relay) and the advisor
+    // can tap buttons by their text. The page runs sandboxed with no access to NGMY.
+    const bridge = `(function(){
+var P=window.parent;function abs(h){try{return new URL(h,document.baseURI).href}catch(e){return ''}}
+document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a[href]'):null;if(!a)return;
+var h=a.getAttribute('href')||'';if(!h||h.charAt(0)==='#'||/^javascript:/i.test(h))return;var u=abs(h);if(!/^https?:/i.test(u))return;
+e.preventDefault();P.postMessage({ngmyBrowser:'navigate',url:u},'*');},true);
+function vis(el){var r=el.getBoundingClientRect();return r.width>0&&r.height>0;}
+function byText(t){t=String(t||'').trim().toLowerCase();if(!t)return null;var els=document.querySelectorAll('a,button,[role=button],input[type=submit],input[type=button],label,summary,li,span,div');var best=null;
+for(var i=0;i<els.length;i++){var el=els[i];if(!vis(el))continue;var s=(el.innerText||el.value||el.getAttribute('aria-label')||'').trim().toLowerCase();if(!s)continue;
+if(s===t)return el;if(!best&&s.length<=t.length+40&&s.indexOf(t)>=0)best=el;}return best;}
+window.addEventListener('message',function(e){if(e.source!==P)return;var d=e.data||{};var el=null;
+if(d.ngmyBrowserCmd==='click_text')el=byText(d.text);else if(d.ngmyBrowserCmd==='click_selector'){try{el=document.querySelector(d.selector)}catch(x){}}
+if(el){el.scrollIntoView({block:'center'});el.click();}P.postMessage({ngmyBrowser:'clicked',ok:!!el},'*');});
+P.postMessage({ngmyBrowser:'loaded',title:document.title||''},'*');})();`;
     const inject =
       `<base href="${baseHref}" target="_self" />` +
       `<meta name="referrer" content="no-referrer" />` +
       `<meta name="viewport" content="width=device-width, initial-scale=1" />` +
-      `<script>(function(){document.addEventListener('click',function(e){var a=e.target&&e.target.closest?e.target.closest('a'):null;if(a&&a.target==='_top')a.target='_self';},true);})();</script>`;
+      `<script>document.addEventListener('DOMContentLoaded',function(){${bridge}});</script>`;
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/<head[^>]*>/i, (m) => `${m}${inject}`);
     } else if (/<html[^>]*>/i.test(html)) {
@@ -6395,6 +6635,7 @@ serve(async (req) => {
       i1: "geminiVirtualOutfit",
       i2: "pollinationsImage",
       b1: "advisorBrowserFrame",
+      w1: "advisorBrowse",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -6612,6 +6853,19 @@ serve(async (req) => {
       const limited = await enforceRateLimit(req, "civic_groups_write", clientIp(req), 40, 60);
       if (limited) return limited;
       return await handleCivicUserGroupsJoin(req, body as Record<string, unknown>);
+    }
+
+    // Advisor "eyes" — read a page / search the web so the advisor answers from what is really there.
+    if (action === "advisorBrowse") {
+      const limited = await enforceRateLimit(req, "ai_browse", clientIp(req), 12, 600);
+      if (limited) return limited;
+      const task = String(body?.task ?? "").trim().slice(0, 2000);
+      const rawUrl = String(body?.url ?? "").trim();
+      if (!task && !rawUrl) {
+        return jsonOk({ ok: false, error: "task or url is required" }, 400);
+      }
+      const apiKey = await resolveServerAiApiKey();
+      return jsonOk(await advisorBrowse(apiKey ?? "", task, rawUrl));
     }
 
     if (action === "advisorBrowserFrame") {

@@ -16,6 +16,7 @@ import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
+import 'ngmy_advisor_web_eyes.dart';
 import 'ngmy_phone_action_ui.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_register_ai_tools.dart';
@@ -3589,6 +3590,64 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   bool _busy = false;
   bool _loaded = false;
   String? _activityCaption;
+  /// What the advisor just saw on the web for the message being answered.
+  NgmyAdvisorBrowseResult? _pendingBrowse;
+
+  /// Advisor looks at the web BEFORE answering: Browser card in chat, page in the mini
+  /// browser, and the real page content handed to the reply prompt.
+  Future<void> _lookAtWebFor(String text, String? url, int sendGen) async {
+    final first = ngmyAdvisorFirstName(widget.profile.name);
+    final host = ngmyAdvisorBrowserHost(url ?? '');
+    final card = <String, String>{
+      'role': 'ai',
+      'kind': 'browser',
+      'text': '🌐 Browser',
+      'browserUrl': url ?? '',
+      'browserLabel': host.isNotEmpty ? 'Opening $host' : 'Searching the web',
+      'browserLoading': '1',
+    };
+    if (mounted && sendGen == _sendGen) {
+      setState(() {
+        _activityCaption = '$first is browsing…';
+        _messages.add(card);
+      });
+      _scrollBottom();
+    }
+    if (url != null && url.isNotEmpty) {
+      unawaited(_browserSession.open(url, label: card['browserLabel']));
+    }
+
+    final r = await ngmyAdvisorBrowseWeb(task: text, url: url);
+    _pendingBrowse = r;
+    final shownHost = ngmyAdvisorBrowserHost(r.url);
+    final label = r.ok
+        ? (shownHost.isNotEmpty ? 'Viewing $shownHost' : 'Searched the web')
+        : 'Couldn\'t load the page';
+    card
+      ..remove('browserLoading')
+      ..['browserUrl'] = r.url
+      ..['browserLabel'] = label
+      ..['text'] = r.ok
+          ? '🌐 Browsed ${shownHost.isNotEmpty ? shownHost : 'the web'}${r.title.isNotEmpty ? ' — ${r.title}' : ''}'
+          : '🌐 Tried to open ${host.isNotEmpty ? host : 'a page'} (it didn\'t load)';
+    if (r.screenshotB64 != null) card['browserShotB64'] = r.screenshotB64!;
+    if (mounted) {
+      setState(() => _activityCaption = r.ok ? '$first is reading the page…' : null);
+    }
+    if (r.url.isNotEmpty && r.url != _browserSession.url) {
+      unawaited(_browserSession.open(r.url, label: label));
+    }
+    await NgmyCommunicateMemoryStore.append(
+      _email,
+      widget.profile.id,
+      role: 'ai',
+      text: card['text']!,
+      kind: 'browser',
+      browserUrl: r.url,
+      browserLabel: label,
+      browserShotB64: r.screenshotB64,
+    );
+  }
   final _browserSession = NgmyAdvisorBrowserSession();
   double _browserLift = 0;
   /// Outbound texts waiting for an AI reply (never drop while busy).
@@ -3724,6 +3783,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
     }
     buf.writeln(ngmyAdvisorWebAndReactionContext(advisorName: widget.profile.name));
+    final seen = _pendingBrowse;
+    if (seen != null) buf.writeln(ngmyAdvisorBrowsePromptBlock(seen));
     if (ngmyAdvisorShouldWritePoetry(
       name: widget.profile.name,
       id: widget.profile.id,
@@ -3863,7 +3924,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
-        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions']) {
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64']) {
           final v = (m[key] ?? '').toString().trim();
           if (v.isNotEmpty) row[key] = v;
         }
@@ -4779,6 +4840,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
 
+      // Asked to open a site / look something up → the advisor actually looks first.
+      final browse = (imageB64 == null && !_isTextCoach && !_isDebater) ? ngmyAdvisorBrowseIntent(text) : null;
+      if (browse != null) {
+        await _lookAtWebFor(text, browse.url, sendGen);
+      }
+
       // Fast path for hey/hi — tiny prompt, short budget (stops glitch loops on weak signal).
       if (imageB64 == null && ngmyUserMessageIsShortChatPing(text)) {
         final girl = widget.profile.gender != 'male';
@@ -5199,6 +5266,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ) ||
           deliveredOk;
     } finally {
+      _pendingBrowse = null;
       if (mounted) setState(() => _activityCaption = null);
       // Never leave this job without a reply bubble.
       if (!deliveredOk && sendGen == _sendGen) {
@@ -5289,6 +5357,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   return const SizedBox.shrink();
                 }
                 final m = _messages[msgIndex];
+                if (m['kind'] == 'browser') {
+                  final cardUrl = (m['browserUrl'] ?? '').trim();
+                  final cardLabel = (m['browserLabel'] ?? '').trim();
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: NgmyAdvisorBrowserChatCard(
+                      status: cardLabel.isNotEmpty ? cardLabel : 'Browsing',
+                      url: cardUrl,
+                      screenshotB64: m['browserShotB64'],
+                      loading: m['browserLoading'] == '1',
+                      onOpen: cardUrl.isEmpty
+                          ? null
+                          : () => unawaited(_browserSession.open(cardUrl, label: cardLabel)),
+                    ),
+                  );
+                }
                 final user = m['role'] == 'user';
                 final msgText = (m['text'] ?? '').toString();
                 final reaction = (m['reaction'] ?? '').toString();
@@ -5362,8 +5446,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     if (user && reaction.isNotEmpty)
                       Positioned(
                         right: 4,
-                        bottom: -6,
-                        child: NgmyAdvisorMessageReactionBadge(emoji: reaction),
+                        bottom: -14,
+                        child: NgmyAdvisorReactionBadge(emoji: reaction),
                       ),
                   ],
                 );
@@ -5372,7 +5456,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   child: Column(
                     crossAxisAlignment: user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
-                      bubbleStack,
+                      // Room under the bubble for the reaction badge.
+                      if (user && reaction.isNotEmpty)
+                        Padding(padding: const EdgeInsets.only(bottom: 12), child: bubbleStack)
+                      else
+                        bubbleStack,
                       if (!user && phoneActions.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, left: 4),

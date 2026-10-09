@@ -28,20 +28,39 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   html.IFrameElement? _frame;
   Timer? _loadTimeout;
   String _lastLoaded = '';
+  StreamSubscription<html.MessageEvent>? _messages;
+  // Own history — the sandboxed frame is cross-origin, so its history can't be driven.
+  final List<String> _history = [];
+  int _historyIndex = -1;
+  bool _historyNav = false;
 
   @override
   void initState() {
     super.initState();
     _viewType = 'ngmy-advisor-browser-${identityHashCode(this)}';
     _registerFrame();
+    _messages = html.window.onMessage.listen(_onFrameMessage);
     widget.session.attachController(this);
   }
 
   @override
   void dispose() {
     _loadTimeout?.cancel();
+    _messages?.cancel();
     widget.session.detachController(this);
     super.dispose();
+  }
+
+  /// Messages from the relay bridge inside the page (link taps, click results).
+  void _onFrameMessage(html.MessageEvent e) {
+    // Sandboxed srcdoc pages post with the opaque origin "null".
+    if (_frame == null || e.origin != 'null') return;
+    final data = e.data;
+    if (data is! Map) return;
+    if (data['ngmyBrowser'] == 'navigate') {
+      final url = (data['url'] ?? '').toString();
+      if (url.startsWith('http')) unawaited(widget.session.open(url, force: true));
+    }
   }
 
   void _registerFrame() {
@@ -58,9 +77,11 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'
+        // NO allow-same-origin: srcdoc pages would otherwise run AS ngmy.org and could read
+        // the user's NGMY session. Sandboxed pages get an opaque origin instead.
         ..setAttribute(
           'sandbox',
-          'allow-scripts allow-same-origin allow-forms allow-popups allow-modals',
+          'allow-scripts allow-forms allow-popups allow-modals',
         )
         ..allowFullscreen = false
         ..src = 'about:blank';
@@ -112,6 +133,14 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
     }
 
     _lastLoaded = url;
+    if (!_historyNav) {
+      if (_historyIndex < _history.length - 1) {
+        _history.removeRange(_historyIndex + 1, _history.length);
+      }
+      if (_history.isEmpty || _history.last != url) _history.add(url);
+      _historyIndex = _history.length - 1;
+    }
+    _historyNav = false;
     _armTimeout();
     if (mounted) setState(() {});
 
@@ -137,16 +166,18 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
 
   @override
   Future<void> goBack() async {
-    try {
-      _frame?.contentWindow?.history.back();
-    } catch (_) {}
+    if (_historyIndex <= 0) return;
+    _historyIndex--;
+    _historyNav = true;
+    await widget.session.open(_history[_historyIndex], force: true);
   }
 
   @override
   Future<void> goForward() async {
-    try {
-      _frame?.contentWindow?.history.forward();
-    } catch (_) {}
+    if (_historyIndex >= _history.length - 1) return;
+    _historyIndex++;
+    _historyNav = true;
+    await widget.session.open(_history[_historyIndex], force: true);
   }
 
   @override
@@ -160,10 +191,14 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   }
 
   @override
-  Future<void> clickByVisibleText(String text) async {}
+  Future<void> clickByVisibleText(String text) async {
+    _frame?.contentWindow?.postMessage({'ngmyBrowserCmd': 'click_text', 'text': text}, '*');
+  }
 
   @override
-  Future<void> clickSelector(String selector) async {}
+  Future<void> clickSelector(String selector) async {
+    _frame?.contentWindow?.postMessage({'ngmyBrowserCmd': 'click_selector', 'selector': selector}, '*');
+  }
 
   @override
   Widget build(BuildContext context) {

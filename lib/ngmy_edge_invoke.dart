@@ -75,6 +75,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'geminiVirtualOutfit': 'i1',
   'pollinationsImage': 'i2',
   'advisorBrowserFrame': 'b1',
+  'advisorBrowse': 'w1',
   'chat': 'z0',
 };
 

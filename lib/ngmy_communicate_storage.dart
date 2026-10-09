@@ -96,6 +96,13 @@ class NgmyCommunicateMemoryStore {
         if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
         final mime = (map['imageMime'] ?? '').toString().trim();
         if (mime.isNotEmpty) row['imageMime'] = mime;
+        // Keep reactions / browser links — dropping them here erased them on the next save.
+        _copyAdvisorMeta(map, row);
+        final shotId = (row['browserShotId'] ?? '').toString();
+        if (shotId.isNotEmpty) {
+          final shot = await NgmyCommunicateChatImageStore.getBase64(shotId);
+          if (shot != null && shot.isNotEmpty) row['browserShotB64'] = shot;
+        }
         kept.add(row);
       }
       if (kept.length != decoded.length || migratedInlineImages) {
@@ -118,6 +125,8 @@ class NgmyCommunicateMemoryStore {
     String? browserUrl,
     String? browserLabel,
     String? phoneActions,
+    String? browserShotB64,
+    String? kind,
   }) async =>
       appendWithMime(
         email,
@@ -129,6 +138,8 @@ class NgmyCommunicateMemoryStore {
         browserUrl: browserUrl,
         browserLabel: browserLabel,
         phoneActions: phoneActions,
+        browserShotB64: browserShotB64,
+        kind: kind,
       );
 
   static Future<void> appendWithMime(
@@ -142,6 +153,8 @@ class NgmyCommunicateMemoryStore {
     String? browserUrl,
     String? browserLabel,
     String? phoneActions,
+    String? browserShotB64,
+    String? kind,
   }) async {
     if (profileId.trim().isEmpty) return;
     final storeEmail = _storageEmail(email);
@@ -163,6 +176,16 @@ class NgmyCommunicateMemoryStore {
           browserLabel: browserLabel,
           phoneActions: phoneActions,
         );
+        final k = (kind ?? '').trim();
+        if (k.isNotEmpty) row['kind'] = k;
+        final shot = (browserShotB64 ?? '').trim();
+        if (shot.isNotEmpty) {
+          final shotId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);
+          if (await NgmyCommunicateChatImageStore.putBase64(shotId, shot)) {
+            row['browserShotId'] = shotId;
+            row['browserShotB64'] = shot;
+          }
+        }
         if (img.isNotEmpty) {
           final imageId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);
           final ok = await NgmyCommunicateChatImageStore.putBase64(imageId, img);
@@ -240,7 +263,7 @@ class NgmyCommunicateMemoryStore {
   }
 
   static void _copyAdvisorMeta(Map<String, dynamic> from, Map<String, dynamic> to) {
-    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions']) {
+    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'browserShotId', 'kind']) {
       final v = (from[key] ?? '').toString().trim();
       if (v.isNotEmpty) to[key] = v;
     }
