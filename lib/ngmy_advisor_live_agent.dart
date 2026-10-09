@@ -98,9 +98,34 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
   Timer? _poll;
   bool _polling = false;
   bool _disposed = false;
+  /// Bumped to rebuild the live view (fresh connection) — after returning to the app, or Reconnect.
+  int viewNonce = 0;
+  /// The cloud browser was left idle after a task and shuts itself down — show a clear message
+  /// instead of a dead "waiting for the browser to connect" view.
+  bool browserClosed = false;
+  Timer? _idleTimer;
 
   /// Called once when a task finishes (completed / failed / cancelled).
   void Function(NgmyAdvisorAgentRun run)? onFinished;
+
+  /// Fresh connection to the same live browser.
+  void reconnect() {
+    if (liveUrl.isEmpty || browserClosed) return;
+    viewNonce++;
+    _notify();
+  }
+
+  void _armIdleClose() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: 75), () {
+      if (running || _disposed) return;
+      browserClosed = true;
+      // The next task gets a fresh browser instead of trying a stopped one.
+      sessionId = null;
+      liveUrl = '';
+      _notify();
+    });
+  }
 
   bool get running => status == 'queued' || status == 'dispatching' || status == 'running' || status == 'starting';
   bool get hasSession => (sessionId ?? '').isNotEmpty;
@@ -127,6 +152,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     // A follow-up in the same browser needs the earlier task as context.
     final prevTask = continueSession && hasSession ? this.task : '';
     _liveUrlLockedForRun = false;
+    browserClosed = false;
+    _idleTimer?.cancel();
     this.task = task;
     status = 'starting';
     result = null;
@@ -187,6 +214,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     steps.clear();
     _after = 0;
     _liveUrlLockedForRun = false;
+    browserClosed = false;
+    _idleTimer?.cancel();
     visible = true;
     _notify();
     _schedulePoll(const Duration(milliseconds: 600));
@@ -237,6 +266,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
       if (running) {
         _schedulePoll(const Duration(milliseconds: 2500));
       } else {
+        _armIdleClose();
         onFinished?.call(this);
       }
     } catch (e) {
@@ -252,6 +282,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     _poll?.cancel();
     if (id == null) return;
     status = 'cancelled';
+    _armIdleClose();
     _notify();
     await ngmyEdgeInvoke({'action': 'agentStop', 'runId': id});
   }
@@ -287,6 +318,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _poll?.cancel();
+    _idleTimer?.cancel();
     super.dispose();
   }
 }
@@ -504,7 +536,7 @@ class _NgmyAdvisorLiveFullscreenState extends State<_NgmyAdvisorLiveFullscreen> 
       height: viewH,
       child: r.liveUrl.isEmpty
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF60A5FA)))
-          : NgmyAdvisorLiveView(key: ValueKey('fs-${r.liveUrl}'), url: r.liveUrl),
+          : NgmyAdvisorLiveView(key: ValueKey('fs-${r.liveUrl}#${r.viewNonce}'), url: r.liveUrl),
     );
 
     Widget controls(bool vertical) {
@@ -712,6 +744,12 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                     style: TextButton.styleFrom(foregroundColor: const Color(0xFFF87171)),
                     child: const Text('Stop', style: TextStyle(fontWeight: FontWeight.w800)),
                   ),
+                if (r.liveUrl.isNotEmpty && !r.browserClosed)
+                  IconButton(
+                    tooltip: 'Reconnect',
+                    onPressed: r.reconnect,
+                    icon: const Icon(Icons.refresh_rounded, color: Colors.white60, size: 21),
+                  ),
                 IconButton(
                   tooltip: 'Full screen',
                   onPressed: r.liveUrl.isEmpty ? null : () => ngmyOpenAdvisorLiveFullscreen(context, r),
@@ -740,8 +778,23 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                             child: Text('Watching in full screen', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           ),
                         )
+                      : r.browserClosed
+                      ? ColoredBox(
+                          color: const Color(0xFF0F172A),
+                          child: Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                'The browser closed after the task to save data.\n'
+                                'Ask ${widget.advisorName} anything and a fresh one opens.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
+                              ),
+                            ),
+                          ),
+                        )
                       : r.liveUrl.isNotEmpty
-                      ? NgmyAdvisorLiveView(key: ValueKey(r.liveUrl), url: r.liveUrl)
+                      ? NgmyAdvisorLiveView(key: ValueKey('${r.liveUrl}#${r.viewNonce}'), url: r.liveUrl)
                       : ColoredBox(
                           color: const Color(0xFF0F172A),
                           child: Center(

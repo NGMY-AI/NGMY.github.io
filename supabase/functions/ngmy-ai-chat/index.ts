@@ -474,7 +474,9 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     delete payload.browserSettings; // continuing an existing browser
   }
   let r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
-  if ((r.status === 400 || r.status === 404) && payload.sessionId) {
+  if (r.status !== 200 && r.status !== 201 && r.status !== 402 && r.status !== 429 && payload.sessionId) {
+    // The earlier browser has shut down (idle timeout) or is unusable — start a fresh one.
+    console.log("[agent] session reuse failed", r.status, "— starting a new browser");
     // Old browser expired — start fresh.
     delete payload.sessionId;
     payload.browserSettings = freshBrowser();

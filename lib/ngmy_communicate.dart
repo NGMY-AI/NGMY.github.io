@@ -4112,8 +4112,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final wasAway = _lifecycle != AppLifecycleState.resumed;
     _lifecycle = state;
     unawaited(_syncTimeCounting());
+    // Phones drop the live connection while the screen is off / app in background —
+    // reconnect the live browser view as soon as they come back.
+    if (state == AppLifecycleState.resumed && wasAway && _agentRun.visible) _agentRun.reconnect();
   }
 
   @override
