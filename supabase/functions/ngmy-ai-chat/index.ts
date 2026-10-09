@@ -3469,6 +3469,33 @@ function rankingSnapshotFrom(
   }));
 }
 
+/** Copy helps/missed from the saved board onto live roster rows — never add people from the board alone. */
+function overlayRankingStatsFromBoard(
+  live: Record<string, unknown>[],
+  board: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  if (!board.length) return live;
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const b of board) {
+    const k = memberRowKey(b);
+    if (k) byKey.set(k, b);
+  }
+  return live.map((m) => {
+    const k = memberRowKey(m);
+    if (!k) return m;
+    const b = byKey.get(k);
+    if (!b) return m;
+    return {
+      ...m,
+      helps: b.helps ?? m.helps,
+      missed: b.missed ?? m.missed,
+      activityAt: b.activityAt ?? m.activityAt,
+      firstHelpAt: b.firstHelpAt ?? m.firstHelpAt,
+      enrolledAt: b.enrolledAt ?? m.enrolledAt,
+    };
+  });
+}
+
 function rankingBoardFromPayload(
   payload: Record<string, unknown>,
   state: string,
@@ -4126,9 +4153,10 @@ async function handleCivicFetchRankings(
     }
   }
   const board = rankingBoardFromPayload(payload, state) ?? [];
+  const withStats = overlayRankingStatsFromBoard(live, board);
   const members = rankingSnapshotFrom(
     filterTombstonedMembers(
-      mergeMemberLists(live, board),
+      withStats,
       asMemberList(payload.removed),
       asMemberList(payload.deceased),
     ),

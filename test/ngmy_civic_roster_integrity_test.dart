@@ -377,6 +377,31 @@ void main() {
     expect(NgmyCivicRegistryMembers.findByRegistryId(config, 'GA1111111')?['helps'], 0);
   });
 
+  test('replacePayloadScoped drops device-only members in that state', () {
+    final config = _RosterConfig();
+    NgmyCivicRegistryMembers.setList(config, [
+      _member(email: 'local@example.com', registryId: 'GA1111111'),
+      _member(email: 'other@example.com', registryId: 'TX2222222', state: 'Texas'),
+    ]);
+    NgmyCivicRegistryMembers.replacePayloadScoped(
+      config,
+      {
+        'members': [
+          _member(email: 'cloud@example.com', registryId: 'GA3333333'),
+        ],
+        'removed': const [],
+        'deceased': const [],
+      },
+      scopeState: 'Georgia',
+    );
+    final emails = NgmyCivicRegistryMembers.listFrom(config)
+        .map((m) => (m['email'] ?? '').toString())
+        .toList();
+    expect(emails, contains('cloud@example.com'));
+    expect(emails, contains('other@example.com'));
+    expect(emails, isNot(contains('local@example.com')));
+  });
+
   test('a deleted member drops out of rankings even with a masked id', () {
     final config = _RosterConfig();
     NgmyCivicRegistryMembers.upsert(

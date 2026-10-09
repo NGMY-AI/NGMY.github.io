@@ -31894,6 +31894,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   bool _sharedDirectoryLoading = false;
   String _sharedDirectoryError = '';
   int _sharedDirectoryLoadGen = 0;
+  /// True after a successful [civicFetchRankings] for [_sharedDirectoryState].
+  bool _sharedDirectoryHasLiveFetch = false;
   /// Optimistic during the 2-month state trial so AR tools do not flash away.
   bool _civicStateAccessOk = true;
   String _civicTrialBanner = '';
@@ -34649,12 +34651,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         await prefs.setString('current_user', jsonEncode(widget.user.toJson()));
       }
     } catch (_) {}
-    _sharedDirectoryRows = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
-      widget.config,
-      _sharedDirectoryRows,
-    );
-    _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
-    unawaited(NgmyCivicRegistryMembers.saveRankingsCache(_selectedState, _sharedDirectoryRows));
+    unawaited(_loadSharedCivicDirectory());
     return membersCloudOk && userCloudOk;
   }
 
@@ -37267,6 +37264,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _sharedDirectoryState = wanted;
     _sharedDirectoryLoading = true;
     _sharedDirectoryError = '';
+    _sharedDirectoryHasLiveFetch = false;
   }
 
   /// The state whose help mode this viewer sees/controls — King/Admin
@@ -43323,9 +43321,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return a;
   }
 
-  /// Search + Members: registrars use the local roster. Rankings unions this
-  /// with the last good shared/cloud list so names never blink out.
+  /// Search uses the same live server list as Rankings when it has loaded.
   List<UserData> _civicVisibleMembersForState() {
+    if (_sharedDirectoryHasLiveFetch &&
+        NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState)) {
+      return _dedupeRankingUsers(_sharedDirectoryUsers);
+    }
     if (_canUseRegistrarToolsHere()) {
       return _dedupeRankingUsers(
         _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
@@ -43334,38 +43335,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       );
     }
     return _dedupeRankingUsers(_sharedDirectoryUsers);
-  }
-
-  List<Map<String, dynamic>> _unionRankingRows(
-    List<Map<String, dynamic>> a,
-    List<Map<String, dynamic>> b,
-  ) {
-    final byKey = <String, Map<String, dynamic>>{};
-    void take(Map<String, dynamic> raw) {
-      final m = Map<String, dynamic>.from(raw);
-      final rid = (m['registryId'] ?? '').toString().trim();
-      if (NgmyCivicWalletIdentity.isMaskedRegistryId(rid)) return;
-      final key = NgmyCivicWalletIdentity.rankingPersonKey(
-        rid,
-        email: (m['email'] ?? '').toString(),
-      );
-      if (key.isEmpty) return;
-      final prev = byKey[key];
-      if (prev == null) {
-        byKey[key] = m;
-        return;
-      }
-      final prevName = NgmyCivicRegistryMembers.resolvedDisplayName(prev);
-      final nextName = NgmyCivicRegistryMembers.resolvedDisplayName(m);
-      byKey[key] = nextName != 'Member' && prevName == 'Member' ? m : prev;
-    }
-    for (final row in a) {
-      take(row);
-    }
-    for (final row in b) {
-      take(row);
-    }
-    return byKey.values.toList();
   }
 
   /// Rankings cards are built only from the live server row. Never clone
@@ -43459,12 +43428,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       final cached = await NgmyCivicRegistryMembers.loadRankingsCache(wanted);
       if (cached.isNotEmpty && mounted && gen == _sharedDirectoryLoadGen) {
         setState(() {
-          _sharedDirectoryRows = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
-            widget.config,
-            cached,
-          );
+          _sharedDirectoryRows = cached;
           _sharedDirectoryUsers = _usersFromDirectoryRows(_sharedDirectoryRows);
           _sharedDirectoryState = wanted;
+          _sharedDirectoryHasLiveFetch = false;
         });
       }
     }
@@ -43501,27 +43468,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         });
         return;
       }
-      if (rankings.members.isEmpty) {
-        setState(() {
-          _sharedDirectoryLoading = false;
-          _sharedDirectoryError = _sharedDirectoryUsers.isEmpty
-              ? 'The server returned no registered members for $wanted.'
-              : '';
-        });
-        return;
-      }
-      final merged = NgmyCivicRegistryMembers.withoutRemovedFromRankings(
-        widget.config,
-        _unionRankingRows(_sharedDirectoryRows, rankings.members),
-      );
+      final liveRows = rankings.members
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
       setState(() {
-        _sharedDirectoryRows = merged;
-        _sharedDirectoryUsers = _usersFromDirectoryRows(merged);
+        _sharedDirectoryRows = liveRows;
+        _sharedDirectoryUsers = _usersFromDirectoryRows(liveRows);
         _sharedDirectoryState = wanted;
         _sharedDirectoryLoading = false;
-        _sharedDirectoryError = '';
+        _sharedDirectoryError = liveRows.isEmpty
+            ? 'The server returned no registered members for $wanted.'
+            : '';
+        _sharedDirectoryHasLiveFetch = true;
       });
-      unawaited(NgmyCivicRegistryMembers.saveRankingsCache(wanted, merged));
+      unawaited(NgmyCivicRegistryMembers.saveRankingsCache(wanted, liveRows));
     } finally {
       if (mounted && gen == _sharedDirectoryLoadGen && _sharedDirectoryLoading) {
         setState(() => _sharedDirectoryLoading = false);
@@ -43529,31 +43489,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     }
   }
 
-  /// Same people as the Members tab, plus anyone already saved from cloud
-  /// rankings. A refresh must never blank a list that already had names.
-  bool _stillOnRankings(UserData u) => !NgmyCivicRegistryMembers.isHiddenFromRankings(
-        widget.config,
-        email: u.email,
-        registryId: u.registryId ?? '',
-      );
-
+  /// Rankings headcount comes only from [civicFetchRankings] — never a device-local union.
   List<UserData> _rankingsEnrolled() {
-    final local = _dedupeRankingUsers(
-      _civicRegistryMembersForDisplay(widget.config, widget.allUsers)
-          .where((u) => NgmyCivicRegistryStats.statesMatch(u.state, _selectedState))
-          .where(_stillOnRankings)
-          .toList(),
-    );
-    final shared = !NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState)
-        ? <UserData>[]
-        : _dedupeRankingUsers(
-            _rankingUsersForSelectedState(_sharedDirectoryUsers)
-                .where(_stillOnRankings)
-                .toList(),
-          );
-    if (local.isEmpty) return shared;
-    if (shared.isEmpty) return local;
-    return _dedupeRankingUsers([...local, ...shared]);
+    if (!NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState)) {
+      return const [];
+    }
+    return _dedupeRankingUsers(_rankingUsersForSelectedState(_sharedDirectoryUsers));
   }
 
   Future<void> _refreshCivicMembersFromCloud() async {
@@ -43590,7 +43531,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       child: InkWell(
         onTap: () {
           setState(() => _activeTab = index);
-          if (index == 2) unawaited(_refreshCivicMembersFromCloud());
+          if (index == 2) {
+            unawaited(_refreshCivicMembersFromCloud());
+            unawaited(_loadSharedCivicDirectory());
+          }
           final rankingsTab = _canUseRegistrarToolsHere() ? 3 : 1;
           if (index == rankingsTab) unawaited(_loadSharedCivicDirectory());
         },
@@ -44836,6 +44780,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     );
                   }
 
+                  final liveRegistered = _sharedDirectoryHasLiveFetch &&
+                          NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState) &&
+                          q.isEmpty &&
+                          _selectedCity == 'All Cities' &&
+                          _selectedRoom == 'All Rooms'
+                      ? _rankingsEnrolled().length
+                      : null;
                   return Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -44843,6 +44794,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     children: [
                       glassChip('Family ${members.length}'),
                       glassChip('Members $people'),
+                      if (liveRegistered != null)
+                        glassChip('Registered $liveRegistered (live)'),
                     ],
                   );
                 },

@@ -955,18 +955,25 @@ Future<void> ngmyHydrateCivicRegistryMembersFromAllBackups(
       final view = (row['view'] ?? '').toString();
       // Member-view rows are sanitized (masked email, no phone/dob) — never merge into config.
       if (view == 'admin' || view == 'registrar') {
-        final scope = view == 'registrar'
-            ? (row['registrarState'] ?? resolvedState).toString()
-            : '';
-        NgmyCivicRegistryMembers.adoptCloudPayload(
-          config,
-          {
-            'members': row['members'] ?? const [],
-            'removed': row['removed'] ?? const [],
-            'deceased': row['deceased'] ?? const [],
-          },
-          scopeState: scope,
-        );
+        final envelope = {
+          'members': row['members'] ?? const [],
+          'removed': row['removed'] ?? const [],
+          'deceased': row['deceased'] ?? const [],
+        };
+        if (view == 'registrar') {
+          final scope = (row['registrarState'] ?? resolvedState).toString();
+          NgmyCivicRegistryMembers.replacePayloadScoped(
+            config,
+            envelope,
+            scopeState: scope,
+          );
+        } else {
+          NgmyCivicRegistryMembers.replacePayload(config, envelope);
+        }
+        NgmyCivicRegistryMembers.dedupeMembers(config);
+        NgmyCivicRegistryMembers.pruneIncompleteEnrollments(config);
+        NgmyCivicRegistryMembers.purgePhantomMembers(config);
+        NgmyCivicRegistryMembers.clearSoftDeletesForActiveMembers(config);
         await NgmyCivicRegistryMembers.saveLocalBackup(config);
         cloudHydrated = true;
       }
