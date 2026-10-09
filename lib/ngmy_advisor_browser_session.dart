@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 enum NgmyAdvisorBrowserLoadState { idle, loading, ready, failed }
 
@@ -53,6 +54,13 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
   Future<void> open(String url, {String? label, bool force = false}) async {
     final u = _normalizeUrl(url);
     if (u.isEmpty) return;
+    // Logins only work in the real browser — send them there instead of showing an error page.
+    if (ngmyAdvisorNeedsRealBrowser(u)) {
+      _label = 'Opened sign-in in your browser';
+      notifyListeners();
+      await ngmyOpenInRealBrowser(u);
+      return;
+    }
 
     final sameUrl = u == _url;
     if (!force &&
@@ -223,6 +231,33 @@ abstract class NgmyAdvisorBrowserController {
   Future<void> resetToBlank();
   Future<void> clickByVisibleText(String text);
   Future<void> clickSelector(String selector);
+}
+
+/// Sign-in / sign-up pages can't work inside the in-app mini browser (pages come through the
+/// NGMY server, so the site's cookies and security checks break — Google shows "400").
+/// These open in the phone's real browser instead.
+bool ngmyAdvisorNeedsRealBrowser(String url) {
+  final u = Uri.tryParse(url.trim());
+  if (u == null || u.host.isEmpty) return false;
+  final host = u.host.toLowerCase();
+  const authHosts = [
+    'accounts.google.com', 'accounts.youtube.com', 'appleid.apple.com', 'idmsa.apple.com',
+    'login.microsoftonline.com', 'login.live.com', 'auth0.com', 'okta.com',
+  ];
+  if (authHosts.any((h) => host == h || host.endsWith('.$h'))) return true;
+  if ((host == 'facebook.com' || host.endsWith('.facebook.com')) && u.path.contains('login')) return true;
+  return RegExp(r'/(log-?in|sign-?in|sign-?up|register|auth|oauth2?|sso|account/create)(/|$|\?)', caseSensitive: false)
+      .hasMatch('${u.path}/');
+}
+
+Future<void> ngmyOpenInRealBrowser(String url) async {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null || !(uri.scheme == 'http' || uri.scheme == 'https')) return;
+  try {
+    await launchUrl(uri, mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+  } catch (e) {
+    debugPrint('[advisor-browser] open external: $e');
+  }
 }
 
 bool ngmyAdvisorBrowserBlocksHost(String host) {

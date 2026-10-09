@@ -65,6 +65,10 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
             if (next != null && ngmyAdvisorBrowserBlocksHost(next.host)) {
               return NavigationDecision.prevent;
             }
+            if (ngmyAdvisorNeedsRealBrowser(request.url)) {
+              unawaited(ngmyOpenInRealBrowser(request.url));
+              return NavigationDecision.prevent;
+            }
             return NavigationDecision.navigate;
           },
           onPageStarted: (_) {

@@ -80,6 +80,10 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
       final url = (data['url'] ?? '').toString();
       if (url.startsWith('http')) unawaited(widget.session.open(url, force: true));
     }
+    if (data['ngmyBrowser'] == 'needsRealBrowser') {
+      // Login form — only works on the real site, so open the page in the phone's browser.
+      unawaited(ngmyOpenInRealBrowser(_lastLoaded.isNotEmpty ? _lastLoaded : widget.session.url));
+    }
   }
 
   void _registerFrame() {

@@ -77,6 +77,12 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
               ),
             ),
             IconButton(
+              tooltip: 'Open in your browser (for logging in)',
+              iconSize: 20,
+              onPressed: widget.session.url.isEmpty ? null : () => ngmyOpenInRealBrowser(widget.session.url),
+              icon: Icon(Icons.open_in_new_rounded, color: muted),
+            ),
+            IconButton(
               tooltip: 'Bigger preview',
               iconSize: 20,
               onPressed: widget.session.cycleSize,
@@ -150,7 +156,7 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Text(
-                'Drag the handle to move this window. Keep chatting — ${widget.advisorName} can guide you inside this site.',
+                'To log in or pay, tap ↗ to open this page in your phone\'s browser. Drag the handle to move this window.',
                 style: TextStyle(fontSize: 10, height: 1.3, color: widget.isDark ? Colors.white54 : Colors.black45),
               ),
             ),
