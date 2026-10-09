@@ -1135,7 +1135,8 @@ async function handleTrading(req: Request, action: string, body: any): Promise<R
   const db = adminClient();
 
   if (action === "tradeAnalyze") {
-    const limited = await enforceRateLimit(req, "trade_analyze", email || clientIp(req), 60, 3600);
+    if (!email) return jsonOk({ ok: false, error: "Please sign in to use the Trading Lab." }, 401);
+    const limited = await enforceRateLimit(req, "trade_analyze", email, 60, 3600);
     if (limited) return limited;
     const risk = email && db ? await tlRisk(db, email) : TL_DEFAULT_RISK;
     const a: any = await tlAnalyze(symbol, gran, horizon, risk);
@@ -7794,6 +7795,13 @@ serve(async (req) => {
     }
 
     // Advisor "eyes" — read a page / search the web so the advisor answers from what is really there.
+    // Advisor web tools cost money / fetch other sites — signed-in NGMY users only, so the
+    // server can't be used as a free open proxy or to run up AI costs.
+    if (["advisorBrowse", "advisorBrowserShot", "advisorBrowserFrame"].includes(action)) {
+      const who = (await requireJwtEmail(req)).trim();
+      if (!who) return jsonOk({ ok: false, error: "Please sign in to use the advisor browser." }, 401);
+    }
+
     if (action === "advisorBrowse") {
       const limited = await enforceRateLimit(req, "ai_browse", clientIp(req), 12, 600);
       if (limited) return limited;

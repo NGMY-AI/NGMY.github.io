@@ -14,6 +14,7 @@ import 'ngmy_network_resilience.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_worksheet_helpers.dart';
+import 'ngmy_upload_shrink.dart';
 
 /// Short QR prefix for admin-generated local Growth Income deposit codes.
 const String kNgmyLocalDepositQrPrefix = 'NGMYLOCALDEP1';
@@ -616,10 +617,11 @@ Future<String?> _uploadLocalProofPublicUrl({
   final txnSafe = transactionId.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
   final storagePath = 'wallet-proofs/local_$emailSafe/$txnSafe.$ext';
   try {
+    final upload = ngmyShrinkImageForUpload(bytes, mime: mime);
     await Supabase.instance.client.storage.from('media').uploadBinary(
           storagePath,
-          bytes,
-          fileOptions: FileOptions(upsert: true, contentType: mime),
+          upload.bytes,
+          fileOptions: FileOptions(upsert: true, contentType: upload.mime),
         ).timeout(kNgmyCloudWriteTimeout);
     return Supabase.instance.client.storage.from('media').getPublicUrl(storagePath);
   } catch (e) {

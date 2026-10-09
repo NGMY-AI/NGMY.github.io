@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
+import 'ngmy_upload_shrink.dart';
 
 const String kNgmyCivicVotingSettingsKey = 'civic_voting_settings';
 const String _kNgmyCivicVotingPrefsKey = 'ngmy_civic_voting_settings_v1';
@@ -661,8 +662,9 @@ class NgmyCivicVotingStore {
       if (safe.isEmpty) return null;
       final path = '$folder/$safe.$ext';
       final storage = Supabase.instance.client.storage.from('media');
+      final upload = ngmyShrinkImageForUpload(bytes, mime: contentType, maxSide: 1200);
       await storage
-          .uploadBinary(path, bytes, fileOptions: FileOptions(upsert: true, contentType: contentType))
+          .uploadBinary(path, upload.bytes, fileOptions: FileOptions(upsert: true, contentType: upload.mime))
           .timeout(const Duration(seconds: 45));
       final url = storage.getPublicUrl(path);
       if (url.isEmpty) return null;

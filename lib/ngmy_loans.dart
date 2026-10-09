@@ -17,6 +17,7 @@ import 'ngmy_feature_sync_session.dart';
 import 'ngmy_loan_phone.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_offline.dart';
+import 'ngmy_upload_shrink.dart';
 
 const ngmyLoanPhotoKeys = ['idFrontRef', 'idBackRef', 'selfieRef', 'titleFrontRef', 'titleBackRef'];
 
@@ -3583,7 +3584,8 @@ class NgmyLoanStore {
   static Future<String?> _upload(Uint8List bytes, String path) async {
     try {
       final storage = Supabase.instance.client.storage.from('media');
-      await storage.uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
+      final small = ngmyShrinkImageForUpload(bytes).bytes;
+      await storage.uploadBinary(path, small, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'));
       return 'supabase://media/$path';
     } catch (e) {
       debugPrint('[loan] upload: $e');

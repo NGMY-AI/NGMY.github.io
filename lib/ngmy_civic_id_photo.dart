@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_upload_shrink.dart';
 
 const _promptKeyPrefix = 'ngmy_civic_id_photo_prompted_v1_';
 const _localPhotoKeyPrefix = 'ngmy_civic_id_photo_local_v1_';
@@ -85,8 +86,9 @@ Future<String?> _uploadCivicIdPhotoToCloud(String email, Uint8List bytes) async 
     if (safeKey.isEmpty) return null;
     final path = 'civic_id_photos/$safeKey.jpg';
     final storage = Supabase.instance.client.storage.from('media');
+    final small = ngmyShrinkImageForUpload(bytes, maxSide: 1200).bytes;
     await storage
-        .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'))
+        .uploadBinary(path, small, fileOptions: const FileOptions(upsert: true, contentType: 'image/jpeg'))
         .timeout(const Duration(seconds: 45));
     final url = storage.getPublicUrl(path);
     if (url.isEmpty) return null;

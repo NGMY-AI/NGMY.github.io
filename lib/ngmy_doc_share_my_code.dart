@@ -245,6 +245,14 @@ class NgmyDocShareMyCode {
       onStatus?.call('No internet. Large files need a connection to send via My Code.');
       return false;
     }
+    // Cloud storage limit per send — one huge upload must not fill the whole storage.
+    const maxBytes = 500 * 1024 * 1024;
+    final totalBytes = items.fold<int>(0, (sum, i) => sum + i.sizeBytes);
+    if (totalBytes > maxBytes) {
+      onStatus?.call('Too large to send by code (${(totalBytes / (1024 * 1024)).round()} MB). The limit is 500 MB — '
+          'send fewer or smaller files, or use a direct/nearby transfer.');
+      return false;
+    }
 
     final deliveryId = 'mc_${DateTime.now().millisecondsSinceEpoch}_${Random.secure().nextInt(9999)}';
     final sessionId = '${DateTime.now().microsecondsSinceEpoch}_${Random().nextInt(99999)}';

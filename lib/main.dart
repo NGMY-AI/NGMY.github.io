@@ -221,6 +221,7 @@ import 'ngmy_investment_plans.dart';
 import 'ngmy_legal_content.dart';
 import 'ngmy_auth_dialogs.dart';
 import 'ngmy_legal_ui.dart';
+import 'ngmy_upload_shrink.dart';
 
 part 'ngmy_admin_panels.dart';
 part 'ngmy_admin_management.dart';
@@ -7808,6 +7809,23 @@ String _friendlyStorageError(Object error) {
 }
 
 Future<({String? ref, String? error})> _uploadNgmyMediaBytes({
+  required Uint8List bytes,
+  required String storagePath,
+  required String contentType,
+}) async {
+  try {
+    // Photos are shrunk before upload (one picture shouldn't eat many MB of cloud storage).
+    if (contentType.toLowerCase().startsWith('image/')) {
+      final shrunk = ngmyShrinkImageForUpload(bytes, mime: contentType);
+      return _uploadNgmyMediaBytesRaw(bytes: shrunk.bytes, storagePath: storagePath, contentType: shrunk.mime);
+    }
+    return _uploadNgmyMediaBytesRaw(bytes: bytes, storagePath: storagePath, contentType: contentType);
+  } catch (e) {
+    return _uploadNgmyMediaBytesRaw(bytes: bytes, storagePath: storagePath, contentType: contentType);
+  }
+}
+
+Future<({String? ref, String? error})> _uploadNgmyMediaBytesRaw({
   required Uint8List bytes,
   required String storagePath,
   required String contentType,
@@ -56291,10 +56309,13 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
         return src;
       }
       final storagePath = 'news/${DateTime.now().microsecondsSinceEpoch}_${widget.user.email.hashCode}.$ext';
+      final upload = isVideo
+          ? (bytes: Uint8List.fromList(bytes), mime: 'video/mp4')
+          : ngmyShrinkImageForUpload(Uint8List.fromList(bytes), mime: 'image/jpeg');
       await Supabase.instance.client.storage.from('media').uploadBinary(
         storagePath,
-        Uint8List.fromList(bytes),
-        fileOptions: FileOptions(upsert: false, contentType: isVideo ? 'video/mp4' : 'image/jpeg'),
+        upload.bytes,
+        fileOptions: FileOptions(upsert: false, contentType: upload.mime),
       );
       return 'supabase://media/$storagePath';
     } catch (e) {
