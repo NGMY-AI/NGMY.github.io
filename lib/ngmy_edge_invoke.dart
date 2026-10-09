@@ -81,6 +81,13 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'agentPoll': 'g2',
   'agentStop': 'g3',
   'agentStatus': 'g4',
+  'tradeAnalyze': 'x1',
+  'tradeSummary': 'x2',
+  'tradePaperOpen': 'x3',
+  'tradePaperClose': 'x4',
+  'tradeHalt': 'x5',
+  'tradeRiskSet': 'x6',
+  'tradeReset': 'x7',
   'chat': 'z0',
 };
 

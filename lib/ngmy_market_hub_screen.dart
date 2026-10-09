@@ -6,6 +6,7 @@ import 'ngmy_hub_form_ui.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_menu_studio.dart';
 import 'ngmy_menu_storage.dart';
+import 'ngmy_trading_lab.dart';
 
 /// Scroll padding so list content can pass behind the floating bottom nav.
 double ngmyMarketHubBottomPadding(BuildContext context) {
@@ -147,6 +148,30 @@ class _NgmyMarketHubScreenState extends State<NgmyMarketHubScreen> {
                     );
                     await _refreshBadges();
                   },
+                ),
+                const SizedBox(height: 18),
+                _hudFrame(
+                  t: t,
+                  title: 'Trading Lab',
+                  subtitle: '',
+                  thumbHeight: thumbH,
+                  colors: const [
+                    Color(0xFF22C55E),
+                    Color(0xFF0F172A),
+                    Color(0xFFEF4444),
+                  ],
+                  pulse: pulse,
+                  scan: scan,
+                  orbit: orbit,
+                  phase: 0.66,
+                  badge: 'PAPER',
+                  preview: const ColoredBox(
+                    color: Color(0xFF0B0F17),
+                    child: Center(
+                      child: Icon(Icons.candlestick_chart_rounded, color: Color(0xFF22C55E), size: 64),
+                    ),
+                  ),
+                  onTap: () => showNgmyTradingLab(context),
                 ),
               ],
             );

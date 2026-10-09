@@ -503,6 +503,641 @@ async function handleAgentStop(body: any): Promise<Response> {
   return jsonOk({ ok: r.status === 200, status: r.data?.status ?? null });
 }
 
+// ── NGMY Trading Lab (Stage 1) ──────────────────────────────────────────────
+// Real data (Coinbase public candles) → validation → indicators → a model that is
+// trained AND tested chronologically on each request → independent risk engine →
+// PAPER trading only (simulated money, server-side ledger). No broker / live orders.
+
+const TL_SYMBOLS = new Set(["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD", "DOGE-USD", "LTC-USD", "ADA-USD"]);
+const TL_TIMEFRAMES = new Set([60, 300, 900, 3600]);
+const TL_FEE_RATE = 0.001; // 0.10% per side (simulated taker fee)
+const TL_SLIPPAGE = 0.0005; // 0.05% per fill (simulated)
+const TL_MODEL_VERSION = "lr2-v1"; // two logistic models (up / down), chronological split
+
+type Candle = { t: number; o: number; h: number; l: number; c: number; v: number };
+
+const TL_DEFAULT_RISK = {
+  riskPerTradePct: 1, // % of equity lost if the stop is hit
+  maxPositionPct: 20, // max notional as % of equity
+  maxDailyLossPct: 3,
+  maxDrawdownPct: 10,
+  maxOpenPositions: 2,
+  maxConsecutiveLosses: 3,
+  minSecondsBetweenOrders: 300,
+  minExpectedReturnPct: 0.05, // after costs, per trade
+  minEdgeBrierImprovementPct: 1, // model must beat the base rate on unseen data
+  maxDataAgeBars: 2,
+};
+
+async function tlFetchCandles(symbol: string, gran: number, want = 1200): Promise<Candle[]> {
+  const out = new Map<number, Candle>();
+  let end = Math.floor(Date.now() / 1000);
+  const pages = Math.min(6, Math.ceil(want / 290));
+  for (let p = 0; p < pages; p++) {
+    const start = end - 290 * gran;
+    const url = `https://api.exchange.coinbase.com/products/${symbol}/candles?granularity=${gran}` +
+      `&start=${new Date(start * 1000).toISOString()}&end=${new Date(end * 1000).toISOString()}`;
+    const res = await fetch(url, { headers: { "User-Agent": "NGMY-TradingLab/1.0" }, signal: AbortSignal.timeout(12000) });
+    if (!res.ok) break;
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const r of rows) {
+      // Coinbase row: [time, low, high, open, close, volume]
+      const k: Candle = { t: Number(r[0]), l: Number(r[1]), h: Number(r[2]), o: Number(r[3]), c: Number(r[4]), v: Number(r[5]) };
+      if ([k.t, k.l, k.h, k.o, k.c].every(Number.isFinite)) out.set(k.t, k);
+    }
+    end = start - gran;
+  }
+  return [...out.values()].sort((a, b) => a.t - b.t);
+}
+
+function tlValidate(c: Candle[], gran: number) {
+  const issues: string[] = [];
+  let bad = 0;
+  let gaps = 0;
+  for (let i = 0; i < c.length; i++) {
+    const k = c[i];
+    if (!(k.l > 0) || k.h < Math.max(k.o, k.c) || k.l > Math.min(k.o, k.c)) bad++;
+    if (i > 0 && k.t - c[i - 1].t > gran) gaps += Math.round((k.t - c[i - 1].t) / gran) - 1;
+  }
+  const last = c.length ? c[c.length - 1].t : 0;
+  const ageBars = last ? (Date.now() / 1000 - last) / gran : Infinity;
+  if (bad) issues.push(`${bad} malformed candles`);
+  if (gaps) issues.push(`${gaps} missing intervals (no trades or feed gaps)`);
+  if (ageBars > 2) issues.push(`latest candle is ${ageBars.toFixed(1)} bars old`);
+  return { count: c.length, malformed: bad, gaps, lastCandleAt: last ? new Date(last * 1000).toISOString() : null, ageBars, issues };
+}
+
+function tlEma(v: number[], n: number): number[] {
+  const k = 2 / (n + 1);
+  const out: number[] = [];
+  v.forEach((x, i) => out.push(i === 0 ? x : x * k + out[i - 1] * (1 - k)));
+  return out;
+}
+
+function tlIndicators(c: Candle[]) {
+  const close = c.map((k) => k.c);
+  const ema20 = tlEma(close, 20), ema50 = tlEma(close, 50);
+  const ema12 = tlEma(close, 12), ema26 = tlEma(close, 26);
+  const macd = ema12.map((x, i) => x - ema26[i]);
+  const signal = tlEma(macd, 9);
+  const hist = macd.map((x, i) => x - signal[i]);
+  // RSI(14), Wilder smoothing
+  const rsi: number[] = new Array(c.length).fill(50);
+  let ag = 0, al = 0;
+  for (let i = 1; i < c.length; i++) {
+    const d = close[i] - close[i - 1];
+    const g = Math.max(d, 0), l = Math.max(-d, 0);
+    if (i <= 14) {
+      ag += g / 14; al += l / 14;
+    } else {
+      ag = (ag * 13 + g) / 14; al = (al * 13 + l) / 14;
+    }
+    rsi[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  // ATR(14)
+  const atr: number[] = new Array(c.length).fill(0);
+  for (let i = 0; i < c.length; i++) {
+    const tr = i === 0 ? c[i].h - c[i].l : Math.max(c[i].h - c[i].l, Math.abs(c[i].h - close[i - 1]), Math.abs(c[i].l - close[i - 1]));
+    atr[i] = i === 0 ? tr : (atr[i - 1] * 13 + tr) / 14;
+  }
+  // Bollinger(20, 2)
+  const bbU: number[] = [], bbL: number[] = [], bbM: number[] = [];
+  for (let i = 0; i < c.length; i++) {
+    const s = close.slice(Math.max(0, i - 19), i + 1);
+    const m = s.reduce((a, b) => a + b, 0) / s.length;
+    const sd = Math.sqrt(s.reduce((a, b) => a + (b - m) ** 2, 0) / s.length);
+    bbM.push(m); bbU.push(m + 2 * sd); bbL.push(m - 2 * sd);
+  }
+  return { close, ema20, ema50, macd, signal, hist, rsi, atr, bbU, bbL, bbM };
+}
+
+/** Features at bar i use ONLY data up to and including bar i (no look-ahead). */
+function tlFeatures(c: Candle[], ind: ReturnType<typeof tlIndicators>, i: number): number[] {
+  const cl = ind.close;
+  const width = ind.bbU[i] - ind.bbL[i];
+  return [
+    Math.log(cl[i] / cl[i - 1]) * 100,
+    Math.log(cl[i] / cl[i - 5]) * 100,
+    (ind.rsi[i] - 50) / 50,
+    (ind.hist[i] / cl[i]) * 1000,
+    (ind.ema20[i] / ind.ema20[i - 5] - 1) * 100,
+    width > 0 ? (cl[i] - ind.bbL[i]) / width - 0.5 : 0,
+    (ind.atr[i] / cl[i]) * 100,
+    (cl[i] / ind.ema50[i] - 1) * 100,
+  ];
+}
+const TL_FEATURE_NAMES = ["ret_1", "ret_5", "rsi_14", "macd_hist", "ema20_slope", "bollinger_pos", "atr_pct", "dist_ema50"];
+
+function tlSigmoid(z: number) {
+  return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))));
+}
+
+function tlTrainLogistic(X: number[][], y: number[], lambda: number): number[] {
+  const d = X[0].length;
+  const w = new Array(d + 1).fill(0);
+  const lr = 0.1;
+  for (let it = 0; it < 300; it++) {
+    const g = new Array(d + 1).fill(0);
+    for (let n = 0; n < X.length; n++) {
+      let z = w[d];
+      for (let j = 0; j < d; j++) z += w[j] * X[n][j];
+      const e = tlSigmoid(z) - y[n];
+      for (let j = 0; j < d; j++) g[j] += e * X[n][j];
+      g[d] += e;
+    }
+    for (let j = 0; j < d; j++) w[j] -= lr * (g[j] / X.length + lambda * w[j]);
+    w[d] -= lr * (g[d] / X.length);
+  }
+  return w;
+}
+
+function tlPredict(w: number[], x: number[]) {
+  let z = w[x.length];
+  for (let j = 0; j < x.length; j++) z += w[j] * x[j];
+  return tlSigmoid(z);
+}
+
+function tlBrier(p: number[], y: number[]) {
+  return p.reduce((a, pi, i) => a + (pi - y[i]) ** 2, 0) / Math.max(1, p.length);
+}
+
+function tlCalibration(p: number[], y: number[]) {
+  const bins = [0, 0.2, 0.4, 0.6, 0.8, 1.0001];
+  const out: { from: number; to: number; n: number; predicted: number; observed: number }[] = [];
+  for (let b = 0; b < bins.length - 1; b++) {
+    const idx = p.map((v, i) => (v >= bins[b] && v < bins[b + 1] ? i : -1)).filter((i) => i >= 0);
+    if (!idx.length) continue;
+    out.push({
+      from: bins[b], to: Math.min(1, bins[b + 1]), n: idx.length,
+      predicted: idx.reduce((a, i) => a + p[i], 0) / idx.length,
+      observed: idx.reduce((a, i) => a + y[i], 0) / idx.length,
+    });
+  }
+  return out;
+}
+
+/** Full analysis: validate data, train on the past, test on unseen later data, forecast now. */
+async function tlAnalyze(symbol: string, gran: number, horizon: number, risk: typeof TL_DEFAULT_RISK) {
+  const candles = await tlFetchCandles(symbol, gran, 1500);
+  const quality = tlValidate(candles, gran);
+  if (candles.length < 300) {
+    return { ok: false, error: "Not enough market data from the provider right now.", quality };
+  }
+  const ind = tlIndicators(candles);
+  const cost = 2 * (TL_FEE_RATE + TL_SLIPPAGE); // round trip
+  const start = 60;
+  const rows: { i: number; x: number[]; ret: number }[] = [];
+  for (let i = start; i < candles.length - horizon; i++) {
+    rows.push({ i, x: tlFeatures(candles, ind, i), ret: ind.close[i + horizon] / ind.close[i] - 1 });
+  }
+  // Chronological split — never mix future into training.
+  const nTrain = Math.floor(rows.length * 0.7), nVal = Math.floor(rows.length * 0.15);
+  const train = rows.slice(0, nTrain), val = rows.slice(nTrain, nTrain + nVal), test = rows.slice(nTrain + nVal);
+  const d = TL_FEATURE_NAMES.length;
+  const mean = new Array(d).fill(0), std = new Array(d).fill(0);
+  for (const r of train) r.x.forEach((v, j) => (mean[j] += v / train.length));
+  for (const r of train) r.x.forEach((v, j) => (std[j] += (v - mean[j]) ** 2 / train.length));
+  for (let j = 0; j < d; j++) std[j] = Math.sqrt(std[j]) || 1;
+  const z = (x: number[]) => x.map((v, j) => (v - mean[j]) / std[j]);
+  const yUp = (r: { ret: number }) => (r.ret > cost ? 1 : 0);
+  const yDown = (r: { ret: number }) => (r.ret < -cost ? 1 : 0);
+
+  function fit(label: (r: { ret: number }) => number) {
+    let best = { lambda: 0.1, w: [] as number[], vb: Infinity };
+    for (const lambda of [0.001, 0.01, 0.1, 1]) {
+      const w = tlTrainLogistic(train.map((r) => z(r.x)), train.map(label), lambda);
+      const vb = tlBrier(val.map((r) => tlPredict(w, z(r.x))), val.map(label));
+      if (vb < best.vb) best = { lambda, w, vb };
+    }
+    // Refit on train+val with the chosen regularization, then evaluate ONLY on unseen test data.
+    const tv = [...train, ...val];
+    const w = tlTrainLogistic(tv.map((r) => z(r.x)), tv.map(label), best.lambda);
+    const baseRate = tv.reduce((a, r) => a + label(r), 0) / tv.length;
+    const p = test.map((r) => tlPredict(w, z(r.x)));
+    const y = test.map(label);
+    const brier = tlBrier(p, y);
+    const baseBrier = tlBrier(test.map(() => baseRate), y);
+    return { w, lambda: best.lambda, baseRate, brier, baseBrier, improvementPct: (1 - brier / baseBrier) * 100, calibration: tlCalibration(p, y), p };
+  }
+  const up = fit(yUp), down = fit(yDown);
+
+  // Backtest on the unseen test window: non-overlapping trades, entry next open, exit at horizon close
+  // (or ATR stop / target hit first, stop assumed first when both touch), costs included.
+  const minEdge = 0.1;
+  let equity = 0, peak = 0, maxDd = 0, wins = 0, losses = 0, grossW = 0, grossL = 0;
+  const trades: number[] = [];
+  for (let k = 0; k < test.length; k++) {
+    const r = test[k];
+    const pu = up.p[k], pd = down.p[k];
+    const side = pu - pd > minEdge ? 1 : pd - pu > minEdge ? -1 : 0;
+    if (!side || r.i + 1 + horizon >= candles.length) continue;
+    const entry = candles[r.i + 1].o;
+    const stopDist = 1.5 * ind.atr[r.i], tgtDist = 2 * ind.atr[r.i];
+    let exit = candles[r.i + horizon].c;
+    for (let j = r.i + 1; j <= r.i + horizon; j++) {
+      const hitStop = side > 0 ? candles[j].l <= entry - stopDist : candles[j].h >= entry + stopDist;
+      const hitTgt = side > 0 ? candles[j].h >= entry + tgtDist : candles[j].l <= entry - tgtDist;
+      if (hitStop) { exit = side > 0 ? entry - stopDist : entry + stopDist; break; }
+      if (hitTgt) { exit = side > 0 ? entry + tgtDist : entry - tgtDist; break; }
+    }
+    const ret = side * (exit / entry - 1) - cost;
+    trades.push(ret);
+    equity += ret; peak = Math.max(peak, equity); maxDd = Math.max(maxDd, peak - equity);
+    if (ret > 0) { wins++; grossW += ret; } else { losses++; grossL -= ret; }
+    k += horizon; // no overlapping positions
+  }
+  const n = trades.length;
+  const testFrom = new Date(candles[test[0].i].t * 1000).toISOString();
+  const testTo = new Date(candles[test[test.length - 1].i].t * 1000).toISOString();
+  const backtest = {
+    period: { from: testFrom, to: testTo }, trades: n, wins, losses,
+    winRate: n ? wins / n : null,
+    avgWinPct: wins ? (grossW / wins) * 100 : null, avgLossPct: losses ? (grossL / losses) * 100 : null,
+    profitFactor: grossL > 0 ? grossW / grossL : null,
+    netReturnPct: equity * 100, maxDrawdownPct: maxDd * 100,
+    expectedValuePct: n ? (equity / n) * 100 : null,
+    costPerTradePct: cost * 100,
+    note: n < 30 ? "Small sample — results are not statistically reliable." : "Simulated on past data; not a guarantee.",
+  };
+
+  // Forecast for the latest closed bar.
+  const last = candles.length - 1;
+  const xNow = tlFeatures(candles, ind, last);
+  let pUp = tlPredict(up.w, z(xNow)), pDown = tlPredict(down.w, z(xNow));
+  const s = pUp + pDown;
+  if (s > 0.98) { pUp = (pUp / s) * 0.98; pDown = (pDown / s) * 0.98; }
+  const pRange = Math.max(0, 1 - pUp - pDown);
+  const avg = (f: (r: { ret: number }) => boolean) => {
+    const sel = [...train, ...val].filter(f);
+    return sel.length ? sel.reduce((a, r) => a + r.ret, 0) / sel.length : 0;
+  };
+  const eUp = avg((r) => r.ret > cost), eDown = avg((r) => r.ret < -cost), eRange = avg((r) => Math.abs(r.ret) <= cost);
+  const expRet = pUp * eUp + pDown * eDown + pRange * eRange;
+  const longEv = (expRet - cost) * 100, shortEv = (-expRet - cost) * 100;
+
+  const reasons: string[] = [], against: string[] = [];
+  const price = ind.close[last];
+  const trend = ind.ema20[last] > ind.ema50[last] ? "up" : "down";
+  const bbWidthPct = ((ind.bbU[last] - ind.bbL[last]) / price) * 100;
+  const regime = Math.abs(ind.ema20[last] / ind.ema50[last] - 1) * 100 > bbWidthPct * 0.15 ? `trending ${trend}` : "ranging";
+  if (ind.rsi[last] > 70) against.push(`RSI ${ind.rsi[last].toFixed(0)} — overbought`);
+  if (ind.rsi[last] < 30) against.push(`RSI ${ind.rsi[last].toFixed(0)} — oversold`);
+  reasons.push(`EMA20 ${trend === "up" ? "above" : "below"} EMA50 (${regime})`);
+  reasons.push(`MACD histogram ${ind.hist[last] >= 0 ? "positive" : "negative"}`);
+
+  let decision = "NO_TRADE";
+  const noTrade: string[] = [];
+  const edgeUp = up.improvementPct >= risk.minEdgeBrierImprovementPct;
+  const edgeDown = down.improvementPct >= risk.minEdgeBrierImprovementPct;
+  if (quality.ageBars > risk.maxDataAgeBars) noTrade.push("market data is stale");
+  if (pUp - pDown > minEdge && edgeUp && longEv >= risk.minExpectedReturnPct) decision = "LONG";
+  else if (pDown - pUp > minEdge && edgeDown && shortEv >= risk.minExpectedReturnPct) decision = "SHORT";
+  else {
+    if (Math.abs(pUp - pDown) <= minEdge) noTrade.push("up and down probabilities too close");
+    if (!edgeUp && !edgeDown) noTrade.push("model did not beat a simple base rate on unseen data");
+    if (Math.max(longEv, shortEv) < risk.minExpectedReturnPct) noTrade.push("expected return after costs is too small");
+  }
+  if (decision !== "NO_TRADE" && noTrade.length) decision = "NO_TRADE";
+  if (decision !== "NO_TRADE" && (backtest.expectedValuePct ?? -1) <= 0) {
+    decision = "NO_TRADE";
+    noTrade.push("this model lost money in the out-of-sample backtest");
+  }
+
+  const atr = ind.atr[last];
+  return {
+    ok: true,
+    symbol, timeframeSec: gran, horizonBars: horizon,
+    dataSource: "Coinbase Exchange public candles",
+    quality,
+    price, priceAt: new Date(candles[last].t * 1000).toISOString(),
+    candles: candles.slice(-120).map((k) => [k.t, k.o, k.h, k.l, k.c]),
+    indicators: {
+      rsi14: ind.rsi[last], macdHist: ind.hist[last], ema20: ind.ema20[last], ema50: ind.ema50[last],
+      atr14: atr, bollingerUpper: ind.bbU[last], bollingerLower: ind.bbL[last],
+      support: Math.min(...candles.slice(-50).map((k) => k.l)), resistance: Math.max(...candles.slice(-50).map((k) => k.h)),
+      regime,
+    },
+    forecast: {
+      pUp, pDown, pRange, expectedReturnPct: expRet * 100, longEvPct: longEv, shortEvPct: shortEv,
+      costRoundTripPct: cost * 100, horizonMinutes: (horizon * gran) / 60,
+      label: "Estimate, not a guarantee",
+    },
+    decision, reasons, against, noTradeReasons: noTrade,
+    plan: decision === "NO_TRADE" ? null : {
+      side: decision === "LONG" ? "long" : "short",
+      stopLoss: decision === "LONG" ? price - 1.5 * atr : price + 1.5 * atr,
+      takeProfit: decision === "LONG" ? price + 2 * atr : price - 2 * atr,
+      invalidation: `Close ${decision === "LONG" ? "below" : "above"} ${(decision === "LONG" ? price - 1.5 * atr : price + 1.5 * atr).toFixed(4)}`,
+    },
+    model: {
+      version: TL_MODEL_VERSION,
+      features: TL_FEATURE_NAMES,
+      trainedOn: { bars: train.length + val.length, from: new Date(candles[train[0].i].t * 1000).toISOString() },
+      testedOn: { bars: test.length, from: testFrom, to: testTo },
+      up: { brier: up.brier, baseBrier: up.baseBrier, improvementPct: up.improvementPct, lambda: up.lambda, calibration: up.calibration },
+      down: { brier: down.brier, baseBrier: down.baseBrier, improvementPct: down.improvementPct, lambda: down.lambda, calibration: down.calibration },
+    },
+    backtest,
+    news: { available: false, note: "News analysis is not connected yet (Stage 2)." },
+    _features: xNow,
+  };
+}
+
+// ── Paper ledger, risk engine, actions ──
+
+async function tlAudit(db: any, email: string, action: string, detail: Record<string, unknown>) {
+  try {
+    await db.from("trading_audit_log").insert({ user_email: email, action, detail });
+  } catch { /* never block on audit */ }
+}
+
+async function tlRisk(db: any, email: string) {
+  const { data } = await db.from("trading_risk_settings").select("settings").eq("user_email", email).maybeSingle();
+  return { ...TL_DEFAULT_RISK, ...(data?.settings ?? {}) };
+}
+
+async function tlAccount(db: any, email: string) {
+  let { data: acct } = await db.from("trading_paper_accounts").select("*").eq("user_email", email).maybeSingle();
+  if (!acct) {
+    await db.from("trading_paper_accounts").insert({ user_email: email });
+    ({ data: acct } = await db.from("trading_paper_accounts").select("*").eq("user_email", email).maybeSingle());
+  }
+  return acct;
+}
+
+/** Close paper trades whose stop / target / time stop was reached, using real candles. */
+async function tlSettleOpen(db: any, email: string) {
+  const { data: open } = await db.from("trading_paper_trades").select("*").eq("user_email", email).eq("status", "open");
+  const marks: Record<string, number> = {};
+  for (const t of open ?? []) {
+    const candles = await tlFetchCandles(t.symbol, 60, 300);
+    if (!candles.length) continue;
+    const entryT = Date.parse(t.entry_at) / 1000;
+    const stopT = Date.parse(t.time_stop_at) / 1000;
+    let exit: number | null = null, reason = "", at = 0;
+    for (const k of candles) {
+      if (k.t < entryT) continue;
+      const long = t.side === "long";
+      if (long ? k.l <= t.stop_loss : k.h >= t.stop_loss) { exit = Number(t.stop_loss); reason = "stop loss"; at = k.t; break; }
+      if (long ? k.h >= t.take_profit : k.l <= t.take_profit) { exit = Number(t.take_profit); reason = "take profit"; at = k.t; break; }
+      if (k.t >= stopT) { exit = k.c; reason = "time stop"; at = k.t; break; }
+    }
+    const lastPx = candles[candles.length - 1].c;
+    marks[t.id] = lastPx;
+    if (exit === null) continue;
+    const fill = t.side === "long" ? exit * (1 - TL_SLIPPAGE) : exit * (1 + TL_SLIPPAGE);
+    const fee = fill * Number(t.qty) * TL_FEE_RATE;
+    const gross = (t.side === "long" ? fill - t.entry_price : t.entry_price - fill) * Number(t.qty);
+    const pnl = gross - fee - Number(t.fees);
+    const { data: upd } = await db.from("trading_paper_trades")
+      .update({ status: "closed", exit_price: fill, exit_at: new Date(at * 1000).toISOString(), exit_reason: reason, fees: Number(t.fees) + fee, pnl })
+      .eq("id", t.id).eq("status", "open").select("id");
+    if (upd?.length) {
+      const acct = await tlAccount(db, email);
+      await db.from("trading_paper_accounts").update({
+        balance: Number(acct.balance) + gross - fee,
+        realized_pnl: Number(acct.realized_pnl) + pnl,
+        fees_paid: Number(acct.fees_paid) + fee,
+        updated_at: new Date().toISOString(),
+      }).eq("user_email", email);
+      await tlAudit(db, email, "paper_close", { tradeId: t.id, reason, fill, pnl });
+    }
+  }
+  return marks;
+}
+
+/** Score past predictions against what the market actually did. */
+async function tlResolvePredictions(db: any, email: string) {
+  const { data: due } = await db.from("trading_predictions").select("*").eq("user_email", email)
+    .is("resolved_at", null).lte("resolve_after", new Date().toISOString()).limit(20);
+  for (const p of due ?? []) {
+    const candles = await tlFetchCandles(p.symbol, p.timeframe_sec, 300);
+    const target = Date.parse(p.resolve_after) / 1000;
+    const k = candles.find((c) => c.t >= target - p.timeframe_sec) ?? null;
+    if (!k) continue;
+    const ret = k.c / Number(p.price_at) - 1;
+    const cost = 2 * (TL_FEE_RATE + TL_SLIPPAGE);
+    const outcome = ret > cost ? "up" : ret < -cost ? "down" : "range";
+    await db.from("trading_predictions").update({ resolved_at: new Date().toISOString(), outcome, actual_return: ret })
+      .eq("id", p.id);
+  }
+}
+
+async function tlSummary(db: any, email: string) {
+  const marks = await tlSettleOpen(db, email);
+  await tlResolvePredictions(db, email);
+  const acct = await tlAccount(db, email);
+  const { data: trades } = await db.from("trading_paper_trades").select("*").eq("user_email", email)
+    .order("entry_at", { ascending: false }).limit(200);
+  const open = (trades ?? []).filter((t: any) => t.status === "open");
+  const closed = (trades ?? []).filter((t: any) => t.status === "closed");
+  const unrealized = open.reduce((a: number, t: any) => {
+    const px = marks[t.id] ?? Number(t.entry_price);
+    return a + (t.side === "long" ? px - t.entry_price : t.entry_price - px) * Number(t.qty);
+  }, 0);
+  const equity = Number(acct.balance) + unrealized;
+  if (equity > Number(acct.peak_equity)) {
+    await db.from("trading_paper_accounts").update({ peak_equity: equity }).eq("user_email", email);
+    acct.peak_equity = equity;
+  }
+  const pnls = closed.map((t: any) => Number(t.pnl ?? 0));
+  const wins = pnls.filter((x: number) => x > 0), losses = pnls.filter((x: number) => x <= 0);
+  const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
+  const { data: preds } = await db.from("trading_predictions").select("p_up,outcome,decision").eq("user_email", email)
+    .not("resolved_at", "is", null).order("created_at", { ascending: false }).limit(500);
+  const res = preds ?? [];
+  const brier = res.length ? res.reduce((a: number, p: any) => a + (Number(p.p_up) - (p.outcome === "up" ? 1 : 0)) ** 2, 0) / res.length : null;
+  const today = new Date(); today.setUTCHours(0, 0, 0, 0);
+  const todayPnl = sum(closed.filter((t: any) => Date.parse(t.exit_at) >= today.getTime()).map((t: any) => Number(t.pnl ?? 0)));
+  return {
+    ok: true,
+    mode: "PAPER (simulated money)",
+    account: {
+      startingBalance: Number(acct.starting_balance), balance: Number(acct.balance), equity,
+      realizedPnl: Number(acct.realized_pnl), unrealizedPnl: unrealized, feesPaid: Number(acct.fees_paid),
+      netChange: equity - Number(acct.starting_balance), deposits: 0, withdrawals: 0,
+      drawdownPct: Number(acct.peak_equity) > 0 ? (1 - equity / Number(acct.peak_equity)) * 100 : 0,
+      todayPnl, halted: acct.halted, haltedReason: acct.halted_reason,
+    },
+    openTrades: open.map((t: any) => ({ ...t, markPrice: marks[t.id] ?? null })),
+    closedTrades: closed.slice(0, 50),
+    performance: {
+      trades: closed.length, winRate: closed.length ? wins.length / closed.length : null,
+      avgWin: wins.length ? sum(wins) / wins.length : null, avgLoss: losses.length ? sum(losses) / losses.length : null,
+      profitFactor: losses.length && sum(losses) < 0 ? sum(wins) / -sum(losses) : null,
+      expectedValue: closed.length ? sum(pnls) / closed.length : null, netPnl: sum(pnls),
+      sampleNote: closed.length < 30 ? `Only ${closed.length} closed trades — too few to judge.` : null,
+    },
+    predictions: { resolved: res.length, brierUp: brier },
+    risk: await tlRisk(db, email),
+  };
+}
+
+/** Independent risk check — can veto any trade the model suggests. */
+async function tlRiskCheck(db: any, email: string, analysis: any, risk: typeof TL_DEFAULT_RISK) {
+  const reasons: string[] = [];
+  const sum = await tlSummary(db, email);
+  const a = sum.account;
+  if (a.halted) reasons.push(`trading halted: ${a.haltedReason ?? "emergency stop"}`);
+  if (analysis.decision === "NO_TRADE") reasons.push("model says NO TRADE");
+  if (analysis.quality.ageBars > risk.maxDataAgeBars) reasons.push("market data is stale");
+  if (sum.openTrades.length >= risk.maxOpenPositions) reasons.push(`max open positions (${risk.maxOpenPositions}) reached`);
+  if (sum.openTrades.some((t: any) => t.symbol === analysis.symbol)) reasons.push(`already have an open ${analysis.symbol} position`);
+  if (a.todayPnl <= -(risk.maxDailyLossPct / 100) * a.startingBalance) reasons.push("daily loss limit reached");
+  if (a.drawdownPct >= risk.maxDrawdownPct) reasons.push("max drawdown reached");
+  const recent = sum.closedTrades.slice(0, risk.maxConsecutiveLosses);
+  if (recent.length === risk.maxConsecutiveLosses && recent.every((t: any) => Number(t.pnl) <= 0)) {
+    reasons.push(`${risk.maxConsecutiveLosses} losses in a row — cooling off`);
+  }
+  const lastOpen = (sum.openTrades[0] ?? sum.closedTrades[0])?.entry_at;
+  if (lastOpen && (Date.now() - Date.parse(lastOpen)) / 1000 < risk.minSecondsBetweenOrders) reasons.push("order frequency limit");
+  return { approved: reasons.length === 0, reasons, summary: sum };
+}
+
+async function handleTrading(req: Request, action: string, body: any): Promise<Response> {
+  const symbol = String(body?.symbol ?? "BTC-USD").toUpperCase();
+  const gran = Number(body?.timeframeSec ?? 300);
+  const horizon = Math.min(Math.max(Math.round(Number(body?.horizonBars ?? 6)), 2), 48);
+  if (!TL_SYMBOLS.has(symbol)) return jsonOk({ ok: false, error: "Unsupported symbol." }, 400);
+  if (!TL_TIMEFRAMES.has(gran)) return jsonOk({ ok: false, error: "Unsupported timeframe." }, 400);
+
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  const db = adminClient();
+
+  if (action === "tradeAnalyze") {
+    const limited = await enforceRateLimit(req, "trade_analyze", email || clientIp(req), 60, 3600);
+    if (limited) return limited;
+    const risk = email && db ? await tlRisk(db, email) : TL_DEFAULT_RISK;
+    const a: any = await tlAnalyze(symbol, gran, horizon, risk);
+    if (a.ok && email && db) {
+      const { data: row } = await db.from("trading_predictions").insert({
+        user_email: email, symbol, timeframe_sec: gran, horizon_bars: horizon, price_at: a.price,
+        p_up: a.forecast.pUp, p_down: a.forecast.pDown, p_range: a.forecast.pRange,
+        expected_return: a.forecast.expectedReturnPct / 100, decision: a.decision, model_version: TL_MODEL_VERSION,
+        features: Object.fromEntries(TL_FEATURE_NAMES.map((n, j) => [n, a._features[j]])),
+        test_metrics: { up: a.model.up.improvementPct, down: a.model.down.improvementPct, backtest: a.backtest },
+        resolve_after: new Date(Date.parse(a.priceAt) + (horizon + 1) * gran * 1000).toISOString(),
+      }).select("id").maybeSingle();
+      a.predictionId = row?.id ?? null;
+    }
+    delete a._features;
+    return jsonOk(a);
+  }
+
+  if (!email) return jsonOk({ ok: false, error: "Please sign in to use paper trading." }, 401);
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const limited = await enforceRateLimit(req, "trade_ops", email, 240, 3600);
+  if (limited) return limited;
+
+  if (action === "tradeSummary") return jsonOk(await tlSummary(db, email));
+
+  if (action === "tradePaperOpen") {
+    const key = String(body?.idempotencyKey ?? "").slice(0, 80);
+    if (key.length < 8) return jsonOk({ ok: false, error: "idempotencyKey required" }, 400);
+    const { data: dup } = await db.from("trading_paper_trades").select("id").eq("idempotency_key", key).maybeSingle();
+    if (dup) return jsonOk({ ok: true, duplicate: true, tradeId: dup.id });
+    // Re-analyze on the server — the client can't feed in its own numbers.
+    const risk = await tlRisk(db, email);
+    const a: any = await tlAnalyze(symbol, gran, horizon, risk);
+    if (!a.ok) return jsonOk({ ok: false, error: a.error });
+    const check = await tlRiskCheck(db, email, a, risk);
+    if (!check.approved) {
+      await tlAudit(db, email, "paper_rejected", { symbol, reasons: check.reasons });
+      return jsonOk({ ok: false, rejected: true, reasons: check.reasons, analysis: { decision: a.decision, noTradeReasons: a.noTradeReasons } });
+    }
+    const equity = check.summary.account.equity;
+    const side = a.plan.side;
+    const fill = side === "long" ? a.price * (1 + TL_SLIPPAGE) : a.price * (1 - TL_SLIPPAGE);
+    const stopDist = Math.abs(fill - a.plan.stopLoss);
+    let qty = ((risk.riskPerTradePct / 100) * equity) / stopDist;
+    qty = Math.min(qty, ((risk.maxPositionPct / 100) * equity) / fill);
+    if (!(qty > 0)) return jsonOk({ ok: false, error: "Position size came out as zero." });
+    const fee = fill * qty * TL_FEE_RATE;
+    const { data: t, error } = await db.from("trading_paper_trades").insert({
+      user_email: email, symbol, side, qty, entry_price: fill, stop_loss: a.plan.stopLoss, take_profit: a.plan.takeProfit,
+      time_stop_at: new Date(Date.now() + 3 * horizon * gran * 1000).toISOString(), fees: fee,
+      model_version: TL_MODEL_VERSION, reason: [...a.reasons, ...a.against.map((s: string) => `against: ${s}`)].join("; "),
+      idempotency_key: key,
+    }).select("*").maybeSingle();
+    if (error) return jsonOk({ ok: false, error: "Could not record the paper trade." }, 500);
+    const acct = await tlAccount(db, email);
+    await db.from("trading_paper_accounts").update({ balance: Number(acct.balance) - fee, fees_paid: Number(acct.fees_paid) + fee })
+      .eq("user_email", email);
+    await tlAudit(db, email, "paper_open", { tradeId: t.id, symbol, side, qty, fill });
+    return jsonOk({ ok: true, trade: t, simulated: true });
+  }
+
+  if (action === "tradePaperClose") {
+    const id = String(body?.tradeId ?? "");
+    const { data: t } = await db.from("trading_paper_trades").select("*").eq("id", id).eq("user_email", email).eq("status", "open").maybeSingle();
+    if (!t) return jsonOk({ ok: false, error: "Open trade not found." }, 404);
+    const candles = await tlFetchCandles(t.symbol, 60, 30);
+    if (!candles.length) return jsonOk({ ok: false, error: "No price available — try again." });
+    const px = candles[candles.length - 1].c;
+    const fill = t.side === "long" ? px * (1 - TL_SLIPPAGE) : px * (1 + TL_SLIPPAGE);
+    const fee = fill * Number(t.qty) * TL_FEE_RATE;
+    const gross = (t.side === "long" ? fill - t.entry_price : t.entry_price - fill) * Number(t.qty);
+    const pnl = gross - fee - Number(t.fees);
+    const { data: upd } = await db.from("trading_paper_trades").update({
+      status: "closed", exit_price: fill, exit_at: new Date().toISOString(), exit_reason: "closed by user",
+      fees: Number(t.fees) + fee, pnl,
+    }).eq("id", t.id).eq("status", "open").select("id");
+    if (upd?.length) {
+      const acct = await tlAccount(db, email);
+      await db.from("trading_paper_accounts").update({
+        balance: Number(acct.balance) + gross - fee, realized_pnl: Number(acct.realized_pnl) + pnl, fees_paid: Number(acct.fees_paid) + fee,
+      }).eq("user_email", email);
+      await tlAudit(db, email, "paper_close", { tradeId: t.id, reason: "user", fill, pnl });
+    }
+    return jsonOk({ ok: true, pnl });
+  }
+
+  if (action === "tradeHalt") {
+    const halted = body?.halted === true;
+    await tlAccount(db, email);
+    await db.from("trading_paper_accounts").update({ halted, halted_reason: halted ? "emergency stop by user" : null })
+      .eq("user_email", email);
+    await tlAudit(db, email, halted ? "halt" : "resume", {});
+    return jsonOk({ ok: true, halted });
+  }
+
+  if (action === "tradeRiskSet") {
+    if (body?.confirm !== true) return jsonOk({ ok: false, error: "Confirmation required to change risk limits." }, 400);
+    const s = body?.settings ?? {};
+    const clamp = (v: unknown, lo: number, hi: number, d: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(Math.max(n, lo), hi) : d;
+    };
+    const next = {
+      riskPerTradePct: clamp(s.riskPerTradePct, 0.1, 5, TL_DEFAULT_RISK.riskPerTradePct),
+      maxPositionPct: clamp(s.maxPositionPct, 1, 50, TL_DEFAULT_RISK.maxPositionPct),
+      maxDailyLossPct: clamp(s.maxDailyLossPct, 0.5, 20, TL_DEFAULT_RISK.maxDailyLossPct),
+      maxDrawdownPct: clamp(s.maxDrawdownPct, 1, 50, TL_DEFAULT_RISK.maxDrawdownPct),
+      maxOpenPositions: Math.round(clamp(s.maxOpenPositions, 1, 10, TL_DEFAULT_RISK.maxOpenPositions)),
+      maxConsecutiveLosses: Math.round(clamp(s.maxConsecutiveLosses, 1, 10, TL_DEFAULT_RISK.maxConsecutiveLosses)),
+      minSecondsBetweenOrders: Math.round(clamp(s.minSecondsBetweenOrders, 30, 86400, TL_DEFAULT_RISK.minSecondsBetweenOrders)),
+      minExpectedReturnPct: clamp(s.minExpectedReturnPct, 0, 5, TL_DEFAULT_RISK.minExpectedReturnPct),
+      minEdgeBrierImprovementPct: clamp(s.minEdgeBrierImprovementPct, 0, 20, TL_DEFAULT_RISK.minEdgeBrierImprovementPct),
+      maxDataAgeBars: clamp(s.maxDataAgeBars, 1, 5, TL_DEFAULT_RISK.maxDataAgeBars),
+    };
+    await db.from("trading_risk_settings").upsert({ user_email: email, settings: next, updated_at: new Date().toISOString() });
+    await tlAudit(db, email, "risk_settings", next);
+    return jsonOk({ ok: true, settings: next });
+  }
+
+  if (action === "tradeReset") {
+    if (body?.confirm !== true) return jsonOk({ ok: false, error: "Confirmation required." }, 400);
+    await db.from("trading_paper_trades").delete().eq("user_email", email).eq("mode", "paper");
+    await db.from("trading_paper_accounts").delete().eq("user_email", email);
+    await tlAccount(db, email);
+    await tlAudit(db, email, "paper_reset", {});
+    return jsonOk({ ok: true });
+  }
+
+  return jsonOk({ ok: false, error: "Unknown trading action." }, 400);
+}
+
 async function openAiChat(
   apiKey: string,
   prompt: string,
@@ -6801,6 +7436,13 @@ serve(async (req) => {
       g2: "agentPoll",
       g3: "agentStop",
       g4: "agentStatus",
+      x1: "tradeAnalyze",
+      x2: "tradeSummary",
+      x3: "tradePaperOpen",
+      x4: "tradePaperClose",
+      x5: "tradeHalt",
+      x6: "tradeRiskSet",
+      x7: "tradeReset",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -7031,6 +7673,13 @@ serve(async (req) => {
       }
       const apiKey = await resolveServerAiApiKey();
       return jsonOk(await advisorBrowse(apiKey ?? "", task, rawUrl));
+    }
+
+    // Trading Lab — analysis, risk engine, paper trading (simulated money only).
+    if (action.startsWith("trade") &&
+      ["tradeAnalyze", "tradeSummary", "tradePaperOpen", "tradePaperClose", "tradeHalt", "tradeRiskSet", "tradeReset"]
+        .includes(action)) {
+      return await handleTrading(req, action, body);
     }
 
     // Live agent: advisor drives a real cloud browser; user watches the live view in chat.
