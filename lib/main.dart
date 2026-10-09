@@ -22698,6 +22698,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 animDelayMs: 50,
               ),
               _menuFrame(
+                'Local deposit',
+                Icons.qr_code_2_rounded,
+                const Color(0xFF22C55E),
+                () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
+                isDark,
+                animDelayMs: 55,
+              ),
+              _menuFrame(
                 'Civic Voting',
                 Icons.how_to_vote_rounded,
                 const Color(0xFF059669),
@@ -28281,18 +28289,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 dense: true,
               ),
             ),
-            if (widget.user.isAdmin)
-              IconButton(
-                onPressed: () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
-                tooltip: 'Local deposit',
-                icon: NgmyHudMiniOrb(
-                  colors: const [Color(0xFF22C55E), Color(0xFF16A34A)],
+            IconButton(
+              onPressed: () async {
+                await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+                if (!context.mounted) return;
+                setState(() {});
+                await showNgmyHelperGiftUserWallet(
+                  context: context,
+                  config: widget.config,
+                  userEmail: widget.user.email,
+                );
+              },
+              tooltip: 'Money cards',
+              icon: Badge(
+                isLabelVisible: NgmyCivicHelperGifts.unredeemedGiftCount(widget.config, widget.user.email) > 0,
+                label: Text(
+                  '${NgmyCivicHelperGifts.unredeemedGiftCount(widget.config, widget.user.email)}',
+                  style: const TextStyle(fontSize: 10),
+                ),
+                child: NgmyHudMiniOrb(
+                  colors: const [Color(0xFFF59E0B), Color(0xFFEC4899)],
                   pulse: pulse,
                   orbit: orbit,
                   size: 36,
                   icon: Icons.qr_code_2_rounded,
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -32261,11 +32284,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Future<void> _maybeShowHelperGiftsInbox() async {
+    if (NgmyHelperGiftUserPopupSession.isDismissedForAppSession) return;
     await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
     if (!mounted) return;
-    final gifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, widget.user.email)
-        .where((g) => !g.redeemed)
-        .toList();
+    final gifts = await NgmyCivicHelperGifts.giftsNeedingUserPopup(
+      widget.config,
+      widget.user.email,
+    );
     if (gifts.isEmpty) return;
     await showNgmyHelperGiftReceivedDialog(context, gifts.first);
   }
