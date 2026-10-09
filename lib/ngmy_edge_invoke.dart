@@ -10,6 +10,7 @@ import 'ngmy_net_trace.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_web_api_base.dart';
+import 'ngmy_activity_gate.dart';
 
 /// Public same-origin path on web — service worker proxies to Supabase Edge.
 /// DevTools shows `ngmy.org/api/sync`, not `bright-handler`.
@@ -212,8 +213,92 @@ Map<String, dynamic> ngmyEdgeWirePayload(
   return out;
 }
 
+// ── Usage savers for the database relay (reads 15k+/day and writes 5k+/day from one idle user) ──
+class _RelayHit {
+  _RelayHit(this.data) : at = DateTime.now();
+  final Map<String, dynamic> data;
+  final DateTime at;
+}
+
+final Map<String, _RelayHit> _relayReadCache = {};
+final Map<String, DateTime> _relayWriteCache = {};
+
+String _relayWriteKey(Map<String, dynamic> body) {
+  // Same write except for the timestamp = same data.
+  final copy = Map<String, dynamic>.from(body);
+  final rows = copy['rows'];
+  if (rows is List) {
+    copy['rows'] = rows.map((r) {
+      if (r is! Map) return r;
+      final m = Map<String, dynamic>.from(r)..remove('updated_at')..remove('updatedAt');
+      return m;
+    }).toList();
+  }
+  copy.remove('updated_at');
+  return jsonEncode(copy);
+}
+
 /// Single Edge entry — web uses same-origin [/api/sync] (service worker proxy).
+/// Database relay calls are trimmed here: while nobody is using the app (hidden or no touch for
+/// 5 min) repeated reads reuse the last answer; identical reads within a few seconds are sent once;
+/// re-saving exactly the same data within 5 minutes is skipped.
 Future<Map<String, dynamic>?> ngmyEdgeInvoke(
+  Map<String, dynamic> body, {
+  bool anonymous = false,
+  Duration timeout = kNgmyEdgeTimeout,
+  bool preferDirect = false,
+  bool fallbackOnTimeout = false,
+}) async {
+  final action = (body['action'] ?? 'chat').toString().trim();
+  if (action != 'dbRelay') {
+    return _ngmyEdgeInvokeNetwork(body,
+        anonymous: anonymous, timeout: timeout, preferDirect: preferDirect, fallbackOnTimeout: fallbackOnTimeout);
+  }
+  final op = (body['op'] ?? '').toString();
+  final isRead = op == 's';
+  final isWrite = op == 'up' || op == 'u' || op == 'i';
+  String? readKey;
+  String? writeKey;
+  try {
+    if (isRead) {
+      readKey = '${anonymous ? 'a' : 'u'}|${jsonEncode(body)}';
+      final hit = _relayReadCache[readKey];
+      if (hit != null) {
+        final age = DateTime.now().difference(hit.at);
+        if (age < const Duration(seconds: 5) || NgmyActivityGate.isIdle) {
+          return Map<String, dynamic>.from(hit.data);
+        }
+      }
+    } else if (isWrite) {
+      writeKey = _relayWriteKey(body);
+      final last = _relayWriteCache[writeKey];
+      if (last != null && DateTime.now().difference(last) < const Duration(minutes: 5)) {
+        return {'ok': true, 'deduped': true};
+      }
+    }
+  } catch (_) {
+    readKey = null;
+    writeKey = null;
+  }
+  final res = await _ngmyEdgeInvokeNetwork(body,
+      anonymous: anonymous, timeout: timeout, preferDirect: preferDirect, fallbackOnTimeout: fallbackOnTimeout);
+  final ok = res != null && res['ok'] == true && res['error'] == null;
+  if (ok && readKey != null) {
+    if (_relayReadCache.length > 300) _relayReadCache.clear();
+    _relayReadCache[readKey] = _RelayHit(Map<String, dynamic>.from(res));
+  }
+  if (isWrite || op == 'd') {
+    // Anything changed → later reads must see fresh data.
+    _relayReadCache.clear();
+    if (ok && writeKey != null) {
+      if (_relayWriteCache.length > 300) _relayWriteCache.clear();
+      _relayWriteCache[writeKey] = DateTime.now();
+    }
+  }
+  return res;
+}
+
+Future<Map<String, dynamic>?> _ngmyEdgeInvokeNetwork(
   Map<String, dynamic> body, {
   bool anonymous = false,
   Duration timeout = kNgmyEdgeTimeout,
