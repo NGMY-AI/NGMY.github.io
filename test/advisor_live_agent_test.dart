@@ -8,6 +8,11 @@ void main() {
     expect(ngmyAdvisorAgentTaskIntent('scroll down and tell me how much they lost', currentUrl: 'https://beebots.tech'), isNotNull);
     expect(ngmyAdvisorAgentTaskIntent('search for flights to Kinshasa on google.com')?.url, 'https://google.com');
   });
+  test('applications and named websites start the live browser', () {
+    expect(ngmyAdvisorAgentTaskIntent('help me apply for college at middle Georgia State University MGA'), isNotNull);
+    expect(ngmyAdvisorAgentTaskIntent('open the MGA website and help me apply'), isNotNull);
+    expect(ngmyAdvisorAgentTaskIntent('open the Zillow website'), isNotNull);
+  });
   test('continue after logging in', () {
     final c = ngmyAdvisorAgentTaskIntent('ok I logged in', hasLiveSession: true);
     expect(c?.continuing, isTrue);

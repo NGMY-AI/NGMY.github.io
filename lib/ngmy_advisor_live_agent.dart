@@ -22,8 +22,14 @@ final RegExp _agentAction = RegExp(
   r"navigate|go to (my|the|their)|open (my|the) (profile|account|settings|dashboard|balance|wallet|cart|orders|inbox|history)|"
   r"check (my|the|their) (balance|account|profile|orders|wallet|history|trades|inbox|status)|"
   r"book|reserve|add to (the )?cart|search (for|on)|find (it|that|this)? ?on (the|this|that|their) (site|page|website)|"
-  r"download|compare prices|subscribe|"
+  r"download|compare prices|subscribe|apply|application|enroll|admissions?|"
+  r"open (up )?(the |their |my |a )?[\w .&'-]{1,40}(website|site|web ?page|portal|app)|"
   r"switch to|turn (on|off)|do (it|that|this) (for me|now)|for me in the (browser|site|website))\b",
+  caseSensitive: false,
+);
+/// Requests that are clearly online tasks even without the word "website".
+final RegExp _agentSelfContained = RegExp(
+  r"\b(apply|application|enroll|admissions?|register for|sign up for|book (a|an|my)|order (a|an|my|some))\b",
   caseSensitive: false,
 );
 final RegExp _agentWebContext = RegExp(
@@ -49,7 +55,11 @@ final RegExp _agentContinue = RegExp(
   final full = _agentUrl.firstMatch(t)?.group(0)?.replaceAll(RegExp(r'[).,!?]+$'), '');
   final bare = _agentDomain.firstMatch(t)?.group(0);
   final url = full ?? (bare != null && !bare.contains('@') ? 'https://$bare' : null);
-  final webContext = url != null || currentUrl.isNotEmpty || hasLiveSession || _agentWebContext.hasMatch(t);
+  final webContext = url != null ||
+      currentUrl.isNotEmpty ||
+      hasLiveSession ||
+      _agentWebContext.hasMatch(t) ||
+      _agentSelfContained.hasMatch(t);
   if (!webContext) return null;
   return (url: url, continuing: false);
 }
