@@ -37,7 +37,8 @@ final RegExp _agentWebContext = RegExp(
   caseSensitive: false,
 );
 final RegExp _agentContinue = RegExp(
-  r"^\s*(ok(ay)?[,!. ]*)?(continue|keep going|go ahead|go on|carry on|resume|i('?m| am) (logged|signed) in|i (logged|signed) in|done|finished|ready|next)\b",
+  r"^\s*(ok(ay)?[,!. ]*)?(continue|keep going|go ahead|go on|carry on|resume|i('?m| am) (logged|signed) in|i (logged|signed) in|done|finished|ready|next|try again|retry|do it( again)?)\b"
+  r"|\b(you('re| are)? not (continuing|doing (it|anything)|working)|i don'?t see (it|anything|them|the (list|page|results))|nothing (is )?(happening|showing))\b",
   caseSensitive: false,
 );
 

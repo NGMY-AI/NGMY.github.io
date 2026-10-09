@@ -13,6 +13,11 @@ void main() {
     expect(ngmyAdvisorAgentTaskIntent('open the MGA website and help me apply'), isNotNull);
     expect(ngmyAdvisorAgentTaskIntent('open the Zillow website'), isNotNull);
   });
+  test('complaints that it stopped resume the task', () {
+    expect(ngmyAdvisorAgentTaskIntent('you not continuing', hasLiveSession: true)?.continuing, isTrue);
+    expect(ngmyAdvisorAgentTaskIntent("I don't see it in the screen", hasLiveSession: true)?.continuing, isTrue);
+    expect(ngmyAdvisorAgentTaskIntent("I don't see it in the screen"), isNull);
+  });
   test('continue after logging in', () {
     final c = ngmyAdvisorAgentTaskIntent('ok I logged in', hasLiveSession: true);
     expect(c?.continuing, isTrue);

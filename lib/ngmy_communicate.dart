@@ -4995,6 +4995,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
 
       // Asked to open a site / look something up → the advisor actually looks first.
+      // No remembered task (e.g. app reopened)? Recover the last web task from their messages,
+      // so "continue" / "you're not continuing" picks it back up instead of fake chat.
+      if (_agentRun.task.isEmpty && !_isTextCoach && !_isDebater) {
+        for (final m in _messages.reversed) {
+          final t = (m['text'] ?? '').trim();
+          if (m['role'] != 'user' || t.isEmpty || t == text) continue;
+          final i = ngmyAdvisorAgentTaskIntent(t);
+          if (i != null && !i.continuing) {
+            _agentRun.task = t;
+            break;
+          }
+        }
+      }
       // Asked to DO something on a website → the advisor does it in a live browser they watch.
       final agentTask = (imageB64 == null && !_isTextCoach && !_isDebater)
           ? ngmyAdvisorAgentTaskIntent(
