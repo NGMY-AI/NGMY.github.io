@@ -124639,7 +124639,7 @@ $S:12}
 A.dUT.prototype={
 $1(a){var s=A.jV().b
 s=s==null?null:s.canvasKitBaseUrl
-return(s==null?"https://www.gstatic.com/flutter-canvaskit/692136cb6582dbfc5af3fb33c2515a069f2f66d0/":s)+a},
+return(s==null?"canvaskit/":s)+a},
 $S:14}
 A.aGQ.prototype={
 gN(a){var s=this.a
