@@ -44811,13 +44811,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     );
                   }
 
-                  final liveRegistered = _sharedDirectoryHasLiveFetch &&
-                          NgmyCivicRegistryStats.statesMatch(_sharedDirectoryState, _selectedState) &&
-                          q.isEmpty &&
-                          _selectedCity == 'All Cities' &&
-                          _selectedRoom == 'All Rooms'
-                      ? _rankingsEnrolled().length
-                      : null;
                   return Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -44825,8 +44818,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     children: [
                       glassChip('Family ${members.length}'),
                       glassChip('Members $people'),
-                      if (liveRegistered != null)
-                        glassChip('Registered $liveRegistered (live)'),
                     ],
                   );
                 },
