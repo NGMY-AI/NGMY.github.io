@@ -349,6 +349,149 @@ async function advisorBrowse(apiKey: string, task: string, rawUrl: string): Prom
   };
 }
 
+// ── Advisor Live Agent ──────────────────────────────────────────────────────
+// A real cloud browser (Browser Use Cloud) that the advisor drives while the user watches
+// a live view inside the chat. Key: BROWSER_USE_API_KEY (Supabase secret).
+
+const BROWSER_USE_API = "https://api.browser-use.com/api/v4";
+
+const ADVISOR_AGENT_RULES =
+  "\n\nRULES (from the NGMY app — always follow):\n" +
+  "- The user is watching this browser live and can tap into it.\n" +
+  "- NEVER complete a payment, purchase, money transfer, withdrawal, deposit, trade, bet, or order that " +
+  "spends money. Go up to the final confirm button, stop, and report exactly what is ready for the user to confirm.\n" +
+  "- NEVER guess or invent passwords. If a login is needed and you are not logged in, stop and say: " +
+  "'Please log in in the browser window, then tell me to continue.'\n" +
+  "- Do not change account settings, passwords, or delete anything unless the task explicitly says so.\n" +
+  "- Finish with a short plain summary of what you did and what you saw (numbers, names, balances exactly as shown).";
+
+function browserUseKey(): string {
+  return String(Deno.env.get("BROWSER_USE_API_KEY") ?? "").trim();
+}
+
+async function browserUseFetch(path: string, init: RequestInit = {}): Promise<{ status: number; data: any }> {
+  const res = await fetch(`${BROWSER_USE_API}${path}`, {
+    ...init,
+    headers: {
+      "X-Browser-Use-API-Key": browserUseKey(),
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch { /* empty body */ }
+  return { status: res.status, data };
+}
+
+function browserUseError(status: number, data: any): string {
+  if (status === 402) return "The live browser is out of credits. Top up Browser Use Cloud to keep going.";
+  if (status === 409) return "The browser is still busy with the last task.";
+  if (status === 429) return "Too many live browsers at once — try again in a moment.";
+  const d = data?.detail;
+  const msg = typeof d === "string" ? d : (d?.message ?? data?.message ?? "");
+  return msg ? String(msg).slice(0, 200) : `Live browser error (HTTP ${status}).`;
+}
+
+/** Short human line for one agent event (step / thought / action). */
+function agentEventText(ev: any): string {
+  const d = ev?.data ?? {};
+  for (const k of ["summary", "next_goal", "nextGoal", "goal", "message", "text", "description", "action", "title"]) {
+    const v = d?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim().slice(0, 220);
+  }
+  return "";
+}
+
+async function handleAgentStart(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) {
+    return jsonOk({ ok: false, code: "not_configured", error: "Live browser is not set up yet." });
+  }
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in to use the live browser." }, 401);
+  const limited = await enforceRateLimit(req, "agent_run", email, 20, 3600);
+  if (limited) return limited;
+
+  const task = String(body?.task ?? "").trim().slice(0, 3000);
+  if (!task) return jsonOk({ ok: false, error: "task is required" }, 400);
+  const startUrl = String(body?.startUrl ?? "").trim();
+  const safeStart = startUrl ? advisorBrowseSafeUrl(startUrl) : null;
+  const sessionId = String(body?.sessionId ?? "").trim();
+
+  const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") + task + ADVISOR_AGENT_RULES;
+  const payload: Record<string, unknown> = {
+    task: fullTask,
+    maxCostUsd: 0.75,
+    browserSettings: { screenWidth: 1100, screenHeight: 760 },
+  };
+  if (/^[0-9a-f-]{36}$/i.test(sessionId)) {
+    payload.sessionId = sessionId;
+    delete payload.browserSettings; // continuing an existing browser
+  }
+  let r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  if ((r.status === 400 || r.status === 404) && payload.sessionId) {
+    // Old browser expired — start fresh.
+    delete payload.sessionId;
+    payload.browserSettings = { screenWidth: 1100, screenHeight: 760 };
+    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  }
+  if (r.status !== 200 && r.status !== 201) {
+    return jsonOk({ ok: false, error: browserUseError(r.status, r.data) });
+  }
+  return jsonOk({ ok: true, runId: r.data?.id, sessionId: r.data?.sessionId, status: r.data?.status });
+}
+
+async function handleAgentPoll(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const runId = String(body?.runId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonOk({ ok: false, error: "runId is required" }, 400);
+  const after = Math.max(0, Number(body?.after ?? 0) || 0);
+
+  const [run, evs] = await Promise.all([
+    browserUseFetch(`/runs/${runId}`),
+    browserUseFetch(`/runs/${runId}/events?after=${after}&limit=100&include_output=false`),
+  ]);
+  if (run.status !== 200) return jsonOk({ ok: false, error: browserUseError(run.status, run.data) });
+
+  let liveUrl = "";
+  let pageUrl = "";
+  const steps: { id: number; type: string; text: string }[] = [];
+  let maxId = after;
+  for (const ev of Array.isArray(evs.data?.events) ? evs.data.events : []) {
+    const id = Number(ev?.id ?? 0);
+    if (id > maxId) maxId = id;
+    const d = ev?.data ?? {};
+    const lv = d?.live_view_url ?? d?.liveViewUrl ?? d?.liveUrl;
+    if (typeof lv === "string" && lv.startsWith("https://")) liveUrl = lv;
+    const u = d?.url ?? d?.page_url ?? d?.pageUrl;
+    if (typeof u === "string" && /^https?:\/\//.test(u)) pageUrl = u;
+    const text = agentEventText(ev);
+    if (text) steps.push({ id, type: String(ev?.type ?? ""), text });
+  }
+  return jsonOk({
+    ok: true,
+    status: run.data?.status,
+    result: run.data?.result ?? (typeof run.data?.output === "string" ? run.data.output : null),
+    error: run.data?.error ?? null,
+    costUsd: run.data?.totalCostUsd ?? null,
+    sessionId: run.data?.sessionId ?? null,
+    liveUrl,
+    pageUrl,
+    steps,
+    nextAfter: evs.data?.nextAfter ?? maxId,
+  });
+}
+
+async function handleAgentStop(body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const runId = String(body?.runId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(runId)) return jsonOk({ ok: false, error: "runId is required" }, 400);
+  const r = await browserUseFetch(`/runs/${runId}/cancel`, { method: "POST" });
+  return jsonOk({ ok: r.status === 200, status: r.data?.status ?? null });
+}
+
 async function openAiChat(
   apiKey: string,
   prompt: string,
@@ -6643,6 +6786,10 @@ serve(async (req) => {
       b1: "advisorBrowserFrame",
       w1: "advisorBrowse",
       w2: "advisorBrowserShot",
+      g1: "agentStart",
+      g2: "agentPoll",
+      g3: "agentStop",
+      g4: "agentStatus",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -6874,6 +7021,16 @@ serve(async (req) => {
       const apiKey = await resolveServerAiApiKey();
       return jsonOk(await advisorBrowse(apiKey ?? "", task, rawUrl));
     }
+
+    // Live agent: advisor drives a real cloud browser; user watches the live view in chat.
+    if (action === "agentStart") return await handleAgentStart(req, body);
+    if (action === "agentPoll") {
+      const limited = await enforceRateLimit(req, "agent_poll", clientIp(req), 900, 3600);
+      if (limited) return limited;
+      return await handleAgentPoll(req, body);
+    }
+    if (action === "agentStop") return await handleAgentStop(body);
+    if (action === "agentStatus") return jsonOk({ ok: true, configured: !!browserUseKey() });
 
     // Rendered picture of a page for the mini browser (sites that can't be re-hosted).
     if (action === "advisorBrowserShot") {

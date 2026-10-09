@@ -77,6 +77,10 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'advisorBrowserFrame': 'b1',
   'advisorBrowse': 'w1',
   'advisorBrowserShot': 'w2',
+  'agentStart': 'g1',
+  'agentPoll': 'g2',
+  'agentStop': 'g3',
+  'agentStatus': 'g4',
   'chat': 'z0',
 };
 

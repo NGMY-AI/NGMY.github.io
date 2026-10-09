@@ -16,6 +16,7 @@ import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
+import 'ngmy_advisor_live_agent.dart';
 import 'ngmy_advisor_web_eyes.dart';
 import 'ngmy_phone_action_ui.dart';
 import 'ngmy_phone_integrations.dart';
@@ -3651,6 +3652,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   }
   final _browserSession = NgmyAdvisorBrowserSession();
   double _browserLift = 0;
+  /// Real cloud browser the advisor drives live (Browser Use Cloud).
+  final _agentRun = NgmyAdvisorAgentRun();
   /// Outbound texts waiting for an AI reply (never drop while busy).
   final List<Map<String, String>> _outboundQueue = [];
   DateTime? _sessionStart;
@@ -3827,8 +3830,36 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     );
     _sessionStart = DateTime.now();
     _browserSession.addListener(_onBrowserSessionChanged);
+    _agentRun
+      ..addListener(_onBrowserSessionChanged)
+      ..onFinished = (run) => unawaited(_onAgentFinished(run));
     _load();
     _tickTimer();
+  }
+
+  /// Live task finished → the advisor tells them what it did / found (truthfully).
+  Future<void> _onAgentFinished(NgmyAdvisorAgentRun run) async {
+    try {
+      final apiKey = await _resolveApiKey();
+      final creds = ngmyParseAiCredentials(apiKey);
+      final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
+      final partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
+      final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem, maxMessages: 16);
+      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+          '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+          '${ngmyAdvisorAgentResultPromptBlock(run)}'
+          'Reply as ${widget.profile.name} — natural texting, no asterisks, no markdown, no action tags:';
+      final result = await ngmyAiGenerateCommunicateFast(creds, prompt);
+      var reply = ngmyStripAdvisorBrowserCommandTags(_cleanAdvisorReply(result.text));
+      if (reply.isEmpty) {
+        reply = run.status == 'completed'
+            ? 'Done! ${(run.result ?? '').trim().isNotEmpty ? run.result!.trim() : 'Take a look in the Browser window.'}'
+            : 'I couldn\'t finish that one${(run.error ?? '').isNotEmpty ? ' — ${run.error}' : ''}. Want me to try again?';
+      }
+      await _deliverAiReply(sendGen: _sendGen, text: reply);
+    } catch (e) {
+      debugPrint('[advisor-agent] finish reply: $e');
+    }
   }
 
   void _onBrowserSessionChanged() {
@@ -4025,6 +4056,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   @override
   void dispose() {
     _browserSession.removeListener(_onBrowserSessionChanged);
+    _agentRun
+      ..onFinished = null
+      ..removeListener(_onBrowserSessionChanged)
+      ..dispose();
     _cancelRomanticNudge();
     _flushSessionTime();
     WidgetsBinding.instance.removeObserver(this);
@@ -4842,6 +4877,42 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       var partner = await NgmyCommunicateRelationshipStore.loadPartner(widget.profile.id);
 
       // Asked to open a site / look something up → the advisor actually looks first.
+      // Asked to DO something on a website → the advisor does it in a live browser they watch.
+      final agentTask = (imageB64 == null && !_isTextCoach && !_isDebater)
+          ? ngmyAdvisorAgentTaskIntent(
+              text,
+              currentUrl: _browserSession.url,
+              hasLiveSession: _agentRun.hasSession,
+            )
+          : null;
+      if (agentTask != null) {
+        final continuing = agentTask.continuing;
+        final startUrl = agentTask.url ??
+            (_agentRun.hasSession ? null : (_browserSession.url.isNotEmpty ? _browserSession.url : null));
+        final taskText = continuing
+            ? 'Continue the previous task in this same browser: "${_agentRun.task}". The user says: "$text"'
+            : text;
+        final started = await _agentRun.start(task: taskText, startUrl: startUrl);
+        if (started == NgmyAgentStartResult.started) {
+          if (_browserSession.visible) unawaited(_browserSession.hide());
+          deliveredOk = await _deliverAiReply(
+            sendGen: sendGen,
+            text: continuing
+                ? 'Got it — picking up where we left off. Watch the Browser 👀'
+                : 'On it! I\'m doing that now in my browser — watch me live below. I\'ll tell you what I find.',
+          );
+          return;
+        }
+        if (started == NgmyAgentStartResult.failed) {
+          deliveredOk = await _deliverAiReply(
+            sendGen: sendGen,
+            text: 'I tried to open my live browser but it didn\'t start (${_agentRun.startError}). Want me to try again?',
+          );
+          return;
+        }
+        // Not set up yet → fall back to looking at the page and guiding them.
+      }
+
       final browse = (imageB64 == null && !_isTextCoach && !_isDebater) ? ngmyAdvisorBrowseIntent(text) : null;
       if (browse != null) {
         await _lookAtWebFor(text, browse.url, sendGen);
@@ -5335,9 +5406,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               itemCount: _messages.length + (_busy ? 1 : 0) + 1,
               itemBuilder: (context, i) {
                 if (i == 0) {
-                  final browserPad = _browserSession.visible
-                      ? _browserSession.previewHeight + 96 + _browserLift
-                      : 0.0;
+                  final browserPad = _agentRun.visible
+                      ? (_agentRun.expanded
+                              ? (MediaQuery.sizeOf(context).height * 0.55).clamp(260.0, 560.0)
+                              : 230.0) +
+                          110 +
+                          _browserLift
+                      : _browserSession.visible
+                          ? _browserSession.previewHeight + 96 + _browserLift
+                          : 0.0;
                   return SizedBox(height: bottomClearance + browserPad);
                 }
                 final slot = i - 1;
@@ -5559,7 +5636,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               ),
             ),
           ),
-          if (_browserSession.visible)
+          if (_agentRun.visible)
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: composerBottom + 12 + _browserLift,
+              child: NgmyAdvisorLivePanel(
+                run: _agentRun,
+                advisorName: ngmyAdvisorFirstName(widget.profile.name),
+              ),
+            )
+          else if (_browserSession.visible)
             Positioned(
               left: 8,
               right: 8,
