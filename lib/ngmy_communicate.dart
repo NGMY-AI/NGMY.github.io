@@ -4671,6 +4671,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (id == null) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingAgentKey, jsonEncode({'runId': id, 'sessionId': _agentRun.sessionId, 'task': _agentRun.task}));
+    // Last task survives closing the app, so "continue" later still knows what to pick up.
+    await prefs.setString('${_pendingAgentKey}_last_task', _agentRun.task);
   }
 
   Future<void> _clearPendingAgentRun() async {
@@ -4681,6 +4683,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _resumePendingAgentRun() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (_agentRun.task.isEmpty) _agentRun.task = prefs.getString('${_pendingAgentKey}_last_task') ?? '';
       final raw = prefs.getString(_pendingAgentKey);
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw);
@@ -4997,7 +5000,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ? ngmyAdvisorAgentTaskIntent(
               text,
               currentUrl: _browserSession.url,
-              hasLiveSession: _agentRun.hasSession,
+              // A closed browser still has a task to pick up — "continue" restarts it in a fresh browser.
+              hasLiveSession: _agentRun.hasSession || _agentRun.task.isNotEmpty,
             )
           : null;
       if (agentTask != null) {
@@ -5005,7 +5009,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final startUrl = agentTask.url ??
             (_agentRun.hasSession ? null : (_browserSession.url.isNotEmpty ? _browserSession.url : null));
         final taskText = continuing
-            ? 'Continue the previous task in this same browser: "${_agentRun.task}". The user says: "$text"'
+            ? 'Continue this task (open the site again if the browser is fresh): "${_agentRun.task}". The user says: "$text"'
             : text;
         // Last few things they said (before this message) — e.g. "open Zillow" two texts ago.
         final recentUser = _messages
