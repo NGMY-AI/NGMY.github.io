@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -107,7 +109,7 @@ Future<void> showNgmyHelperGiftPendingHub({
     builder: (ctx) {
       return StatefulBuilder(
         builder: (ctx, setST) {
-          final open = NgmyCivicHelperGifts.openPending(config);
+          final open = NgmyCivicHelperGifts.openPendingNeedingAdminGrant(config);
           final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
           return Container(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.92),
@@ -604,131 +606,183 @@ Future<void> showNgmyHelperGiftReceivedDialog(BuildContext context, NgmyHelperGi
   );
 }
 
+bool _ngmyHelperGiftWalletSheetOpen = false;
+
 /// Profile wallet — all money cards for this member.
 Future<void> showNgmyHelperGiftUserWallet({
   required BuildContext context,
   required dynamic config,
   required String userEmail,
 }) async {
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  await NgmyCivicHelperGifts.hydrateFromCloud(config);
-  if (!context.mounted) return;
-  final gifts = NgmyCivicHelperGifts.giftsForEmail(config, userEmail);
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
-      return Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.88),
-        margin: const EdgeInsets.fromLTRB(10, 40, 10, 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(2))),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 8, 4),
-              child: Row(
-                children: [
-                  const Text('🎁', style: TextStyle(fontSize: 28)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('My money cards', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                        Text(
-                          gifts.isEmpty ? 'When an admin sends you a card, it appears here.' : '${gifts.where((g) => !g.redeemed).length} active · ${gifts.length} total',
-                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close_rounded)),
-                ],
-              ),
-            ),
-            Expanded(
-              child: gifts.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(28),
-                        child: Text(
-                          'No helper presents yet. Earn three first-helper campaigns in a row in Civic Registry.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, height: 1.4),
-                        ),
+  if (_ngmyHelperGiftWalletSheetOpen) return;
+  _ngmyHelperGiftWalletSheetOpen = true;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _NgmyHelperGiftWalletSheet(
+        config: config,
+        userEmail: userEmail,
+        parentContext: context,
+      ),
+    );
+  } finally {
+    _ngmyHelperGiftWalletSheetOpen = false;
+  }
+}
+
+class _NgmyHelperGiftWalletSheet extends StatefulWidget {
+  const _NgmyHelperGiftWalletSheet({
+    required this.config,
+    required this.userEmail,
+    required this.parentContext,
+  });
+
+  final dynamic config;
+  final String userEmail;
+  final BuildContext parentContext;
+
+  @override
+  State<_NgmyHelperGiftWalletSheet> createState() => _NgmyHelperGiftWalletSheetState();
+}
+
+class _NgmyHelperGiftWalletSheetState extends State<_NgmyHelperGiftWalletSheet> {
+  var _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_refresh());
+  }
+
+  Future<void> _refresh() async {
+    await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
+    if (mounted) setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0B1220) : Colors.white;
+    final gifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, widget.userEmail);
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
+      margin: const EdgeInsets.fromLTRB(10, 40, 10, 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? Colors.white24 : Colors.black12, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 8, 4),
+            child: Row(
+              children: [
+                const Text('🎁', style: TextStyle(fontSize: 28)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('My money cards', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                      Text(
+                        _loading
+                            ? 'Syncing your cards…'
+                            : gifts.isEmpty
+                                ? 'When an admin sends you a card, it appears here.'
+                                : '${gifts.where((g) => !g.redeemed).length} active · ${gifts.length} total',
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
                       ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount: gifts.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (_, i) {
-                        final g = gifts[i];
-                        final style = ngmyHelperGiftStyleById(g.styleId);
-                        return Material(
-                          color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(18),
-                          child: InkWell(
+                    ],
+                  ),
+                ),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFEC4899)))
+                : gifts.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Text(
+                            'No helper presents yet. Earn three first-helper campaigns in a row in Civic Registry.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: isDark ? Colors.white54 : Colors.black45, height: 1.4),
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                        itemCount: gifts.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) {
+                          final g = gifts[i];
+                          final style = ngmyHelperGiftStyleById(g.styleId);
+                          return Material(
+                            color: isDark ? Colors.white.withValues(alpha: 0.05) : const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(18),
-                            onTap: () async {
-                              Navigator.pop(ctx);
-                              await showNgmyHelperGiftReceivedDialog(context, g);
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: style.accent.withValues(alpha: 0.35)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(14),
-                                      gradient: LinearGradient(colors: [style.accent, style.accent2]),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(18),
+                              onTap: () async {
+                                final parent = widget.parentContext;
+                                Navigator.pop(context);
+                                if (parent.mounted) {
+                                  await showNgmyHelperGiftReceivedDialog(parent, g);
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: style.accent.withValues(alpha: 0.35)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        gradient: LinearGradient(colors: [style.accent, style.accent2]),
+                                      ),
+                                      child: Center(child: Text(style.emoji, style: const TextStyle(fontSize: 24))),
                                     ),
-                                    child: Center(child: Text(style.emoji, style: const TextStyle(fontSize: 24))),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(g.giftName, style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                                        Text(
-                                          g.redeemed ? 'Redeemed · \$${g.amount.toStringAsFixed(2)}' : '\$${g.amount.toStringAsFixed(2)} · ${g.storeSellerName.isEmpty ? 'NGMY store' : g.storeSellerName}',
-                                          style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
-                                        ),
-                                      ],
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(g.giftName, style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+                                          Text(
+                                            g.redeemed ? 'Redeemed · \$${g.amount.toStringAsFixed(2)}' : '\$${g.amount.toStringAsFixed(2)} · ${g.storeSellerName.isEmpty ? 'NGMY store' : g.storeSellerName}',
+                                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  Icon(
-                                    g.redeemed ? Icons.check_circle_rounded : Icons.qr_code_2_rounded,
-                                    color: g.redeemed ? Colors.green : style.accent,
-                                  ),
-                                ],
+                                    Icon(
+                                      g.redeemed ? Icons.check_circle_rounded : Icons.qr_code_2_rounded,
+                                      color: g.redeemed ? Colors.green : style.accent,
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Future<String?> _scanHelperGiftQr(BuildContext context) {

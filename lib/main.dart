@@ -16817,7 +16817,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       await _checkAdminHelperGiftPopups();
       if (ngmyHelperGiftAdminPopupIsOpen) return;
       if (NgmyHelperGiftAdminPopupSession.isDismissedForAppSession) return;
-      if (NgmyCivicHelperGifts.openPending(widget.config).isNotEmpty) return;
+      if (NgmyCivicHelperGifts.openPendingNeedingAdminGrant(widget.config).isNotEmpty) return;
       await Future<void>.delayed(const Duration(milliseconds: 350));
     }
   }
@@ -27758,6 +27758,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _referralPreviewName;
   bool _referralPreviewInvalid = false;
   bool _referralSubmitting = false;
+  bool _openingHelperGiftWallet = false;
   Timer? _referralPreviewDebounce;
   String _referralPreviewCode = '';
   Map<String, dynamic>? _referralPreviewReferrerRow;
@@ -28290,16 +28291,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             IconButton(
-              onPressed: () async {
-                await NgmyCivicHelperGifts.hydrateFromCloud(widget.config);
-                if (!context.mounted) return;
-                setState(() {});
-                await showNgmyHelperGiftUserWallet(
-                  context: context,
-                  config: widget.config,
-                  userEmail: widget.user.email,
-                );
-              },
+              onPressed: _openingHelperGiftWallet
+                  ? null
+                  : () async {
+                      _openingHelperGiftWallet = true;
+                      try {
+                        await showNgmyHelperGiftUserWallet(
+                          context: context,
+                          config: widget.config,
+                          userEmail: widget.user.email,
+                        );
+                        if (mounted) setState(() {});
+                      } finally {
+                        if (mounted) _openingHelperGiftWallet = false;
+                      }
+                    },
               tooltip: 'Money cards',
               icon: Badge(
                 isLabelVisible: NgmyCivicHelperGifts.unredeemedGiftCount(widget.config, widget.user.email) > 0,

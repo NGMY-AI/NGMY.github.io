@@ -120,6 +120,46 @@ void main() {
     expect(stores.any((s) => s['title'] == 'Blue Sneakers'), isFalse);
   });
 
+  test('inbox gift closes admin pending for that member', () {
+    final config = _GiftConfig()
+      ..civicHelperGiftPending = [
+        {
+          'id': 'hgpend_1',
+          'email': 'helper@example.com',
+          'fullName': 'Helper',
+          'registryId': 'GA1',
+          'state': 'Georgia',
+          'city': 'Atlanta',
+          'phone': '',
+          'streak': 3,
+          'createdAt': '2026-01-01T00:00:00.000Z',
+          'granted': false,
+          'notified': false,
+        },
+      ]
+      ..civicHelperGiftInbox = [
+        {
+          'id': 'hgift_1',
+          'email': 'helper@example.com',
+          'fullName': 'Helper',
+          'giftName': 'Reward',
+          'amount': 25,
+          'styleId': 'gold_envelope',
+          'storeAddress': 'Main',
+          'storeSellerEmail': 'shop@example.com',
+          'storeSellerName': 'Shop',
+          'storeListingId': 'x',
+          'qrPayload': 'NGMYHELPERGIFT1|HG12345678',
+          'token': 'HG12345678',
+          'createdAt': '2026-01-02T00:00:00.000Z',
+          'grantedBy': 'admin@example.com',
+          'redeemed': false,
+        },
+      ];
+    NgmyCivicHelperGifts.reconcilePendingWithInbox(config);
+    expect(NgmyCivicHelperGifts.openPendingNeedingAdminGrant(config), isEmpty);
+  });
+
   test('gift QR accepts only the helper-gift prefix or token', () {
     expect(
       NgmyCivicHelperGifts.parseTokenFromPayload('NGMYHELPERGIFT1|HG23456789'),
