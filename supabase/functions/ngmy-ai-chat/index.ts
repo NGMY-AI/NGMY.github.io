@@ -1268,6 +1268,99 @@ async function handleTrading(req: Request, action: string, body: any): Promise<R
   return jsonOk({ ok: false, error: "Unknown trading action." }, 400);
 }
 
+// ── Storage / database housekeeping (approved by the owner 2026-10-09) ──────
+// Runs at most every 6 h, in the background of normal requests:
+//  • Doc Share "My Code" cloud transfers nobody collected within 14 days (files + inbox entry)
+//  • temporary QR transfer stashes not touched for 14 days
+//  • security-event log rows older than 30 days, rate-limit counters older than 2 days
+const NGMY_MAINT_KEY = "maintenance_last_run_v1";
+const NGMY_TRANSFER_TTL_MS = 14 * 24 * 3600 * 1000;
+let ngmyMaintRunning = false;
+
+async function ngmyMaybeRunMaintenance(): Promise<void> {
+  if (ngmyMaintRunning) return;
+  const db = adminClient();
+  if (!db) return;
+  try {
+    const { data } = await db.from("ngmy_agent_config").select("value").eq("key", NGMY_MAINT_KEY).maybeSingle();
+    const last = Date.parse(String(data?.value ?? "")) || 0;
+    if (Date.now() - last < 6 * 3600 * 1000) return;
+    ngmyMaintRunning = true;
+    const finished = await ngmyRunMaintenance(db);
+    if (finished) {
+      await db.from("ngmy_agent_config").upsert({ key: NGMY_MAINT_KEY, value: new Date().toISOString(), updated_at: new Date().toISOString() });
+    }
+  } catch (e) {
+    console.log("[maintenance] error", String(e));
+  } finally {
+    ngmyMaintRunning = false;
+  }
+}
+
+/** Returns true when everything was cleaned (false = ran out of time, continue next request). */
+async function ngmyRunMaintenance(db: any): Promise<boolean> {
+  const started = Date.now();
+  const outOfTime = () => Date.now() - started > 90_000;
+  const cutoff = Date.now() - NGMY_TRANSFER_TTL_MS;
+  const bucket = db.storage.from("media");
+  let removedFiles = 0;
+
+  // 1) Uncollected My Code transfer files: my-code-inbox/<email>/<session>/<file>.partNNNNN
+  const list = async (path: string) => {
+    const out: any[] = [];
+    for (let offset = 0; offset < 20000; offset += 1000) {
+      const { data, error } = await bucket.list(path, { limit: 1000, offset, sortBy: { column: "name", order: "asc" } });
+      if (error || !Array.isArray(data) || data.length === 0) break;
+      out.push(...data);
+      if (data.length < 1000) break;
+    }
+    return out;
+  };
+  for (const who of await list("my-code-inbox")) {
+    if (outOfTime()) return false;
+    for (const session of await list(`my-code-inbox/${who.name}`)) {
+      if (outOfTime()) return false;
+      const base = `my-code-inbox/${who.name}/${session.name}`;
+      const old = (await list(base))
+        .filter((f) => f.id && Date.parse(String(f.created_at ?? f.updated_at ?? "")) < cutoff)
+        .map((f) => `${base}/${f.name}`);
+      for (let i = 0; i < old.length; i += 500) {
+        if (outOfTime()) return false;
+        const { error } = await bucket.remove(old.slice(i, i + 500));
+        if (!error) removedFiles += Math.min(500, old.length - i);
+      }
+    }
+  }
+
+  // 2) Their inbox entries (pending storage deliveries older than 14 days).
+  const { data: inboxes } = await db.from("ngmy_settings").select("key,value").like("key", "ngmy_doc_share_inbox_v1_%");
+  for (const row of inboxes ?? []) {
+    const list = Array.isArray(row?.value?.deliveries) ? row.value.deliveries : null;
+    if (!list) continue;
+    const keep = list.filter((d: any) => {
+      const created = Date.parse(String(d?.createdAt ?? "")) || Date.now();
+      const expired = d?.type === "storage" && d?.status !== "done" && created < cutoff;
+      return !expired;
+    });
+    if (keep.length !== list.length) {
+      await db.from("ngmy_settings").update({ value: { ...row.value, deliveries: keep }, updated_at: new Date().toISOString() })
+        .eq("key", row.key);
+    }
+  }
+
+  // 3) Temporary QR transfer stashes.
+  const stashCutoff = new Date(cutoff).toISOString();
+  const { data: s1 } = await db.from("ngmy_settings").delete().like("key", "ngmy_doc_share_stash_v2_%").lt("updated_at", stashCutoff).select("key");
+  const { data: s2 } = await db.from("ngmy_settings").delete().like("key", "%_qr_stashes_v1").lt("updated_at", stashCutoff).select("key");
+
+  // 4) Logs.
+  await db.from("ngmy_security_events").delete().lt("at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString());
+  await db.from("ngmy_rate_limits").delete().lt("window_start", new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString());
+
+  console.log(`[maintenance] removed ${removedFiles} transfer files, ${(s1?.length ?? 0) + (s2?.length ?? 0)} stashes`);
+  return true;
+}
+
 async function openAiChat(
   apiKey: string,
   prompt: string,
@@ -7506,6 +7599,13 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+
+  // Housekeeping in the background (at most every 6 h) — never delays the request.
+  try {
+    const job = ngmyMaybeRunMaintenance();
+    const rt = (globalThis as any).EdgeRuntime;
+    if (rt?.waitUntil) rt.waitUntil(job);
+  } catch { /* ignore */ }
 
   try {
     const body = await req.json();
