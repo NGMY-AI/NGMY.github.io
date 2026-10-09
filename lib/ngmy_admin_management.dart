@@ -1063,9 +1063,8 @@ bool _communicateProfilesEffectivelyEmpty(AppConfig config) {
 void _applyCommunicateSettingsPayload(AppConfig config, Map<String, dynamic> payload) {
   final localEmpty = _communicateProfilesEffectivelyEmpty(config);
   if (ngmyShouldDeferRemoteConfigOverwrite() && !localEmpty) return;
-  if (payload.containsKey('communicateEnabled')) {
-    config.communicateEnabled = payload['communicateEnabled'] == true;
-  }
+  // NGMY Advisors are always on — an old saved "off" must never hide them.
+  config.communicateEnabled = true;
   final raw = payload['communicateProfiles'];
   if (raw is List) {
     final next = raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();

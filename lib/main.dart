@@ -2000,7 +2000,7 @@ class AppConfig {
     this.translateWeeklyFreeLimit = NgmyTranslatePayments.defaultWeeklyFreeLimit,
     this.translateWeeklyUnlockFee = NgmyTranslatePayments.defaultWeeklyUnlockFee,
     Map<String, String>? translateWeekPassByEmail,
-    this.communicateEnabled = false,
+    this.communicateEnabled = true,
     this.appBuilderEnabled = false,
     List<Map<String, dynamic>>? appBuilderPublished,
     List<Map<String, dynamic>>? appBuilderReviewQueue,
@@ -2333,7 +2333,7 @@ class AppConfig {
     translateWeeklyFreeLimit: (json['translateWeeklyFreeLimit'] as num?)?.toInt() ?? NgmyTranslatePayments.defaultWeeklyFreeLimit,
     translateWeeklyUnlockFee: (json['translateWeeklyUnlockFee'] as num?)?.toDouble() ?? NgmyTranslatePayments.defaultWeeklyUnlockFee,
     translateWeekPassByEmail: _familyTreePhotoAccessFromJson(json['translateWeekPassByEmail']),
-    communicateEnabled: json['communicateEnabled'] == true,
+    communicateEnabled: true, // Advisors are always on
     appBuilderEnabled: json['appBuilderEnabled'] == true,
     appBuilderPublished: List<Map<String, dynamic>>.from(
       (json['appBuilderPublished'] ?? const []).map((e) => Map<String, dynamic>.from(e as Map)),
@@ -3964,11 +3964,8 @@ void _applyRemoteConfigMerge(AppConfig next, Map<String, dynamic> record, AppCon
   } else {
     next.appStudioCloudSaveFee = keep.appStudioCloudSaveFee;
   }
-  if (record.containsKey('communicateEnabled')) {
-    next.communicateEnabled = record['communicateEnabled'] == true;
-  } else {
-    next.communicateEnabled = keep.communicateEnabled;
-  }
+  // NGMY Advisors are always on — an old "off" value in the cloud must never hide them.
+  next.communicateEnabled = true;
   if (record.containsKey('appBuilderEnabled')) {
     next.appBuilderEnabled = record['appBuilderEnabled'] == true;
   } else {
@@ -53944,7 +53941,8 @@ class MediaHubScreen extends StatelessWidget {
     this.onSyncUserMedia,
   });
 
-  bool get _canOpenWorld => config.communicateEnabled || user.isAdmin;
+  /// NGMY Advisors are always open to every user (no admin switch can hide them).
+  bool get _canOpenWorld => true;
 
   @override
   Widget build(BuildContext context) {

@@ -28,7 +28,8 @@ Future<void> showNgmyCommunicateAdminSheet({
         .where((p) => p.id.isNotEmpty)
         .toList();
   }
-  var enabled = (config as dynamic).communicateEnabled == true;
+  // NGMY Advisors are always open to every user — there is no off switch.
+  const enabled = true;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -59,15 +60,6 @@ Future<void> showNgmyCommunicateAdminSheet({
                       style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54, height: 1.35),
                     ),
                     const SizedBox(height: 14),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Open Communicate for users', style: TextStyle(fontWeight: FontWeight.w800)),
-                      subtitle: const Text('When off, double-tap Chat does nothing extra'),
-                      value: enabled,
-                      activeThumbColor: const Color(0xFFEC4899),
-                      onChanged: (v) => setST(() => enabled = v),
-                    ),
-                    const SizedBox(height: 8),
                     FilledButton.icon(
                       onPressed: () async {
                         final created = await _openProfileEditor(ctx, isDark: isDark, apiKey: apiKey);
