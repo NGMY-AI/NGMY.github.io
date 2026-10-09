@@ -7030,7 +7030,15 @@ serve(async (req) => {
       return await handleAgentPoll(req, body);
     }
     if (action === "agentStop") return await handleAgentStop(body);
-    if (action === "agentStatus") return jsonOk({ ok: true, configured: !!browserUseKey() });
+    if (action === "agentStatus") {
+      const configured = !!browserUseKey();
+      if (!configured || !body?.verify) return jsonOk({ ok: true, configured });
+      const limited = await enforceRateLimit(req, "agent_verify", clientIp(req), 10, 600);
+      if (limited) return limited;
+      // Cheap authenticated call — confirms the key is accepted (never returns the key).
+      const r = await browserUseFetch("/runs?limit=1");
+      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status });
+    }
 
     // Rendered picture of a page for the mini browser (sites that can't be re-hosted).
     if (action === "advisorBrowserShot") {
