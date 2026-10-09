@@ -76,6 +76,7 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'pollinationsImage': 'i2',
   'advisorBrowserFrame': 'b1',
   'advisorBrowse': 'w1',
+  'advisorBrowserShot': 'w2',
   'chat': 'z0',
 };
 

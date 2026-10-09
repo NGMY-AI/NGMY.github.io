@@ -176,6 +176,8 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
     var u = raw.trim();
     if (u.isEmpty) return '';
     if (!u.startsWith('http://') && !u.startsWith('https://')) u = 'https://$u';
+    // "site.com/" and "site.com" are the same page — don't reload for a slash.
+    if (u.endsWith('/') && (Uri.tryParse(u)?.path ?? '') == '/') u = u.substring(0, u.length - 1);
     return u;
   }
 

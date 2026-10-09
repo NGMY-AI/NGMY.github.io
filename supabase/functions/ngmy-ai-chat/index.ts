@@ -722,7 +722,13 @@ P.postMessage({ngmyBrowser:'loaded',title:document.title||''},'*');})();`;
     } else {
       html = `<!DOCTYPE html><html><head>${inject}</head><body>${html}</body></html>`;
     }
-    return jsonOk({ ok: true, html, finalUrl: res.url || parsed.toString() });
+    // Modern JS apps (React/Vite shells like beebots.tech) can't run re-hosted — their own
+    // security rules block it. Tell the app so it shows a real rendered picture instead.
+    const visibleText = advisorHtmlToText(html).text;
+    const appShell = visibleText.length < 160 &&
+      (/<script[^>]+type=["']?module/i.test(html) ||
+        /id=["'](root|app|__next|__nuxt)["']/i.test(html));
+    return jsonOk({ ok: true, html, appShell, finalUrl: res.url || parsed.toString() });
   } catch (e) {
     return jsonOk({ ok: false, error: String(e) }, 502);
   }
@@ -6636,6 +6642,7 @@ serve(async (req) => {
       i2: "pollinationsImage",
       b1: "advisorBrowserFrame",
       w1: "advisorBrowse",
+      w2: "advisorBrowserShot",
       z0: "chat",
     };
     const action = WIRE_TO_ACTION[wireCode] ?? String(body?.action ?? "chat").trim();
@@ -6866,6 +6873,16 @@ serve(async (req) => {
       }
       const apiKey = await resolveServerAiApiKey();
       return jsonOk(await advisorBrowse(apiKey ?? "", task, rawUrl));
+    }
+
+    // Rendered picture of a page for the mini browser (sites that can't be re-hosted).
+    if (action === "advisorBrowserShot") {
+      const limited = await enforceRateLimit(req, "advisor_shot", clientIp(req), 90, 3600);
+      if (limited) return limited;
+      const safe = advisorBrowseSafeUrl(String(body?.url ?? ""));
+      if (!safe) return jsonOk({ ok: false, error: "That link can't be opened." }, 400);
+      const shot = await advisorScreenshot(safe);
+      return jsonOk(shot ? { ok: true, screenshotBase64: shot } : { ok: false, error: "No picture yet." });
     }
 
     if (action === "advisorBrowserFrame") {

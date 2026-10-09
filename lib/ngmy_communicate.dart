@@ -3634,7 +3634,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (mounted) {
       setState(() => _activityCaption = r.ok ? '$first is reading the page…' : null);
     }
-    if (r.url.isNotEmpty && r.url != _browserSession.url) {
+    // Same page → open() only updates the label ("Opening…" → "Viewing…"); new page → loads it.
+    if (r.url.isNotEmpty) {
       unawaited(_browserSession.open(r.url, label: label));
     }
     await NgmyCommunicateMemoryStore.append(

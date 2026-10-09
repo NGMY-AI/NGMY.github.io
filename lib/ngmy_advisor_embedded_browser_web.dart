@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
@@ -33,6 +34,24 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   final List<String> _history = [];
   int _historyIndex = -1;
   bool _historyNav = false;
+  /// Picture mode — modern app sites that can't run inside this window.
+  String? _shotB64;
+  bool _shotLoading = false;
+
+  Future<void> _showPicture(String url) async {
+    if (mounted) setState(() => _shotLoading = true);
+    final shot = await ngmyFetchAdvisorBrowserShot(url);
+    if (!mounted || _lastLoaded != url) return;
+    setState(() {
+      _shotLoading = false;
+      if (shot != null) _shotB64 = shot;
+    });
+    if (shot != null) {
+      widget.session.markReady();
+    } else if (_shotB64 == null) {
+      widget.session.markFailed('This site only works in a full browser. Tap Open to view it.');
+    }
+  }
 
   @override
   void initState() {
@@ -144,10 +163,21 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
     _armTimeout();
     if (mounted) setState(() {});
 
-    final html = await ngmyFetchAdvisorBrowserHtml(url);
-    if (!mounted) return;
+    _shotB64 = null;
+    final page = await ngmyFetchAdvisorBrowserPage(url);
+    if (!mounted || _lastLoaded != url) return;
+    final html = page.html;
 
-    if (html != null && html.trim().isNotEmpty) {
+    if (page.appShell || html == null) {
+      // Can't run here (blank otherwise) — show a real rendered picture of the page.
+      _loadTimeout?.cancel();
+      frame.removeAttribute('srcdoc');
+      frame.src = 'about:blank';
+      await _showPicture(url);
+      return;
+    }
+
+    if (html.trim().isNotEmpty) {
       frame.src = 'about:blank';
       frame.srcdoc = html;
       _loadTimeout?.cancel();
@@ -184,6 +214,7 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
   Future<void> resetToBlank() async {
     _loadTimeout?.cancel();
     _lastLoaded = '';
+    _shotB64 = null;
     final frame = _frame;
     if (frame == null) return;
     frame.removeAttribute('srcdoc');
@@ -200,6 +231,62 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
     _frame?.contentWindow?.postMessage({'ngmyBrowserCmd': 'click_selector', 'selector': selector}, '*');
   }
 
+  Widget _pictureView() {
+    Widget img;
+    try {
+      img = Image.memory(
+        base64Decode(_shotB64!),
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        gaplessPlayback: true,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      );
+    } catch (_) {
+      img = const SizedBox.shrink();
+    }
+    final url = _lastLoaded;
+    return ColoredBox(
+      color: const Color(0xFF0F172A),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          img,
+          Positioned(
+            left: 8,
+            right: 8,
+            bottom: 8,
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xCC0F172A), borderRadius: BorderRadius.circular(999)),
+                  child: const Text('Snapshot', style: TextStyle(color: Colors.white70, fontSize: 10.5)),
+                ),
+                const Spacer(),
+                _pill(_shotLoading ? 'Refreshing…' : 'Refresh', _shotLoading ? null : () => _showPicture(url)),
+                const SizedBox(width: 6),
+                _pill('Open', () => html.window.open(url, '_blank')),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pill(String label, VoidCallback? onTap) => Material(
+        color: const Color(0xE60EA5E9),
+        borderRadius: BorderRadius.circular(999),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final loading = widget.session.loadState == NgmyAdvisorBrowserLoadState.loading;
@@ -215,6 +302,7 @@ class _NgmyAdvisorEmbeddedBrowserState extends State<NgmyAdvisorEmbeddedBrowser>
           children: [
             HtmlElementView(viewType: _viewType),
             if (!widget.interactive) const AbsorbPointer(child: SizedBox.expand()),
+            if (_shotB64 != null) _pictureView(),
             if (loading)
               const ColoredBox(
                 color: Color(0x88000000),
