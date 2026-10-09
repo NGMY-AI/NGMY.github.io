@@ -7,11 +7,60 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_communicate_chat_images.dart';
+import 'ngmy_communicate_chat_images_io.dart'
+    if (dart.library.html) 'ngmy_communicate_chat_images_web.dart' as chat_blob;
 
-/// Long-term local storage for Communicate companion chats (months on same device).
+/// Long-term local storage for advisor chats.
+/// Every chat is kept in TWO places: the full history in IndexedDB (web) / a file (phone),
+/// and a quick copy in SharedPreferences. Loads merge both, saves only ever ADD — so a
+/// failed read, a full browser storage quota or a refresh can never erase a conversation.
 class NgmyCommunicateMemoryStore {
-  static const int retentionDays = 365;
-  static const int maxStoredMessages = 500;
+  /// Kept forever (the user wants every conversation saved).
+  static const int retentionDays = 36500;
+  static const int maxStoredMessages = 100000;
+
+  static String _logKey(String email, String profileId) =>
+      'chatlog_v1_${email.toLowerCase().trim()}_${profileId.trim()}'.replaceAll(RegExp(r'[^A-Za-z0-9@._-]'), '_');
+
+  static Future<List<Map<String, dynamic>>> _readLog(String email, String profileId) async {
+    try {
+      final bytes = await chat_blob.ngmyCommChatImageGetImpl(_logKey(email, profileId));
+      if (bytes == null || bytes.isEmpty) return [];
+      final decoded = jsonDecode(utf8.decode(bytes));
+      if (decoded is! List) return [];
+      return decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
+      debugPrint('[communicate] read full chat log: $e');
+      return [];
+    }
+  }
+
+  static Future<bool> _writeLog(String email, String profileId, List<Map<String, dynamic>> rows) async {
+    try {
+      return await chat_blob.ngmyCommChatImagePutImpl(
+        _logKey(email, profileId),
+        Uint8List.fromList(utf8.encode(jsonEncode(rows))),
+      );
+    } catch (e) {
+      debugPrint('[communicate] write full chat log: $e');
+      return false;
+    }
+  }
+
+  /// Union of two message lists (same message = same time/role/text/image); [b] wins on
+  /// duplicates so updates like a new reaction are kept. Sorted oldest → newest.
+  static List<Map<String, dynamic>> _mergeRows(List<Map<String, dynamic>> a, List<Map<String, dynamic>> b) {
+    final byKey = <String, Map<String, dynamic>>{};
+    for (final m in a) {
+      byKey[_messageMergeKey(m)] = m;
+    }
+    for (final m in b) {
+      byKey[_messageMergeKey(m)] = m;
+    }
+    final out = byKey.values.toList();
+    out.sort((x, y) => (x['at'] ?? '').toString().compareTo((y['at'] ?? '').toString()));
+    return out;
+  }
 
   /// Serialize all writes — concurrent appends were overwriting each other and deleting messages.
   static Future<void> _writeChain = Future<void>.value();
@@ -51,27 +100,43 @@ class NgmyCommunicateMemoryStore {
   }
 
   static Future<List<Map<String, dynamic>>> _loadUnlocked(String email, String profileId) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_chatKey(email, profileId));
-    if (raw == null || raw.isEmpty) return [];
+    // Full history (IndexedDB / file) merged with the quick copy (prefs) — either alone may be
+    // incomplete (old app versions, storage quota), together nothing is lost.
+    final fromLog = await _readLog(email, profileId);
+    var fromPrefs = <Map<String, dynamic>>[];
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-      final now = DateTime.now();
-      final cutoff = now.subtract(const Duration(days: retentionDays));
-      final kept = <Map<String, dynamic>>[];
-      var migratedInlineImages = false;
-      for (final item in decoded) {
-        if (item is! Map) continue;
-        final map = Map<String, dynamic>.from(item);
-        final at = DateTime.tryParse((map['at'] ?? '').toString());
-        if (at != null && at.isBefore(cutoff)) continue;
-        final role = (map['role'] ?? '').toString();
-        final text = (map['text'] ?? '').toString().trim();
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_chatKey(email, profileId));
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          fromPrefs = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+        }
+      }
+    } catch (e) {
+      debugPrint('[communicate] read chat prefs copy: $e');
+    }
+    final source = _mergeRows(fromLog, fromPrefs);
+    if (source.isEmpty) return [];
+
+    final now = DateTime.now();
+    final kept = <Map<String, dynamic>>[];
+    var migratedInlineImages = false;
+    for (final map in source) {
+      final role = (map['role'] ?? '').toString();
+      final text = (map['text'] ?? '').toString().trim();
+      if (role != 'user' && role != 'ai') continue;
+      final at = DateTime.tryParse((map['at'] ?? '').toString());
+      final row = <String, dynamic>{
+        'role': role,
+        'text': text,
+        'at': (at ?? now).toUtc().toIso8601String(),
+      };
+      // One bad message (e.g. a broken image) must never cost the rest of the chat.
+      try {
         var imageB64 = (map['imageB64'] ?? '').toString().trim();
         var imageId = (map['imageId'] ?? '').toString().trim();
         if (text.isEmpty && imageB64.isEmpty && imageId.isEmpty) continue;
-        if (role != 'user' && role != 'ai') continue;
 
         // Migrate old inline base64 → durable local blob store (survives restarts).
         if (imageB64.isNotEmpty && imageId.isEmpty) {
@@ -86,12 +151,6 @@ class NgmyCommunicateMemoryStore {
         if (imageId.isNotEmpty && imageB64.isEmpty) {
           imageB64 = (await NgmyCommunicateChatImageStore.getBase64(imageId)) ?? '';
         }
-
-        final row = <String, dynamic>{
-          'role': role,
-          'text': text,
-          'at': (at ?? now).toUtc().toIso8601String(),
-        };
         if (imageId.isNotEmpty) row['imageId'] = imageId;
         if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
         final mime = (map['imageMime'] ?? '').toString().trim();
@@ -103,16 +162,18 @@ class NgmyCommunicateMemoryStore {
           final shot = await NgmyCommunicateChatImageStore.getBase64(shotId);
           if (shot != null && shot.isNotEmpty) row['browserShotB64'] = shot;
         }
-        kept.add(row);
+      } catch (e) {
+        debugPrint('[communicate] chat row restore: $e');
+        if (text.isEmpty) continue;
+        _copyAdvisorMeta(map, row);
       }
-      if (kept.length != decoded.length || migratedInlineImages) {
-        // Queue rewrite after current work — never write unlocked (causes lost messages).
-        unawaited(_serialized(() => _persistUnlocked(email, profileId, kept)));
-      }
-      return kept;
-    } catch (_) {
-      return [];
+      kept.add(row);
     }
+    if (migratedInlineImages || fromLog.length < kept.length) {
+      // Back-fill the full log (first run after this update / old chats only in prefs).
+      unawaited(_serialized(() => _persistUnlocked(email, profileId, kept)));
+    }
+    return kept;
   }
 
   static Future<void> append(
@@ -225,6 +286,37 @@ class NgmyCommunicateMemoryStore {
     }
   }
 
+  /// Set (or clear with '') a reaction on the newest message with this role + text.
+  static Future<void> setReactionMatching(
+    String email,
+    String profileId, {
+    required String role,
+    required String text,
+    required String emoji,
+  }) async {
+    if (profileId.trim().isEmpty) return;
+    final storeEmail = _storageEmail(email);
+    try {
+      await _serialized(() async {
+        final list = await _loadUnlocked(storeEmail, profileId);
+        for (var i = list.length - 1; i >= 0; i--) {
+          if (list[i]['role']?.toString() != role || (list[i]['text'] ?? '').toString().trim() != text.trim()) continue;
+          final row = Map<String, dynamic>.from(list[i]);
+          if (emoji.trim().isEmpty) {
+            row.remove('reaction');
+          } else {
+            row['reaction'] = emoji.trim();
+          }
+          list[i] = row;
+          await _saveAllUnlocked(storeEmail, profileId, list);
+          return;
+        }
+      });
+    } catch (err) {
+      debugPrint('[communicate] setReactionMatching: $err');
+    }
+  }
+
   /// Stamp an emoji reaction on the most recent user message in this thread.
   static Future<void> setReactionOnLastUser(
     String email,
@@ -320,11 +412,10 @@ class NgmyCommunicateMemoryStore {
     final at = (m['at'] ?? '').toString();
     final role = (m['role'] ?? '').toString();
     final text = (m['text'] ?? '').toString();
-    final imageId = (m['imageId'] ?? '').toString();
-    final imgHint = imageId.isNotEmpty
-        ? imageId
-        : (m['imageB64'] ?? '').toString().hashCode.toString();
-    return '$at|$role|$text|$imgHint';
+    // Only whether there IS an image — an old inline image that gets a new storage id when
+    // migrated must still count as the same message (no duplicates).
+    final hasImg = (m['imageId'] ?? '').toString().isNotEmpty || (m['imageB64'] ?? '').toString().isNotEmpty;
+    return '$at|$role|$text|${hasImg ? 'img' : ''}';
   }
 
   static Future<List<Map<String, dynamic>>> _cleanMessageRowsAsync(
@@ -389,24 +480,37 @@ class NgmyCommunicateMemoryStore {
       _copyAdvisorMeta(m, row);
       slim.add(row);
     }
+    // Saves only ADD: merge with the full history already on disk, so a shorter list
+    // (failed read, stale screen) can never erase earlier messages.
     final prefs = await SharedPreferences.getInstance();
     final key = _chatKey(email, profileId);
-    var payload = slim;
-    for (var attempt = 0; attempt < 4; attempt++) {
+    var prefsRows = <Map<String, dynamic>>[];
+    try {
+      final raw = prefs.getString(key);
+      final decoded = raw == null || raw.isEmpty ? null : jsonDecode(raw);
+      if (decoded is List) prefsRows = decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (_) {}
+    final existing = _mergeRows(await _readLog(email, profileId), prefsRows);
+    final merged = _mergeRows(existing, slim);
+    final logOk = await _writeLog(email, profileId, merged);
+
+    // Quick copy in prefs — the full history lives in the log, so on storage pressure keep
+    // just the most recent messages here instead of failing.
+    for (final keep in [merged.length, 400, 150, 40]) {
+      if (keep > merged.length) continue;
+      final payload = keep == merged.length ? merged : merged.sublist(merged.length - keep);
       try {
-        final ok = await prefs.setString(key, jsonEncode(payload));
-        if (ok) return;
+        if (await prefs.setString(key, jsonEncode(payload))) {
+          if (!logOk && keep < merged.length) {
+            debugPrint('[communicate] WARNING: full chat log unavailable; prefs kept last $keep of ${merged.length}');
+          }
+          return;
+        }
       } catch (e) {
-        debugPrint('[communicate] prefs write attempt $attempt: $e');
-      }
-      // Quota / size pressure — drop oldest half and retry.
-      if (payload.length <= 20) {
-        payload = payload.isEmpty ? payload : [payload.last];
-      } else {
-        payload = payload.sublist(payload.length ~/ 2);
+        debugPrint('[communicate] prefs write ($keep msgs): $e');
       }
     }
-    debugPrint('[communicate] chat prefs write failed after retries for $profileId');
+    debugPrint('[communicate] chat prefs write failed for $profileId (full log ok: $logOk)');
   }
 
   static String transcriptForPrompt(List<Map<String, dynamic>> memory, {int maxMessages = 40}) {

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_advisor_app_knowledge.dart';
 import 'ngmy_advisor_badge_copy.dart';
@@ -3501,51 +3502,91 @@ class _HoldToCopyBubble extends StatefulWidget {
     required this.child,
     required this.copyText,
     required this.onCopied,
+    this.reaction = '',
+    this.onReact,
   });
 
   final Widget child;
   final String copyText;
   final Future<void> Function(String text) onCopied;
+  /// Current reaction on this message ('' = none).
+  final String reaction;
+  /// Null = this message can't be reacted to (e.g. your own message).
+  final void Function(String emoji)? onReact;
 
   @override
   State<_HoldToCopyBubble> createState() => _HoldToCopyBubbleState();
 }
 
 class _HoldToCopyBubbleState extends State<_HoldToCopyBubble> {
-  Timer? _holdTimer;
+  static const _emojis = ['❤️', '😂', '😮', '😢', '😡', '👍'];
 
-  @override
-  void dispose() {
-    _holdTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startHold() {
-    final t = widget.copyText.trim();
-    if (t.isEmpty) return;
-    _holdTimer?.cancel();
-    _holdTimer = Timer(const Duration(seconds: 3), () {
-      _holdTimer = null;
-      unawaited(widget.onCopied(t));
-    });
-  }
-
-  void _cancelHold() {
-    _holdTimer?.cancel();
-    _holdTimer = null;
+  /// Instagram-style: emoji bar + Copy.
+  Future<void> _openMenu() async {
+    HapticFeedback.mediumImpact();
+    final text = widget.copyText.trim();
+    final canReact = widget.onReact != null;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF1C1C22),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (canReact)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (final e in _emojis)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(30),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          HapticFeedback.selectionClick();
+                          widget.onReact!(widget.reaction == e ? '' : e);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: widget.reaction == e ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+                          ),
+                          child: Text(e, style: const TextStyle(fontSize: 30)),
+                        ),
+                      ),
+                  ],
+                ),
+              if (text.isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.copy_rounded, color: Colors.white70),
+                  title: const Text('Copy', style: TextStyle(color: Colors.white)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    unawaited(widget.onCopied(text));
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (widget.copyText.trim().isEmpty) return widget.child;
+    if (widget.copyText.trim().isEmpty && widget.onReact == null) return widget.child;
     return GestureDetector(
-      onLongPressStart: (_) => _startHold(),
-      onLongPressEnd: (_) => _cancelHold(),
-      onLongPressCancel: _cancelHold,
-      onDoubleTap: () {
-        _cancelHold();
-        unawaited(widget.onCopied(widget.copyText.trim()));
-      },
+      onLongPress: _openMenu,
+      // Double-tap = ❤️ (tap again to remove), like Instagram.
+      onDoubleTap: widget.onReact == null
+          ? null
+          : () {
+              HapticFeedback.lightImpact();
+              widget.onReact!(widget.reaction == '❤️' ? '' : '❤️');
+            },
       behavior: HitTestBehavior.opaque,
       child: widget.child,
     );
@@ -3839,6 +3880,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   /// Live task finished → the advisor tells them what it did / found (truthfully).
   Future<void> _onAgentFinished(NgmyAdvisorAgentRun run) async {
+    unawaited(_clearPendingAgentRun());
     try {
       final apiKey = await _resolveApiKey();
       final creds = ngmyParseAiCredentials(apiKey);
@@ -3993,6 +4035,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _browserSession.stage(url, label: label.isEmpty ? null : label);
       break;
     }
+    // A live task that was still running when they left → keep following it so the answer lands.
+    unawaited(_resumePendingAgentRun());
     if (_isTranslator && _translatorNativeLang.isEmpty && mounted) {
       await _pickTranslatorLanguages(required: true);
     }
@@ -4595,6 +4639,54 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     });
   }
 
+  /// You react to one of the advisor's messages (double-tap ❤️ or hold for more) — saved with the chat.
+  Future<void> _reactToAdvisorMessage(int index, String emoji) async {
+    if (index < 0 || index >= _messages.length) return;
+    final row = Map<String, String>.from(_messages[index]);
+    if (emoji.isEmpty) {
+      row.remove('reaction');
+    } else {
+      row['reaction'] = emoji;
+    }
+    setState(() => _messages[index] = row);
+    await NgmyCommunicateMemoryStore.setReactionMatching(
+      _email,
+      widget.profile.id,
+      role: 'ai',
+      text: row['text'] ?? '',
+      emoji: emoji,
+    );
+  }
+
+  // A live task keeps running in the cloud if they leave the chat — remember it so the
+  // advisor's answer still arrives (and is saved) when they come back.
+  String get _pendingAgentKey => 'ngmy_agent_pending_${_email.toLowerCase()}_${widget.profile.id}';
+
+  Future<void> _savePendingAgentRun() async {
+    final id = _agentRun.runId;
+    if (id == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingAgentKey, jsonEncode({'runId': id, 'sessionId': _agentRun.sessionId, 'task': _agentRun.task}));
+  }
+
+  Future<void> _clearPendingAgentRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_pendingAgentKey);
+  }
+
+  Future<void> _resumePendingAgentRun() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_pendingAgentKey);
+      if (raw == null || raw.isEmpty) return;
+      final m = jsonDecode(raw);
+      if (m is! Map || '${m['runId'] ?? ''}'.isEmpty) return;
+      _agentRun.resume(runId: '${m['runId']}', sessionId: m['sessionId']?.toString(), task: '${m['task'] ?? ''}');
+    } catch (e) {
+      debugPrint('[advisor-agent] resume: $e');
+    }
+  }
+
   Future<void> _tapAdvisorPhoneAction(NgmyPhoneAction action) async {
     if (!mounted) return;
     if (action.type == 'open_url') {
@@ -4923,6 +5015,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           recentUserMessages: recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser,
         );
         if (started == NgmyAgentStartResult.started) {
+          unawaited(_savePendingAgentRun());
           if (_browserSession.visible) unawaited(_browserSession.hide());
           deliveredOk = await _deliverAiReply(
             sendGen: sendGen,
@@ -5563,11 +5656,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     _HoldToCopyBubble(
                       copyText: msgText,
                       onCopied: _copyChatText,
+                      reaction: reaction,
+                      // You react to the advisor's messages; the advisor reacts to yours.
+                      onReact: user ? null : (emoji) => _reactToAdvisorMessage(msgIndex, emoji),
                       child: bubble,
                     ),
-                    if (user && reaction.isNotEmpty)
+                    if (reaction.isNotEmpty)
                       Positioned(
-                        right: 4,
+                        right: user ? 4 : null,
+                        left: user ? null : 8,
                         bottom: -14,
                         child: NgmyAdvisorReactionBadge(emoji: reaction),
                       ),
@@ -5579,7 +5676,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                     crossAxisAlignment: user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
                       // Room under the bubble for the reaction badge.
-                      if (user && reaction.isNotEmpty)
+                      if (reaction.isNotEmpty)
                         Padding(padding: const EdgeInsets.only(bottom: 12), child: bubbleStack)
                       else
                         bubbleStack,

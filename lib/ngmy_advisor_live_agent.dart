@@ -174,6 +174,24 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     return NgmyAgentStartResult.started;
   }
 
+  /// Pick up a task that was still running when the chat was closed.
+  void resume({required String runId, String? sessionId, required String task}) {
+    this.runId = runId;
+    if ((sessionId ?? '').isNotEmpty) this.sessionId = sessionId;
+    this.task = task;
+    status = 'running';
+    result = null;
+    structured = null;
+    error = null;
+    startError = '';
+    steps.clear();
+    _after = 0;
+    _liveUrlLockedForRun = false;
+    visible = true;
+    _notify();
+    _schedulePoll(const Duration(milliseconds: 600));
+  }
+
   void _schedulePoll(Duration after) {
     _poll?.cancel();
     if (_disposed) return;
