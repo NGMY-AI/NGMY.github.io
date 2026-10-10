@@ -3364,7 +3364,8 @@ UserData _civicMemberRecordToDisplayUser(Map<String, dynamic> m, List<UserData> 
   u.idType = (m['idType'] ?? u.idType ?? '').toString();
   u.registryId = registryId.isNotEmpty ? registryId : (u.registryId ?? '').toString();
   u.homeAddress = (m['homeAddress'] ?? u.homeAddress ?? '').toString();
-  u.phone = (m['phone'] ?? u.phone).toString();
+  // The phone the user saved on their profile wins — a registry record must not erase it.
+  if (!ngmyUserPhoneOnFile(u.phone)) u.phone = (m['phone'] ?? u.phone).toString();
   u.city = (m['city'] ?? '').toString();
   u.room = (m['room'] ?? '').toString();
   // Prefer non-empty registry state — empty string must not wipe a valid account state.
@@ -4492,12 +4493,32 @@ Future<void> _pushTransactionToCloudFast(AppTransaction t) async {
   }
 }
 
+/// Saves just the phone to the cloud user row (was an empty placeholder — phone never synced).
 Future<bool> _pushUserPhoneToCloud(UserData u) async {
-  return true;
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty || !ngmyUserPhoneOnFile(u.phone)) return false;
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (await _safeUpsertUserRow({'email': email, 'phone': ngmyPhoneDigits(u.phone)})) return true;
+    await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+  }
+  return false;
 }
 
+/// Saves the profile basics (username + phone) to the cloud user row. This used to be an empty
+/// placeholder, so edits only lived on the device and the next app start loaded the old cloud
+/// profile over them — the phone number "disappeared".
 Future<bool> _pushUserProfileBasicsToCloud(UserData u) async {
-  return true;
+  if (!await ngmyCanReachCloud()) return false;
+  final email = u.email.trim();
+  if (email.isEmpty) return false;
+  final row = <String, dynamic>{'email': email, 'username': u.username.trim()};
+  if (ngmyUserPhoneOnFile(u.phone)) row['phone'] = ngmyPhoneDigits(u.phone);
+  for (var attempt = 0; attempt < 3; attempt++) {
+    if (await _safeUpsertUserRow(row)) return true;
+    await Future.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+  }
+  return false;
 }
 
 Future<bool> _pushUserProfilePictureToCloud(UserData u) async {
@@ -28619,10 +28640,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 widget.allUsers[uIdx].phone = phone;
               }
               widget.onDataChanged();
-              await _pushUserProfileBasicsToCloud(widget.user);
+              final cloudOk = await _pushUserProfileBasicsToCloud(widget.user);
               await widget.onPersistUserToCloud?.call(widget.user);
               if (dialogCtx.mounted) Navigator.pop(dialogCtx);
-              if (mounted) setState(() {});
+              if (mounted) {
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(cloudOk
+                      ? 'Profile saved.'
+                      : 'Saved on this phone — it will sync to your account when you\'re back online.'),
+                ));
+              }
             }
 
             return Dialog(
@@ -34838,7 +34866,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         u.city = (m['city'] ?? u.city)?.toString();
         u.room = (m['room'] ?? u.room)?.toString();
         u.homeAddress = (m['homeAddress'] ?? u.homeAddress)?.toString();
-        u.phone = (m['phone'] ?? u.phone).toString();
+        if (!ngmyUserPhoneOnFile(u.phone)) u.phone = (m['phone'] ?? u.phone).toString();
         u.dob = (m['dob'] ?? u.dob)?.toString();
         u.idType = (m['idType'] ?? u.idType)?.toString();
       }
