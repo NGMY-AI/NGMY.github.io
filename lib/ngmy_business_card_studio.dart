@@ -434,12 +434,18 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
                 orbit: orbit,
                 phase: 0.14,
                 padding: const EdgeInsets.all(8),
+                // Two rows (top and bottom) so twice as many templates show at once.
                 child: SizedBox(
-                  height: 100,
-                  child: ListView.separated(
+                  height: 208,
+                  child: GridView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: templates.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisExtent: 120,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
                     itemBuilder: (_, i) {
                       final tpl = templates[i];
                       final selected = tpl.id == _doc.templateId;

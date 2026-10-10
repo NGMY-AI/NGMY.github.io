@@ -239,6 +239,20 @@ class _NgmyHomeVoteAdStudioPanelState extends State<NgmyHomeVoteAdStudioPanel> {
     );
   }
 
+  Widget _slideStyleChip(NgmyVoteAdSlideStyle s, NgmyHubTheme t) {
+    final on = _draft.slideStyle == s.id;
+    return FilterChip(
+      avatar: Icon(s.icon, size: 16, color: on ? Colors.black : s.accent),
+      label: Text(s.label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: on ? Colors.black : t.chipOffLabel)),
+      selected: on,
+      onSelected: (_) => setState(() => _draft = _draft.copyWith(slideStyle: s.id, accentArgb: s.accent.toARGB32())),
+      selectedColor: s.accent,
+      backgroundColor: t.chipOffBg,
+      side: BorderSide(color: on ? s.accent : t.chipOffBorder),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = NgmyHubTheme.of(context);
@@ -323,26 +337,29 @@ class _NgmyHomeVoteAdStudioPanelState extends State<NgmyHomeVoteAdStudioPanel> {
 
         Text('Slide styles', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: kNgmyVoteAdSlideStyles.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (_, i) {
-              final s = kNgmyVoteAdSlideStyles[i];
-              final on = _draft.slideStyle == s.id;
-              return FilterChip(
-                avatar: Icon(s.icon, size: 16, color: on ? Colors.black : s.accent),
-                label: Text(s.label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: on ? Colors.black : t.chipOffLabel)),
-                selected: on,
-                onSelected: (_) => setState(() => _draft = _draft.copyWith(slideStyle: s.id, accentArgb: s.accent.toARGB32())),
-                selectedColor: s.accent,
-                backgroundColor: t.chipOffBg,
-                side: BorderSide(color: on ? s.accent : t.chipOffBorder),
-                visualDensity: VisualDensity.compact,
-              );
-            },
+        // Two rows (top and bottom) that scroll together.
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final row in [
+                kNgmyVoteAdSlideStyles.sublist(0, (kNgmyVoteAdSlideStyles.length + 1) ~/ 2),
+                kNgmyVoteAdSlideStyles.sublist((kNgmyVoteAdSlideStyles.length + 1) ~/ 2),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      for (final s in row)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: _slideStyleChip(s, t),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
           ),
         ),
         const SizedBox(height: 14),

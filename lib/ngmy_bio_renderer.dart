@@ -239,6 +239,22 @@ class NgmyBioPreview extends StatelessWidget {
         return _photoImmersive(tpl, ring, avatarSize, pad, name, tagline, links);
       case NgmyBioLayoutStyle.diamondWhite:
         return _diamondWhite(tpl, ring, avatarSize, pad, name, tagline, links);
+      case NgmyBioLayoutStyle.proRobotHud:
+        return _proRobotHud(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proOrbit:
+        return _proOrbit(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proPolaroid:
+        return _proPolaroid(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proMagazine:
+        return _proMagazine(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proLiquid:
+        return _proLiquid(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proArcade:
+        return _proArcade(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proBoardingPass:
+        return _proBoardingPass(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proHoloId:
+        return _proHoloId(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.bioSiteClassic:
         return _bioSiteClassic(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
     }
@@ -1085,6 +1101,613 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Pro bio layouts (2026-10). Each has its own structure and decorations.
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Published full-height pages give layouts a fixed box; scroll inside it.
+  Widget _proScroll(Widget child, double minPageHeight) {
+    if (minPageHeight <= 0) return child;
+    return SingleChildScrollView(clipBehavior: Clip.none, child: ConstrainedBox(constraints: BoxConstraints(minHeight: minPageHeight), child: child));
+  }
+
+  TextStyle _mono(Color color, double size, {FontWeight weight = FontWeight.w700}) =>
+      TextStyle(fontFamily: 'monospace', color: color, fontSize: size, fontWeight: weight, letterSpacing: 0.6);
+
+  // ── Robot HUD ─────────────────────────────────────────────────────────────
+  Widget _proRobotHud(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final ringSize = avatarSize + (compact ? 44 : 60);
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.fromLTRB(pad, pad, pad, pad),
+        child: Column(
+          children: [
+            // Status bar.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(border: Border.all(color: a.withValues(alpha: 0.5)), color: a.withValues(alpha: 0.06)),
+              child: Row(
+                children: [
+                  _ProBlinkDot(color: a, animate: !lightweight),
+                  const SizedBox(width: 6),
+                  Text('SYS://ONLINE', style: _mono(a, 10)),
+                  const Spacer(),
+                  Text('ID ${name.hashCode.abs().toRadixString(16).toUpperCase().padLeft(6, '0').substring(0, 6)}', style: _mono(a.withValues(alpha: 0.7), 10)),
+                ],
+              ),
+            ),
+            SizedBox(height: compact ? 18 : 26),
+            SizedBox(
+              width: ringSize,
+              height: ringSize,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  _ProSpin(
+                    animate: !lightweight,
+                    seconds: 9,
+                    child: CustomPaint(size: Size.square(ringSize), painter: _ProTargetPainter(a)),
+                  ),
+                  _ProSpin(
+                    animate: !lightweight,
+                    seconds: 5,
+                    reverse: true,
+                    child: CustomPaint(size: Size.square(ringSize - 18), painter: _ProDashRingPainter(a.withValues(alpha: 0.5))),
+                  ),
+                  _avatar(document.avatarImageBase64, avatarSize, ring),
+                ],
+              ),
+            ),
+            SizedBox(height: compact ? 12 : 16),
+            Text(
+              name.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: _mono(tpl.titleColor, compact ? 18 : 22, weight: FontWeight.w900).copyWith(
+                letterSpacing: 2,
+                shadows: [Shadow(color: a, blurRadius: 14)],
+              ),
+            ),
+            if (tagline.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text('> $tagline _', textAlign: TextAlign.center, style: _mono(a, compact ? 10.5 : 12)),
+            ],
+            NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: false),
+            SizedBox(height: compact ? 14 : 18),
+            for (var i = 0; i < links.length; i++)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: compact ? 30 : 36,
+                    margin: const EdgeInsets.only(right: 8, bottom: 10),
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(border: Border.all(color: a.withValues(alpha: 0.6))),
+                    child: Text((i + 1).toString().padLeft(2, '0'), textAlign: TextAlign.center, style: _mono(a, 10)),
+                  ),
+                  Expanded(child: _linkCard(links[i], tpl)),
+                ],
+              ),
+            SizedBox(height: compact ? 8 : 12),
+            Text('// END OF TRANSMISSION', style: _mono(a.withValues(alpha: 0.6), 9.5)),
+            if (!fullBleed) ...[
+              const SizedBox(height: 14),
+              _madeByNgmyWatermark(tpl),
+            ],
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Orbit (planet with satellites) ────────────────────────────────────────
+  Widget _proOrbit(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final size = avatarSize + (compact ? 90 : 120);
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? 10 : 18),
+            SizedBox(
+              width: size,
+              height: size,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: size * 0.92,
+                    height: size * 0.92,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [tpl.accent.withValues(alpha: 0.35), Colors.transparent]),
+                    ),
+                  ),
+                  _ProSpin(
+                    animate: !lightweight,
+                    seconds: 14,
+                    child: CustomPaint(size: Size.square(size), painter: _ProOrbitPainter(tpl.accent, moons: 3)),
+                  ),
+                  _ProSpin(
+                    animate: !lightweight,
+                    seconds: 8,
+                    reverse: true,
+                    child: CustomPaint(size: Size.square(size * 0.74), painter: _ProOrbitPainter(tpl.subtitleColor, moons: 2)),
+                  ),
+                  _avatar(document.avatarImageBase64, avatarSize, ring),
+                ],
+              ),
+            ),
+            SizedBox(height: compact ? 8 : 12),
+            _belowName(tpl, name, tagline),
+            SizedBox(height: compact ? 14 : 18),
+            _linksColumn(links, tpl, 0),
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Polaroid ──────────────────────────────────────────────────────────────
+  Widget _proPolaroid(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final photo = avatarSize * 1.55;
+    Widget polaroid(double angle, {bool front = false}) => Transform.rotate(
+          angle: angle,
+          child: Container(
+            padding: EdgeInsets.fromLTRB(8, 8, 8, front ? 30 : 26),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 10, offset: const Offset(2, 6))],
+            ),
+            child: SizedBox(
+              width: photo,
+              height: photo,
+              child: front
+                  ? (document.avatarImageBase64.isNotEmpty
+                      ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: photo, height: photo)
+                      : Container(color: tpl.accent.withValues(alpha: 0.3), child: Icon(Icons.person_rounded, size: photo * 0.5, color: Colors.white)))
+                  : Container(color: tpl.accent.withValues(alpha: front ? 0.3 : 0.18)),
+            ),
+          ),
+        );
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? 14 : 22),
+            SizedBox(
+              height: photo + 70,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned(left: null, child: Transform.translate(offset: const Offset(-36, 6), child: polaroid(-0.16))),
+                  Transform.translate(offset: const Offset(34, 2), child: polaroid(0.13)),
+                  polaroid(-0.03, front: true),
+                  // Tape.
+                  Positioned(
+                    top: 0,
+                    child: Transform.rotate(
+                      angle: 0.05,
+                      child: Container(width: 64, height: 18, color: const Color(0xCCFDE68A)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Georgia', fontStyle: FontStyle.italic, fontSize: compact ? 24 : 30, fontWeight: FontWeight.w700, color: tpl.titleColor),
+            ),
+            if (tagline.isNotEmpty)
+              Text(tagline, textAlign: TextAlign.center, style: TextStyle(color: tpl.subtitleColor, fontSize: compact ? 12 : 13, fontWeight: FontWeight.w600)),
+            NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: !_isDarkBg(tpl.pageBg)),
+            SizedBox(height: compact ? 14 : 18),
+            for (var i = 0; i < links.length; i++)
+              Transform.rotate(angle: i.isEven ? -0.012 : 0.012, child: _linkCard(links[i], tpl)),
+            if (!fullBleed) ...[
+              const SizedBox(height: 14),
+              _madeByNgmyWatermark(tpl),
+            ],
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Magazine cover ────────────────────────────────────────────────────────
+  Widget _proMagazine(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final coverH = compact ? 300.0 : 380.0;
+    return _proScroll(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: coverH,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (document.headerImageBase64.isNotEmpty || document.avatarImageBase64.isNotEmpty)
+                  _bioImage(
+                    document.headerImageBase64.isNotEmpty ? document.headerImageBase64 : document.avatarImageBase64,
+                    fit: BoxFit.cover,
+                    alignment: Alignment.topCenter,
+                  )
+                else
+                  DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: tpl.headerGradient ?? [tpl.accent, tpl.pageBg]))),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.black.withValues(alpha: 0.35), Colors.transparent, Colors.black.withValues(alpha: 0.75)],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: pad,
+                  left: pad,
+                  right: pad,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      parts.first.toUpperCase(),
+                      style: TextStyle(fontFamily: 'Georgia', fontSize: compact ? 64 : 84, fontWeight: FontWeight.w900, color: tpl.accent, height: 0.9, letterSpacing: -2),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: pad + (compact ? 62 : 80),
+                  left: pad,
+                  child: Text('ISSUE Nº ${DateTime.now().month.toString().padLeft(2, '0')}  ·  ${DateTime.now().year}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                ),
+                Positioned(
+                  left: pad,
+                  right: pad,
+                  bottom: pad,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        color: tpl.accent,
+                        child: const Text('EXCLUSIVE', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6)),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(name, style: TextStyle(color: Colors.white, fontSize: compact ? 22 : 28, fontWeight: FontWeight.w900, height: 1)),
+                      if (tagline.isNotEmpty)
+                        Text(tagline, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: compact ? 12 : 13, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  right: pad,
+                  bottom: pad,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    color: Colors.white,
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < 18; i++)
+                          Container(width: i % 3 == 0 ? 2.2 : 1.1, height: 22, margin: const EdgeInsets.only(right: 1.2), color: Colors.black),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(pad, pad * 0.8, pad, 0),
+            child: Column(
+              children: [
+                Text('INSIDE THIS ISSUE', style: TextStyle(color: tpl.accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2)),
+                NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: !_isDarkBg(tpl.pageBg)),
+                SizedBox(height: compact ? 10 : 14),
+                _linksColumn(links, tpl, 0),
+              ],
+            ),
+          ),
+        ],
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Liquid blob ───────────────────────────────────────────────────────────
+  Widget _proLiquid(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final blob = avatarSize + (compact ? 80 : 110);
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? 8 : 14),
+            SizedBox(
+              width: blob,
+              height: blob,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  _ProBlob(colors: tpl.headerGradient ?? [tpl.accent, tpl.subtitleColor], size: blob, animate: !lightweight),
+                  _avatar(document.avatarImageBase64, avatarSize, ring),
+                ],
+              ),
+            ),
+            SizedBox(height: compact ? 8 : 12),
+            _belowName(tpl, name, tagline),
+            SizedBox(height: compact ? 14 : 18),
+            _linksColumn(links, tpl, 0),
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Arcade (8-bit) ────────────────────────────────────────────────────────
+  Widget _proArcade(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final score = (name.codeUnits.fold<int>(0, (s, c) => s + c) * 37 % 99999).toString().padLeft(6, '0');
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Text('1UP', style: _mono(const Color(0xFFEF4444), 12, weight: FontWeight.w900)),
+                const SizedBox(width: 8),
+                Text(score, style: _mono(Colors.white, 12, weight: FontWeight.w900)),
+                const Spacer(),
+                Text('HI-SCORE', style: _mono(a, 12, weight: FontWeight.w900)),
+              ],
+            ),
+            SizedBox(height: compact ? 16 : 24),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(border: Border.all(color: a, width: 4)),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 2)),
+                child: SizedBox(
+                  width: avatarSize,
+                  height: avatarSize,
+                  child: document.avatarImageBase64.isNotEmpty
+                      ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize, height: avatarSize)
+                      : Icon(Icons.videogame_asset_rounded, color: a, size: avatarSize * 0.6),
+                ),
+              ),
+            ),
+            SizedBox(height: compact ? 12 : 16),
+            Text('PLAYER 1', style: _mono(const Color(0xFFFACC15), 11, weight: FontWeight.w900).copyWith(letterSpacing: 3)),
+            const SizedBox(height: 4),
+            Text(name.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.titleColor, compact ? 18 : 22, weight: FontWeight.w900).copyWith(letterSpacing: 2)),
+            if (tagline.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(tagline.toUpperCase(), textAlign: TextAlign.center, style: _mono(tpl.subtitleColor, 10.5)),
+              ),
+            NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: false),
+            SizedBox(height: compact ? 12 : 16),
+            for (var i = 0; i < links.length; i++) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('LEVEL ${i + 1}', style: _mono(a, 9.5, weight: FontWeight.w900)),
+              ),
+              const SizedBox(height: 2),
+              _linkCard(links[i], tpl),
+            ],
+            SizedBox(height: compact ? 8 : 12),
+            _ProBlinkText(text: 'INSERT COIN', style: _mono(const Color(0xFFFACC15), 11, weight: FontWeight.w900), animate: !lightweight),
+            if (!fullBleed) ...[
+              const SizedBox(height: 14),
+              _madeByNgmyWatermark(tpl),
+            ],
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Boarding pass ─────────────────────────────────────────────────────────
+  Widget _proBoardingPass(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final small = avatarSize * 0.72;
+    Widget field(String label, String value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(color: const Color(0xFF64748B), fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.w900)),
+          ],
+        );
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? 8 : 14),
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 8))],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    decoration: BoxDecoration(
+                      color: a,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.flight_takeoff_rounded, color: Colors.white),
+                        const SizedBox(width: 8),
+                        const Flexible(child: Text('BOARDING PASS', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 12))),
+                        const SizedBox(width: 8),
+                        Text('FIRST CLASS', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 10)),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                    child: Row(
+                      children: [
+                        _avatar(document.avatarImageBase64, small, ring),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              field('PASSENGER', name),
+                              if (tagline.isNotEmpty) Text(tagline, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: a, fontSize: 11, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Expanded(child: field('FROM', 'HERE')),
+                        Icon(Icons.arrow_forward_rounded, color: a),
+                        Expanded(child: Align(alignment: Alignment.centerRight, child: field('TO', 'MY LINKS'))),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Perforation.
+                  Row(
+                    children: [
+                      Container(width: 12, height: 24, decoration: BoxDecoration(color: tpl.pageBg, borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)))),
+                      Expanded(child: CustomPaint(painter: _ProDashLinePainter(const Color(0xFFCBD5E1)), child: const SizedBox(height: 2))),
+                      Container(width: 12, height: 24, decoration: BoxDecoration(color: tpl.pageBg, borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)))),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              for (var i = 0; i < 30; i++)
+                                Container(width: i % 4 == 0 ? 2.6 : 1.2, height: 30, margin: const EdgeInsets.only(right: 1.6), color: const Color(0xFF0F172A)),
+                            ],
+                          ),
+                        ),
+                        field('GATE', '${links.length.clamp(1, 99)}'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: compact ? 14 : 18),
+            for (var i = 0; i < links.length; i++)
+              Row(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(right: 8, bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    decoration: BoxDecoration(color: a, borderRadius: BorderRadius.circular(6)),
+                    child: Text('G${i + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                  ),
+                  Expanded(child: _linkCard(links[i], tpl)),
+                ],
+              ),
+            if (!fullBleed) ...[
+              const SizedBox(height: 10),
+              _madeByNgmyWatermark(tpl),
+            ],
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // ── Holographic ID card ───────────────────────────────────────────────────
+  Widget _proHoloId(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? 10 : 16),
+            AspectRatio(
+              aspectRatio: 1.586,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _ProHoloSheen(animate: !lightweight, base: tpl.headerGradient ?? [tpl.accent, tpl.pageBg]),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.2),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 16,
+                      top: 16,
+                      child: Container(
+                        width: 38,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(5),
+                          gradient: const LinearGradient(colors: [Color(0xFFFDE68A), Color(0xFFD4AF37), Color(0xFFB8860B)]),
+                        ),
+                        child: CustomPaint(painter: _ProChipPainter()),
+                      ),
+                    ),
+                    Positioned(right: 16, top: 14, child: Icon(Icons.contactless_rounded, color: Colors.white.withValues(alpha: 0.85), size: 26)),
+                    Positioned(right: 16, bottom: 16, child: _avatar(document.avatarImageBase64, avatarSize * 0.78, ring)),
+                    Positioned(
+                      left: 16,
+                      right: avatarSize * 0.78 + 28,
+                      bottom: 16,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('NGMY • MEMBER', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 1.8)),
+                          const SizedBox(height: 4),
+                          Text(name.toUpperCase(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 1.2, shadows: [Shadow(color: Colors.black38, blurRadius: 6)])),
+                          if (tagline.isNotEmpty)
+                            Text(tagline, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: !_isDarkBg(tpl.pageBg)),
+            SizedBox(height: compact ? 14 : 18),
+            _linksColumn(links, tpl, 0),
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
   // ── Shared pieces ─────────────────────────────────────────────────────────
 
   Widget _framedLinks(List<NgmyBioLink> links, NgmyBioTemplate tpl, double pad) {
@@ -1597,4 +2220,330 @@ class _OrganicClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// ── Animated pieces for the pro bio layouts (static when animate is false) ──
+
+class _ProSpin extends StatefulWidget {
+  const _ProSpin({required this.child, required this.animate, this.seconds = 8, this.reverse = false});
+  final Widget child;
+  final bool animate;
+  final int seconds;
+  final bool reverse;
+
+  @override
+  State<_ProSpin> createState() => _ProSpinState();
+}
+
+class _ProSpinState extends State<_ProSpin> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds));
+    if (widget.animate) _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.animate) return widget.child;
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (_, child) => Transform.rotate(angle: (widget.reverse ? -1 : 1) * _c.value * 2 * math.pi, child: child),
+    );
+  }
+}
+
+class _ProBlinkDot extends StatefulWidget {
+  const _ProBlinkDot({required this.color, required this.animate});
+  final Color color;
+  final bool animate;
+  @override
+  State<_ProBlinkDot> createState() => _ProBlinkDotState();
+}
+
+class _ProBlinkDotState extends State<_ProBlinkDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  static const _d = Duration(milliseconds: 900);
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _d);
+    if (widget.animate) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: widget.animate ? Tween<double>(begin: 0.3, end: 1).animate(_c) : const AlwaysStoppedAnimation(1),
+        child: Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle, boxShadow: [BoxShadow(color: widget.color, blurRadius: 6)]),
+        ),
+      );
+}
+
+class _ProBlinkText extends StatefulWidget {
+  const _ProBlinkText({required this.text, required this.style, required this.animate});
+  final String text;
+  final TextStyle style;
+  final bool animate;
+  @override
+  State<_ProBlinkText> createState() => _ProBlinkTextState();
+}
+
+class _ProBlinkTextState extends State<_ProBlinkText> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  static const _d = Duration(milliseconds: 700);
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _d);
+    if (widget.animate) _c.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: widget.animate ? _c : const AlwaysStoppedAnimation(1),
+        child: Text(widget.text, style: widget.style),
+      );
+}
+
+/// A soft blob whose outline slowly changes shape.
+class _ProBlob extends StatefulWidget {
+  const _ProBlob({required this.colors, required this.size, required this.animate});
+  final List<Color> colors;
+  final double size;
+  final bool animate;
+  @override
+  State<_ProBlob> createState() => _ProBlobState();
+}
+
+class _ProBlobState extends State<_ProBlob> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  static const _d = Duration(seconds: 7);
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _d);
+    if (widget.animate) _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => CustomPaint(size: Size.square(widget.size), painter: _ProBlobPainter(widget.colors, _c.value)),
+      );
+}
+
+class _ProBlobPainter extends CustomPainter {
+  _ProBlobPainter(this.colors, this.t);
+  final List<Color> colors;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width * 0.42;
+    final path = Path();
+    const n = 64;
+    for (var i = 0; i <= n; i++) {
+      final a = i / n * math.pi * 2;
+      final wobble = 1 + 0.09 * math.sin(a * 3 + t * math.pi * 2) + 0.06 * math.cos(a * 5 - t * math.pi * 4);
+      final p = c + Offset(math.cos(a), math.sin(a)) * r * wobble;
+      i == 0 ? path.moveTo(p.dx, p.dy) : path.lineTo(p.dx, p.dy);
+    }
+    path.close();
+    canvas.drawShadow(path, colors.first, 18, false);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = SweepGradient(
+          transform: GradientRotation(t * math.pi * 2),
+          colors: [...colors, colors.first],
+        ).createShader(Rect.fromCircle(center: c, radius: r * 1.2)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProBlobPainter old) => old.t != t;
+}
+
+/// Moving rainbow sheen for the holographic card.
+class _ProHoloSheen extends StatefulWidget {
+  const _ProHoloSheen({required this.animate, required this.base});
+  final bool animate;
+  final List<Color> base;
+  @override
+  State<_ProHoloSheen> createState() => _ProHoloSheenState();
+}
+
+class _ProHoloSheenState extends State<_ProHoloSheen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  static const _d = Duration(seconds: 5);
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: _d);
+    if (widget.animate) _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _c,
+        builder: (_, __) => Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: widget.base))),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment(-1 + _c.value * 2, -1),
+                  end: Alignment(_c.value * 2, 1),
+                  colors: const [Color(0x00FFFFFF), Color(0x55F0ABFC), Color(0x5567E8F9), Color(0x55FDE68A), Color(0x00FFFFFF)],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ProTargetPainter extends CustomPainter {
+  _ProTargetPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 2;
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 4; i++) {
+      canvas.drawArc(Rect.fromCircle(center: c, radius: r), i * math.pi / 2 + 0.3, math.pi / 2 - 0.6, false, p);
+    }
+    for (var i = 0; i < 4; i++) {
+      final a = i * math.pi / 2;
+      canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * (r - 10), c + Offset(math.cos(a), math.sin(a)) * (r + 2), p..strokeWidth = 2);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProTargetPainter old) => old.color != color;
+}
+
+class _ProDashRingPainter extends CustomPainter {
+  _ProDashRingPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 2;
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const n = 36;
+    for (var i = 0; i < n; i++) {
+      final a0 = i / n * math.pi * 2;
+      canvas.drawArc(Rect.fromCircle(center: c, radius: r), a0, math.pi / n, false, p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProDashRingPainter old) => old.color != color;
+}
+
+class _ProOrbitPainter extends CustomPainter {
+  _ProOrbitPainter(this.color, {required this.moons});
+  final Color color;
+  final int moons;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 6;
+    canvas.drawOval(
+      Rect.fromCircle(center: c, radius: r),
+      Paint()
+        ..color = color.withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    for (var i = 0; i < moons; i++) {
+      final a = i / moons * math.pi * 2;
+      final p = c + Offset(math.cos(a), math.sin(a)) * r;
+      canvas.drawCircle(p, 9, Paint()..color = color.withValues(alpha: 0.25));
+      canvas.drawCircle(p, 5, Paint()..color = color);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProOrbitPainter old) => old.color != color || old.moons != moons;
+}
+
+class _ProDashLinePainter extends CustomPainter {
+  _ProDashLinePainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 2;
+    for (var x = 4.0; x < s.width; x += 10) {
+      canvas.drawLine(Offset(x, s.height / 2), Offset(x + 5, s.height / 2), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProDashLinePainter old) => old.color != color;
+}
+
+class _ProChipPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = const Color(0x99785A00)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset(s.width / 3, 0), Offset(s.width / 3, s.height), p);
+    canvas.drawLine(Offset(s.width * 2 / 3, 0), Offset(s.width * 2 / 3, s.height), p);
+    canvas.drawLine(Offset(0, s.height / 2), Offset(s.width, s.height / 2), p);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width / 3, s.height * 0.25, s.width / 3, s.height / 2), const Radius.circular(2)), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

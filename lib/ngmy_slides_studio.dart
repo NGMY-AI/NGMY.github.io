@@ -5039,7 +5039,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         if (onTrailingTap != null) ...[
           const SizedBox(width: 8),
           Transform.translate(
-            offset: const Offset(0, -7),
+            offset: Offset.zero,
             child: Tooltip(
               message: 'Documents (Hati)',
               child: Material(
@@ -5073,29 +5073,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         ],
       ],
     );
-    // Features from the subtitle ("edit PDFs, photos, …") as small tags.
-    final parts = subtitle.split(' — ');
-    final features = parts.length > 1
-        ? parts[1]
-            .replaceAll(' and ', ', ')
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .map((e) => e[0].toUpperCase() + e.substring(1))
-            .toList()
-        : const <String>[];
-    const featureIcons = <IconData>[
-      Icons.picture_as_pdf_rounded,
-      Icons.photo_library_rounded,
-      Icons.draw_rounded,
-      Icons.slideshow_rounded,
-      Icons.school_rounded,
-    ];
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // A compact frame around the one-line header (icon, title, tagline).
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -5105,48 +5088,10 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         ),
         border: Border.all(color: accent.withValues(alpha: isDark ? 0.45 : 0.25), width: 1.2),
         boxShadow: [
-          BoxShadow(color: accent.withValues(alpha: isDark ? 0.18 : 0.10), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(color: accent.withValues(alpha: isDark ? 0.18 : 0.10), blurRadius: 14, offset: const Offset(0, 6)),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          headerRow,
-          if (features.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (var i = 0; i < features.length; i++)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: accent.withValues(alpha: isDark ? 0.16 : 0.08),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: accent.withValues(alpha: isDark ? 0.4 : 0.22)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(featureIcons[i % featureIcons.length], size: 13, color: accent),
-                        const SizedBox(width: 4),
-                        Text(
-                          features[i],
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF1E293B),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
+      child: headerRow,
     );
   }
 

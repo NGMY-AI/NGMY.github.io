@@ -144,6 +144,12 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'line_art' => _layoutLineArt(ctx),
       'tech_grid_glow' => _layoutTechGridGlow(ctx),
       'luxe_emboss' => _layoutLuxeEmboss(ctx),
+      're_yard_sign' => _layoutReYardSign(ctx),
+      're_key_tag' => _layoutReKeyTag(ctx),
+      're_window' => _layoutReWindow(ctx),
+      're_floor_plan' => _layoutReFloorPlan(ctx),
+      're_estate' => _layoutReEstate(ctx),
+      're_map_pin' => _layoutReMapPin(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
     // Templates with their own logo placement (Orbit ring, hero strip, etc.).
@@ -170,6 +176,9 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'line_art',
       'qr_corner',
       'medical_cross',
+      're_yard_sign',
+      're_window',
+      're_map_pin',
     };
     final hasLogo = document.logoBytes != null;
     final needsLogoOverlay = hasLogo && !stylesWithBuiltInLogo.contains(tpl.renderStyle);
@@ -2032,4 +2041,344 @@ Widget _layoutLuxeEmboss(_CardRenderCtx c) {
       c.slot('phone', Center(child: c.txt('${c.doc.phone}   ·   ${c.doc.email}', color: c.sub, size: c.h * 0.036, maxLines: 1)), left: 14, right: 14, bottom: c.h * 0.1),
     ],
   );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Real estate pro layouts (2026-10)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── RE 1: Yard sign on a post ──────────────────────────────────────────────
+Widget _layoutReYardSign(_CardRenderCtx c) {
+  final signLeft = c.w * 0.4;
+  final signTop = c.h * 0.24;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      // Grass line.
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.12, child: Container(color: const Color(0xFF15803D).withValues(alpha: 0.85))),
+      // Post and arm.
+      Positioned(left: signLeft - c.w * 0.03, top: c.h * 0.1, bottom: c.h * 0.06, width: c.w * 0.02, child: Container(color: const Color(0xFF3F2A1B))),
+      Positioned(left: signLeft - c.w * 0.03, top: c.h * 0.1, width: c.w * 0.56, height: c.h * 0.035, child: Container(color: const Color(0xFF3F2A1B))),
+      // Chains.
+      for (final x in [signLeft + c.w * 0.04, signLeft + c.w * 0.46])
+        Positioned(left: x, top: c.h * 0.135, width: 1.5, height: signTop - c.h * 0.135, child: Container(color: const Color(0xFF6B7280))),
+      // The sign board.
+      Positioned(
+        left: signLeft,
+        top: signTop,
+        width: c.w * 0.52,
+        height: c.h * 0.56,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: c.accent, width: 3),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(2, 4))],
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                color: c.accent,
+                padding: EdgeInsets.symmetric(vertical: c.h * 0.02),
+                child: Center(
+                  child: Text(
+                    // Short taglines ("SOLD", "OPEN HOUSE") go on the sign; longer ones would be cut off.
+                    (c.doc.tagline.trim().isEmpty || c.doc.tagline.trim().length > 12 ? 'FOR SALE' : c.doc.tagline.trim()).toUpperCase(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: c.h * 0.065, letterSpacing: 1.4),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: c.w * 0.02),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(c.doc.phone, maxLines: 1, style: TextStyle(color: c.accent, fontWeight: FontWeight.w900, fontSize: c.h * 0.065)),
+                      Text(c.doc.website, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: const Color(0xFF334155), fontWeight: FontWeight.w700, fontSize: c.h * 0.04)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      c.slot('logo', c.logo(c.h * 0.24), left: 16, top: 14),
+      c.slot('name', SizedBox(width: signLeft - c.w * 0.06, child: c.txt(c.doc.fullName, size: c.h * 0.085, weight: FontWeight.w900)), left: 16, top: c.h * 0.42),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.042, weight: FontWeight.w800), left: 16, top: c.h * 0.57),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.038, maxLines: 1), left: 16, top: c.h * 0.68),
+    ],
+  );
+}
+
+// ─── RE 2: Key tag ──────────────────────────────────────────────────────────
+Widget _layoutReKeyTag(_CardRenderCtx c) {
+  final tagW = c.w * 0.3;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      Positioned(
+        right: c.w * 0.06,
+        top: c.h * 0.08,
+        bottom: c.h * 0.08,
+        width: tagW,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(c.accent, Colors.white, 0.35)!, c.accent, Color.lerp(c.accent, Colors.black, 0.3)!]),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(tagW / 2),
+              topRight: Radius.circular(tagW / 2),
+              bottomLeft: const Radius.circular(10),
+              bottomRight: const Radius.circular(10),
+            ),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(2, 5))],
+          ),
+          child: Column(
+            children: [
+              SizedBox(height: tagW * 0.14),
+              Container(
+                width: tagW * 0.22,
+                height: tagW * 0.22,
+                decoration: BoxDecoration(color: c.bg1, shape: BoxShape.circle, border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2)),
+              ),
+              const Spacer(),
+              Icon(Icons.vpn_key_rounded, color: Colors.white, size: c.h * 0.2),
+              const Spacer(),
+              Padding(
+                padding: EdgeInsets.only(bottom: c.h * 0.05),
+                child: Text('WELCOME HOME', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: c.h * 0.034, letterSpacing: 1)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.047, weight: FontWeight.w800), left: 16, top: c.h * 0.29),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.043), left: 16, top: c.h * 0.39),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: c.h * 0.3),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: c.h * 0.17),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website), left: 16, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+// ─── RE 3: Window view ──────────────────────────────────────────────────────
+Widget _layoutReWindow(_CardRenderCtx c) {
+  final winW = c.w * 0.36;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(
+        left: c.w * 0.05,
+        top: c.h * 0.1,
+        bottom: c.h * 0.1,
+        width: winW,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: c.accent, width: 4),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(winW / 2)),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [const Color(0xFF38BDF8), const Color(0xFFFDE68A), c.bg2],
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.22, child: CustomPaint(painter: _SkylinePainter(Colors.white))),
+              Center(child: Container(width: 3, color: c.accent)),
+              Align(alignment: const Alignment(0, 0.25), child: Container(height: 3, color: c.accent)),
+            ],
+          ),
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: c.w * 0.46, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046, weight: FontWeight.w800), left: c.w * 0.46, top: c.h * 0.27),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.043), left: c.w * 0.46, top: c.h * 0.37),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: c.w * 0.46, bottom: c.h * 0.3),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: c.w * 0.46, bottom: c.h * 0.17),
+      c.slot('website', _iconLine(c, Icons.home_work_rounded, c.doc.website), left: c.w * 0.46, bottom: c.h * 0.05),
+      c.slot('logo', c.logo(c.h * 0.2), right: 12, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+// ─── RE 4: Floor plan ───────────────────────────────────────────────────────
+Widget _layoutReFloorPlan(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      CustomPaint(painter: _GridPainter(c.accent.withValues(alpha: 0.12), 14)),
+      Positioned(right: c.w * 0.04, top: c.h * 0.1, bottom: c.h * 0.1, width: c.w * 0.44, child: CustomPaint(painter: _FloorPlanPainter(c.accent))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.04, letterSpacing: 1.6, weight: FontWeight.w800), left: 16, top: c.h * 0.28),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.043), left: 16, top: c.h * 0.38),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: c.h * 0.17),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+class _FloorPlanPainter extends CustomPainter {
+  _FloorPlanPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final wall = Paint()
+      ..color = color
+      ..strokeWidth = 2.6
+      ..style = PaintingStyle.stroke;
+    final thin = Paint()
+      ..color = color.withValues(alpha: 0.6)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    final r = Offset.zero & s;
+    canvas.drawRect(r, wall);
+    // Rooms.
+    canvas.drawLine(Offset(s.width * 0.55, 0), Offset(s.width * 0.55, s.height * 0.38), wall);
+    canvas.drawLine(Offset(s.width * 0.55, s.height * 0.52), Offset(s.width * 0.55, s.height), wall);
+    canvas.drawLine(Offset(0, s.height * 0.6), Offset(s.width * 0.4, s.height * 0.6), wall);
+    canvas.drawLine(Offset(s.width * 0.55, s.height * 0.45), Offset(s.width, s.height * 0.45), wall);
+    // Door swings.
+    canvas.drawArc(Rect.fromCircle(center: Offset(s.width * 0.55, s.height * 0.38), radius: s.height * 0.14), 0, math.pi / 2, false, thin);
+    canvas.drawArc(Rect.fromCircle(center: Offset(s.width * 0.4, s.height * 0.6), radius: s.height * 0.14), math.pi / 2, math.pi / 2, false, thin);
+    // Furniture hints.
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width * 0.62, s.height * 0.08, s.width * 0.3, s.height * 0.24), const Radius.circular(4)), thin);
+    canvas.drawCircle(Offset(s.width * 0.22, s.height * 0.3), s.height * 0.12, thin);
+    canvas.drawRect(Rect.fromLTWH(s.width * 0.08, s.height * 0.72, s.width * 0.26, s.height * 0.18), thin);
+  }
+
+  @override
+  bool shouldRepaint(covariant _FloorPlanPainter old) => old.color != color;
+}
+
+// ─── RE 5: Luxury estate ────────────────────────────────────────────────────
+Widget _layoutReEstate(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(0, 0.4), radius: 1.1, colors: [c.bg2, c.bg1]))),
+      Positioned(left: 0, right: 0, bottom: c.h * 0.16, height: c.h * 0.42, child: CustomPaint(painter: _EstatePainter(c.accent))),
+      Positioned(left: c.w * 0.08, right: c.w * 0.08, bottom: c.h * 0.16, height: 1.5, child: Container(color: c.accent)),
+      c.slot('name', Center(child: c.txt(c.doc.fullName.toUpperCase(), size: c.h * 0.085, weight: FontWeight.w300, letterSpacing: 3)), left: 12, right: 12, top: c.h * 0.08),
+      c.slot('title', Center(child: c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.036, letterSpacing: 2.6)), left: 12, right: 12, top: c.h * 0.24),
+      c.slot('phone', Center(child: c.txt('${c.doc.phone}   ·   ${c.doc.email}', color: c.sub, size: c.h * 0.036, maxLines: 1)), left: 12, right: 12, bottom: c.h * 0.04),
+    ],
+  );
+}
+
+class _EstatePainter extends CustomPainter {
+  _EstatePainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1.6
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round;
+    final cx = s.width / 2;
+    final base = s.height;
+    // Main house + roof.
+    final body = Rect.fromLTRB(cx - s.width * 0.18, base - s.height * 0.55, cx + s.width * 0.18, base);
+    canvas.drawRect(body, p);
+    canvas.drawPath(Path()
+      ..moveTo(body.left - 8, body.top)
+      ..lineTo(cx, base - s.height * 0.95)
+      ..lineTo(body.right + 8, body.top), p);
+    // Wings.
+    for (final dir in [-1.0, 1.0]) {
+      final w = Rect.fromLTRB(
+        dir < 0 ? cx - s.width * 0.34 : body.right,
+        base - s.height * 0.38,
+        dir < 0 ? body.left : cx + s.width * 0.34,
+        base,
+      );
+      canvas.drawRect(w, p);
+      for (var i = 0; i < 2; i++) {
+        final wx = w.left + w.width * (0.22 + i * 0.4);
+        canvas.drawRect(Rect.fromLTWH(wx, w.top + w.height * 0.25, w.width * 0.18, w.height * 0.3), p..strokeWidth = 1);
+      }
+      p.strokeWidth = 1.6;
+    }
+    // Columns and door.
+    for (var i = 0; i < 4; i++) {
+      final x = body.left + body.width * (0.15 + i * 0.233);
+      canvas.drawLine(Offset(x, body.top + 6), Offset(x, base), p..strokeWidth = 1.2);
+    }
+    canvas.drawRRect(
+      RRect.fromRectAndCorners(
+        Rect.fromLTWH(cx - body.width * 0.1, base - body.height * 0.45, body.width * 0.2, body.height * 0.45),
+        topLeft: const Radius.circular(20),
+        topRight: const Radius.circular(20),
+      ),
+      p..strokeWidth = 1.6,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _EstatePainter old) => old.color != color;
+}
+
+// ─── RE 6: Map pin ──────────────────────────────────────────────────────────
+Widget _layoutReMapPin(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(right: 0, top: 0, bottom: 0, width: c.w * 0.5, child: CustomPaint(painter: _StreetMapPainter(c.bg2, c.accent))),
+      Positioned(
+        right: c.w * 0.18,
+        top: c.h * 0.16,
+        child: Stack(
+          alignment: const Alignment(0, -0.32),
+          children: [
+            Icon(Icons.location_on_rounded, size: c.h * 0.5, color: c.accent, shadows: [Shadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))]),
+            c.logo(c.h * 0.17),
+          ],
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046, weight: FontWeight.w800), left: 16, top: c.h * 0.28),
+      c.slot('address', _iconLine(c, Icons.place_rounded, c.doc.address), left: 16, top: c.h * 0.42),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: c.h * 0.17),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+class _StreetMapPainter extends CustomPainter {
+  _StreetMapPainter(this.ground, this.accent);
+  final Color ground;
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRect(Offset.zero & s, Paint()..color = ground);
+    final block = Paint()..color = Colors.white.withValues(alpha: 0.18);
+    for (var y = 6.0; y < s.height; y += s.height / 4) {
+      for (var x = 6.0; x < s.width; x += s.width / 3) {
+        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, y, s.width / 3 - 12, s.height / 4 - 12), const Radius.circular(3)), block);
+      }
+    }
+    final road = Paint()
+      ..color = accent.withValues(alpha: 0.55)
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(Path()
+      ..moveTo(0, s.height * 0.75)
+      ..quadraticBezierTo(s.width * 0.4, s.height * 0.55, s.width * 0.55, s.height * 0.62)
+      ..quadraticBezierTo(s.width * 0.8, s.height * 0.7, s.width, s.height * 0.3), road);
+  }
+
+  @override
+  bool shouldRepaint(covariant _StreetMapPainter old) => old.ground != ground || old.accent != accent;
 }

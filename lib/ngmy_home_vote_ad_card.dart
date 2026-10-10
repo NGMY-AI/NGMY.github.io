@@ -102,7 +102,7 @@ class _NgmyHomeVoteAdCardState extends State<NgmyHomeVoteAdCard> with TickerProv
           child: Stack(
             fit: StackFit.expand,
             children: [
-              _Backdrop(styleId: style.id, accent: accent, bg: bg, pulse: _pulse.value),
+              _Backdrop(styleId: style.id, accent: accent, bg: bg, pulse: _pulse.value, orbit: _orbit.value),
               if (bg != null)
                 Opacity(
                   opacity: style.id == 'portrait' ? 0.35 : 0.72,
@@ -202,11 +202,12 @@ class _NgmyHomeVoteAdCardState extends State<NgmyHomeVoteAdCard> with TickerProv
 }
 
 class _Backdrop extends StatelessWidget {
-  const _Backdrop({required this.styleId, required this.accent, required this.bg, required this.pulse});
+  const _Backdrop({required this.styleId, required this.accent, required this.bg, required this.pulse, this.orbit = 0});
   final String styleId;
   final Color accent;
   final ImageProvider? bg;
   final double pulse;
+  final double orbit;
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +358,107 @@ class _Backdrop extends StatelessWidget {
               ),
           ],
         );
+      case 'ballot':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [const Color(0xFF0B1F4D), accent.withValues(alpha: 0.35), const Color(0xFF020617)],
+            ),
+          ),
+        );
+      case 'hologram':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF00060F)),
+            CustomPaint(painter: _ScanlinePainter(accent, orbit)),
+          ],
+        );
+      case 'confetti':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0, -0.3),
+                  radius: 1.2,
+                  colors: [accent.withValues(alpha: 0.55), const Color(0xFF1E0B3D)],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _ConfettiPainter(orbit)),
+          ],
+        );
+      case 'patriot':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF0A1A3F)),
+            CustomPaint(painter: _FlagWavePainter(accent, orbit)),
+          ],
+        );
+      case 'magazine':
+        return const ColoredBox(color: Color(0xFFF4EFE6));
+      case 'radar':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF02140E)),
+            CustomPaint(painter: _RadarPainter(accent, orbit)),
+          ],
+        );
+      case 'seal':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(radius: 1.1, colors: [const Color(0xFF3A2A06), const Color(0xFF0C0904)]),
+          ),
+        );
+      case 'swiss':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFFF5F5F0)),
+            Positioned(right: 0, top: 0, width: 120, height: 120, child: ColoredBox(color: accent)),
+            const Positioned(right: 120, top: 0, width: 40, height: 60, child: ColoredBox(color: Color(0xFF111111))),
+            Positioned(left: 0, bottom: 0, width: 80, height: 36, child: ColoredBox(color: accent.withValues(alpha: 0.35))),
+          ],
+        );
+      case 'aurora':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF07071A)),
+            for (var i = 0; i < 3; i++)
+              Align(
+                alignment: Alignment(
+                  math.cos(orbit * math.pi * 2 + i * 2.1) * 0.9,
+                  math.sin(orbit * math.pi * 2 + i * 2.1) * 0.7,
+                ),
+                child: Container(
+                  width: 220,
+                  height: 220,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [
+                      [accent, const Color(0xFF22D3EE), const Color(0xFFF472B6)][i].withValues(alpha: 0.55),
+                      Colors.transparent,
+                    ]),
+                  ),
+                ),
+              ),
+          ],
+        );
+      case 'split':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF0B0B0F)),
+            ClipPath(clipper: _DiagonalClipper(), child: ColoredBox(color: accent)),
+          ],
+        );
       case 'cinematic':
       default:
         return Stack(
@@ -385,7 +487,7 @@ class _Wash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (styleId == 'editorial' || styleId == 'parade') {
+    if (const {'editorial', 'parade', 'magazine', 'swiss', 'split'}.contains(styleId)) {
       return const SizedBox.shrink();
     }
     return DecoratedBox(
@@ -486,8 +588,9 @@ class _SlideBody extends StatelessWidget {
   final bool showCircle;
   final double orbit;
 
-  Color get _ink => styleId == 'editorial' || styleId == 'parade' ? const Color(0xFF0F172A) : Colors.white;
-  Color get _muted => styleId == 'editorial' || styleId == 'parade'
+  bool get _lightFace => const {'editorial', 'parade', 'magazine', 'swiss'}.contains(styleId);
+  Color get _ink => _lightFace ? const Color(0xFF0F172A) : Colors.white;
+  Color get _muted => _lightFace
       ? const Color(0xFF334155)
       : Colors.white.withValues(alpha: 0.9);
 
@@ -785,6 +888,382 @@ class _SlideBody extends StatelessWidget {
           ],
         );
 
+      case 'ballot':
+        // A real-looking paper ballot with the candidate ticked.
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.6)),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Transform.rotate(
+                angle: -0.025,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFDF7),
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 14, offset: const Offset(0, 6))],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('OFFICIAL BALLOT', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 2)),
+                      const Divider(height: 10, color: Color(0xFFCBD5E1)),
+                      Row(
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(border: Border.all(color: const Color(0xFF0F172A), width: 2)),
+                            child: Transform.scale(
+                              scale: breathe,
+                              child: Icon(Icons.check_rounded, color: accent, size: 24),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w900, fontSize: 18)),
+                          ),
+                          if (_face(size: 40, square: true) != null) _face(size: 40, square: true)!,
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Expanded(
+                        child: Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF475569), fontSize: 11, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerRight, child: _CtaChip(label: cta, accent: accent, pulse: breathe)),
+          ],
+        );
+
+      case 'hologram':
+        // Robotic HUD: corner brackets, targeting ring around the photo, data readouts.
+        return Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _HudBracketPainter(accent))),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 104,
+                    height: 104,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Transform.rotate(
+                          angle: orbit * math.pi * 2,
+                          child: CustomPaint(size: const Size.square(104), painter: _TargetRingPainter(accent)),
+                        ),
+                        if (_face(size: 72) != null)
+                          _face(size: 72)!
+                        else
+                          Icon(Icons.how_to_vote_rounded, color: accent, size: 44),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('> IDENTITY CONFIRMED', style: TextStyle(color: accent, fontFamily: 'monospace', fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                        const SizedBox(height: 4),
+                        Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 19, letterSpacing: 1, shadows: [Shadow(color: accent, blurRadius: 12)])),
+                        const SizedBox(height: 4),
+                        Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent.withValues(alpha: 0.85), fontFamily: 'monospace', fontSize: 10)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(99),
+                                child: LinearProgressIndicator(
+                                  value: 0.25 + 0.75 * ((orbit * 3) % 1),
+                                  minHeight: 4,
+                                  color: accent,
+                                  backgroundColor: accent.withValues(alpha: 0.15),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text('${(((orbit * 3) % 1) * 100).round()}%', style: TextStyle(color: accent, fontFamily: 'monospace', fontSize: 9)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        _CtaChip(label: cta, accent: accent, pulse: breathe),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'confetti':
+        return Column(
+          children: [
+            Text(headline, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 2)),
+            const Spacer(),
+            if (_face(size: 80) != null) _face(size: 80)!,
+            const SizedBox(height: 8),
+            Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 24, shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])),
+            Text(support, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
+      case 'patriot':
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    for (var i = 0; i < 5; i++) Icon(Icons.star_rounded, size: 14, color: Colors.white.withValues(alpha: 0.9)),
+                  ]),
+                  const Spacer(),
+                  Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.6)),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 26, height: 0.95)),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+            if (_face(size: 86) != null) ...[const SizedBox(width: 10), _face(size: 86)!],
+          ],
+        );
+
+      case 'magazine':
+        // Cover: giant masthead, big photo, barcode.
+        return Stack(
+          children: [
+            Positioned(
+              top: -6,
+              left: 0,
+              right: 0,
+              child: Text(
+                'VOTE',
+                style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 66, height: 1, letterSpacing: -2),
+              ),
+            ),
+            if (_face(size: 112, square: true) != null)
+              Positioned(right: 0, bottom: 26, child: _face(size: 112, square: true)!),
+            Positioned(
+              left: 0,
+              bottom: 26,
+              right: 124,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(headline, style: const TextStyle(color: Color(0xFF7F1D1D), fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.4)),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF0C0A09), fontWeight: FontWeight.w900, fontSize: 20, height: 1)),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF44403C), fontSize: 10.5, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+            Positioned(
+              left: 0,
+              bottom: 0,
+              child: Row(
+                children: [
+                  for (var i = 0; i < 22; i++)
+                    Container(width: i % 3 == 0 ? 2.4 : 1.2, height: 18, margin: const EdgeInsets.only(right: 1.4), color: const Color(0xFF0C0A09)),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Text(cta, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
+            ),
+          ],
+        );
+
+      case 'radar':
+        return Row(
+          children: [
+            SizedBox(
+              width: 116,
+              height: 116,
+              child: Center(
+                child: _face(size: 64) ?? Icon(Icons.how_to_vote_rounded, color: accent, size: 40),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('TARGET LOCKED', style: TextStyle(color: accent, fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1.6)),
+                  const SizedBox(height: 4),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                  Text(headline, style: TextStyle(color: accent.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 10.5)),
+                  const SizedBox(height: 8),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'seal':
+        return Row(
+          children: [
+            SizedBox(
+              width: 124,
+              height: 124,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Transform.rotate(
+                    angle: orbit * math.pi * 2,
+                    child: CustomPaint(size: const Size.square(124), painter: _SealStarsPainter(accent)),
+                  ),
+                  Container(
+                    width: 92,
+                    height: 92,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(colors: [Color.lerp(accent, Colors.white, 0.35)!, accent, Color.lerp(accent, Colors.black, 0.45)!]),
+                      boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.5), blurRadius: 18)],
+                    ),
+                    child: _face(size: 78) ?? const Icon(Icons.verified_rounded, color: Colors.white, size: 46),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('APPROVED BY THE PEOPLE', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 1.4)),
+                  const SizedBox(height: 4),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 21, height: 1)),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                  const SizedBox(height: 8),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'swiss':
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(headline, style: const TextStyle(color: Color(0xFF111111), fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.4)),
+            const Spacer(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Color(0xFF111111), fontWeight: FontWeight.w900, fontSize: 32, height: 0.9, letterSpacing: -1.2),
+                  ),
+                ),
+                if (_face(size: 64, square: true) != null) _face(size: 64, square: true)!,
+              ],
+            ),
+            const SizedBox(height: 6),
+            Container(height: 3, width: 60, color: accent),
+            const SizedBox(height: 6),
+            Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF333333), fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              color: const Color(0xFF111111),
+              child: Text(cta, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1)),
+            ),
+          ],
+        );
+
+      case 'aurora':
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_face(size: 70) != null) ...[_face(size: 70)!, const SizedBox(width: 12)],
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(headline, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.4)),
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 21)),
+                      const SizedBox(height: 4),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                      const SizedBox(height: 8),
+                      _CtaChip(label: cta, accent: accent, pulse: breathe),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+      case 'split':
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(headline, style: const TextStyle(color: Color(0xFF0B0B0F), fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.4)),
+                  const Spacer(),
+                  if (_face(size: 84) != null) _face(size: 84)!,
+                  const Spacer(),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Spacer(),
+                  Text(name, textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 24, height: 0.95)),
+                  const SizedBox(height: 4),
+                  Text(support, textAlign: TextAlign.right, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                  const SizedBox(height: 8),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+          ],
+        );
+
       case 'cinematic':
       default:
         return Column(
@@ -886,4 +1365,213 @@ class _CtaChip extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Painters for the 2026-10 slide styles ──────────────────────────────────
+
+class _ScanlinePainter extends CustomPainter {
+  _ScanlinePainter(this.color, this.t);
+  final Color color;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final line = Paint()..color = color.withValues(alpha: 0.07);
+    for (var y = 0.0; y < s.height; y += 4) {
+      canvas.drawRect(Rect.fromLTWH(0, y, s.width, 1), line);
+    }
+    final grid = Paint()
+      ..color = color.withValues(alpha: 0.08)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < s.width; x += 28) {
+      canvas.drawLine(Offset(x, 0), Offset(x, s.height), grid);
+    }
+    final sweepY = (t * 3 % 1) * s.height;
+    canvas.drawRect(
+      Rect.fromLTWH(0, sweepY - 18, s.width, 36),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0), color.withValues(alpha: 0.22), color.withValues(alpha: 0)],
+        ).createShader(Rect.fromLTWH(0, sweepY - 18, s.width, 36)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ScanlinePainter old) => old.t != t || old.color != color;
+}
+
+class _HudBracketPainter extends CustomPainter {
+  _HudBracketPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..style = PaintingStyle.stroke;
+    const l = 18.0;
+    for (final c in [Offset.zero, Offset(s.width, 0), Offset(0, s.height), Offset(s.width, s.height)]) {
+      final dx = c.dx == 0 ? l : -l;
+      final dy = c.dy == 0 ? l : -l;
+      canvas.drawLine(c, c + Offset(dx, 0), p);
+      canvas.drawLine(c, c + Offset(0, dy), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HudBracketPainter old) => old.color != color;
+}
+
+class _TargetRingPainter extends CustomPainter {
+  _TargetRingPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 2;
+    final arc = Paint()
+      ..color = color
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 4; i++) {
+      canvas.drawArc(Rect.fromCircle(center: c, radius: r), i * math.pi / 2 + 0.25, math.pi / 2 - 0.5, false, arc);
+    }
+    final thin = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(c, r - 7, thin);
+    for (var i = 0; i < 4; i++) {
+      final a = i * math.pi / 2;
+      canvas.drawLine(c + Offset(math.cos(a) * (r - 12), math.sin(a) * (r - 12)), c + Offset(math.cos(a) * (r + 2), math.sin(a) * (r + 2)), arc..strokeWidth = 1.5);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TargetRingPainter old) => old.color != color;
+}
+
+class _ConfettiPainter extends CustomPainter {
+  _ConfettiPainter(this.t);
+  final double t;
+  static const _colors = [Color(0xFFFACC15), Color(0xFFF472B6), Color(0xFF22D3EE), Color(0xFF4ADE80), Color(0xFFFB923C), Colors.white];
+  @override
+  void paint(Canvas canvas, Size s) {
+    for (var i = 0; i < 46; i++) {
+      final seed = (i * 7919) % 997 / 997.0;
+      final x = (seed * s.width + math.sin(t * math.pi * 2 + i) * 12) % s.width;
+      final y = ((seed * 1.7 + t * (0.6 + seed)) % 1) * (s.height + 20) - 10;
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(t * math.pi * 4 * (seed - 0.5) + i);
+      canvas.drawRect(const Rect.fromLTWH(-3, -1.6, 6, 3.2), Paint()..color = _colors[i % _colors.length].withValues(alpha: 0.9));
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter old) => old.t != t;
+}
+
+class _FlagWavePainter extends CustomPainter {
+  _FlagWavePainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    const stripes = 7;
+    final h = s.height / stripes;
+    for (var i = 0; i < stripes; i++) {
+      final path = Path();
+      final top = i * h;
+      path.moveTo(0, top);
+      for (var x = 0.0; x <= s.width; x += 8) {
+        path.lineTo(x, top + math.sin(x / 38 + t * math.pi * 2) * 6);
+      }
+      for (var x = s.width; x >= 0; x -= 8) {
+        path.lineTo(x, top + h + math.sin(x / 38 + t * math.pi * 2) * 6);
+      }
+      path.close();
+      canvas.drawPath(path, Paint()..color = (i.isEven ? accent : Colors.white).withValues(alpha: i.isEven ? 0.55 : 0.08));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlagWavePainter old) => old.t != t || old.accent != accent;
+}
+
+class _RadarPainter extends CustomPainter {
+  _RadarPainter(this.color, this.t);
+  final Color color;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = Offset(72, s.height / 2);
+    final ring = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (var r = 20.0; r <= 100; r += 20) {
+      canvas.drawCircle(c, r, ring);
+    }
+    canvas.drawLine(c - const Offset(100, 0), c + const Offset(100, 0), ring);
+    canvas.drawLine(c - const Offset(0, 100), c + const Offset(0, 100), ring);
+    final a = t * math.pi * 2;
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: 100),
+      a - 0.9,
+      0.9,
+      true,
+      Paint()
+        ..shader = SweepGradient(
+          startAngle: a - 0.9,
+          endAngle: a,
+          colors: [color.withValues(alpha: 0), color.withValues(alpha: 0.45)],
+        ).createShader(Rect.fromCircle(center: c, radius: 100)),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RadarPainter old) => old.t != t || old.color != color;
+}
+
+class _SealStarsPainter extends CustomPainter {
+  _SealStarsPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 4;
+    final dot = Paint()..color = color;
+    for (var i = 0; i < 24; i++) {
+      final a = i / 24 * math.pi * 2;
+      canvas.drawCircle(c + Offset(math.cos(a) * r, math.sin(a) * r), i.isEven ? 3 : 1.6, dot);
+    }
+    canvas.drawCircle(
+      c,
+      r - 9,
+      Paint()
+        ..color = color.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _SealStarsPainter old) => old.color != color;
+}
+
+class _DiagonalClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size s) => Path()
+    ..moveTo(0, 0)
+    ..lineTo(s.width * 0.48, 0)
+    ..lineTo(s.width * 0.32, s.height)
+    ..lineTo(0, s.height)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

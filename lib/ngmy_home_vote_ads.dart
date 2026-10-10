@@ -55,6 +55,16 @@ const List<NgmyVoteAdSlideStyle> kNgmyVoteAdSlideStyles = [
   NgmyVoteAdSlideStyle(id: 'parade', label: 'Parade', icon: Icons.flag_rounded, accent: Color(0xFF34D399)),
   NgmyVoteAdSlideStyle(id: 'editorial', label: 'Editorial', icon: Icons.newspaper_rounded, accent: Color(0xFFE2E8F0)),
   NgmyVoteAdSlideStyle(id: 'stadium', label: 'Stadium', icon: Icons.stadium_rounded, accent: Color(0xFF60A5FA)),
+  NgmyVoteAdSlideStyle(id: 'hologram', label: 'Hologram', icon: Icons.smart_toy_rounded, accent: Color(0xFF22D3EE)),
+  NgmyVoteAdSlideStyle(id: 'ballot', label: 'Ballot', icon: Icons.how_to_vote_rounded, accent: Color(0xFF3B82F6)),
+  NgmyVoteAdSlideStyle(id: 'confetti', label: 'Celebration', icon: Icons.celebration_rounded, accent: Color(0xFFA855F7)),
+  NgmyVoteAdSlideStyle(id: 'patriot', label: 'Patriot', icon: Icons.flag_circle_rounded, accent: Color(0xFFDC2626)),
+  NgmyVoteAdSlideStyle(id: 'magazine', label: 'Magazine', icon: Icons.auto_stories_rounded, accent: Color(0xFFB91C1C)),
+  NgmyVoteAdSlideStyle(id: 'radar', label: 'Radar', icon: Icons.radar_rounded, accent: Color(0xFF4ADE80)),
+  NgmyVoteAdSlideStyle(id: 'seal', label: 'Seal', icon: Icons.verified_rounded, accent: Color(0xFFD4AF37)),
+  NgmyVoteAdSlideStyle(id: 'swiss', label: 'Swiss Poster', icon: Icons.grid_view_rounded, accent: Color(0xFFEF4444)),
+  NgmyVoteAdSlideStyle(id: 'aurora', label: 'Aurora Glass', icon: Icons.blur_on_rounded, accent: Color(0xFFA78BFA)),
+  NgmyVoteAdSlideStyle(id: 'split', label: 'Split', icon: Icons.vertical_split_rounded, accent: Color(0xFFFACC15)),
 ];
 
 NgmyVoteAdSlideStyle ngmyVoteAdSlideStyleById(String id) {
