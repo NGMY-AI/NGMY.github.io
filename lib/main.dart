@@ -36936,6 +36936,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   }
 
   Future<void> _showCivicRegistryBackupSheet() async {
+    final syncTaps = <DateTime>[];
     if (!_canUseRegistrarToolsHere()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -37183,41 +37184,75 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                               },
                             ),
                             // Tiny corner button — was a full-width tile, too big.
+                            // Three fast taps (within 1.5 s) to sync, so a single
+                            // accidental touch never starts it. The button shows
+                            // how many taps are still needed.
                             Positioned(
                               right: 6,
                               bottom: 6,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  customBorder: const CircleBorder(),
-                                  onTap: () {
-                                    Navigator.pop(ctx);
-                                    unawaited(_syncAllCivicRegistryMembersToDatabase());
-                                  },
-                                  child: Tooltip(
-                                    message: 'Sync all members',
-                                    child: Container(
-                                      width: 22,
-                                      height: 22,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: const Color(0xFF0EA5E9),
-                                        border: Border.all(
-                                          color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                                          width: 1.5,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.25),
-                                            blurRadius: 4,
-                                            offset: const Offset(0, 1),
+                              child: StatefulBuilder(
+                                builder: (context, setBtn) {
+                                  final now = DateTime.now();
+                                  final recent = syncTaps
+                                      .where((t) => now.difference(t) <= const Duration(milliseconds: 1500))
+                                      .length;
+                                  final armed = recent > 0;
+                                  return Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      customBorder: const CircleBorder(),
+                                      onTap: () {
+                                        final tapAt = DateTime.now();
+                                        syncTaps
+                                          ..add(tapAt)
+                                          ..removeWhere((t) => tapAt.difference(t) > const Duration(milliseconds: 1500));
+                                        if (syncTaps.length < 3) {
+                                          setBtn(() {});
+                                          // Drop back to the cloud icon if they stop tapping.
+                                          Future.delayed(const Duration(milliseconds: 1600), () {
+                                            try {
+                                              setBtn(() {});
+                                            } catch (_) {}
+                                          });
+                                          return;
+                                        }
+                                        syncTaps.clear();
+                                        Navigator.pop(ctx);
+                                        unawaited(_syncAllCivicRegistryMembersToDatabase());
+                                      },
+                                      child: Tooltip(
+                                        message: 'Tap 3 times quickly to sync all members',
+                                        child: AnimatedContainer(
+                                          duration: const Duration(milliseconds: 150),
+                                          width: armed ? 26 : 22,
+                                          height: armed ? 26 : 22,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: armed ? const Color(0xFF0284C7) : const Color(0xFF0EA5E9),
+                                            border: Border.all(
+                                              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                              width: 1.5,
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withOpacity(0.25),
+                                                blurRadius: 4,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
                                           ),
-                                        ],
+                                          child: armed
+                                              ? Text(
+                                                  '${3 - recent}',
+                                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900),
+                                                )
+                                              : const Icon(Icons.cloud_sync_rounded, size: 12, color: Colors.white),
+                                        ),
                                       ),
-                                      child: const Icon(Icons.cloud_sync_rounded, size: 12, color: Colors.white),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
                               ),
                             ),
                           ],
@@ -46484,6 +46519,49 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                         isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
                     countTag(Icons.hourglass_empty_rounded, nonHelpers.length, 'not yet',
                         isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                    // How many state changes this person has left.
+                    Builder(builder: (_) {
+                      final unlimited = widget.user.isAdmin ||
+                          widget.user.isCivicRegistryAdmin ||
+                          widget.user.isCivicRegistryKing ||
+                          _hasRegistrarAccess();
+                      final left = NgmyCivicStateSwitches.remainingSwitches(
+                        isAdmin: widget.user.isAdmin,
+                        isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+                        isCivicRegistryKing: widget.user.isCivicRegistryKing,
+                        isAuthorizedRegistrar: _hasRegistrarAccess(),
+                        switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+                        lockedUntil: _stateSwitchLockedUntil,
+                      );
+                      final lock = _stateSwitchLockedUntil;
+                      final locked = !unlimited &&
+                          lock != null &&
+                          DateTime.now().toUtc().isBefore(lock.toUtc());
+                      final color = locked
+                          ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
+                          : purple;
+                      final valueText = unlimited ? '∞' : '$left';
+                      final labelText = locked
+                          ? 'changes · ${lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60)}m'
+                          : (left == 1 && !unlimited ? 'change left' : 'changes left');
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(isDark ? 0.16 : 0.09),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(locked ? Icons.lock_clock_rounded : Icons.swap_horiz_rounded, size: 12, color: color),
+                            const SizedBox(width: 4),
+                            Text(valueText, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color)),
+                            const SizedBox(width: 3),
+                            Text(labelText, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: muted)),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
                 const SizedBox(height: 6),
@@ -46495,21 +46573,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             ),
           );
         }),
-        if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin && !_hasRegistrarAccess()) ...[
-          const SizedBox(height: 8),
-          Text(
-            NgmyCivicStateSwitches.statusLabel(
-              isAdmin: widget.user.isAdmin,
-              isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
-              isCivicRegistryKing: widget.user.isCivicRegistryKing,
-              isAuthorizedRegistrar: _hasRegistrarAccess(),
-              switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-              lockedUntil: _stateSwitchLockedUntil,
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 10, color: muted),
-          ),
-        ],
+        // State changes left now show as a tag in the header above.
         // (Helper presents are not shown in Rankings — members open them from their helper gift wallet.)
         const SizedBox(height: 22),
         if (waitingOnDirectory) ...[
