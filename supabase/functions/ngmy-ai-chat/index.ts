@@ -1368,7 +1368,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 // client's phone only to the worker they sent the job to.
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
-  "hwAdminList", "hwAdminDecide",
+  "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -1518,6 +1518,115 @@ function hwCanWork(e: HwElig | undefined, email = ""): boolean {
   return !!e && e.hasRegistryId && !e.deactivated;
 }
 
+// ── NGMY Store accounts granted by an admin ─────────────────────────────────
+// The admin types an email or a phone number; the matching account gets NGMY
+// Store access (users."canSellOnStore") and a store profile: store name and a
+// short description that helper gift cards show, so the store is recognised
+// when it scans the gift QR.
+const STORE_ACTIONS = new Set(["storeGrant", "storeRevoke", "storeList", "storeMine"]);
+
+async function storeFindAccount(db: any, target: string): Promise<{ email: string; phone: string; name: string } | null> {
+  const t = target.trim();
+  if (!t) return null;
+  if (t.includes("@")) {
+    const { data } = await db.from("users").select("email,phone,username").ilike("email", t).maybeSingle();
+    return data ? { email: emailKey(data.email), phone: String(data.phone ?? ""), name: String(data.username ?? "") } : null;
+  }
+  const want = hwPhoneKey(t);
+  if (!want) return null;
+  const { data } = await db.from("users").select("email,phone,username").ilike("phone", `%${want.slice(-4)}%`).limit(200);
+  const hit = (data ?? []).find((u: any) => hwPhoneKey(u.phone) === want);
+  return hit ? { email: emailKey(hit.email), phone: String(hit.phone ?? ""), name: String(hit.username ?? "") } : null;
+}
+
+function storePublic(s: any) {
+  return {
+    email: s.email,
+    storeName: s.store_name,
+    description: s.description,
+    phone: s.phone,
+    grantedAt: s.granted_at,
+  };
+}
+
+async function handleStoreAccess(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const isAdmin = isNgmyAdminEmail(email);
+  const now = new Date().toISOString();
+
+  if (action === "storeMine") {
+    const { data } = await db.from("ngmy_stores").select("*").eq("email", email).eq("active", true).maybeSingle();
+    return jsonOk({ ok: true, store: data ? storePublic(data) : null });
+  }
+  if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+
+  if (action === "storeList") {
+    const { data } = await db.from("ngmy_stores").select("*").eq("active", true).order("store_name").limit(500);
+    return jsonOk({ ok: true, stores: (data ?? []).map(storePublic) });
+  }
+  if (action === "storeGrant") {
+    const storeName = hwText(body?.storeName, 80);
+    const description = hwLongText(body?.description, 240);
+    if (!storeName) return jsonOk({ ok: false, error: "Enter the store name." }, 400);
+    const acct = await storeFindAccount(db, String(body?.target ?? ""));
+    if (!acct || !acct.email) {
+      return jsonOk({ ok: false, error: "No NGMY account has that email or phone number." }, 404);
+    }
+    const { error } = await db.from("ngmy_stores").upsert({
+      email: acct.email, phone: acct.phone, store_name: storeName, description,
+      active: true, granted_by: email, updated_at: now,
+    });
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    await db.from("users").update({ canSellOnStore: true }).ilike("email", acct.email);
+    return jsonOk({ ok: true, store: { email: acct.email, storeName, description, phone: acct.phone }, accountName: acct.name });
+  }
+  // storeRevoke
+  const target = emailKey(String(body?.storeEmail ?? ""));
+  if (!target) return jsonOk({ ok: false, error: "Store not found." }, 400);
+  await db.from("ngmy_stores").update({ active: false, updated_at: now }).eq("email", target);
+  await db.from("users").update({ canSellOnStore: false }).ilike("email", target);
+  return jsonOk({ ok: true });
+}
+
+// Plans: basic ($50/mo, card or Cash App) lets a member post jobs to the
+// board; premium ($65/mo, Cash App) also lets them send work straight to a
+// worker they choose. Card payments for basic land in ngmy_stripe_access.
+const HW_BASIC_PRICE = 50;
+const HW_PREMIUM_PRICE = 65;
+const HW_PLAN_DAYS = 30;
+// Off until the job board and plan screens ship in the app: until then a
+// client can still send work straight to a worker without Premium.
+const HW_PLANS_ENFORCED = false;
+
+async function hwPlans(db: any, email: string) {
+  const nowMs = Date.now();
+  const { data: rows } = await db.from("house_plans").select("plan,access_until").eq("email", email);
+  let basicUntil = 0;
+  let premiumUntil = 0;
+  for (const r of rows ?? []) {
+    const t = Date.parse(String(r.access_until ?? "")) || 0;
+    if (r.plan === "basic") basicUntil = Math.max(basicUntil, t);
+    if (r.plan === "premium") premiumUntil = Math.max(premiumUntil, t);
+  }
+  try {
+    const { data: card } = await db.from("ngmy_stripe_access").select("access_until")
+      .eq("email", email).eq("product", "house_insurance");
+    for (const r of card ?? []) basicUntil = Math.max(basicUntil, Date.parse(String(r.access_until ?? "")) || 0);
+  } catch (_) { /* card table missing: Cash App plans still count */ }
+  const premium = premiumUntil > nowMs;
+  return {
+    basicUntil: basicUntil > 0 ? new Date(basicUntil).toISOString() : null,
+    premiumUntil: premiumUntil > 0 ? new Date(premiumUntil).toISOString() : null,
+    canPost: premium || basicUntil > nowMs,
+    premium,
+    basicPrice: HW_BASIC_PRICE,
+    premiumPrice: HW_PREMIUM_PRICE,
+  };
+}
+
 /** Deletes one worker photo from storage. Only touches house-workers/ files. */
 async function hwRemovePhoto(db: any, url: string): Promise<void> {
   const marker = "/storage/v1/object/public/media/";
@@ -1554,7 +1663,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const { data: me } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
     const { data: sent } = await db.from("house_work_requests").select("*")
       .eq("client_email", email).order("created_at", { ascending: false }).limit(50);
-    const workerEmails = [...new Set((sent ?? []).map((r: any) => r.worker_email))];
+    const workerEmails = [...new Set((sent ?? []).map((r: any) => r.worker_email).filter(Boolean))];
     const { data: sentWorkers } = workerEmails.length
       ? await db.from("house_workers").select("*").in("email", workerEmails)
       : { data: [] as any[] };
@@ -1595,7 +1704,80 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       inbox,
       isAdmin,
       eligibility: myElig ?? null,
+      plans: await hwPlans(db, email),
     });
+  }
+
+  if (action === "hwPlanCashApp") {
+    // Cash App is confirmed by the member (like every NGMY Cash App plan);
+    // admins see each plan with its method in Worker applications.
+    const limited = await enforceRateLimit(req, "hw_plan", email, 6, 86400);
+    if (limited) return limited;
+    const plan = body?.plan === "premium" ? "premium" : body?.plan === "basic" ? "basic" : "";
+    if (!plan) return jsonOk({ ok: false, error: "Pick a plan." }, 400);
+    const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
+    const base = Math.max(Date.now(), Date.parse(String(prev?.access_until ?? "")) || 0);
+    const until = new Date(base + HW_PLAN_DAYS * 86400000).toISOString();
+    const { error } = await db.from("house_plans").upsert({
+      email, plan, method: "cashapp", access_until: until, updated_at: now,
+    });
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true, plans: await hwPlans(db, email) });
+  }
+
+  if (action === "hwPostJob") {
+    const limited = await enforceRateLimit(req, "hw_post", email, 10, 3600);
+    if (limited) return limited;
+    const plans = await hwPlans(db, email);
+    if (!isAdmin && !plans.canPost) {
+      return jsonOk({ ok: false, needsPlan: "basic", error: `Posting jobs needs the $${HW_BASIC_PRICE}/month plan.` }, 402);
+    }
+    const state = hwText(body?.state, 60);
+    const details = hwLongText(body?.details, 1500);
+    const clientName = hwText(body?.clientName, 80);
+    const clientPhone = hwPhone(body?.clientPhone);
+    if (!state || details.length < 5 || !clientName || clientPhone.replace(/\D/g, "").length < 10) {
+      return jsonOk({ ok: false, error: "Enter your state, name, WhatsApp number, and what is wrong." }, 400);
+    }
+    const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
+      .eq("client_email", email).in("status", ["open", "pending"]);
+    if ((count ?? 0) >= 5) {
+      return jsonOk({ ok: false, error: "You already have 5 jobs waiting. Wait for a worker to pick one up first." }, 429);
+    }
+    const { data, error } = await db.from("house_work_requests").insert({
+      client_email: email, client_name: clientName, client_phone: clientPhone,
+      worker_email: null, status: "open", state, city: hwText(body?.city, 60),
+      address: hwText(body?.address, 200), category: hwText(body?.category, 60),
+      details, best_time: hwText(body?.bestTime, 80),
+    }).select("id").single();
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true, id: data?.id });
+  }
+
+  if (action === "hwJobs" || action === "hwPickJob") {
+    const { data: me } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    const canWork = me?.status === "approved" && hwCanWork((await hwEligibility(db, [email])).get(email), email);
+    if (!canWork) return jsonOk({ ok: false, error: "Only approved workers in good standing can pick up jobs." }, 403);
+    if (action === "hwJobs") {
+      const { data } = await db.from("house_work_requests").select("*")
+        .eq("status", "open").ilike("state", me.state).neq("client_email", email)
+        .order("created_at", { ascending: false }).limit(60);
+      const jobs = (data ?? []).map((r: any) => ({
+        id: r.id, details: r.details, city: r.city, state: r.state, category: r.category,
+        bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80).split(" ")[0],
+      }));
+      return jsonOk({ ok: true, jobs, state: me.state });
+    }
+    const id = hwText(body?.requestId, 60);
+    // First worker to tap wins: the update only matches while the job is still open.
+    const { data: picked } = await db.from("house_work_requests").update({
+      worker_email: email, status: "accepted", accepted_at: now,
+    }).eq("id", id).eq("status", "open").is("worker_email", null).neq("client_email", email)
+      .ilike("state", me.state).select("*");
+    if (!picked || picked.length === 0) {
+      return jsonOk({ ok: false, error: "Another worker already picked up this job." }, 409);
+    }
+    return jsonOk({ ok: true, clientPhone: picked[0].client_phone, clientName: picked[0].client_name });
   }
 
   if (action === "hwApply") {
@@ -1654,6 +1836,14 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   if (action === "hwRequest") {
     const limited = await enforceRateLimit(req, "hw_request", email, 20, 3600);
     if (limited) return limited;
+    // Choosing a specific worker is a Premium feature; posting to the job board is not.
+    if (HW_PLANS_ENFORCED && !isAdmin && !(await hwPlans(db, email)).premium) {
+      return jsonOk({
+        ok: false,
+        needsPlan: "premium",
+        error: `Sending work straight to a worker needs Premium ($${HW_PREMIUM_PRICE}/month).`,
+      }, 402);
+    }
     const workerId = hwText(body?.workerId, 60);
     const details = hwLongText(body?.details, 1500);
     const clientName = hwText(body?.clientName, 80);
@@ -1736,8 +1926,10 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     }
     // hwCancel
     if (!isClient) return jsonOk({ ok: false, error: "Only the client can cancel." }, 403);
-    if (r.status !== "pending") return jsonOk({ ok: false, error: "Only waiting requests can be cancelled." }, 409);
-    await db.from("house_work_requests").update({ status: "cancelled" }).eq("id", id).eq("status", "pending");
+    if (r.status !== "pending" && r.status !== "open") {
+      return jsonOk({ ok: false, error: "Only waiting requests can be cancelled." }, 409);
+    }
+    await db.from("house_work_requests").update({ status: "cancelled" }).eq("id", id).in("status", ["pending", "open"]);
     return jsonOk({ ok: true, status: "cancelled" });
   }
 
@@ -1757,7 +1949,11 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
         deactivated: !hwCanWork(e, w.email),
       };
     }).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
-    return jsonOk({ ok: true, workers });
+    const { data: planRows } = await db.from("house_plans").select("*").order("updated_at", { ascending: false }).limit(100);
+    const plans = (planRows ?? []).map((p: any) => ({
+      email: p.email, plan: p.plan, method: p.method, until: p.access_until, at: p.updated_at,
+    }));
+    return jsonOk({ ok: true, workers, plans });
   }
   // hwAdminDecide
   const target = hwText(body?.workerEmail ?? body?.email, 200).toLowerCase();
@@ -8246,6 +8442,14 @@ serve(async (req) => {
       h8: "hwCancel",
       h9: "hwAdminList",
       ha: "hwAdminDecide",
+      hb: "hwPostJob",
+      hc: "hwJobs",
+      hd: "hwPickJob",
+      he: "hwPlanCashApp",
+      s1: "storeGrant",
+      s2: "storeRevoke",
+      s3: "storeList",
+      s4: "storeMine",
       d1: "relStatus",
       d2: "relTouch",
       d3: "relStart",
@@ -8505,6 +8709,7 @@ serve(async (req) => {
 
     if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
     if (HW_ACTIONS.has(action)) return await handleHouseWorkers(req, action, body);
+    if (STORE_ACTIONS.has(action)) return await handleStoreAccess(req, action, body);
 
     if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {
       return await handleAdvisorRelationship(req, action, body);

@@ -152,6 +152,7 @@ import 'ngmy_transactions_cloud.dart';
 import 'ngmy_civic_registry_enrollment.dart';
 import 'ngmy_civic_self_enrollment.dart';
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_store_access.dart';
 import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_recovery_email.dart';
 import 'ngmy_civic_registry_id_card.dart';
@@ -4340,10 +4341,12 @@ void _applyStoreSellAccessEmailsToUsers(AppConfig config, List<UserData> users, 
   final grants = _storeSellAccessEmailSet(config);
   for (final u in users) {
     if (u.isAdmin) continue;
-    u.canSellOnStore = grants.contains(u.email.toLowerCase().trim());
+    // OR, not replace: a store an admin granted on the server has the flag on
+    // its user row, and this local list may not include it.
+    u.canSellOnStore = u.canSellOnStore || grants.contains(u.email.toLowerCase().trim());
   }
   if (currentUser != null && !currentUser.isAdmin) {
-    currentUser.canSellOnStore = grants.contains(currentUser.email.toLowerCase().trim());
+    currentUser.canSellOnStore = currentUser.canSellOnStore || grants.contains(currentUser.email.toLowerCase().trim());
   }
 }
 
@@ -53249,6 +53252,22 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             _storeTabChip(0, 'Shop', shop.length, isDark),
                             if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
                             _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
+                            // Admin: give an account store access (email or phone).
+                            if (widget.user.isAdmin)
+                              IconButton(
+                                tooltip: 'Give store access',
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                icon: const Icon(Icons.receipt_long_rounded, size: 20, color: _storePurple),
+                                onPressed: () => showNgmyStoreAccessAdminSheet(
+                                  context,
+                                  onChanged: () {
+                                    widget.onDataChanged();
+                                    if (mounted) setState(() {});
+                                  },
+                                ),
+                              ),
                           ],
                         ),
                       ),

@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'ngmy_barcode_platform.dart' if (dart.library.html) 'ngmy_barcode_platform_web.dart' as barcode_platform;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_store_access.dart';
 
 /// After the member dismisses a gift alert, skip auto pop-ups until next app open.
 class NgmyHelperGiftUserPopupSession {
@@ -74,6 +75,11 @@ List<Map<String, dynamic>> ngmyHelperGiftStoreOptions(List<Map<String, dynamic>>
       'sellerEmail': seller,
       'sellerName': (l['sellerName'] ?? display).toString(),
     };
+  }
+  // Stores the admin granted win: their store name and description are what
+  // the gift card shows, even if the seller has no listings yet.
+  for (final granted in NgmyStoreAccessCache.giftOptions()) {
+    bySeller[granted['sellerEmail'] as String] = granted;
   }
   final out = bySeller.values.toList()
     ..sort((a, b) => (a['title'] as String).compareTo(b['title'] as String));
@@ -291,6 +297,9 @@ Future<NgmyHelperGift?> showNgmyHelperGiftGrantSheet({
   final amountC = TextEditingController(text: '25');
   var styleId = kNgmyHelperGiftStyles.first.id;
   String? selectedListingId;
+  // Stores the admin granted (Store access) show with their name and description.
+  await NgmyStoreAccessCache.load();
+  if (!context.mounted) return null;
   final storeOptions = ngmyHelperGiftStoreOptions(storeListings);
   final stateColors = ngmyHelperGiftStateGradient(pending.state);
 
@@ -1126,6 +1135,12 @@ class _NgmyHelperGiftStorePeekCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text('\$${gift.amount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 32)),
           Text('Member: ${gift.fullName}', style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 13)),
+          if (gift.storeSellerName.trim().isNotEmpty)
+            Text(
+              'Store: ${gift.storeSellerName.trim()}'
+              '${gift.storeAddress.trim().isEmpty || gift.storeAddress.trim() == 'Store location on file' ? '' : ' · ${gift.storeAddress.trim()}'}',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w600),
+            ),
           if (gift.redeemed)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -1263,6 +1278,12 @@ class _NgmyHelperGiftMemberCardPanel extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Color(0xFF334155)),
                   ),
+                  if (gift.storeAddress.trim().isNotEmpty && gift.storeAddress.trim() != 'Store location on file')
+                    Text(
+                      gift.storeAddress.trim(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
                 ],
               ),
             )
