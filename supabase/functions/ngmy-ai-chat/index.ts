@@ -1601,10 +1601,11 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     return jsonOk({ ok: true, workers });
   }
   // hwAdminDecide
-  const target = hwText(body?.email, 200).toLowerCase();
+  const target = hwText(body?.workerEmail ?? body?.email, 200).toLowerCase();
   const decision = String(body?.decision ?? "");
   const status = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : decision === "remove" ? "removed" : "";
-  if (!target || !status) return jsonOk({ ok: false, error: "Pick approve, reject, or remove." }, 400);
+  if (!target) return jsonOk({ ok: false, error: "Worker not found. Refresh and try again." }, 400);
+  if (!status) return jsonOk({ ok: false, error: "Pick approve, reject, or remove." }, 400);
   const { error } = await db.from("house_workers").update({ status, reviewed_at: now, updated_at: now }).eq("email", target);
   if (error) return jsonOk({ ok: false, error: error.message }, 500);
   return jsonOk({ ok: true, status });

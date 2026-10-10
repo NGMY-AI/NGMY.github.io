@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'ngmy_circle_cropper.dart';
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_state_picker.dart';
@@ -36,7 +37,8 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> cancel(String id) => _call('hwCancel', {'requestId': id});
   static Future<Map<String, dynamic>> adminList() => _call('hwAdminList');
   static Future<Map<String, dynamic>> adminDecide(String email, String decision) =>
-      _call('hwAdminDecide', {'email': email, 'decision': decision});
+      // Not 'email': that key is stripped from every signed-in request.
+      _call('hwAdminDecide', {'workerEmail': email, 'decision': decision});
 }
 
 const Color _kHwAccent = Color(0xFF0EA5E9);
@@ -128,6 +130,8 @@ class NgmyRingAvatar extends StatelessWidget {
             )
           : Image.network(
               url,
+              width: size - 6,
+              height: size - 6,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Center(
                 child: Text(initials, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: size * 0.28)),
@@ -806,11 +810,14 @@ Future<void> showNgmyWorkerApplySheet(
       builder: (ctx, setSheet) {
         final c = _HwColors(ctx);
         Future<void> pickPhoto() async {
-          final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 900, imageQuality: 85);
+          final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 90);
           if (file == null) return;
           final raw = await file.readAsBytes();
-          final mime = (file.mimeType ?? '').isNotEmpty ? file.mimeType! : (file.name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
-          final shrunk = ngmyShrinkImageForUpload(raw, mime: mime, maxSide: 600, quality: 80);
+          if (!ctx.mounted) return;
+          // Let them move and zoom the photo so it fills the circle.
+          final cropped = await showNgmyCircleCropper(ctx, raw);
+          if (cropped == null) return;
+          final shrunk = ngmyShrinkImageForUpload(cropped, mime: 'image/jpeg', maxSide: 600, quality: 82);
           setSheet(() => photo = Uint8ListHolder(shrunk.bytes, shrunk.mime));
         }
 
@@ -884,9 +891,9 @@ Future<void> showNgmyWorkerApplySheet(
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: photo != null
-                              ? Image.memory(photo!.bytes, fit: BoxFit.cover)
+                              ? Image.memory(photo!.bytes, width: 96, height: 96, fit: BoxFit.cover)
                               : (photoUrl.isNotEmpty
-                                  ? Image.network(photoUrl, fit: BoxFit.cover)
+                                  ? Image.network(photoUrl, width: 96, height: 96, fit: BoxFit.cover)
                                   : Icon(Icons.person_rounded, size: 46, color: c.muted)),
                         ),
                         const Positioned(

@@ -120,7 +120,6 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_share_image.dart';
 import 'ngmy_local_growth_income_ui.dart';
-import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
@@ -22772,14 +22771,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 isDark,
                 badgeCount: NgmyCivicHelperGifts.openPendingCount(widget.config),
                 animDelayMs: 50,
-              ),
-              _menuFrame(
-                'Local deposit',
-                Icons.qr_code_2_rounded,
-                const Color(0xFF22C55E),
-                () => showNgmyAdminLocalDepositQrFlow(context, adminEmail: widget.user.email),
-                isDark,
-                animDelayMs: 55,
               ),
               _menuFrame(
                 'Civic Voting',
