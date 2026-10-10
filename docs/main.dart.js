@@ -54925,13 +54925,17 @@ _.e=e
 _.f=f},
 e9C:function e9C(){},
 e9D:function e9D(){},
-f3A(a){var s,r,q
+f3A(a){var s,r,q,p
 if(a==null||!J.y(J.n(a,"ok"),!0))return B.Ua
 s=J.a_(a)
 r=s.h(a,"state")
 r=J.k(r==null?"unknown":r)
 q=s.h(a,"availableAt")
-return new A.YG(r,A.b5(A.r(q==null?"":q)),J.y(s.h(a,"started"),!0))},
+q=A.b5(A.r(q==null?"":q))
+p=J.y(s.h(a,"started"),!0)
+s=s.h(a,"rapport")
+s=A.c2(A.r(s==null?0:s),null)
+return new A.YG(r,q,p,s==null?0:s)},
 azR(a,b){return A.fsi(a,b)},
 fsi(a,b){var s=0,r=A.j(t.JP),q,p=2,o=[],n,m,l,k
 var $async$azR=A.e(function(c,d){if(c===1){o.push(d)
@@ -54959,19 +54963,22 @@ case 6:case 1:return A.h(q,r)
 case 2:return A.f(o.at(-1),r)}})
 return A.i($async$azR,r)},
 fsh(a){var s,r=a.a
-A:{if("taken"===r){s="You are in a relationship with someone else. If they flirt or ask you out, say kindly that you are seeing someone and keep it professional."
+A:{if("taken"===r){s='You are in a relationship with someone else. If they flirt or ask you out, kindly tell them you are seeing someone. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").'
+break A}if("you_are_taken"===r){s='They are already dating someone else on NGMY. If they flirt, gently remind them they have someone. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").'
 break A}if("cooldown"===r){s=a.b
-s="You two broke up before. If they ask you out again, say kindly you are not ready yet"+(s!=null?" (not before "+A.by(s.bM())+"/"+A.bu(s.bM())+")":"")+"."
-break A}if("no_more_chances"===r){s="You already gave them a second chance. If they ask you out again, say kindly but clearly that it will not happen again \u2014 you can only stay friends / professional."
-break A}s="You are not dating this person. If they want to date you, they must ask you directly."
-break A}return'PROFESSIONAL MODE (this overrides any warm or romantic persona above): Be friendly, respectful and helpful, like a professional advisor. NO flirting, NO romance, NO sexual talk, NO pet names (love, honey, baby, babe, sweetheart, darling, dear, my love), NO hearts or kiss emojis, NO "miss you". '+s+"\n"},
+s="You two broke up before. If they ask you out again, gently say you are not ready yet and need time"+(s!=null?" (not before "+A.by(s.bM())+"/"+A.bu(s.bM())+")":"")+'. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").'
+break A}if("no_more_chances"===r){s='You already gave them a second chance. If they ask you out again, gently but clearly say it can only be friendship now. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").'
+break A}s=a.d>=10?'You are single and getting to know them. You may be warm, curious and a little playful, ask about their life \u2014 but you are NOT dating, so no pet names, no romance, no sexual talk. You are not easy to win: if they want more, they have to really get to know you first. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").':'You are single and just met them. Friendly and professional. Always let someone down gently, like a kind real person: thank them, say you are flattered, explain softly, and stay warm and friendly \u2014 never cold, blunt or preachy (never "you gotta respect that").'
+break A}return'PROFESSIONAL MODE (this overrides any warm or romantic persona above): Be friendly, respectful and helpful. NO flirting back, NO romance, NO sexual talk, NO pet names (love, honey, baby, babe, sweetheart, darling, dear, my love), NO hearts or kiss emojis, NO "miss you". '+s+"\n"},
 eRs(a,b){var s,r
 if(a==="ask"){if(b.c)return"THEY JUST ASKED YOU OUT AND YOU SAID YES \u2014 you are now officially dating them (and only them). Reply happily in character.\n"
 s=b.a
 A:{if("dating_you"===s){r="You are already dating them.\n"
-break A}if("taken"===s){r="THEY JUST ASKED YOU OUT: say no kindly \u2014 you are already seeing someone.\n"
-break A}if("cooldown"===s){r="THEY JUST ASKED YOU OUT: say no kindly \u2014 you broke up and you are not ready to date them again yet.\n"
-break A}if("no_more_chances"===s){r="THEY JUST ASKED YOU OUT: say no kindly but firmly \u2014 you already gave them a second chance.\n"
+break A}if("taken"===s){r="THEY JUST ASKED YOU OUT. Let them down softly \u2014 you are already seeing someone. Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship warm. Never blunt, cold or lecturing.\n"
+break A}if("you_are_taken"===s){r="THEY JUST ASKED YOU OUT, but they are already dating someone else on NGMY. Gently point that out with a little humor. Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship warm. Never blunt, cold or lecturing.\n"
+break A}if("too_soon"===s){r="THEY JUST ASKED YOU OUT, but you barely know each other yet. Say you are flattered and you like talking with them, but you want to get to know them better first \u2014 keep chatting and see where it goes. Playful, not a hard no. Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship warm. Never blunt, cold or lecturing.\n"
+break A}if("cooldown"===s){r="THEY JUST ASKED YOU OUT. You broke up before and you are not ready yet \u2014 say it softly. Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship warm. Never blunt, cold or lecturing.\n"
+break A}if("no_more_chances"===s){r="THEY JUST ASKED YOU OUT. You already gave them a second chance; gently say it can only be friendship now. Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship warm. Never blunt, cold or lecturing.\n"
 break A}r=""
 break A}return r}if(a==="end")return"THEY JUST BROKE UP WITH YOU. Accept it gracefully and with dignity, from now on stay professional.\n"
 return""},
@@ -54981,9 +54988,11 @@ s=A.ae("[ \\t]{2,}",!0,!1,!1,!1)
 r=A.aK(q,s," ")
 q=A.ae("^[,.\\s]+",!0,!1,!1,!1)
 return B.a.i(A.aK(r,q,""))},
-YG:function YG(a,b,c){this.a=a
-this.b=b
-this.c=c},
+YG:function YG(a,b,c,d){var _=this
+_.a=a
+_.b=b
+_.c=c
+_.d=d},
 egZ:function egZ(){},
 eh_:function eh_(){},
 acL:function acL(a,b,c,d){var _=this
@@ -376811,8 +376820,8 @@ B.Jz=new A.YE(0,"idle")
 B.ub=new A.YE(1,"loading")
 B.Bs=new A.YE(2,"ready")
 B.anD=new A.YE(3,"failed")
-B.ct_=new A.YG("not_datable",null,!1)
-B.Ua=new A.YG("unknown",null,!1)
+B.ct_=new A.YG("not_datable",null,!1,0)
+B.Ua=new A.YG("unknown",null,!1,0)
 B.anE=new A.YH(0,"started")
 B.ct0=new A.YH(1,"notConfigured")
 B.anF=new A.YH(2,"failed")
