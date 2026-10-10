@@ -1,6 +1,8 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'ngmy_platform_graphics.dart';
 
@@ -128,6 +130,20 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'shadow_kb' => _layoutShadowKb(ctx),
       'watermark_gold' => _layoutWatermarkGold(ctx),
       'type_halo' => _layoutTypeHalo(ctx),
+      'diagonal_slash' => _layoutDiagonalSlash(ctx),
+      'sidebar_icons' => _layoutSidebarIcons(ctx),
+      'center_crest' => _layoutCenterCrest(ctx),
+      'gov_seal' => _layoutGovSeal(ctx),
+      'stamp_badge' => _layoutStampBadge(ctx),
+      'medical_cross' => _layoutMedicalCross(ctx),
+      'skyline' => _layoutSkyline(ctx),
+      'house_arch' => _layoutHouseArch(ctx),
+      'gradient_mesh' => _layoutGradientMesh(ctx),
+      'split_horizontal' => _layoutSplitHorizontal(ctx),
+      'qr_corner' => _layoutQrCorner(ctx),
+      'line_art' => _layoutLineArt(ctx),
+      'tech_grid_glow' => _layoutTechGridGlow(ctx),
+      'luxe_emboss' => _layoutLuxeEmboss(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
     // Templates with their own logo placement (Orbit ring, hero strip, etc.).
@@ -142,6 +158,18 @@ class _NgmyCardRenderBody extends StatelessWidget {
       'champagne_foil',
       'rose_gold_arc',
       'crystalline',
+      'diagonal_slash',
+      'sidebar_icons',
+      'center_crest',
+      'gov_seal',
+      'stamp_badge',
+      'skyline',
+      'house_arch',
+      'gradient_mesh',
+      'split_horizontal',
+      'line_art',
+      'qr_corner',
+      'medical_cross',
     };
     final hasLogo = document.logoBytes != null;
     final needsLogoOverlay = hasLogo && !stylesWithBuiltInLogo.contains(tpl.renderStyle);
@@ -489,7 +517,8 @@ Widget _layoutMetroBento(_CardRenderCtx c) {
         children: [
           Icon(icon, size: c.h * 0.055, color: c.accent),
           const SizedBox(height: 4),
-          c.txt(val, size: c.h * 0.038, color: Colors.white, maxLines: 2),
+          // Flexible: on narrow phones the tile is a hair too short for icon + 2 lines.
+          Flexible(child: c.txt(val, size: c.h * 0.038, color: Colors.white, maxLines: 2)),
         ],
       ),
     );
@@ -1392,5 +1421,615 @@ Widget ngmyBusinessCardTemplateThumb(NgmyBusinessCardTemplate tpl, {double width
       height: width / kNgmyBusinessCardAspect,
       child: NgmyBusinessCardPreview(document: doc, width: width, interactive: false),
     ),
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Pro layouts (2026-10): each is its own structure, not a recolour.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Small icon + text line used by several pro layouts.
+Widget _iconLine(_CardRenderCtx c, IconData icon, String value, {Color? color, double? size}) {
+  if (value.trim().isEmpty) return const SizedBox.shrink();
+  final s = size ?? c.h * 0.043;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: s * 1.15 * c.doc.fontScale, color: c.accent),
+      SizedBox(width: s * 0.45),
+      c.txt(value, color: color ?? c.sub, size: s, maxLines: 1),
+    ],
+  );
+}
+
+// ─── Pro 1: Diagonal slash ──────────────────────────────────────────────────
+Widget _layoutDiagonalSlash(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      CustomPaint(painter: _SlashPainter(c.accent)),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.115, weight: FontWeight.w900, letterSpacing: -0.3), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.042, letterSpacing: 1.6), left: 16, top: c.h * 0.3),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.048, weight: FontWeight.w700), left: 16, top: c.h * 0.41),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: 30),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: 12),
+      c.slot('logo', c.logo(c.h * 0.3), right: c.w * 0.08, bottom: c.h * 0.14),
+    ],
+  );
+}
+
+class _SlashPainter extends CustomPainter {
+  _SlashPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final band = Path()
+      ..moveTo(s.width * 0.62, s.height)
+      ..lineTo(s.width * 0.86, 0)
+      ..lineTo(s.width, 0)
+      ..lineTo(s.width, s.height)
+      ..close();
+    canvas.drawPath(band, Paint()..color = color);
+    final thin = Path()
+      ..moveTo(s.width * 0.55, s.height)
+      ..lineTo(s.width * 0.79, 0)
+      ..lineTo(s.width * 0.82, 0)
+      ..lineTo(s.width * 0.58, s.height)
+      ..close();
+    canvas.drawPath(thin, Paint()..color = color.withValues(alpha: 0.45));
+  }
+
+  @override
+  bool shouldRepaint(covariant _SlashPainter old) => old.color != color;
+}
+
+// ─── Pro 2: Icon rail ───────────────────────────────────────────────────────
+Widget _layoutSidebarIcons(_CardRenderCtx c) {
+  final rail = c.w * 0.13;
+  Widget railIcon(IconData i) => Icon(i, size: c.h * 0.075, color: Colors.white.withValues(alpha: 0.95));
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: rail,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.accent, c.accent.withValues(alpha: 0.75)]),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [railIcon(Icons.call_rounded), railIcon(Icons.mail_rounded), railIcon(Icons.language_rounded), railIcon(Icons.place_rounded)],
+          ),
+        ),
+      ),
+      c.slot('logo', c.logo(c.h * 0.26), right: 14, top: 14),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: rail + 14, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046, weight: FontWeight.w800), left: rail + 14, top: c.h * 0.27),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.043), left: rail + 14, top: c.h * 0.44),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.043), left: rail + 14, top: c.h * 0.56),
+      c.slot('website', c.txt(c.doc.website, color: c.sub, size: c.h * 0.043), left: rail + 14, top: c.h * 0.68),
+      c.slot('address', c.txt(c.doc.address, color: c.sub, size: c.h * 0.04), left: rail + 14, top: c.h * 0.8),
+    ],
+  );
+}
+
+// ─── Pro 3: Centered crest ──────────────────────────────────────────────────
+Widget _layoutCenterCrest(_CardRenderCtx c) {
+  final contacts = [c.doc.phone, c.doc.email, c.doc.website].where((e) => e.trim().isNotEmpty).join('  •  ');
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: RadialGradient(radius: 1.1, colors: [c.bg2, c.bg1]))),
+      Positioned.fill(
+        child: Padding(
+          padding: EdgeInsets.all(c.h * 0.05),
+          child: Container(decoration: BoxDecoration(border: Border.all(color: c.accent.withValues(alpha: 0.55), width: 1))),
+        ),
+      ),
+      c.slot('logo', Center(child: c.logo(c.h * 0.24)), left: 0, right: 0, top: c.h * 0.1),
+      c.slot('name', Center(child: c.txt(c.doc.fullName.toUpperCase(), size: c.h * 0.085, weight: FontWeight.w900, letterSpacing: 1.6)), left: 14, right: 14, top: c.h * 0.42),
+      c.slot('title', Center(child: c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.045, weight: FontWeight.w700)), left: 14, right: 14, top: c.h * 0.57),
+      c.slot('company', Center(child: c.txt(c.doc.company, color: c.sub, size: c.h * 0.042)), left: 14, right: 14, top: c.h * 0.67),
+      c.slot('phone', Center(child: c.txt(contacts, color: c.sub, size: c.h * 0.036, maxLines: 1)), left: 14, right: 14, bottom: c.h * 0.1),
+    ],
+  );
+}
+
+// ─── Pro 4: Government seal ─────────────────────────────────────────────────
+Widget _layoutGovSeal(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      // Flag stripes along the bottom.
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: c.h * 0.12,
+        child: Column(children: [
+          for (var i = 0; i < 3; i++)
+            Expanded(child: Container(color: i.isEven ? c.accent : c.bg2)),
+        ]),
+      ),
+      Positioned(right: -c.h * 0.18, top: -c.h * 0.18, child: CustomPaint(size: Size.square(c.h * 0.9), painter: _SealPainter(c.accent))),
+      c.slot('logo', c.logo(c.h * 0.24), right: c.h * 0.15, top: c.h * 0.15),
+      c.slot('company', c.txt(c.doc.company.toUpperCase(), color: c.accent, size: c.h * 0.04, weight: FontWeight.w900, letterSpacing: 2), left: 16, top: 14),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 16, top: c.h * 0.24),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.sub, size: c.h * 0.05, weight: FontWeight.w700), left: 16, top: c.h * 0.42),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: c.h * 0.3),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: c.h * 0.18),
+    ],
+  );
+}
+
+class _SealPainter extends CustomPainter {
+  _SealPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final center = s.center(Offset.zero);
+    final r = s.width / 2;
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 2;
+    canvas.drawCircle(center, r * 0.92, stroke);
+    canvas.drawCircle(center, r * 0.78, stroke..strokeWidth = 1);
+    // Star ring.
+    final star = Paint()..color = color.withValues(alpha: 0.4);
+    for (var i = 0; i < 16; i++) {
+      final a = (i / 16) * 6.283185;
+      final p = center + Offset(r * 0.85 * math.cos(a), r * 0.85 * math.sin(a));
+      canvas.drawCircle(p, r * 0.025, star);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SealPainter old) => old.color != color;
+}
+
+// ─── Pro 5: Stamp badge ─────────────────────────────────────────────────────
+Widget _layoutStampBadge(_CardRenderCtx c) {
+  final label = c.doc.tagline.trim().isEmpty ? 'OFFICIAL' : c.doc.tagline.trim().toUpperCase();
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
+      // Stamp in the top-right corner, kept to the right half so it never
+      // runs over the name, whatever the tagline length.
+      Positioned(
+        right: c.w * 0.05,
+        top: c.h * 0.1,
+        width: c.w * 0.44,
+        child: Align(
+          alignment: Alignment.topRight,
+          child: Transform.rotate(
+            angle: -0.16,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: c.h * 0.05, vertical: c.h * 0.02),
+                decoration: BoxDecoration(
+                  border: Border.all(color: c.accent, width: 2.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(color: c.accent, fontWeight: FontWeight.w900, fontSize: c.h * 0.06, letterSpacing: 1.6),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 16, top: c.h * 0.36),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800), left: 16, top: c.h * 0.53),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.044), left: 16, top: c.h * 0.64),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: 12),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), right: 14, bottom: 12),
+      c.slot('logo', c.logo(c.h * 0.24), left: 16, top: 14),
+    ],
+  );
+}
+
+// ─── Pro 6: Medical cross + heartbeat ───────────────────────────────────────
+Widget _layoutMedicalCross(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      Positioned(
+        right: c.w * 0.06,
+        top: c.h * 0.12,
+        child: c.doc.logoBytes != null
+            ? c.logo(c.h * 0.32)
+            : Icon(Icons.local_hospital_rounded, size: c.h * 0.34, color: c.accent.withValues(alpha: 0.9)),
+      ),
+      Positioned(left: 0, right: 0, top: c.h * 0.5, height: c.h * 0.2, child: CustomPaint(painter: _PulsePainter(c.accent))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800), left: 16, top: c.h * 0.29),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.044), left: 16, top: c.h * 0.39),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 16, bottom: 28),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 16, bottom: 10),
+      c.slot('address', _iconLine(c, Icons.place_rounded, c.doc.address), right: 14, bottom: 10),
+    ],
+  );
+}
+
+class _PulsePainter extends CustomPainter {
+  _PulsePainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final y = s.height / 2;
+    final p = Path()..moveTo(0, y);
+    p.lineTo(s.width * 0.42, y);
+    p.lineTo(s.width * 0.46, y - s.height * 0.35);
+    p.lineTo(s.width * 0.5, y + s.height * 0.45);
+    p.lineTo(s.width * 0.54, y - s.height * 0.15);
+    p.lineTo(s.width * 0.57, y);
+    p.lineTo(s.width, y);
+    canvas.drawPath(
+      p,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeJoin = StrokeJoin.round
+        ..color = color.withValues(alpha: 0.55),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PulsePainter old) => old.color != color;
+}
+
+// ─── Pro 7: City skyline ────────────────────────────────────────────────────
+Widget _layoutSkyline(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.42, child: CustomPaint(painter: _SkylinePainter(c.accent))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900), left: 16, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800), left: 16, top: c.h * 0.28),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.044), left: 16, top: c.h * 0.38),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone, color: c.text), right: 14, top: 16),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email, color: c.text), right: 14, top: c.h * 0.18),
+      c.slot('logo', c.logo(c.h * 0.22), right: 14, top: c.h * 0.33),
+    ],
+  );
+}
+
+class _SkylinePainter extends CustomPainter {
+  _SkylinePainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final heights = [0.45, 0.7, 0.55, 0.9, 0.62, 0.8, 0.5, 1.0, 0.66, 0.42, 0.74, 0.58, 0.85, 0.48];
+    final w = s.width / heights.length;
+    final back = Paint()..color = color.withValues(alpha: 0.22);
+    final front = Paint()..color = color.withValues(alpha: 0.5);
+    for (var i = 0; i < heights.length; i++) {
+      final h = s.height * heights[(i + 3) % heights.length] * 0.9;
+      canvas.drawRect(Rect.fromLTWH(i * w + w * 0.3, s.height - h, w * 0.9, h), back);
+    }
+    final window = Paint()..color = Colors.white.withValues(alpha: 0.35);
+    for (var i = 0; i < heights.length; i++) {
+      final h = s.height * heights[i] * 0.75;
+      final r = Rect.fromLTWH(i * w + w * 0.08, s.height - h, w * 0.78, h);
+      canvas.drawRect(r, front);
+      for (var y = r.top + w * 0.25; y < r.bottom - w * 0.2; y += w * 0.4) {
+        canvas.drawRect(Rect.fromLTWH(r.left + w * 0.18, y, w * 0.14, w * 0.14), window);
+        canvas.drawRect(Rect.fromLTWH(r.left + w * 0.46, y, w * 0.14, w * 0.14), window);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SkylinePainter old) => old.color != color;
+}
+
+// ─── Pro 8: House roofline ──────────────────────────────────────────────────
+Widget _layoutHouseArch(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(left: 0, top: 0, bottom: 0, width: c.w * 0.42, child: CustomPaint(painter: _RoofPainter(c.accent, c.bg2))),
+      Positioned(
+        left: 0,
+        top: c.h * 0.36,
+        width: c.w * 0.42,
+        child: Center(child: c.logo(c.h * 0.3)),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900), left: c.w * 0.47, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046, weight: FontWeight.w800), left: c.w * 0.47, top: c.h * 0.27),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.043), left: c.w * 0.47, top: c.h * 0.37),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: c.w * 0.47, bottom: c.h * 0.3),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: c.w * 0.47, bottom: c.h * 0.17),
+      c.slot('website', _iconLine(c, Icons.home_work_rounded, c.doc.website), left: c.w * 0.47, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+class _RoofPainter extends CustomPainter {
+  _RoofPainter(this.color, this.fill);
+  final Color color;
+  final Color fill;
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRect(Offset.zero & s, Paint()..color = color);
+    final roof = Path()
+      ..moveTo(s.width * 0.1, s.height * 0.42)
+      ..lineTo(s.width * 0.5, s.height * 0.14)
+      ..lineTo(s.width * 0.9, s.height * 0.42);
+    canvas.drawPath(
+      roof,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = Colors.white.withValues(alpha: 0.9),
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(s.width * 0.18, s.height * 0.42, s.width * 0.64, s.height * 0.46),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = Colors.white.withValues(alpha: 0.45),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RoofPainter old) => old.color != color || old.fill != fill;
+}
+
+// ─── Pro 9: Gradient mesh ───────────────────────────────────────────────────
+Widget _layoutGradientMesh(_CardRenderCtx c) {
+  Widget blob(Alignment a, Color col, double r) => Positioned.fill(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(center: a, radius: r, colors: [col, col.withValues(alpha: 0)]),
+          ),
+        ),
+      );
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      blob(const Alignment(-0.9, -0.8), c.accent.withValues(alpha: 0.85), 0.9),
+      blob(const Alignment(1.0, -0.2), c.bg2, 1.0),
+      blob(const Alignment(0.2, 1.1), c.accent.withValues(alpha: 0.45), 0.8),
+      Positioned(
+        left: 12,
+        right: 12,
+        bottom: 12,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: c.h * 0.04),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Expanded(child: c.txt(c.doc.phone, color: c.text, size: c.h * 0.042, maxLines: 1)),
+              Expanded(child: Align(alignment: Alignment.centerRight, child: c.txt(c.doc.email, color: c.text, size: c.h * 0.042, maxLines: 1))),
+            ],
+          ),
+        ),
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.13, weight: FontWeight.w900, letterSpacing: -0.5), left: 16, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.text.withValues(alpha: 0.85), size: c.h * 0.05, weight: FontWeight.w600), left: 16, top: c.h * 0.33),
+      c.slot('logo', c.logo(c.h * 0.26), right: 14, top: 14),
+    ],
+  );
+}
+
+// ─── Pro 10: Horizontal split ───────────────────────────────────────────────
+Widget _layoutSplitHorizontal(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Column(children: [
+        Expanded(flex: 55, child: Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.accent, c.accent.withValues(alpha: 0.78)])))),
+        Expanded(flex: 45, child: Container(color: c.bg2)),
+      ]),
+      Positioned(left: 16, right: 16, top: c.h * 0.55 - 1, child: Container(height: 2, color: c.bg1.withValues(alpha: 0.4))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900, color: Colors.white), left: 16, top: c.h * 0.12),
+      c.slot('title', c.txt(c.doc.jobTitle, color: Colors.white.withValues(alpha: 0.88), size: c.h * 0.048), left: 16, top: c.h * 0.31),
+      // Logo sits fully in the coloured top half.
+      c.slot('logo', c.logo(c.h * 0.3), right: 16, top: c.h * 0.1),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone, color: c.text), left: 16, top: c.h * 0.62),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email, color: c.text), left: 16, top: c.h * 0.75),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website, color: c.text), left: 16, top: c.h * 0.87),
+    ],
+  );
+}
+
+// ─── Pro 11: Website QR corner ──────────────────────────────────────────────
+Widget _layoutQrCorner(_CardRenderCtx c) {
+  final data = c.doc.website.trim().isNotEmpty ? c.doc.website.trim() : c.doc.email.trim();
+  final qr = c.h * 0.42;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(colors: [c.bg1, c.bg2]))),
+      Positioned(left: 0, top: 0, bottom: 0, width: 5, child: Container(color: c.accent)),
+      c.slot(
+        'qr',
+        Container(
+          padding: EdgeInsets.all(qr * 0.06),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+          child: data.isEmpty
+              ? SizedBox(width: qr, height: qr)
+              : QrImageView(data: data, size: qr, padding: EdgeInsets.zero, backgroundColor: Colors.white),
+        ),
+        right: 14,
+        top: (c.h - qr) / 2 - qr * 0.06,
+      ),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.105, weight: FontWeight.w900), left: 18, top: 16),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.047, weight: FontWeight.w800), left: 18, top: c.h * 0.28),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 18, top: c.h * 0.48),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 18, top: c.h * 0.61),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website), left: 18, top: c.h * 0.74),
+      c.slot('company', c.txt('Scan for my site', color: c.sub, size: c.h * 0.034), right: 14, bottom: 8),
+    ],
+  );
+}
+
+// ─── Pro 12: Inset line frame ───────────────────────────────────────────────
+Widget _layoutLineArt(_CardRenderCtx c) {
+  final inset = c.h * 0.07;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned.fill(child: Padding(padding: EdgeInsets.all(inset), child: CustomPaint(painter: _CornerTickPainter(c.accent)))),
+      c.slot('name', c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w600, letterSpacing: 0.8), left: inset + 14, top: inset + 12),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.044), left: inset + 14, top: c.h * 0.33),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.041), left: inset + 14, bottom: inset + 30),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.041), left: inset + 14, bottom: inset + 12),
+      c.slot('website', c.txt(c.doc.website, color: c.sub, size: c.h * 0.041), right: inset + 14, bottom: inset + 12),
+      c.slot('logo', c.logo(c.h * 0.22), right: inset + 12, top: inset + 10),
+    ],
+  );
+}
+
+class _CornerTickPainter extends CustomPainter {
+  _CornerTickPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8
+      ..color = color.withValues(alpha: 0.45);
+    canvas.drawRect(Offset.zero & s, p);
+    final t = Paint()
+      ..strokeWidth = 2.4
+      ..color = color;
+    final l = s.shortestSide * 0.14;
+    for (final corner in [Offset.zero, Offset(s.width, 0), Offset(0, s.height), Offset(s.width, s.height)]) {
+      final dx = corner.dx == 0 ? l : -l;
+      final dy = corner.dy == 0 ? l : -l;
+      canvas.drawLine(corner, corner + Offset(dx, 0), t);
+      canvas.drawLine(corner, corner + Offset(0, dy), t);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerTickPainter old) => old.color != color;
+}
+
+// ─── Pro 13: Tech grid glow ─────────────────────────────────────────────────
+Widget _layoutTechGridGlow(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.55, child: CustomPaint(painter: _PerspectiveGridPainter(c.accent))),
+      Positioned(
+        left: c.w * 0.25,
+        right: c.w * 0.25,
+        top: c.h * 0.42,
+        height: 2,
+        child: Container(
+          decoration: BoxDecoration(
+            color: c.accent,
+            boxShadow: [BoxShadow(color: c.accent.withValues(alpha: 0.8), blurRadius: 14, spreadRadius: 2)],
+          ),
+        ),
+      ),
+      c.slot('name', Center(child: c.txt(c.doc.fullName, size: c.h * 0.11, weight: FontWeight.w900, letterSpacing: 1)), left: 12, right: 12, top: c.h * 0.12),
+      c.slot('title', Center(child: c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.04, letterSpacing: 2.4)), left: 12, right: 12, top: c.h * 0.3),
+      c.slot('phone', c.txt(c.doc.phone, color: c.sub, size: c.h * 0.041), left: 16, bottom: 12),
+      c.slot('email', c.txt(c.doc.email, color: c.sub, size: c.h * 0.041), right: 16, bottom: 12),
+    ],
+  );
+}
+
+class _PerspectiveGridPainter extends CustomPainter {
+  _PerspectiveGridPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..strokeWidth = 0.8
+      ..color = color.withValues(alpha: 0.35);
+    final vanish = Offset(s.width / 2, 0);
+    for (var i = -8; i <= 8; i++) {
+      canvas.drawLine(vanish, Offset(s.width / 2 + i * s.width * 0.12, s.height), p);
+    }
+    for (var k = 1; k <= 6; k++) {
+      final y = s.height * (k * k) / 36;
+      canvas.drawLine(Offset(0, y), Offset(s.width, y), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _PerspectiveGridPainter old) => old.color != color;
+}
+
+// ─── Pro 14: Luxe emboss ────────────────────────────────────────────────────
+Widget _layoutLuxeEmboss(_CardRenderCtx c) {
+  Widget rule() => Container(width: c.w * 0.16, height: 1, color: c.accent);
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: RadialGradient(radius: 1.2, colors: [c.bg2, c.bg1]))),
+      // Fine double gold frame.
+      Positioned.fill(
+        child: Padding(
+          padding: EdgeInsets.all(c.h * 0.055),
+          child: Container(
+            decoration: BoxDecoration(border: Border.all(color: c.accent.withValues(alpha: 0.7), width: 1)),
+            child: Padding(
+              padding: const EdgeInsets.all(3.5),
+              child: Container(decoration: BoxDecoration(border: Border.all(color: c.accent.withValues(alpha: 0.3), width: 0.8))),
+            ),
+          ),
+        ),
+      ),
+      c.slot(
+        'name',
+        Center(
+          child: Text(
+            c.doc.fullName.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: c.text,
+              fontSize: c.h * 0.095 * c.doc.fontScale,
+              fontWeight: FontWeight.w300,
+              letterSpacing: 4,
+              shadows: [Shadow(color: c.accent.withValues(alpha: 0.6), blurRadius: 6)],
+            ),
+          ),
+        ),
+        left: 14,
+        right: 14,
+        top: c.h * 0.3,
+      ),
+      Positioned(
+        left: 0,
+        right: 0,
+        top: c.h * 0.48,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [rule(), SizedBox(width: c.w * 0.03), Icon(Icons.diamond_outlined, size: c.h * 0.06, color: c.accent), SizedBox(width: c.w * 0.03), rule()],
+        ),
+      ),
+      c.slot('title', Center(child: c.txt(c.doc.jobTitle.toUpperCase(), color: c.accent, size: c.h * 0.038, letterSpacing: 3)), left: 14, right: 14, top: c.h * 0.58),
+      c.slot('phone', Center(child: c.txt('${c.doc.phone}   ·   ${c.doc.email}', color: c.sub, size: c.h * 0.036, maxLines: 1)), left: 14, right: 14, bottom: c.h * 0.1),
+    ],
   );
 }

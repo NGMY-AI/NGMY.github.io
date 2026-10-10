@@ -4965,7 +4965,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     VoidCallback? onTrailingTap,
   }) {
     const marriageAccent = Color(0xFFB8860B);
-    return Row(
+    final headerRow = Row(
       children: [
         AnimatedBuilder(
           animation: _framePulse,
@@ -5026,7 +5026,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-              Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(
+                subtitle.split(' — ').first,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: accent, fontWeight: FontWeight.w800, letterSpacing: 0.2),
+              ),
             ],
           ),
         ),
@@ -5066,6 +5072,81 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           ),
         ],
       ],
+    );
+    // Features from the subtitle ("edit PDFs, photos, …") as small tags.
+    final parts = subtitle.split(' — ');
+    final features = parts.length > 1
+        ? parts[1]
+            .replaceAll(' and ', ', ')
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .map((e) => e[0].toUpperCase() + e.substring(1))
+            .toList()
+        : const <String>[];
+    const featureIcons = <IconData>[
+      Icons.picture_as_pdf_rounded,
+      Icons.photo_library_rounded,
+      Icons.draw_rounded,
+      Icons.slideshow_rounded,
+      Icons.school_rounded,
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? [const Color(0xFF1B2232), const Color(0xFF151A26)]
+              : [Colors.white, const Color(0xFFEFF6FF)],
+        ),
+        border: Border.all(color: accent.withValues(alpha: isDark ? 0.45 : 0.25), width: 1.2),
+        boxShadow: [
+          BoxShadow(color: accent.withValues(alpha: isDark ? 0.18 : 0.10), blurRadius: 18, offset: const Offset(0, 8)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          headerRow,
+          if (features.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (var i = 0; i < features.length; i++)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: isDark ? 0.16 : 0.08),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: accent.withValues(alpha: isDark ? 0.4 : 0.22)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(featureIcons[i % featureIcons.length], size: 13, color: accent),
+                        const SizedBox(width: 4),
+                        Text(
+                          features[i],
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF1E293B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 
