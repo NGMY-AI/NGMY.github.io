@@ -41535,9 +41535,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                         padding: const EdgeInsets.only(right: 4),
                         child: Row(
                           children: [
-                            miniStat('Collected', '\$${formatCurrency(total)}', emeraldText),
-                            const SizedBox(width: 6),
                             miniStat('Contributors', '$contributors', strongText),
+                            const SizedBox(width: 6),
+                            miniStat('Collected', '\$${formatCurrency(total)}', emeraldText),
                             const SizedBox(width: 6),
                             miniStat('Average', '\$${formatCurrency(average)}', strongText),
                           ],
@@ -41660,6 +41660,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     ).whenComplete(() => pageOpen = false));
   }
 
+  bool _contributionDialogOpen = false;
+
   void _showContributionDialog(UserData u) {
     // Anchor on _selectedState throughout, not _helpModeState() (which
     // falls back to widget.user.state for a non-King/Admin viewer) — the
@@ -41678,6 +41680,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Help mode must be active before adding contribution.')));
       return;
     }
+    // A quick second tap on the money button used to stack a second pop-up
+    // on top of the first. Only one may be open at a time.
+    if (_contributionDialogOpen) return;
+    _contributionDialogOpen = true;
     final existing = _activeCampaignContributionForMember(u, forState: state);
     final inScope = _memberMatchesHelpScope(u, forState: state);
     void openDialog() {
@@ -42213,7 +42219,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ),
             );
       },
-    );
+    ).whenComplete(() => _contributionDialogOpen = false);
     }
 
     if (inScope) {
@@ -42221,6 +42227,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       return;
     }
 
+    var proceeded = false;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -42233,6 +42240,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
+              proceeded = true;
               Navigator.pop(ctx);
               openDialog();
             },
@@ -42240,7 +42248,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           ),
         ],
       ),
-    );
+    ).whenComplete(() {
+      if (!proceeded) _contributionDialogOpen = false;
+    });
   }
 
   void _showClaimDialog(UserData u) {
@@ -46334,51 +46344,121 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF93C5FD).withOpacity(0.6)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6200EE).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.location_on_rounded, color: Color(0xFF6200EE)),
+        Builder(builder: (context) {
+          // Header: state name, then three small count tags (members,
+          // helpers, non-helpers) instead of one long sentence.
+          final purple = isDark ? const Color(0xFFC4B5FD) : const Color(0xFF6200EE);
+          final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+          Widget countTag(IconData icon, int n, String label, Color color) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withOpacity(isDark ? 0.16 : 0.09),
+                borderRadius: BorderRadius.circular(999),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 12, color: color),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$n',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color),
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    label,
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: muted),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: purple.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
                   children: [
-                    Text('$st Rankings', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
-                    Text(
-                      hasContributions
-                          ? '${enrolled.length} members — helpers by who helped first, everyone else in Non-Helpers.'
-                          : '${enrolled.length} members — no contributions yet, so everyone is in Non-Helpers (newest first).',
-                      style: TextStyle(fontSize: 11, color: muted, height: 1.3),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: purple.withOpacity(0.14),
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      child: Icon(Icons.emoji_events_rounded, color: purple, size: 20),
                     ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            st,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: ink),
+                          ),
+                          Text(
+                            'Rankings',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted, letterSpacing: 0.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_canChangeCivicState())
+                      Material(
+                        color: purple.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: _showStatePicker,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.swap_horiz_rounded, size: 16, color: purple),
+                                const SizedBox(width: 4),
+                                Text('State', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: purple)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-              if (_canChangeCivicState())
-                TextButton(
-                  onPressed: _showStatePicker,
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF6200EE),
-                    backgroundColor: const Color(0xFF6200EE).withOpacity(0.1),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
-                  child: const Text('Change State', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    countTag(Icons.groups_rounded, enrolled.length, enrolled.length == 1 ? 'member' : 'members',
+                        isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                    countTag(Icons.volunteer_activism_rounded, topHelpers.length,
+                        topHelpers.length == 1 ? 'helper' : 'helpers',
+                        isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                    countTag(Icons.hourglass_empty_rounded, nonHelpers.length, 'not yet',
+                        isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                  ],
                 ),
-            ],
-          ),
-        ),
+                const SizedBox(height: 6),
+                Text(
+                  hasContributions ? 'Helpers are ranked by who helped first.' : 'No contributions yet. Newest members first.',
+                  style: TextStyle(fontSize: 10.5, color: muted),
+                ),
+              ],
+            ),
+          );
+        }),
         if (!widget.user.isCivicRegistryAdmin && !widget.user.isAdmin && !_hasRegistrarAccess()) ...[
           const SizedBox(height: 8),
           Text(
