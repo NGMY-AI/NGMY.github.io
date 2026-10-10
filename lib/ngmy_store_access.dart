@@ -158,7 +158,10 @@ class _StoreAccessSheetState extends State<_StoreAccessSheet> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Remove ${s['storeName']}?'),
-        content: const Text('This account will no longer have NGMY Store access.'),
+        content: const Text(
+          'This deletes the store everywhere: its name, picture, and every item it posted. '
+          'The account goes back to a normal shopper with no Sell button.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remove')),
@@ -169,7 +172,7 @@ class _StoreAccessSheetState extends State<_StoreAccessSheet> {
     final res = await NgmyStoreAccessApi.revoke((s['email'] ?? '').toString());
     if (!mounted) return;
     if (res['ok'] == true) {
-      _snack('Store access removed.');
+      _snack('Store removed. Its items and picture were deleted (${res['removedListings'] ?? 0} items).');
       widget.onChanged?.call();
       _load();
     } else {

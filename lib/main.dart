@@ -12963,7 +12963,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         } else {
           final local = _allUsers[idx];
           _preserveLocalSessionState(local, updatedUser);
-          updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || local.canSellOnStore;
+          // Server row wins: when an admin removes a store, Sell must go away.
+          updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
           _mergeUserMediaProfileFields(local, updatedUser);
           _ngmyReconcileClockInSession(updatedUser, _allTransactions);
           _allUsers[idx] = updatedUser;
@@ -12984,7 +12985,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           } else {
             final localCurrent = _currentUser!;
             _preserveLocalSessionState(localCurrent, updatedUser);
-            updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore || localCurrent.canSellOnStore;
+            updatedUser.canSellOnStore = grant || updatedUser.canSellOnStore;
             _ngmyReconcileClockInSession(updatedUser, _allTransactions);
             final listIdx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == email);
             if (listIdx >= 0) _allUsers[listIdx] = updatedUser;
@@ -17824,8 +17825,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     if (!widget.user.isAdmin) {
       Future<void>.delayed(const Duration(seconds: 3), () async {
         if (!mounted) return;
-        final store = await ngmyCheckMyStore(context);
-        if (store != null && mounted) widget.user.canSellOnStore = true;
+        final res = await NgmyStoreAccessApi.mine();
+        if (!mounted || res['ok'] != true) return;
+        if (res['store'] is Map) {
+          widget.user.canSellOnStore = true;
+          await ngmyCheckMyStore(context);
+        } else if (!_canSellOnStoreForEmail(widget.config, widget.user.email)) {
+          // The admin removed this store: Sell goes away.
+          widget.user.canSellOnStore = false;
+        }
       });
     }
   }
@@ -48106,11 +48114,19 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       if (id.isEmpty) continue;
       byId[id] = _normalizeStoreListing(Map<String, dynamic>.from(l));
     }
+    final me = widget.user.email.toLowerCase().trim();
     for (final l in widget.config.storeListings) {
       final id = (l['id'] ?? '').toString();
       if (id.isEmpty) continue;
       final existing = byId[id];
       final local = _normalizeStoreListing(Map<String, dynamic>.from(l));
+      if (existing == null && remote.isNotEmpty) {
+        // On this phone but not on the server: it was deleted there (for
+        // example the admin removed that store). Only keep my own new items
+        // that have not been uploaded yet, and only while I may still sell.
+        final seller = (local['sellerEmail'] ?? '').toString().toLowerCase().trim();
+        if (seller != me || !_canSell) continue;
+      }
       byId[id] = existing == null ? local : _pickNewerListing(existing, local);
     }
     widget.config.storeListings = byId.values.toList();
@@ -48125,13 +48141,18 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       // A store an admin granted lives on the server. Ask it directly, turn on
       // Sell, and have a new store owner fill in their store profile once.
       if (!widget.user.isAdmin) {
-        final store = await ngmyCheckMyStore(context);
+        final res = await NgmyStoreAccessApi.mine();
         if (!mounted) return;
-        if (store != null) {
+        if (res['ok'] == true) {
+          final store = res['store'] is Map ? Map<String, dynamic>.from(res['store'] as Map) : null;
+          // No store on the server (never granted, or the admin removed it):
+          // back to a normal shopper, unless the old grant list still has them.
+          final legacy = _canSellOnStoreForEmail(widget.config, widget.user.email);
           setState(() {
             _myStore = store;
-            widget.user.canSellOnStore = true;
+            widget.user.canSellOnStore = store != null || legacy;
           });
+          if (store != null) unawaited(ngmyCheckMyStore(context));
         }
       }
     } catch (e) {

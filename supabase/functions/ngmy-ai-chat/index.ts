@@ -1666,12 +1666,60 @@ async function handleStoreAccess(req: Request, action: string, body: any): Promi
     await db.from("users").update({ canSellOnStore: true }).ilike("email", acct.email);
     return jsonOk({ ok: true, store: { email: acct.email, storeName, description, phone: acct.phone }, accountName: acct.name });
   }
-  // storeRevoke
+  // storeRevoke — removes the store completely: store profile and picture,
+  // every listing it posted (and their photos), and the account's Sell access.
+  // Orders and helper gift cards already given stay: they are buyers' records.
   const target = emailKey(String(body?.storeEmail ?? ""));
   if (!target) return jsonOk({ ok: false, error: "Store not found." }, 400);
-  await db.from("ngmy_stores").update({ active: false, updated_at: now }).eq("email", target);
+  const { data: storeRow } = await db.from("ngmy_stores").select("photo_url").eq("email", target).maybeSingle();
+  if (storeRow?.photo_url) await storeRemovePhoto(db, String(storeRow.photo_url));
+  await db.from("ngmy_stores").delete().eq("email", target);
   await db.from("users").update({ canSellOnStore: false }).ilike("email", target);
-  return jsonOk({ ok: true });
+
+  // Listings live in store_listings (id, data jsonb).
+  const mediaPaths = new Set<string>();
+  const collectMedia = (v: unknown) => {
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (s.startsWith("supabase://media/")) mediaPaths.add(s.slice("supabase://media/".length).split("?")[0]);
+      const marker = "/storage/v1/object/public/media/";
+      const at = s.indexOf(marker);
+      if (at >= 0) mediaPaths.add(decodeURIComponent(s.slice(at + marker.length).split("?")[0]));
+    } else if (Array.isArray(v)) {
+      for (const x of v) collectMedia(x);
+    } else if (v && typeof v === "object") {
+      for (const x of Object.values(v as Record<string, unknown>)) collectMedia(x);
+    }
+  };
+  let removedListings = 0;
+  const { data: listingRows } = await db.from("store_listings").select("id,data").limit(5000);
+  const mine = (listingRows ?? []).filter((r: any) =>
+    emailKey(String(r?.data?.sellerEmail ?? "")) === target
+  );
+  for (const r of mine) collectMedia(r.data);
+  if (mine.length > 0) {
+    await db.from("store_listings").delete().in("id", mine.map((r: any) => r.id));
+    removedListings = mine.length;
+  }
+  // Older copy of the listings kept on the config row.
+  try {
+    const { data: cfg } = await db.from("config").select("id,storelistings").limit(5);
+    for (const row of cfg ?? []) {
+      const list = Array.isArray(row.storelistings) ? row.storelistings : [];
+      const keep = list.filter((l: any) => emailKey(String(l?.sellerEmail ?? "")) !== target);
+      if (keep.length !== list.length) {
+        for (const l of list) if (emailKey(String(l?.sellerEmail ?? "")) === target) collectMedia(l);
+        await db.from("config").update({ storelistings: keep }).eq("id", row.id);
+      }
+    }
+  } catch (_) { /* no config copy */ }
+  const paths = [...mediaPaths].filter((p) => p && !p.includes(".."));
+  for (let i = 0; i < paths.length; i += 100) {
+    try {
+      await db.storage.from("media").remove(paths.slice(i, i + 100));
+    } catch (_) { /* leftover files are harmless */ }
+  }
+  return jsonOk({ ok: true, removedListings, removedFiles: paths.length });
 }
 
 // Plans: basic ($50/mo, card or Cash App) lets a member post jobs to the
