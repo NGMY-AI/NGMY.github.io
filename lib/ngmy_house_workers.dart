@@ -428,7 +428,9 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
                 _pill('Work inbox', Icons.inbox_rounded, _kHwGreen, _openInbox, badge: _newJobs),
               if (myWorker != null && !workerApproved)
                 _pill(
-                  myWorker['status'] == 'pending' ? 'Worker application: waiting' : 'Worker application: ${myWorker['status']}',
+                  myWorker['status'] == 'pending'
+                      ? 'Worker application: waiting'
+                      : (myWorker['status'] == 'deactivated' ? 'Worker: paused' : 'Worker application: ${myWorker['status']}'),
                   Icons.hourglass_top_rounded,
                   const Color(0xFFF59E0B),
                   () => showNgmyWorkerApplySheet(context, state: widget.state, clientName: widget.clientName, clientPhone: widget.clientPhone).then((_) => _load()),
@@ -443,8 +445,12 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
   }
 }
 
-/// Top-of-card button: apply to become a house worker.
-class NgmyApplyWorkerButton extends StatelessWidget {
+/// Top of the House & Insurance card.
+///
+/// - No Civic Registry ID: nothing about workers (they can still send work).
+/// - Registry ID but not every requirement met: a short note of what is needed.
+/// - Every requirement met (or already a worker): the Apply / profile button.
+class NgmyApplyWorkerButton extends StatefulWidget {
   const NgmyApplyWorkerButton({
     super.key,
     required this.state,
@@ -457,29 +463,123 @@ class NgmyApplyWorkerButton extends StatelessWidget {
   final String clientPhone;
 
   @override
+  State<NgmyApplyWorkerButton> createState() => _NgmyApplyWorkerButtonState();
+}
+
+class _NgmyApplyWorkerButtonState extends State<NgmyApplyWorkerButton> {
+  Map<String, dynamic>? _me;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final res = await NgmyHouseWorkersApi.me();
+    if (!mounted) return;
+    setState(() => _me = res['ok'] == true ? res : <String, dynamic>{});
+  }
+
+  Widget _summaryLabel(BuildContext context) {
+    final c = _HwColors(context);
+    return Row(
+      children: [
+        const Icon(Icons.receipt_long_rounded, color: _kHwAccent, size: 20),
+        const SizedBox(width: 8),
+        Text(
+          'REQUEST SUMMARY',
+          style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: c.muted),
+        ),
+      ],
+    );
+  }
+
+  Widget _note(BuildContext context, String text, {Color color = const Color(0xFFF59E0B)}) {
+    final c = _HwColors(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(c.isDark ? 0.14 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.construction_rounded, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11.5, height: 1.3, fontWeight: FontWeight.w600, color: c.ink),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final me = _me;
+    if (me == null || me.isEmpty) return _summaryLabel(context);
+    final isAdmin = me['isAdmin'] == true;
+    final worker = me['worker'] is Map ? Map<String, dynamic>.from(me['worker'] as Map) : null;
+    final elig = me['eligibility'] is Map ? Map<String, dynamic>.from(me['eligibility'] as Map) : const <String, dynamic>{};
+    final hasId = elig['hasRegistryId'] == true;
+    if (!hasId && !isAdmin && worker == null) return _summaryLabel(context);
+
+    if (worker?['status'] == 'deactivated') {
+      return _note(
+        context,
+        'Your worker account is paused: more than 5 missed or more than 3 claims in Civic Registry.',
+        color: const Color(0xFFEF4444),
+      );
+    }
+    final eligible = elig['eligible'] == true;
+    if (!eligible && !isAdmin && worker == null) {
+      final missing = <String>[
+        if (elig['hasBio'] != true) 'a bio page',
+        if (elig['deactivated'] == true) 'no more than 5 missed / 3 claims',
+      ];
+      return _note(
+        context,
+        'Want to work fixing houses? You need a Civic Registry ID, at least one bio page in Menu Studio, '
+        'no more than 5 missed and no more than 3 claims.'
+        '${missing.isEmpty ? '' : ' Still needed: ${missing.join(', ')}.'}',
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () => showNgmyWorkerApplySheet(context, state: state, clientName: clientName, clientPhone: clientPhone),
+        onTap: () => showNgmyWorkerApplySheet(
+          context,
+          state: widget.state,
+          clientName: widget.clientName,
+          clientPhone: widget.clientPhone,
+        ).then((_) => _load()),
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             gradient: const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF10B981)]),
           ),
-          child: const Row(
+          child: Row(
             children: [
-              Icon(Icons.construction_rounded, color: Colors.white, size: 18),
-              SizedBox(width: 8),
+              const Icon(Icons.construction_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Apply to be a worker',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5),
+                  worker == null ? 'Apply to be a worker' : 'My worker profile',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5),
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
+              const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 18),
             ],
           ),
         ),
@@ -1455,6 +1555,22 @@ class _AdminWorkersSheetState extends State<_AdminWorkersSheet> {
                             ((w['skills'] as List?) ?? const []).join(', '),
                             style: TextStyle(fontSize: 11.5, color: c.ink.withOpacity(0.8)),
                           ),
+                          const SizedBox(height: 4),
+                          // Civic standing: what makes someone allowed to work.
+                          Text(
+                            '${w['hasRegistryId'] == true ? '✓' : '✗'} Registry ID · '
+                            '${w['hasBio'] == true ? '✓' : '✗'} Bio page · '
+                            'Missed ${w['missed'] ?? 0}/5 · Claims ${w['claims'] ?? 0}/3',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: c.muted),
+                          ),
+                          if (w['deactivated'] == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Paused: hidden from clients until their Civic Registry standing is good.',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.red.shade400),
+                              ),
+                            ),
                           if (rating > 0) ...[
                             const SizedBox(height: 4),
                             Row(children: [

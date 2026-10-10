@@ -1415,6 +1415,81 @@ async function hwUploadPhoto(db: any, email: string, b64: string, mime: string):
   return `${base}/storage/v1/object/public/media/${path}`;
 }
 
+// Who may work fixing houses: a Civic Registry member (has a Registry ID)
+// with at least one published bio page (Menu Studio → Bio Studio). A worker
+// with more than 5 missed or more than 3 claims in Civic Registry is
+// deactivated: hidden from clients and unable to take work.
+const HW_MAX_MISSED = 5;
+const HW_MAX_CLAIMS = 3;
+type HwElig = {
+  hasRegistryId: boolean;
+  hasBio: boolean;
+  missed: number;
+  claims: number;
+  deactivated: boolean;
+  eligible: boolean;
+};
+
+async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwElig>> {
+  const keys = [...new Set(emails.map((e) => emailKey(e)).filter(Boolean))];
+  const out = new Map<string, HwElig>();
+  if (keys.length === 0) return out;
+  const payload = await loadCivicPayload(db);
+  const live = filterTombstonedMembers(
+    asMemberList(payload.members),
+    asMemberList(payload.removed),
+    asMemberList(payload.deceased),
+  );
+  const memberFor = new Map<string, Record<string, unknown>>();
+  for (const m of live) {
+    if (!String(m.registryId ?? "").trim()) continue;
+    for (const raw of [m.email, m.linkedAppEmail]) {
+      const e = emailKey(String(raw ?? ""));
+      if (e && keys.includes(e) && !memberFor.has(e)) memberFor.set(e, m);
+    }
+  }
+  const claims = new Map<string, number>();
+  const { data: claimRows } = await db.from("transactions").select("userEmail").eq("type", 6).in("userEmail", keys);
+  for (const r of claimRows ?? []) {
+    const e = emailKey(String(r.userEmail ?? ""));
+    claims.set(e, (claims.get(e) ?? 0) + 1);
+  }
+  const bioOwners = new Set<string>();
+  for (const key of ["ngmy_bio_publish_registry", "ngmy_local_bio_publish_registry"]) {
+    const value = await loadSettingsObject(db, key);
+    for (const group of [value.bios, value.entries]) {
+      if (!group || typeof group !== "object") continue;
+      for (const entry of Object.values(group as Record<string, unknown>)) {
+        if (!entry || typeof entry !== "object") continue;
+        const e = emailKey(String((entry as Record<string, unknown>).createdByEmail ?? ""));
+        if (e) bioOwners.add(e);
+      }
+    }
+  }
+  for (const e of keys) {
+    const m = memberFor.get(e);
+    const missed = Number(m?.missed ?? 0) || 0;
+    const c = claims.get(e) ?? 0;
+    const hasRegistryId = !!m;
+    const hasBio = bioOwners.has(e);
+    const deactivated = missed > HW_MAX_MISSED || c > HW_MAX_CLAIMS;
+    out.set(e, {
+      hasRegistryId,
+      hasBio,
+      missed,
+      claims: c,
+      deactivated,
+      eligible: hasRegistryId && hasBio && !deactivated,
+    });
+  }
+  return out;
+}
+
+/** An approved worker can only be seen and sent work while still in good standing. */
+function hwCanWork(e: HwElig | undefined): boolean {
+  return !!e && e.hasRegistryId && !e.deactivated;
+}
+
 async function handleHouseWorkers(req: Request, action: string, body: any): Promise<Response> {
   const email = (await requireJwtEmail(req)).trim().toLowerCase();
   if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
@@ -1429,7 +1504,8 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const { data, error } = await db.from("house_workers").select("*")
       .eq("status", "approved").ilike("state", state).limit(200);
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
-    const workers = (data ?? []).map(hwPublicWorker)
+    const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
+    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)))).map(hwPublicWorker)
       .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
     return jsonOk({ ok: true, workers });
   }
@@ -1465,12 +1541,20 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
         clientPhone: (r.status === "accepted" || r.status === "done") ? r.client_phone : "",
       }));
     }
+    const myElig = (await hwEligibility(db, [email])).get(email);
     return jsonOk({
       ok: true,
-      worker: me ? { ...hwPublicWorker(me), status: me.status, phone: me.phone } : null,
+      worker: me
+        ? {
+          ...hwPublicWorker(me),
+          status: me.status === "approved" && !hwCanWork(myElig) ? "deactivated" : me.status,
+          phone: me.phone,
+        }
+        : null,
       requests: mine,
       inbox,
       isAdmin,
+      eligibility: myElig ?? null,
     });
   }
 
@@ -1486,6 +1570,17 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       .map((s: unknown) => hwText(s, 40)).filter(Boolean).slice(0, 12);
     if (!name || phone.replace(/\D/g, "").length < 10 || !state || skills.length === 0) {
       return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, state, and at least one skill." }, 400);
+    }
+    const elig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !elig?.eligible) {
+      return jsonOk({
+        ok: false,
+        error: !elig?.hasRegistryId
+          ? "You need a Civic Registry ID to be a worker."
+          : elig.deactivated
+          ? "You cannot work right now: more than 5 missed or more than 3 claims in Civic Registry."
+          : "You need at least one bio page (Menu Studio → Bio Studio) to be a worker.",
+      }, 403);
     }
     const { data: prev } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
     if (prev?.status === "removed") {
@@ -1520,7 +1615,9 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, and what is wrong." }, 400);
     }
     const { data: w } = await db.from("house_workers").select("*").eq("id", workerId).maybeSingle();
-    if (!w || w.status !== "approved") return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    if (!w || w.status !== "approved" || !hwCanWork((await hwEligibility(db, [w.email])).get(emailKey(w.email)))) {
+      return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    }
     if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
     const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
       .eq("client_email", email).eq("status", "pending");
@@ -1549,6 +1646,12 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       if (!isWorker) return jsonOk({ ok: false, error: "Only the worker can answer this." }, 403);
       if (r.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
       const accept = body?.decision === "accept";
+      if (accept && !hwCanWork((await hwEligibility(db, [email])).get(email))) {
+        return jsonOk({
+          ok: false,
+          error: "Your worker account is deactivated (more than 5 missed or more than 3 claims in Civic Registry).",
+        }, 403);
+      }
       await db.from("house_work_requests").update({
         status: accept ? "accepted" : "declined",
         accepted_at: accept ? now : null,
@@ -1595,9 +1698,18 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   if (action === "hwAdminList") {
     const { data } = await db.from("house_workers").select("*").order("created_at", { ascending: false }).limit(500);
     const rank: Record<string, number> = { pending: 0, approved: 1, rejected: 2, removed: 3 };
-    const workers = (data ?? []).map((w: any) => ({
-      ...hwPublicWorker(w), email: w.email, phone: w.phone, status: w.status, createdAt: w.created_at,
-    })).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
+    const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
+    const workers = (data ?? []).map((w: any) => {
+      const e = elig.get(emailKey(w.email));
+      return {
+        ...hwPublicWorker(w), email: w.email, phone: w.phone, status: w.status, createdAt: w.created_at,
+        hasRegistryId: e?.hasRegistryId ?? false,
+        hasBio: e?.hasBio ?? false,
+        missed: e?.missed ?? 0,
+        claims: e?.claims ?? 0,
+        deactivated: !hwCanWork(e),
+      };
+    }).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
     return jsonOk({ ok: true, workers });
   }
   // hwAdminDecide
