@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -239,6 +240,14 @@ class _NgmyHomeVoteAdStudioPanelState extends State<NgmyHomeVoteAdStudioPanel> {
     );
   }
 
+  List<List<NgmyVoteAdSlideStyle>> _slideStyleRows(int rows) {
+    final all = kNgmyVoteAdSlideStyles;
+    final per = (all.length + rows - 1) ~/ rows;
+    return [
+      for (var i = 0; i < all.length; i += per) all.sublist(i, math.min(i + per, all.length)),
+    ];
+  }
+
   Widget _slideStyleChip(NgmyVoteAdSlideStyle s, NgmyHubTheme t) {
     final on = _draft.slideStyle == s.id;
     return FilterChip(
@@ -337,16 +346,13 @@ class _NgmyHomeVoteAdStudioPanelState extends State<NgmyHomeVoteAdStudioPanel> {
 
         Text('Slide styles', style: TextStyle(color: t.title, fontWeight: FontWeight.w800, fontSize: 12)),
         const SizedBox(height: 8),
-        // Two rows (top and bottom) that scroll together.
+        // Three rows that scroll together.
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              for (final row in [
-                kNgmyVoteAdSlideStyles.sublist(0, (kNgmyVoteAdSlideStyles.length + 1) ~/ 2),
-                kNgmyVoteAdSlideStyles.sublist((kNgmyVoteAdSlideStyles.length + 1) ~/ 2),
-              ])
+              for (final row in _slideStyleRows(3))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 6),
                   child: Row(

@@ -255,6 +255,34 @@ class NgmyBioPreview extends StatelessWidget {
         return _proBoardingPass(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.proHoloId:
         return _proHoloId(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proNeonSign:
+        return _proNeonSign(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proVinyl:
+        return _proVinyl(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proFilmStrip:
+        return _proFilmStrip(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proGlassStack:
+        return _proGlassStack(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proCrown:
+        return _proCrown(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proConstellation:
+        return _proConstellation(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proSunburst:
+        return _proSunburst(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proEqualizer:
+        return _proEqualizer(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proBubbles:
+        return _proBubbles(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proTerminal:
+        return _proTerminal(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proGallery:
+        return _proGallery(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proPulse:
+        return _proPulse(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proPostcard:
+        return _proPostcard(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
+      case NgmyBioLayoutStyle.proDiagonal:
+        return _proDiagonal(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
       case NgmyBioLayoutStyle.bioSiteClassic:
         return _bioSiteClassic(tpl, ring, avatarSize, pad, name, tagline, links, minPageHeight: minPageHeight);
     }
@@ -1708,6 +1736,708 @@ class NgmyBioPreview extends StatelessWidget {
     );
   }
 
+
+  // ── Pro bio layouts, set 2 (2026-10) ──────────────────────────────────────
+
+  /// Shared column: decoration on top, then name, socials and links.
+  Widget _proStack(
+    NgmyBioTemplate tpl,
+    double pad,
+    Widget hero,
+    String name,
+    String tagline,
+    List<NgmyBioLink> links, {
+    double minPageHeight = 0,
+    Widget? nameOverride,
+    Widget Function(int i, Widget card)? wrapLink,
+    double topGap = 14,
+  }) {
+    return _proScroll(
+      Padding(
+        padding: EdgeInsets.all(pad),
+        child: Column(
+          children: [
+            SizedBox(height: compact ? topGap * 0.6 : topGap),
+            hero,
+            SizedBox(height: compact ? 8 : 12),
+            nameOverride ?? _belowName(tpl, name, tagline),
+            if (nameOverride != null)
+              NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: !_isDarkBg(tpl.pageBg)),
+            SizedBox(height: compact ? 14 : 18),
+            if (wrapLink == null)
+              _linksColumn(links, tpl, 0)
+            else ...[
+              for (var i = 0; i < links.length; i++) wrapLink(i, _linkCard(links[i], tpl)),
+              if (!fullBleed) ...[
+                SizedBox(height: compact ? 12 : 16),
+                _madeByNgmyWatermark(tpl),
+              ],
+            ],
+          ],
+        ),
+      ),
+      minPageHeight,
+    );
+  }
+
+  // Neon sign on a brick wall.
+  Widget _proNeonSign(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final b = tpl.subtitleColor;
+    return Stack(
+      children: [
+        Positioned.fill(child: CustomPaint(painter: _ProBrickPainter(Colors.white.withValues(alpha: 0.05)))),
+        _proStack(
+          tpl,
+          pad,
+          _ProFlicker(
+            animate: !lightweight,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(avatarSize),
+                border: Border.all(color: a, width: 3),
+                boxShadow: [
+                  BoxShadow(color: a.withValues(alpha: 0.8), blurRadius: 18, spreadRadius: 1),
+                  BoxShadow(color: a.withValues(alpha: 0.4), blurRadius: 40, spreadRadius: 4),
+                ],
+              ),
+              child: _avatar(document.avatarImageBase64, avatarSize, ring),
+            ),
+          ),
+          name,
+          tagline,
+          links,
+          minPageHeight: minPageHeight,
+          topGap: 26,
+          nameOverride: Column(
+            children: [
+              _ProFlicker(
+                animate: !lightweight,
+                child: Text(
+                  name,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontStyle: FontStyle.italic,
+                    fontSize: compact ? 26 : 32,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    shadows: [Shadow(color: a, blurRadius: 8), Shadow(color: a, blurRadius: 22)],
+                  ),
+                ),
+              ),
+              if (tagline.isNotEmpty)
+                Text(
+                  tagline.toUpperCase(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: b, letterSpacing: 3, fontSize: 11, fontWeight: FontWeight.w800, shadows: [Shadow(color: b, blurRadius: 10)]),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Spinning vinyl record.
+  Widget _proVinyl(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final disc = avatarSize * 2.1;
+    return _proStack(
+      tpl,
+      pad,
+      SizedBox(
+        width: disc + 40,
+        height: disc,
+        child: Stack(
+          children: [
+            Positioned(
+              left: 0,
+              top: 0,
+              child: _ProSpin(
+                animate: !lightweight,
+                seconds: 4,
+                child: SizedBox(
+                  width: disc,
+                  height: disc,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(size: Size.square(disc), painter: _ProVinylPainter(tpl.accent)),
+                      ClipOval(
+                        child: SizedBox(
+                          width: avatarSize * 0.9,
+                          height: avatarSize * 0.9,
+                          child: document.avatarImageBase64.isNotEmpty
+                              ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.9, height: avatarSize * 0.9)
+                              : ColoredBox(color: tpl.accent, child: Icon(Icons.music_note_rounded, color: Colors.white, size: avatarSize * 0.4)),
+                        ),
+                      ),
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(right: 0, top: 6, child: CustomPaint(size: Size(54, disc * 0.62), painter: _ProTonearmPainter(tpl.subtitleColor))),
+          ],
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      wrapLink: (i, card) => Row(
+        children: [
+          SizedBox(
+            width: compact ? 28 : 34,
+            child: Text('A${i + 1}', style: TextStyle(color: tpl.accent, fontWeight: FontWeight.w900, fontSize: 12)),
+          ),
+          Expanded(child: card),
+        ],
+      ),
+    );
+  }
+
+  // Film strip borders.
+  Widget _proFilmStrip(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final frame = avatarSize * 1.6;
+    return Stack(
+      children: [
+        Positioned(left: 0, top: 0, bottom: 0, width: 22, child: CustomPaint(painter: _ProSprocketPainter(tpl.accent))),
+        Positioned(right: 0, top: 0, bottom: 0, width: 22, child: CustomPaint(painter: _ProSprocketPainter(tpl.accent))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22),
+          child: _proStack(
+            tpl,
+            pad,
+            Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(color: Colors.black, border: Border.all(color: tpl.accent.withValues(alpha: 0.6))),
+                  child: SizedBox(
+                    width: frame * 1.3,
+                    height: frame,
+                    child: document.headerImageBase64.isNotEmpty || document.avatarImageBase64.isNotEmpty
+                        ? _bioImage(document.headerImageBase64.isNotEmpty ? document.headerImageBase64 : document.avatarImageBase64, fit: BoxFit.cover, width: frame * 1.3, height: frame)
+                        : DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: tpl.headerGradient ?? [tpl.accent, tpl.pageBg]))),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('▶ SCENE 01 · TAKE 1', style: _mono(tpl.accent, 9.5)),
+              ],
+            ),
+            name,
+            tagline,
+            links,
+            minPageHeight: minPageHeight,
+            wrapLink: (i, card) => Row(
+              children: [
+                Text('${(i + 1) * 12}A', style: _mono(tpl.accent.withValues(alpha: 0.8), 9)),
+                const SizedBox(width: 6),
+                Expanded(child: card),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Floating 3D glass panels.
+  Widget _proGlassStack(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final size = avatarSize * 2;
+    Widget panel(double rot, double dx, double dy, Color c) => Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.0012)
+            ..rotateY(rot)
+            ..rotateZ(rot * 0.3),
+          child: Transform.translate(
+            offset: Offset(dx, dy),
+            child: Container(
+              width: size * 0.78,
+              height: size * 0.92,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.withValues(alpha: 0.55), c.withValues(alpha: 0.12)]),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.45)),
+              ),
+            ),
+          ),
+        );
+    final cols = tpl.headerGradient ?? [tpl.accent, tpl.subtitleColor];
+    return _proStack(
+      tpl,
+      pad,
+      _ProBob(
+        animate: !lightweight,
+        child: SizedBox(
+          width: size + 40,
+          height: size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              panel(-0.55, -size * 0.32, 6, cols.first),
+              panel(0.55, size * 0.32, 6, cols.last),
+              _avatar(document.avatarImageBase64, avatarSize, ring),
+            ],
+          ),
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+    );
+  }
+
+  // Crown and sparkling gold rings.
+  Widget _proCrown(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final outer = avatarSize + 40;
+    return _proStack(
+      tpl,
+      pad,
+      Column(
+        children: [
+          _ProBob(animate: !lightweight, amplitude: 3, child: Icon(Icons.workspace_premium_rounded, size: compact ? 36 : 44, color: a, shadows: [Shadow(color: a, blurRadius: 14)])),
+          const SizedBox(height: 4),
+          SizedBox(
+            width: outer + 30,
+            height: outer + 30,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                _ProSpin(animate: !lightweight, seconds: 16, child: CustomPaint(size: Size.square(outer + 30), painter: _ProSparkleRingPainter(a))),
+                Container(
+                  width: outer,
+                  height: outer,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: a, width: 2),
+                    gradient: RadialGradient(colors: [a.withValues(alpha: 0.18), Colors.transparent]),
+                  ),
+                ),
+                _avatar(document.avatarImageBase64, avatarSize, ring),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.eco_rounded, size: 18, color: a),
+              const SizedBox(width: 6),
+              Container(width: 60, height: 1, color: a),
+              const SizedBox(width: 6),
+              Transform.flip(flipX: true, child: Icon(Icons.eco_rounded, size: 18, color: a)),
+            ],
+          ),
+        ],
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+    );
+  }
+
+  // Constellation of twinkling stars around the photo.
+  Widget _proConstellation(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final size = avatarSize * 2.4;
+    return _proStack(
+      tpl,
+      pad,
+      SizedBox(
+        width: size,
+        height: size * 0.9,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            _ProTicker(animate: !lightweight, seconds: 4, builder: (t) => CustomPaint(size: Size(size, size * 0.9), painter: _ProConstellationPainter(tpl.accent, t))),
+            _avatar(document.avatarImageBase64, avatarSize, ring),
+          ],
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+    );
+  }
+
+  // Rotating sun rays.
+  Widget _proSunburst(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final size = avatarSize * 2.3;
+    return _proStack(
+      tpl,
+      pad,
+      SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            _ProSpin(animate: !lightweight, seconds: 24, child: CustomPaint(size: Size.square(size), painter: _ProRaysPainter(tpl.accent))),
+            Container(
+              width: avatarSize + 26,
+              height: avatarSize + 26,
+              decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: tpl.accent.withValues(alpha: 0.7), blurRadius: 30, spreadRadius: 4)]),
+            ),
+            _avatar(document.avatarImageBase64, avatarSize, ring),
+          ],
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      topGap: 4,
+    );
+  }
+
+  // Bouncing audio equalizer.
+  Widget _proEqualizer(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    return _proStack(
+      tpl,
+      pad,
+      Column(
+        children: [
+          _avatar(document.avatarImageBase64, avatarSize, ring),
+          const SizedBox(height: 14),
+          _ProTicker(
+            animate: !lightweight,
+            seconds: 2,
+            builder: (t) => CustomPaint(size: Size(compact ? 200 : 240, 40), painter: _ProEqualizerPainter(tpl.headerGradient ?? [tpl.accent, tpl.subtitleColor], t)),
+          ),
+        ],
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      topGap: 26,
+      wrapLink: (i, card) => Row(
+        children: [
+          Icon(Icons.play_circle_fill_rounded, color: tpl.accent, size: compact ? 22 : 26),
+          const SizedBox(width: 8),
+          Expanded(child: card),
+        ],
+      ),
+    );
+  }
+
+  // Rising bubbles.
+  Widget _proBubbles(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    return Stack(
+      children: [
+        Positioned.fill(child: IgnorePointer(child: _ProTicker(animate: !lightweight, seconds: 9, builder: (t) => CustomPaint(painter: _ProBubblePainter(tpl.accent, t))))),
+        _proStack(
+          tpl,
+          pad,
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(center: const Alignment(-0.4, -0.5), colors: [Colors.white.withValues(alpha: 0.45), tpl.accent.withValues(alpha: 0.12)]),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
+            ),
+            child: _avatar(document.avatarImageBase64, avatarSize, ring),
+          ),
+          name,
+          tagline,
+          links,
+          minPageHeight: minPageHeight,
+          topGap: 26,
+        ),
+      ],
+    );
+  }
+
+  // Code editor window.
+  Widget _proTerminal(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final keyword = const Color(0xFFC084FC);
+    final str = const Color(0xFFFDE68A);
+    Widget line(int n, List<TextSpan> parts) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: 22, child: Text('$n', style: _mono(Colors.white.withValues(alpha: 0.3), 10.5))),
+            Expanded(child: Text.rich(TextSpan(children: parts), style: _mono(Colors.white, 11.5))),
+          ],
+        );
+    return _proStack(
+      tpl,
+      pad,
+      Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1117),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          boxShadow: [BoxShadow(color: a.withValues(alpha: 0.25), blurRadius: 24)],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: const BorderRadius.vertical(top: Radius.circular(12))),
+              child: Row(
+                children: [
+                  for (final c in const [Color(0xFFEF4444), Color(0xFFF59E0B), Color(0xFF22C55E)])
+                    Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+                  const SizedBox(width: 6),
+                  Text('profile.dart', style: _mono(Colors.white.withValues(alpha: 0.6), 10.5)),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _avatar(document.avatarImageBase64, avatarSize * 0.7, ring),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        line(1, [TextSpan(text: 'final ', style: TextStyle(color: keyword)), const TextSpan(text: 'me = Person(')]),
+                        line(2, [TextSpan(text: "  name: ", style: TextStyle(color: a)), TextSpan(text: "'$name',", style: TextStyle(color: str))]),
+                        if (tagline.isNotEmpty) line(3, [TextSpan(text: '  role: ', style: TextStyle(color: a)), TextSpan(text: "'$tagline',", style: TextStyle(color: str))]),
+                        line(tagline.isNotEmpty ? 4 : 3, [const TextSpan(text: ');')]),
+                        Row(children: [
+                          SizedBox(width: 22, child: Text('${tagline.isNotEmpty ? 5 : 4}', style: _mono(Colors.white.withValues(alpha: 0.3), 10.5))),
+                          _ProBlinkText(text: '▌', style: _mono(a, 12), animate: !lightweight),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      nameOverride: const SizedBox.shrink(),
+      wrapLink: (i, card) => Row(
+        children: [
+          Text('\$ ', style: _mono(a, 13, weight: FontWeight.w900)),
+          Expanded(child: card),
+        ],
+      ),
+    );
+  }
+
+  // Museum frame with a plaque.
+  Widget _proGallery(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    final w = avatarSize * 1.7;
+    return _proStack(
+      tpl,
+      pad,
+      Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(a, Colors.white, 0.4)!, a, Color.lerp(a, Colors.black, 0.45)!, a]),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 18, offset: const Offset(0, 10))],
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              color: const Color(0xFFF5F0E6),
+              child: SizedBox(
+                width: w,
+                height: w * 1.2,
+                child: document.avatarImageBase64.isNotEmpty
+                    ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: w, height: w * 1.2)
+                    : ColoredBox(color: tpl.pageBg, child: Icon(Icons.person_rounded, size: w * 0.5, color: a)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [Color.lerp(a, Colors.white, 0.3)!, a]),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Column(
+              children: [
+                Text(name, style: const TextStyle(fontFamily: 'Georgia', color: Color(0xFF1C1917), fontWeight: FontWeight.w700, fontSize: 16)),
+                if (tagline.isNotEmpty) Text(tagline, style: const TextStyle(color: Color(0xFF44403C), fontSize: 10.5, fontStyle: FontStyle.italic)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      nameOverride: const SizedBox.shrink(),
+    );
+  }
+
+  // Moving heartbeat line.
+  Widget _proPulse(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    return _proStack(
+      tpl,
+      pad,
+      SizedBox(
+        height: avatarSize + 30,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: _ProTicker(animate: !lightweight, seconds: 3, builder: (t) => CustomPaint(painter: _ProEcgPainter(tpl.accent, t))),
+            ),
+            _ProPulseScale(
+              animate: !lightweight,
+              child: Container(
+                decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: tpl.accent.withValues(alpha: 0.6), blurRadius: 24)]),
+                child: _avatar(document.avatarImageBase64, avatarSize, ring),
+              ),
+            ),
+          ],
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+    );
+  }
+
+  // Postcard with stamp and postmark.
+  Widget _proPostcard(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final a = tpl.accent;
+    return _proStack(
+      tpl,
+      pad,
+      Transform.rotate(
+        angle: -0.02,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFFCF5),
+            borderRadius: BorderRadius.circular(6),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 14, offset: const Offset(0, 8))],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Greetings from', style: TextStyle(color: a, fontFamily: 'Georgia', fontStyle: FontStyle.italic, fontSize: 12)),
+                    Text(name, style: const TextStyle(color: Color(0xFF1C1917), fontFamily: 'Georgia', fontWeight: FontWeight.w700, fontSize: 20, height: 1.1)),
+                    const SizedBox(height: 6),
+                    if (tagline.isNotEmpty) Text(tagline, style: const TextStyle(color: Color(0xFF57534E), fontSize: 11.5)),
+                    const SizedBox(height: 10),
+                    for (var i = 0; i < 3; i++) Container(height: 1, margin: const EdgeInsets.only(bottom: 9), color: const Color(0xFFD6D3D1)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(border: Border.all(color: a, width: 1.5)),
+                    child: SizedBox(
+                      width: avatarSize * 0.72,
+                      height: avatarSize * 0.86,
+                      child: document.avatarImageBase64.isNotEmpty
+                          ? _bioImage(document.avatarImageBase64, fit: BoxFit.cover, width: avatarSize * 0.72, height: avatarSize * 0.86)
+                          : ColoredBox(color: a.withValues(alpha: 0.25), child: Icon(Icons.person_rounded, color: a)),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Transform.rotate(
+                    angle: -0.3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(border: Border.all(color: a.withValues(alpha: 0.7), width: 1.5), borderRadius: BorderRadius.circular(20)),
+                      child: Text('NGMY · ${DateTime.now().year}', style: TextStyle(color: a.withValues(alpha: 0.8), fontSize: 8.5, fontWeight: FontWeight.w900)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      name,
+      tagline,
+      links,
+      minPageHeight: minPageHeight,
+      nameOverride: const SizedBox.shrink(),
+    );
+  }
+
+  // Bold diagonal split with sideways lettering.
+  Widget _proDiagonal(NgmyBioTemplate tpl, NgmyBioRingStyle ring, double avatarSize, double pad, String name, String tagline, List<NgmyBioLink> links, {double minPageHeight = 0}) {
+    final first = name.trim().split(RegExp(r'\s+')).first.toUpperCase();
+    final heroH = avatarSize * 2.2;
+    return _proScroll(
+      Column(
+        children: [
+          SizedBox(
+            height: heroH,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ClipPath(
+                  clipper: _ProDiagonalClipper(),
+                  child: DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(colors: tpl.headerGradient ?? [tpl.accent, tpl.subtitleColor]))),
+                ),
+                Positioned(
+                  left: 6,
+                  top: 0,
+                  bottom: 0,
+                  child: RotatedBox(
+                    quarterTurns: 3,
+                    child: Center(
+                      child: Text(first, style: TextStyle(fontSize: compact ? 40 : 54, fontWeight: FontWeight.w900, color: Colors.white.withValues(alpha: 0.22), letterSpacing: 4)),
+                    ),
+                  ),
+                ),
+                Positioned(right: pad + 4, top: heroH * 0.18, child: _avatar(document.avatarImageBase64, avatarSize * 1.05, ring)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(pad, 4, pad, pad),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: TextStyle(color: tpl.titleColor, fontSize: compact ? 26 : 32, fontWeight: FontWeight.w900, height: 1, letterSpacing: -0.8)),
+                if (tagline.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(height: 3, width: 48, color: tpl.accent),
+                  const SizedBox(height: 6),
+                  Text(tagline, style: TextStyle(color: tpl.subtitleColor, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                ],
+                NgmyBioSocialRow(links: document.socialLinks, compact: compact, lightBackground: !_isDarkBg(tpl.pageBg)),
+                SizedBox(height: compact ? 12 : 16),
+                _linksColumn(links, tpl, 0),
+              ],
+            ),
+          ),
+        ],
+      ),
+      minPageHeight,
+    );
+  }
+
   // ── Shared pieces ─────────────────────────────────────────────────────────
 
   Widget _framedLinks(List<NgmyBioLink> links, NgmyBioTemplate tpl, double pad) {
@@ -2546,4 +3276,366 @@ class _ProChipPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Set 2 animation helpers (all static when animate is false) ─────────────
+
+/// Rebuilds [builder] with a 0→1 value that loops every [seconds].
+class _ProTicker extends StatefulWidget {
+  const _ProTicker({required this.builder, required this.animate, this.seconds = 4});
+  final Widget Function(double t) builder;
+  final bool animate;
+  final int seconds;
+  @override
+  State<_ProTicker> createState() => _ProTickerState();
+}
+
+class _ProTickerState extends State<_ProTicker> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds));
+    if (widget.animate) _c.repeat();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.animate) return widget.builder(0.3);
+    return AnimatedBuilder(animation: _c, builder: (_, __) => widget.builder(_c.value));
+  }
+}
+
+/// Neon flicker: mostly on, with short random-looking dips.
+class _ProFlicker extends StatelessWidget {
+  const _ProFlicker({required this.child, required this.animate});
+  final Widget child;
+  final bool animate;
+  @override
+  Widget build(BuildContext context) {
+    if (!animate) return child;
+    return _ProTicker(
+      animate: true,
+      seconds: 5,
+      builder: (t) {
+        final dip = (t > 0.31 && t < 0.33) || (t > 0.35 && t < 0.36) || (t > 0.78 && t < 0.795);
+        return Opacity(opacity: dip ? 0.35 : 1, child: child);
+      },
+    );
+  }
+}
+
+/// Gentle up-and-down float.
+class _ProBob extends StatelessWidget {
+  const _ProBob({required this.child, required this.animate, this.amplitude = 6});
+  final Widget child;
+  final bool animate;
+  final double amplitude;
+  @override
+  Widget build(BuildContext context) {
+    if (!animate) return child;
+    return _ProTicker(
+      animate: true,
+      seconds: 4,
+      builder: (t) => Transform.translate(offset: Offset(0, math.sin(t * math.pi * 2) * amplitude), child: child),
+    );
+  }
+}
+
+/// Heartbeat scale.
+class _ProPulseScale extends StatelessWidget {
+  const _ProPulseScale({required this.child, required this.animate});
+  final Widget child;
+  final bool animate;
+  @override
+  Widget build(BuildContext context) {
+    if (!animate) return child;
+    return _ProTicker(
+      animate: true,
+      seconds: 1,
+      builder: (t) {
+        final beat = t < 0.12 ? math.sin(t / 0.12 * math.pi) : (t > 0.22 && t < 0.34 ? 0.6 * math.sin((t - 0.22) / 0.12 * math.pi) : 0.0);
+        return Transform.scale(scale: 1 + beat * 0.05, child: child);
+      },
+    );
+  }
+}
+
+class _ProBrickPainter extends CustomPainter {
+  _ProBrickPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    const bh = 22.0;
+    const bw = 52.0;
+    for (var row = 0; row * bh < s.height; row++) {
+      final y = row * bh;
+      canvas.drawLine(Offset(0, y), Offset(s.width, y), p);
+      final off = row.isEven ? 0.0 : bw / 2;
+      for (var x = off; x < s.width; x += bw) {
+        canvas.drawLine(Offset(x, y), Offset(x, y + bh), p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProBrickPainter old) => old.color != color;
+}
+
+class _ProVinylPainter extends CustomPainter {
+  _ProVinylPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2;
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFF0A0A0A));
+    final groove = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8
+      ..color = Colors.white.withValues(alpha: 0.07);
+    for (var rr = r * 0.48; rr < r - 3; rr += 3.2) {
+      canvas.drawCircle(c, rr, groove);
+    }
+    // Light reflection.
+    canvas.drawArc(
+      Rect.fromCircle(center: c, radius: r * 0.8),
+      -2.4,
+      0.9,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.3
+        ..color = Colors.white.withValues(alpha: 0.05),
+    );
+    canvas.drawCircle(c, r * 0.47, Paint()..color = accent);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProVinylPainter old) => old.accent != accent;
+}
+
+class _ProTonearmPainter extends CustomPainter {
+  _ProTonearmPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final pivot = Offset(s.width - 12, 12);
+    canvas.drawCircle(pivot, 10, Paint()..color = color.withValues(alpha: 0.9));
+    final arm = Paint()
+      ..color = color
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    final end = Offset(10, s.height - 8);
+    canvas.drawLine(pivot, end, arm);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: end, width: 14, height: 20), const Radius.circular(3)), Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProTonearmPainter old) => old.color != color;
+}
+
+class _ProSprocketPainter extends CustomPainter {
+  _ProSprocketPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawRect(Offset.zero & s, Paint()..color = const Color(0xFF0A0A0A));
+    final hole = Paint()..color = accent.withValues(alpha: 0.35);
+    for (var y = 8.0; y < s.height; y += 22) {
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(s.width * 0.25, y, s.width * 0.5, 12), const Radius.circular(2)), hole);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProSprocketPainter old) => old.accent != accent;
+}
+
+class _ProSparkleRingPainter extends CustomPainter {
+  _ProSparkleRingPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 6;
+    for (var i = 0; i < 12; i++) {
+      final a = i / 12 * math.pi * 2;
+      final p = c + Offset(math.cos(a), math.sin(a)) * r;
+      final big = i % 3 == 0;
+      final len = big ? 6.0 : 3.0;
+      final paint = Paint()
+        ..color = color.withValues(alpha: big ? 1 : 0.6)
+        ..strokeWidth = big ? 1.8 : 1.2
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(p - Offset(len, 0), p + Offset(len, 0), paint);
+      canvas.drawLine(p - Offset(0, len), p + Offset(0, len), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProSparkleRingPainter old) => old.color != color;
+}
+
+class _ProConstellationPainter extends CustomPainter {
+  _ProConstellationPainter(this.color, this.t);
+  final Color color;
+  final double t;
+  static const _pts = [
+    Offset(0.08, 0.2), Offset(0.22, 0.08), Offset(0.36, 0.18), Offset(0.12, 0.62),
+    Offset(0.26, 0.86), Offset(0.74, 0.12), Offset(0.9, 0.3), Offset(0.84, 0.66),
+    Offset(0.68, 0.9), Offset(0.95, 0.85),
+  ];
+  static const _links = [[0, 1], [1, 2], [0, 3], [3, 4], [5, 6], [6, 7], [7, 8], [7, 9]];
+  @override
+  void paint(Canvas canvas, Size s) {
+    final pts = [for (final p in _pts) Offset(p.dx * s.width, p.dy * s.height)];
+    final line = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 1;
+    for (final l in _links) {
+      canvas.drawLine(pts[l[0]], pts[l[1]], line);
+    }
+    for (var i = 0; i < pts.length; i++) {
+      final tw = 0.5 + 0.5 * math.sin((t + i * 0.13) * math.pi * 2);
+      canvas.drawCircle(pts[i], 2 + tw * 2.5, Paint()..color = Colors.white.withValues(alpha: 0.5 + tw * 0.5));
+      canvas.drawCircle(pts[i], 7 + tw * 4, Paint()..color = color.withValues(alpha: 0.15 * tw));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProConstellationPainter old) => old.t != t || old.color != color;
+}
+
+class _ProRaysPainter extends CustomPainter {
+  _ProRaysPainter(this.color);
+  final Color color;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2;
+    const n = 18;
+    for (var i = 0; i < n; i++) {
+      final a = i / n * math.pi * 2;
+      final path = Path()
+        ..moveTo(c.dx, c.dy)
+        ..lineTo(c.dx + math.cos(a - 0.08) * r, c.dy + math.sin(a - 0.08) * r)
+        ..lineTo(c.dx + math.cos(a + 0.08) * r, c.dy + math.sin(a + 0.08) * r)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = RadialGradient(colors: [color.withValues(alpha: 0.55), color.withValues(alpha: 0)]).createShader(Rect.fromCircle(center: c, radius: r)),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProRaysPainter old) => old.color != color;
+}
+
+class _ProEqualizerPainter extends CustomPainter {
+  _ProEqualizerPainter(this.colors, this.t);
+  final List<Color> colors;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    const n = 21;
+    final w = s.width / n;
+    for (var i = 0; i < n; i++) {
+      final v = 0.25 + 0.75 * (0.5 + 0.5 * math.sin(t * math.pi * 2 * (1 + (i % 4) * 0.5) + i * 0.9)).abs();
+      final h = s.height * v;
+      final col = Color.lerp(colors.first, colors.last, i / (n - 1))!;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Rect.fromLTWH(i * w + w * 0.18, (s.height - h) / 2, w * 0.64, h), const Radius.circular(3)),
+        Paint()..color = col,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProEqualizerPainter old) => old.t != t;
+}
+
+class _ProBubblePainter extends CustomPainter {
+  _ProBubblePainter(this.color, this.t);
+  final Color color;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    for (var i = 0; i < 18; i++) {
+      final seed = (i * 7907 % 991) / 991.0;
+      final r = 6 + seed * 18;
+      final sx = (i * 3571 % 997) / 997.0;
+      final phase = (i * 0.6180339) % 1.0;
+      final x = sx * s.width + math.sin((t + phase) * math.pi * 2) * 14;
+      final y = s.height - ((t * (0.5 + seed) + phase) % 1) * (s.height + r * 2) + r;
+      final c = Offset(x, y);
+      canvas.drawCircle(
+        c,
+        r,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..color = Colors.white.withValues(alpha: 0.35),
+      );
+      canvas.drawCircle(c, r, Paint()..color = color.withValues(alpha: 0.08));
+      canvas.drawCircle(c + Offset(-r * 0.35, -r * 0.35), r * 0.18, Paint()..color = Colors.white.withValues(alpha: 0.6));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProBubblePainter old) => old.t != t;
+}
+
+class _ProEcgPainter extends CustomPainter {
+  _ProEcgPainter(this.color, this.t);
+  final Color color;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final y = s.height / 2;
+    final path = Path()..moveTo(0, y);
+    const period = 140.0;
+    final shift = t * period;
+    for (var x = 0.0; x <= s.width; x += 2) {
+      final u = ((x + shift) % period) / period;
+      double dy = 0;
+      if (u > 0.40 && u < 0.44) dy = -(u - 0.40) / 0.04 * s.height * 0.35;
+      if (u >= 0.44 && u < 0.48) dy = -s.height * 0.35 + (u - 0.44) / 0.04 * s.height * 0.7;
+      if (u >= 0.48 && u < 0.52) dy = s.height * 0.35 - (u - 0.48) / 0.04 * s.height * 0.35;
+      path.lineTo(x, y + dy);
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = color.withValues(alpha: 0.75)
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ProEcgPainter old) => old.t != t || old.color != color;
+}
+
+class _ProDiagonalClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size s) => Path()
+    ..lineTo(s.width, 0)
+    ..lineTo(s.width, s.height * 0.62)
+    ..lineTo(0, s.height)
+    ..close();
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }

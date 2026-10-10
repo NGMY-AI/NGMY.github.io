@@ -459,6 +459,149 @@ class _Backdrop extends StatelessWidget {
             ClipPath(clipper: _DiagonalClipper(), child: ColoredBox(color: accent)),
           ],
         );
+      case 'fireworks':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF020617), Color(0xFF1E1B4B), Color(0xFF312E81)],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _FireworksPainter(accent, orbit)),
+          ],
+        );
+      case 'liquid':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF14052B)),
+            CustomPaint(painter: _LiquidBlobPainter(accent, orbit)),
+          ],
+        );
+      case 'onair':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0F0A1E), Color(0xFF2A0E2E), Color(0xFF0B0B14)],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _EqualizerBgPainter(accent, orbit)),
+          ],
+        );
+      case 'globe':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0.6, 0),
+                  radius: 1.1,
+                  colors: [Color(0xFF0C4A6E), Color(0xFF020617)],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _TwinkleStarsPainter(orbit)),
+          ],
+        );
+      case 'countdown':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF0C0A09)),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.55, 0.15),
+                  radius: 0.9,
+                  colors: [accent.withValues(alpha: 0.32 + pulse * 0.12), Colors.transparent],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _DashedOrbitsPainter(accent, orbit)),
+          ],
+        );
+      case 'prism':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF07070C)),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: SweepGradient(
+                  center: const Alignment(0.7, -0.6),
+                  transform: GradientRotation(orbit * math.pi * 2),
+                  colors: [
+                    const Color(0xFFF472B6).withValues(alpha: 0.35),
+                    const Color(0xFFFACC15).withValues(alpha: 0.25),
+                    const Color(0xFF4ADE80).withValues(alpha: 0.25),
+                    const Color(0xFF22D3EE).withValues(alpha: 0.35),
+                    const Color(0xFFA78BFA).withValues(alpha: 0.35),
+                    const Color(0xFFF472B6).withValues(alpha: 0.35),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      case 'sunrise':
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                const Color(0xFF1E1B4B),
+                Color.lerp(const Color(0xFF7C2D12), const Color(0xFF9D174D), pulse)!,
+                const Color(0xFFF97316),
+              ],
+              stops: const [0, 0.55, 1],
+            ),
+          ),
+        );
+      case 'matrix':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF000502)),
+            CustomPaint(painter: _DigitalRainPainter(accent, orbit)),
+          ],
+        );
+      case 'ripple':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF042F2E), Color(0xFF0B3B4F), Color(0xFF020617)],
+                ),
+              ),
+            ),
+            CustomPaint(painter: _WaveLinesPainter(accent, orbit)),
+          ],
+        );
+      case 'stage':
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: Color(0xFF0A0505)),
+            CustomPaint(painter: _StagePainter(accent, orbit)),
+          ],
+        );
       case 'cinematic':
       default:
         return Stack(
@@ -510,6 +653,11 @@ class _Wash extends StatelessWidget {
                 Colors.black.withValues(alpha: 0.25),
                 Colors.transparent,
                 Colors.black.withValues(alpha: 0.55),
+              ],
+            'fireworks' || 'liquid' || 'onair' || 'globe' || 'countdown' || 'prism' || 'sunrise' || 'matrix' || 'ripple' || 'stage' => [
+                Colors.transparent,
+                Colors.black.withValues(alpha: 0.05),
+                Colors.black.withValues(alpha: 0.35),
               ],
             _ => [
                 Colors.black.withValues(alpha: 0.18),
@@ -609,6 +757,22 @@ class _SlideBody extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Candidate photo, or a glowing ballot badge when there is none.
+  Widget _faceOr(double size, IconData icon, {bool square = false}) {
+    return _face(size: size, square: square) ??
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(square ? 8 : 999),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(accent, Colors.white, 0.25)!, Color.lerp(accent, Colors.black, 0.35)!]),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.7), width: 2),
+            boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.4), blurRadius: 14)],
+          ),
+          child: Icon(icon, color: Colors.white, size: size * 0.48),
+        );
   }
 
   @override
@@ -1264,6 +1428,472 @@ class _SlideBody extends StatelessWidget {
           ],
         );
 
+      case 'fireworks':
+        return Column(
+          children: [
+            Text(headline, textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 2.4, shadows: [Shadow(color: accent, blurRadius: 12)])),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: SweepGradient(
+                  transform: GradientRotation(orbit * math.pi * 4),
+                  colors: [accent, Colors.white, accent.withValues(alpha: 0.2), accent],
+                ),
+                boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.45 * breathe), blurRadius: 22)],
+              ),
+              child: _faceOr(74, Icons.how_to_vote_rounded),
+            ),
+            const SizedBox(height: 8),
+            ShaderMask(
+              shaderCallback: (r) => LinearGradient(colors: [Colors.white, accent, Colors.white], stops: [0, (orbit * 2) % 1, 1]).createShader(r),
+              child: Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 23, letterSpacing: 0.4)),
+            ),
+            const SizedBox(height: 2),
+            Text(support, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
+      case 'liquid':
+        final w1 = 0.5 + 0.5 * math.sin(orbit * math.pi * 2);
+        final w2 = 0.5 + 0.5 * math.cos(orbit * math.pi * 2);
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.32)),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 20, offset: const Offset(0, 8))],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Transform.scale(
+                  scale: breathe,
+                  child: Container(
+                    width: 78,
+                    height: 78,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(22 + w1 * 26),
+                        topRight: Radius.circular(22 + w2 * 26),
+                        bottomRight: Radius.circular(48 - w1 * 26),
+                        bottomLeft: Radius.circular(48 - w2 * 26),
+                      ),
+                      border: Border.all(color: Colors.white, width: 2.5),
+                      gradient: LinearGradient(colors: [accent, const Color(0xFFA78BFA)]),
+                      image: showCircle && face != null ? DecorationImage(image: face!, fit: BoxFit.cover) : null,
+                    ),
+                    child: showCircle && face != null ? null : const Icon(Icons.how_to_vote_rounded, color: Colors.white, size: 36),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(99)),
+                        child: Text(headline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 1.2)),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.05)),
+                      const SizedBox(height: 3),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
+                      const SizedBox(height: 8),
+                      _CtaChip(label: cta, accent: accent, pulse: breathe),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+      case 'onair':
+        final lamp = ((breathe - 0.94) / 0.06).clamp(0.0, 1.0);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Color.lerp(const Color(0xFF7F1D1D), accent, lamp),
+                    borderRadius: BorderRadius.circular(6),
+                    boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.7 * lamp), blurRadius: 16)],
+                  ),
+                  child: const Text('ON AIR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 2)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.4))),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                SizedBox(
+                  width: 78,
+                  height: 78,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Transform.rotate(angle: orbit * math.pi * 6, child: CustomPaint(size: const Size.square(78), painter: _VinylRingPainter(accent))),
+                      _faceOr(52, Icons.mic_rounded),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.02)),
+                      const SizedBox(height: 4),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                _CtaChip(label: cta, accent: accent, pulse: breathe),
+                const Spacer(),
+                Text('VOTE FM 98.6', style: TextStyle(color: accent, fontFamily: 'monospace', fontWeight: FontWeight.w800, fontSize: 9.5, letterSpacing: 1)),
+              ],
+            ),
+            const SizedBox(height: 22),
+          ],
+        );
+
+      case 'globe':
+        return Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(border: Border.all(color: accent.withValues(alpha: 0.7)), borderRadius: BorderRadius.circular(99)),
+                    child: Text('NATIONWIDE', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.8)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.2)),
+                  const SizedBox(height: 2),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.02)),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                  const SizedBox(height: 10),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 140,
+              height: 140,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(size: const Size.square(140), painter: _GlobePainter(accent, orbit)),
+                  _faceOr(58, Icons.how_to_vote_rounded),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'countdown':
+        final ticks = orbit * 70;
+        final step = ticks.floor() % 10;
+        final frac = ticks % 1;
+        Widget digit(String d, {bool flip = false}) => Container(
+              width: 20,
+              height: 26,
+              alignment: Alignment.center,
+              margin: const EdgeInsets.only(left: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1917),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: accent.withValues(alpha: 0.55)),
+              ),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.diagonal3Values(1, flip && frac < 0.18 ? (frac / 0.18).clamp(0.05, 1.0) : 1, 1),
+                child: Text(d, style: TextStyle(color: accent, fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 15)),
+              ),
+            );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text('COUNTDOWN', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 2)),
+                const Spacer(),
+                digit('0'),
+                digit('0'),
+                Padding(padding: const EdgeInsets.only(left: 3), child: Text(':', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 15))),
+                digit('0'),
+                digit('${9 - step}', flip: true),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                SizedBox(
+                  width: 92,
+                  height: 92,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CustomPaint(size: const Size.square(92), painter: _CountdownRingPainter(accent, (step + frac) / 10)),
+                      _faceOr(66, Icons.timer_rounded),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.4)),
+                      const SizedBox(height: 2),
+                      Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.02)),
+                      const SizedBox(height: 4),
+                      Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < 10; i++)
+                        Expanded(
+                          child: Container(
+                            height: 6,
+                            margin: const EdgeInsets.only(right: 3),
+                            decoration: BoxDecoration(
+                              color: i <= step ? accent : Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _CtaChip(label: cta, accent: accent, pulse: breathe),
+              ],
+            ),
+          ],
+        );
+
+      case 'prism':
+        const rainbow = [Color(0xFFF472B6), Color(0xFFFACC15), Color(0xFF4ADE80), Color(0xFF22D3EE), Color(0xFFA78BFA), Color(0xFFF472B6)];
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(1.8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: SweepGradient(transform: GradientRotation(orbit * math.pi * 2), colors: rainbow),
+              boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.35), blurRadius: 20)],
+            ),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+              decoration: BoxDecoration(color: const Color(0xF20B0B14), borderRadius: BorderRadius.circular(20)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: SweepGradient(transform: GradientRotation(-orbit * math.pi * 4), colors: rainbow)),
+                    child: _faceOr(68, Icons.diamond_rounded),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ShaderMask(
+                          shaderCallback: (r) => LinearGradient(colors: rainbow, transform: GradientRotation(orbit * math.pi * 2)).createShader(r),
+                          child: Text(headline, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.6)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21, height: 1.02)),
+                        const SizedBox(height: 4),
+                        Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+                        const SizedBox(height: 8),
+                        _CtaChip(label: cta, accent: accent, pulse: breathe),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+
+      case 'sunrise':
+        return Stack(
+          children: [
+            Positioned.fill(child: CustomPaint(painter: _SunrisePainter(accent, orbit, breathe))),
+            Align(alignment: const Alignment(0.48, 0.18), child: _faceOr(64, Icons.wb_sunny_rounded)),
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 180,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('A NEW DAY', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 2.6)),
+                  const SizedBox(height: 2),
+                  Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1)),
+                  const SizedBox(height: 8),
+                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, height: 1, shadows: [Shadow(color: Colors.black38, blurRadius: 8)])),
+                  const SizedBox(height: 4),
+                  Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.88), fontSize: 11, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  _CtaChip(label: cta, accent: accent, pulse: breathe),
+                ],
+              ),
+            ),
+          ],
+        );
+
+      case 'matrix':
+        final cursor = ((orbit * 14) % 1) < 0.5;
+        return Center(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: accent.withValues(alpha: 0.65)),
+              boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.25), blurRadius: 18)],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('> ${headline.toLowerCase().replaceAll(' ', '_')}${cursor ? '_' : ' '}', style: TextStyle(color: accent, fontFamily: 'monospace', fontWeight: FontWeight.w800, fontSize: 10.5)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        width: 62,
+                        height: 62,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(child: _faceOr(62, Icons.terminal_rounded, square: true)),
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              top: ((orbit * 4) % 1) * 62 - 2,
+                              child: Container(height: 3, color: accent.withValues(alpha: 0.8)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ACCESS GRANTED', style: TextStyle(color: accent.withValues(alpha: 0.8), fontFamily: 'monospace', fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1.4)),
+                          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20, height: 1.05, shadows: [Shadow(color: accent, blurRadius: 10)])),
+                          const SizedBox(height: 3),
+                          Text(support, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: accent.withValues(alpha: 0.85), fontFamily: 'monospace', fontSize: 9.5)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _CtaChip(label: cta, accent: accent, pulse: breathe),
+              ],
+            ),
+          ),
+        );
+
+      case 'ripple':
+        final pop = Curves.elasticOut.transform((((orbit * 2) % 1).clamp(0.0, 0.6) / 0.6).toDouble());
+        return Column(
+          children: [
+            Text(headline, textAlign: TextAlign.center, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 2)),
+            Expanded(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(child: CustomPaint(painter: _RipplePainter(accent, orbit))),
+                  _faceOr(72, Icons.how_to_vote_rounded),
+                  Transform.translate(
+                    offset: const Offset(28, 26),
+                    child: Transform.scale(
+                      scale: pop,
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(color: accent, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2)),
+                        child: const Icon(Icons.check_rounded, size: 15, color: Color(0xFF042F2E)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 21)),
+            Text(support, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+            const SizedBox(height: 8),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
+      case 'stage':
+        return Column(
+          children: [
+            Text('LIVE ON STAGE', style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 3)),
+            const SizedBox(height: 2),
+            Text(headline, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.2)),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accent,
+                boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.6), blurRadius: 26 * breathe)],
+              ),
+              child: _faceOr(76, Icons.star_rounded),
+            ),
+            const SizedBox(height: 8),
+            Text(name, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: 0.4)),
+            Text(support, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _muted, fontSize: 11)),
+            const Spacer(),
+            _CtaChip(label: cta, accent: accent, pulse: breathe),
+          ],
+        );
+
       case 'cinematic':
       default:
         return Column(
@@ -1574,4 +2204,533 @@ class _DiagonalClipper extends CustomClipper<Path> {
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// ── Painters for the animated 2026-10 set ──────────────────────────────────
+
+double _vSeed(int i, int salt) => ((i * 7919 + salt * 104729) % 997) / 997.0;
+
+class _FireworksPainter extends CustomPainter {
+  _FireworksPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final colors = [accent, const Color(0xFFF472B6), const Color(0xFF22D3EE), Colors.white, const Color(0xFF4ADE80)];
+    for (var k = 0; k < 5; k++) {
+      final p = (t * 2.5 + k * 0.2) % 1;
+      final cx = s.width * (0.1 + 0.8 * _vSeed(k, 3));
+      final cy = s.height * (0.16 + 0.32 * _vSeed(k, 11));
+      final col = colors[k % colors.length];
+      if (p < 0.22) {
+        final q = Curves.easeOut.transform(p / 0.22);
+        final y = s.height - (s.height - cy) * q;
+        canvas.drawLine(
+          Offset(cx, y),
+          Offset(cx, y + 16),
+          Paint()
+            ..strokeWidth = 2
+            ..strokeCap = StrokeCap.round
+            ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [col, col.withValues(alpha: 0)]).createShader(Rect.fromLTWH(cx - 1, y, 2, 16)),
+        );
+        continue;
+      }
+      final q = (p - 0.22) / 0.78;
+      final r = 8 + 64 * Curves.easeOutCubic.transform(q);
+      final fade = (1 - q).clamp(0.0, 1.0);
+      final c = Offset(cx, cy);
+      for (var j = 0; j < 22; j++) {
+        final a = j / 22 * math.pi * 2 + k;
+        final dir = Offset(math.cos(a), math.sin(a));
+        final pos = c + dir * r + Offset(0, q * q * 22);
+        final tail = c + dir * (r - 9) + Offset(0, q * q * 18);
+        final pc = (j.isEven ? col : colors[(k + 2) % colors.length]).withValues(alpha: fade);
+        canvas.drawLine(tail, pos, Paint()
+          ..color = pc.withValues(alpha: fade * 0.6)
+          ..strokeWidth = 1.4
+          ..strokeCap = StrokeCap.round);
+        canvas.drawCircle(pos, 0.8 + 1.6 * fade, Paint()..color = pc);
+      }
+    }
+    // City skyline with flickering windows.
+    final sky = Paint()..color = const Color(0xFF020617);
+    var x = 0.0;
+    var i = 0;
+    while (x < s.width) {
+      final w = 18 + _vSeed(i, 5) * 22;
+      final h = 18 + _vSeed(i, 9) * 34;
+      canvas.drawRect(Rect.fromLTWH(x, s.height - h, w + 1, h), sky);
+      for (var wy = s.height - h + 5; wy < s.height - 4; wy += 7) {
+        for (var wx = x + 4; wx < x + w - 3; wx += 6) {
+          final on = _vSeed((wx * 3 + wy).round(), (t * 6).floor()) > 0.72;
+          if (on) canvas.drawRect(Rect.fromLTWH(wx, wy, 2.4, 3), Paint()..color = accent.withValues(alpha: 0.55));
+        }
+      }
+      x += w + 2;
+      i++;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FireworksPainter old) => old.t != t || old.accent != accent;
+}
+
+class _LiquidBlobPainter extends CustomPainter {
+  _LiquidBlobPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final colors = [accent, const Color(0xFF8B5CF6), const Color(0xFF22D3EE), const Color(0xFFFB7185)];
+    final tau = math.pi * 2;
+    for (var i = 0; i < 4; i++) {
+      final c = Offset(
+        s.width * (0.15 + 0.25 * i) + math.cos(t * tau + i * 1.3) * s.width * 0.12,
+        s.height * 0.5 + math.sin(t * tau + i * 1.7) * s.height * 0.32,
+      );
+      final base = s.height * (0.42 + 0.06 * i % 0.2);
+      final path = Path();
+      for (var k = 0; k <= 48; k++) {
+        final th = k / 48 * tau;
+        final r = base * (1 + 0.14 * math.sin(3 * th + t * tau + i) + 0.08 * math.sin(5 * th - t * tau * 2 + i));
+        final p = c + Offset(math.cos(th) * r, math.sin(th) * r);
+        if (k == 0) {
+          path.moveTo(p.dx, p.dy);
+        } else {
+          path.lineTo(p.dx, p.dy);
+        }
+      }
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = colors[i].withValues(alpha: 0.7)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiquidBlobPainter old) => old.t != t || old.accent != accent;
+}
+
+class _EqualizerBgPainter extends CustomPainter {
+  _EqualizerBgPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final tau = math.pi * 2;
+    const step = 9.0;
+    final n = (s.width / step).ceil();
+    final rect = Rect.fromLTWH(0, s.height - 70, s.width, 70);
+    final shader = LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [accent, const Color(0xFFF0ABFC), const Color(0xFF22D3EE)]).createShader(rect);
+    final bar = Paint()..shader = shader;
+    for (var i = 0; i < n; i++) {
+      final v = (math.sin(t * tau * 6 + i * 0.55) * (0.6 + 0.4 * math.sin(t * tau * 10 + i * 1.3))).abs();
+      final h = 6 + v * 58;
+      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(i * step + 1, s.height - h, step - 3, h), const Radius.circular(2)), bar..color = Colors.white.withValues(alpha: 0.35));
+    }
+    final wave = Path();
+    for (var x = 0.0; x <= s.width; x += 3) {
+      final y = s.height * 0.42 + math.sin(x / 22 + t * tau * 4) * 10 * math.sin(x / s.width * math.pi);
+      if (x == 0) {
+        wave.moveTo(x, y);
+      } else {
+        wave.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(wave, Paint()
+      ..color = accent.withValues(alpha: 0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5);
+  }
+
+  @override
+  bool shouldRepaint(covariant _EqualizerBgPainter old) => old.t != t || old.accent != accent;
+}
+
+class _VinylRingPainter extends CustomPainter {
+  _VinylRingPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2;
+    canvas.drawCircle(c, r, Paint()..color = const Color(0xFF0A0A0A));
+    final groove = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6
+      ..color = Colors.white.withValues(alpha: 0.12);
+    for (var rr = r - 3; rr > r * 0.7; rr -= 2.2) {
+      canvas.drawCircle(c, rr, groove);
+    }
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r - 4), -0.6, 0.9, false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = Colors.white.withValues(alpha: 0.22));
+    canvas.drawCircle(c, r, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = accent.withValues(alpha: 0.8));
+  }
+
+  @override
+  bool shouldRepaint(covariant _VinylRingPainter old) => old.accent != accent;
+}
+
+class _TwinkleStarsPainter extends CustomPainter {
+  _TwinkleStarsPainter(this.t);
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    for (var i = 0; i < 60; i++) {
+      final p = Offset(_vSeed(i, 1) * s.width, _vSeed(i, 2) * s.height);
+      final tw = 0.5 + 0.5 * math.sin(t * math.pi * 2 * 3 + i);
+      canvas.drawCircle(p, 0.6 + _vSeed(i, 4) * 1.1, Paint()..color = Colors.white.withValues(alpha: 0.2 + 0.6 * tw));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TwinkleStarsPainter old) => old.t != t;
+}
+
+class _GlobePainter extends CustomPainter {
+  _GlobePainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 10;
+    final tau = math.pi * 2;
+    canvas.drawCircle(c, r + 8, Paint()
+      ..color = accent.withValues(alpha: 0.18)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10));
+    canvas.drawCircle(c, r, Paint()..shader = RadialGradient(center: const Alignment(-0.3, -0.4), colors: [accent.withValues(alpha: 0.35), const Color(0xFF020617)]).createShader(Rect.fromCircle(center: c, radius: r)));
+    final line = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (var k = -2; k <= 2; k++) {
+      final y = c.dy + r * k / 3;
+      final hw = math.sqrt(math.max(0, r * r - (y - c.dy) * (y - c.dy)));
+      canvas.drawOval(Rect.fromCenter(center: Offset(c.dx, y), width: hw * 2, height: hw * 0.22), line..color = accent.withValues(alpha: 0.3));
+    }
+    for (var k = 0; k < 6; k++) {
+      final a = k / 6 * math.pi + t * tau;
+      final w = (r * math.cos(a)).abs() * 2;
+      canvas.drawOval(Rect.fromCenter(center: c, width: w, height: r * 2), line..color = accent.withValues(alpha: 0.2 + 0.35 * math.sin(a).abs()));
+    }
+    canvas.drawCircle(c, r, line..color = accent.withValues(alpha: 0.85));
+    // Cities pulse as they rotate into view.
+    for (var i = 0; i < 7; i++) {
+      final lon = _vSeed(i, 7) * tau + t * tau;
+      final lat = (_vSeed(i, 13) - 0.5) * 2.2;
+      if (math.cos(lon) <= 0) continue;
+      final p = c + Offset(r * math.cos(lat) * math.sin(lon), r * math.sin(lat) * 0.9);
+      final pulse = (t * 6 + i * 0.3) % 1;
+      canvas.drawCircle(p, 2.2, Paint()..color = Colors.white);
+      canvas.drawCircle(p, 2 + pulse * 7, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = accent.withValues(alpha: 1 - pulse));
+    }
+    // Satellite on a tilted orbit.
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(-0.4);
+    final orbitRect = Rect.fromCenter(center: Offset.zero, width: r * 2 + 18, height: r * 0.7);
+    canvas.drawOval(orbitRect, line..color = Colors.white.withValues(alpha: 0.25));
+    final sa = t * tau * 2;
+    canvas.drawCircle(Offset(math.cos(sa) * orbitRect.width / 2, math.sin(sa) * orbitRect.height / 2), 3, Paint()..color = accent);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlobePainter old) => old.t != t || old.accent != accent;
+}
+
+class _DashedOrbitsPainter extends CustomPainter {
+  _DashedOrbitsPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = Offset(s.width * 0.22, s.height * 0.58);
+    for (var k = 0; k < 3; k++) {
+      final r = 70.0 + k * 34;
+      final dir = k.isEven ? 1 : -1;
+      final p = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = accent.withValues(alpha: 0.18 - k * 0.04);
+      const dashes = 36;
+      for (var i = 0; i < dashes; i++) {
+        final a = i / dashes * math.pi * 2 + dir * t * math.pi * 2 / (k + 1);
+        canvas.drawArc(Rect.fromCircle(center: c, radius: r), a, math.pi / dashes, false, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedOrbitsPainter old) => old.t != t || old.accent != accent;
+}
+
+class _CountdownRingPainter extends CustomPainter {
+  _CountdownRingPainter(this.accent, this.progress);
+  final Color accent;
+  final double progress;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final r = s.width / 2 - 4;
+    canvas.drawCircle(c, r, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..color = Colors.white.withValues(alpha: 0.08));
+    for (var i = 0; i < 60; i++) {
+      final a = i / 60 * math.pi * 2;
+      final inner = i % 5 == 0 ? r - 9 : r - 6;
+      canvas.drawLine(c + Offset(math.cos(a), math.sin(a)) * inner, c + Offset(math.cos(a), math.sin(a)) * (r - 3.5), Paint()
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: 0.18));
+    }
+    final sweep = progress * math.pi * 2;
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2, sweep, false, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(startAngle: 0, endAngle: math.pi * 2, transform: const GradientRotation(-math.pi / 2), colors: [accent.withValues(alpha: 0.2), accent]).createShader(Rect.fromCircle(center: c, radius: r)));
+    final end = c + Offset(math.cos(sweep - math.pi / 2), math.sin(sweep - math.pi / 2)) * r;
+    canvas.drawCircle(end, 6, Paint()
+      ..color = accent.withValues(alpha: 0.5)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4));
+    canvas.drawCircle(end, 3.5, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CountdownRingPainter old) => old.progress != progress || old.accent != accent;
+}
+
+class _SunrisePainter extends CustomPainter {
+  _SunrisePainter(this.accent, this.t, this.breathe);
+  final Color accent;
+  final double t;
+  final double breathe;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = Offset(s.width * 0.74, s.height * 0.59);
+    final tau = math.pi * 2;
+    // Rotating rays.
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(t * tau / 3);
+    final ray = Paint()..color = Colors.white.withValues(alpha: 0.10);
+    for (var i = 0; i < 14; i++) {
+      final a = i / 14 * tau;
+      final path = Path()
+        ..moveTo(0, 0)
+        ..lineTo(math.cos(a - 0.08) * 220, math.sin(a - 0.08) * 220)
+        ..lineTo(math.cos(a + 0.08) * 220, math.sin(a + 0.08) * 220)
+        ..close();
+      canvas.drawPath(path, ray);
+    }
+    canvas.restore();
+    final sr = 46 * breathe;
+    canvas.drawCircle(c, sr + 26, Paint()
+      ..color = accent.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22));
+    canvas.drawCircle(c, sr, Paint()..shader = RadialGradient(colors: [const Color(0xFFFFF7ED), accent, const Color(0xFFF97316)]).createShader(Rect.fromCircle(center: c, radius: sr)));
+    // Two layers of hills drifting slowly.
+    for (var layer = 0; layer < 2; layer++) {
+      final base = s.height * (layer == 0 ? 0.80 : 0.90);
+      final amp = layer == 0 ? 16.0 : 10.0;
+      final shift = t * tau * (layer == 0 ? 1 : -1);
+      final path = Path()..moveTo(0, s.height);
+      for (var x = 0.0; x <= s.width; x += 6) {
+        path.lineTo(x, base + math.sin(x / (layer == 0 ? 52 : 34) + shift) * amp);
+      }
+      path
+        ..lineTo(s.width, s.height + 20)
+        ..lineTo(0, s.height + 20)
+        ..close();
+      canvas.drawPath(path, Paint()..color = layer == 0 ? const Color(0xE63B0764) : const Color(0xFF1E1B4B));
+    }
+    // A few birds gliding across.
+    final bird = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round
+      ..color = const Color(0xFF1E1B4B);
+    for (var i = 0; i < 3; i++) {
+      final bx = ((t * 1.5 + i * 0.27) % 1) * (s.width + 40) - 20;
+      final by = s.height * (0.22 + i * 0.07) + math.sin(t * tau * 3 + i) * 4;
+      final flap = math.sin(t * tau * 18 + i) * 3;
+      final path = Path()
+        ..moveTo(bx - 6, by - flap)
+        ..quadraticBezierTo(bx - 3, by - 3, bx, by)
+        ..quadraticBezierTo(bx + 3, by - 3, bx + 6, by - flap);
+      canvas.drawPath(path, bird);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SunrisePainter old) => old.t != t || old.breathe != breathe || old.accent != accent;
+}
+
+class _DigitalRainPainter extends CustomPainter {
+  _DigitalRainPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    const col = 13.0;
+    final n = (s.width / col).ceil();
+    for (var i = 0; i < n; i++) {
+      final speed = 0.6 + _vSeed(i, 3) * 0.9;
+      final head = ((t * speed * 4 + _vSeed(i, 8)) % 1) * (s.height + 140) - 40;
+      for (var j = 0; j < 12; j++) {
+        final y = head - j * 10;
+        if (y < -8 || y > s.height) continue;
+        final a = (1 - j / 12) * 0.75;
+        final on = _vSeed(i * 31 + j, (t * 20).floor() + i) > 0.25;
+        if (!on) continue;
+        final color = j == 0 ? Colors.white.withValues(alpha: 0.9) : accent.withValues(alpha: a);
+        final glyph = _vSeed(i * 17 + j, (t * 10).floor()) > 0.5;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(i * col + 3, y, glyph ? 6 : 3, 7), const Radius.circular(1)),
+          Paint()..color = color,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DigitalRainPainter old) => old.t != t || old.accent != accent;
+}
+
+class _WaveLinesPainter extends CustomPainter {
+  _WaveLinesPainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final tau = math.pi * 2;
+    for (var k = 0; k < 6; k++) {
+      final base = s.height * (0.15 + k * 0.15);
+      final path = Path();
+      for (var x = 0.0; x <= s.width; x += 4) {
+        final y = base + math.sin(x / (30 + k * 6) + t * tau * (k.isEven ? 2 : -2) + k) * (5 + k * 1.2);
+        if (x == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(path, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = accent.withValues(alpha: 0.10 + k * 0.02));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveLinesPainter old) => old.t != t || old.accent != accent;
+}
+
+class _RipplePainter extends CustomPainter {
+  _RipplePainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final c = s.center(Offset.zero);
+    final maxR = math.max(s.width, s.height) * 0.55;
+    for (var k = 0; k < 4; k++) {
+      final p = (t * 2 + k / 4) % 1;
+      final r = 38 + p * (maxR - 38);
+      canvas.drawCircle(c, r, Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4 * (1 - p) + 0.4
+        ..color = accent.withValues(alpha: (1 - p) * 0.7));
+    }
+    canvas.drawCircle(c, 44, Paint()
+      ..color = accent.withValues(alpha: 0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14));
+  }
+
+  @override
+  bool shouldRepaint(covariant _RipplePainter old) => old.t != t || old.accent != accent;
+}
+
+class _StagePainter extends CustomPainter {
+  _StagePainter(this.accent, this.t);
+  final Color accent;
+  final double t;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final tau = math.pi * 2;
+    // Floor glow.
+    final floor = Rect.fromCenter(center: Offset(s.width / 2, s.height * 0.92), width: s.width * 0.9, height: 60);
+    canvas.drawOval(floor, Paint()..shader = RadialGradient(colors: [accent.withValues(alpha: 0.45), Colors.transparent]).createShader(floor));
+    // Two sweeping spotlight beams.
+    for (var k = 0; k < 2; k++) {
+      final origin = Offset(k == 0 ? s.width * 0.12 : s.width * 0.88, -6);
+      final target = Offset(s.width / 2 + math.sin(t * tau * 2 + k * math.pi) * s.width * 0.22, s.height * 0.95);
+      final dir = target - origin;
+      final normal = Offset(-dir.dy, dir.dx) / dir.distance;
+      final path = Path()
+        ..moveTo(origin.dx - normal.dx * 4, origin.dy)
+        ..lineTo(target.dx - normal.dx * 46, target.dy - normal.dy * 46)
+        ..lineTo(target.dx + normal.dx * 46, target.dy + normal.dy * 46)
+        ..lineTo(origin.dx + normal.dx * 4, origin.dy)
+        ..close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment(k == 0 ? -0.8 : 0.8, -1),
+            end: Alignment.bottomCenter,
+            colors: [Colors.white.withValues(alpha: 0.38), accent.withValues(alpha: 0.10)],
+          ).createShader(Offset.zero & s),
+      );
+    }
+    // Swaying curtains.
+    for (final left in [true, false]) {
+      final sway = math.sin(t * tau + (left ? 0 : 1.5)) * 4;
+      final w = 30 + sway;
+      final rect = left ? Rect.fromLTWH(0, 0, w, s.height) : Rect.fromLTWH(s.width - w, 0, w, s.height);
+      final path = Path()..moveTo(rect.left, 0);
+      if (left) {
+        path
+          ..lineTo(rect.right, 0)
+          ..quadraticBezierTo(rect.right - 10, s.height * 0.5, rect.right + 6, s.height)
+          ..lineTo(0, s.height);
+      } else {
+        path
+          ..lineTo(s.width, 0)
+          ..lineTo(s.width, s.height)
+          ..lineTo(rect.left - 6, s.height)
+          ..quadraticBezierTo(rect.left + 10, s.height * 0.5, rect.left, 0);
+      }
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            colors: const [Color(0xFF7F1D1D), Color(0xFF450A0A), Color(0xFF991B1B), Color(0xFF450A0A)],
+            stops: const [0, 0.35, 0.6, 1],
+            tileMode: TileMode.repeated,
+          ).createShader(Rect.fromLTWH(rect.left, 0, 12, s.height)),
+      );
+    }
+    // Valance scallops along the top.
+    final val = Paint()..color = const Color(0xFF7F1D1D);
+    for (var x = 0.0; x < s.width; x += 24) {
+      canvas.drawArc(Rect.fromLTWH(x, -12, 24, 24), 0, math.pi, true, val);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StagePainter old) => old.t != t || old.accent != accent;
 }

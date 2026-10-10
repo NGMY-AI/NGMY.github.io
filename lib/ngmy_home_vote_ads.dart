@@ -65,6 +65,17 @@ const List<NgmyVoteAdSlideStyle> kNgmyVoteAdSlideStyles = [
   NgmyVoteAdSlideStyle(id: 'swiss', label: 'Swiss Poster', icon: Icons.grid_view_rounded, accent: Color(0xFFEF4444)),
   NgmyVoteAdSlideStyle(id: 'aurora', label: 'Aurora Glass', icon: Icons.blur_on_rounded, accent: Color(0xFFA78BFA)),
   NgmyVoteAdSlideStyle(id: 'split', label: 'Split', icon: Icons.vertical_split_rounded, accent: Color(0xFFFACC15)),
+  // 2026-10 animated set.
+  NgmyVoteAdSlideStyle(id: 'fireworks', label: 'Fireworks', icon: Icons.auto_awesome_rounded, accent: Color(0xFFFBBF24)),
+  NgmyVoteAdSlideStyle(id: 'liquid', label: 'Liquid', icon: Icons.water_drop_rounded, accent: Color(0xFFF472B6)),
+  NgmyVoteAdSlideStyle(id: 'onair', label: 'On Air', icon: Icons.radio_rounded, accent: Color(0xFFF43F5E)),
+  NgmyVoteAdSlideStyle(id: 'globe', label: 'Globe', icon: Icons.public_rounded, accent: Color(0xFF38BDF8)),
+  NgmyVoteAdSlideStyle(id: 'countdown', label: 'Countdown', icon: Icons.timer_rounded, accent: Color(0xFFFB923C)),
+  NgmyVoteAdSlideStyle(id: 'prism', label: 'Prism', icon: Icons.diamond_rounded, accent: Color(0xFFC084FC)),
+  NgmyVoteAdSlideStyle(id: 'sunrise', label: 'Sunrise', icon: Icons.wb_twilight_rounded, accent: Color(0xFFFDBA74)),
+  NgmyVoteAdSlideStyle(id: 'matrix', label: 'Digital Rain', icon: Icons.terminal_rounded, accent: Color(0xFF4ADE80)),
+  NgmyVoteAdSlideStyle(id: 'ripple', label: 'Ripple', icon: Icons.waves_rounded, accent: Color(0xFF2DD4BF)),
+  NgmyVoteAdSlideStyle(id: 'stage', label: 'Stage', icon: Icons.theater_comedy_rounded, accent: Color(0xFFFACC15)),
 ];
 
 NgmyVoteAdSlideStyle ngmyVoteAdSlideStyleById(String id) {
