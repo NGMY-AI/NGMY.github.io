@@ -1523,7 +1523,7 @@ function hwCanWork(e: HwElig | undefined, email = ""): boolean {
 // Store access (users."canSellOnStore") and a store profile: store name and a
 // short description that helper gift cards show, so the store is recognised
 // when it scans the gift QR.
-const STORE_ACTIONS = new Set(["storeGrant", "storeRevoke", "storeList", "storeMine"]);
+const STORE_ACTIONS = new Set(["storeGrant", "storeRevoke", "storeList", "storeMine", "storeSaveProfile", "storeDirectory"]);
 
 async function storeFindAccount(db: any, target: string): Promise<{ email: string; phone: string; name: string } | null> {
   const t = target.trim();
@@ -1539,6 +1539,30 @@ async function storeFindAccount(db: any, target: string): Promise<{ email: strin
   return hit ? { email: emailKey(hit.email), phone: String(hit.phone ?? ""), name: String(hit.username ?? "") } : null;
 }
 
+async function storeUploadPhoto(db: any, email: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error("Picture is too big. Pick a smaller one.");
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const key = await sha256Hex(`store:${email}`);
+  const path = `stores/${key.slice(0, 24)}-${Date.now()}.${type === "image/png" ? "png" : "jpg"}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error("Picture upload failed. Try again.");
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+async function storeRemovePhoto(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("stores/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* harmless leftover */ }
+}
+
 function storePublic(s: any) {
   return {
     email: s.email,
@@ -1546,6 +1570,11 @@ function storePublic(s: any) {
     description: s.description,
     phone: s.phone,
     grantedAt: s.granted_at,
+    address: s.address ?? "",
+    city: s.city ?? "",
+    state: s.state ?? "",
+    photoUrl: s.photo_url ?? "",
+    profileDone: s.profile_done === true,
   };
 }
 
@@ -1561,6 +1590,56 @@ async function handleStoreAccess(req: Request, action: string, body: any): Promi
     const { data } = await db.from("ngmy_stores").select("*").eq("email", email).eq("active", true).maybeSingle();
     return jsonOk({ ok: true, store: data ? storePublic(data) : null });
   }
+
+  if (action === "storeDirectory") {
+    // Every signed-in member can browse stores (no phone numbers here).
+    const { data } = await db.from("ngmy_stores").select("*").eq("active", true).order("store_name").limit(500);
+    const stores = (data ?? []).map((s: any) => {
+      const p = storePublic(s);
+      return { ...p, phone: "" };
+    });
+    return jsonOk({ ok: true, stores });
+  }
+
+  if (action === "storeSaveProfile") {
+    const limited = await enforceRateLimit(req, "store_profile", email, 20, 3600);
+    if (limited) return limited;
+    const { data: mine } = await db.from("ngmy_stores").select("*").eq("email", email).eq("active", true).maybeSingle();
+    if (!mine) return jsonOk({ ok: false, error: "This account does not have NGMY Store access." }, 403);
+    const storeName = hwText(body?.storeName, 80);
+    const address = hwText(body?.address, 200);
+    const city = hwText(body?.city, 60);
+    const state = hwText(body?.state, 60);
+    const description = hwLongText(body?.description, 240);
+    if (!storeName || !address || !state) {
+      return jsonOk({ ok: false, error: "Enter the store name, address, and state." }, 400);
+    }
+    let photoUrl = String(mine.photo_url ?? "");
+    let uploaded = "";
+    if (typeof body?.photoBase64 === "string" && body.photoBase64.length > 0) {
+      try {
+        uploaded = await storeUploadPhoto(db, email, body.photoBase64, String(body?.photoMime ?? ""));
+        photoUrl = uploaded;
+      } catch (e) {
+        return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+      }
+    }
+    if (!photoUrl) return jsonOk({ ok: false, error: "Add a store profile picture." }, 400);
+    const { error } = await db.from("ngmy_stores").update({
+      store_name: storeName, address, city, state, description, photo_url: photoUrl,
+      profile_done: true, updated_at: now,
+    }).eq("email", email);
+    if (error) {
+      if (uploaded) await storeRemovePhoto(db, uploaded);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    // New picture saved: delete the old file so only the current one is kept.
+    const oldUrl = String(mine.photo_url ?? "");
+    if (uploaded && oldUrl && oldUrl !== uploaded) await storeRemovePhoto(db, oldUrl);
+    const { data: saved } = await db.from("ngmy_stores").select("*").eq("email", email).maybeSingle();
+    return jsonOk({ ok: true, store: saved ? storePublic(saved) : null });
+  }
+
   if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
 
   if (action === "storeList") {
@@ -1568,17 +1647,21 @@ async function handleStoreAccess(req: Request, action: string, body: any): Promi
     return jsonOk({ ok: true, stores: (data ?? []).map(storePublic) });
   }
   if (action === "storeGrant") {
+    // Store name and description are optional here: the owner fills in the
+    // store profile (name, address, picture) in the pop-up they receive.
     const storeName = hwText(body?.storeName, 80);
     const description = hwLongText(body?.description, 240);
-    if (!storeName) return jsonOk({ ok: false, error: "Enter the store name." }, 400);
     const acct = await storeFindAccount(db, String(body?.target ?? ""));
     if (!acct || !acct.email) {
       return jsonOk({ ok: false, error: "No NGMY account has that email or phone number." }, 404);
     }
-    const { error } = await db.from("ngmy_stores").upsert({
-      email: acct.email, phone: acct.phone, store_name: storeName, description,
-      active: true, granted_by: email, updated_at: now,
-    });
+    const { data: existing } = await db.from("ngmy_stores").select("email").eq("email", acct.email).maybeSingle();
+    const patch: Record<string, unknown> = { phone: acct.phone, active: true, granted_by: email, updated_at: now };
+    if (storeName) patch.store_name = storeName;
+    if (description) patch.description = description;
+    const { error } = existing
+      ? await db.from("ngmy_stores").update(patch).eq("email", acct.email)
+      : await db.from("ngmy_stores").insert({ email: acct.email, store_name: storeName, description, ...patch });
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     await db.from("users").update({ canSellOnStore: true }).ilike("email", acct.email);
     return jsonOk({ ok: true, store: { email: acct.email, storeName, description, phone: acct.phone }, accountName: acct.name });
@@ -8450,6 +8533,8 @@ serve(async (req) => {
       s2: "storeRevoke",
       s3: "storeList",
       s4: "storeMine",
+      s5: "storeSaveProfile",
+      s6: "storeDirectory",
       d1: "relStatus",
       d2: "relTouch",
       d3: "relStart",

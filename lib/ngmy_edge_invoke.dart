@@ -102,6 +102,8 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'storeRevoke': 's2',
   'storeList': 's3',
   'storeMine': 's4',
+  'storeSaveProfile': 's5',
+  'storeDirectory': 's6',
   'relStatus': 'd1',
   'relTouch': 'd2',
   'relStart': 'd3',

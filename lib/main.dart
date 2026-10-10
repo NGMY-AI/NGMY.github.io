@@ -17819,6 +17819,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (!ngmyPreferLightGraphics) _smokeCtrl.repeat();
     });
     unawaited(_loadAssistantMemory());
+    // A store an admin just granted: turn on Sell and show the "set up your
+    // store" pop-up once, without the owner having to find NGMY Store first.
+    if (!widget.user.isAdmin) {
+      Future<void>.delayed(const Duration(seconds: 3), () async {
+        if (!mounted) return;
+        final store = await ngmyCheckMyStore(context);
+        if (store != null && mounted) widget.user.canSellOnStore = true;
+      });
+    }
   }
 
   Future<void> _loadAssistantMemory() async {
@@ -48113,9 +48122,40 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       _applyStoreSellAccessEmailsToUsers(widget.config, widget.allUsers, currentUser: widget.user);
       if (!mounted) return;
       setState(() {});
+      // A store an admin granted lives on the server. Ask it directly, turn on
+      // Sell, and have a new store owner fill in their store profile once.
+      if (!widget.user.isAdmin) {
+        final store = await ngmyCheckMyStore(context);
+        if (!mounted) return;
+        if (store != null) {
+          setState(() {
+            _myStore = store;
+            widget.user.canSellOnStore = true;
+          });
+        }
+      }
     } catch (e) {
       debugPrint('[store] sell access refresh: $e');
     }
+  }
+
+  /// This account's store profile (admin-granted store), when it has one.
+  Map<String, dynamic>? _myStore;
+
+  /// Only show items from one store (picked from the Stores list).
+  String? _storeFilterEmail;
+  String _storeFilterName = '';
+
+  static const int _kMaxStoreItems = 4;
+
+  Future<void> _openStoresDirectory() async {
+    final picked = await showNgmyStoresDirectory(context, userState: widget.user.state);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _storeFilterEmail = (picked['email'] ?? '').toString().toLowerCase().trim();
+      _storeFilterName = (picked['storeName'] ?? '').toString();
+    });
+    _tabCtrl.animateTo(0);
   }
 
   Future<void> _refreshStoreListingsFromCloud({bool silent = false, bool force = false}) async {
@@ -49524,11 +49564,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   List<Map<String, dynamic>> _activeShopListings() {
     // Sellers see their own items in Shop the same way buyers do.
+    final onlyStore = _storeFilterEmail;
     return _listings
         .where((l) =>
             (l['status'] ?? 'active').toString() == 'active' &&
             _matchesSearch(l) &&
-            NgmyStoreListingExtras.isVisibleToBuyersToday(l))
+            NgmyStoreListingExtras.isVisibleToBuyersToday(l) &&
+            (onlyStore == null || (l['sellerEmail'] ?? '').toString().toLowerCase().trim() == onlyStore))
         .toList()
       ..sort((a, b) => (b['createdAt'] ?? '').toString().compareTo((a['createdAt'] ?? '').toString()));
   }
@@ -51919,6 +51961,21 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not authorized to sell on NGMY Store. Ask admin to enable Store Sell.')));
       return;
     }
+    // Each store may have at most 4 items up at a time (admin has no limit).
+    if (!widget.user.isAdmin) {
+      final me = widget.user.email.toLowerCase().trim();
+      final live = _listings.where((l) {
+        if ((l['sellerEmail'] ?? '').toString().toLowerCase().trim() != me) return false;
+        final s = (l['status'] ?? 'active').toString().toLowerCase();
+        return s != 'sold' && s != 'deleted' && s != 'removed';
+      }).length;
+      if (live >= _kMaxStoreItems) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Your store already has 4 items. Remove one before posting another.'),
+        ));
+        return;
+      }
+    }
     final titleC = TextEditingController();
     final descC = TextEditingController();
     final priceC = TextEditingController();
@@ -53252,22 +53309,15 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                             _storeTabChip(0, 'Shop', shop.length, isDark),
                             if (_canSell) _storeTabChip(1, 'Listings', mine.length, isDark),
                             _storeTabChip(_canSell ? 2 : 1, ordersTabLabel, ordersTabCount, isDark),
-                            // Admin: give an account store access (email or phone).
-                            if (widget.user.isAdmin)
-                              IconButton(
-                                tooltip: 'Give store access',
-                                visualDensity: VisualDensity.compact,
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                                icon: const Icon(Icons.receipt_long_rounded, size: 20, color: _storePurple),
-                                onPressed: () => showNgmyStoreAccessAdminSheet(
-                                  context,
-                                  onChanged: () {
-                                    widget.onDataChanged();
-                                    if (mounted) setState(() {});
-                                  },
-                                ),
-                              ),
+                            // Everyone: browse the NGMY stores (by state / city).
+                            IconButton(
+                              tooltip: 'Stores',
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                              icon: const Icon(Icons.account_circle_rounded, size: 24, color: _storePurple),
+                              onPressed: _openStoresDirectory,
+                            ),
                           ],
                         ),
                       ),
@@ -53275,6 +53325,39 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
                         child: _storeTopActionBar(isDark, frameBorder),
                       ),
+                      if (_storeFilterEmail != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                          child: SizedBox(
+                            height: 28,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.storefront_rounded, size: 16, color: _storePurple),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Only ${_storeFilterName.isEmpty ? 'this store' : _storeFilterName}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: _storePurple),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    _storeFilterEmail = null;
+                                    _storeFilterName = '';
+                                  }),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    minimumSize: const Size(0, 26),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('Show all', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -53348,19 +53431,33 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             margin: const EdgeInsets.symmetric(horizontal: 6),
             color: frameBorder,
           ),
-          IconButton(
-            tooltip: 'Receipts',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
-            icon: const Icon(Icons.receipt_long_rounded, color: _storeAccent, size: 22),
-            onPressed: _showStoreReceipts,
+          // Admin: tap = give an account store access; hold = receipts.
+          // Everyone else: receipts.
+          GestureDetector(
+            onLongPress: widget.user.isAdmin ? _showStoreReceipts : null,
+            child: IconButton(
+              tooltip: widget.user.isAdmin ? 'Give store access (hold for receipts)' : 'Receipts',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 36),
+              icon: const Icon(Icons.receipt_long_rounded, color: _storeAccent, size: 22),
+              onPressed: widget.user.isAdmin
+                  ? () => showNgmyStoreAccessAdminSheet(
+                        context,
+                        onChanged: () {
+                          widget.onDataChanged();
+                          if (mounted) setState(() {});
+                        },
+                      )
+                  : _showStoreReceipts,
+            ),
           ),
         ],
       ),
     );
   }
 
-  double get _storeHeaderClearance => MediaQuery.paddingOf(context).top + 128;
+  double get _storeHeaderClearance =>
+      MediaQuery.paddingOf(context).top + 128 + (_storeFilterEmail != null ? 36 : 0);
 
   Widget _shopGrid(List<Map<String, dynamic>> items) {
     if (_storeLoading && items.isEmpty && _listings.isEmpty) {
