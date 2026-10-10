@@ -33203,8 +33203,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     if (configStatus == 'rejected' || configStatus == 'revoked' || configStatus == 'approved') {
       return false;
     }
+    // A pending copy kept only on this phone counts just while it is a
+    // request made moments ago. An older one means the King/Admin deleted
+    // it, and the person must see Apply again.
     final local = _localRegistrarBackup;
-    return local != null && (local['status'] ?? 'pending').toString().toLowerCase() == 'pending';
+    return local != null &&
+        (local['status'] ?? 'pending').toString().toLowerCase() == 'pending' &&
+        NgmyCivicRegistrarApplication.isFreshRequest(local);
   }
 
   bool _hasRejectedRegistrarApplication() {
@@ -41247,65 +41252,156 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           );
         }
 
+        final memberName = u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email;
+        final initials = memberName
+            .split(RegExp(r'\s+'))
+            .where((p) => p.isNotEmpty)
+            .take(2)
+            .map((p) => p[0].toUpperCase())
+            .join();
         return Dialog(
               backgroundColor: Colors.transparent,
               insetPadding: const EdgeInsets.all(16),
               child: Container(
                 constraints: const BoxConstraints(maxWidth: 460),
-                padding: const EdgeInsets.all(18),
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: panelBg,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.4 : 0.14), blurRadius: 24, offset: const Offset(0, 12))],
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.45 : 0.16), blurRadius: 28, offset: const Offset(0, 14))],
                 ),
+                child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                existing != null ? 'Update Contribution' : 'Add Contribution',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: ink),
-                              ),
-                              Text(u.fullName?.trim().isNotEmpty == true ? u.fullName!.trim() : u.email, style: TextStyle(fontSize: 12, color: ink.withOpacity(0.6)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
+                    // Emerald header band with the member and the campaign.
                     Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(color: sectionBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: borderColor)),
-                      child: Column(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 10, 18),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF047857), Color(0xFF10B981)],
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          TextField(
-                            controller: amountC,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w700),
-                            decoration: framedInput(
-                              existing != null ? 'Amount to add' : 'Amount',
-                              prefixText: '\$ ',
-                              helperText: existing != null
-                                  ? 'Current record: \$${formatCurrency(existing.amount)}. This amount is added to it (same help campaign).'
-                                  : null,
+                          Container(
+                            width: 48,
+                            height: 48,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+                            ),
+                            child: Text(
+                              initials.isEmpty ? '?' : initials,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  existing != null ? 'Add to contribution' : 'Record contribution',
+                                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(memberName, style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.9), fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.18), borderRadius: BorderRadius.circular(999)),
+                                  child: Text(
+                                    'Help mode · $state',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            icon: const Icon(Icons.close_rounded, color: Colors.white),
+                            tooltip: 'Close',
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (existing != null)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(isDark ? 0.14 : 0.08),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.receipt_long_rounded, size: 18, color: Color(0xFF059669)),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Already given this campaign: \$${formatCurrency(existing.amount)}. What you enter is added on top.',
+                                      style: TextStyle(fontSize: 12.5, color: ink.withOpacity(0.8), fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          Text('AMOUNT', style: TextStyle(fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w800, color: ink.withOpacity(0.55))),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: amountC,
+                            autofocus: true,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 30),
+                            decoration: InputDecoration(
+                              hintText: '0.00',
+                              hintStyle: TextStyle(color: ink.withOpacity(0.25), fontWeight: FontWeight.w900, fontSize: 30),
+                              prefixIcon: const Padding(
+                                padding: EdgeInsets.only(left: 16, right: 4),
+                                child: Text('\$', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
+                              ),
+                              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                              filled: true,
+                              fillColor: sectionBg,
+                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
+                              focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: Color(0xFF10B981), width: 2)),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: [5, 10, 20, 50, 100].map((v) {
+                              return ActionChip(
+                                label: Text('\$$v', style: const TextStyle(fontWeight: FontWeight.w800)),
+                                backgroundColor: const Color(0xFF10B981).withOpacity(isDark ? 0.16 : 0.1),
+                                side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.35)),
+                                labelStyle: TextStyle(color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                onPressed: () {
+                                  amountC.text = '$v';
+                                  amountC.selection = TextSelection.collapsed(offset: amountC.text.length);
+                                },
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: noteC,
                             style: TextStyle(color: ink),
@@ -41314,7 +41410,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                      child:
                     Row(
                       children: [
                         Expanded(
@@ -41459,22 +41557,32 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                               // local truth before waiting on the cloud.
                               NgmyCivicWalletRefresh.notify();
                               unawaited(_persistCivicMemberActivity(u));
-                            await _persistCivicContributionsBackup();
-                            final saved = await Future.wait<bool>([
-                              _pushTransactionDecisionToCloud(
-                                tx,
-                                attempts: 3,
-                              ),
-                              // The shared help-mode row also carries the
-                              // receipt list, so other devices still see the
-                              // money when a transactions insert is refused.
-                              ngmyPersistCivicHelpModeSettings(widget.config),
-                            ]);
-                            final cloudSaved = saved[0] || saved[1];
+                              // The money is already recorded on this device,
+                              // so close the pop-up right away. The cloud save
+                              // below can take several seconds (3 attempts),
+                              // which used to leave the registrar staring at
+                              // an open dialog and tapping Cancel.
+                              if (Navigator.of(ctx).canPop()) Navigator.pop(ctx);
+                              var cloudSaved = false;
+                              try {
+                                await _persistCivicContributionsBackup();
+                                final saved = await Future.wait<bool>([
+                                  _pushTransactionDecisionToCloud(
+                                    tx,
+                                    attempts: 3,
+                                  ),
+                                  // The shared help-mode row also carries the
+                                  // receipt list, so other devices still see the
+                                  // money when a transactions insert is refused.
+                                  ngmyPersistCivicHelpModeSettings(widget.config),
+                                ]);
+                                cloudSaved = saved[0] || saved[1];
+                              } catch (e) {
+                                debugPrint('[civic contribution save] $e');
+                              }
                               NgmyCivicWalletRefresh.notify();
                               NgmyAdminLiveRefresh.notify();
                               widget.onDataChanged();
-                              Navigator.pop(ctx);
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
@@ -41511,15 +41619,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF059669),
                               foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             ),
-                            child: Text(existing != null ? 'Update' : 'Save', style: const TextStyle(fontWeight: FontWeight.w800)),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, size: 18),
+                                const SizedBox(width: 6),
+                                Text(existing != null ? 'Add & save' : 'Save', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    ),
                   ],
+                ),
                 ),
               ),
             );

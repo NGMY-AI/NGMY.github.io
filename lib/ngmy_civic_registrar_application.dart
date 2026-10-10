@@ -39,17 +39,26 @@ class NgmyCivicRegistrarApplication {
   static String _statusOf(Map<String, dynamic> a) =>
       (a['status'] ?? 'pending').toString().toLowerCase();
 
+  /// Pending only when this person's newest row is pending. An old pending
+  /// row left behind next to a later revoke/reject no longer hides Apply.
   static bool isPendingForEmail(
     Iterable<Map<String, dynamic>> applications,
     String email,
   ) {
     final key = _emailKey(email);
     if (key.isEmpty) return false;
-    return applications.any(
-      (a) =>
-          (a['userEmail'] ?? '').toString().toLowerCase().trim() == key &&
-          _statusOf(a) == 'pending',
-    );
+    final newest = newestRowForEmail(applications, key);
+    return newest != null && _statusOf(newest) == 'pending';
+  }
+
+  /// How long a request the server has not received yet is still resent.
+  static const Duration freshRequestWindow = Duration(minutes: 30);
+
+  static bool isFreshRequest(Map<String, dynamic> row, {String? now}) {
+    final created = DateTime.tryParse((row['createdAt'] ?? '').toString())?.toUtc();
+    if (created == null) return false;
+    final at = DateTime.tryParse((now ?? '').trim())?.toUtc() ?? DateTime.now().toUtc();
+    return at.difference(created) <= freshRequestWindow;
   }
 
   static bool isApprovedForEmail(
@@ -490,22 +499,20 @@ class NgmyCivicRegistrarApplication {
     }
     final localRow = localBackup ?? newestRowForEmail(list, key);
     final localStatus = localRow == null ? '' : _statusOf(localRow);
-    if (localRow != null && localStatus == 'pending') {
+    // Only a request made moments ago is sent again (its first push may
+    // have failed). Anything older that the server no longer holds was
+    // deleted or revoked by the King/Admin: resending it, or turning an old
+    // approval into a new request, left the person stuck on "Pending" with
+    // no Apply button. They are a plain member again and may apply.
+    if (localRow != null &&
+        localStatus == 'pending' &&
+        isFreshRequest(localRow, now: now)) {
       final pending = Map<String, dynamic>.from(localRow);
       return (
         list: [...others, pending],
         own: pending,
         resubmit: pending,
         reappliedFromStaleApproval: false,
-      );
-    }
-    if (localRow != null && localStatus == 'approved') {
-      final reapply = pendingReapplicationFrom(localRow, at: now, id: reapplicationId);
-      return (
-        list: [...others, reapply],
-        own: reapply,
-        resubmit: reapply,
-        reappliedFromStaleApproval: true,
       );
     }
     return (list: others, own: null, resubmit: null, reappliedFromStaleApproval: false);

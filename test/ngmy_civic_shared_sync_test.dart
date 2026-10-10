@@ -674,7 +674,7 @@ void main() {
       'createdAt': '2026-08-01T00:00:00Z',
     };
 
-    test('a phone-only approval becomes a fresh pending request', () {
+    test('a deleted registrar is a plain member who can apply again', () {
       final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
         list: [other, row('old', 'approved', at: '2026-09-02T00:00:00Z')],
         email: me,
@@ -683,19 +683,34 @@ void main() {
         now: '2026-10-08T15:00:00Z',
         reapplicationId: 'new1',
       );
-      expect(rec.reappliedFromStaleApproval, isTrue);
-      expect(rec.resubmit, isNotNull);
-      expect(rec.resubmit!['status'], 'pending');
-      expect(rec.resubmit!['id'], 'new1');
-      expect(rec.resubmit!['reappliedFrom'], 'old');
-      expect(rec.resubmit!['createdAt'], '2026-10-08T15:00:00Z');
-      expect(rec.resubmit!.containsKey('updatedAt'), isFalse);
-      expect(rec.own!['status'], 'pending');
-      expect(
-        NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me),
-        isFalse,
-      );
+      expect(rec.reappliedFromStaleApproval, isFalse);
+      expect(rec.resubmit, isNull);
+      expect(rec.own, isNull);
+      expect(NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me), isFalse);
+      expect(NgmyCivicRegistrarApplication.isPendingForEmail(rec.list, me), isFalse);
+      expect(NgmyCivicRegistrarApplication.canReapply(applications: rec.list, email: me), isTrue);
       expect(rec.list.where((a) => a['id'] == 'ga1').length, 1);
+    });
+
+    test('an old pending request the server deleted is not sent again', () {
+      final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
+        list: [row('p1', 'pending')],
+        email: me,
+        serverRows: const [],
+        localBackup: row('p1', 'pending'),
+        now: '2026-10-08T15:00:00Z',
+      );
+      expect(rec.resubmit, isNull);
+      expect(NgmyCivicRegistrarApplication.isPendingForEmail(rec.list, me), isFalse);
+    });
+
+    test('an old pending row behind a newer revoke is not pending', () {
+      final rows = [
+        row('p0', 'pending'),
+        row('p1', 'revoked', at: '2026-09-09T00:00:00Z'),
+      ];
+      expect(NgmyCivicRegistrarApplication.isPendingForEmail(rows, me), isFalse);
+      expect(NgmyCivicRegistrarApplication.canReapply(applications: rows, email: me), isTrue);
     });
 
     test('a server approval replaces whatever the phone held', () {
@@ -723,12 +738,13 @@ void main() {
       expect(NgmyCivicRegistrarApplication.isApprovedForEmail(rec.list, me), isFalse);
     });
 
-    test('a pending request the server never received is sent again', () {
+    test('a pending request just made that the server never received is sent again', () {
       final rec = NgmyCivicRegistrarApplication.reconcileOwnRowsWithServer(
         list: const [],
         email: me,
         serverRows: const [],
         localBackup: row('p1', 'pending'),
+        now: '2026-09-01T00:10:00Z',
       );
       expect(rec.resubmit!['id'], 'p1');
       expect(rec.resubmit!['status'], 'pending');
