@@ -6770,6 +6770,11 @@ async function handleCivicHelperGifts(
 
   if (op === "redeem") {
     if (gift.redeemed === true) return jsonOk({ error: "This gift was already redeemed", gift }, 409);
+    // Money cards are valid for 1 week after they are sent.
+    const sentAt = Date.parse(String(gift.createdAt ?? ""));
+    if (sentAt && Date.now() - sentAt > 7 * 24 * 3600 * 1000) {
+      return jsonOk({ error: "This money card expired (cards are valid for 1 week after they are sent).", gift }, 410);
+    }
     const updated = {
       ...gift,
       redeemed: true,

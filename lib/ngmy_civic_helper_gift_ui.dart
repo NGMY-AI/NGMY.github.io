@@ -694,7 +694,7 @@ class _NgmyHelperGiftWalletSheetState extends State<_NgmyHelperGiftWalletSheet> 
                             ? 'Syncing your cards…'
                             : gifts.isEmpty
                                 ? 'When an admin sends you a card, it appears here.'
-                                : '${gifts.where((g) => !g.redeemed).length} active · ${gifts.length} total',
+                                : '${gifts.where((g) => g.isActive).length} active · ${gifts.length} total',
                         style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
                       ),
                     ],
@@ -761,7 +761,12 @@ class _NgmyHelperGiftWalletSheetState extends State<_NgmyHelperGiftWalletSheet> 
                                         children: [
                                           Text(g.giftName, style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF0F172A))),
                                           Text(
-                                            g.redeemed ? 'Redeemed · \$${g.amount.toStringAsFixed(2)}' : '\$${g.amount.toStringAsFixed(2)} · ${g.storeSellerName.isEmpty ? 'NGMY store' : g.storeSellerName}',
+                                            g.redeemed
+                                                ? 'Redeemed · \$${g.amount.toStringAsFixed(2)}'
+                                                : g.isExpired
+                                                    ? 'Expired · \$${g.amount.toStringAsFixed(2)}'
+                                                    : '\$${g.amount.toStringAsFixed(2)} · ${g.storeSellerName.isEmpty ? 'NGMY store' : g.storeSellerName}'
+                                                        '${g.expiresAt != null ? ' · use by ${_ngmyGiftDate(g.expiresAt!)}' : ''}',
                                             style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
                                           ),
                                         ],
@@ -1211,17 +1216,38 @@ class _NgmyHelperGiftMemberCardPanel extends StatelessWidget {
                 Text(style.emoji, style: const TextStyle(fontSize: 36)),
                 const SizedBox(height: 8),
                 Text(
-                  gift.redeemed ? 'Card used' : 'Your money card',
+                  gift.redeemed ? 'Card used' : (gift.isExpired ? 'Card expired' : 'Your money card'),
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 13),
                 ),
                 Text(gift.giftName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
                 const SizedBox(height: 4),
                 Text('\$${gift.amount.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 36)),
+                if (!gift.redeemed && gift.expiresAt != null)
+                  Text(
+                    gift.isExpired
+                        ? 'Expired ${_ngmyGiftDate(gift.expiresAt!)}'
+                        : 'Use by ${_ngmyGiftDate(gift.expiresAt!)} (valid 1 week)',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontWeight: FontWeight.w700, fontSize: 12.5),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          if (!gift.redeemed)
+          if (gift.isExpired && !gift.redeemed)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Text(
+                'This card expired — money cards can be used for 1 week after they are sent.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
+              ),
+            )
+          else if (!gift.redeemed)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -1352,4 +1378,9 @@ class NgmyHelperGiftAdminBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+String _ngmyGiftDate(DateTime d) {
+  final l = d.toLocal();
+  return '${l.month}/${l.day}/${l.year}';
 }

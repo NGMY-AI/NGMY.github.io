@@ -291,7 +291,29 @@ class NgmyHelperGift {
     this.redeemed = false,
     this.redeemedAt = '',
     this.redeemedByStore = '',
+    this.milestoneKey = '',
+    this.forStreak = 0,
   });
+
+  /// Money cards are valid for one week after they are sent.
+  static const Duration validFor = Duration(days: 7);
+
+  /// Which set of 3 "first helper" wins this card pays for (email|campaign that reached it).
+  final String milestoneKey;
+  final int forStreak;
+
+  DateTime? get expiresAt {
+    final c = DateTime.tryParse(createdAt);
+    return c?.add(validFor);
+  }
+
+  bool get isExpired {
+    final e = expiresAt;
+    return e != null && DateTime.now().toUtc().isAfter(e.toUtc());
+  }
+
+  /// Still usable at the store.
+  bool get isActive => !redeemed && !isExpired;
 
   final String id;
   final String email;
@@ -329,6 +351,8 @@ class NgmyHelperGift {
         'redeemed': redeemed,
         'redeemedAt': redeemedAt,
         'redeemedByStore': redeemedByStore,
+        if (milestoneKey.isNotEmpty) 'milestoneKey': milestoneKey,
+        if (forStreak > 0) 'forStreak': forStreak,
       };
 
   factory NgmyHelperGift.fromMap(Map<String, dynamic> map) => NgmyHelperGift(
@@ -349,6 +373,8 @@ class NgmyHelperGift {
         redeemed: map['redeemed'] == true,
         redeemedAt: (map['redeemedAt'] ?? '').toString(),
         redeemedByStore: (map['redeemedByStore'] ?? '').toString(),
+        milestoneKey: (map['milestoneKey'] ?? '').toString(),
+        forStreak: (map['forStreak'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -387,8 +413,38 @@ class NgmyCivicHelperGifts {
   static bool recipientAlreadyHasMoneyCard(dynamic config, String email) {
     final key = email.toLowerCase().trim();
     if (key.isEmpty) return false;
-    if (giftsForEmail(config, key).any((g) => !g.redeemed)) return true;
+    if (giftsForEmail(config, key).any((g) => g.isActive)) return true;
     if (pendingFromConfig(config).any((p) => p.email == key && p.granted)) return true;
+    return false;
+  }
+
+  // ── One card per set of 3 "first helper" wins ─────────────────────────────
+  // A set is identified by the member + the campaign where their streak hit 3, 6, 9…
+  // so a card that was already sent (used or not) never brings the pop-up back.
+
+  static String milestoneKeyFor(String email, String campaignId, int streak) {
+    final e = email.toLowerCase().trim();
+    final c = campaignId.trim();
+    return c.isNotEmpty ? '$e|$c' : '$e|s$streak';
+  }
+
+  static String pendingIdForMilestone(String key) => 'hgpend_m_$key';
+
+  /// True when this set of 3 wins already has a card (or an open alert).
+  static bool milestoneAlreadyHandled(dynamic config, String email, String key, int streak) {
+    final e = email.toLowerCase().trim();
+    final pid = pendingIdForMilestone(key);
+    final pending = pendingFromConfig(config);
+    if (pending.any((p) => p.id == pid)) return true;
+    final gifts = giftsForEmail(config, e);
+    if (gifts.any((g) => g.milestoneKey == key)) return true;
+    // Cards sent before milestones were tracked: matched by the streak they were sent for.
+    final legacyGifts = gifts.where((g) => g.milestoneKey.isEmpty).toList();
+    if (legacyGifts.isNotEmpty) {
+      if (legacyGifts.any((g) => g.forStreak == streak)) return true;
+      if (pending.any((p) => p.email == e && p.granted && p.streak == streak)) return true;
+      if (streak == 3) return true;
+    }
     return false;
   }
 
@@ -420,7 +476,19 @@ class NgmyCivicHelperGifts {
   /// Pending alerts that still need an admin to send a money card.
   static List<NgmyHelperGiftPending> openPendingNeedingAdminGrant(dynamic config) {
     reconcilePendingWithInbox(config);
-    return openPending(config).where((p) => !recipientAlreadyHasMoneyCard(config, p.email)).toList();
+    return openPending(config)
+        .where((p) => !recipientAlreadyHasMoneyCard(config, p.email) && !_pendingCoveredByGift(config, p))
+        .toList();
+  }
+
+  /// An alert whose set of 3 wins already got a card (used, unused or expired) — never show it again.
+  static bool _pendingCoveredByGift(dynamic config, NgmyHelperGiftPending p) {
+    final gifts = giftsForEmail(config, p.email);
+    if (gifts.isEmpty) return false;
+    final key = p.id.startsWith('hgpend_m_') ? p.id.substring('hgpend_m_'.length) : milestoneKeyFor(p.email, '', p.streak);
+    if (gifts.any((g) => g.milestoneKey == key)) return true;
+    final legacy = gifts.where((g) => g.milestoneKey.isEmpty);
+    return legacy.isNotEmpty && (legacy.any((g) => g.forStreak == p.streak) || p.streak == 3);
   }
 
   static int openPendingCount(dynamic config) => openPendingNeedingAdminGrant(config).length;
@@ -514,10 +582,13 @@ class NgmyCivicHelperGifts {
       if (email.isEmpty) continue;
       if (list.any((p) => !p.granted && p.email == email)) continue;
       if (recipientAlreadyHasMoneyCard(config, email)) continue;
+      // Already rewarded this exact set of 3 (even if the card was used or expired) → no pop-up.
+      final key = milestoneKeyFor(email, (item['lastFirstHelperCampaignId'] ?? '').toString(), streak);
+      if (milestoneAlreadyHandled(config, email, key, streak)) continue;
       list.insert(
         0,
         NgmyHelperGiftPending(
-          id: 'hgpend_roster_${email}_$streak',
+          id: pendingIdForMilestone(key),
           email: email,
           fullName: (item['fullName'] ?? email).toString(),
           registryId: (item['registryId'] ?? '').toString(),
@@ -586,9 +657,11 @@ class NgmyCivicHelperGifts {
     memberRecord['lastFirstHelperCampaignId'] = campaignId;
 
     if (streak < 3 || streak % 3 != 0) return null;
+    final key = milestoneKeyFor(email, campaignId, streak);
+    if (milestoneAlreadyHandled(config, email, key, streak)) return null;
 
     final pending = NgmyHelperGiftPending(
-      id: 'hgpend_${DateTime.now().millisecondsSinceEpoch}_$email',
+      id: pendingIdForMilestone(key),
       email: email,
       fullName: (memberRecord['fullName'] ?? email).toString(),
       registryId: (memberRecord['registryId'] ?? '').toString(),
@@ -835,6 +908,11 @@ class NgmyCivicHelperGifts {
       token: token,
       createdAt: now,
       grantedBy: grantedBy.toLowerCase().trim(),
+      // Remember which set of 3 wins this card pays for — that set never pops up again.
+      milestoneKey: pending.id.startsWith('hgpend_m_')
+          ? pending.id.substring('hgpend_m_'.length)
+          : milestoneKeyFor(pending.email, '', pending.streak),
+      forStreak: pending.streak,
     );
 
     await _syncPendingAlertToServer(pending);
@@ -913,6 +991,9 @@ class NgmyCivicHelperGifts {
     }
     if (gift.redeemed) {
       return (ok: false, message: 'This gift was already redeemed.', gift: gift);
+    }
+    if (gift.isExpired) {
+      return (ok: false, message: 'This money card expired — cards are valid for 1 week after they are sent.', gift: gift);
     }
     final owner = storeOwnerEmail.toLowerCase().trim();
     final locked = gift.storeSellerEmail;
@@ -1008,11 +1089,12 @@ class NgmyCivicHelperGifts {
     String email,
   ) async {
     final seen = await _seenGiftTokens();
+    // Only the recipient, only while the card can still be used (not redeemed, not expired).
     return giftsForEmail(config, email)
-        .where((g) => !g.redeemed && g.token.isNotEmpty && !seen.contains(g.token))
+        .where((g) => g.isActive && g.token.isNotEmpty && !seen.contains(g.token))
         .toList();
   }
 
   static int unredeemedGiftCount(dynamic config, String email) =>
-      giftsForEmail(config, email).where((g) => !g.redeemed).length;
+      giftsForEmail(config, email).where((g) => g.isActive).length;
 }
