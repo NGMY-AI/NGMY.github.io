@@ -32080,10 +32080,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
     // Live changes arrive through the help-mode broadcast channel; this poll
     // only catches a missed broadcast, so it stays slow and skips hidden tabs.
+    var helpPollTicks = 0;
     _helpModePoll = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted) return;
       if (ngmyAppInBackground()) return;
       unawaited(_refreshCivicHelpModeSettingsOnly());
+      // Every 2 minutes also pull contributions, for a missed broadcast.
+      helpPollTicks++;
+      if (helpPollTicks % 4 == 0) _refreshCivicMoneySoon();
     });
     _membersCloudPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _activeTab != 2) return;
@@ -32192,12 +32196,27 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             callback: (_) {
               if (!mounted) return;
               unawaited(_refreshCivicHelpModeSettingsOnly());
+              // The settings row no longer carries receipts, so a phone that
+              // only re-read it never saw the money recorded on another
+              // phone: after Deactivate the receipt stayed empty or missing
+              // until the app was reopened. Pull the contributions too.
+              _refreshCivicMoneySoon();
             },
           )
           .subscribe();
     } catch (e) {
       debugPrint('[help mode] live channel: $e');
     }
+  }
+
+  Timer? _civicMoneyRefreshDebounce;
+
+  void _refreshCivicMoneySoon() {
+    _civicMoneyRefreshDebounce?.cancel();
+    _civicMoneyRefreshDebounce = Timer(const Duration(milliseconds: 1500), () {
+      if (!mounted) return;
+      unawaited(_refreshCivicHelpModeAndContributions());
+    });
   }
 
   Future<void> _broadcastCivicHelpModeChanged(String state) async {
@@ -32453,6 +32472,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   void dispose() {
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
+    _civicMoneyRefreshDebounce?.cancel();
     _membersCloudPoll?.cancel();
     _civicAccessPoll?.cancel();
     _liveRefreshDebounce?.cancel();
@@ -38250,59 +38270,56 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     required bool canDelete,
     VoidCallback? onDeleted,
   }) {
-    return Positioned(
-      top: 0,
-      right: 0,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Material(
-            color: const Color(0xFF2563EB),
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(canDelete ? 0 : 12),
-              bottomLeft: const Radius.circular(10),
-            ),
-            child: InkWell(
-              onTap: () => _showHelpCampaignSpendingLedger(
-                campaignId: campaignKey,
-                campaignTitle: campaignTitle,
-                campaignTxs: campaignTxs,
-              ),
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(canDelete ? 0 : 12),
-                bottomLeft: const Radius.circular(10),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(7),
-                child: Icon(Icons.receipt_long_rounded, color: Colors.white, size: 18),
-              ),
+    Widget roundAction({
+      required IconData icon,
+      required Color color,
+      required String tooltip,
+      required VoidCallback onTap,
+    }) {
+      return Tooltip(
+        message: tooltip,
+        child: Material(
+          color: color.withOpacity(0.12),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(icon, color: color, size: 18),
             ),
           ),
-          if (canDelete)
-            Material(
-              color: Colors.red.shade600,
-              borderRadius: const BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomLeft: Radius.circular(10),
-              ),
-              child: InkWell(
-                onTap: () {
-                  unawaited(_deleteContributionReceipt(campaignKey).then((_) {
-                    onDeleted?.call();
-                  }));
-                },
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(12),
-                  bottomLeft: Radius.circular(10),
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(7),
-                  child: Icon(Icons.delete_outline, color: Colors.white, size: 18),
-                ),
-              ),
-            ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        roundAction(
+          icon: Icons.receipt_long_rounded,
+          color: const Color(0xFF2563EB),
+          tooltip: 'Spending ledger',
+          onTap: () => _showHelpCampaignSpendingLedger(
+            campaignId: campaignKey,
+            campaignTitle: campaignTitle,
+            campaignTxs: campaignTxs,
+          ),
+        ),
+        if (canDelete) ...[
+          const SizedBox(width: 6),
+          roundAction(
+            icon: Icons.delete_outline_rounded,
+            color: Colors.red.shade600,
+            tooltip: 'Delete receipt',
+            onTap: () {
+              unawaited(_deleteContributionReceipt(campaignKey).then((_) {
+                onDeleted?.call();
+              }));
+            },
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -39622,28 +39639,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     const SizedBox(height: 18),
                     const Text('Contribution Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
-                    glassFrame(
-                      child: contributions.isEmpty
-                          ? const Text('No contribution records on file.', style: TextStyle(color: Colors.grey))
-                          : Column(
-                              children: contributions.asMap().entries.map((entry) {
-                                final t = entry.value;
-                                return glassTile(
-                                  last: entry.key == contributions.length - 1,
-                                  child: ListTile(
-                                    dense: true,
-                                    leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                    title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                    subtitle: Text(_txReadableDetails(t)),
-                                    trailing: Text(
-                                      '${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}',
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                    ),
+                    if (contributions.isEmpty)
+                      glassFrame(
+                        child: const Text('No contribution records on file.', style: TextStyle(color: Colors.grey)),
+                      )
+                    else
+                      ...contributions.map((t) => _civicContributionRecordCard(ctx, t)),
                     const SizedBox(height: 16),
                     const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
@@ -39711,6 +39712,116 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// One contribution or claim shown in its own frame on a member profile.
+  Widget _civicRecordCard(
+    BuildContext ctx, {
+    required IconData icon,
+    required Color accent,
+    required String title,
+    required String subtitle,
+    required DateTime date,
+    String? badge,
+  }) {
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final mute = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1F2937) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withOpacity(isDark ? 0.35 : 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.25 : 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(isDark ? 0.22 : 0.12),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: ink),
+                ),
+                if (subtitle.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: mute),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '${date.month}/${date.day}/${date.year}',
+                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: mute),
+                ),
+              ),
+              if (badge != null) ...[
+                const SizedBox(height: 4),
+                Text(badge, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: accent)),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _civicContributionRecordCard(BuildContext ctx, AppTransaction t) => _civicRecordCard(
+        ctx,
+        icon: Icons.volunteer_activism_rounded,
+        accent: const Color(0xFF059669),
+        title: '\$${formatCurrency(t.amount)}',
+        subtitle: _txReadableDetails(t),
+        date: t.timestamp,
+      );
+
+  Widget _civicClaimRecordCard(BuildContext ctx, AppTransaction t) {
+    final open = t.status == TransactionStatus.pending;
+    return _civicRecordCard(
+      ctx,
+      icon: Icons.report_gmailerrorred_rounded,
+      accent: open ? const Color(0xFFEA580C) : const Color(0xFF64748B),
+      title: t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : 'Claim',
+      subtitle: '',
+      date: t.timestamp,
+      badge: open ? 'Open' : 'Resolved',
     );
   }
 
@@ -39850,35 +39961,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     if (contributions.isEmpty)
                       Text('No contribution records yet.', style: TextStyle(color: mute))
                     else
-                      ...contributions.take(12).map(
-                        (t) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                          title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(_txReadableDetails(t)),
-                          trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: mute)),
-                        ),
-                      ),
+                      ...contributions.take(12).map((t) => _civicContributionRecordCard(ctx, t)),
                     const SizedBox(height: 16),
                     Text('Claim records', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
                     const SizedBox(height: 8),
                     if (claims.isEmpty)
                       Text('No claim records yet.', style: TextStyle(color: mute))
                     else
-                      ...claims.take(12).map(
-                        (t) => ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(
-                            Icons.report_gmailerrorred_rounded,
-                            color: t.status == TransactionStatus.pending ? Colors.orange : Colors.grey,
-                          ),
-                          title: Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : 'Claim', style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(t.status == TransactionStatus.pending ? 'Open claim' : 'Resolved claim'),
-                          trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: TextStyle(fontSize: 11, color: mute)),
-                        ),
-                      ),
+                      ...claims.take(12).map((t) => _civicClaimRecordCard(ctx, t)),
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
@@ -40115,25 +40205,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   const SizedBox(height: 18),
                   const Text('Contribution Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
-                  glassFrame(
-                    child: contributions.isEmpty
-                        ? const Text('No contribution records yet.', style: TextStyle(color: Colors.grey))
-                        : Column(
-                            children: contributions.take(8).toList().asMap().entries.map((entry) {
-                              final t = entry.value;
-                              return glassTile(
-                                last: entry.key == contributions.take(8).length - 1,
-                                child: ListTile(
-                                  dense: true,
-                                  leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                  title: Text('\$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(_txReadableDetails(t)),
-                                  trailing: Text('${t.timestamp.month}/${t.timestamp.day}/${t.timestamp.year}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                  ),
+                  if (contributions.isEmpty)
+                    glassFrame(
+                      child: const Text('No contribution records yet.', style: TextStyle(color: Colors.grey)),
+                    )
+                  else
+                    ...contributions.take(8).map((t) => _civicContributionRecordCard(ctx, t)),
                   const SizedBox(height: 16),
                   const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),
@@ -40862,21 +40939,52 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     });
     unawaited(_persistReceiptReadState());
     String? selectedKey;
+    StateSetter? pageSetter;
+    var pageOpen = true;
+    var refreshing = true;
+
+    // Pull the latest money from the server every time the receipts open, so
+    // a member sees contributions recorded on the registrar's phone even
+    // after help mode was deactivated.
+    Future<void> refreshFromCloud() async {
+      try {
+        await _refreshCivicHelpModeAndContributions();
+      } catch (e) {
+        debugPrint('[receipts] refresh: $e');
+      }
+      refreshing = false;
+      if (!pageOpen) return;
+      try {
+        pageSetter?.call(() {});
+      } catch (_) {}
+    }
+
+    unawaited(refreshFromCloud());
+
+    String shortDate(DateTime d) => '${d.month}/${d.day}/${d.year}';
+
+    String initialsOf(String name) {
+      final parts = name.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).take(2);
+      final s = parts.map((p) => p[0].toUpperCase()).join();
+      return s.isEmpty ? '?' : s;
+    }
 
     unawaited(NgmyNavigator.push<void>(
       context,
       StatefulBuilder(
         builder: (ctx, setPage) {
+          pageSetter = setPage;
           final groups = _groupContributionReceipts(_visibleContributionTx());
           final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final pageBg = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB);
-          final panelBg = isDark ? const Color(0xFF121212) : const Color(0xFFE9F7EF);
-          final tileBg = isDark ? const Color(0xFF161616) : Colors.white;
-          final lineColor = isDark ? const Color(0xFF2A2A2A) : Colors.black12;
-          final strongText = isDark ? Colors.white : Colors.black87;
-          final softText = isDark ? Colors.white70 : Colors.black54;
-          final hintGreen = isDark ? const Color(0xFF4ADE80) : Colors.green.shade800;
+          final pageBg = isDark ? const Color(0xFF0B1120) : const Color(0xFFF3F6FA);
+          final cardBg = isDark ? const Color(0xFF111827) : Colors.white;
+          final tileBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
+          final lineColor = isDark ? const Color(0xFF263244) : const Color(0xFFE5E9F0);
+          final strongText = isDark ? Colors.white : const Color(0xFF0F172A);
+          final softText = isDark ? Colors.white70 : const Color(0xFF64748B);
+          const emerald = Color(0xFF059669);
+          final emeraldText = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857);
           final selected = selectedKey != null ? (groups[selectedKey] ?? <AppTransaction>[]) : <AppTransaction>[];
           final first = selected.isNotEmpty ? selected.first : null;
           final total = selected.fold<double>(0.0, (s, t) => s + t.amount);
@@ -40892,21 +41000,508 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             }
           }
 
-          Widget receiptStat(String label, String value, Color fg) {
+          BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(radius),
+                border: Border.all(color: lineColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              );
+
+          Widget chip(IconData icon, String text, {Color? color}) {
+            final c = color ?? softText;
             return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                color: c.withOpacity(isDark ? 0.16 : 0.09),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 13, color: c),
+                  const SizedBox(width: 4),
+                  Text(text, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c)),
+                ],
+              ),
+            );
+          }
+
+          bool campaignActive(String state, String campaignKey) {
+            if (state.trim().isEmpty || !widget.config.helpActiveFor(state)) return false;
+            final cid = widget.config.helpCampaignIdFor(state).trim();
+            return cid.isEmpty || cid == campaignKey;
+          }
+
+          Widget statusChip(String state, String campaignKey, Map<String, dynamic> m) {
+            if (campaignActive(state, campaignKey)) {
+              return chip(Icons.circle, 'Active', color: emerald);
+            }
+            final until = _contributionReceiptVisibleUntil(campaignKey, m);
+            return chip(
+              Icons.lock_clock_rounded,
+              until == null ? 'Closed' : 'Closed · visible until ${shortDate(until)}',
+              color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
+            );
+          }
+
+          String scopeLabel(Map<String, dynamic> m) {
+            final type = (m['scopeType'] ?? 'all').toString();
+            if (type == 'all') return 'All members';
+            final value = (m['scopeValue'] ?? '').toString();
+            return '${type[0].toUpperCase()}${type.substring(1)}: $value';
+          }
+
+          Widget listCard(String k, List<AppTransaction> txs) {
+            final seed = txs.first;
+            final m = _decodeContributionMeta(seed);
+            final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
+            final c = txs.map(_contributionContributorKey).toSet().length;
+            final state = _contributionReceiptState(seed, m);
+            final canDelete = _canDeleteReceiptForState(state);
+            final title = (m['purpose'] ?? 'Contribution Campaign').toString();
+            void open() {
+              setPage(() {
+                selectedKey = k;
+                _openedReceiptKeys.add(k);
+              });
+              unawaited(_persistReceiptReadState());
+              if (mounted) setState(() {});
+            }
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: cardDecoration(),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: open,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [Color(0xFF10B981), Color(0xFF047857)],
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: strongText),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${state.isNotEmpty ? state : widget.user.state} · ${scopeLabel(m)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: softText, fontSize: 12.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _campaignReceiptCornerActions(
+                              campaignKey: k,
+                              receiptState: state,
+                              campaignTitle: title,
+                              campaignTxs: txs,
+                              canDelete: canDelete,
+                              onDeleted: () {
+                                setPage(() => selectedKey = null);
+                                if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
+                                  NgmyNavigator.pop(ctx);
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            chip(Icons.event_rounded, shortDate(seed.timestamp)),
+                            statusChip(state, k, m),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: tileBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: lineColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Total collected', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 2),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '\$${formatCurrency(t)}',
+                                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: emeraldText),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(width: 1, height: 34, color: lineColor),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('Contributors', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.groups_rounded, size: 20, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          '$c',
+                                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: strongText),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 44,
+                          child: ElevatedButton(
+                            onPressed: open,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: emerald,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Open receipt', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
+                                SizedBox(width: 6),
+                                Icon(Icons.arrow_forward_rounded, size: 18),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          Widget contributionTile(AppTransaction t) {
+            final rowMeta = _decodeContributionMeta(t);
+            final name = _contributionMemberDisplayName(t);
+            final rid = (rowMeta['registryId'] ?? '').toString().trim();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: tileBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: lineColor),
               ),
-              child: Column(
+              child: Row(
                 children: [
-                  Text(label, style: TextStyle(fontSize: 12, color: softText)),
-                  const SizedBox(height: 6),
-                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: fg)),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: emerald.withOpacity(isDark ? 0.22 : 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      initialsOf(name),
+                      style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 14),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: strongText),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _txReadableDetails(t),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: softText, fontSize: 12),
+                        ),
+                        if (rid.isNotEmpty) ...[
+                          const SizedBox(height: 5),
+                          chip(Icons.badge_outlined, 'ID $rid'),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: emerald.withOpacity(isDark ? 0.2 : 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '\$${formatCurrency(t.amount)}',
+                      style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 14),
+                    ),
+                  ),
                 ],
               ),
+            );
+          }
+
+          Widget receiptDetail() {
+            final title = (meta['purpose'] ?? 'Contribution Campaign').toString();
+            final average = contributors == 0 ? 0.0 : total / contributors;
+            final stateLabel = receiptState.isNotEmpty ? receiptState : _selectedState;
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              children: [
+                Container(
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF047857), Color(0xFF10B981)],
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(color: emerald.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const SizedBox(width: 36),
+                          Expanded(
+                            child: Text(
+                              'CONTRIBUTION RECEIPT',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.85),
+                                fontSize: 11,
+                                letterSpacing: 1.6,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Material(
+                              color: Colors.white.withOpacity(0.18),
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () {
+                                  final text = _buildContributionReceiptWhatsAppSwahili(
+                                    meta: meta,
+                                    txs: selected,
+                                  );
+                                  Clipboard.setData(ClipboardData(text: text));
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Ripoti imenakiliwa — bandika kwenye WhatsApp.'),
+                                      backgroundColor: Color(0xFF059669),
+                                    ),
+                                  );
+                                },
+                                child: const Icon(Icons.copy_rounded, size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          stateLabel,
+                          if ((meta['scopeType'] ?? 'all').toString() != 'all') scopeLabel(meta),
+                          if (first != null) shortDate(first.timestamp),
+                        ].join(' · '),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 16),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          '\$${formatCurrency(total)}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38),
+                        ),
+                      ),
+                      Text(
+                        'Total collected',
+                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: cardDecoration(radius: 16),
+                        child: Column(
+                          children: [
+                            Icon(Icons.groups_rounded, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                            const SizedBox(height: 4),
+                            Text('$contributors', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: strongText)),
+                            Text('Contributors', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: cardDecoration(radius: 16),
+                        child: Column(
+                          children: [
+                            Icon(Icons.trending_up_rounded, color: emeraldText),
+                            const SizedBox(height: 4),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text('\$${formatCurrency(average)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: strongText)),
+                            ),
+                            Text('Average each', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+                  decoration: cardDecoration(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Text('Contribution details', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: strongText)),
+                          const Spacer(),
+                          chip(Icons.receipt_rounded, '${selected.length} record${selected.length == 1 ? '' : 's'}'),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (selected.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
+                        )
+                      else
+                        ...selected.map(contributionTile),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
+          Widget receiptList() {
+            if (keys.isEmpty) {
+              return ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const SizedBox(height: 80),
+                  Icon(Icons.receipt_long_rounded, size: 56, color: softText.withOpacity(0.5)),
+                  const SizedBox(height: 12),
+                  Text(
+                    refreshing ? 'Loading contributions…' : 'No contribution receipts yet.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: softText, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              );
+            }
+            final allTotal = keys.fold<double>(
+              0.0,
+              (s, k) => s + (groups[k] ?? const <AppTransaction>[]).fold<double>(0.0, (a, e) => a + e.amount),
+            );
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 14, left: 2, right: 2),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Community contributions',
+                          style: TextStyle(color: softText, fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      if (refreshing)
+                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      else
+                        chip(Icons.savings_rounded, '\$${formatCurrency(allTotal)} total', color: emeraldText),
+                    ],
+                  ),
+                ),
+                for (final k in keys)
+                  if ((groups[k] ?? const <AppTransaction>[]).isNotEmpty) listCard(k, groups[k]!),
+              ],
             );
           }
 
@@ -40925,13 +41520,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   onPressed: goBack,
                 ),
                 title: Text(
-                  selectedKey == null ? 'Contribution Receipts' : 'Contribution Receipt',
-                  style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                  selectedKey == null ? 'Contribution Receipts' : 'Receipt',
+                  style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.3),
                 ),
                 centerTitle: true,
                 backgroundColor: pageBg,
                 foregroundColor: strongText,
                 elevation: 0,
+                scrolledUnderElevation: 0,
                 actions: [
                   IconButton(
                     tooltip: 'State wallet',
@@ -40943,251 +41539,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                   ),
                 ],
               ),
-              body: selectedKey == null
-                  ? (keys.isEmpty
-                      ? Center(child: Text('No contribution receipts yet.', style: TextStyle(color: softText)))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          itemCount: keys.length + 1,
-                          itemBuilder: (_, i) {
-                            if (i == 0) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: Text("Past week's community contributions", style: TextStyle(color: softText, fontSize: 13)),
-                              );
-                            }
-                            final k = keys[i - 1];
-                            final txs = groups[k] ?? [];
-                            if (txs.isEmpty) return const SizedBox.shrink();
-                            final seed = txs.first;
-                            final m = _decodeContributionMeta(seed);
-                            final t = txs.fold<double>(0.0, (s, e) => s + e.amount);
-                            final c = txs.map(_contributionContributorKey).toSet().length;
-                            final receiptState = _contributionReceiptState(seed, m);
-                            final canDelete = _canDeleteReceiptForState(receiptState);
-                            final title = (m['purpose'] ?? 'Contribution Campaign').toString();
-                            return Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  width: double.infinity,
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-                                  decoration: BoxDecoration(
-                                    color: panelBg,
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.greenAccent.shade400),
-                                  ),
-                                  clipBehavior: Clip.hardEdge,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: strongText),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${m['state'] ?? widget.user.state} • ${m['scopeType'] == 'all' ? 'All members' : '${m['scopeType']}: ${m['scopeValue']}'}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(color: softText),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text('${seed.timestamp.month}/${seed.timestamp.day}/${seed.timestamp.year}', style: TextStyle(color: softText)),
-                                      Divider(color: lineColor),
-                                      FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(
-                                              'Click to view full receipt →',
-                                              style: TextStyle(color: hintGreen, fontWeight: FontWeight.w700, fontSize: 12),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              '\$${formatCurrency(t)} • $c contributors',
-                                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12, color: strongText),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      SelectionContainer.disabled(
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            setPage(() {
-                                              selectedKey = k;
-                                              _openedReceiptKeys.add(k);
-                                            });
-                                            unawaited(_persistReceiptReadState());
-                                            if (mounted) setState(() {});
-                                          },
-                                          child: Container(
-                                            height: 38,
-                                            width: double.infinity,
-                                            decoration: BoxDecoration(color: Colors.indigo, borderRadius: BorderRadius.circular(10)),
-                                            child: const Center(child: Text('Open Receipt', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                _campaignReceiptCornerActions(
-                                  campaignKey: k,
-                                  receiptState: receiptState,
-                                  campaignTitle: title,
-                                  campaignTxs: txs,
-                                  canDelete: canDelete,
-                                  onDeleted: () {
-                                    setPage(() => selectedKey = null);
-                                    if (_groupContributionReceipts(_visibleContributionTx()).isEmpty) {
-                                      NgmyNavigator.pop(ctx);
-                                    }
-                                  },
-                                ),
-                              ],
-                            );
-                          },
-                        ))
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      children: [
-                        Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(14, 14, 40, 14),
-                              decoration: BoxDecoration(
-                                color: panelBg,
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.greenAccent.shade400),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    (meta['purpose'] ?? 'Contribution Campaign').toString(),
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: strongText),
-                                  ),
-                                  Text('State: ${receiptState.isNotEmpty ? receiptState : _selectedState}', style: TextStyle(color: softText)),
-                                  if ((meta['scopeType'] ?? 'all').toString() != 'all')
-                                    Text(
-                                      'Scope: ${meta['scopeType']}: ${meta['scopeValue']}',
-                                      style: TextStyle(color: softText),
-                                    ),
-                                  Text('${first?.timestamp.month}/${first?.timestamp.day}/${first?.timestamp.year}', style: TextStyle(color: softText)),
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(child: receiptStat('Total Collected', '\$${formatCurrency(total)}', isDark ? const Color(0xFF4ADE80) : Colors.green.shade800)),
-                                      const SizedBox(width: 10),
-                                      Expanded(child: receiptStat('Contributors', contributors.toString(), isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    width: double.infinity,
-                                    decoration: BoxDecoration(
-                                      color: tileBg,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: lineColor),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Padding(
-                                          padding: const EdgeInsets.all(10),
-                                          child: Text('Contribution Details', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                        ),
-                                        Divider(height: 1, color: lineColor),
-                                        if (selected.isEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.all(20),
-                                            child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
-                                          )
-                                        else
-                                          ...selected.map(
-                                            (t) {
-                                              final rowMeta = _decodeContributionMeta(t);
-                                              return ListTile(
-                                                dense: true,
-                                                leading: const Icon(Icons.volunteer_activism, color: Colors.green),
-                                                title: Text(
-                                                  _contributionMemberDisplayName(t),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(color: strongText),
-                                                ),
-                                                subtitle: Text(
-                                                  [
-                                                    _txReadableDetails(t),
-                                                    if ((rowMeta['registryId'] ?? '').toString().trim().isNotEmpty)
-                                                      'ID: ${rowMeta['registryId']}',
-                                                  ].join(' · '),
-                                                  maxLines: 3,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(color: softText),
-                                                ),
-                                                trailing: Text('\$${formatCurrency(t.amount)}', style: TextStyle(fontWeight: FontWeight.bold, color: strongText)),
-                                              );
-                                            },
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              top: 6,
-                              right: 6,
-                              child: Material(
-                                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                elevation: 1,
-                                shape: const CircleBorder(),
-                                child: InkWell(
-                                  customBorder: const CircleBorder(),
-                                  onTap: () {
-                                    final text = _buildContributionReceiptWhatsAppSwahili(
-                                      meta: meta,
-                                      txs: selected,
-                                    );
-                                    Clipboard.setData(ClipboardData(text: text));
-                                    ScaffoldMessenger.of(ctx).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Ripoti imenakiliwa — bandika kwenye WhatsApp.'),
-                                        backgroundColor: Color(0xFF059669),
-                                      ),
-                                    );
-                                  },
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(6),
-                                    child: Icon(
-                                      Icons.copy_rounded,
-                                      size: 14,
-                                      color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+              body: RefreshIndicator(
+                color: emerald,
+                onRefresh: () {
+                  setPage(() => refreshing = true);
+                  return refreshFromCloud();
+                },
+                child: selectedKey == null ? receiptList() : receiptDetail(),
+              ),
             ),
           );
         },
       ),
       routeName: 'ContributionReceipts',
-    ));
+    ).whenComplete(() => pageOpen = false));
   }
 
   void _showContributionDialog(UserData u) {
@@ -41577,6 +41942,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                   ngmyPersistCivicHelpModeSettings(widget.config),
                                 ]);
                                 cloudSaved = saved[0] || saved[1];
+                                // Tell phones that have Civic Registry open to
+                                // pull the new money now.
+                                if (cloudSaved) unawaited(_broadcastCivicHelpModeChanged(state));
                               } catch (e) {
                                 debugPrint('[civic contribution save] $e');
                               }
@@ -45480,11 +45848,80 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                     ),
                   ],
                 ),
-                if (_civicTrialBanner.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    _civicTrialBanner,
-                    style: TextStyle(fontSize: 9, height: 1.25, fontWeight: FontWeight.w600, color: muted),
+                if (_civicTrialBanner.isNotEmpty ||
+                    (!_canUseRegistrarToolsHere() && slotsLeft > 0)) ...[
+                  const SizedBox(height: 6),
+                  // Free-period note and open registrar seats side by side,
+                  // each in its own small frame.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (_civicTrialBanner.isNotEmpty)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)).withOpacity(isDark ? 0.12 : 0.07),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: (isDark ? const Color(0xFF34D399) : const Color(0xFF059669)).withOpacity(0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.event_available_rounded,
+                                  size: 13,
+                                  color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    _civicTrialBanner,
+                                    style: TextStyle(
+                                      fontSize: 9.5,
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? const Color(0xFFD1FAE5) : const Color(0xFF065F46),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        const Spacer(),
+                      if (!_canUseRegistrarToolsHere() && slotsLeft > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6200EE).withOpacity(isDark ? 0.2 : 0.07),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF6200EE).withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '$slotsLeft',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? const Color(0xFFC4B5FD) : const Color(0xFF6200EE),
+                                ),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                slotsLeft == 1 ? 'slot left' : 'slots left',
+                                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700, color: muted),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
                 if (_hasRegistrarAccess() &&
@@ -45565,9 +46002,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                       ],
                     ),
                   ],
-                ] else if (slotsLeft > 0 && slotsLeft < kNgmyMaxRegistrarsPerState) ...[
-                  const SizedBox(height: 3),
-                  Text('$slotsLeft slot${slotsLeft == 1 ? '' : 's'} left', style: TextStyle(fontSize: 9, color: muted)),
                 ],
               ],
             ),
