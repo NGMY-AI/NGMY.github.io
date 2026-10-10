@@ -3103,15 +3103,20 @@ void _openCivicRegistryPinSheet(
   );
 }
 
-Future<void> _pushUserAuthorizedRegistrar(UserData u) async {
+/// Saves the account's Civic state, registrar flag and state-change count.
+/// No reachability probe first: that 3-second check often fails on the web
+/// app while the save itself works, which silently skipped the save and let
+/// the state-change count reset on the next start.
+Future<bool> _pushUserAuthorizedRegistrar(UserData u) async {
   final email = u.email.trim();
-  if (email.isEmpty || !await ngmyCanReachCloud()) return;
-  await _safeUpsertUserRow({
+  if (email.isEmpty) return false;
+  return _safeUpsertUserRow({
     'email': email,
     'isAuthorizedRegistrar': u.isAuthorizedRegistrar,
     'state': u.state,
     'civicRegistryStateSwitchesUsed': u.civicRegistryStateSwitchesUsed,
     'civicRegistryAnchorState': u.civicRegistryAnchorState,
+    'civicRegistryStateSwitchLockedUntil': u.civicRegistryStateSwitchLockedUntil,
   });
 }
 
@@ -8559,6 +8564,9 @@ class UserData {
   bool isCivicRegistryAdmin;
   int civicRegistryStateSwitchesUsed;
   String civicRegistryAnchorState;
+  /// When the 1-hour state-change lock ends (UTC ISO), saved on the account
+  /// so the lock and the count survive logout and a different phone.
+  String civicRegistryStateSwitchLockedUntil = '';
   bool isApprovedWorker;
   bool isApprovedHelper;
   bool canSellOnStore;
@@ -8678,7 +8686,7 @@ class UserData {
     if (full <= 0) return 0.0;
     return full * (1 - (clockInPenaltyPercent.clamp(0.0, 100.0) / 100));
   }
-  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'isAppLoginAccount': isAppLoginAccount, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys, 'clockInMissMonth': clockInMissMonth, 'clockInMissCount': clockInMissCount, 'clockInMissedDays': clockInMissedDays};
+  Map<String, dynamic> toJson() => {'email': email, 'phone': phone, 'username': username, 'accountBalance': accountBalance, 'totalProfit': totalProfit, 'isClockedIn': isClockedIn, 'clockInStartTime': clockInStartTime?.toUtc().toIso8601String(), 'isAdmin': isAdmin, 'activeInvestment': activeInvestment?.toJson(), 'status': status, 'forceLogout': forceLogout, 'referralCount': referralCount, 'points': points, 'profilePicturePath': profilePicturePath, 'isAuthorizedRegistrar': isAuthorizedRegistrar, 'isCivicRegistryKing': isCivicRegistryKing, 'isCivicRegistryAdmin': isCivicRegistryAdmin, 'civicRegistryStateSwitchesUsed': civicRegistryStateSwitchesUsed, 'civicRegistryAnchorState': civicRegistryAnchorState, 'civicRegistryStateSwitchLockedUntil': civicRegistryStateSwitchLockedUntil, 'isApprovedWorker': isApprovedWorker, 'isApprovedHelper': isApprovedHelper, 'canSellOnStore': canSellOnStore, 'lastClockInDate': lastClockInDate?.toUtc().toIso8601String(), 'lastClockInEarningsDate': lastClockInEarningsDate?.toUtc().toIso8601String(), 'todayClockInEarned': todayClockInEarned, 'passwordHash': passwordHash, 'state': state, 'helps': helps, 'missed': missed, 'isEnrolledInRegistry': isEnrolledInRegistry, 'fullName': fullName, 'dob': dob, 'idType': idType, 'registryId': registryId, 'homeAddress': homeAddress, 'city': city, 'room': room, 'referredByCode': referredByCode, 'clockInPenaltyPercent': clockInPenaltyPercent, 'pendingInvestmentName': pendingInvestmentName, 'pendingInvestmentAmount': pendingInvestmentAmount, 'pendingInvestmentRoi': pendingInvestmentRoi, 'savedCashAppTag': savedCashAppTag, 'savedZelleInfo': savedZelleInfo, 'savedBitcoinAddress': savedBitcoinAddress, 'crownBadge': crownBadge, 'freeFixCredit': freeFixCredit, 'freeTrialActive': freeTrialActive, 'freeTrialDailyAmount': freeTrialDailyAmount, 'mediaBio': mediaBio, 'isAppLoginAccount': isAppLoginAccount, 'mediaFollowers': mediaFollowers, 'mediaFollowing': mediaFollowing, 'mediaHighlights': mediaHighlights, 'mediaStories': mediaStories, 'readAnnouncementIds': readAnnouncementIds, 'openedContributionReceiptKeys': openedContributionReceiptKeys, 'dismissedContributionReceiptKeys': dismissedContributionReceiptKeys, 'clockInMissMonth': clockInMissMonth, 'clockInMissCount': clockInMissCount, 'clockInMissedDays': clockInMissedDays};
   factory UserData.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic v) {
       if (v == null || v == "null" || v.toString().isEmpty) return null;
@@ -8766,7 +8774,7 @@ class UserData {
           ? json['clockInMissCount'] as int
           : int.tryParse('${json['clockInMissCount']}') ?? 0,
       clockInMissedDays: _jsonStringList(json['clockInMissedDays']),
-    );
+    )..civicRegistryStateSwitchLockedUntil = (json['civicRegistryStateSwitchLockedUntil'] ?? '').toString();
   }
 }
 
@@ -13949,9 +13957,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         // Supabase is authoritative while online so an administrator's reset
         // cannot be undone by an older device-local switch counter. Local
         // storage remains the offline fallback.
-        if (!await ngmyCanReachCloud()) {
-          final civicLocal = await NgmyCivicStateSwitches.loadLocal(registrarEmail);
+        // Exception: a change this phone made that never reached the account
+        // (marked synced: false) is newer than the account, so it is kept
+        // and saved again instead of being reset.
+        final civicLocalPeek = await NgmyCivicStateSwitches.loadLocal(registrarEmail);
+        final localUnsynced = civicLocalPeek != null && civicLocalPeek['synced'] == false;
+        if (localUnsynced || !await ngmyCanReachCloud()) {
+          final civicLocal = civicLocalPeek;
           if (civicLocal != null) {
+            final lockRaw = (civicLocal['lockedUntil'] ?? '').toString();
+            if (lockRaw.trim().isNotEmpty) {
+              _currentUser!.civicRegistryStateSwitchLockedUntil = lockRaw;
+            }
             final used = civicLocal['used'];
             final anchor = (civicLocal['anchor'] ?? '').toString();
             final parsedUsed = used is num ? used.toInt() : int.tryParse('$used');
@@ -13964,8 +13981,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         final key = _currentUser!.email.toLowerCase().trim();
         final idx = _allUsers.indexWhere((u) => u.email.toLowerCase().trim() == key);
         if (idx != -1) {
+          final keepUsed = _currentUser!.civicRegistryStateSwitchesUsed;
+          final keepLock = _currentUser!.civicRegistryStateSwitchLockedUntil;
+          final keepAnchor = _currentUser!.civicRegistryAnchorState;
           _preserveLocalSessionState(_currentUser!, _allUsers[idx]);
           _currentUser = _allUsers[idx];
+          if (localUnsynced) {
+            // Keep this phone's newer count/lock over the account copy.
+            _currentUser!.civicRegistryStateSwitchesUsed = keepUsed;
+            _currentUser!.civicRegistryStateSwitchLockedUntil = keepLock;
+            if (_currentUser!.civicRegistryAnchorState.trim().isEmpty) {
+              _currentUser!.civicRegistryAnchorState = keepAnchor;
+            }
+          }
         }
       } else if (localCurrent != null) {
         final key = localCurrent.email.toLowerCase().trim();
@@ -32122,9 +32150,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   Future<void> _hydrateStateSwitchLock() async {
     final local = await NgmyCivicStateSwitches.loadLocal(widget.user.email);
     if (!mounted) return;
-    var lock = local == null
-        ? null
-        : NgmyCivicStateSwitches.parseLockedUntil(local['lockedUntil']);
+    // A change made on this phone that has not reached the account yet wins;
+    // otherwise the account (same on every phone) is the truth.
+    final localUnsynced = local != null && local['synced'] == false;
+    if (localUnsynced) {
+      final lu = local['used'];
+      final parsed = lu is num ? lu.toInt() : int.tryParse('$lu');
+      if (parsed != null && parsed > widget.user.civicRegistryStateSwitchesUsed) {
+        widget.user.civicRegistryStateSwitchesUsed = parsed;
+      }
+    }
+    var lock = NgmyCivicStateSwitches.parseLockedUntil(widget.user.civicRegistryStateSwitchLockedUntil);
+    if (local != null && (lock == null || localUnsynced)) {
+      lock = NgmyCivicStateSwitches.parseLockedUntil(local['lockedUntil']) ?? lock;
+    }
     var used = widget.user.civicRegistryStateSwitchesUsed;
     final cleared = NgmyCivicStateSwitches.refreshLockIfNeeded(
       switchesUsed: used,
@@ -32137,16 +32176,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     );
     if (!mounted) return;
     setState(() => _stateSwitchLockedUntil = lock);
-    if (cleared) unawaited(_persistStateSwitchLocal());
+    if (cleared || localUnsynced) unawaited(_persistStateSwitchLocal());
   }
 
+  /// Saves the state-change count and lock on this phone, then on the
+  /// account. The phone copy stays marked "not synced" until the account
+  /// save succeeds, so a failed save is retried instead of being undone by
+  /// the older account value on the next app start.
   Future<void> _persistStateSwitchLocal() async {
+    widget.user.civicRegistryStateSwitchLockedUntil =
+        _stateSwitchLockedUntil?.toUtc().toIso8601String() ?? '';
     await NgmyCivicStateSwitches.saveLocal(
       email: widget.user.email,
       switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
       anchorState: widget.user.civicRegistryAnchorState,
       lockedUntil: _stateSwitchLockedUntil,
+      synced: false,
     );
+    final pushed = await _pushUserAuthorizedRegistrar(widget.user);
+    if (pushed) {
+      await NgmyCivicStateSwitches.saveLocal(
+        email: widget.user.email,
+        switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+        anchorState: widget.user.civicRegistryAnchorState,
+        lockedUntil: _stateSwitchLockedUntil,
+        synced: true,
+      );
+    }
   }
 
   Future<void> _refreshCivicHelpModeSettingsOnly({bool fresh = false}) async {
@@ -32962,8 +33018,52 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     NgmyNavigator.pop(context);
   }
 
+  /// Counts one state change for a member who just got into [to] from
+  /// [from]. Same state, the first state ever, and registrars/admins are
+  /// free. Saved on the phone and on the account right away.
+  bool _consumeStateSwitch(String from, String to) {
+    final ok = NgmyCivicStateSwitches.tryConsumeSwitch(
+      isAdmin: widget.user.isAdmin,
+      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+      isCivicRegistryKing: widget.user.isCivicRegistryKing,
+      isAuthorizedRegistrar: _hasRegistrarAccess(),
+      fromState: from,
+      toState: to,
+      anchorState: widget.user.civicRegistryAnchorState,
+      setAnchorState: (s) => widget.user.civicRegistryAnchorState = s,
+      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+      setSwitchesUsed: (n) => widget.user.civicRegistryStateSwitchesUsed = n,
+      lockedUntil: _stateSwitchLockedUntil,
+      setLockedUntil: (u) => _stateSwitchLockedUntil = u,
+    );
+    widget.user.civicRegistryStateSwitchLockedUntil =
+        _stateSwitchLockedUntil?.toUtc().toIso8601String() ?? '';
+    unawaited(_persistStateSwitchLocal());
+    return ok;
+  }
+
+  void _showStateSwitchLockedMessage() {
+    if (!mounted) return;
+    final lock = _stateSwitchLockedUntil;
+    final locked = lock != null && DateTime.now().toUtc().isBefore(lock.toUtc());
+    final mins = locked ? lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60) : 60;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          locked
+              ? 'State changes locked. Try again in ${mins}m.'
+              : 'You have used all ${NgmyCivicStateSwitches.maxSwitches} state changes. Wait 1 hour, then you can change again.',
+        ),
+      ),
+    );
+  }
+
   void _onRegistryUnlocked(String state) {
     _unlockCheckGen++;
+    // A state change counts only now, after the member got through the
+    // state code and their information for the new state.
+    final previous = widget.user.state.trim();
+    if (previous.isNotEmpty) _consumeStateSwitch(previous, state);
     NgmyCivicStateSwitches.onGateUnlock(
       state: state,
       currentAnchor: widget.user.civicRegistryAnchorState,
@@ -33024,37 +33124,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       // carry a normal member into another state.
       await civicRegistryClearUnlockForState(widget.user.email, state: newState);
     }
-    final ok = NgmyCivicStateSwitches.tryConsumeSwitch(
-      isAdmin: widget.user.isAdmin,
-      isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
-      isCivicRegistryKing: widget.user.isCivicRegistryKing,
-      isAuthorizedRegistrar: _hasRegistrarAccess(),
-      fromState: from,
-      toState: newState,
-      anchorState: widget.user.civicRegistryAnchorState,
-      setAnchorState: (s) => widget.user.civicRegistryAnchorState = s,
-      switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-      setSwitchesUsed: (n) => widget.user.civicRegistryStateSwitchesUsed = n,
-      lockedUntil: _stateSwitchLockedUntil,
-      setLockedUntil: (u) => _stateSwitchLockedUntil = u,
-    );
-    if (!ok) {
-      if (mounted) {
-        final lock = _stateSwitchLockedUntil;
-        final locked = lock != null && DateTime.now().toUtc().isBefore(lock.toUtc());
-        final mins = locked
-            ? lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60)
-            : 60;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              locked
-                  ? 'State changes locked. Try again in ${mins}m.'
-                  : 'You have used all ${NgmyCivicStateSwitches.maxSwitches} state changes. Wait 1 hour, then you can change again.',
-            ),
-          ),
-        );
-      }
+    // Members are only checked here; the change is counted once they pass
+    // the state code and their information (_onRegistryUnlocked), so
+    // backing out of Verify does not use one up.
+    final isMember = !_hasRegistrarAccess() && !_isGlobalCivicRegistryAdmin();
+    if (!_canChangeCivicState()) {
+      _showStateSwitchLockedMessage();
+      return false;
+    }
+    if (!isMember && !_consumeStateSwitch(from, newState)) {
+      _showStateSwitchLockedMessage();
       return false;
     }
     // Pull the authoritative per-state map before revealing the destination.
@@ -33115,6 +33194,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       }
     }
     if (!mounted) return false;
+    // Already verified for this state (no Verify screen): count it now.
+    if (isMember && !_consumeStateSwitch(from, newState)) {
+      _showStateSwitchLockedMessage();
+      return false;
+    }
     setState(() {
       // The chosen state is the member's active Civic Registry state. It is
       // persisted with the switch allowance and controls receipt visibility.
@@ -46420,28 +46504,37 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           // helpers, non-helpers) instead of one long sentence.
           final purple = isDark ? const Color(0xFFC4B5FD) : const Color(0xFF6200EE);
           final ink = isDark ? Colors.white : const Color(0xFF0F172A);
-          Widget countTag(IconData icon, int n, String label, Color color) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withOpacity(isDark ? 0.16 : 0.09),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 12, color: color),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$n',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color),
+          // One of four equal tags on a single line. Text shrinks to fit a
+          // narrow phone instead of wrapping to a second row.
+          Widget countTag(IconData icon, String value, String label, Color color) {
+            return Expanded(
+              child: Container(
+                height: 26,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(isDark ? 0.16 : 0.09),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 12, color: color),
+                      const SizedBox(width: 3),
+                      Text(
+                        value,
+                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        label,
+                        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: muted),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 3),
-                  Text(
-                    label,
-                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: muted),
-                  ),
-                ],
+                ),
               ),
             );
           }
@@ -46508,62 +46601,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   ],
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    countTag(Icons.groups_rounded, enrolled.length, enrolled.length == 1 ? 'member' : 'members',
-                        isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                    countTag(Icons.volunteer_activism_rounded, topHelpers.length,
-                        topHelpers.length == 1 ? 'helper' : 'helpers',
-                        isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
-                    countTag(Icons.hourglass_empty_rounded, nonHelpers.length, 'not yet',
-                        isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
-                    // How many state changes this person has left.
-                    Builder(builder: (_) {
-                      final unlimited = widget.user.isAdmin ||
-                          widget.user.isCivicRegistryAdmin ||
-                          widget.user.isCivicRegistryKing ||
-                          _hasRegistrarAccess();
-                      final left = NgmyCivicStateSwitches.remainingSwitches(
-                        isAdmin: widget.user.isAdmin,
-                        isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
-                        isCivicRegistryKing: widget.user.isCivicRegistryKing,
-                        isAuthorizedRegistrar: _hasRegistrarAccess(),
-                        switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
-                        lockedUntil: _stateSwitchLockedUntil,
-                      );
-                      final lock = _stateSwitchLockedUntil;
-                      final locked = !unlimited &&
-                          lock != null &&
-                          DateTime.now().toUtc().isBefore(lock.toUtc());
-                      final color = locked
-                          ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626))
-                          : purple;
-                      final valueText = unlimited ? '∞' : '$left';
-                      final labelText = locked
-                          ? 'changes · ${lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60)}m'
-                          : (left == 1 && !unlimited ? 'change left' : 'changes left');
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: color.withOpacity(isDark ? 0.16 : 0.09),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(locked ? Icons.lock_clock_rounded : Icons.swap_horiz_rounded, size: 12, color: color),
-                            const SizedBox(width: 4),
-                            Text(valueText, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color)),
-                            const SizedBox(width: 3),
-                            Text(labelText, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: muted)),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                ),
+                Builder(builder: (_) {
+                  // How many state changes this person has left.
+                  final unlimited = widget.user.isAdmin ||
+                      widget.user.isCivicRegistryAdmin ||
+                      widget.user.isCivicRegistryKing ||
+                      _hasRegistrarAccess();
+                  final left = NgmyCivicStateSwitches.remainingSwitches(
+                    isAdmin: widget.user.isAdmin,
+                    isCivicRegistryAdmin: widget.user.isCivicRegistryAdmin,
+                    isCivicRegistryKing: widget.user.isCivicRegistryKing,
+                    isAuthorizedRegistrar: _hasRegistrarAccess(),
+                    switchesUsed: widget.user.civicRegistryStateSwitchesUsed,
+                    lockedUntil: _stateSwitchLockedUntil,
+                  );
+                  final lock = _stateSwitchLockedUntil;
+                  final locked = !unlimited &&
+                      lock != null &&
+                      DateTime.now().toUtc().isBefore(lock.toUtc());
+                  return Row(
+                    children: [
+                      countTag(Icons.groups_rounded, '${enrolled.length}', enrolled.length == 1 ? 'member' : 'members',
+                          isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
+                      const SizedBox(width: 5),
+                      countTag(Icons.volunteer_activism_rounded, '${topHelpers.length}',
+                          topHelpers.length == 1 ? 'helper' : 'helpers',
+                          isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
+                      const SizedBox(width: 5),
+                      countTag(Icons.hourglass_empty_rounded, '${nonHelpers.length}', 'not yet',
+                          isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309)),
+                      const SizedBox(width: 5),
+                      countTag(
+                        locked ? Icons.lock_clock_rounded : Icons.swap_horiz_rounded,
+                        locked
+                            ? '${lock.toUtc().difference(DateTime.now().toUtc()).inMinutes.clamp(1, 60)}m'
+                            : (unlimited ? '∞' : '$left'),
+                        locked ? 'locked' : 'left',
+                        locked ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626)) : purple,
+                      ),
+                    ],
+                  );
+                }),
                 const SizedBox(height: 6),
                 Text(
                   hasContributions ? 'Helpers are ranked by who helped first.' : 'No contributions yet. Newest members first.',

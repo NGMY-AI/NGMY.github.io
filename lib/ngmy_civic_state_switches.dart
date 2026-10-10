@@ -24,6 +24,8 @@ class NgmyCivicStateSwitches {
     required int switchesUsed,
     required String anchorState,
     DateTime? lockedUntil,
+    /// False until the same values were saved on the account.
+    bool synced = true,
   }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -33,6 +35,7 @@ class NgmyCivicStateSwitches {
           'used': switchesUsed,
           'anchor': anchorState,
           'lockedUntil': lockedUntil?.toUtc().toIso8601String() ?? '',
+          'synced': synced,
         }),
       );
     } catch (_) {}

@@ -73,6 +73,7 @@ class NgmyCloudPolicy {
     'state',
     'civicRegistryStateSwitchesUsed',
     'civicRegistryAnchorState',
+    'civicRegistryStateSwitchLockedUntil',
     'profilePicturePath',
     'accountBalance',
     'totalProfit',
