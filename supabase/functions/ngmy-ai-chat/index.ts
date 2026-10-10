@@ -1272,6 +1272,21 @@ async function handleTrading(req: Request, action: string, body: any): Promise<R
 const REL_INACTIVE_MS = 30 * 24 * 3600 * 1000; // no message from the partner for 30 days → breakup
 const REL_COOLDOWN_MS = 365 * 24 * 3600 * 1000; // after a breakup: wait 1 year
 const REL_MAX_CHANCES = 2; // first chance + one second chance
+// Not easy to get: they only say yes after real conversation.
+const REL_MIN_MESSAGES = 30;
+const REL_MIN_DAYS = 2;
+
+async function relRapport(db: any, advisorId: string, email: string, bump: boolean) {
+  const { data } = await db.from("advisor_rapport").select("messages,first_at")
+    .eq("advisor_id", advisorId).eq("user_email", email).maybeSingle();
+  if (!bump) return { messages: Number(data?.messages ?? 0), firstAt: data?.first_at ?? null };
+  const next = Number(data?.messages ?? 0) + 1;
+  await db.from("advisor_rapport").upsert({
+    advisor_id: advisorId, user_email: email, messages: next,
+    first_at: data?.first_at ?? new Date().toISOString(), last_at: new Date().toISOString(),
+  });
+  return { messages: next, firstAt: data?.first_at ?? new Date().toISOString() };
+}
 
 /** Ends relationships whose partner hasn't written in 30 days. */
 async function relExpireInactive(db: any, advisorId: string) {
@@ -1313,14 +1328,25 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
   if (!advisorId) return jsonOk({ ok: false, error: "advisorId required" }, 400);
 
   if (action === "relTouch") {
-    // The partner wrote — keeps the relationship alive.
+    // The partner wrote — keeps the relationship alive. Every message also builds rapport.
     await db.from("advisor_relationships").update({ last_user_msg_at: new Date().toISOString() })
       .eq("advisor_id", advisorId).eq("user_email", email).eq("status", "dating");
-    return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
+    const rapport = await relRapport(db, advisorId, email, true);
+    return jsonOk({ ok: true, rapport: rapport.messages, ...(await relStatusFor(db, advisorId, email)) });
   }
   if (action === "relStart") {
     const st: any = await relStatusFor(db, advisorId, email);
     if (st.state !== "single") return jsonOk({ ok: true, started: false, ...st });
+    // One advisor per user.
+    const { data: mine } = await db.from("advisor_relationships").select("advisor_id")
+      .eq("user_email", email).eq("status", "dating").maybeSingle();
+    if (mine) return jsonOk({ ok: true, started: false, state: "you_are_taken" });
+    // Not easy to get — they need to have really talked first.
+    const rapport = await relRapport(db, advisorId, email, false);
+    const days = rapport.firstAt ? (Date.now() - Date.parse(rapport.firstAt)) / 86400000 : 0;
+    if (rapport.messages < REL_MIN_MESSAGES || days < REL_MIN_DAYS) {
+      return jsonOk({ ok: true, started: false, state: "too_soon", rapport: rapport.messages });
+    }
     const { error } = await db.from("advisor_relationships").insert({
       advisor_id: advisorId, user_email: email, status: "dating", chance: st.nextChance,
     });

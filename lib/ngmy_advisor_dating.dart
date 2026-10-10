@@ -9,12 +9,14 @@ import 'ngmy_edge_invoke.dart';
 
 /// Server answer for "this user + this advisor".
 class NgmyAdvisorRelationship {
-  const NgmyAdvisorRelationship(this.state, {this.availableAt, this.started = false});
+  const NgmyAdvisorRelationship(this.state, {this.availableAt, this.started = false, this.rapport = 0});
 
-  /// dating_you | single | taken | cooldown | no_more_chances | unknown
+  /// dating_you | single | taken | you_are_taken | too_soon | cooldown | no_more_chances | unknown
   final String state;
   final DateTime? availableAt;
   final bool started;
+  /// How many messages they've exchanged with this advisor (getting-to-know-you).
+  final int rapport;
 
   bool get datingYou => state == 'dating_you';
 
@@ -24,6 +26,7 @@ class NgmyAdvisorRelationship {
       (m['state'] ?? 'unknown').toString(),
       availableAt: DateTime.tryParse('${m['availableAt'] ?? ''}'),
       started: m['started'] == true,
+      rapport: int.tryParse('${m['rapport'] ?? 0}') ?? 0,
     );
   }
 }
@@ -54,18 +57,26 @@ bool ngmyUserEndsRelationship(String text) => RegExp(
 
 /// Prompt block — overrides any warm / romantic persona when they are NOT the partner.
 String ngmyAdvisorProfessionalBlock(NgmyAdvisorRelationship rel) {
+  const gentle = 'Always let someone down gently, like a kind real person: thank them, say you are flattered, '
+      'explain softly, and stay warm and friendly — never cold, blunt or preachy (never "you gotta respect that").';
   final why = switch (rel.state) {
-    'taken' => 'You are in a relationship with someone else. If they flirt or ask you out, say kindly that you are '
-        'seeing someone and keep it professional.',
-    'cooldown' => 'You two broke up before. If they ask you out again, say kindly you are not ready yet'
-        '${rel.availableAt != null ? ' (not before ${rel.availableAt!.toLocal().month}/${rel.availableAt!.toLocal().year})' : ''}.',
-    'no_more_chances' => 'You already gave them a second chance. If they ask you out again, say kindly but clearly that '
-        'it will not happen again — you can only stay friends / professional.',
-    _ => 'You are not dating this person. If they want to date you, they must ask you directly.',
+    'taken' => 'You are in a relationship with someone else. If they flirt or ask you out, kindly tell them you are '
+        'seeing someone. $gentle',
+    'you_are_taken' => 'They are already dating someone else on NGMY. If they flirt, gently remind them they have '
+        'someone. $gentle',
+    'cooldown' => 'You two broke up before. If they ask you out again, gently say you are not ready yet and need '
+        'time${rel.availableAt != null ? ' (not before ${rel.availableAt!.toLocal().month}/${rel.availableAt!.toLocal().year})' : ''}. $gentle',
+    'no_more_chances' => 'You already gave them a second chance. If they ask you out again, gently but clearly say it '
+        'can only be friendship now. $gentle',
+    _ => rel.rapport >= 10
+        ? 'You are single and getting to know them. You may be warm, curious and a little playful, ask about their '
+            'life — but you are NOT dating, so no pet names, no romance, no sexual talk. You are not easy to win: if '
+            'they want more, they have to really get to know you first. $gentle'
+        : 'You are single and just met them. Friendly and professional. $gentle',
   };
-  return 'PROFESSIONAL MODE (this overrides any warm or romantic persona above): Be friendly, respectful and helpful, '
-      'like a professional advisor. NO flirting, NO romance, NO sexual talk, NO pet names (love, honey, baby, babe, '
-      'sweetheart, darling, dear, my love), NO hearts or kiss emojis, NO "miss you". $why\n';
+  return 'PROFESSIONAL MODE (this overrides any warm or romantic persona above): Be friendly, respectful and helpful. '
+      'NO flirting back, NO romance, NO sexual talk, NO pet names (love, honey, baby, babe, sweetheart, darling, dear, '
+      'my love), NO hearts or kiss emojis, NO "miss you". $why\n';
 }
 
 /// One-time note for the reply right after a dating request / breakup.
@@ -75,11 +86,19 @@ String ngmyAdvisorDatingEventNote(String event, NgmyAdvisorRelationship rel) {
       return 'THEY JUST ASKED YOU OUT AND YOU SAID YES — you are now officially dating them (and only them). '
           'Reply happily in character.\n';
     }
+    const soft = 'Be gentle and human: thank them, say you are flattered / touched, explain softly, keep the friendship '
+        'warm. Never blunt, cold or lecturing.';
     return switch (rel.state) {
       'dating_you' => 'You are already dating them.\n',
-      'taken' => 'THEY JUST ASKED YOU OUT: say no kindly — you are already seeing someone.\n',
-      'cooldown' => 'THEY JUST ASKED YOU OUT: say no kindly — you broke up and you are not ready to date them again yet.\n',
-      'no_more_chances' => 'THEY JUST ASKED YOU OUT: say no kindly but firmly — you already gave them a second chance.\n',
+      'taken' => 'THEY JUST ASKED YOU OUT. Let them down softly — you are already seeing someone. $soft\n',
+      'you_are_taken' => 'THEY JUST ASKED YOU OUT, but they are already dating someone else on NGMY. Gently point that '
+          'out with a little humor. $soft\n',
+      'too_soon' => 'THEY JUST ASKED YOU OUT, but you barely know each other yet. Say you are flattered and you like '
+          'talking with them, but you want to get to know them better first — keep chatting and see where it goes. '
+          'Playful, not a hard no. $soft\n',
+      'cooldown' => 'THEY JUST ASKED YOU OUT. You broke up before and you are not ready yet — say it softly. $soft\n',
+      'no_more_chances' => 'THEY JUST ASKED YOU OUT. You already gave them a second chance; gently say it can only be '
+          'friendship now. $soft\n',
       _ => '',
     };
   }

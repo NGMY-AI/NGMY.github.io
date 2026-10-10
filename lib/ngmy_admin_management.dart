@@ -1116,6 +1116,37 @@ Future<void> ngmyHydrateCommunicateSettingsFromAllBackups(AppConfig config) asyn
   unawaited(_persistCommunicateSettingsLocal(config));
 }
 
+/// Advisor photos were stored INSIDE the advisor list as big base64 images, so the list got too large
+/// to save to the cloud — users kept an old June list while the admin saw the new one. Upload each
+/// embedded photo as a normal (shrunk) image file and keep only its link in the list.
+Future<void> _hostCommunicateAvatars(AppConfig config) async {
+  var changed = false;
+  final out = <Map<String, dynamic>>[];
+  for (final raw in config.communicateProfiles) {
+    final m = Map<String, dynamic>.from(raw);
+    final url = (m['avatarUrl'] ?? '').toString();
+    if (url.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(url.substring(url.indexOf(',') + 1));
+        final small = ngmyShrinkImageForUpload(bytes, maxSide: 720);
+        final id = (m['id'] ?? 'advisor').toString().replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+        final path = 'advisor_avatars/$id-${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final storage = Supabase.instance.client.storage.from('media');
+        await storage.uploadBinary(path, small.bytes, fileOptions: FileOptions(upsert: true, contentType: small.mime));
+        final public = storage.getPublicUrl(path);
+        if (public.isNotEmpty) {
+          m['avatarUrl'] = public;
+          changed = true;
+        }
+      } catch (e) {
+        debugPrint('[communicate] host avatar for ${m['id']}: $e');
+      }
+    }
+    out.add(m);
+  }
+  if (changed) config.communicateProfiles = out;
+}
+
 Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {
   ngmyAdminConfigMutationAt = DateTime.now();
   NgmyAdminLiveRefresh.notify();
@@ -1124,6 +1155,7 @@ Future<bool> ngmyPersistCommunicateSettings(AppConfig config) async {
 
   var cloudOk = false;
   if (await ngmyCanReachCloud()) {
+    await _hostCommunicateAvatars(config);
     final payload = _communicateSettingsPayload(config);
     cloudOk = await _upsertNgmySettingSafe(_kNgmyCommunicateSettingsKey, payload);
     await NgmySupabaseSyncThrottle.persistCriticalConfigNow(config, _persistCriticalConfigFields);
