@@ -315,6 +315,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
     if (!mounted) return;
     if (ok) {
+      // Also record it on the server: the job board checks the plan there.
+      unawaited(NgmyHouseWorkersApi.planCashApp('basic'));
       setState(() {});
       _snack('You\'re subscribed. Choose a service, then Send on WhatsApp.');
     } else {
@@ -1102,6 +1104,8 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
               clientPhone: widget.clientPhone,
               isAdmin: widget.isAdmin,
               reportUrl: (text) => _cfg.resolvedWhatsAppUrl(prefilledText: text),
+              cashAppUrl: _cfg.resolvedCashAppUrl(),
+              cashAppTag: _cfg.cashAppDisplayTag(),
             ),
             const SizedBox(height: 14),
             if (widget.appConfig != null) ...[

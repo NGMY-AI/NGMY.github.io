@@ -35,6 +35,10 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> rate(String id, int rating, String review) =>
       _call('hwRate', {'requestId': id, 'rating': rating, 'review': review});
   static Future<Map<String, dynamic>> cancel(String id) => _call('hwCancel', {'requestId': id});
+  static Future<Map<String, dynamic>> postJob(Map<String, dynamic> form) => _call('hwPostJob', form);
+  static Future<Map<String, dynamic>> jobs() => _call('hwJobs');
+  static Future<Map<String, dynamic>> pickJob(String id) => _call('hwPickJob', {'requestId': id});
+  static Future<Map<String, dynamic>> planCashApp(String plan) => _call('hwPlanCashApp', {'plan': plan});
   static Future<Map<String, dynamic>> adminList() => _call('hwAdminList');
   static Future<Map<String, dynamic>> adminDecide(String email, String decision) =>
       // Not 'email': that key is stripped from every signed-in request.
@@ -180,6 +184,8 @@ class NgmyHouseWorkersSection extends StatefulWidget {
     required this.clientPhone,
     required this.isAdmin,
     required this.reportUrl,
+    this.cashAppUrl = '',
+    this.cashAppTag = '',
   });
 
   final String state;
@@ -190,6 +196,10 @@ class NgmyHouseWorkersSection extends StatefulWidget {
 
   /// Admin WhatsApp link with [text] already filled in (for reports).
   final String Function(String text) reportUrl;
+
+  /// Cash App link and tag for the $50 / $65 monthly plans (job board, coming next).
+  final String cashAppUrl;
+  final String cashAppTag;
 
   @override
   State<NgmyHouseWorkersSection> createState() => _NgmyHouseWorkersSectionState();

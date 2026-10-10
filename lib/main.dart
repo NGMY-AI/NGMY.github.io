@@ -43271,26 +43271,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     );
   }
 
-  Widget _civicHomeIdFrame() {
-    final record = _civicMemberRecordForCurrentUser();
-    if (record == null) return const SizedBox.shrink();
-    final email = NgmyCivicRegistryMembers.emailKey((record['email'] ?? widget.user.email).toString());
-    final photoPath = ngmyCivicIdPhotoForRecord(
-      record,
-      profilePicturePath: widget.user.profilePicturePath,
-      emailHint: email,
-    );
-    return NgmyCivicRegistryIdFrame(
-      record: record,
-      photoPath: photoPath,
-      photoImage: ngmyCachedProfileImage(photoPath),
-      onViewPassport: _showMyCivicIdCard,
-      onAccessControl: _canUseRegistrarToolsHere()
-          ? () => unawaited(_openCivicAccessControl(record))
-          : (!_canBypassCivicGate() ? () => unawaited(_leaveCivicRegistrySession()) : null),
-    );
-  }
-
   Future<void> _leaveCivicRegistrySession() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -43916,10 +43896,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ),
             ),
             const SizedBox(height: 20),
-            if (_canViewCivicIdForCurrentUser()) ...[
-              _civicHomeIdFrame(),
-              const SizedBox(height: 20),
-            ],
+            // The member's Registry ID opens from the ID icon in the top bar;
+            // it is not shown on the page itself.
 
             if (_canCurrentUserSeeHelpMode()) ...[
               Builder(builder: (context) {
