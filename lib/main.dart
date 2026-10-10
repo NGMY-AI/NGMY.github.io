@@ -6067,7 +6067,19 @@ Future<bool> _upsertNgmySettingSafe(String key, Map<String, dynamic> value) asyn
   }
 }
 
+/// Settings every signed-in user may READ (but not write) — e.g. the shared NGMY Advisors list,
+/// so users see the same advisors as the admin.
+const Set<String> _kNgmyUserReadableSettingsKeys = {'communicate_settings'};
+
 Future<Map<String, dynamic>?> _fetchNgmySettingSafe(String key) async {
+  if (_kNgmyUserReadableSettingsKeys.contains(key) && ngmyCurrentAuthEmail().isNotEmpty) {
+    try {
+      return await ngmyDbRelaySettingsFetch(key, timeout: kNgmyCloudLoadTimeout);
+    } catch (e) {
+      debugPrint('[ngmy_settings] relay fetch error ($key): $e');
+      return null;
+    }
+  }
   if (!NgmyCloudPolicy.settingsKeyPublicReadable(key)) {
     final email = ngmyCurrentAuthEmail();
     if (email.isEmpty || !ngmyEmailIsAdmin(email)) return null;
