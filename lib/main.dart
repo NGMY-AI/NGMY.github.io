@@ -41280,14 +41280,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           }
 
           // Small framed number used for amount / contributors / average.
-          Widget miniStat(String label, String value, Color valueColor) {
+          Widget miniStat(String label, String value, Color valueColor, {bool big = false}) {
             return Expanded(
+              flex: big ? 5 : 4,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: big ? 10 : 7),
                 decoration: BoxDecoration(
-                  color: tileBg,
+                  color: big ? emerald.withOpacity(isDark ? 0.14 : 0.07) : tileBg,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: lineColor),
+                  border: Border.all(color: big ? emerald.withOpacity(isDark ? 0.45 : 0.35) : lineColor),
                 ),
                 child: Column(
                   children: [
@@ -41295,7 +41296,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       fit: BoxFit.scaleDown,
                       child: Text(
                         value,
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: valueColor),
+                        style: TextStyle(fontSize: big ? 17 : 14, fontWeight: FontWeight.w900, color: valueColor),
                       ),
                     ),
                     const SizedBox(height: 1),
@@ -41394,14 +41395,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             children: [
                               statusChip(state, k, m),
                               const Spacer(),
-                              Text(
-                                '$c contributor${c == 1 ? '' : 's'}',
-                                style: TextStyle(fontSize: 11, color: softText, fontWeight: FontWeight.w600),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '\$${formatCurrency(t)}',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: emeraldText),
+                              // Contributors and money together in one frame.
+                              Container(
+                                padding: const EdgeInsets.fromLTRB(8, 4, 4, 4),
+                                decoration: BoxDecoration(
+                                  color: tileBg,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: lineColor),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.groups_rounded, size: 13, color: softText),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      '$c',
+                                      style: TextStyle(fontSize: 11.5, color: strongText, fontWeight: FontWeight.w800),
+                                    ),
+                                    Container(
+                                      width: 1,
+                                      height: 14,
+                                      margin: const EdgeInsets.symmetric(horizontal: 7),
+                                      color: lineColor,
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: emerald.withOpacity(isDark ? 0.2 : 0.1),
+                                        borderRadius: BorderRadius.circular(7),
+                                      ),
+                                      child: Text(
+                                        '\$${formatCurrency(t)}',
+                                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: emeraldText),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                               Icon(Icons.chevron_right_rounded, size: 18, color: softText),
                             ],
@@ -41537,7 +41566,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           children: [
                             miniStat('Contributors', '$contributors', strongText),
                             const SizedBox(width: 6),
-                            miniStat('Collected', '\$${formatCurrency(total)}', emeraldText),
+                            miniStat('Collected', '\$${formatCurrency(total)}', emeraldText, big: true),
                             const SizedBox(width: 6),
                             miniStat('Average', '\$${formatCurrency(average)}', strongText),
                           ],
@@ -42033,7 +42062,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                         : ''),
                                 'registryId': memberRid,
                               });
-                              final isUpdate = existing != null;
+                              // Re-read: the background refresh may have brought in money another
+                              // registrar recorded for this member after the pop-up opened.
+                              final latest = _activeCampaignContributionForMember(u, forState: state) ?? existing;
+                              final isUpdate = latest != null;
                               final stableKey = memberEmail.isNotEmpty ? memberEmail : memberRid;
                               final reset = _softResetForState(state);
                               final resetAt = reset?['hideBudget'] == true
@@ -42045,19 +42077,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                   ? ''
                                   : '_after_${resetAt.toUtc().microsecondsSinceEpoch}';
                               final txId = isUpdate
-                                  ? existing.id
+                                  ? latest.id
                                   : (campaignId.trim().isNotEmpty
                                       ? 'contrib_${stableKey}_$campaignId$resetSuffix'
                                       : 'contrib_${stableKey}_${now.microsecondsSinceEpoch}');
                               final tx = AppTransaction(
                                 id: txId,
                                 userEmail: memberEmail.isNotEmpty ? memberEmail : u.email,
-                                amount: isUpdate ? (existing.amount + amount) : amount,
+                                amount: isUpdate ? (latest.amount + amount) : amount,
                                 type: TransactionType.contribution,
                                 method: PaymentMethod.system,
                                 sourceDetails: payload,
                                 status: TransactionStatus.approved,
-                                timestamp: isUpdate ? existing.timestamp : now,
+                                timestamp: isUpdate ? latest.timestamp : now,
                               );
                               widget.onAddTransaction(tx);
                               // Keep civic money list in sync instantly so Remove /
@@ -45604,7 +45636,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   }
 
   Future<void> _openMoneyForMember(UserData u) async {
-    await _refreshCivicHelpModeAndContributions();
+    // Open right away from what this phone already has. Waiting for the
+    // full cloud refresh first made the money button feel dead for several
+    // seconds. The refresh still runs in the background, and Save re-reads
+    // the newest record so money another registrar just added is kept.
+    unawaited(_refreshCivicHelpModeAndContributions());
     if (!mounted) return;
     final helpOn = widget.config.helpActiveFor(_selectedState);
     final records = _contributionsForMember(u);
