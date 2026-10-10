@@ -15,6 +15,7 @@ import 'ngmy_help_center_send_money_receipt.dart';
 import 'ngmy_help_center_send_money_receipt_templates.dart';
 import 'ngmy_help_center_send_money_store.dart';
 import 'ngmy_house_insurance.dart';
+import 'ngmy_house_workers.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_qr_download.dart';
@@ -328,6 +329,16 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   bool get _isMovingDelivery => _selected != null && ngmyHelpCenterIsMovingDelivery(_selected!);
 
   bool get _isHouseFixture => _selected != null && ngmyHelpCenterIsHouseFixture(_selected!);
+
+  /// The signed-in member's state, used to show house workers near them.
+  String get _userState {
+    try {
+      final s = (widget.user as dynamic)?.state;
+      return (s ?? '').toString().trim();
+    } catch (_) {
+      return '';
+    }
+  }
 
   void _touchForm() => setState(() {});
 
@@ -971,23 +982,32 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                               ],
                             ),
                           )
-                    : Row(
-                        children: [
-                          const Icon(Icons.receipt_long_rounded, color: _accent, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'REQUEST SUMMARY',
-                            style: TextStyle(
-                              fontSize: 10,
-                              letterSpacing: 1.6,
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? Colors.white70 : Colors.black54,
-                            ),
+                    : _isHouseFixture
+                        // House & Insurance: the summary header is the way in
+                        // for people who want to work fixing houses.
+                        ? NgmyApplyWorkerButton(
+                            state: _userState,
+                            clientName: widget.clientName,
+                            clientPhone: widget.clientPhone,
+                          )
+                        : Row(
+                            children: [
+                              const Icon(Icons.receipt_long_rounded, color: _accent, size: 20),
+                              const SizedBox(width: 8),
+                              Text(
+                                'REQUEST SUMMARY',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  letterSpacing: 1.6,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
               ),
-              Text('#$_reference', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.black38)),
+              if (!_isHouseFixture)
+                Text('#$_reference', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: isDark ? Colors.white38 : Colors.black38)),
             ],
           ),
           const SizedBox(height: 12),
@@ -1075,6 +1095,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             _deliveryFeeBox(isDark),
           ] else if (_isHouseFixture) ...[
             const SizedBox(height: 10),
+            NgmyHouseWorkersSection(
+              state: _userState,
+              clientName: widget.clientName,
+              clientEmail: widget.clientEmail,
+              clientPhone: widget.clientPhone,
+              isAdmin: widget.isAdmin,
+              reportUrl: (text) => _cfg.resolvedWhatsAppUrl(prefilledText: text),
+            ),
+            const SizedBox(height: 14),
             if (widget.appConfig != null) ...[
               NgmyHouseInsuranceCard(
                 isDark: isDark,

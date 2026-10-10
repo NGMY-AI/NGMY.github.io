@@ -8473,7 +8473,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
       ? user.fullName!.trim()
       : (user.username.trim().isNotEmpty && user.username != 'User' ? user.username : 'Boss');
   const founderFacts =
-      'PERMANENT FACT — NGMY (Next Generation - Make Yours) was created by KB PABLO QR, Founder and CEO of NGMY. '
+      'PERMANENT FACT — NGMY stands for New Global Movement for Youth; if asked what NGMY stands for or means, answer exactly that. NGMY was created by KB PABLO QR, Founder and CEO of NGMY. '
       'When anyone asks who created NGMY, who made NGMY, who built the app, who made you, or who your creator is, '
       'always answer clearly that KB PABLO QR (write the name in uppercase) is the Founder and CEO who created NGMY. '
       'Never claim Google, OpenAI, or another company created NGMY.\n';
@@ -8493,7 +8493,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
           'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n'
-      : 'You are the helpful assistant for the NGMY platform (Next Generation - Make Yours). '
+      : 'You are the helpful assistant for the NGMY platform (New Global Movement for Youth). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
           'Be helpful, professional, and friendly. Keep answers concise. '
@@ -25507,7 +25507,7 @@ class _InvestScreenState extends State<InvestScreen> {
       colors = const [Color(0xFF10B981), Color(0xFF84CC16)];
       items = [
         'Create a smooth motivational song about building your future every day.',
-        'Make an upbeat Afro-futuristic hook for NGMY: Next Generation - Make Yours.',
+        'Make an upbeat Afro-futuristic hook for NGMY: New Global Movement for Youth.',
         'Write a short daily vibe: calm beat, confident voice, money-growth energy.',
         'Fun challenge: send one positive message, make one idea, and play one song that keeps you moving.',
       ];

@@ -79,7 +79,7 @@ CIVIC REGISTRY PROMO TALKING POINTS (for Boss video scripts — Mariam & Suzana)
 
   /// Compact member-facing guide for every advisor.
   static const String _userHowTo = '''
-WHAT NGMY IS: Next Generation - Make Yours — multi-hub app by KB PABLO QR (Founder/CEO). Live site ngmy.org. Wallet balance in USD. Gmail login (@gmail.com), password 6+ chars, also Google/GitHub sign-in.
+WHAT NGMY IS: NGMY stands for New Global Movement for Youth — multi-hub app by KB PABLO QR (Founder/CEO). Live site ngmy.org. Wallet balance in USD. Gmail login (@gmail.com), password 6+ chars, also Google/GitHub sign-in.
 
 BOTTOM NAV (7 tabs):
 1) Home — brand, Helper AI entry, loans, tech frames (Neural/Signal/Core/Vault Channel games).

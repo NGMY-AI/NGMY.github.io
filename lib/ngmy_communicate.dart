@@ -1316,7 +1316,7 @@ class NgmyCommunicateProfile {
     );
 
     const founderFacts =
-        'PERMANENT FACT — NGMY (Next Generation - Make Yours) was created by KB PABLO QR, '
+        'PERMANENT FACT — NGMY stands for New Global Movement for Youth. If anyone asks what NGMY stands for or means, answer exactly: New Global Movement for Youth (never guess another meaning). NGMY (New Global Movement for Youth) was created by KB PABLO QR, '
         'Founder, President, and CEO of NGMY. The "QR" in his name stands for QR codes — '
         'NGMY apps and his business heavily use QR codes; it is part of his brand identity. '
         'If anyone asks who created NGMY / who made this app / who the President or CEO is, '

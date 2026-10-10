@@ -1362,6 +1362,254 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
   return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
 }
 
+// ── House & Insurance workers (apply, list by state, work requests, ratings) ──
+// Phones never read these tables directly. A worker's phone number is only
+// returned to a client after that worker accepted the client's job, and a
+// client's phone only to the worker they sent the job to.
+const HW_ACTIONS = new Set([
+  "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
+  "hwAdminList", "hwAdminDecide",
+]);
+const HW_MAX_PHOTO_BYTES = 900 * 1024;
+
+function hwText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+function hwLongText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\r/g, "").trim().slice(0, max);
+}
+
+function hwPhone(v: unknown): string {
+  const digits = String(v ?? "").replace(/[^\d+]/g, "");
+  return digits.slice(0, 20);
+}
+
+function hwPublicWorker(w: any) {
+  const count = Number(w.rating_count ?? 0);
+  return {
+    id: w.id,
+    name: w.name,
+    state: w.state,
+    city: w.city,
+    skills: Array.isArray(w.skills) ? w.skills : [],
+    bio: w.bio,
+    photoUrl: w.photo_url,
+    rating: count > 0 ? Math.round((Number(w.rating_sum ?? 0) / count) * 10) / 10 : 0,
+    ratingCount: count,
+    jobsDone: Number(w.jobs_done ?? 0),
+  };
+}
+
+async function hwUploadPhoto(db: any, email: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error("Photo is too big. Pick a smaller picture.");
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const ext = type === "image/png" ? "png" : "jpg";
+  const key = await sha256Hex(`hw:${email}`);
+  const path = `house-workers/${key.slice(0, 24)}-${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error("Photo upload failed. Try again.");
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+async function handleHouseWorkers(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const now = new Date().toISOString();
+  const isAdmin = isNgmyAdminEmail(email);
+
+  if (action === "hwList") {
+    const state = hwText(body?.state, 60);
+    if (!state) return jsonOk({ ok: true, workers: [] });
+    const { data, error } = await db.from("house_workers").select("*")
+      .eq("status", "approved").ilike("state", state).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const workers = (data ?? []).map(hwPublicWorker)
+      .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
+    return jsonOk({ ok: true, workers });
+  }
+
+  if (action === "hwMe") {
+    const { data: me } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    const { data: sent } = await db.from("house_work_requests").select("*")
+      .eq("client_email", email).order("created_at", { ascending: false }).limit(50);
+    const workerEmails = [...new Set((sent ?? []).map((r: any) => r.worker_email))];
+    const { data: sentWorkers } = workerEmails.length
+      ? await db.from("house_workers").select("*").in("email", workerEmails)
+      : { data: [] as any[] };
+    const byEmail = new Map((sentWorkers ?? []).map((w: any) => [w.email, w]));
+    const mine = (sent ?? []).map((r: any) => {
+      const w: any = byEmail.get(r.worker_email) ?? {};
+      const shared = r.status === "accepted" || r.status === "done";
+      return {
+        id: r.id, status: r.status, details: r.details, address: r.address, city: r.city,
+        category: r.category, bestTime: r.best_time, createdAt: r.created_at,
+        acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
+        worker: { ...hwPublicWorker(w), phone: shared ? (w.phone ?? "") : "" },
+      };
+    });
+    let inbox: any[] = [];
+    if (me && me.status === "approved") {
+      const { data: incoming } = await db.from("house_work_requests").select("*")
+        .eq("worker_email", email).order("created_at", { ascending: false }).limit(80);
+      inbox = (incoming ?? []).map((r: any) => ({
+        id: r.id, status: r.status, details: r.details, address: r.address, city: r.city,
+        state: r.state, category: r.category, bestTime: r.best_time, createdAt: r.created_at,
+        acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
+        clientName: r.client_name,
+        clientPhone: (r.status === "accepted" || r.status === "done") ? r.client_phone : "",
+      }));
+    }
+    return jsonOk({
+      ok: true,
+      worker: me ? { ...hwPublicWorker(me), status: me.status, phone: me.phone } : null,
+      requests: mine,
+      inbox,
+      isAdmin,
+    });
+  }
+
+  if (action === "hwApply") {
+    const limited = await enforceRateLimit(req, "hw_apply", email, 10, 3600);
+    if (limited) return limited;
+    const name = hwText(body?.name, 80);
+    const phone = hwPhone(body?.phone);
+    const state = hwText(body?.state, 60);
+    const city = hwText(body?.city, 60);
+    const bio = hwLongText(body?.bio, 500);
+    const skills = (Array.isArray(body?.skills) ? body.skills : [])
+      .map((s: unknown) => hwText(s, 40)).filter(Boolean).slice(0, 12);
+    if (!name || phone.replace(/\D/g, "").length < 10 || !state || skills.length === 0) {
+      return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, state, and at least one skill." }, 400);
+    }
+    const { data: prev } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
+    if (prev?.status === "removed") {
+      return jsonOk({ ok: false, error: "This account cannot apply as a worker. Contact NGMY." }, 403);
+    }
+    let photoUrl = prev?.photo_url ?? "";
+    if (typeof body?.photoBase64 === "string" && body.photoBase64.length > 0) {
+      try {
+        photoUrl = await hwUploadPhoto(db, email, body.photoBase64, String(body?.photoMime ?? ""));
+      } catch (e) {
+        return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+      }
+    }
+    if (!photoUrl) return jsonOk({ ok: false, error: "Add a profile photo so clients can see you." }, 400);
+    // An approved worker who edits keeps approval; a rejected one goes back to review.
+    const status = prev?.status === "approved" ? "approved" : "pending";
+    const { error } = await db.from("house_workers").upsert({
+      email, name, phone, state, city, bio, skills, photo_url: photoUrl, status, updated_at: now,
+    });
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true, status });
+  }
+
+  if (action === "hwRequest") {
+    const limited = await enforceRateLimit(req, "hw_request", email, 20, 3600);
+    if (limited) return limited;
+    const workerId = hwText(body?.workerId, 60);
+    const details = hwLongText(body?.details, 1500);
+    const clientName = hwText(body?.clientName, 80);
+    const clientPhone = hwPhone(body?.clientPhone);
+    if (!workerId || details.length < 5 || !clientName || clientPhone.replace(/\D/g, "").length < 10) {
+      return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, and what is wrong." }, 400);
+    }
+    const { data: w } = await db.from("house_workers").select("*").eq("id", workerId).maybeSingle();
+    if (!w || w.status !== "approved") return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
+    const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
+      .eq("client_email", email).eq("status", "pending");
+    if ((count ?? 0) >= 5) {
+      return jsonOk({ ok: false, error: "You already have 5 requests waiting. Wait for a worker to answer first." }, 429);
+    }
+    const { data, error } = await db.from("house_work_requests").insert({
+      client_email: email, client_name: clientName, client_phone: clientPhone,
+      worker_email: w.email, state: w.state, city: hwText(body?.city, 60),
+      address: hwText(body?.address, 200), category: hwText(body?.category, 60),
+      details, best_time: hwText(body?.bestTime, 80),
+    }).select("id").single();
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true, id: data?.id });
+  }
+
+  // The remaining actions all act on one request.
+  if (["hwRespond", "hwDone", "hwRate", "hwCancel"].includes(action)) {
+    const id = hwText(body?.requestId, 60);
+    const { data: r } = await db.from("house_work_requests").select("*").eq("id", id).maybeSingle();
+    if (!r) return jsonOk({ ok: false, error: "Request not found." }, 404);
+    const isWorker = r.worker_email === email;
+    const isClient = r.client_email === email;
+
+    if (action === "hwRespond") {
+      if (!isWorker) return jsonOk({ ok: false, error: "Only the worker can answer this." }, 403);
+      if (r.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
+      const accept = body?.decision === "accept";
+      await db.from("house_work_requests").update({
+        status: accept ? "accepted" : "declined",
+        accepted_at: accept ? now : null,
+      }).eq("id", id).eq("status", "pending");
+      return jsonOk({ ok: true, status: accept ? "accepted" : "declined", clientPhone: accept ? r.client_phone : "" });
+    }
+    if (action === "hwDone") {
+      if (!isWorker && !isClient) return jsonOk({ ok: false, error: "Not your request." }, 403);
+      if (r.status !== "accepted") return jsonOk({ ok: false, error: "Only accepted work can be marked done." }, 409);
+      const { data: upd } = await db.from("house_work_requests").update({ status: "done", done_at: now })
+        .eq("id", id).eq("status", "accepted").select("id");
+      if (upd && upd.length) {
+        const { data: w } = await db.from("house_workers").select("jobs_done").eq("email", r.worker_email).maybeSingle();
+        await db.from("house_workers").update({ jobs_done: Number(w?.jobs_done ?? 0) + 1 }).eq("email", r.worker_email);
+      }
+      return jsonOk({ ok: true, status: "done" });
+    }
+    if (action === "hwRate") {
+      if (!isClient) return jsonOk({ ok: false, error: "Only the client can rate this work." }, 403);
+      if (r.status !== "done") return jsonOk({ ok: false, error: "Rate the worker after the work is done." }, 409);
+      if (r.rating) return jsonOk({ ok: false, error: "You already rated this work." }, 409);
+      const rating = Math.round(Number(body?.rating ?? 0));
+      if (!(rating >= 1 && rating <= 5)) return jsonOk({ ok: false, error: "Pick 1 to 5 stars." }, 400);
+      const { data: upd } = await db.from("house_work_requests").update({
+        rating, review: hwLongText(body?.review, 500), rated_at: now,
+      }).eq("id", id).is("rating", null).select("id");
+      if (upd && upd.length) {
+        const { data: w } = await db.from("house_workers").select("rating_sum,rating_count").eq("email", r.worker_email).maybeSingle();
+        await db.from("house_workers").update({
+          rating_sum: Number(w?.rating_sum ?? 0) + rating,
+          rating_count: Number(w?.rating_count ?? 0) + 1,
+        }).eq("email", r.worker_email);
+      }
+      return jsonOk({ ok: true });
+    }
+    // hwCancel
+    if (!isClient) return jsonOk({ ok: false, error: "Only the client can cancel." }, 403);
+    if (r.status !== "pending") return jsonOk({ ok: false, error: "Only waiting requests can be cancelled." }, 409);
+    await db.from("house_work_requests").update({ status: "cancelled" }).eq("id", id).eq("status", "pending");
+    return jsonOk({ ok: true, status: "cancelled" });
+  }
+
+  if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+  if (action === "hwAdminList") {
+    const { data } = await db.from("house_workers").select("*").order("created_at", { ascending: false }).limit(500);
+    const rank: Record<string, number> = { pending: 0, approved: 1, rejected: 2, removed: 3 };
+    const workers = (data ?? []).map((w: any) => ({
+      ...hwPublicWorker(w), email: w.email, phone: w.phone, status: w.status, createdAt: w.created_at,
+    })).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
+    return jsonOk({ ok: true, workers });
+  }
+  // hwAdminDecide
+  const target = hwText(body?.email, 200).toLowerCase();
+  const decision = String(body?.decision ?? "");
+  const status = decision === "approve" ? "approved" : decision === "reject" ? "rejected" : decision === "remove" ? "removed" : "";
+  if (!target || !status) return jsonOk({ ok: false, error: "Pick approve, reject, or remove." }, 400);
+  const { error } = await db.from("house_workers").update({ status, reviewed_at: now, updated_at: now }).eq("email", target);
+  if (error) return jsonOk({ ok: false, error: error.message }, 500);
+  return jsonOk({ ok: true, status });
+}
+
 // ── Free advisor minutes per account (never resets) ─────────────────────────
 async function handleFreeTime(req: Request, action: string, body: any): Promise<Response> {
   const email = (await requireJwtEmail(req)).trim().toLowerCase();
@@ -7792,6 +8040,16 @@ serve(async (req) => {
       g4: "agentStatus",
       f1: "freeTimeGet",
       f2: "freeTimeAdd",
+      h1: "hwList",
+      h2: "hwMe",
+      h3: "hwApply",
+      h4: "hwRequest",
+      h5: "hwRespond",
+      h6: "hwDone",
+      h7: "hwRate",
+      h8: "hwCancel",
+      h9: "hwAdminList",
+      ha: "hwAdminDecide",
       d1: "relStatus",
       d2: "relTouch",
       d3: "relStart",
@@ -8050,6 +8308,7 @@ serve(async (req) => {
     }
 
     if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
+    if (HW_ACTIONS.has(action)) return await handleHouseWorkers(req, action, body);
 
     if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {
       return await handleAdvisorRelationship(req, action, body);
