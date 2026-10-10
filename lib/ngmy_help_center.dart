@@ -245,7 +245,13 @@ class NgmyHelpCenterConfig {
   }
 
   String sendMoneyPayFirstNote() =>
-      'Send the full transfer amount on Cash App first. After payment, tap Send on WhatsApp with your request. If you skip Cash App, your money will not be sent.';
+      'Send the full transfer amount on Cash App first. After payment, take a SCREENSHOT of the Cash App payment '
+      'and attach it to your WhatsApp message when you tap Send on WhatsApp. If you skip Cash App or the '
+      'screenshot, your money will not be sent.';
+
+  /// Shown under every Cash App payment in the Help Center.
+  static const String cashAppScreenshotNote =
+      '📸 After paying on Cash App, take a screenshot of the payment and include it in the WhatsApp message you send.';
 
   String cashAppButtonLabelForAmount(double amount) {
     final base = cashAppButtonLabel.trim().isEmpty ? 'Pay on Cash App' : cashAppButtonLabel.trim();

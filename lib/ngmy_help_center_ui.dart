@@ -477,6 +477,12 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   String get _message {
     final s = _selected;
     if (s == null) return '';
+    final msg = _buildBaseMessage(s);
+    // Reminder inside the WhatsApp message itself: attach the Cash App payment screenshot.
+    return _isSendMoney ? '$msg\n\n📸 Cash App payment screenshot: attached' : msg;
+  }
+
+  String _buildBaseMessage(NgmyHelpCenterService s) {
     return _cfg.buildRequestMessage(
       service: s,
       clientName: widget.clientName,
@@ -535,7 +541,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     }
     setState(() => _cashAppOpened = true);
     unawaited(_persistSenderInfo());
-    _snack('After you send ${_cfg.cashAppDisplayTag()}, tap Send on WhatsApp.');
+    _snack('After you send ${_cfg.cashAppDisplayTag()}, take a screenshot of the payment, then tap Send on WhatsApp and attach it.');
   }
 
   Future<void> _openWhatsApp() async {
@@ -1350,6 +1356,15 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                 'Send on WhatsApp unlocks after you tap Pay on Cash App.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.amber.shade200 : const Color(0xFFB45309)),
+              ),
+            ),
+          if (_isSendMoney || _isHouseFixture)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                NgmyHelpCenterConfig.cashAppScreenshotNote,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: isDark ? Colors.greenAccent.shade100 : const Color(0xFF166534)),
               ),
             ),
           if (_isHouseFixture && !_canContactWhatsApp)

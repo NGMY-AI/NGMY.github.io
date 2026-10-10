@@ -76,7 +76,7 @@ class NgmyStripePayments {
       'https://buy.stripe.com/test_ngmy_civic_user_group_members';
   /// Live Payment Link for House Insurance (\$50 / 30 days). Empty until the
   /// Stripe Dashboard link is pasted here — Cash App still collects the fee.
-  static const String houseInsuranceUrl = '';
+  static const String houseInsuranceUrl = 'https://buy.stripe.com/eVqbJ1eo1fcdcArgcRb7y0l';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
