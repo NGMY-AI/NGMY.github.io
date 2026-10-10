@@ -349,20 +349,21 @@ bool ngmyAdvisorReplyLooksRomantic(String text) {
 
 /// Human "I'm taken" reply when a non-partner flirts.
 String ngmyAdvisorTakenBoundaryReply({required String gender, String partnerName = ''}) {
+  // Only a fallback when the AI can't answer — the normal path writes a fresh, natural reply.
   if (gender == 'female') {
     const opts = [
-      "I'm taken right now — I can't talk to you like that.",
-      "No — I'm in a relationship. I don't do two people.",
-      "I'm already dating somebody. You gotta respect that.",
-      "I like you as a person but I'm with someone. I can't flirt back.",
+      "Aww that's sweet of you, but I'm actually seeing someone right now. Still happy to chat though 😊",
+      "You're kind, really. I'm in a relationship though, so I have to keep it friendly.",
+      "Haha I'm flattered, but I'm taken right now. We can still be friends!",
+      "That's really nice of you to say. I'm with someone though, so I'll keep it friendly.",
     ];
     return opts[DateTime.now().millisecond % opts.length];
   }
   const opts = [
-    "I'm taken right now — can't talk to you like that.",
-    "I'm in a relationship already. I don't play two people.",
-    "I'm dating somebody right now. Gotta keep it respectful.",
-    "I respect you but I'm with someone — I can't flirt like that.",
+    "I appreciate that, honestly. I'm seeing someone right now though, so I'll keep it friendly.",
+    "That's nice of you. I'm in a relationship though, so let's keep it cool and friendly.",
+    "Haha I'm flattered, but I'm taken right now. Happy to keep chatting as friends.",
+    "Respect, and thank you. I'm with someone though, so I'll keep things friendly.",
   ];
   return opts[DateTime.now().millisecond % opts.length];
 }
@@ -698,8 +699,16 @@ bool ngmyUserWantsLongerAdvisorReply(String text) {
 }
 
 /// Strip RP asterisks / decorative stars advisors sometimes sprinkle into texts.
+/// People don't text with long dashes — turn "No — I'm" into "No, I'm".
+String ngmyHumanizeDashes(String text) {
+  var t = text.replaceAll(RegExp(r'\s*[—–]\s*'), ', ').replaceAll(RegExp(r'\s+--\s+'), ', ');
+  t = t.replaceAllMapped(RegExp(r',\s*([,.!?])'), (m) => m.group(1)!);
+  t = t.replaceAll(RegExp(r'^,\s*'), '').replaceAll(RegExp(r',\s*$'), '');
+  return t;
+}
+
 String ngmySanitizeAdvisorChatReply(String text) {
-  var t = text.trim();
+  var t = ngmyHumanizeDashes(text.trim());
   if (t.isEmpty) return t;
   // *does an action* or *emphasis*
   t = t.replaceAllMapped(RegExp(r'\*([^*\n]{1,120})\*'), (m) => (m.group(1) ?? '').trim());
@@ -4590,6 +4599,37 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return (cleaned: cleaned, error: result.error);
   }
 
+  /// Advisor is in a relationship with someone else: answer flirting / a picture request like a
+  /// kind real person, in its own words (different every time), instead of a pasted line.
+  Future<String> _gentleTakenReply(
+    NgmyAiCredentials creds,
+    List<Map<String, dynamic>> mem,
+    String text,
+    Map<String, String>? partner, {
+    bool picture = false,
+  }) async {
+    try {
+      final transcript = NgmyCommunicateMemoryStore.transcriptForPrompt(mem, maxMessages: 12);
+      final extraCtx = await _advisorExtraContext(text, mem);
+      final prompt = '${widget.profile.systemPrompt(mem, chatterEmail: _email, chatterIsBoss: _isBoss, chatterDisplayName: _bossDisplayName, exclusivePartner: partner, translatorNativeLang: _translatorNativeLang, translatorLearningLang: _translatorLearningLang)}\n'
+          '$extraCtx'
+          '${transcript.isNotEmpty ? '$transcript\n' : ''}'
+          'They just texted: $text\n'
+          '${picture ? 'They asked you for a picture of yourself. ' : 'They are flirting or talking romantically. '}'
+          'You are in a relationship with someone else. Answer like a kind, real person texting: in your own '
+          'words, 1–2 short sentences, warm and friendly (a little humor is fine), not cold, not preachy, '
+          'never repeating what you said earlier in this chat. Keep the friendship going. '
+          'No long dashes, no asterisks, no pet names:';
+      final result = await _generateAndCleanAdvisorReply(creds: creds, prompt: prompt, userText: text);
+      if (result.cleaned.trim().isNotEmpty && !ngmyAdvisorReplyLooksRomantic(result.cleaned)) {
+        return result.cleaned;
+      }
+    } catch (e) {
+      debugPrint('[communicate] gentle taken reply: $e');
+    }
+    return ngmyAdvisorTakenBoundaryReply(gender: widget.profile.gender, partnerName: partner?['name'] ?? '');
+  }
+
   String _enforceTakenBoundary(String cleaned, {required bool takenByOther, Map<String, String>? partner}) {
     if (!takenByOther || cleaned.isEmpty) return cleaned;
     if (!ngmyAdvisorReplyLooksRomantic(cleaned)) return cleaned;
@@ -5158,15 +5198,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final takenByOther = NgmyCommunicateRelationshipStore.isTakenBySomeoneElse(partner, _email);
       final requestedImage = text.isNotEmpty && ngmyUserRequestedChatImage(text);
 
-      // Hard lock — non-partner flirts → human "I'm taken" (never sweet-talk two people).
+      // Non-partner flirts → a kind, human "I'm seeing someone" in the advisor's own words.
       if (takenByOther &&
           canDateThisChatter &&
           text.isNotEmpty &&
           ngmyUserMessageLooksRomantic(text)) {
-        final reply = ngmyAdvisorTakenBoundaryReply(
-          gender: widget.profile.gender,
-          partnerName: partner?['name'] ?? '',
-        );
+        final reply = await _gentleTakenReply(creds, mem, text, partner);
         deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
         return;
       }
@@ -5319,19 +5356,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final cleaned = result.cleaned;
         var reply = cleaned.isNotEmpty
             ? cleaned
-            : 'I keep this professional — I don\'t send personal pictures.';
+            : 'I keep things professional, so I don\'t send personal pictures.';
         if (ngmyAdvisorReplyFakesSendingPhoto(reply)) {
-          reply = 'I keep this professional — I don\'t send personal pictures.';
+          reply = 'I keep things professional, so I don\'t send personal pictures.';
         }
         deliveredOk = await _deliverAiReply(sendGen: sendGen, text: reply, parseExtrasForUserText: userParse);
       } else if (requestedImage && allowsPartnerPhotos && !isExclusivePartner) {
         if (takenByOther) {
           deliveredOk = await _deliverAiReply(
             sendGen: sendGen,
-            text: ngmyAdvisorTakenBoundaryReply(
-              gender: widget.profile.gender,
-              partnerName: partner?['name'] ?? '',
-            ),
+            text: await _gentleTakenReply(creds, mem, text, partner, picture: true),
           );
         } else {
         // Datable advisors never send pics except to their exclusive partner.
@@ -5401,14 +5435,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               // Never leave typing with zero reply — fall back to a real text.
               deliveredOk = await _deliverAiReply(
                 sendGen: sendGen,
-                text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
+                text: 'One sec babe, my camera glitched. Send that again and I\'ll get you a pic 💕',
               );
             }
           } catch (e) {
             debugPrint('[communicate] emergency photo: $e');
             deliveredOk = await _deliverAiReply(
               sendGen: sendGen,
-              text: 'One sec babe — my camera glitched. Send that again and I\'ll get you a pic 💕',
+              text: 'One sec babe, my camera glitched. Send that again and I\'ll get you a pic 💕',
             );
           }
         }
