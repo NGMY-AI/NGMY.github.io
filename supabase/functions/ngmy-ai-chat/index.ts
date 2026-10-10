@@ -1362,6 +1362,29 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
   return jsonOk({ ok: true, ...(await relStatusFor(db, advisorId, email)) });
 }
 
+// ── Free advisor minutes per account (never resets) ─────────────────────────
+async function handleFreeTime(req: Request, action: string, body: any): Promise<Response> {
+  const email = (await requireJwtEmail(req)).trim().toLowerCase();
+  if (!email) return jsonOk({ ok: false, error: "Please sign in." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server database unavailable." }, 500);
+  const { data: row } = await db.from("advisor_free_time").select("used_seconds,updated_at").eq("user_email", email).maybeSingle();
+  let used = Number(row?.used_seconds ?? 0);
+  if (action === "freeTimeAdd") {
+    const limited = await enforceRateLimit(req, "free_time", email, 400, 3600);
+    if (limited) return limited;
+    const asked = Math.max(0, Math.floor(Number(body?.seconds ?? 0) || 0));
+    // Only real time can be added: no more than the time since the last update (+ small slack).
+    const sinceLast = row?.updated_at ? (Date.now() - Date.parse(row.updated_at)) / 1000 : 60;
+    const add = Math.min(asked, 120, Math.max(5, Math.ceil(sinceLast) + 5));
+    // A phone that was offline may report a higher total — take the higher number, never lower.
+    const deviceTotal = Math.max(0, Math.floor(Number(body?.deviceTotal ?? 0) || 0));
+    used = Math.max(used + add, Math.min(deviceTotal, 24 * 3600));
+    await db.from("advisor_free_time").upsert({ user_email: email, used_seconds: used, updated_at: new Date().toISOString() });
+  }
+  return jsonOk({ ok: true, usedSeconds: used });
+}
+
 // ── Storage / database housekeeping (approved by the owner 2026-10-09) ──────
 // Runs at most every 6 h, in the background of normal requests:
 //  • Doc Share "My Code" cloud transfers nobody collected within 14 days (files + inbox entry)
@@ -7762,6 +7785,8 @@ serve(async (req) => {
       g2: "agentPoll",
       g3: "agentStop",
       g4: "agentStatus",
+      f1: "freeTimeGet",
+      f2: "freeTimeAdd",
       d1: "relStatus",
       d2: "relTouch",
       d3: "relStart",
@@ -8018,6 +8043,8 @@ serve(async (req) => {
         .includes(action)) {
       return await handleTrading(req, action, body);
     }
+
+    if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
 
     if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {
       return await handleAdvisorRelationship(req, action, body);

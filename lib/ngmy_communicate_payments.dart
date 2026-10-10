@@ -133,7 +133,8 @@ class NgmyCommunicatePayments {
     if (isAdmin) return false;
     if (await NgmyStripePayments.hasActiveAccess(email, NgmyStripeProduct.advisors)) return false;
     if (hasActivePass(config, email)) return false;
-    final used = await NgmyCommunicateTimeTracker.getUsedSeconds(email);
+    // Server count per account (higher number wins) — a new phone / cleared browser can't reset it.
+    final used = await NgmyCommunicateTimeTracker.syncFromCloud(email);
     return used >= thresholdSeconds(config);
   }
 

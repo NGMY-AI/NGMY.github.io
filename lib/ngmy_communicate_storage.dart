@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_communicate_chat_images.dart';
+import 'ngmy_edge_invoke.dart';
 import 'ngmy_communicate_chat_images_io.dart'
     if (dart.library.html) 'ngmy_communicate_chat_images_web.dart' as chat_blob;
 
@@ -574,27 +575,66 @@ class NgmyCommunicateMemoryStore {
 class NgmyCommunicateTimeTracker {
   static String _key(String email) => 'ngmy_communicate_used_sec_${email.toLowerCase().trim()}';
 
+  // The free minutes are per ACCOUNT and kept on the server too, so logging out, clearing the
+  // browser, reinstalling or another phone can never give them back. The meter only goes up.
+
   static Future<int> getUsedSeconds(String email) async {
     if (email.trim().isEmpty) return 0;
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_key(email)) ?? 0;
   }
 
-  /// Kept for call sites — reads local usage only (no cloud).
-  static Future<int> syncFromCloud(String email) async => getUsedSeconds(email);
+  static Future<void> _raiseLocal(String email, int total) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cur = prefs.getInt(_key(email)) ?? 0;
+    if (total > cur) await prefs.setInt(_key(email), total);
+  }
+
+  /// Pulls the account's used time from the server (higher number wins). Returns the total.
+  static Future<int> syncFromCloud(String email) async {
+    if (email.trim().isEmpty) return 0;
+    try {
+      final res = await ngmyEdgeInvoke({'action': 'freeTimeGet'}, timeout: const Duration(seconds: 10));
+      final server = int.tryParse('${res?['usedSeconds'] ?? ''}');
+      if (server != null) await _raiseLocal(email, server);
+    } catch (e) {
+      debugPrint('[communicate] free time sync: $e');
+    }
+    return getUsedSeconds(email);
+  }
+
+  static int _pendingSeconds = 0;
+  static DateTime? _lastServerPush;
 
   static Future<void> addSeconds(String email, int seconds) async {
     if (email.trim().isEmpty || seconds <= 0) return;
     final prefs = await SharedPreferences.getInstance();
     final cur = prefs.getInt(_key(email)) ?? 0;
-    await prefs.setInt(_key(email), cur + seconds);
+    final total = cur + seconds;
+    await prefs.setInt(_key(email), total);
+    // Batch server updates (at most every 30 s) so chatting doesn't flood the server.
+    _pendingSeconds += seconds;
+    final last = _lastServerPush;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 30)) return;
+    _lastServerPush = DateTime.now();
+    final send = _pendingSeconds;
+    _pendingSeconds = 0;
+    unawaited(() async {
+      try {
+        final res = await ngmyEdgeInvoke(
+          {'action': 'freeTimeAdd', 'seconds': send, 'deviceTotal': total},
+          timeout: const Duration(seconds: 10),
+        );
+        final server = int.tryParse('${res?['usedSeconds'] ?? ''}');
+        if (server != null) await _raiseLocal(email, server);
+      } catch (_) {
+        // Offline — the local total is sent with the next update (server keeps the higher number).
+      }
+    }());
   }
 
-  static Future<void> resetAfterPayment(String email) async {
-    if (email.trim().isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_key(email), 0);
-  }
+  /// Kept for old call sites: paying gives a pass; the FREE minutes never come back.
+  static Future<void> resetAfterPayment(String email) async {}
 }
 
 /// Offline avatar cache — companion photos stay on device when Wi‑Fi drops.

@@ -82,6 +82,8 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'agentPoll': 'g2',
   'agentStop': 'g3',
   'agentStatus': 'g4',
+  'freeTimeGet': 'f1',
+  'freeTimeAdd': 'f2',
   'relStatus': 'd1',
   'relTouch': 'd2',
   'relStart': 'd3',
