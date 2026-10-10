@@ -127,9 +127,21 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     _notify();
   }
 
+  /// When the last task ended — replies soon after go back to that task.
+  DateTime? finishedAt;
+
+  /// True for 30 minutes after a task ended: the user's short replies (a number, an email, a code,
+  /// "yes") are answers for that task, not normal chat.
+  bool get recentlyFinished {
+    final f = finishedAt;
+    return f != null && task.isNotEmpty && DateTime.now().difference(f) < const Duration(minutes: 30);
+  }
+
   void _armIdleClose() {
+    finishedAt = DateTime.now();
     _idleTimer?.cancel();
-    _idleTimer = Timer(const Duration(seconds: 75), () {
+    // Keep the live view up for a good while — 75 s was far too short.
+    _idleTimer = Timer(const Duration(minutes: 10), () {
       if (running || _disposed) return;
       browserClosed = true;
       // The next task gets a fresh browser instead of trying a stopped one.
@@ -797,8 +809,8 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                             child: Padding(
                               padding: const EdgeInsets.all(16),
                               child: Text(
-                                'The browser closed after the task to save data.\n'
-                                'Ask ${widget.advisorName} anything and a fresh one opens.',
+                                'The browser is resting to save data.\n'
+                                'Just reply to ${widget.advisorName} and it opens again right where you left off.',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4),
                               ),

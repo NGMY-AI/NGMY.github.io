@@ -3889,6 +3889,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Live task finished → the advisor tells them what it did / found (truthfully).
   Future<void> _onAgentFinished(NgmyAdvisorAgentRun run) async {
     unawaited(_clearPendingAgentRun());
+    unawaited(SharedPreferences.getInstance().then((p) => p.setString(
+          '${_pendingAgentKey}_finished_at',
+          DateTime.now().toUtc().toIso8601String(),
+        )));
     try {
       final apiKey = await _resolveApiKey();
       final creds = ngmyParseAiCredentials(apiKey);
@@ -4695,6 +4699,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final prefs = await SharedPreferences.getInstance();
       if (_agentRun.task.isEmpty) _agentRun.task = prefs.getString('${_pendingAgentKey}_last_task') ?? '';
+      _agentRun.finishedAt ??= DateTime.tryParse(prefs.getString('${_pendingAgentKey}_finished_at') ?? '')?.toLocal();
       final raw = prefs.getString(_pendingAgentKey);
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw);
@@ -5037,7 +5042,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         }
       }
       // Asked to DO something on a website → the advisor does it in a live browser they watch.
-      final agentTask = (imageB64 == null && !_isTextCoach && !_isDebater)
+      var agentTask = (imageB64 == null && !_isTextCoach && !_isDebater)
           ? ngmyAdvisorAgentTaskIntent(
               text,
               currentUrl: _browserSession.url,
@@ -5045,6 +5050,18 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
               hasLiveSession: _agentRun.hasSession || _agentRun.task.isNotEmpty,
             )
           : null;
+      // Shortly after a browser task, a short reply (phone number, email, code, "yes", a name) is
+      // the answer the browser was waiting for — send it back to the task, not to normal chat.
+      if (agentTask == null &&
+          imageB64 == null &&
+          !_isTextCoach &&
+          !_isDebater &&
+          _agentRun.recentlyFinished &&
+          !_agentRun.running &&
+          text.trim().length <= 160 &&
+          !ngmyUserMessageIsShortChatPing(text)) {
+        agentTask = (url: null, continuing: true);
+      }
       if (agentTask != null) {
         final continuing = agentTask.continuing;
         final startUrl = agentTask.url ??
