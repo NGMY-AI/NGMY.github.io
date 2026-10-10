@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'main.dart';
@@ -821,10 +822,17 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     );
   }
 
+  // Growth Income's own floating menu: a dark emerald glass pill with a thin gold edge; the selected
+  // tab grows into a gold capsule with its name. (Same height + position as before.)
+  static const _navGold = Color(0xFFD4AF37);
+  static const _navGoldLight = Color(0xFFF6E27A);
+  static const _navTabs = <({IconData icon, String label})>[
+    (icon: Icons.home_rounded, label: 'Home'),
+    (icon: Icons.trending_up_rounded, label: 'Growth'),
+    (icon: Icons.account_balance_wallet_rounded, label: 'Wallet'),
+  ];
+
   Widget _buildLocalBottomNavBar() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    const glassGreen = Color(0xFF2EF6A3);
-    const ball = NgmyBottomNavMetrics.localSelectionBall;
     const barHeight = NgmyBottomNavMetrics.localBarHeight;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
@@ -832,51 +840,25 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
         top: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: NgmyBottomNavMetrics.localNavMaxWidth),
-            child: NgmySculptedBottomNavFrame(
-              barHeight: barHeight,
-              borderRadius: 24,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final tabW = constraints.maxWidth / 3;
-                  final ballLeft = _idx * tabW + (tabW - ball) / 2;
-                  final ballTop = (barHeight - ball) / 2;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AnimatedPositioned(
-                        duration: const Duration(milliseconds: 280),
-                        curve: Curves.easeOutCubic,
-                        left: ballLeft,
-                        top: ballTop,
-                        width: ball,
-                        height: ball,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                glassGreen.withValues(alpha: isDark ? 0.34 : 0.20),
-                                const Color(0xFF10B981).withValues(alpha: isDark ? 0.16 : 0.06),
-                              ],
-                            ),
-                            border: Border.all(color: glassGreen.withValues(alpha: isDark ? 0.50 : 0.34), width: 1.2),
-                            boxShadow: [BoxShadow(color: glassGreen.withValues(alpha: 0.18), blurRadius: 14)],
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          _navIcon(0, Icons.home_rounded),
-                          _navIcon(1, Icons.trending_up_rounded),
-                          _navIcon(2, Icons.account_balance_wallet_rounded),
-                        ],
-                      ),
-                    ],
-                  );
-                },
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Container(
+              height: barHeight,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF0F2A22), Color(0xFF07130F), Color(0xFF0B1F19)],
+                ),
+                border: Border.all(color: _navGold.withValues(alpha: 0.45), width: 1),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 22, offset: const Offset(0, 10)),
+                  BoxShadow(color: _navGold.withValues(alpha: 0.12), blurRadius: 18, spreadRadius: -2),
+                ],
+              ),
+              child: Row(
+                children: [for (var i = 0; i < _navTabs.length; i++) _navItem(i)],
               ),
             ),
           ),
@@ -885,27 +867,56 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     );
   }
 
-  Widget _navIcon(int i, IconData icon) => Expanded(
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => setState(() => _idx = i),
-            customBorder: const CircleBorder(),
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            child: SizedBox(
-              height: NgmyBottomNavMetrics.localBarHeight,
-              child: Center(
-                child: Icon(
-                  icon,
-                  color: _idx == i ? const Color(0xFF2EF6A3) : Colors.grey,
-                  size: NgmyBottomNavMetrics.sideIconSize,
-                ),
+  Widget _navItem(int i) {
+    final selected = _idx == i;
+    final tab = _navTabs[i];
+    return Expanded(
+      flex: selected ? 5 : 3,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _idx = i);
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: selected
+                ? const LinearGradient(colors: [_navGoldLight, _navGold], begin: Alignment.topLeft, end: Alignment.bottomRight)
+                : null,
+            boxShadow: selected ? [BoxShadow(color: _navGold.withValues(alpha: 0.35), blurRadius: 12)] : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                tab.icon,
+                size: 21,
+                color: selected ? const Color(0xFF1A1405) : Colors.white.withValues(alpha: 0.55),
               ),
-            ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                          tab.label,
+                          maxLines: 1,
+                          style: const TextStyle(color: Color(0xFF1A1405), fontWeight: FontWeight.w800, fontSize: 13),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _LocalGrowthHomeTab extends StatelessWidget {

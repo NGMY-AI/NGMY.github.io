@@ -45639,52 +45639,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             style: TextStyle(fontSize: 10, color: muted),
           ),
         ],
-        Builder(
-          builder: (_) {
-            final myGifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, widget.user.email);
-            if (myGifts.isEmpty) return const SizedBox.shrink();
-            final openGift = myGifts.firstWhere((g) => !g.redeemed, orElse: () => myGifts.first);
-            return Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => showNgmyHelperGiftReceivedDialog(context, openGift),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEC4899)]),
-                    ),
-                    child: Row(
-                      children: [
-                        const Text('🎁', style: TextStyle(fontSize: 26)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                openGift.redeemed ? 'Your helper presents' : 'You have a present!',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-                              ),
-                              Text(
-                                '${openGift.giftName} · \$${openGift.amount.toStringAsFixed(2)} — tap to show store QR',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.qr_code_2_rounded, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+        // (Helper presents are not shown in Rankings — members open them from their helper gift wallet.)
         const SizedBox(height: 22),
         if (waitingOnDirectory) ...[
           _rankingsEmptyBox('Loading members…', isDark),
