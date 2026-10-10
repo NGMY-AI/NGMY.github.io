@@ -34323,6 +34323,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       unawaited(_persistRegistryMember(displayUser));
     }
     widget.onDataChanged();
+    // The Members list shows the server's list once loaded; pull it again so
+    // the person just enrolled appears right away.
+    if (saved) unawaited(_loadSharedCivicDirectory());
     if (closeSelfSheet != null && closeSelfSheet.mounted) Navigator.pop(closeSelfSheet);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -44338,6 +44341,42 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return ngmyCurrentAuthEmail();
   }
 
+  final Set<String> _healTriedRegistryIds = <String>{};
+
+  /// A member this registrar enrolled recently is on this phone but not on
+  /// the server (a save that raced with another one lost them), so the
+  /// Members list never showed them. Send each one again. The server skips
+  /// anyone who was deleted or marked deceased, so this never undoes a delete.
+  Future<void> _healMembersMissingOnServer(String state, List<Map<String, dynamic>> liveRows) async {
+    if (!_canUseRegistrarToolsHere()) return;
+    final onServer = liveRows
+        .map((r) => (r['registryId'] ?? '').toString().trim().toUpperCase())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final cutoff = DateTime.now().toUtc().subtract(const Duration(days: 30));
+    final missing = NgmyCivicRegistryMembers.listFrom(widget.config).where((m) {
+      if (!NgmyCivicRegistryStats.statesMatch((m['state'] ?? '').toString(), state)) return false;
+      final rid = (m['registryId'] ?? '').toString().trim().toUpperCase();
+      if (rid.isEmpty || onServer.contains(rid) || _healTriedRegistryIds.contains(rid)) return false;
+      if ((m['fullName'] ?? '').toString().trim().isEmpty) return false;
+      final at = DateTime.tryParse((m['enrolledAt'] ?? '').toString())?.toUtc();
+      return at != null && at.isAfter(cutoff);
+    }).take(10).toList();
+    if (missing.isEmpty) return;
+    var healed = 0;
+    for (final m in missing) {
+      _healTriedRegistryIds.add((m['registryId'] ?? '').toString().trim().toUpperCase());
+      final res = await ngmyCivicUpsertMember(
+        email: widget.user.email,
+        member: Map<String, dynamic>.from(m),
+        state: state,
+        heal: true,
+      );
+      if (res.ok) healed++;
+    }
+    if (healed > 0 && mounted) unawaited(_loadSharedCivicDirectory());
+  }
+
   Future<void> _loadSharedCivicDirectory() async {
     if (!mounted) return;
     if (!_registryUnlocked &&
@@ -44409,6 +44448,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         _sharedDirectoryHasLiveFetch = true;
       });
       unawaited(NgmyCivicRegistryMembers.saveRankingsCache(wanted, liveRows));
+      unawaited(_healMembersMissingOnServer(wanted, liveRows));
     } finally {
       if (mounted && gen == _sharedDirectoryLoadGen && _sharedDirectoryLoading) {
         setState(() => _sharedDirectoryLoading = false);

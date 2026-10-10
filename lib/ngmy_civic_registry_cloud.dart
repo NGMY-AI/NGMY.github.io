@@ -307,6 +307,8 @@ Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
   required String email,
   required Map<String, dynamic> member,
   String state = '',
+  /// Re-sending a member the server lost: the server skips deleted ones.
+  bool heal = false,
 }) async {
   final slim = _slimMemberForCloud(member);
   Future<({bool ok, String? registryId, String? error})> once() async {
@@ -315,6 +317,7 @@ Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
       'email': email.trim().toLowerCase(),
       'state': state.trim().isNotEmpty ? state.trim() : (slim['state'] ?? '').toString(),
       'member': slim,
+      if (heal) 'heal': true,
     });
     if (data == null) {
       return (ok: false, registryId: null, error: 'Could not reach server.');

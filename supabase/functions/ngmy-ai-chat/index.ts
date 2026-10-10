@@ -1440,6 +1440,19 @@ async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwE
     asMemberList(payload.removed),
     asMemberList(payload.deceased),
   );
+  // A person is found by email first, then by phone number (the account's
+  // phone, and the WhatsApp number on their worker profile).
+  const phonesFor = new Map<string, Set<string>>();
+  const addPhone = (e: string, raw: unknown) => {
+    const p = hwPhoneKey(raw);
+    if (!p) return;
+    if (!phonesFor.has(e)) phonesFor.set(e, new Set());
+    phonesFor.get(e)!.add(p);
+  };
+  const { data: userRows } = await db.from("users").select("email,phone").in("email", keys);
+  for (const u of userRows ?? []) addPhone(emailKey(String(u.email ?? "")), u.phone);
+  const { data: workerRows } = await db.from("house_workers").select("email,phone").in("email", keys);
+  for (const w of workerRows ?? []) addPhone(emailKey(String(w.email ?? "")), w.phone);
   const memberFor = new Map<string, Record<string, unknown>>();
   for (const m of live) {
     if (!String(m.registryId ?? "").trim()) continue;
@@ -1447,6 +1460,13 @@ async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwE
       const e = emailKey(String(raw ?? ""));
       if (e && keys.includes(e) && !memberFor.has(e)) memberFor.set(e, m);
     }
+  }
+  for (const e of keys) {
+    if (memberFor.has(e)) continue;
+    const mine = phonesFor.get(e);
+    if (!mine || mine.size === 0) continue;
+    const hit = live.find((m) => String(m.registryId ?? "").trim() && mine.has(hwPhoneKey(m.phone)));
+    if (hit) memberFor.set(e, hit);
   }
   const claims = new Map<string, number>();
   const { data: claimRows } = await db.from("transactions").select("userEmail").eq("type", 6).in("userEmail", keys);
@@ -1485,9 +1505,29 @@ async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwE
   return out;
 }
 
-/** An approved worker can only be seen and sent work while still in good standing. */
-function hwCanWork(e: HwElig | undefined): boolean {
+/** Last 10 digits of a phone number, so +1 706-…, (706) … and 706… all match. */
+function hwPhoneKey(raw: unknown): string {
+  const digits = String(raw ?? "").replace(/\D/g, "");
+  return digits.length >= 10 ? digits.slice(-10) : "";
+}
+
+/** An approved worker can only be seen and sent work while still in good standing.
+ *  NGMY admins are never paused: they run the program, not a Civic Registry seat. */
+function hwCanWork(e: HwElig | undefined, email = ""): boolean {
+  if (email && isNgmyAdminEmail(email)) return true;
   return !!e && e.hasRegistryId && !e.deactivated;
+}
+
+/** Deletes one worker photo from storage. Only touches house-workers/ files. */
+async function hwRemovePhoto(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("house-workers/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* a leftover file is harmless; never block the save */ }
 }
 
 async function handleHouseWorkers(req: Request, action: string, body: any): Promise<Response> {
@@ -1505,7 +1545,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       .eq("status", "approved").ilike("state", state).limit(200);
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
-    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)))).map(hwPublicWorker)
+    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)), w.email)).map(hwPublicWorker)
       .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
     return jsonOk({ ok: true, workers });
   }
@@ -1547,7 +1587,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       worker: me
         ? {
           ...hwPublicWorker(me),
-          status: me.status === "approved" && !hwCanWork(myElig) ? "deactivated" : me.status,
+          status: me.status === "approved" && !hwCanWork(myElig, email) ? "deactivated" : me.status,
           phone: me.phone,
         }
         : null,
@@ -1600,7 +1640,14 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const { error } = await db.from("house_workers").upsert({
       email, name, phone, state, city, bio, skills, photo_url: photoUrl, status, updated_at: now,
     });
-    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    if (error) {
+      // The new file is not used; remove it so it does not linger.
+      if (photoUrl !== (prev?.photo_url ?? "")) await hwRemovePhoto(db, photoUrl);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    // Saved with the new photo: delete the old file so storage only holds the current one.
+    const oldUrl = String(prev?.photo_url ?? "");
+    if (oldUrl && oldUrl !== photoUrl) await hwRemovePhoto(db, oldUrl);
     return jsonOk({ ok: true, status });
   }
 
@@ -1615,7 +1662,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: false, error: "Enter your name, WhatsApp number, and what is wrong." }, 400);
     }
     const { data: w } = await db.from("house_workers").select("*").eq("id", workerId).maybeSingle();
-    if (!w || w.status !== "approved" || !hwCanWork((await hwEligibility(db, [w.email])).get(emailKey(w.email)))) {
+    if (!w || w.status !== "approved" || !hwCanWork((await hwEligibility(db, [w.email])).get(emailKey(w.email)), w.email)) {
       return jsonOk({ ok: false, error: "This worker is not available." }, 404);
     }
     if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
@@ -1646,7 +1693,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       if (!isWorker) return jsonOk({ ok: false, error: "Only the worker can answer this." }, 403);
       if (r.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
       const accept = body?.decision === "accept";
-      if (accept && !hwCanWork((await hwEligibility(db, [email])).get(email))) {
+      if (accept && !hwCanWork((await hwEligibility(db, [email])).get(email), email)) {
         return jsonOk({
           ok: false,
           error: "Your worker account is deactivated (more than 5 missed or more than 3 claims in Civic Registry).",
@@ -1707,7 +1754,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
         hasBio: e?.hasBio ?? false,
         missed: e?.missed ?? 0,
         claims: e?.claims ?? 0,
-        deactivated: !hwCanWork(e),
+        deactivated: !hwCanWork(e, w.email),
       };
     }).sort((a: any, b: any) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9));
     return jsonOk({ ok: true, workers });
@@ -4085,6 +4132,26 @@ async function saveCivicPayload(
   payload: Record<string, unknown>,
 ): Promise<{ ok: boolean; error?: string }> {
   const current = await loadCivicPayload(admin);
+  // Every writer loads the roster, changes it, then saves the whole list.
+  // When two saves overlap (an enroll and a phone's full sync), the later
+  // one used to write a list that never had the other's new member, and
+  // that member silently vanished. Keep anyone in the latest saved roster
+  // that this save does not know about, unless this save deleted them.
+  if (Array.isArray(payload.members)) {
+    const next = asMemberList(payload.members);
+    const known = new Set<string>();
+    for (const m of next) for (const k of identityKeys(m)) known.add(k);
+    const lost = asMemberList(current.members).filter((m) => {
+      const keys = identityKeys(m);
+      return keys.length > 0 && !keys.some((k) => known.has(k));
+    });
+    if (lost.length > 0) {
+      const removed = asMemberList(payload.removed ?? current.removed);
+      const deceased = asMemberList(payload.deceased ?? current.deceased);
+      const keep = filterTombstonedMembers(lost, removed, deceased).filter((m) => !isGhostMemberRow(m));
+      if (keep.length > 0) payload = { ...payload, members: [...next, ...keep] };
+    }
+  }
   const row = {
     key: CIVIC_MEMBERS_KEY,
     value: { ...current, ...payload, savedAt: new Date().toISOString() },
@@ -6264,6 +6331,22 @@ async function handleCivicUpsertMember(
   const members = asMemberList(current.members);
   const removed = asMemberList(current.removed);
   const deceased = asMemberList(current.deceased);
+
+  if (body.heal === true) {
+    // A phone re-sending a member the server lost. Never bring back someone
+    // who was deleted or marked deceased.
+    if (!registryId || filterTombstonedMembers([member], removed, deceased).length === 0) {
+      return jsonOk({ ok: false, skipped: true, error: "Member was deleted." });
+    }
+    const exists = members.some((m) =>
+      String(m.registryId ?? "").trim().toUpperCase() === registryId.toUpperCase()
+    );
+    if (exists) return jsonOk({ ok: true, registryId, skipped: true });
+  } else {
+    // An explicit enroll: wins over an older delete of the same person, even
+    // when a phone later syncs that old delete again.
+    member.restoredAt = new Date().toISOString();
+  }
 
   if (!registryId) {
     const existingIds = new Set(
