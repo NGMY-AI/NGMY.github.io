@@ -254,6 +254,7 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
   Duration timeout = kNgmyEdgeTimeout,
   bool preferDirect = false,
   bool fallbackOnTimeout = false,
+  bool fresh = false,
 }) async {
   final action = (body['action'] ?? 'chat').toString().trim();
   if (action != 'dbRelay') {
@@ -269,7 +270,9 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
     if (isRead) {
       readKey = '${anonymous ? 'a' : 'u'}|${jsonEncode(body)}';
       final hit = _relayReadCache[readKey];
-      if (hit != null) {
+      // [fresh]: something just changed on another phone (live signal), so
+      // the saved answer is known to be old.
+      if (hit != null && !fresh) {
         final age = DateTime.now().difference(hit.at);
         if (age < const Duration(seconds: 5) || NgmyActivityGate.isIdle) {
           return Map<String, dynamic>.from(hit.data);

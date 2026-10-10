@@ -31915,7 +31915,7 @@ class CivicRegistryScreen extends StatefulWidget {
   State<CivicRegistryScreen> createState() => _CivicRegistryScreenState();
 }
 
-class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
+class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsBindingObserver {
   int _activeTab = 0; // 0: Search, 1: Enroll, 2: Members, 3: Rankings
   String _searchQuery = '';
   late String _selectedState;
@@ -32016,6 +32016,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       _unlockChecked = false;
     }
     _subscribeToCivicHelpBroadcasts();
+    WidgetsBinding.instance.addObserver(this);
+    _showRememberedCivicTrialBanner();
     // Seed in-memory civic contributions immediately so Contribution Receipts
     // are not empty while async local/cloud hydration runs (e.g. right after
     // help mode deactivation or app reopen).
@@ -32147,7 +32149,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     );
   }
 
-  Future<void> _refreshCivicHelpModeSettingsOnly() async {
+  Future<void> _refreshCivicHelpModeSettingsOnly({bool fresh = false}) async {
     if (ngmyShouldDeferRemoteConfigOverwrite()) return;
     if (_helpSettingsRefreshInFlight) {
       final pending = _helpSettingsRefreshCompleter;
@@ -32158,7 +32160,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     final refreshCompleter = Completer<void>();
     _helpSettingsRefreshCompleter = refreshCompleter;
     try {
-      await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+      await ngmyHydrateCivicHelpModeFromAllBackups(widget.config, fresh: fresh);
       final mirrored = await ngmyHydrateCivicContributionsLocal(
         deletedIds: widget.config.civicDeletedContributionIds,
       );
@@ -32195,7 +32197,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             event: 'changed',
             callback: (_) {
               if (!mounted) return;
-              unawaited(_refreshCivicHelpModeSettingsOnly());
+              unawaited(_refreshCivicHelpModeSettingsOnly(fresh: true));
               // The settings row no longer carries receipts, so a phone that
               // only re-read it never saw the money recorded on another
               // phone: after Deactivate the receipt stayed empty or missing
@@ -32210,6 +32212,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
   }
 
   Timer? _civicMoneyRefreshDebounce;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back into the app: the live signal may have been missed while
+    // the phone was away, so read help mode fresh right now.
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    _showRememberedCivicTrialBanner();
+    unawaited(_refreshCivicHelpModeSettingsOnly(fresh: true));
+    _refreshCivicMoneySoon();
+    unawaited(_refreshCivicStateAccess(promptPaywall: false));
+  }
 
   void _refreshCivicMoneySoon() {
     _civicMoneyRefreshDebounce?.cancel();
@@ -32386,7 +32399,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     _helpRefreshCompleter = refreshCompleter;
     try {
       if (!ngmyShouldDeferRemoteConfigOverwrite()) {
-        await ngmyHydrateCivicHelpModeFromAllBackups(widget.config);
+        await ngmyHydrateCivicHelpModeFromAllBackups(widget.config, fresh: true);
+        // Show the help-mode banner now. It used to appear only after the
+        // full contribution list below finished downloading, which is why
+        // members waited a long time to see a registrar's Activate.
+        if (mounted) {
+          setState(() {});
+          _queueHelpModeLifecycleMaintenance();
+        }
       }
     await ngmyHydrateCivicContributionReceiptRemoved(widget.config);
     await ngmyHydrateCivicDeletedContributions(widget.config);
@@ -32470,6 +32490,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     _civicMoneyRefreshDebounce?.cancel();
@@ -32664,6 +32685,49 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
     return NgmyCivicRegistryStats.statesMatch(st, home);
   }
 
+  // The free-period banner used to live only on this screen, so after the
+  // app was closed or swiped away it was blank for 3–4 seconds until the
+  // server answered. The last answer per state is kept in memory and on the
+  // phone and shown straight away, then replaced by the fresh one.
+  static final Map<String, String> _civicTrialBannerMemory = {};
+  static const String _kCivicTrialBannerPrefsPrefix = 'ngmy_civic_trial_banner_v1_';
+
+  String _civicTrialBannerKey(String state) => state.trim().toLowerCase();
+
+  void _showRememberedCivicTrialBanner() {
+    final key = _civicTrialBannerKey(_selectedState);
+    if (key.isEmpty) return;
+    final mem = _civicTrialBannerMemory[key];
+    if (mem != null) {
+      if (_civicTrialBanner != mem) _civicTrialBanner = mem;
+      return;
+    }
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final saved = prefs.getString('$_kCivicTrialBannerPrefsPrefix$key');
+        if (saved == null) return;
+        _civicTrialBannerMemory.putIfAbsent(key, () => saved);
+        if (!mounted || _civicTrialBannerKey(_selectedState) != key) return;
+        if (_civicTrialBanner.isEmpty && saved.isNotEmpty) {
+          setState(() => _civicTrialBanner = saved);
+        }
+      } catch (_) {}
+    }());
+  }
+
+  void _rememberCivicTrialBanner(String state, String banner) {
+    final key = _civicTrialBannerKey(state);
+    if (key.isEmpty) return;
+    _civicTrialBannerMemory[key] = banner;
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('$_kCivicTrialBannerPrefsPrefix$key', banner);
+      } catch (_) {}
+    }());
+  }
+
   Future<void> _refreshCivicStateAccess({bool promptPaywall = true}) async {
     final state = _selectedState;
     final admin = widget.user.isAdmin || _isGlobalCivicRegistryAdmin();
@@ -32674,6 +32738,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
         _civicTrialBanner = '';
       });
       return;
+    }
+    // Show the last known banner for this state while the server answers.
+    final rememberedKey = _civicTrialBannerKey(state);
+    if (_civicTrialBannerMemory.containsKey(rememberedKey) && mounted) {
+      setState(() => _civicTrialBanner = _civicTrialBannerMemory[rememberedKey]!);
     }
     try {
       final inspected = await NgmyStateRegistrarPayments.inspectState(state);
@@ -32686,6 +32755,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
           isAdmin: admin,
         );
       }
+      _rememberCivicTrialBanner(state, inspected.banner);
       if (!mounted) return;
       setState(() {
         _civicStateAccessOk = ok;
@@ -33295,139 +33365,296 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final surface = isDark ? const Color(0xFF121726) : Colors.white;
-        final border = isDark ? const Color(0xFF4B5563) : const Color(0xFFE2E8F0);
-        final muted = isDark ? Colors.white60 : Colors.black54;
+        final border = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+        final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+        final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+        final fieldBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+        const purple = Color(0xFF6200EE);
+        final purpleSoft = isDark ? const Color(0xFFC4B5FD) : const Color(0xFF5B21B6);
+        final applyState = widget.user.state.trim().isNotEmpty ? widget.user.state.trim() : _selectedState.trim();
+        final slots = _registrarSlotsRemainingInSelectedState();
+
+        InputDecoration field(String label, IconData icon, {String? hint, bool multiline = false}) {
+          return InputDecoration(
+            labelText: label,
+            hintText: hint,
+            hintMaxLines: 3,
+            alignLabelWithHint: multiline,
+            prefixIcon: multiline
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 52),
+                    child: Icon(icon, color: purpleSoft, size: 20),
+                  )
+                : Icon(icon, color: purpleSoft, size: 20),
+            filled: true,
+            fillColor: fieldBg,
+            labelStyle: TextStyle(color: muted, fontWeight: FontWeight.w600),
+            hintStyle: TextStyle(color: muted.withValues(alpha: 0.7), fontSize: 12.5),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: border)),
+            focusedBorder: const OutlineInputBorder(
+              borderRadius: BorderRadius.all(Radius.circular(14)),
+              borderSide: BorderSide(color: purple, width: 1.8),
+            ),
+          );
+        }
+
+        Widget sectionLabel(String text) => Padding(
+              padding: const EdgeInsets.only(bottom: 10, left: 2),
+              child: Text(
+                text.toUpperCase(),
+                style: TextStyle(fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w900, color: purpleSoft),
+              ),
+            );
+
+        Widget duty(IconData icon, String text) => Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                decoration: BoxDecoration(
+                  color: fieldBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: border),
+                ),
+                child: Column(
+                  children: [
+                    Icon(icon, size: 20, color: purpleSoft),
+                    const SizedBox(height: 4),
+                    Text(
+                      text,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: TextStyle(fontSize: 10.5, height: 1.2, fontWeight: FontWeight.w700, color: ink),
+                    ),
+                  ],
+                ),
+              ),
+            );
+
+        Widget headerChip(IconData icon, String text) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 12, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(text, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            );
+
         return Padding(
           padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              margin: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              constraints: BoxConstraints(
+                maxWidth: 520,
+                maxHeight: MediaQuery.of(ctx).size.height * 0.92,
+              ),
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: border, width: 1.2),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 24, offset: const Offset(0, 8))],
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: border),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.22), blurRadius: 28, offset: const Offset(0, 10))],
               ),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.35), borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6200EE).withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.verified_user_rounded, color: Color(0xFF6200EE), size: 26),
+                    // Purple header band.
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(18, 10, 10, 18),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF4C1D95), Color(0xFF7C3AED)],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Authorized Registrar Application',
-                                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: isDark ? Colors.white : Colors.black87),
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                                ),
+                                child: const Icon(Icons.verified_user_rounded, color: Colors.white, size: 26),
                               ),
-                              Text('Civic Registry • ${widget.user.state}', style: TextStyle(fontSize: 12, color: muted)),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Become an Authorized Registrar',
+                                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white, height: 1.15),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: [
+                                        headerChip(Icons.map_rounded, applyState.isEmpty ? 'Civic Registry' : applyState),
+                                        if (slots > 0)
+                                          headerChip(Icons.event_seat_rounded, '$slots of $kNgmyMaxRegistrarsPerState seats open'),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                                tooltip: 'Close',
+                              ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Registrars enroll members, run help mode, and keep the registry accurate for their state. All fields marked * are required.',
-                      style: TextStyle(fontSize: 12.5, height: 1.4, color: muted),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: nameC,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: InputDecoration(
-                        labelText: 'Your full name *',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: phoneC,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: const [PhoneDashFormatter()],
-                      decoration: InputDecoration(
-                        labelText: 'Phone number (optional)',
-                        hintText: '123-456-7890',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: reasonC,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        labelText: 'Why do you want to become an Authorized Registrar? *',
-                        alignLabelWithHint: true,
-                        hintText: 'Explain your experience, community role, and how you will use this access responsibly.',
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: experienceC,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: 'Relevant experience (optional)',
-                        alignLabelWithHint: true,
-                        filled: true,
-                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          sectionLabel('What registrars do'),
+                          Row(
+                            children: [
+                              duty(Icons.person_add_alt_1_rounded, 'Enroll members'),
+                              const SizedBox(width: 8),
+                              duty(Icons.volunteer_activism_rounded, 'Run help mode'),
+                              const SizedBox(width: 8),
+                              duty(Icons.fact_check_rounded, 'Keep records right'),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          sectionLabel('About you'),
+                          TextField(
+                            controller: nameC,
+                            textCapitalization: TextCapitalization.words,
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w600),
+                            decoration: field('Full name *', Icons.badge_outlined),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: phoneC,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: const [PhoneDashFormatter()],
+                            style: TextStyle(color: ink, fontWeight: FontWeight.w600),
+                            decoration: field('Phone number (optional)', Icons.phone_rounded, hint: '123-456-7890'),
+                          ),
+                          const SizedBox(height: 18),
+                          sectionLabel('Your application'),
+                          TextField(
+                            controller: reasonC,
+                            maxLines: 4,
+                            style: TextStyle(color: ink),
+                            decoration: field(
+                              'Why do you want to be a registrar? *',
+                              Icons.edit_note_rounded,
+                              hint: 'Your community role, and how you will use this access responsibly.',
+                              multiline: true,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: experienceC,
+                            maxLines: 3,
+                            style: TextStyle(color: ink),
+                            decoration: field(
+                              'Relevant experience (optional)',
+                              Icons.workspace_premium_rounded,
+                              multiline: true,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: purple.withValues(alpha: isDark ? 0.16 : 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline_rounded, size: 16, color: purpleSoft),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'The King/Admin reviews every request. You will see the result here in Civic Registry.',
+                                    style: TextStyle(fontSize: 11.5, height: 1.3, color: muted, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            height: 50,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(colors: [Color(0xFF6200EE), Color(0xFF7C3AED)]),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(color: purple.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 6)),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                ),
+                                onPressed: () {
+                                  if (nameC.text.trim().isEmpty || reasonC.text.trim().isEmpty) {
+                                    ScaffoldMessenger.of(ctx).showSnackBar(
+                                      const SnackBar(content: Text('Enter your full name and reason for applying.')),
+                                    );
+                                    return;
+                                  }
+                                  Navigator.pop(ctx, true);
+                                },
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.send_rounded, size: 18),
+                                    SizedBox(width: 8),
+                                    Text('Submit application', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          TextButton(
                             onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
+                            style: TextButton.styleFrom(foregroundColor: muted),
+                            child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w700)),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF6200EE), padding: const EdgeInsets.symmetric(vertical: 14)),
-                            onPressed: () {
-                              if (nameC.text.trim().isEmpty || reasonC.text.trim().isEmpty) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(content: Text('Enter your full name and reason for applying.')),
-                                );
-                                return;
-                              }
-                              Navigator.pop(ctx, true);
-                            },
-                            child: const Text('Submit Application', style: TextStyle(fontWeight: FontWeight.w800)),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -41305,41 +41532,59 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
             return ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
+                // Compact receipt header: title row, the total in its own
+                // frame, then contributors and average side by side.
                 Container(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF047857), Color(0xFF10B981)],
-                    ),
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(color: emerald.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10)),
-                    ],
-                  ),
+                  padding: const EdgeInsets.all(14),
+                  decoration: cardDecoration(),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
                         children: [
-                          const SizedBox(width: 36),
-                          Expanded(
-                            child: Text(
-                              'CONTRIBUTION RECEIPT',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.85),
-                                fontSize: 11,
-                                letterSpacing: 1.6,
-                                fontWeight: FontWeight.w800,
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF10B981), Color(0xFF047857)],
                               ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: strongText),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  [
+                                    stateLabel,
+                                    if ((meta['scopeType'] ?? 'all').toString() != 'all') scopeLabel(meta),
+                                    if (first != null) shortDate(first.timestamp),
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: softText, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
+                              ],
                             ),
                           ),
-                          SizedBox(
-                            width: 36,
-                            height: 36,
+                          const SizedBox(width: 8),
+                          Tooltip(
+                            message: 'Copy for WhatsApp',
                             child: Material(
-                              color: Colors.white.withOpacity(0.18),
+                              color: emerald.withOpacity(isDark ? 0.2 : 0.1),
                               shape: const CircleBorder(),
                               child: InkWell(
                                 customBorder: const CircleBorder(),
@@ -41356,79 +41601,117 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                     ),
                                   );
                                 },
-                                child: const Icon(Icons.copy_rounded, size: 16, color: Colors.white),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(9),
+                                  child: Icon(Icons.copy_rounded, size: 17, color: emeraldText),
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(
-                        title,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        [
-                          stateLabel,
-                          if ((meta['scopeType'] ?? 'all').toString() != 'all') scopeLabel(meta),
-                          if (first != null) shortDate(first.timestamp),
-                        ].join(' · '),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12.5, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 16),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          '\$${formatCurrency(total)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: emerald.withOpacity(isDark ? 0.14 : 0.07),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: emerald.withOpacity(isDark ? 0.45 : 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Total collected',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: softText),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      '\$${formatCurrency(total)}',
+                                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: emeraldText),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: emerald.withOpacity(isDark ? 0.25 : 0.14),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.savings_rounded, color: emeraldText, size: 22),
+                            ),
+                          ],
                         ),
                       ),
-                      Text(
-                        'Total collected',
-                        style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12, fontWeight: FontWeight.w700),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          for (final stat in [
+                            (
+                              icon: Icons.groups_rounded,
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                              value: '$contributors',
+                              label: 'Contributors',
+                            ),
+                            (
+                              icon: Icons.trending_up_rounded,
+                              color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
+                              value: '\$${formatCurrency(average)}',
+                              label: 'Average each',
+                            ),
+                          ]) ...[
+                            if (stat.label == 'Average each') const SizedBox(width: 10),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: tileBg,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: lineColor),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(stat.icon, size: 20, color: stat.color),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: Text(
+                                              stat.value,
+                                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: strongText),
+                                            ),
+                                          ),
+                                          Text(
+                                            stat.label,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 11, color: softText, fontWeight: FontWeight.w600),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: cardDecoration(radius: 16),
-                        child: Column(
-                          children: [
-                            Icon(Icons.groups_rounded, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                            const SizedBox(height: 4),
-                            Text('$contributors', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: strongText)),
-                            Text('Contributors', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        decoration: cardDecoration(radius: 16),
-                        child: Column(
-                          children: [
-                            Icon(Icons.trending_up_rounded, color: emeraldText),
-                            const SizedBox(height: 4),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('\$${formatCurrency(average)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: strongText)),
-                            ),
-                            Text('Average each', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -41599,7 +41882,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         final panelBg = isDark ? const Color(0xFF111827) : Colors.white;
-        final sectionBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
         final inputBg = isDark ? const Color(0xFF0F172A) : Colors.white;
         final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFD1D5DB);
         final ink = isDark ? Colors.white : const Color(0xFF0F172A);
@@ -41723,48 +42005,147 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> {
                                 ],
                               ),
                             ),
-                          Text('AMOUNT', style: TextStyle(fontSize: 11, letterSpacing: 1.2, fontWeight: FontWeight.w800, color: ink.withOpacity(0.55))),
-                          const SizedBox(height: 6),
-                          TextField(
-                            controller: amountC,
-                            autofocus: true,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 30),
-                            decoration: InputDecoration(
-                              hintText: '0.00',
-                              hintStyle: TextStyle(color: ink.withOpacity(0.25), fontWeight: FontWeight.w900, fontSize: 30),
-                              prefixIcon: const Padding(
-                                padding: EdgeInsets.only(left: 16, right: 4),
-                                child: Text('\$', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF059669))),
-                              ),
-                              prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
-                              filled: true,
-                              fillColor: sectionBg,
-                              contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
-                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: borderColor)),
-                              focusedBorder: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(16)), borderSide: BorderSide(color: Color(0xFF10B981), width: 2)),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            alignment: WrapAlignment.center,
-                            children: [5, 10, 20, 50, 100].map((v) {
-                              return ActionChip(
-                                label: Text('\$$v', style: const TextStyle(fontWeight: FontWeight.w800)),
-                                backgroundColor: const Color(0xFF10B981).withOpacity(isDark ? 0.16 : 0.1),
-                                side: BorderSide(color: const Color(0xFF10B981).withOpacity(0.35)),
-                                labelStyle: TextStyle(color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                onPressed: () {
-                                  amountC.text = '$v';
-                                  amountC.selection = TextSelection.collapsed(offset: amountC.text.length);
-                                },
+                          // Amount card: a framed money display with a "$"
+                          // badge, the typed amount, and quick amounts that
+                          // light up when picked.
+                          ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: amountC,
+                            builder: (_, value, __) {
+                              const accent = Color(0xFF059669);
+                              final accentSoft = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857);
+                              final typed = double.tryParse(value.text.trim());
+                              return Container(
+                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                                decoration: BoxDecoration(
+                                  color: accent.withOpacity(isDark ? 0.1 : 0.05),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(color: accent.withOpacity(isDark ? 0.45 : 0.35), width: 1.4),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          existing != null ? 'Amount to add' : 'Amount',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: accentSoft),
+                                        ),
+                                        const Spacer(),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: inputBg,
+                                            borderRadius: BorderRadius.circular(999),
+                                            border: Border.all(color: borderColor),
+                                          ),
+                                          child: Text('USD', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: ink.withOpacity(0.6))),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.fromLTRB(8, 4, 12, 4),
+                                      decoration: BoxDecoration(
+                                        color: inputBg,
+                                        borderRadius: BorderRadius.circular(14),
+                                        boxShadow: [
+                                          BoxShadow(color: Colors.black.withOpacity(isDark ? 0.25 : 0.05), blurRadius: 8, offset: const Offset(0, 3)),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 40,
+                                            height: 40,
+                                            alignment: Alignment.center,
+                                            decoration: const BoxDecoration(
+                                              gradient: LinearGradient(colors: [Color(0xFF10B981), Color(0xFF047857)]),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Text('\$', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: TextField(
+                                              controller: amountC,
+                                              autofocus: true,
+                                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                              style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 28),
+                                              cursorColor: accent,
+                                              decoration: InputDecoration(
+                                                hintText: '0.00',
+                                                hintStyle: TextStyle(color: ink.withOpacity(0.22), fontWeight: FontWeight.w900, fontSize: 28),
+                                                border: InputBorder.none,
+                                                enabledBorder: InputBorder.none,
+                                                focusedBorder: InputBorder.none,
+                                                isDense: true,
+                                                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                                              ),
+                                            ),
+                                          ),
+                                          if (value.text.isNotEmpty)
+                                            IconButton(
+                                              onPressed: amountC.clear,
+                                              icon: Icon(Icons.cancel_rounded, color: ink.withOpacity(0.3), size: 20),
+                                              tooltip: 'Clear',
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Row(
+                                      children: [5, 10, 20, 50, 100].map((v) {
+                                        final picked = typed != null && typed == v.toDouble();
+                                        return Expanded(
+                                          child: Padding(
+                                            padding: EdgeInsets.only(right: v == 100 ? 0 : 6),
+                                            child: Material(
+                                              color: picked ? accent : inputBg,
+                                              borderRadius: BorderRadius.circular(12),
+                                              child: InkWell(
+                                                borderRadius: BorderRadius.circular(12),
+                                                onTap: () {
+                                                  amountC.text = '$v';
+                                                  amountC.selection = TextSelection.collapsed(offset: amountC.text.length);
+                                                },
+                                                child: Container(
+                                                  height: 38,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.circular(12),
+                                                    border: Border.all(color: picked ? accent : borderColor),
+                                                  ),
+                                                  child: FittedBox(
+                                                    fit: BoxFit.scaleDown,
+                                                    child: Text(
+                                                      '\$$v',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.w900,
+                                                        fontSize: 13.5,
+                                                        color: picked ? Colors.white : accentSoft,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                    ),
+                                    if (existing != null && typed != null && typed > 0) ...[
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'New total: \$${formatCurrency(existing.amount + typed)}',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: accentSoft),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               );
-                            }).toList(),
+                            },
                           ),
                           const SizedBox(height: 16),
                           TextField(

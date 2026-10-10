@@ -1842,7 +1842,10 @@ Future<List<Map<String, dynamic>>> _contributionReceiptMirrorForCloud(AppConfig 
   );
 }
 
-Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
+/// [fresh] skips the saved relay answer — used when a live "help mode
+/// changed" signal arrives or Civic Registry is opened, so members see a
+/// registrar's Activate right away instead of after the next idle refresh.
+Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config, {bool fresh = false}) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kNgmyCivicHelpModePrefsKey);
@@ -1866,7 +1869,7 @@ Future<void> ngmyHydrateCivicHelpModeFromAllBackups(AppConfig config) async {
     // Shared row. Do not skip this when the short REST probe fails — that
     // probe false-negatives while the same-origin sync path still works, and
     // skipping it left every other device on a stale help-mode copy.
-    var row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey);
+    var row = await ngmyDbRelaySettingsFetch(_kNgmyCivicHelpModeSettingsKey, fresh: fresh);
     if (row == null && ngmyCurrentAuthEmail().isEmpty && !_civicHelpModeReadForcedLoginThisRun) {
       // The row is only readable with a signed-in email session. A device
       // that still sits on an anonymous storage token gets nothing and the

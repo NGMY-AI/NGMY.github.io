@@ -190,6 +190,7 @@ Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
   String key, {
   Duration timeout = kNgmyCloudLoadTimeout,
   bool? anonymous,
+  bool fresh = false,
 }) async {
   final resolved = _resolveSettingsKey(key);
   if (resolved == null) throw NgmyDbRelayException('Unknown settings key: $key');
@@ -206,6 +207,7 @@ Future<Map<String, dynamic>?> ngmyDbRelaySettingsFetch(
       },
       anonymous: anonymous ?? !_ngmyHasSession,
       timeout: timeout,
+      fresh: fresh,
     ),
   );
   final row = data['data'];
