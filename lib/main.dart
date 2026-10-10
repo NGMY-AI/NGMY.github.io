@@ -38512,8 +38512,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             customBorder: const CircleBorder(),
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(icon, color: color, size: 18),
+              padding: const EdgeInsets.all(6),
+              child: Icon(icon, color: color, size: 16),
             ),
           ),
         ),
@@ -41026,7 +41026,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       final local = email.split('@').first.trim();
       if (local.isNotEmpty && !local.startsWith('civic.')) return local;
     }
-    return rid.isNotEmpty ? rid : 'Contributor';
+    // Never fall back to the registry ID: it is private member information.
+    return 'Contributor';
   }
 
   List<UserData> _membersForReceiptMeta(Map<String, dynamic> meta) {
@@ -41204,12 +41205,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           final groups = _groupContributionReceipts(_visibleContributionTx());
           final keys = groups.keys.toList();
           final isDark = Theme.of(ctx).brightness == Brightness.dark;
-          final pageBg = isDark ? const Color(0xFF0B1120) : const Color(0xFFF3F6FA);
-          final cardBg = isDark ? const Color(0xFF111827) : Colors.white;
-          final tileBg = isDark ? const Color(0xFF1F2937) : const Color(0xFFF8FAFC);
-          final lineColor = isDark ? const Color(0xFF263244) : const Color(0xFFE5E9F0);
+          // Same neutral dark as the main Civic Registry screen (no blue tint).
+          final pageBg = isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB);
+          final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+          final tileBg = isDark ? const Color(0xFF262626) : const Color(0xFFF8FAFC);
+          final lineColor = isDark ? const Color(0xFF2E2E2E) : const Color(0xFFE5E9F0);
           final strongText = isDark ? Colors.white : const Color(0xFF0F172A);
-          final softText = isDark ? Colors.white70 : const Color(0xFF64748B);
+          final softText = isDark ? Colors.white60 : const Color(0xFF64748B);
           const emerald = Color(0xFF059669);
           final emeraldText = isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857);
           final selected = selectedKey != null ? (groups[selectedKey] ?? <AppTransaction>[]) : <AppTransaction>[];
@@ -41227,23 +41229,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             }
           }
 
-          BoxDecoration cardDecoration({double radius = 20}) => BoxDecoration(
+          BoxDecoration cardDecoration({double radius = 16}) => BoxDecoration(
                 color: cardBg,
                 borderRadius: BorderRadius.circular(radius),
                 border: Border.all(color: lineColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.3 : 0.06),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
               );
 
           Widget chip(IconData icon, String text, {Color? color}) {
             final c = color ?? softText;
             return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
                 color: c.withOpacity(isDark ? 0.16 : 0.09),
                 borderRadius: BorderRadius.circular(999),
@@ -41251,9 +41246,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 13, color: c),
-                  const SizedBox(width: 4),
-                  Text(text, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: c)),
+                  Icon(icon, size: 11, color: c),
+                  const SizedBox(width: 3),
+                  Text(text, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: c)),
                 ],
               ),
             );
@@ -41272,7 +41267,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             final until = _contributionReceiptVisibleUntil(campaignKey, m);
             return chip(
               Icons.lock_clock_rounded,
-              until == null ? 'Closed' : 'Closed · visible until ${shortDate(until)}',
+              until == null ? 'Closed' : 'Closed · until ${shortDate(until)}',
               color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309),
             );
           }
@@ -41282,6 +41277,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             if (type == 'all') return 'All members';
             final value = (m['scopeValue'] ?? '').toString();
             return '${type[0].toUpperCase()}${type.substring(1)}: $value';
+          }
+
+          // Small framed number used for amount / contributors / average.
+          Widget miniStat(String label, String value, Color valueColor) {
+            return Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                decoration: BoxDecoration(
+                  color: tileBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: lineColor),
+                ),
+                child: Column(
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        value,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: valueColor),
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 10, color: softText, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           Widget listCard(String k, List<AppTransaction> txs) {
@@ -41302,56 +41329,49 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             }
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 14),
+              margin: const EdgeInsets.only(bottom: 10),
               decoration: cardDecoration(),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   onTap: open,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 8, 12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
-                              width: 44,
-                              height: 44,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [Color(0xFF10B981), Color(0xFF047857)],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
+                                color: emerald.withOpacity(isDark ? 0.22 : 0.12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white, size: 22),
+                              child: Icon(Icons.volunteer_activism_rounded, color: emeraldText, size: 17),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     title,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: strongText),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${state.isNotEmpty ? state : widget.user.state} · ${scopeLabel(m)}',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: softText, fontSize: 12.5),
+                                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: strongText),
+                                  ),
+                                  Text(
+                                    '${state.isNotEmpty ? state : widget.user.state} · ${scopeLabel(m)} · ${shortDate(seed.timestamp)}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: softText, fontSize: 11),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
                             _campaignReceiptCornerActions(
                               campaignKey: k,
                               receiptState: state,
@@ -41367,85 +41387,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            chip(Icons.event_rounded, shortDate(seed.timestamp)),
-                            statusChip(state, k, m),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: tileBg,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: lineColor),
-                          ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
                           child: Row(
                             children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Total collected', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
-                                    const SizedBox(height: 2),
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        '\$${formatCurrency(t)}',
-                                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: emeraldText),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              statusChip(state, k, m),
+                              const Spacer(),
+                              Text(
+                                '$c contributor${c == 1 ? '' : 's'}',
+                                style: TextStyle(fontSize: 11, color: softText, fontWeight: FontWeight.w600),
                               ),
-                              Container(width: 1, height: 34, color: lineColor),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text('Contributors', style: TextStyle(fontSize: 11.5, color: softText, fontWeight: FontWeight.w600)),
-                                    const SizedBox(height: 2),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.groups_rounded, size: 20, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB)),
-                                        const SizedBox(width: 5),
-                                        Text(
-                                          '$c',
-                                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: strongText),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '\$${formatCurrency(t)}',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: emeraldText),
                               ),
+                              Icon(Icons.chevron_right_rounded, size: 18, color: softText),
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 44,
-                          child: ElevatedButton(
-                            onPressed: open,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: emerald,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('Open receipt', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
-                                SizedBox(width: 6),
-                                Icon(Icons.arrow_forward_rounded, size: 18),
-                              ],
-                            ),
                           ),
                         ),
                       ],
@@ -41457,22 +41416,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           }
 
           Widget contributionTile(AppTransaction t) {
-            final rowMeta = _decodeContributionMeta(t);
             final name = _contributionMemberDisplayName(t);
-            final rid = (rowMeta['registryId'] ?? '').toString().trim();
             return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: tileBg,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: lineColor),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 28,
+                    height: 28,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: emerald.withOpacity(isDark ? 0.22 : 0.12),
@@ -41480,10 +41437,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     ),
                     child: Text(
                       initialsOf(name),
-                      style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 14),
+                      style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 11),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -41492,33 +41449,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: strongText),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: strongText),
                         ),
-                        const SizedBox(height: 2),
                         Text(
-                          _txReadableDetails(t),
-                          maxLines: 2,
+                          '${_txReadableDetails(t)} · ${shortDate(t.timestamp)}',
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: softText, fontSize: 12),
+                          style: TextStyle(color: softText, fontSize: 11),
                         ),
-                        if (rid.isNotEmpty) ...[
-                          const SizedBox(height: 5),
-                          chip(Icons.badge_outlined, 'ID $rid'),
-                        ],
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: emerald.withOpacity(isDark ? 0.2 : 0.1),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '\$${formatCurrency(t.amount)}',
-                      style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 14),
-                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '\$${formatCurrency(t.amount)}',
+                    style: TextStyle(fontWeight: FontWeight.w900, color: emeraldText, fontSize: 13),
                   ),
                 ],
               ),
@@ -41530,43 +41475,28 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             final average = contributors == 0 ? 0.0 : total / contributors;
             final stateLabel = receiptState.isNotEmpty ? receiptState : _selectedState;
             return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
               children: [
-                // Compact receipt header: title row, the total in its own
-                // frame, then contributors and average side by side.
+                // Small header: title line with copy, then three equal
+                // framed numbers.
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 8, 12),
                   decoration: cardDecoration(),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
                         children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF10B981), Color(0xFF047857)],
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
-                          ),
-                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   title,
-                                  maxLines: 2,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: strongText),
+                                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5, color: strongText),
                                 ),
-                                const SizedBox(height: 2),
                                 Text(
                                   [
                                     stateLabel,
@@ -41575,163 +41505,71 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                   ].join(' · '),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: softText, fontSize: 12, fontWeight: FontWeight.w600),
+                                  style: TextStyle(color: softText, fontSize: 11),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Tooltip(
-                            message: 'Copy for WhatsApp',
-                            child: Material(
-                              color: emerald.withOpacity(isDark ? 0.2 : 0.1),
-                              shape: const CircleBorder(),
-                              child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: () {
-                                  final text = _buildContributionReceiptWhatsAppSwahili(
-                                    meta: meta,
-                                    txs: selected,
-                                  );
-                                  Clipboard.setData(ClipboardData(text: text));
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Ripoti imenakiliwa — bandika kwenye WhatsApp.'),
-                                      backgroundColor: Color(0xFF059669),
-                                    ),
-                                  );
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(9),
-                                  child: Icon(Icons.copy_rounded, size: 17, color: emeraldText),
+                          IconButton(
+                            tooltip: 'Copy for WhatsApp',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () {
+                              final text = _buildContributionReceiptWhatsAppSwahili(
+                                meta: meta,
+                                txs: selected,
+                              );
+                              Clipboard.setData(ClipboardData(text: text));
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Ripoti imenakiliwa — bandika kwenye WhatsApp.'),
+                                  backgroundColor: Color(0xFF059669),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
+                            icon: Icon(Icons.copy_rounded, size: 17, color: emeraldText),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: emerald.withOpacity(isDark ? 0.14 : 0.07),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: emerald.withOpacity(isDark ? 0.45 : 0.3)),
-                        ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(right: 4),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Total collected',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: softText),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      '\$${formatCurrency(total)}',
-                                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: emeraldText),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: emerald.withOpacity(isDark ? 0.25 : 0.14),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.savings_rounded, color: emeraldText, size: 22),
-                            ),
+                            miniStat('Collected', '\$${formatCurrency(total)}', emeraldText),
+                            const SizedBox(width: 6),
+                            miniStat('Contributors', '$contributors', strongText),
+                            const SizedBox(width: 6),
+                            miniStat('Average', '\$${formatCurrency(average)}', strongText),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          for (final stat in [
-                            (
-                              icon: Icons.groups_rounded,
-                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
-                              value: '$contributors',
-                              label: 'Contributors',
-                            ),
-                            (
-                              icon: Icons.trending_up_rounded,
-                              color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309),
-                              value: '\$${formatCurrency(average)}',
-                              label: 'Average each',
-                            ),
-                          ]) ...[
-                            if (stat.label == 'Average each') const SizedBox(width: 10),
-                            Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: tileBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: lineColor),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(stat.icon, size: 20, color: stat.color),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              stat.value,
-                                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: strongText),
-                                            ),
-                                          ),
-                                          Text(
-                                            stat.label,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 11, color: softText, fontWeight: FontWeight.w600),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 Container(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 4),
                   decoration: cardDecoration(),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Row(
-                        children: [
-                          Text('Contribution details', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: strongText)),
-                          const Spacer(),
-                          chip(Icons.receipt_rounded, '${selected.length} record${selected.length == 1 ? '' : 's'}'),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.only(left: 2, bottom: 8),
+                        child: Row(
+                          children: [
+                            Text('Contribution details', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: strongText)),
+                            const Spacer(),
+                            Text(
+                              '${selected.length} record${selected.length == 1 ? '' : 's'}',
+                              style: TextStyle(fontSize: 11, color: softText, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
                       if (selected.isEmpty)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText))),
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(child: Text('No contributions recorded yet', style: TextStyle(color: softText, fontSize: 12))),
                         )
                       else
                         ...selected.map(contributionTile),
@@ -41748,40 +41586,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 padding: const EdgeInsets.all(24),
                 children: [
                   const SizedBox(height: 80),
-                  Icon(Icons.receipt_long_rounded, size: 56, color: softText.withOpacity(0.5)),
-                  const SizedBox(height: 12),
+                  Icon(Icons.receipt_long_rounded, size: 44, color: softText.withOpacity(0.5)),
+                  const SizedBox(height: 10),
                   Text(
                     refreshing ? 'Loading contributions…' : 'No contribution receipts yet.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: softText, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: softText, fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                 ],
               );
             }
-            final allTotal = keys.fold<double>(
-              0.0,
-              (s, k) => s + (groups[k] ?? const <AppTransaction>[]).fold<double>(0.0, (a, e) => a + e.amount),
-            );
             return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 24),
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 14, left: 2, right: 2),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Community contributions',
-                          style: TextStyle(color: softText, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (refreshing)
-                        const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      else
-                        chip(Icons.savings_rounded, '\$${formatCurrency(allTotal)} total', color: emeraldText),
-                    ],
+                if (refreshing)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: LinearProgressIndicator(minHeight: 2),
                   ),
-                ),
                 for (final k in keys)
                   if ((groups[k] ?? const <AppTransaction>[]).isNotEmpty) listCard(k, groups[k]!),
               ],
