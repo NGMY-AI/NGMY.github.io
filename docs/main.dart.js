@@ -112945,7 +112945,7 @@ case 5:p=4
 c=o.pop()
 j=A.X(c)
 i=B.a.dW(J.k(j),A.ag("^(Error|Exception):\\s*",!0,!1,!1,!1),"")
-if(J.a1(i)>48)i=J.biT(i,0,48)
+if(J.a1(i)>150)i=J.biT(i,0,150)
 $.Ve=i
 $.ab.$1("[studio export] media-time export failed, recording live instead: "+A.t(j))
 n.push(7)
