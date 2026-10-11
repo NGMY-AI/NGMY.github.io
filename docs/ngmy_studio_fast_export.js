@@ -409,9 +409,17 @@ export async function ngmyStudioMediaTimeExport(o) {
     let nudges = 0;
     let watchdog = null;
     let poller = null;
+    let playErr = '';
+    let tapBtn = null;
+    let tapWaitSince = 0;
+    const removeTap = () => {
+      if (tapBtn) tapBtn.remove();
+      tapBtn = null;
+    };
     const finish = (err) => {
       if (finished) return;
       finished = true;
+      removeTap();
       clearInterval(watchdog);
       clearInterval(poller);
       video.removeEventListener('ended', onEnded);
@@ -422,8 +430,57 @@ export async function ngmyStudioMediaTimeExport(o) {
     const onEnded = () => setTimeout(() => finish(), 120);
     const playAll = () => {
       for (const v of all) {
-        if (!v.ended) v.play().catch(() => {});
+        if (v.ended) continue;
+        try {
+          const p = v.play();
+          if (p && p.catch) p.catch((e) => (playErr = (e && e.name) || 'play refused'));
+        } catch (e) {
+          playErr = (e && e.name) || 'play refused';
+        }
       }
+    };
+    // iPhones only start a video right after a tap. If the clip won't start on its
+    // own, show a real button — playing inside the tap is always allowed.
+    const askForTap = () => {
+      if (tapBtn || finished) return;
+      tapWaitSince = performance.now();
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '▶  Tap here to start saving your video';
+      Object.assign(btn.style, {
+        position: 'fixed',
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: '2147483647',
+        padding: '20px 26px',
+        maxWidth: '86vw',
+        borderRadius: '18px',
+        border: '2px solid rgba(255,255,255,0.7)',
+        background: 'linear-gradient(135deg, #16a34a, #0d9488)',
+        color: '#fff',
+        font: '800 18px -apple-system, system-ui, sans-serif',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.55)',
+        cursor: 'pointer',
+      });
+      const go = () => {
+        for (const v of all) {
+          v.muted = true;
+          v.setAttribute('muted', '');
+          v.setAttribute('playsinline', '');
+        }
+        playAll();
+        removeTap();
+        lastCaptureWall = performance.now();
+        nudges = 0;
+      };
+      btn.addEventListener('click', go);
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        go();
+      });
+      document.body.appendChild(btn);
+      tapBtn = btn;
     };
     const drainThenPlay = () => {
       if (finished) return;
@@ -529,6 +586,15 @@ export async function ngmyStudioMediaTimeExport(o) {
       if (finished) return;
       if (isCancelled()) return finish(new Error('cancelled'));
       if (waiting) return;
+      // Clip won't play by itself (phone wants a fresh tap) → ask for one.
+      if (video.paused && !video.ended && video.readyState >= 2 && performance.now() - lastCaptureWall > 1200) {
+        askForTap();
+      }
+      // Waiting for that tap: give them up to 2 minutes.
+      if (tapBtn) {
+        if (performance.now() - tapWaitSince > 120000) finish(new Error('start tap not received'));
+        return;
+      }
       const quiet = performance.now() - lastCaptureWall;
       // Nearly done: keep what we have.
       if (quiet > 3000 && frames > 0 && lastTs / 1_000_000 >= durationSec - 0.5) return finish();
@@ -546,7 +612,8 @@ export async function ngmyStudioMediaTimeExport(o) {
           new Error(
             `video stalled at ${video.currentTime.toFixed(1)}s/${durationSec.toFixed(0)}s, ` +
               `${frames} frames (${rvfcFrames} rv, ${pollFrames} clk), ` +
-              `${clockStuck ? 'clip stopped' : 'clip moving'}, ready ${video.readyState}`,
+              `${clockStuck ? 'clip stopped' : 'clip moving'}, ready ${video.readyState}` +
+              (playErr ? `, play: ${playErr}` : ''),
           ),
         );
         return;
