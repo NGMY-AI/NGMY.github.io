@@ -21,6 +21,12 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
 
   NgmyAdvisorBrowserController? _controller;
 
+  /// The user tapped X on this page — the chat remembers it so it stays closed.
+  void Function(String url)? onUserClosed;
+
+  /// A page was opened on purpose (advisor or user) — forget any earlier close.
+  void Function(String url)? onOpened;
+
   String get url => _url;
   String get label => _label;
   bool get visible => _visible;
@@ -84,6 +90,7 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
     _visible = true;
     _errorMessage = '';
     _loadState = NgmyAdvisorBrowserLoadState.loading;
+    onOpened?.call(u);
     notifyListeners();
     _scheduleLoad(force: force || !sameUrl);
   }
@@ -131,6 +138,12 @@ class NgmyAdvisorBrowserSession extends ChangeNotifier {
   }
 
   Future<void> startLoad() async => _loadNow(force: true);
+
+  /// X button: hide and remember that the user closed this page.
+  Future<void> close() async {
+    if (_url.isNotEmpty) onUserClosed?.call(_url);
+    await hide();
+  }
 
   Future<void> hide() async {
     _loadDebounce?.cancel();
@@ -263,4 +276,18 @@ Future<void> ngmyOpenInRealBrowser(String url) async {
 bool ngmyAdvisorBrowserBlocksHost(String host) {
   final h = host.toLowerCase();
   return h == 'ngmy.org' || h.endsWith('.ngmy.org');
+}
+
+/// Same page for "the user closed it" purposes (ignores http/https, trailing slash and case).
+bool ngmyAdvisorSameBrowserPage(String a, String b) {
+  String norm(String s) {
+    var u = s.trim().toLowerCase();
+    u = u.replaceFirst(RegExp(r'^https?://'), '').replaceFirst(RegExp(r'^www\.'), '');
+    while (u.endsWith('/')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+
+  return norm(a) == norm(b);
 }

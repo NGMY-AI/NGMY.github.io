@@ -211,6 +211,7 @@ import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_market_hub_screen.dart';
+import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
 import 'ngmy_business_essentials.dart' show showNgmyBusinessEssentialsHub;
 import 'ngmy_menu_studio.dart' show showNgmyMenuStudioDialog;
@@ -18535,7 +18536,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final textColor = isLight ? const Color(0xFF171633) : Colors.white;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
+      child: NgmyMessageTaps(
+        copyText: text,
+        alignHeartEnd: isUser,
+        child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.74),
@@ -18563,6 +18567,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               ],
                             ),
                           ),
+      ),
     );
   }
 
@@ -49444,7 +49449,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   Widget _inquiryBubble({required bool isDark, required String who, required String text, required bool mine}) {
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      child: NgmyMessageTaps(
+        copyText: text,
+        alignHeartEnd: mine,
+        child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
@@ -49460,6 +49468,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
             Text(text, style: TextStyle(fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
           ],
         ),
+      ),
       ),
     );
   }
@@ -58211,7 +58220,10 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     padding: EdgeInsets.only(left: 4, bottom: 3),
                     child: Text('NGMY Helper', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF00B25A))),
                   ),
-                Container(
+                NgmyMessageTaps(
+                  copyText: typing ? '' : (m['text'] ?? '').toString(),
+                  alignHeartEnd: isUser,
+                  child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
                   decoration: BoxDecoration(
                     color: isUser ? const Color(0xFF00B25A) : (isDark ? const Color(0xFF1C2433) : const Color(0xFFF8FAFC)),
@@ -58241,6 +58253,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                             height: 1.35,
                           ),
                         ),
+                ),
                 ),
                 if (!isUser && phoneActions.isNotEmpty)
                   ngmyPhoneActionChips(

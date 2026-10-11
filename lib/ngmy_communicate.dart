@@ -36,6 +36,7 @@ import 'ngmy_communicate_sync_ui.dart';
 import 'ngmy_communicate_text_coach.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_mshauri.dart';
+import 'ngmy_message_taps.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_push_notifications.dart';
@@ -3589,16 +3590,13 @@ class _HoldToCopyBubbleState extends State<_HoldToCopyBubble> {
   @override
   Widget build(BuildContext context) {
     if (widget.copyText.trim().isEmpty && widget.onReact == null) return widget.child;
-    return GestureDetector(
+    // Double-tap = ❤️ (again to remove), triple-tap = copy, hold = emoji bar + Copy.
+    return NgmyMessageTaps(
+      copyText: widget.copyText,
+      onCopied: widget.onCopied,
       onLongPress: _openMenu,
-      // Double-tap = ❤️ (tap again to remove), like Instagram.
-      onDoubleTap: widget.onReact == null
-          ? null
-          : () {
-              HapticFeedback.lightImpact();
-              widget.onReact!(widget.reaction == '❤️' ? '' : '❤️');
-            },
-      behavior: HitTestBehavior.opaque,
+      alignHeartEnd: widget.onReact == null,
+      onLike: widget.onReact == null ? null : () => widget.onReact!(widget.reaction == '❤️' ? '' : '❤️'),
       child: widget.child,
     );
   }
@@ -3890,7 +3888,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       onPersistConfig: widget.onPersistConfig,
     );
     _sessionStart = DateTime.now();
-    _browserSession.addListener(_onBrowserSessionChanged);
+    _browserSession
+      ..onUserClosed = ((url) => unawaited(SharedPreferences.getInstance().then((p) => p.setString(_browserClosedKey, url))))
+      ..onOpened = ((url) => unawaited(SharedPreferences.getInstance().then((p) => p.remove(_browserClosedKey))))
+      ..addListener(_onBrowserSessionChanged);
     _agentRun
       ..addListener(_onBrowserSessionChanged)
       ..onFinished = (run) => unawaited(_onAgentFinished(run));
@@ -4051,13 +4052,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       _usedSeconds = used;
       _loaded = true;
     });
+    // Bring back the last page the advisor showed — unless they closed it with X.
+    final closedUrl = (await SharedPreferences.getInstance()).getString(_browserClosedKey) ?? '';
     for (var i = _messages.length - 1; i >= 0; i--) {
       final m = _messages[i];
       if (m['role'] != 'ai') continue;
       final url = (m['browserUrl'] ?? '').trim();
       if (url.isEmpty) continue;
+      if (closedUrl.isNotEmpty && ngmyAdvisorSameBrowserPage(url, closedUrl)) break;
       final label = (m['browserLabel'] ?? '').trim();
-      _browserSession.stage(url, label: label.isEmpty ? null : label);
+      if (mounted) _browserSession.stage(url, label: label.isEmpty ? null : label);
       break;
     }
     // A live task that was still running when they left → keep following it so the answer lands.
@@ -4722,6 +4726,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   // A live task keeps running in the cloud if they leave the chat — remember it so the
   // advisor's answer still arrives (and is saved) when they come back.
+  String get _browserClosedKey => 'ngmy_advisor_browser_closed_${_email.toLowerCase()}_${widget.profile.id}';
+
   String get _pendingAgentKey => 'ngmy_agent_pending_${_email.toLowerCase()}_${widget.profile.id}';
 
   Future<void> _savePendingAgentRun() async {

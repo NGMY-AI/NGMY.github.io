@@ -91,7 +91,7 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
             IconButton(
               tooltip: 'Hide browser',
               iconSize: 20,
-              onPressed: () => widget.session.hide(),
+              onPressed: () => widget.session.close(),
               icon: Icon(Icons.close_rounded, color: muted),
             ),
           ],
