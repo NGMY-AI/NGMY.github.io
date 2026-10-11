@@ -1278,10 +1278,18 @@ class _NgmyCivicUserGroupHomeScreenState
       (name: _group!.ownerName, email: _group!.ownerEmail),
       ..._group!.members.map((m) => (name: m.name, email: m.email)),
     ];
+    final campaignId = _group!.helpModeActive ? _group!.helpCampaignId.trim() : '';
+    // One contribution per person per help round.
+    final alreadyPaid = <String>{
+      if (kind == NgmyCivicUserGroupLedgerKind.contribution && campaignId.isNotEmpty)
+        for (final p in people)
+          if (_group!.contributedToCampaign(p.name, campaignId, email: p.email)) p.name,
+    };
     final result = await _showNgmyLightningLedgerSheet(
       context,
       kind: kind,
       members: people,
+      alreadyPaid: alreadyPaid,
       helpPurpose: kind == NgmyCivicUserGroupLedgerKind.contribution &&
               _group!.helpModeActive
           ? _group!.helpPurpose
@@ -1291,6 +1299,18 @@ class _NgmyCivicUserGroupHomeScreenState
     if (result.amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a valid amount.')),
+      );
+      return;
+    }
+    if (kind == NgmyCivicUserGroupLedgerKind.contribution &&
+        campaignId.isNotEmpty &&
+        _group!.contributedToCampaign(
+          result.label,
+          campaignId,
+          email: _group!.emailForMemberName(result.label) ?? '',
+        )) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${result.label} already contributed to this round.')),
       );
       return;
     }
@@ -2801,13 +2821,17 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
   BuildContext context, {
   required NgmyCivicUserGroupLedgerKind kind,
   required List<({String name, String email})> members,
+  Set<String> alreadyPaid = const {},
   String? helpPurpose,
 }) {
   final isContribution = kind == NgmyCivicUserGroupLedgerKind.contribution;
   final amountC = TextEditingController();
   final labelC = TextEditingController();
   final searchC = TextEditingController();
-  var selectedName = members.isNotEmpty ? members.first.name : '';
+  bool paid(({String name, String email}) m) => isContribution && alreadyPaid.contains(m.name);
+  final unpaid = members.where((m) => !paid(m)).toList();
+  final everyonePaid = isContribution && members.isNotEmpty && unpaid.isEmpty;
+  var selectedName = unpaid.isNotEmpty ? unpaid.first.name : '';
   var searchOpen = false;
 
   return showModalBottomSheet<_LightningLedgerResult>(
@@ -2829,9 +2853,9 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                           m.email.toLowerCase().contains(query),
                     )
                     .toList();
-            if (filtered.isNotEmpty &&
-                !filtered.any((m) => m.name == selectedName)) {
-              selectedName = filtered.first.name;
+            final pickable = filtered.where((m) => !paid(m)).toList();
+            if (!pickable.any((m) => m.name == selectedName)) {
+              selectedName = pickable.isNotEmpty ? pickable.first.name : '';
             }
 
             return _LightningSheetShell(
@@ -2919,6 +2943,11 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                         'No members yet — invite people with your code first.',
                         style: TextStyle(color: Colors.white54, fontSize: 13),
                       )
+                    else if (everyonePaid)
+                      const Text(
+                        'Everyone has already contributed to this round.',
+                        style: TextStyle(color: Color(0xFF4ADE80), fontSize: 13, fontWeight: FontWeight.w700),
+                      )
                     else if (filtered.isEmpty)
                       const Text(
                         'No member matches that search.',
@@ -2934,10 +2963,12 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                             children: [
                               for (final m in filtered)
                                 ChoiceChip(
-                                  label: Text(m.name),
+                                  label: Text(paid(m) ? '${m.name} ✓ paid' : m.name),
                                   selected: selectedName == m.name,
-                                  onSelected: (_) =>
-                                      setLocal(() => selectedName = m.name),
+                                  onSelected: paid(m)
+                                      ? null
+                                      : (_) => setLocal(() => selectedName = m.name),
+                                  disabledColor: const Color(0xFF16A34A).withValues(alpha: 0.18),
                                   selectedColor: _kBolt,
                                   backgroundColor:
                                       Colors.white.withValues(alpha: 0.06),
@@ -3003,7 +3034,8 @@ Future<_LightningLedgerResult?> _showNgmyLightningLedgerSheet(
                                     : labelC.text.trim());
                             if (isContribution &&
                                 members.isNotEmpty &&
-                                selectedName.trim().isEmpty) {
+                                (selectedName.trim().isEmpty ||
+                                    alreadyPaid.contains(selectedName))) {
                               return;
                             }
                             Navigator.pop(

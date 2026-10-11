@@ -100,6 +100,38 @@ void main() {
       expect(g.ownerMissed, 0);
       expect(g.missedFor('Member', 'member@example.com'), 1);
     });
+
+    test('paying in one round does not count for the next round', () {
+      final g = NgmyCivicUserGroup(
+        id: 'g2',
+        name: 'ABC13',
+        ownerEmail: 'owner@example.com',
+        ownerName: 'Owner',
+        inviteCode: 'ABC13',
+        createdAt: DateTime.utc(2026, 1, 1),
+      );
+      g.saveHelpSettings(purpose: 'Rent', cashApp: '', zelle: '', phone: '');
+      g.activateHelpMode();
+      final first = g.helpCampaignId;
+      g.ledger.add(
+        NgmyCivicUserGroupLedgerEntry(
+          id: 'led1',
+          kind: NgmyCivicUserGroupLedgerKind.contribution,
+          amount: 10,
+          label: 'Owner',
+          note: '',
+          at: DateTime.utc(2026, 1, 3),
+          byEmail: 'owner@example.com',
+          campaignId: first,
+          memberEmail: 'owner@example.com',
+        ),
+      );
+      g.deactivateHelpMode();
+      g.activateHelpMode();
+      expect(g.helpCampaignId, isNot(first));
+      expect(g.contributedToCampaign('Owner', first), isTrue);
+      expect(g.contributedToCampaign('Owner', g.helpCampaignId, email: 'owner@example.com'), isFalse);
+    });
   });
 
   group('ledger', () {
