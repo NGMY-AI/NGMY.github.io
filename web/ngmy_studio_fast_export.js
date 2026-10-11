@@ -392,9 +392,18 @@ export async function ngmyStudioMediaTimeExport(o) {
   }
   await Promise.all(all.map((v) => seekTo(v, 0)));
 
-  const minGapUs = Math.floor(1_000_000 / fps) - 2000;
+  const frameUs = Math.round(1_000_000 / fps);
+  const minGapUs = frameUs - 2000;
   let lastTs = -1;
   let frames = 0;
+  // Slow phone: play the clip slower so every frame still gets captured.
+  // Timestamps come from the clip, so the saved video keeps its real speed.
+  let rate = 1;
+  let smoothRun = 0;
+  const setRate = (r) => {
+    rate = r;
+    for (const v of all) v.playbackRate = r;
+  };
   let lastFrameWall = performance.now();
 
   await new Promise((resolve, reject) => {
@@ -440,6 +449,16 @@ export async function ngmyStudioMediaTimeExport(o) {
         }
       }
       const ts = Math.round(t * 1_000_000);
+      if (lastTs >= 0) {
+        const gap = ts - lastTs;
+        if (gap > frameUs * 1.6 && rate > 0.25) {
+          smoothRun = 0;
+          setRate(Math.max(0.25, rate * 0.75));
+        } else if (gap < frameUs * 1.2 && rate < 1 && ++smoothRun > fps) {
+          smoothRun = 0;
+          setRate(Math.min(1, rate * 1.15));
+        }
+      }
       if (lastTs < 0 || ts - lastTs >= minGapUs) {
         try {
           paint();
