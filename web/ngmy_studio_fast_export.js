@@ -250,8 +250,11 @@ window.ngmyStudioFastExportSupported = ngmyStudioFastExportSupported;
 
 function mediaTimeSupported() {
   try {
+    // Only the video encoder is required — sound is copied from the file
+    // (AudioEncoder is optional, used only when copying isn't possible).
     return (
-      supported() &&
+      typeof VideoEncoder !== 'undefined' &&
+      typeof VideoFrame !== 'undefined' &&
       typeof HTMLVideoElement !== 'undefined' &&
       'requestVideoFrameCallback' in HTMLVideoElement.prototype
     );
@@ -363,20 +366,29 @@ export async function ngmyStudioMediaTimeExport(o) {
   let audio = null;
   let aCodec = null;
   let channels = 2;
+  let pass = null;
   if (o.audioSrc) {
-    const decoded = await decodeAudioBuffer(o.audioSrc);
-    if (decoded && decoded.duration > 0.05) {
-      channels = Math.min(2, decoded.numberOfChannels || 1);
-      aCodec = await pickAudioCodec(channels);
-      if (!aCodec) throw new Error('no audio encoder');
-      audio = await resampleTo48k(decoded, Math.min(decoded.duration, durationSec), channels);
+    pass = await readAacTrack(o.audioSrc, durationSec);
+    if (!pass) {
+      const decoded = await decodeAudioBuffer(o.audioSrc);
+      if (decoded && decoded.duration > 0.05) {
+        if (typeof AudioEncoder === 'undefined') throw new Error('sound not copyable, no audio encoder');
+        channels = Math.min(2, decoded.numberOfChannels || 1);
+        aCodec = await pickAudioCodec(channels);
+        if (!aCodec) throw new Error('no audio encoder');
+        audio = await resampleTo48k(decoded, Math.min(decoded.duration, durationSec), channels);
+      }
     }
   }
 
   const muxer = new Muxer({
     target: new ArrayBufferTarget(),
     video: { codec: 'avc', width, height, frameRate: fps },
-    audio: audio ? { codec: aCodec.mux, sampleRate: 48000, numberOfChannels: channels } : undefined,
+    audio: pass
+      ? { codec: 'aac', sampleRate: pass.sampleRate, numberOfChannels: pass.channels }
+      : audio
+        ? { codec: aCodec.mux, sampleRate: 48000, numberOfChannels: channels }
+        : undefined,
     fastStart: 'in-memory',
     firstTimestampBehavior: 'offset',
   });
@@ -504,7 +516,21 @@ export async function ngmyStudioMediaTimeExport(o) {
   encoder.close();
   if (frames < 2) throw new Error('no frames captured');
   onProgress(0.88);
-  if (audio) await encodePcm(muxer, aCodec.codec, audio, channels, durationSec);
+  if (pass) {
+    pass.chunks.forEach((c, i) => {
+      muxer.addAudioChunkRaw(
+        c.data,
+        'key',
+        c.timestamp,
+        c.duration,
+        i === 0
+          ? { decoderConfig: { codec: pass.codec, sampleRate: pass.sampleRate, numberOfChannels: pass.channels, description: pass.description } }
+          : undefined,
+      );
+    });
+  } else if (audio) {
+    await encodePcm(muxer, aCodec.codec, audio, channels, durationSec);
+  }
   onProgress(0.97);
   muxer.finalize();
   const buffer = muxer.target.buffer;
@@ -514,3 +540,107 @@ export async function ngmyStudioMediaTimeExport(o) {
 
 window.ngmyStudioMediaTimeExport = ngmyStudioMediaTimeExport;
 window.ngmyStudioMediaTimeExportSupported = mediaTimeSupported;
+
+// ── Sound passthrough ──────────────────────────────────────────────────────
+// Phone videos already carry AAC sound. Copy those packets straight into the
+// new file — no AudioEncoder needed (older iPhones don't have one), no quality
+// loss, and much faster than decoding and re-encoding.
+
+let _mp4boxPromise = null;
+function loadMp4Box() {
+  if (!_mp4boxPromise) {
+    _mp4boxPromise = import('https://cdn.jsdelivr.net/npm/mp4box@0.5.3/+esm').then((m) => m.default || m);
+  }
+  return _mp4boxPromise;
+}
+
+async function readAacTrack(src, durationSec) {
+  let buffer;
+  try {
+    buffer = await (await fetch(src)).arrayBuffer();
+  } catch (_) {
+    return null;
+  }
+  if (!buffer || buffer.byteLength < 16) return null;
+  let MP4Box;
+  try {
+    MP4Box = await loadMp4Box();
+  } catch (_) {
+    return null;
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => {
+      if (!settled) {
+        settled = true;
+        resolve(v);
+      }
+    };
+    try {
+      const file = MP4Box.createFile();
+      let track = null;
+      const samples = [];
+      file.onError = () => done(null);
+      file.onReady = (info) => {
+        track = (info.audioTracks || [])[0] || null;
+        if (!track || !String(track.codec || '').startsWith('mp4a')) return done(null);
+        file.setExtractionOptions(track.id, null, { nbSamples: 1_000_000 });
+        file.start();
+      };
+      file.onSamples = (_id, _user, list) => {
+        for (const s of list) samples.push(s);
+      };
+      buffer.fileStart = 0;
+      file.appendBuffer(buffer);
+      file.flush();
+      setTimeout(() => {
+        if (!track || samples.length === 0) return done(null);
+        let description = null;
+        try {
+          const trak = file.getTrackById(track.id);
+          for (const entry of trak.mdia.minf.stbl.stsd.entries) {
+            // mp4box keeps the ES descriptor at esds.esd (0.5.x) or esds.esds (older builds).
+            const es = entry.esds && (entry.esds.esd || entry.esds.esds);
+            const d = es && es.descs && es.descs[0];
+            if (d && d.descs && d.descs[0] && d.descs[0].data) {
+              description = d.descs[0].data;
+              break;
+            }
+          }
+        } catch (_) {}
+        if (!description) return done(null);
+        const chunks = [];
+        for (const s of samples) {
+          const ts = (s.cts / s.timescale) * 1_000_000;
+          if (ts / 1_000_000 >= durationSec) break;
+          chunks.push({ data: new Uint8Array(s.data), timestamp: Math.round(ts), duration: Math.round((s.duration / s.timescale) * 1_000_000) });
+        }
+        if (chunks.length === 0) return done(null);
+        done({
+          sampleRate: track.audio.sample_rate,
+          channels: track.audio.channel_count,
+          codec: track.codec,
+          description: new Uint8Array(description),
+          chunks,
+        });
+      }, 0);
+    } catch (_) {
+      done(null);
+    }
+  });
+}
+
+/** What this browser can do — shown in error messages so failures can be traced. */
+export function ngmyStudioExportDiag() {
+  const has = (n) => (typeof globalThis[n] !== 'undefined' ? 1 : 0);
+  let rvfc = 0;
+  try {
+    rvfc = 'requestVideoFrameCallback' in HTMLVideoElement.prototype ? 1 : 0;
+  } catch (_) {}
+  let mr = 0;
+  try {
+    mr = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/mp4') ? 1 : 0;
+  } catch (_) {}
+  return `VE${has('VideoEncoder')} AE${has('AudioEncoder')} RV${rvfc} MR${mr}`;
+}
+window.ngmyStudioExportDiag = ngmyStudioExportDiag;

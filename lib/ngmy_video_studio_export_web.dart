@@ -1806,7 +1806,17 @@ Future<String> _fallbackComposedExport(
     if (!allowRaw) {
       final detail = reason?.trim();
       final suffix = detail != null && detail.isNotEmpty ? ' ($detail)' : '';
-      return 'Export failed: templates could not be merged$suffix. Try Chrome on a computer, or wait until the preview loads fully and tap Download again.';
+      // Short trace code so a screenshot tells us which step failed on this phone.
+      var diag = '';
+      try {
+        final fn = js_util.getProperty(html.window, 'ngmyStudioExportDiag');
+        if (fn != null) diag = js_util.callMethod(fn, 'call', [html.window]).toString();
+      } catch (_) {}
+      final code = [
+        if (_ngmyMediaTimeLastError != null) 'new: ${_ngmyMediaTimeLastError}',
+        if (diag.isNotEmpty) diag,
+      ].join(' · ');
+      return 'Export failed: templates could not be merged$suffix. Try Chrome on a computer, or wait until the preview loads fully and tap Download again.${code.isEmpty ? '' : ' [$code]'}';
     }
     final raw = await _downloadAllVideoClips(sources);
     if (raw.toLowerCase().contains('failed') || raw.contains('No video')) return raw;
