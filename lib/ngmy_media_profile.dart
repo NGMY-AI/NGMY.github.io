@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_media_delivery.dart';
 
 /// Instagram-style media profile, stories, highlights, follow system.
@@ -230,7 +231,7 @@ class NgmyVirtualMediaProfiles {
     if (url.isEmpty) return null;
     if (url.startsWith('data:image')) {
       try {
-        return MemoryImage(base64Decode(url.split(',').last));
+        return ngmyMemoImage(url)!;
       } catch (_) {
         return null;
       }
@@ -423,7 +424,7 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
   Widget _storyImage(String url) {
     if (url.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
+        return Image(image: ngmyMemoImage(url)!, fit: BoxFit.contain);
       } catch (_) {}
     }
     if (url.startsWith('http') || url.startsWith('supabase://')) {
@@ -847,7 +848,7 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
   Widget _coverThumb(String url) {
     if (url.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover, width: 64, height: 64);
+        return Image(image: ngmyMemoImage(url)!, fit: BoxFit.cover, width: 64, height: 64);
       } catch (_) {}
     }
     if (url.startsWith('http') || url.startsWith('supabase://')) {
@@ -883,7 +884,7 @@ class _NgmyMediaProfileScreenState extends State<NgmyMediaProfileScreen> {
               if (!isVideo && (post.contentType == 'image' || url.startsWith('data:image'))) {
                 if (url.startsWith('data:image')) {
                   try {
-                    return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
+                    return Image(image: ngmyMemoImage(url)!, fit: BoxFit.cover);
                   } catch (_) {}
                 }
                 if (url.startsWith('http')) return Image.network(url, fit: BoxFit.cover);
@@ -2374,7 +2375,7 @@ class _PostPreviewThumbState extends State<_PostPreviewThumb> {
         }
         if (url.startsWith('data:image')) {
           try {
-            return Image.memory(base64Decode(url.split(',').last), fit: BoxFit.cover);
+            return Image(image: ngmyMemoImage(url)!, fit: BoxFit.cover);
           } catch (_) {
             return _brokenTile();
           }

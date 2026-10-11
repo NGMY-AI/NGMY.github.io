@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_platform_graphics.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -4489,22 +4490,22 @@ class NgmyBioPreview extends StatelessWidget {
   }) {
     try {
       if (!ref.startsWith('data:image')) return const SizedBox.shrink();
-      final bytes = base64Decode(ref.split(',').last);
-      int? cacheW;
-      int? cacheH;
+      final provider = ngmyMemoImage(ref);
+      if (provider == null) return const Icon(Icons.broken_image_outlined);
+      // Decode at display size, never full camera resolution.
+      final int cacheW;
       if (downsample) {
         cacheW = width != null ? (width * 2).round().clamp(80, 720) : 640;
-        cacheH = height != null ? (height * 2).round().clamp(80, 720) : null;
+      } else {
+        final side = math.max(width ?? 0, height ?? 0);
+        cacheW = side > 0 ? (side * 3).round().clamp(96, 1440) : 1080;
       }
-      return Image.memory(
-        bytes,
-        key: ValueKey('bio_img_${bytes.length}_${bytes.isNotEmpty ? bytes[0] : 0}'),
+      return Image(
+        image: ResizeImage(provider, width: cacheW, policy: ResizeImagePolicy.fit, allowUpscaling: false),
         width: width,
         height: height,
         fit: fit,
         alignment: alignment,
-        cacheWidth: cacheW,
-        cacheHeight: cacheH,
         gaplessPlayback: true,
         filterQuality: FilterQuality.high,
         isAntiAlias: true,

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'ngmy_civic_registry_members.dart';
+import 'ngmy_image_memo.dart';
 import 'ngmy_network_resilience.dart';
 import 'ngmy_settings_cloud.dart';
 import 'ngmy_upload_shrink.dart';
@@ -495,7 +496,7 @@ ImageProvider? ngmyCivicVotingPhotoProvider(String url) {
     final comma = u.indexOf(',');
     if (comma <= 0 || comma >= u.length - 1) return null;
     try {
-      return MemoryImage(base64Decode(u.substring(comma + 1)));
+      return ngmyMemoImage(u);
     } catch (_) {
       return null;
     }

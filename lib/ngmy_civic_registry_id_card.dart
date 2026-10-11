@@ -8,6 +8,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_civic_id_scanner.dart';
 import 'ngmy_qr_download.dart';
 
@@ -98,7 +99,7 @@ class NgmyCivicRegistryIdCard extends StatelessWidget {
     final src = path.trim();
     if (src.startsWith('data:image')) {
       try {
-        return MemoryImage(base64Decode(src.split(',').last));
+        return ngmyMemoImage(src)!;
       } catch (_) {
         return null;
       }

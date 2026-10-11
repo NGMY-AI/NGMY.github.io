@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_bio_urls.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_bio_models.dart';
@@ -1856,7 +1857,7 @@ class _NgmyMenuStudioState extends State<_NgmyMenuStudio> {
 
   Widget _logoThumb(String b64) {
     try {
-      return Image.memory(base64Decode(b64), fit: BoxFit.cover);
+      return Image(image: ngmyMemoImage(b64)!, fit: BoxFit.cover);
     } catch (_) {
       return Icon(Icons.broken_image_outlined, color: _kMenuAccent);
     }

@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_coming_soon.dart';
 import 'ngmy_popups.dart';
 import 'ngmy_media_profile.dart';
@@ -6877,7 +6878,7 @@ ImageProvider? ngmyCachedProfileImage(String? path) {
   final src = path.trim();
   if (src.startsWith('data:image')) {
     try {
-      return _ngmyProfileImageCache.putIfAbsent(src, () => MemoryImage(base64Decode(src.split(',').last)));
+      return ngmyMemoImage(src);
     } catch (_) {
       return null;
     }
@@ -27441,7 +27442,7 @@ class _AnnouncementManagementSheetState extends State<_AnnouncementManagementShe
     if (ref.isEmpty) return null;
     if (ref.startsWith('data:image')) {
       try {
-        return MemoryImage(base64Decode(ref.split(',').last));
+        return ngmyMemoImage(ref)!;
       } catch (_) {
         return null;
       }
@@ -49531,7 +49532,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     if (src.startsWith('supabase://')) return null;
     if (src.startsWith('data:image')) {
       try {
-        return MemoryImage(base64Decode(src.split(',').last));
+        return ngmyMemoImage(src)!;
       } catch (_) {
         return null;
       }
@@ -55286,7 +55287,7 @@ class _NgmyFullscreenImagePage extends StatelessWidget {
     Widget image;
     if (url.startsWith('data:image')) {
       try {
-        image = Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain);
+        image = Image(image: ngmyMemoImage(url)!, fit: BoxFit.contain);
       } catch (_) {
         image = const Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48);
       }
@@ -55853,7 +55854,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     }
     if (resolved.startsWith('data:image')) {
       try {
-        return Image.memory(base64Decode(resolved.split(',').last), fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+        return Image(image: ngmyMemoImage(resolved)!, fit: BoxFit.cover, width: double.infinity, height: double.infinity);
       } catch (_) {
         return Center(child: Icon(Icons.broken_image_outlined, color: Colors.white.withOpacity(0.7), size: 42));
       }
@@ -55899,7 +55900,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     if (path == null || path.trim().isEmpty) return null;
     if (path.startsWith('data:image')) {
       try {
-        return MemoryImage(base64Decode(path.split(',').last));
+        return ngmyMemoImage(path)!;
       } catch (_) {
         return null;
       }
@@ -56173,7 +56174,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
       ImageProvider? img;
       if (path.startsWith('data:image')) {
         try {
-          img = MemoryImage(base64Decode(path.split(',').last));
+          img = ngmyMemoImage(path)!;
         } catch (_) {}
       } else if (path.startsWith('http')) {
         img = NetworkImage(path);
@@ -56207,7 +56208,7 @@ class _VideoPostWidgetState extends State<VideoPostWidget> with WidgetsBindingOb
     if (path != null && path.trim().isNotEmpty) {
       if (path.startsWith('data:image')) {
         try {
-          img = MemoryImage(base64Decode(path.split(',').last));
+          img = ngmyMemoImage(path)!;
         } catch (_) {}
       } else if (path.startsWith('http')) {
         img = NetworkImage(path);
@@ -58165,7 +58166,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       try {
         return ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.memory(base64Decode(src.split(',').last), fit: BoxFit.cover),
+          child: Image(image: ngmyMemoImage(src)!, fit: BoxFit.cover),
         );
       } catch (_) {}
     }
@@ -58255,7 +58256,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       ImageProvider? img;
       if (ref.startsWith('data:image')) {
         try {
-          img = MemoryImage(base64Decode(ref.split(',').last));
+          img = ngmyMemoImage(ref)!;
         } catch (_) {}
       } else if (ref.startsWith('http')) {
         img = NetworkImage(ref);

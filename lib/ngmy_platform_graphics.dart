@@ -26,7 +26,9 @@ Color ngmyCrispBorderColor(BuildContext context) {
 /// Call once from [main] — keeps CanvasKit/image scaling sharp on web PWA.
 void ngmyInitCrispRendering() {
   if (!kIsWeb) return;
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 256 << 20;
+  PaintingBinding.instance.imageCache
+    ..maximumSizeBytes = 96 << 20
+    ..maximumSize = 300;
 }
 
 /// Locks OS text scaling so labels stay pixel-crisp (especially web/iOS PWA).

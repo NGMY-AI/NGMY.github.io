@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'dart:math' as math;
-import 'dart:typed_data';
+
 
 import 'package:flutter/material.dart';
 
 import 'ngmy_home_vote_ads.dart';
+import 'ngmy_image_memo.dart';
 
 ImageProvider? ngmyVoteAdImageProvider(String raw) {
   final u = raw.trim();
@@ -13,19 +13,13 @@ ImageProvider? ngmyVoteAdImageProvider(String raw) {
     final comma = u.indexOf(',');
     if (comma <= 0 || comma >= u.length - 1) return null;
     try {
-      return MemoryImage(base64Decode(u.substring(comma + 1)));
+      return ngmyMemoImage(u);
     } catch (_) {
       return null;
     }
   }
   if (u.startsWith('http://') || u.startsWith('https://')) return NetworkImage(u);
-  try {
-    final bytes = base64Decode(u);
-    if (bytes.isEmpty) return null;
-    return MemoryImage(Uint8List.fromList(bytes));
-  } catch (_) {
-    return null;
-  }
+  return ngmyMemoImage(u);
 }
 
 /// Home-deck sized (252px) animated voting advertisement.

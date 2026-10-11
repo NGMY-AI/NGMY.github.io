@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import 'ngmy_image_memo.dart';
 import 'ngmy_worksheet_thumb_store.dart';
 
 String ngmyFormatMoney(double amount) {
@@ -125,7 +126,7 @@ ImageProvider? ngmyImageFromRef(String? ref) {
   if (ngmyIsWorksheetThumbBlobRef(ref)) return null;
   if (ref.startsWith('data:image')) {
     try {
-      return MemoryImage(base64Decode(ref.split(',').last));
+      return ngmyMemoImage(ref)!;
     } catch (_) {
       return null;
     }
