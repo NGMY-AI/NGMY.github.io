@@ -777,6 +777,61 @@ Future<html.Blob?> _tryFastWebCodecsExport({
   return null;
 }
 
+/// Media-time WebCodecs export (see web/ngmy_studio_fast_export.js). Returns
+/// null when this browser can't do it or it failed — the caller then records live.
+Future<html.Blob?> _tryMediaTimeExport({
+  required html.CanvasElement canvas,
+  required int w,
+  required int h,
+  required double durationSec,
+  required html.VideoElement primaryVideo,
+  required List<html.VideoElement> videoList,
+  required void Function() paintFrame,
+  required String audioSrc,
+  void Function(double progress, String status)? onProgress,
+}) async {
+  final supportedFn = js_util.getProperty(html.window, 'ngmyStudioMediaTimeExportSupported');
+  final exportFn = js_util.getProperty(html.window, 'ngmyStudioMediaTimeExport');
+  if (supportedFn == null || exportFn == null) return null;
+  try {
+    if (js_util.callMethod(supportedFn, 'call', [html.window]) != true) return null;
+  } catch (_) {
+    return null;
+  }
+  await _flushProgress(onProgress, 0.1, 'Baking your template into the video…');
+  _showExportHud('Saving your video with the template — keep this screen open');
+  try {
+    final blob = await js_util.promiseToFuture<Object?>(
+      js_util.callMethod(exportFn, 'call', [
+        html.window,
+        js_util.jsify({
+          'canvas': canvas,
+          'video': primaryVideo,
+          'others': videoList.where((v) => v != primaryVideo).toList(),
+          'width': w,
+          'height': h,
+          'durationSec': durationSec,
+          'fps': _exportFps(),
+          'bitrate': _ngmyIsMobileBrowser() ? 8000000 : 12000000,
+          'audioSrc': audioSrc.trim(),
+          'paint': js_util.allowInterop(paintFrame),
+          'isCancelled': js_util.allowInterop(() => _exportWasCancelled),
+          'onProgress': js_util.allowInterop((num p) {
+            final frac = p.toDouble().clamp(0.0, 1.0);
+            onProgress?.call(0.1 + frac * 0.88, 'Saving your video ${(frac * 100).round()}%…');
+          }),
+        }),
+      ]),
+    );
+    if (blob is html.Blob && blob.size > 0) return blob;
+  } catch (e) {
+    debugPrint('[studio export] media-time export unavailable, recording live instead: $e');
+  } finally {
+    _hideExportHud();
+  }
+  return null;
+}
+
 Future<String?> _finalizeComposedBlob({
   required html.Blob blob,
   required NgmyVideoStudioExportConfig config,
@@ -2042,7 +2097,43 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     }
     paintFrame();
 
-    // Real-time MediaRecorder only. Seek-frame WebCodecs export is disabled
+    // Best path: stamp every frame with the clip's own clock (correct speed, no
+    // frozen picture, sound in sync). Falls through to the live recorder below
+    // on browsers without WebCodecs / requestVideoFrameCallback.
+    if (primaryVideo != null) {
+      final audioSrc = resolvedSources.entries
+          .firstWhere((e) => videos[e.key] == primaryVideo, orElse: () => const MapEntry('', ''))
+          .value;
+      final mediaTimeBlob = await _tryMediaTimeExport(
+        canvas: canvas,
+        w: w,
+        h: h,
+        durationSec: durationSec,
+        primaryVideo: primaryVideo,
+        videoList: videoList,
+        paintFrame: paintFrame,
+        audioSrc: audioSrc,
+        onProgress: onProgress,
+      );
+      if (_exportWasCancelled) return 'Export cancelled.';
+      if (mediaTimeBlob != null) {
+        final msg = await _finalizeComposedBlob(
+          blob: mediaTimeBlob,
+          config: config,
+          w: w,
+          h: h,
+          startMs: startMs,
+          usedCanvasStream: true,
+        );
+        if (msg != null) return msg;
+      }
+      for (final v in videos.values) {
+        v.pause();
+        v.muted = true;
+      }
+    }
+
+    // Fallback: real-time MediaRecorder. Seek-frame WebCodecs export is disabled
     // because it records a slideshow instead of smooth video.
 
     final recordFps = _exportFps();

@@ -3146,6 +3146,52 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
+  /// The little details under a project name, each in its own small frame.
+  Widget _deckInfoFrames(String info, {required Color accent, required bool isDark}) {
+    final parts = info.split(' • ').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 5,
+        children: [
+          for (final p in parts)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: isDark ? 0.14 : 0.10),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: accent.withValues(alpha: isDark ? 0.55 : 0.45)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    p.startsWith('Updated')
+                        ? Icons.schedule_rounded
+                        : RegExp(r'^\d+ slides?$').hasMatch(p)
+                            ? Icons.layers_rounded
+                            : Icons.description_outlined,
+                    size: 11,
+                    color: isDark ? Colors.white70 : const Color(0xFF475569),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    p,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white.withValues(alpha: 0.82) : const Color(0xFF334155),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _deckTile(NgmySlideDeck deck, bool isDark, {int index = 0}) {
     final accent = deck.deckKind == 'hati_kuhowa'
         ? const [Color(0xFF2E4270), Color(0xFF12213D)]
@@ -3209,7 +3255,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         ),
                       ),
                       title: Text(deck.name.toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : const Color(0xFF0F172A))),
-                      subtitle: Text(
+                      subtitle: _deckInfoFrames(
                         deck.deckKind == 'marriage_agreement'
                             ? 'Hati ya Kuhowesha • Updated ${_formatDate(deck.updatedAt)}'
                             : deck.deckKind == 'hati_kuhowa'
@@ -3219,7 +3265,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                                     : ngmyIsHatiKiapoUongoziDeck(deck.deckKind)
                                         ? 'Kiapo cha Uongozi • ${(deck.marriageState ?? '').trim().isEmpty ? 'Civic Registry' : deck.marriageState} • Updated ${_formatDate(deck.updatedAt)}'
                                         : '${deck.slides.length} slides • Updated ${_formatDate(deck.updatedAt)}',
-                        style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B)),
+                        accent: accent.first,
+                        isDark: isDark,
                       ),
                       trailing: IconButton(
                         icon: Icon(Icons.more_horiz_rounded, color: isDark ? Colors.white54 : const Color(0xFF94A3B8)),
