@@ -361,45 +361,13 @@ export async function ngmyStudioMediaTimeExport(o) {
   const vCodec = await pickVideoCodec(width, height, fps);
   if (!vCodec) throw new Error('no H.264 encoder');
 
-  // Sound: decode the original file once. If the clip has sound we can't encode, give up
-  // so the caller uses the live recorder instead of saving a silent video.
-  let audio = null;
-  let aCodec = null;
-  let channels = 2;
-  let pass = null;
-  window.__ngmyLastExportSound = o.audioSrc ? 'none: no sound found in clip' : 'none: no clip';
-  if (o.audioSrc) {
-    pass = await readAacTrack(o.audioSrc, durationSec);
-    if (pass) window.__ngmyLastExportSound = 'copied';
-    if (!pass) {
-      const decoded = await decodeAudioBuffer(o.audioSrc);
-      if (!decoded) window.__ngmyLastExportSound = 'none: ' + (_lastAacReadError || 'sound could not be read');
-      if (decoded && decoded.duration > 0.05) {
-        window.__ngmyLastExportSound = 'encoded';
-        if (typeof AudioEncoder === 'undefined') throw new Error('sound not copyable, no audio encoder');
-        channels = Math.min(2, decoded.numberOfChannels || 1);
-        aCodec = await pickAudioCodec(channels);
-        if (!aCodec) throw new Error('no audio encoder');
-        audio = await resampleTo48k(decoded, Math.min(decoded.duration, durationSec), channels);
-      }
-    }
-  }
-
-  const muxer = new Muxer({
-    target: new ArrayBufferTarget(),
-    video: { codec: 'avc', width, height, frameRate: fps },
-    audio: pass
-      ? { codec: 'aac', sampleRate: pass.sampleRate, numberOfChannels: pass.channels }
-      : audio
-        ? { codec: aCodec.mux, sampleRate: 48000, numberOfChannels: channels }
-        : undefined,
-    fastStart: 'in-memory',
-    firstTimestampBehavior: 'offset',
-  });
-
+  // 1) Picture first. Encoded pieces are kept aside and the file is assembled at
+  //    the end — reading the sound needs the whole clip in memory, and doing that
+  //    while the phone is decoding video starves the decoder (the picture stalls).
+  const videoChunks = [];
   let encoderError = null;
   const encoder = new VideoEncoder({
-    output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+    output: (chunk, meta) => videoChunks.push({ chunk, meta }),
     error: (e) => {
       encoderError = e;
     },
@@ -416,31 +384,36 @@ export async function ngmyStudioMediaTimeExport(o) {
 
   const frameUs = Math.round(1_000_000 / fps);
   const minGapUs = frameUs - 2000;
-  let lastTs = -1;
-  let frames = 0;
-  // Slow phone: play the clip slower so every frame still gets captured.
-  // Timestamps come from the clip, so the saved video keeps its real speed.
   // Phones stall if the clip plays faster than normal, so only computers speed up.
   const maxRate = Math.max(1, Math.min(2, Number(o.maxRate) || 1));
   let rate = 1;
   let smoothRun = 0;
   let lastResync = 0;
   let lastPresented = 0;
+  let lastTs = -1;
+  let frames = 0;
+  let rvfcFrames = 0;
+  let pollFrames = 0;
+  let lastCaptureWall = performance.now();
+  let lastRvfcWall = 0;
+  let lastClockT = -1;
+  let lastClockMoveWall = performance.now();
   const setRate = (r) => {
     rate = r;
     for (const v of all) v.playbackRate = r;
   };
-  let lastFrameWall = performance.now();
 
-  let nudgesReset = () => {};
   await new Promise((resolve, reject) => {
     let finished = false;
     let waiting = false;
+    let nudges = 0;
     let watchdog = null;
+    let poller = null;
     const finish = (err) => {
       if (finished) return;
       finished = true;
-      if (watchdog) clearInterval(watchdog);
+      clearInterval(watchdog);
+      clearInterval(poller);
       video.removeEventListener('ended', onEnded);
       for (const v of all) v.pause();
       if (err) reject(err);
@@ -461,16 +434,20 @@ export async function ngmyStudioMediaTimeExport(o) {
       waiting = false;
       playAll();
     };
-    const onFrame = (_now, meta) => {
-      if (finished) return;
-      if (isCancelled()) return finish(new Error('cancelled'));
-      if (encoderError) return finish(encoderError);
-      lastFrameWall = performance.now();
-      nudgesReset();
-      const t = meta.mediaTime;
-      // Keep other screens in step with the main clip — rarely, since every jump
-      // makes the phone re-decode and can freeze the main clip.
+
+    // One frame at clip time t (seconds), from either source.
+    const capture = (t) => {
+      if (finished) return false;
+      if (isCancelled()) {
+        finish(new Error('cancelled'));
+        return false;
+      }
+      if (encoderError) {
+        finish(encoderError);
+        return false;
+      }
       const nowWall = performance.now();
+      // Keep other screens in step — rarely, since every jump makes the phone re-decode.
       if (nowWall - lastResync > 2000) {
         for (const v of others) {
           if (!v.ended && Math.abs(v.currentTime - t) > 0.6) {
@@ -482,8 +459,41 @@ export async function ngmyStudioMediaTimeExport(o) {
         }
       }
       const ts = Math.round(t * 1_000_000);
-      // Falling behind = the browser showed frames we never got to see. (Gaps in the
-      // clip's own timing are normal for phone recordings and don't count.)
+      if (lastTs < 0 || ts - lastTs >= minGapUs) {
+        try {
+          paint();
+          const frame = new VideoFrame(canvas, { timestamp: ts, duration: frameUs });
+          encoder.encode(frame, { keyFrame: frames % (fps * 2) === 0 });
+          frame.close();
+          frames++;
+          lastTs = ts;
+          lastCaptureWall = nowWall;
+          nudges = 0;
+        } catch (e) {
+          finish(e);
+          return false;
+        }
+      }
+      onProgress(Math.min(0.85, (t / durationSec) * 0.85));
+      if (t >= durationSec - 0.03) {
+        finish();
+        return false;
+      }
+      // Encoder falling behind: pause and let it catch up. Time comes from the clip, so pausing is harmless.
+      if (!waiting && encoder.encodeQueueSize > 6) {
+        waiting = true;
+        for (const v of all) v.pause();
+        drainThenPlay();
+      }
+      return true;
+    };
+
+    const onFrame = (_now, meta) => {
+      if (finished) return;
+      lastRvfcWall = performance.now();
+      rvfcFrames++;
+      // Falling behind = the browser showed frames we never got to see. (Uneven timing
+      // inside phone recordings is normal and doesn't count.)
       const presented = Number(meta.presentedFrames) || 0;
       if (lastPresented > 0 && presented > lastPresented) {
         const missed = presented - lastPresented - 1;
@@ -496,40 +506,34 @@ export async function ngmyStudioMediaTimeExport(o) {
         }
       }
       lastPresented = presented;
-      if (lastTs < 0 || ts - lastTs >= minGapUs) {
-        try {
-          paint();
-          const frame = new VideoFrame(canvas, { timestamp: ts, duration: Math.round(1_000_000 / fps) });
-          encoder.encode(frame, { keyFrame: frames % (fps * 2) === 0 });
-          frame.close();
-          frames++;
-          lastTs = ts;
-        } catch (e) {
-          return finish(e);
-        }
-      }
-      onProgress(Math.min(0.85, (t / durationSec) * 0.85));
-      if (t >= durationSec - 0.03) return finish();
-      video.requestVideoFrameCallback(onFrame);
-      // Encoder falling behind: pause and let it catch up. Time comes from the clip, so pausing is harmless.
-      if (!waiting && encoder.encodeQueueSize > 6) {
-        waiting = true;
-        for (const v of all) v.pause();
-        drainThenPlay();
-      }
+      if (capture(meta.mediaTime)) video.requestVideoFrameCallback(onFrame);
     };
-    let nudges = 0;
-    nudgesReset = () => {
-      nudges = 0;
-    };
+
+    // Backup: if frame reports go quiet while the clip's clock keeps moving, grab
+    // frames from the clock instead (some phones stop reporting mid-clip).
+    poller = setInterval(() => {
+      if (finished || waiting) return;
+      const t = video.currentTime;
+      if (t !== lastClockT) {
+        lastClockT = t;
+        lastClockMoveWall = performance.now();
+      }
+      if (performance.now() - lastRvfcWall < 350) return;
+      if (video.paused || video.readyState < 2) return;
+      if (lastTs < 0 || Math.round(t * 1_000_000) - lastTs >= minGapUs) {
+        if (capture(t)) pollFrames++;
+      }
+    }, Math.max(20, Math.round(1000 / fps / 1.5)));
+
     watchdog = setInterval(() => {
+      if (finished) return;
       if (isCancelled()) return finish(new Error('cancelled'));
       if (waiting) return;
-      const quiet = performance.now() - lastFrameWall;
+      const quiet = performance.now() - lastCaptureWall;
       // Nearly done: keep what we have.
       if (quiet > 3000 && frames > 0 && lastTs / 1_000_000 >= durationSec - 0.5) return finish();
-      // Stuck: nudge the clip (pause, back to normal speed, play) instead of giving up.
-      if (quiet > 3000 && nudges < 8 && quiet > 3000 * (nudges + 1)) {
+      // Stuck: nudge the clip (pause, normal speed, play) instead of giving up.
+      if (quiet > 3000 * (nudges + 1) && nudges < 8) {
         nudges++;
         for (const v of all) v.pause();
         setRate(1);
@@ -537,11 +541,19 @@ export async function ngmyStudioMediaTimeExport(o) {
         return;
       }
       if (quiet > 30000) {
-        finish(new Error('video stalled'));
+        const clockStuck = performance.now() - lastClockMoveWall > 5000;
+        finish(
+          new Error(
+            `video stalled at ${video.currentTime.toFixed(1)}s/${durationSec.toFixed(0)}s, ` +
+              `${frames} frames (${rvfcFrames} rv, ${pollFrames} clk), ` +
+              `${clockStuck ? 'clip stopped' : 'clip moving'}, ready ${video.readyState}`,
+          ),
+        );
         return;
       }
       if (video.paused && !video.ended) playAll();
     }, 1000);
+
     video.addEventListener('ended', onEnded);
     video.requestVideoFrameCallback(onFrame);
     setRate(rate);
@@ -551,7 +563,54 @@ export async function ngmyStudioMediaTimeExport(o) {
   await encoder.flush();
   encoder.close();
   if (frames < 2) throw new Error('no frames captured');
-  onProgress(0.88);
+  for (const v of all) {
+    v.pause();
+    v.playbackRate = 1;
+  }
+
+  // 2) Sound, now that the decoder is idle. Copy the clip's AAC as-is when possible.
+  onProgress(0.87);
+  let audio = null;
+  let aCodec = null;
+  let channels = 2;
+  let pass = null;
+  window.__ngmyLastExportSound = o.audioSrc ? 'none: no sound found in clip' : 'none: no clip';
+  if (o.audioSrc) {
+    pass = await readAacTrack(o.audioSrc, durationSec);
+    if (pass) window.__ngmyLastExportSound = 'copied';
+    if (!pass && typeof AudioEncoder !== 'undefined') {
+      const decoded = await decodeAudioBuffer(o.audioSrc);
+      if (!decoded) window.__ngmyLastExportSound = 'none: ' + (_lastAacReadError || 'sound could not be read');
+      if (decoded && decoded.duration > 0.05) {
+        channels = Math.min(2, decoded.numberOfChannels || 1);
+        aCodec = await pickAudioCodec(channels);
+        if (aCodec) {
+          audio = await resampleTo48k(decoded, Math.min(decoded.duration, durationSec), channels);
+          window.__ngmyLastExportSound = 'encoded';
+        } else {
+          window.__ngmyLastExportSound = 'none: no audio encoder';
+        }
+      }
+    } else if (!pass) {
+      window.__ngmyLastExportSound = 'none: ' + (_lastAacReadError || 'sound could not be copied');
+    }
+  }
+
+  // 3) Assemble the file.
+  const muxer = new Muxer({
+    target: new ArrayBufferTarget(),
+    video: { codec: 'avc', width, height, frameRate: fps },
+    audio: pass
+      ? { codec: 'aac', sampleRate: pass.sampleRate, numberOfChannels: pass.channels }
+      : audio
+        ? { codec: aCodec.mux, sampleRate: 48000, numberOfChannels: channels }
+        : undefined,
+    fastStart: 'in-memory',
+    firstTimestampBehavior: 'offset',
+  });
+  for (const { chunk, meta } of videoChunks) muxer.addVideoChunk(chunk, meta);
+  videoChunks.length = 0;
+  onProgress(0.9);
   if (pass) {
     pass.chunks.forEach((c, i) => {
       muxer.addAudioChunkRaw(

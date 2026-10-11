@@ -841,7 +841,7 @@ Future<html.Blob?> _tryMediaTimeExport({
     _ngmyMediaTimeLastError = 'empty file';
   } catch (e) {
     var why = e.toString().replaceFirst(RegExp(r'^(Error|Exception):\s*'), '');
-    if (why.length > 48) why = why.substring(0, 48);
+    if (why.length > 150) why = why.substring(0, 150);
     _ngmyMediaTimeLastError = why;
     debugPrint('[studio export] media-time export failed, recording live instead: $e');
   } finally {
