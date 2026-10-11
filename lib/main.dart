@@ -25348,12 +25348,16 @@ class InvestScreen extends StatefulWidget {
   final bool purchaseInFlight;
   final void Function(String name, double price, double roi, double cost) onInvest;
 
+  /// Optional button on the left of the title (Growth Income uses it for its $ home button).
+  final Widget? titleLeading;
+
   const InvestScreen({
     super.key,
     required this.user,
     required this.plans,
     required this.onInvest,
     this.purchaseInFlight = false,
+    this.titleLeading,
   });
 
   @override
@@ -25375,7 +25379,7 @@ class _InvestScreenState extends State<InvestScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const FloatingTitle(title: 'INVESTMENT PLANS'),
+              FloatingTitle(title: 'INVESTMENT PLANS', leading: widget.titleLeading),
               const SizedBox(height: 20),
       if (user.activeInvestment != null) ...[
         const Text('ACTIVE ASSET', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
