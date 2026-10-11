@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import 'ngmy_advisor_browser_session.dart';
+import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_phone_tool_intent.dart';
 
@@ -17,7 +18,7 @@ shop, read news, or use any web app, reply like a human first, then append:
 [[/NGMY_PHONE_ACTIONS]]
 
 Use a real https URL. Optional "label" is shown under Browser in chat (keep it short).
-For directions use maps; for NGMY features inside this app use open_tool (video_studio, phone_unlock, swahili_school, etc.) — same JSON block.
+For directions use maps; for places inside the NGMY app use open_tool (see NGMY APP GUIDE) — same JSON block.
 The site opens ONLY inside the small Browser port above the chat box (never the whole app). Drive that port with:
 
 [[NGMY_BROWSER_CMD]]
@@ -174,7 +175,45 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
 }
 
 List<NgmyPhoneAction> ngmyAdvisorPhoneActionsForChips(List<NgmyPhoneAction> actions) =>
-    actions.where((a) => a.type != 'open_url' && a.type != 'maps').toList();
+    actions.where((a) => a.type != 'open_url' && a.type != 'maps' && a.type != 'app_lookup').toList();
+
+/// Places the advisor opened on its own because the user asked to be taken there.
+bool ngmyAdvisorActionGoesNow(NgmyPhoneAction a) =>
+    a.type == 'open_tool' && const {'true', '1', 'yes'}.contains((a.fields['go'] ?? '').trim().toLowerCase());
+
+/// Prompt block: the advisor can take the user anywhere in NGMY and look up real app data.
+String ngmyAdvisorAppNavigatorContext() {
+  final places = NgmyAiAppBridge.catalogForPrompt();
+  if (places.isEmpty) return '';
+  final lookups = NgmyAiAppBridge.lookupCatalogForPrompt();
+  return '''
+NGMY APP GUIDE — You can take the user anywhere in the NGMY app and look things up for them. You are their guide:
+when someone doesn't know how to do something in the app, take them to the right place and tell them the next tap.
+
+Places (use the id exactly):
+$places
+
+To take them somewhere, add an open_tool action. Add "go":true when they asked you to take/open/bring them there
+right now — the app opens it for them. Leave "go" out to just offer a button. Always give a short "label":
+
+[[NGMY_PHONE_ACTIONS]]
+[{"type":"open_tool","tool":"civic_registry","go":true,"label":"Open Civic Registry"}]
+[[/NGMY_PHONE_ACTIONS]]
+
+${lookups.isEmpty ? '' : '''Lookups — when they ask for information that lives in the app, ask the app instead of guessing:
+$lookups
+
+[[NGMY_PHONE_ACTIONS]]
+[{"type":"app_lookup","kind":"civic_member","query":"Jane Doe"}]
+[[/NGMY_PHONE_ACTIONS]]
+
+The app answers right after your message with the real record and buttons to go there. So in YOUR message only say a
+short line like "Let me check Civic Registry for Jane." NEVER invent names, IDs, phone numbers, balances or any details —
+only the app's answer has them. If they want to see the record after, use open_tool civic_member with the same query.
+'''}Only use the places and lookups listed here. You can't edit or delete records, approve anything, or move money — say so
+and take them to the right screen so they can do it themselves.
+''';
+}
 
 String _normalizeUrl(String url) {
   var u = url.trim();

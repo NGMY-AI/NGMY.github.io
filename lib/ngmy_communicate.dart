@@ -21,6 +21,7 @@ import 'ngmy_advisor_roster.dart';
 import 'ngmy_advisor_live_agent.dart';
 import 'ngmy_advisor_web_eyes.dart';
 import 'ngmy_phone_action_ui.dart';
+import 'ngmy_ai_app_bridge.dart';
 import 'ngmy_phone_integrations.dart';
 import 'ngmy_register_ai_tools.dart';
 import 'ngmy_ai_client.dart';
@@ -3842,6 +3843,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       buf.writeln(ngmyTextCoachModePromptBlock(_textCoachMode, userText: text));
     }
     buf.writeln(ngmyAdvisorWebAndReactionContext(advisorName: widget.profile.name));
+    final appGuide = ngmyAdvisorAppNavigatorContext();
+    if (appGuide.isNotEmpty) buf.writeln(appGuide);
     // Professional with everyone except the one person they're dating.
     if (!_relationship.datingYou) buf.writeln(ngmyAdvisorProfessionalBlock(_relationship));
     if (_datingNote.isNotEmpty) buf.writeln(_datingNote);
@@ -4767,8 +4770,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
       return;
     }
-    final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
-    if (!ok || !mounted) return;
+    // Going somewhere inside NGMY is harmless — no "are you sure" sheet.
+    if (action.type != 'open_tool') {
+      final ok = await ngmyShowPhoneActionSheet(context: context, action: action);
+      if (!ok || !mounted) return;
+    }
     final result = await ngmyRunPhoneAction(
       action,
       context: context,
@@ -4797,6 +4803,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     var reactionEmoji = '';
 
     var browserCommands = const <NgmyAdvisorBrowserCommand>[];
+    var lookups = const <NgmyPhoneAction>[];
+    var goNow = const <NgmyPhoneAction>[];
     if (parseExtrasForUserText != null && parseExtrasForUserText.trim().isNotEmpty && photo.isEmpty) {
       final parsed = ngmyParseAdvisorAssistantReply(body, userMessage: parseExtrasForUserText);
       body = parsed.text.trim();
@@ -4804,11 +4812,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       browserLabel = parsed.browserLabel;
       reactionEmoji = parsed.reactionEmoji;
       browserCommands = parsed.browserCommands;
+      lookups = parsed.actions.where((a) => a.type == 'app_lookup').toList();
+      goNow = parsed.actions.where(ngmyAdvisorActionGoesNow).toList();
       final chipActions = ngmyAdvisorPhoneActionsForChips(parsed.actions);
       if (chipActions.isNotEmpty) {
         phoneActionsJson = ngmyAdvisorPhoneActionsToJson(chipActions);
       }
     }
+    if (body.isEmpty && lookups.isNotEmpty) body = 'Let me check that for you.';
 
     if (body.isEmpty && photo.isEmpty) {
       debugPrint('[communicate] refused empty AI reply');
@@ -4864,7 +4875,47 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (phoneActionsJson.isNotEmpty) row['phoneActions'] = phoneActionsJson;
     setState(() => _messages.add(row));
     _scrollBottom();
+    if (lookups.isNotEmpty || goNow.isNotEmpty) {
+      unawaited(_runAdvisorAppActions(lookups: lookups, goNow: goNow, sendGen: sendGen));
+    }
     return true;
+  }
+
+  /// The advisor asked the app for real data and/or to take the user somewhere.
+  /// Lookup answers are posted as the advisor's next message, with buttons to go there.
+  Future<void> _runAdvisorAppActions({
+    required List<NgmyPhoneAction> lookups,
+    required List<NgmyPhoneAction> goNow,
+    required int sendGen,
+  }) async {
+    for (final l in lookups.take(3)) {
+      final kind = (l.fields['kind'] ?? '').trim();
+      final args = Map<String, String>.from(l.fields)..remove('kind');
+      final result = await NgmyAiAppBridge.lookup(kind, args);
+      final chips = [
+        for (final g in result.goTo) NgmyPhoneAction(type: 'open_tool', fields: g),
+      ];
+      final chipsJson = chips.isEmpty ? '' : ngmyAdvisorPhoneActionsToJson(chips);
+      await NgmyCommunicateMemoryStore.append(
+        _email,
+        widget.profile.id,
+        role: 'ai',
+        text: result.text,
+        phoneActions: chipsJson,
+      );
+      if (!mounted || sendGen != _sendGen) continue;
+      final row = <String, String>{'role': 'ai', 'text': result.text};
+      if (chipsJson.isNotEmpty) row['phoneActions'] = chipsJson;
+      setState(() => _messages.add(row));
+      _scrollBottom();
+    }
+    // Only move the user if they're still looking at this chat.
+    if (goNow.isEmpty || !mounted || sendGen != _sendGen) return;
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    if (!mounted || sendGen != _sendGen) return;
+    final result = await ngmyRunPhoneAction(goNow.first, context: context, skipConfirmation: true, userEmail: _email, isAdmin: _isAdmin, config: widget.config);
+    if (!mounted || result == null || result.startsWith('Opened') || result.startsWith('Took you')) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result), duration: const Duration(seconds: 2)));
   }
 
   Future<void> _sendDebateReply(String text) async {

@@ -158,7 +158,7 @@ class NgmyPhoneAction {
         final url = fields['url'] ?? '';
         return url.length > 42 ? '${url.substring(0, 39)}…' : url;
       case 'open_tool':
-        return fields['tool'] ?? fields['app'] ?? 'NGMY tool';
+        return fields['label'] ?? fields['tool'] ?? fields['app'] ?? 'NGMY tool';
       default:
         return type;
     }
@@ -219,7 +219,7 @@ class NgmyPhoneAction {
     if (actions.isNotEmpty) return (text: text, actions: actions);
   }
 
-  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|send_email|messenger|facebook|instagram|telegram|open_url|open_tool)"[\s\S]*?\}\s*\])');
+  final loose = RegExp(r'(\[\s*\{[\s\S]*?"type"\s*:\s*"(?:calendar|alarm|maps|call|sms|whatsapp|email|send_email|messenger|facebook|instagram|telegram|open_url|open_tool|app_lookup)"[\s\S]*?\}\s*\])');
   final looseMatch = loose.firstMatch(raw);
   if (looseMatch != null) {
     text = raw.replaceFirst(loose, '').trim();
@@ -641,7 +641,10 @@ Future<String?> _runOpenUrl(NgmyPhoneAction action) async {
 Future<String?> _runOpenTool(NgmyPhoneAction action) async {
   final tool = (action.fields['tool'] ?? action.fields['app'] ?? '').trim().toLowerCase();
   if (tool.isEmpty) return 'No NGMY tool was specified.';
-  return NgmyAiAppBridge.open(tool);
+  final args = Map<String, String>.from(action.fields)
+    ..remove('tool')
+    ..remove('app');
+  return NgmyAiAppBridge.open(tool, args: args);
 }
 
 /// Compact chips shown under an AI message that triggered phone actions.

@@ -211,6 +211,10 @@ import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_market_hub_screen.dart';
+import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
+import 'ngmy_business_essentials.dart' show showNgmyBusinessEssentialsHub;
+import 'ngmy_menu_studio.dart' show showNgmyMenuStudioDialog;
+import 'ngmy_trading_lab.dart' show showNgmyTradingLab;
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_cashier_reminder_service.dart';
 import 'ngmy_overlay_guard.dart';
@@ -226,6 +230,7 @@ import 'ngmy_upload_shrink.dart';
 
 part 'ngmy_admin_panels.dart';
 part 'ngmy_admin_management.dart';
+part 'ngmy_ai_app_places.dart';
 
 const String kNgmyDefaultLogoUrl = 'https://i.ibb.co/LhbMvz9/ngmy-logo.png';
 const String kNgmyUserLoggedOutKey = 'ngmy_user_logged_out';
@@ -16757,6 +16762,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didUpdateWidget(MainScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    _registerAiAppPlaces();
     if (oldWidget.user.email != widget.user.email) {
       NgmyIncomeSound.bindSession(widget.user.email);
       _tabPagesKey = null;
@@ -16985,6 +16991,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       config: widget.config,
       onDataChanged: widget.onDataChanged,
     );
+    _registerAiAppPlaces();
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) {
