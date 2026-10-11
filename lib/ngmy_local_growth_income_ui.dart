@@ -87,9 +87,32 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   Timer? _balancePoll;
   Timer? _earningsTick;
 
+  /// Growth Income's balance at the moment it last matched the app balance.
+  double? _alignedBase;
+
+  /// The app's account balance is the one real wallet — it already holds every
+  /// in-app movement (clock-in, games, fees, admin top-ups). Growth Income shows
+  /// that number; it never overwrites it with its own copy.
+  void _adoptAppBalance() {
+    final user = _user;
+    final live = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    if (user != null) user.accountBalance = live;
+    _alignedBase = live;
+    if (user != null) ngmySeedLiveBalance(user.email, live, allowIncrease: true);
+  }
+
   /// One shared spendable balance for Growth Income AND the whole app.
+  /// [balance] is Growth Income's new figure; only the CHANGE since it last
+  /// matched the app balance is applied, so money that moved elsewhere in the
+  /// app meanwhile is never lost or double-counted.
   void _publishAppBalance(double balance, {required bool allowDecrease}) {
-    final bal = balance.clamp(0.0, double.infinity);
+    final bal = ngmyGrowthIncomeAppliedBalance(
+      appBalance: widget.liveUser.accountBalance,
+      alignedBase: _alignedBase,
+      growthIncomeBalance: balance,
+      allowDecrease: allowDecrease,
+    );
+    _alignedBase = bal;
     final user = _user;
     if (user != null) user.accountBalance = bal;
     widget.liveUser.accountBalance = bal;
@@ -118,7 +141,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
     _user = NgmyLocalGrowthIncomeStore.previewUser(widget.liveUser);
     _mirrorWalletOntoLiveUser();
-    _publishAppBalance(_user!.accountBalance, allowDecrease: true);
+    _adoptAppBalance();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_load());
     });
@@ -235,10 +258,11 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
   }
 
+  /// Copies clock-in / plan fields onto the app user. The balance is NOT copied
+  /// here — it only moves through [_publishAppBalance] as a change.
   void _mirrorWalletOntoLiveUser() {
     final user = _user;
     if (user == null) return;
-    widget.liveUser.accountBalance = user.accountBalance;
     widget.liveUser.totalProfit = user.totalProfit;
     widget.liveUser.isClockedIn = user.isClockedIn;
     widget.liveUser.clockInStartTime = user.clockInStartTime;
@@ -294,9 +318,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
           _walletUpdatedAt = synced.updatedAt;
           _creditedTxnIds = List<String>.from(synced.creditedTxnIds);
           _mirrorWalletOntoLiveUser();
-          _publishAppBalance(synced.user.accountBalance, allowDecrease: true);
+          _adoptAppBalance();
         });
-        unawaited(_syncBalanceToCloud(allowDecrease: true));
+        unawaited(_syncBalanceToCloud(allowDecrease: false));
       }
       await _refreshDepositStatusesFromCloud();
     } catch (e) {
@@ -435,7 +459,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     _walletUpdatedAt = synced.updatedAt;
     _user = user;
     _mirrorWalletOntoLiveUser();
-    _publishAppBalance(user.accountBalance, allowDecrease: true);
+    _adoptAppBalance();
     final payoutAdded = NgmyLocalGrowthIncomeStore.applyDailyRollover(user, transactions);
     if (payoutAdded) {
       _publishAppBalance(user.accountBalance, allowDecrease: false);
@@ -443,34 +467,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
     _mirrorWalletOntoLiveUser();
 
-    // Admin "Send money now" credits — no QR scan required.
-    final pendingAdminCredits = await NgmyLocalDepositQr.claimPendingCredits(widget.liveUser.email);
-    final appliedCreditIds = <String>[];
-    for (final credit in pendingAdminCredits) {
-      final txnId = 'local_admin_push_${credit.id}';
-      if (transactions.any((t) => t.id == txnId)) {
-        appliedCreditIds.add(credit.id);
-        continue;
-      }
-      final txn = AppTransaction(
-        id: txnId,
-        userEmail: user.email,
-        amount: credit.amount,
-        type: TransactionType.deposit,
-        method: PaymentMethod.system,
-        sourceDetails: 'Admin deposit (\$${formatCurrency(credit.amount)})',
-        status: TransactionStatus.approved,
-        timestamp: DateTime.now(),
-      );
-      NgmyLocalGrowthIncomeStore.applyTransaction(user, txn);
-      transactions.add(txn);
-      appliedCreditIds.add(credit.id);
-      unawaited(_markTxnCredited(txnId));
-    }
-    if (appliedCreditIds.isNotEmpty) {
-      unawaited(NgmyLocalDepositQr.markCreditsClaimed(widget.liveUser.email, appliedCreditIds));
-      _publishAppBalance(user.accountBalance, allowDecrease: false);
-    }
+    // Admin "Send money now" credits are collected app-wide by MainScreen into
+    // the account balance (the one wallet) — not here, so they're never applied twice.
 
     if (!mounted) return;
     setState(() {
@@ -480,9 +478,9 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _walletUpdatedAt = DateTime.now().toUtc();
     });
     unawaited(_persist(
-      bumpWalletRevision: payoutAdded || appliedCreditIds.isNotEmpty,
+      bumpWalletRevision: payoutAdded,
       syncBalance: true,
-      allowDecrease: true,
+      allowDecrease: false,
     ));
   }
 
@@ -545,9 +543,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       // History only — balance credits when admin approves (pulled from cloud).
     } else if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) {
       allowDecrease = true;
-      final next = (math.min(user.accountBalance, widget.liveUser.accountBalance) - t.amount)
-          .clamp(0.0, double.infinity);
-      _publishAppBalance(next, allowDecrease: true);
+      // Only the withdrawal amount moves; _publishAppBalance applies it to the app balance.
+      _publishAppBalance(user.accountBalance - t.amount, allowDecrease: true);
     } else {
       NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
       if (t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove) {

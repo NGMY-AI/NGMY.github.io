@@ -340,7 +340,8 @@ class NgmyLocalGrowthIncomeStore {
         localCreditedIds: loaded.creditedTxnIds,
       );
       final gi = synced.user;
-      user.accountBalance = gi.accountBalance;
+      // The app's account balance is the one real wallet (clock-in, games, fees,
+      // admin top-ups all land there). Never overwrite it with this copy.
       user.totalProfit = gi.totalProfit;
       user.isClockedIn = gi.isClockedIn;
       user.clockInStartTime = gi.clockInStartTime;
@@ -362,8 +363,7 @@ class NgmyLocalGrowthIncomeStore {
               daysClockedIn: inv.daysClockedIn,
               totalEarned: inv.totalEarned,
             );
-      ngmySeedLiveBalance(user.email, gi.accountBalance, allowIncrease: true);
-      ngmySeedLiveBalance(gi.email, gi.accountBalance, allowIncrease: true);
+      ngmySeedLiveBalance(gi.email, user.accountBalance, allowIncrease: true);
     } catch (_) {}
   }
 
@@ -731,4 +731,20 @@ class NgmyLocalGrowthIncomeStore {
       adoptedCloud: false,
     );
   }
+}
+
+/// The app balance after Growth Income changes its own figure to
+/// [growthIncomeBalance]. Only the change since the two last matched
+/// ([alignedBase]) is applied, so money that moved elsewhere in the app in the
+/// meantime (games, fees, admin top-ups) is kept, never overwritten or doubled.
+double ngmyGrowthIncomeAppliedBalance({
+  required double appBalance,
+  required double? alignedBase,
+  required double growthIncomeBalance,
+  required bool allowDecrease,
+}) {
+  final delta = growthIncomeBalance - (alignedBase ?? appBalance);
+  var next = appBalance + delta;
+  if (!allowDecrease && next < appBalance) next = appBalance;
+  return next < 0 ? 0.0 : next;
 }

@@ -210,6 +210,7 @@ import 'ngmy_push_notification_prompt.dart';
 import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
+import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_market_hub_screen.dart';
 import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
@@ -16463,6 +16464,43 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   static void clearSessionTab() => _ngmySessionMainTabIdx = null;
 
+  bool _claimingAdminMoney = false;
+
+  /// Admin "Send money now" credits land in this user's one wallet (the account
+  /// balance), for every user — not only when the admin-only Growth Income page
+  /// is opened. Each credit becomes one approved transaction with a fixed id, so
+  /// it can never be applied twice.
+  Future<void> _claimAdminSentMoney() async {
+    if (_claimingAdminMoney) return;
+    final email = widget.user.email.trim();
+    if (email.isEmpty) return;
+    _claimingAdminMoney = true;
+    try {
+      final credits = await NgmyLocalDepositQr.claimPendingCredits(email);
+      if (credits.isEmpty || !mounted) return;
+      final applied = <String>[];
+      for (final c in credits) {
+        widget.onAddTransaction(AppTransaction(
+          id: 'local_admin_push_${c.id}',
+          userEmail: email,
+          amount: c.amount,
+          type: TransactionType.deposit,
+          method: PaymentMethod.system,
+          sourceDetails: 'Admin deposit (\$${formatCurrency(c.amount)})',
+          status: TransactionStatus.approved,
+          timestamp: DateTime.now(),
+        ));
+        applied.add(c.id);
+      }
+      await NgmyLocalDepositQr.markCreditsClaimed(email, applied);
+      widget.onDataChanged();
+    } catch (e) {
+      debugPrint('[wallet] claim admin credits: $e');
+    } finally {
+      _claimingAdminMoney = false;
+    }
+  }
+
   void _goToMainTab(int i, {bool refreshLegal = false}) {
     _ngmySessionMainTabIdx = i;
     setState(() {
@@ -16592,6 +16630,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      unawaited(_claimAdminSentMoney());
       // Avoid viewport resettle here — it was firing after gallery/photo pick
       // and made Menu Studio / Bio feel like a full app refresh.
       if (ngmyShouldAllowGlobalInterrupt()) {
@@ -16992,6 +17031,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       onDataChanged: widget.onDataChanged,
     );
     _registerAiAppPlaces();
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_claimAdminSentMoney()));
     _onlineCheck = Timer.periodic(const Duration(seconds: 30), (_) => _refreshOnlineStatus());
     _t = Timer.periodic(const Duration(seconds: 1), (t) {
       if (widget.user.forceLogout) {
