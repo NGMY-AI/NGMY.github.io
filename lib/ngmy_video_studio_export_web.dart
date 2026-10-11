@@ -824,6 +824,8 @@ Future<html.Blob?> _tryMediaTimeExport({
           'height': h,
           'durationSec': durationSec,
           'fps': _exportFps(),
+          // Phones stall when a clip plays faster than normal.
+          'maxRate': _ngmyIsMobileBrowser() ? 1.0 : 2.0,
           'bitrate': _ngmyIsMobileBrowser() ? 8000000 : 12000000,
           'audioSrc': audioSrc.trim(),
           'paint': js_util.allowInterop(paintFrame),
@@ -2169,14 +2171,22 @@ Future<String> _exportNgmyVideoStudioComposedCore({
         v.muted = true;
         v.playbackRate = 1.0;
       }
-      // Don't try the new way again this session on this device.
       final reason = _ngmyMediaTimeLastError ?? 'unknown';
-      _ngmyMediaTimeBrokenReason = reason;
+      // Only switch this device to live recording when it truly can't do the new way.
+      // A stall is temporary — the next tap tries the new way again.
+      final cantDoIt = reason == 'not-loaded' ||
+          reason == 'unsupported' ||
+          reason.contains('encoder') ||
+          reason.contains('H.264');
+      if (cantDoIt) _ngmyMediaTimeBrokenReason = reason;
       // On phones the browser only allows sound playback right after a tap. If the
       // attempt ran a while, that permission is gone and live recording would save
-      // nothing — ask for one more tap, which goes straight to live recording.
+      // nothing — ask for one more tap instead.
       if (_ngmyIsMobileBrowser() && attemptWatch.elapsedMilliseconds > 2500) {
-        return 'Almost there — tap Download once more to finish saving your video. (code: $reason)';
+        if (cantDoIt) {
+          return 'Almost there — tap Download once more to finish saving your video. (code: $reason)';
+        }
+        return 'Saving paused — keep this screen open and on, then tap Download again. (code: $reason)';
       }
     }
 

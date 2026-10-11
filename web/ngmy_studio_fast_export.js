@@ -420,15 +420,19 @@ export async function ngmyStudioMediaTimeExport(o) {
   let frames = 0;
   // Slow phone: play the clip slower so every frame still gets captured.
   // Timestamps come from the clip, so the saved video keeps its real speed.
-  let rate = 1.25;
+  // Phones stall if the clip plays faster than normal, so only computers speed up.
+  const maxRate = Math.max(1, Math.min(2, Number(o.maxRate) || 1));
+  let rate = 1;
   let smoothRun = 0;
-  const maxRate = 2;
+  let lastResync = 0;
+  let lastPresented = 0;
   const setRate = (r) => {
     rate = r;
     for (const v of all) v.playbackRate = r;
   };
   let lastFrameWall = performance.now();
 
+  let nudgesReset = () => {};
   await new Promise((resolve, reject) => {
     let finished = false;
     let waiting = false;
@@ -462,26 +466,36 @@ export async function ngmyStudioMediaTimeExport(o) {
       if (isCancelled()) return finish(new Error('cancelled'));
       if (encoderError) return finish(encoderError);
       lastFrameWall = performance.now();
+      nudgesReset();
       const t = meta.mediaTime;
-      // Keep other screens in step with the main clip.
-      for (const v of others) {
-        if (!v.ended && Math.abs(v.currentTime - t) > 0.3) {
-          try {
-            v.currentTime = t;
-          } catch (_) {}
+      // Keep other screens in step with the main clip — rarely, since every jump
+      // makes the phone re-decode and can freeze the main clip.
+      const nowWall = performance.now();
+      if (nowWall - lastResync > 2000) {
+        for (const v of others) {
+          if (!v.ended && Math.abs(v.currentTime - t) > 0.6) {
+            lastResync = nowWall;
+            try {
+              v.currentTime = t;
+            } catch (_) {}
+          }
         }
       }
       const ts = Math.round(t * 1_000_000);
-      if (lastTs >= 0) {
-        const gap = ts - lastTs;
-        if (gap > frameUs * 1.6 && rate > 0.25) {
+      // Falling behind = the browser showed frames we never got to see. (Gaps in the
+      // clip's own timing are normal for phone recordings and don't count.)
+      const presented = Number(meta.presentedFrames) || 0;
+      if (lastPresented > 0 && presented > lastPresented) {
+        const missed = presented - lastPresented - 1;
+        if (missed >= 2 && rate > 0.4) {
           smoothRun = 0;
-          setRate(Math.max(0.25, rate * 0.75));
-        } else if (gap < frameUs * 1.2 && rate < maxRate && ++smoothRun > fps) {
+          setRate(Math.max(0.4, rate * 0.8));
+        } else if (missed === 0 && rate < maxRate && ++smoothRun > fps) {
           smoothRun = 0;
           setRate(Math.min(maxRate, rate * 1.15));
         }
       }
+      lastPresented = presented;
       if (lastTs < 0 || ts - lastTs >= minGapUs) {
         try {
           paint();
@@ -504,13 +518,29 @@ export async function ngmyStudioMediaTimeExport(o) {
         drainThenPlay();
       }
     };
+    let nudges = 0;
+    nudgesReset = () => {
+      nudges = 0;
+    };
     watchdog = setInterval(() => {
       if (isCancelled()) return finish(new Error('cancelled'));
-      if (!waiting && performance.now() - lastFrameWall > 15000) {
-        finish(frames > 0 && lastTs / 1_000_000 >= durationSec - 0.5 ? null : new Error('video stalled'));
+      if (waiting) return;
+      const quiet = performance.now() - lastFrameWall;
+      // Nearly done: keep what we have.
+      if (quiet > 3000 && frames > 0 && lastTs / 1_000_000 >= durationSec - 0.5) return finish();
+      // Stuck: nudge the clip (pause, back to normal speed, play) instead of giving up.
+      if (quiet > 3000 && nudges < 8 && quiet > 3000 * (nudges + 1)) {
+        nudges++;
+        for (const v of all) v.pause();
+        setRate(1);
+        setTimeout(playAll, 150);
         return;
       }
-      if (!waiting && video.paused && !video.ended) playAll();
+      if (quiet > 30000) {
+        finish(new Error('video stalled'));
+        return;
+      }
+      if (video.paused && !video.ended) playAll();
     }, 1000);
     video.addEventListener('ended', onEnded);
     video.requestVideoFrameCallback(onFrame);
