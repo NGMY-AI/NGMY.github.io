@@ -3146,47 +3146,67 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
-  /// The little details under a project name, each in its own small frame.
+  /// The little details under a project name, in small frames side by side.
   Widget _deckInfoFrames(String info, {required Color accent, required bool isDark}) {
     final parts = info.split(' • ').map((p) => p.trim()).where((p) => p.isNotEmpty).toList();
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 5,
+      padding: const EdgeInsets.only(top: 5),
+      child: _alignedFrameRow(
+        parts,
+        accent: accent,
+        isDark: isDark,
+        iconFor: (p) => p.startsWith('Updated')
+            ? Icons.schedule_rounded
+            : RegExp(r'^\d+ slides?$').hasMatch(p)
+                ? Icons.layers_rounded
+                : Icons.description_outlined,
+      ),
+    );
+  }
+
+  /// Small framed tags in a single row. The row scales down to fit instead of
+  /// wrapping, so a tag never ends up under another one.
+  Widget _alignedFrameRow(
+    List<String> labels, {
+    required Color accent,
+    required bool isDark,
+    IconData Function(String label)? iconFor,
+  }) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          for (final p in parts)
+          for (var i = 0; i < labels.length; i++) ...[
+            if (i > 0) const SizedBox(width: 5),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: accent.withValues(alpha: isDark ? 0.14 : 0.10),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: accent.withValues(alpha: isDark ? 0.55 : 0.45)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    p.startsWith('Updated')
-                        ? Icons.schedule_rounded
-                        : RegExp(r'^\d+ slides?$').hasMatch(p)
-                            ? Icons.layers_rounded
-                            : Icons.description_outlined,
-                    size: 11,
-                    color: isDark ? Colors.white70 : const Color(0xFF475569),
-                  ),
-                  const SizedBox(width: 4),
+                  if (iconFor != null) ...[
+                    Icon(iconFor(labels[i]), size: 10, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+                    const SizedBox(width: 3),
+                  ],
                   Text(
-                    p,
+                    labels[i],
+                    maxLines: 1,
                     style: TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white.withValues(alpha: 0.82) : const Color(0xFF334155),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white.withValues(alpha: 0.85) : const Color(0xFF334155),
                     ),
                   ),
                 ],
               ),
             ),
+          ],
         ],
       ),
     );
@@ -5074,11 +5094,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             children: [
               Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
               const SizedBox(height: 2),
-              Text(
-                subtitle.split(' — ').first,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: accent, fontWeight: FontWeight.w800, letterSpacing: 0.2),
+              const SizedBox(height: 3),
+              // Feature tags in one aligned row — they shrink to fit, never stack.
+              _alignedFrameRow(
+                const ['School', 'Documents', 'Sign & present'],
+                accent: accent,
+                isDark: Theme.of(context).brightness == Brightness.dark,
               ),
             ],
           ),

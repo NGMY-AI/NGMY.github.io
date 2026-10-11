@@ -777,6 +777,10 @@ Future<html.Blob?> _tryFastWebCodecsExport({
   return null;
 }
 
+/// Why the media-time export failed on this device (null = not tried / worked).
+String? _ngmyMediaTimeBrokenReason;
+String? _ngmyMediaTimeLastError;
+
 /// Media-time WebCodecs export (see web/ngmy_studio_fast_export.js). Returns
 /// null when this browser can't do it or it failed — the caller then records live.
 Future<html.Blob?> _tryMediaTimeExport({
@@ -790,12 +794,20 @@ Future<html.Blob?> _tryMediaTimeExport({
   required String audioSrc,
   void Function(double progress, String status)? onProgress,
 }) async {
+  _ngmyMediaTimeLastError = null;
   final supportedFn = js_util.getProperty(html.window, 'ngmyStudioMediaTimeExportSupported');
   final exportFn = js_util.getProperty(html.window, 'ngmyStudioMediaTimeExport');
-  if (supportedFn == null || exportFn == null) return null;
+  if (supportedFn == null || exportFn == null) {
+    _ngmyMediaTimeLastError = 'not-loaded';
+    return null;
+  }
   try {
-    if (js_util.callMethod(supportedFn, 'call', [html.window]) != true) return null;
+    if (js_util.callMethod(supportedFn, 'call', [html.window]) != true) {
+      _ngmyMediaTimeLastError = 'unsupported';
+      return null;
+    }
   } catch (_) {
+    _ngmyMediaTimeLastError = 'unsupported';
     return null;
   }
   await _flushProgress(onProgress, 0.1, 'Baking your template into the video…');
@@ -824,8 +836,12 @@ Future<html.Blob?> _tryMediaTimeExport({
       ]),
     );
     if (blob is html.Blob && blob.size > 0) return blob;
+    _ngmyMediaTimeLastError = 'empty file';
   } catch (e) {
-    debugPrint('[studio export] media-time export unavailable, recording live instead: $e');
+    var why = e.toString().replaceFirst(RegExp(r'^(Error|Exception):\s*'), '');
+    if (why.length > 48) why = why.substring(0, 48);
+    _ngmyMediaTimeLastError = why;
+    debugPrint('[studio export] media-time export failed, recording live instead: $e');
   } finally {
     _hideExportHud();
   }
@@ -2100,10 +2116,11 @@ Future<String> _exportNgmyVideoStudioComposedCore({
     // Best path: stamp every frame with the clip's own clock (correct speed, no
     // frozen picture, sound in sync). Falls through to the live recorder below
     // on browsers without WebCodecs / requestVideoFrameCallback.
-    if (primaryVideo != null) {
+    if (primaryVideo != null && _ngmyMediaTimeBrokenReason == null) {
       final audioSrc = resolvedSources.entries
           .firstWhere((e) => videos[e.key] == primaryVideo, orElse: () => const MapEntry('', ''))
           .value;
+      final attemptWatch = Stopwatch()..start();
       final mediaTimeBlob = await _tryMediaTimeExport(
         canvas: canvas,
         w: w,
@@ -2130,6 +2147,16 @@ Future<String> _exportNgmyVideoStudioComposedCore({
       for (final v in videos.values) {
         v.pause();
         v.muted = true;
+        v.playbackRate = 1.0;
+      }
+      // Don't try the new way again this session on this device.
+      final reason = _ngmyMediaTimeLastError ?? 'unknown';
+      _ngmyMediaTimeBrokenReason = reason;
+      // On phones the browser only allows sound playback right after a tap. If the
+      // attempt ran a while, that permission is gone and live recording would save
+      // nothing — ask for one more tap, which goes straight to live recording.
+      if (_ngmyIsMobileBrowser() && attemptWatch.elapsedMilliseconds > 2500) {
+        return 'Almost there — tap Download once more to finish saving your video. (code: $reason)';
       }
     }
 

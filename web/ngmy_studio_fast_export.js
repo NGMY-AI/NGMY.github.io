@@ -17,7 +17,12 @@ function supported() {
 }
 
 async function pickVideoCodec(width, height, fps) {
-  const candidates = ['avc1.42E01E', 'avc1.4D401E', 'avc1.64001E'];
+  // Level 3.0 only covers ~720x480 — phones (Safari) refuse it for HD/portrait
+  // 1080x1920, so try levels that fit the frame first.
+  const big = width * height > 414720;
+  const candidates = big
+    ? ['avc1.640028', 'avc1.4D4028', 'avc1.42E028', 'avc1.640033', 'avc1.42E01F']
+    : ['avc1.42E01F', 'avc1.42E01E', 'avc1.4D401F', 'avc1.64001F'];
   for (const codec of candidates) {
     try {
       const result = await VideoEncoder.isConfigSupported({
@@ -46,7 +51,8 @@ async function decodeAudioBuffer(src) {
   if (!buffer || buffer.byteLength === 0) return null;
   const decodeCtx = new AudioContext();
   try {
-    const audioBuffer = await decodeCtx.decodeAudioData(buffer.slice(0));
+    // No copy: a second full copy of a long clip can run a phone out of memory.
+    const audioBuffer = await decodeCtx.decodeAudioData(buffer);
     try {
       await decodeCtx.close();
     } catch (_) {}
