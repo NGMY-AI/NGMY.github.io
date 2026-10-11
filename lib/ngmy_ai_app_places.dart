@@ -25,7 +25,7 @@ extension _NgmyAiAppPlaces on _MainScreenState {
       places: {
         'home': NgmyAiPlace(description: 'Home screen', open: (ctx, _) => goTab(ctx, 0, 'Home')),
         'tools': NgmyAiPlace(
-          description: 'Tools tab — Business Card Creator, Menu Studio, Business Essentials, Trading Lab',
+          description: 'Tools tab — Business Card Creator, Menu Studio, Business Essentials',
           open: (ctx, _) => goTab(ctx, 1, 'Tools'),
         ),
         'slides': NgmyAiPlace(description: 'NGMY Slides tab — slide shows and stories', open: (ctx, _) => goTab(ctx, 2, 'Slides')),
@@ -162,13 +162,6 @@ extension _NgmyAiAppPlaces on _MainScreenState {
           open: (ctx, _) async {
             unawaited(showNgmyBusinessEssentialsHub(ctx, userEmail: u.email));
             return 'Opened Business Essentials.';
-          },
-        ),
-        'trading_lab': NgmyAiPlace(
-          description: 'Trading Lab — practice trading with paper money',
-          open: (ctx, _) async {
-            unawaited(showNgmyTradingLab(ctx));
-            return 'Opened Trading Lab.';
           },
         ),
       },

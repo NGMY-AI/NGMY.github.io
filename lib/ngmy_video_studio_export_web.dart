@@ -2152,7 +2152,17 @@ Future<String> _exportNgmyVideoStudioComposedCore({
           startMs: startMs,
           usedCanvasStream: true,
         );
-        if (msg != null) return msg;
+        if (msg != null) {
+          // Never save a silent video quietly — say so, with the reason.
+          var sound = '';
+          try {
+            sound = (js_util.getProperty(html.window, '__ngmyLastExportSound') ?? '').toString();
+          } catch (_) {}
+          if (sound.startsWith('none') && !sound.contains('no sound found') && !sound.contains('no sound track')) {
+            return '$msg Note: the sound could not be added on this phone (${sound.substring(5).trim()}).';
+          }
+          return msg;
+        }
       }
       for (final v in videos.values) {
         v.pause();

@@ -367,11 +367,15 @@ export async function ngmyStudioMediaTimeExport(o) {
   let aCodec = null;
   let channels = 2;
   let pass = null;
+  window.__ngmyLastExportSound = o.audioSrc ? 'none: no sound found in clip' : 'none: no clip';
   if (o.audioSrc) {
     pass = await readAacTrack(o.audioSrc, durationSec);
+    if (pass) window.__ngmyLastExportSound = 'copied';
     if (!pass) {
       const decoded = await decodeAudioBuffer(o.audioSrc);
+      if (!decoded) window.__ngmyLastExportSound = 'none: ' + (_lastAacReadError || 'sound could not be read');
       if (decoded && decoded.duration > 0.05) {
+        window.__ngmyLastExportSound = 'encoded';
         if (typeof AudioEncoder === 'undefined') throw new Error('sound not copyable, no audio encoder');
         channels = Math.min(2, decoded.numberOfChannels || 1);
         aCodec = await pickAudioCodec(channels);
@@ -416,8 +420,9 @@ export async function ngmyStudioMediaTimeExport(o) {
   let frames = 0;
   // Slow phone: play the clip slower so every frame still gets captured.
   // Timestamps come from the clip, so the saved video keeps its real speed.
-  let rate = 1;
+  let rate = 1.25;
   let smoothRun = 0;
+  const maxRate = 2;
   const setRate = (r) => {
     rate = r;
     for (const v of all) v.playbackRate = r;
@@ -472,9 +477,9 @@ export async function ngmyStudioMediaTimeExport(o) {
         if (gap > frameUs * 1.6 && rate > 0.25) {
           smoothRun = 0;
           setRate(Math.max(0.25, rate * 0.75));
-        } else if (gap < frameUs * 1.2 && rate < 1 && ++smoothRun > fps) {
+        } else if (gap < frameUs * 1.2 && rate < maxRate && ++smoothRun > fps) {
           smoothRun = 0;
-          setRate(Math.min(1, rate * 1.15));
+          setRate(Math.min(maxRate, rate * 1.15));
         }
       }
       if (lastTs < 0 || ts - lastTs >= minGapUs) {
@@ -509,6 +514,7 @@ export async function ngmyStudioMediaTimeExport(o) {
     }, 1000);
     video.addEventListener('ended', onEnded);
     video.requestVideoFrameCallback(onFrame);
+    setRate(rate);
     playAll();
   });
 
@@ -547,6 +553,7 @@ window.ngmyStudioMediaTimeExportSupported = mediaTimeSupported;
 // loss, and much faster than decoding and re-encoding.
 
 let _mp4boxPromise = null;
+let _lastAacReadError = '';
 function loadMp4Box() {
   if (!_mp4boxPromise) {
     _mp4boxPromise = import('https://cdn.jsdelivr.net/npm/mp4box@0.5.3/+esm').then((m) => m.default || m);
@@ -555,17 +562,23 @@ function loadMp4Box() {
 }
 
 async function readAacTrack(src, durationSec) {
+  _lastAacReadError = '';
   let buffer;
   try {
     buffer = await (await fetch(src)).arrayBuffer();
   } catch (_) {
+    _lastAacReadError = 'clip fetch failed';
     return null;
   }
-  if (!buffer || buffer.byteLength < 16) return null;
+  if (!buffer || buffer.byteLength < 16) {
+    _lastAacReadError = 'empty clip';
+    return null;
+  }
   let MP4Box;
   try {
     MP4Box = await loadMp4Box();
   } catch (_) {
+    _lastAacReadError = 'mp4 reader did not load';
     return null;
   }
   return new Promise((resolve) => {
@@ -583,7 +596,14 @@ async function readAacTrack(src, durationSec) {
       file.onError = () => done(null);
       file.onReady = (info) => {
         track = (info.audioTracks || [])[0] || null;
-        if (!track || !String(track.codec || '').startsWith('mp4a')) return done(null);
+        if (!track) {
+          _lastAacReadError = 'clip has no sound track';
+          return done(null);
+        }
+        if (!String(track.codec || '').startsWith('mp4a')) {
+          _lastAacReadError = 'sound is ' + track.codec;
+          return done(null);
+        }
         file.setExtractionOptions(track.id, null, { nbSamples: 1_000_000 });
         file.start();
       };
@@ -599,15 +619,13 @@ async function readAacTrack(src, durationSec) {
         try {
           const trak = file.getTrackById(track.id);
           for (const entry of trak.mdia.minf.stbl.stsd.entries) {
-            // mp4box keeps the ES descriptor at esds.esd (0.5.x) or esds.esds (older builds).
-            const es = entry.esds && (entry.esds.esd || entry.esds.esds);
-            const d = es && es.descs && es.descs[0];
-            if (d && d.descs && d.descs[0] && d.descs[0].data) {
-              description = d.descs[0].data;
-              break;
-            }
+            description = findAudioSpecificConfig(entry);
+            if (description) break;
           }
         } catch (_) {}
+        // iPhone .mov files may hide it where mp4box can't reach — AAC-LC's config is
+        // just the sample rate and channel count, so build it.
+        if (!description) description = aacLcConfig(track.audio.sample_rate, track.audio.channel_count);
         if (!description) return done(null);
         const chunks = [];
         for (const s of samples) {
@@ -628,6 +646,30 @@ async function readAacTrack(src, durationSec) {
       done(null);
     }
   });
+}
+
+/** Find the AAC AudioSpecificConfig in a sample entry (also inside QuickTime 'wave' boxes). */
+function findAudioSpecificConfig(box, depth = 0) {
+  if (!box || depth > 4) return null;
+  // mp4box keeps the ES descriptor at esds.esd (0.5.x) or esds.esds (older builds).
+  const es = box.esds && (box.esds.esd || box.esds.esds);
+  const d = es && es.descs && es.descs[0];
+  if (d && d.descs && d.descs[0] && d.descs[0].data && d.descs[0].data.length >= 2) return d.descs[0].data;
+  for (const child of box.boxes || []) {
+    const found = findAudioSpecificConfig(child, depth + 1);
+    if (found) return found;
+  }
+  if (box.type !== 'esds' && box.esds) return findAudioSpecificConfig(box.esds, depth + 1);
+  return null;
+}
+
+/** Two-byte AudioSpecificConfig for AAC-LC (object type 2). */
+function aacLcConfig(sampleRate, channels) {
+  const rates = [96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350];
+  const idx = rates.indexOf(Number(sampleRate));
+  const ch = Number(channels) || 0;
+  if (idx < 0 || ch < 1 || ch > 7) return null;
+  return new Uint8Array([(2 << 3) | (idx >> 1), ((idx & 1) << 7) | (ch << 3)]);
 }
 
 /** What this browser can do — shown in error messages so failures can be traced. */

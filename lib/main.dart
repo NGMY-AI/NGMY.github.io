@@ -215,7 +215,6 @@ import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
 import 'ngmy_business_essentials.dart' show showNgmyBusinessEssentialsHub;
 import 'ngmy_menu_studio.dart' show showNgmyMenuStudioDialog;
-import 'ngmy_trading_lab.dart' show showNgmyTradingLab;
 import 'ngmy_item_reminder_service.dart';
 import 'ngmy_cashier_reminder_service.dart';
 import 'ngmy_overlay_guard.dart';
