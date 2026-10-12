@@ -13,6 +13,7 @@ import 'ngmy_hati_document_transfer.dart';
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_agreement_templates.dart';
+import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
 import 'ngmy_slides_document_tools.dart';
@@ -896,6 +897,30 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       _redo.clear();
       _clearTextControllers();
     });
+  }
+
+  /// Mic on Blank Presentation: describe it, the AI builds a styled deck, open it.
+  Future<void> _createWithAi() async {
+    final deck = await showNgmySlidesAiMaker(context);
+    if (deck == null || !mounted) return;
+    _pushUndoIfEditing();
+    setState(() {
+      _activeDeck = deck.copy();
+      _slideIndex = 0;
+      _selectedElementId = null;
+      _isDraft = true;
+      _undo.clear();
+      _redo.clear();
+      _clearTextControllers();
+    });
+    // Save it right away — the user asked for it, so it shouldn't vanish as an untouched draft.
+    _commitDraftIfNeeded();
+    unawaited(_persistDecks());
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Your ${deck.slides.length}-slide presentation is ready — tap any text to edit it.')),
+      );
+    }
   }
 
   void _createDeck({String? name, bool sample = false}) {
@@ -2862,11 +2887,42 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             Row(
               children: [
                 Expanded(
-                  child: _actionCard(
-                    icon: Icons.add_rounded,
-                    label: 'Blank Presentation',
-                    color: const Color(0xFF2563EB),
-                    onTap: () => _createDeck(),
+                  child: Stack(
+                    children: [
+                      _actionCard(
+                        icon: Icons.add_rounded,
+                        label: 'Blank Presentation',
+                        color: const Color(0xFF2563EB),
+                        onTap: () => _createDeck(),
+                      ),
+                      // Little mic: describe the presentation and the AI makes it.
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Tooltip(
+                          message: 'Describe it — AI creates the slides',
+                          child: Material(
+                            color: Colors.transparent,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: _createWithAi,
+                              child: Ink(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
+                                  boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5), blurRadius: 12)],
+                                ),
+                                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 10),

@@ -36,6 +36,7 @@ import 'ngmy_communicate_sync_ui.dart';
 import 'ngmy_communicate_text_coach.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_mshauri.dart';
+import 'ngmy_desktop_frame.dart';
 import 'ngmy_message_taps.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
@@ -3066,7 +3067,13 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => NgmyDesktopColumn(
+        background: const Color(0xFF07040F),
+        child: Builder(builder: _buildWorld),
+      );
+
+  // Advisors list + chats (kept phone-width on computers by the wrapper above).
+  Widget _buildWorld(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     if (_selected != null) {
       return _LoveWorldChat(

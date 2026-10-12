@@ -211,6 +211,7 @@ import 'ngmy_push_notifications.dart';
 import 'ngmy_app_notifications.dart';
 import 'ngmy_announcement_reads.dart';
 import 'ngmy_local_deposit_qr.dart';
+import 'ngmy_desktop_frame.dart';
 import 'ngmy_market_hub_screen.dart';
 import 'ngmy_message_taps.dart';
 import 'ngmy_business_card_studio.dart' show showNgmyBusinessCardStudioDialog;
@@ -17480,7 +17481,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       ),
       tabIndex: _idx,
       activeIndex: _idx,
-      buildContent: builder!,
+      // Tools, NGMY Hub and Creator toolkit are phone layouts — on computers keep
+      // them in a centered column instead of stretching across the monitor.
+      buildContent: const {1, 3, 5}.contains(_idx) ? () => NgmyDesktopColumn(child: builder!()) : builder!,
     );
   }
 
