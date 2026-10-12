@@ -236,11 +236,60 @@ class NgmyCivicFamilyButton extends StatelessWidget {
   }
 }
 
+/// A spouse is the opposite gender of the person they are married to.
+String ngmyCivicSpouseGender(String headGender) => switch (_g(headGender)) {
+      'male' => 'female',
+      'female' => 'male',
+      _ => '',
+    };
+
+/// After the enrollee's gender changes, their (current) spouse follows.
+List<Map<String, dynamic>> ngmyCivicAlignSpouses(String headGender, List<Map<String, dynamic>> rels) {
+  final sg = ngmyCivicSpouseGender(headGender);
+  if (sg.isEmpty) return rels;
+  return [
+    for (final r in rels)
+      r['relation'] == 'spouse' && (r['status'] ?? 'married') == 'married' && !_splitOff(r) ? {...r, 'gender': sg} : r,
+  ];
+}
+
+const kNgmyCivicIdTypes = ['National ID', 'Passport', 'Drivers License', 'Voters Card'];
+
+/// What the family shares with the person enrolled (they live together), and
+/// which of the enrollment form's questions each relative is asked too.
+class NgmyCivicFamilyHome {
+  const NgmyCivicFamilyHome({
+    this.headName = '',
+    this.headGender = '',
+    this.address = '',
+    this.city = '',
+    this.askIdType = false,
+    this.askEmail = false,
+  });
+  final String headName;
+  final String headGender;
+  final String address;
+  final String city;
+  final bool askIdType;
+  final bool askEmail;
+
+  NgmyCivicFamilyHome under(String name, String gender) => NgmyCivicFamilyHome(
+        headName: name,
+        headGender: gender,
+        address: address,
+        city: city,
+        askIdType: askIdType,
+        askEmail: askEmail,
+      );
+
+  String get where => [address.trim(), city.trim()].where((s) => s.isNotEmpty).join(', ');
+}
+
 /// Edits the spouse and children. Returns the new list, or null if cancelled.
 Future<List<Map<String, dynamic>>?> showNgmyCivicFamilyEditor(
   BuildContext context, {
   required List<Map<String, dynamic>> relatives,
-  String headName = '',
+  NgmyCivicFamilyHome home = const NgmyCivicFamilyHome(),
   bool nested = false,
 }) {
   return showModalBottomSheet<List<Map<String, dynamic>>>(
@@ -248,18 +297,19 @@ Future<List<Map<String, dynamic>>?> showNgmyCivicFamilyEditor(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => _FamilyEditorSheet(
-      initial: relatives.map(_deepCopy).toList(),
-      headName: headName,
+      initial: ngmyCivicAlignSpouses(home.headGender, relatives.map(_deepCopy).toList()),
+      home: home,
       nested: nested,
     ),
   );
 }
 
 class _FamilyEditorSheet extends StatefulWidget {
-  const _FamilyEditorSheet({required this.initial, required this.headName, required this.nested});
+  const _FamilyEditorSheet({required this.initial, required this.home, required this.nested});
   final List<Map<String, dynamic>> initial;
-  final String headName;
+  final NgmyCivicFamilyHome home;
   final bool nested;
+  String get headName => home.headName;
   @override
   State<_FamilyEditorSheet> createState() => _FamilyEditorSheetState();
 }
@@ -270,7 +320,7 @@ class _FamilyEditorSheetState extends State<_FamilyEditorSheet> {
   Future<void> _edit({Map<String, dynamic>? existing, required String relation}) async {
     final r = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _RelativeDialog(existing: existing, relation: relation, allowNested: !widget.nested),
+      builder: (_) => _RelativeDialog(existing: existing, relation: relation, allowNested: !widget.nested, home: widget.home),
     );
     if (r == null || !mounted) return;
     setState(() {
@@ -420,11 +470,13 @@ class _FamilyEditorSheetState extends State<_FamilyEditorSheet> {
   }
 }
 
+
 class _RelativeDialog extends StatefulWidget {
-  const _RelativeDialog({this.existing, required this.relation, required this.allowNested});
+  const _RelativeDialog({this.existing, required this.relation, required this.allowNested, required this.home});
   final Map<String, dynamic>? existing;
   final String relation;
   final bool allowNested;
+  final NgmyCivicFamilyHome home;
   @override
   State<_RelativeDialog> createState() => _RelativeDialogState();
 }
@@ -434,6 +486,11 @@ class _RelativeDialogState extends State<_RelativeDialog> {
   late final _dob = TextEditingController(text: '${widget.existing?['dob'] ?? ''}');
   late final _age = TextEditingController(text: widget.existing?['age'] == null ? '' : '${widget.existing!['age']}');
   late final _phone = TextEditingController(text: '${widget.existing?['phone'] ?? ''}');
+  late final _email = TextEditingController(text: '${widget.existing?['email'] ?? ''}');
+  late String _idType = () {
+    final v = '${widget.existing?['idType'] ?? ''}'.trim();
+    return kNgmyCivicIdTypes.contains(v) ? v : 'National ID';
+  }();
   late String _gender = _g(widget.existing?['gender']);
   late String _status = '${widget.existing?['status'] ?? (widget.relation == 'spouse' ? 'married' : 'single')}';
   late List<Map<String, dynamic>> _nested = ngmyCivicRelativesOf(widget.existing);
@@ -442,40 +499,65 @@ class _RelativeDialogState extends State<_RelativeDialog> {
   bool get _spouse => widget.relation == 'spouse';
   bool get _locked => _splitOff(widget.existing ?? const {});
 
+  /// A married spouse's gender comes from the person enrolled (opposite).
+  String get _fixedGender => _spouse && _status == 'married' ? ngmyCivicSpouseGender(widget.home.headGender) : '';
+
   @override
   void dispose() {
     _name.dispose();
     _dob.dispose();
     _age.dispose();
     _phone.dispose();
+    _email.dispose();
     super.dispose();
   }
 
   void _save() {
     final name = _name.text.trim();
-    if (!RegExp(r'^\S+(\s+\S+)?').hasMatch(name)) {
-      setState(() => _error = 'Enter their name.');
+    if (!RegExp(r'^\S+\s+\S+').hasMatch(name)) {
+      setState(() => _error = 'Full name is required (first and last name).');
       return;
     }
     final dob = _dob.text.trim();
     if (dob.isNotEmpty && !RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(dob)) {
-      setState(() => _error = 'Birthday must be MM/DD/YYYY (or leave it blank and give the age).');
+      setState(() => _error = 'Date of Birth must be in MM/DD/YYYY format.');
       return;
     }
-    final age = int.tryParse(_age.text.trim());
+    final phone = _phone.text.replaceAll(RegExp(r'\D'), '');
+    if (_spouse && !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+      setState(() => _error = 'Phone number is required (7–15 digits).');
+      return;
+    }
+    if (!_spouse && phone.isNotEmpty && !RegExp(r'^\d{7,15}$').hasMatch(phone)) {
+      setState(() => _error = 'Phone number must be 7–15 digits (or leave it blank).');
+      return;
+    }
+    final email = _email.text.trim().toLowerCase();
+    if (email.isNotEmpty && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    final gender = _fixedGender.isNotEmpty ? _fixedGender : _gender;
+    if (gender.isEmpty) {
+      setState(() => _error = 'Choose male or female.');
+      return;
+    }
+    final age = _spouse ? null : int.tryParse(_age.text.trim());
     final out = <String, dynamic>{
       ...?widget.existing,
       'id': widget.existing?['id'] ?? 'rel_${DateTime.now().microsecondsSinceEpoch}',
       'relation': widget.relation,
       'fullName': name,
-      'gender': _gender,
+      'gender': gender,
       'dob': dob,
       'age': age,
-      'phone': _phone.text.replaceAll(RegExp(r'\D'), ''),
+      'phone': phone,
+      if (widget.home.askIdType) 'idType': _idType,
+      if (widget.home.askEmail) 'email': email,
       'status': _status,
     };
     if (!_spouse && _status == 'married' && widget.allowNested) {
-      out['relatives'] = _nested;
+      out['relatives'] = ngmyCivicAlignSpouses(gender, _nested);
     } else {
       out.remove('relatives');
     }
@@ -492,6 +574,9 @@ class _RelativeDialogState extends State<_RelativeDialog> {
           fillColor: isDark ? Colors.black26 : Colors.grey.shade50,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         );
+    final fixed = _fixedGender;
+    final where = widget.home.where;
+    final dobField = TextField(controller: _dob, keyboardType: TextInputType.datetime, decoration: deco('Date of Birth', hint: 'MM/DD/YYYY'));
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       title: Text(widget.existing == null ? (_spouse ? 'Add spouse' : 'Add child') : 'Edit ${_spouse ? 'spouse' : 'child'}'),
@@ -502,34 +587,82 @@ class _RelativeDialogState extends State<_RelativeDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextField(controller: _name, textCapitalization: TextCapitalization.words, decoration: deco('Full name *')),
+              TextField(controller: _name, textCapitalization: TextCapitalization.words, decoration: deco('Full Name *', hint: 'First and last name')),
               const SizedBox(height: 12),
-              NgmyCivicGenderPicker(value: _gender, onChanged: (v) => setState(() => _gender = v), isDark: isDark),
+              if (fixed.isNotEmpty)
+                Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    color: (fixed == 'male' ? const Color(0xFF3B82F6) : const Color(0xFFEC4899)).withValues(alpha: 0.14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        fixed == 'male' ? Icons.male_rounded : Icons.female_rounded,
+                        color: fixed == 'male' ? const Color(0xFF3B82F6) : const Color(0xFFEC4899),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(fixed == 'male' ? 'Male (husband)' : 'Female (wife)', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    ],
+                  ),
+                )
+              else
+                NgmyCivicGenderPicker(value: _gender, onChanged: (v) => setState(() => _gender = v), isDark: isDark),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: _dob,
-                      keyboardType: TextInputType.datetime,
-                      decoration: deco('Birthday', hint: 'MM/DD/YYYY'),
+              if (_spouse)
+                dobField
+              else
+                Row(
+                  children: [
+                    Expanded(flex: 3, child: dobField),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: _age,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: deco('or Age'),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    flex: 2,
-                    child: TextField(
-                      controller: _age,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: deco('or Age'),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
+              if (widget.home.askIdType) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _idType,
+                  decoration: deco('ID Type'),
+                  items: [for (final t in kNgmyCivicIdTypes) DropdownMenuItem(value: t, child: Text(t))],
+                  onChanged: (v) => setState(() => _idType = v ?? _idType),
+                ),
+              ],
+              const SizedBox(height: 12),
+              TextField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                decoration: deco(_spouse ? 'Phone Number *' : 'Phone Number (optional)'),
               ),
-              const SizedBox(height: 12),
-              TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: deco('Phone (optional)')),
+              if (widget.home.askEmail) ...[
+                const SizedBox(height: 12),
+                TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: deco('Email (optional)')),
+              ],
+              if (where.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.home_rounded, size: 18, color: Color(0xFF00B25A)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Lives at $where (same home)',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isDark ? Colors.white70 : Colors.black54),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
               Text(_spouse ? 'Status' : 'Is this child married?', style: const TextStyle(fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
@@ -562,7 +695,12 @@ class _RelativeDialogState extends State<_RelativeDialog> {
                   relatives: _nested,
                   isDark: isDark,
                   onTap: () async {
-                    final next = await showNgmyCivicFamilyEditor(context, relatives: _nested, headName: _name.text, nested: true);
+                    final next = await showNgmyCivicFamilyEditor(
+                      context,
+                      relatives: _nested,
+                      home: widget.home.under(_name.text, _gender),
+                      nested: true,
+                    );
                     if (next != null && mounted) setState(() => _nested = next);
                   },
                 ),

@@ -34279,6 +34279,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     setState(() {
       if (gender != null) _enrollGender = gender;
       if (relatives != null) _enrollRelatives = relatives;
+      _enrollRelatives = ngmyCivicAlignSpouses(_enrollGender, _enrollRelatives);
       if (_enrollRelatives.isEmpty && relatives == null) return;
       final c = ngmyCivicFamilyCounts(_enrollGender, _enrollRelatives);
       _familyMembersC.text = '${c.total}';
@@ -45089,7 +45090,18 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 relatives: _enrollRelatives,
                 isDark: isDark,
                 onTap: () async {
-                  final next = await showNgmyCivicFamilyEditor(context, relatives: _enrollRelatives, headName: _fullNameC.text);
+                  final next = await showNgmyCivicFamilyEditor(
+                    context,
+                    relatives: _enrollRelatives,
+                    home: NgmyCivicFamilyHome(
+                      headName: _fullNameC.text,
+                      headGender: _enrollGender,
+                      address: _addressC.text,
+                      city: _cityC.text,
+                      askIdType: true,
+                      askEmail: true,
+                    ),
+                  );
                   if (next != null && mounted) _setEnrollFamily(relatives: next);
                 },
               ),

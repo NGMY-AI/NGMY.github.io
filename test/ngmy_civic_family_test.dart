@@ -24,6 +24,47 @@ void main() {
     expect(ngmyCivicChildParentConflict(roster, [kid], excludeRegistryId: 'A1'), isNull);
   });
 
+  test('a spouse is the opposite gender of the person enrolled', () {
+    expect(ngmyCivicSpouseGender('male'), 'female');
+    expect(ngmyCivicSpouseGender('female'), 'male');
+    final aligned = ngmyCivicAlignSpouses('female', [wife, kid]);
+    expect(aligned.first['gender'], 'male');
+    expect(aligned.last['gender'], 'male');
+  });
+
+  testWidgets('spouse of a man is set to female without asking', (tester) async {
+    List<Map<String, dynamic>>? result;
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => NgmyCivicFamilyButton(
+            relatives: const [],
+            onTap: () async => result = await showNgmyCivicFamilyEditor(
+              context,
+              relatives: const [],
+              home: const NgmyCivicFamilyHome(headName: 'John Doe', headGender: 'male', address: '1 Main St', city: 'Juba', askIdType: true, askEmail: true),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Add family (spouse & children)'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add spouse'));
+    await tester.pumpAndSettle();
+    expect(find.text('Female (wife)'), findsOneWidget);
+    expect(find.text('Lives at 1 Main St, Juba (same home)'), findsOneWidget);
+    expect(find.text('ID Type'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Full Name *'), 'Jane Doe');
+    await tester.enterText(find.widgetWithText(TextField, 'Phone Number *'), '5551234567');
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Done'));
+    await tester.pumpAndSettle();
+    expect(result!.single['gender'], 'female');
+    expect(result!.single['idType'], 'National ID');
+  });
+
   testWidgets('+ Family opens the editor and adds a child', (tester) async {
     List<Map<String, dynamic>>? result;
     await tester.pumpWidget(MaterialApp(
@@ -31,7 +72,7 @@ void main() {
         body: Builder(
           builder: (context) => NgmyCivicFamilyButton(
             relatives: const [],
-            onTap: () async => result = await showNgmyCivicFamilyEditor(context, relatives: const [], headName: 'John Doe'),
+            onTap: () async => result = await showNgmyCivicFamilyEditor(context, relatives: const [], home: const NgmyCivicFamilyHome(headName: 'John Doe')),
           ),
         ),
       ),

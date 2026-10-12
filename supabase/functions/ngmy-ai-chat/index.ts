@@ -6646,6 +6646,8 @@ function civicCleanRel(r: CivicRel, depth = 0): CivicRel | null {
     dob: String(r.dob ?? "").trim().slice(0, 10),
     age: Number(r.age ?? 0) > 0 && Number(r.age) < 130 ? Math.floor(Number(r.age)) : null,
     phone: String(r.phone ?? "").replace(/\D/g, "").slice(0, 15),
+    idType: String(r.idType ?? "").trim().slice(0, 40),
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(r.email ?? "").trim()) ? String(r.email).trim().toLowerCase().slice(0, 120) : "",
     status: "",
   };
   if (relation === "spouse") {
@@ -6781,7 +6783,7 @@ function applyCivicFamily(
     const rid = generateRegistryId(state, existingIds);
     existingIds.add(rid.toUpperCase());
     const row: CivicRel = {
-      email: `civic.${rid.toLowerCase()}@guest.ngmy`,
+      email: String(r.email ?? "").trim() || `civic.${rid.toLowerCase()}@guest.ngmy`,
       fullName: r.fullName,
       gender: civicGender(r.gender),
       dob: r.dob ?? "",
@@ -6790,7 +6792,7 @@ function applyCivicFamily(
       city: String(member.city ?? ""),
       room: String(member.room ?? ""),
       state,
-      idType: "",
+      idType: String(r.idType ?? ""),
       registryId: rid,
       familyMembers: 1,
       familyMales: 0,

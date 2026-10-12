@@ -553,6 +553,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
     setState(() {
       if (gender != null) _gender = gender;
       if (relatives != null) _relatives = relatives;
+      _relatives = ngmyCivicAlignSpouses(_gender, _relatives);
       if (_relatives.isEmpty && relatives == null) return;
       final c = ngmyCivicFamilyCounts(_gender, _relatives);
       _familyMembersC.text = '${c.total}';
@@ -1211,7 +1212,16 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                         NgmyCivicFamilyButton(
                           relatives: _relatives,
                           onTap: () async {
-                            final next = await showNgmyCivicFamilyEditor(context, relatives: _relatives, headName: _nameC.text);
+                            final next = await showNgmyCivicFamilyEditor(
+                              context,
+                              relatives: _relatives,
+                              home: NgmyCivicFamilyHome(
+                                headName: _nameC.text,
+                                headGender: _gender,
+                                address: _addressC.text,
+                                city: _selectedState,
+                              ),
+                            );
                             if (next != null && mounted) _setFamily(relatives: next);
                           },
                         ),
