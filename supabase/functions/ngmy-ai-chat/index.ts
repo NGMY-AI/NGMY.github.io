@@ -5589,7 +5589,8 @@ function rankingSnapshotFrom(
     seen.set(key, prev ? preferCanonicalRankingRow(prev, m) : m);
   }
   return [...seen.values()].map((m) => ({
-    fullName: String(m.fullName ?? ""),
+    // Married couples rank as one household, shown under the husband.
+    fullName: String(m.householdHeadName ?? "").trim() || String(m.fullName ?? ""),
     username: String(m.username ?? ""),
     registryId: String(m.registryId ?? "").trim(),
     state: displayStateName(String(m.state ?? state)),
@@ -6607,6 +6608,229 @@ async function handleCivicPersistRoster(
 }
 
 /** Upsert one member into the cloud roster — used for immediate enroll (no full-roster payload). */
+// ── Civic Registry families ───────────────────────────────────────────────
+// A member row is a household. Its spouse and unmarried children live inside
+// it as `relatives` — they never appear in public search, are never ranked and
+// never contribute on their own (a married couple counts as one household).
+// A child marked married, or a spouse marked divorced / separated, is split
+// into their own member row (their own household) and stays linked to the
+// family they came from.
+
+type CivicRel = Record<string, unknown>;
+
+const CIVIC_MAX_RELATIVES = 40;
+
+function civicRelList(v: unknown, max = CIVIC_MAX_RELATIVES): CivicRel[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x) => x && typeof x === "object" && !Array.isArray(x))
+    .slice(0, max)
+    .map((x) => ({ ...(x as CivicRel) }));
+}
+
+function civicGender(v: unknown): string {
+  const g = String(v ?? "").trim().toLowerCase();
+  return g === "male" || g === "female" ? g : "";
+}
+
+/** Clean one relative coming from a phone. */
+function civicCleanRel(r: CivicRel, depth = 0): CivicRel | null {
+  const relation = String(r.relation ?? "").trim().toLowerCase() === "spouse" ? "spouse" : "child";
+  const fullName = String(r.fullName ?? "").trim().slice(0, 80);
+  if (!fullName) return null;
+  const out: CivicRel = {
+    id: String(r.id ?? "").trim().slice(0, 40) || `rel_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+    relation,
+    fullName,
+    gender: civicGender(r.gender),
+    dob: String(r.dob ?? "").trim().slice(0, 10),
+    age: Number(r.age ?? 0) > 0 && Number(r.age) < 130 ? Math.floor(Number(r.age)) : null,
+    phone: String(r.phone ?? "").replace(/\D/g, "").slice(0, 15),
+    status: "",
+  };
+  if (relation === "spouse") {
+    const s = String(r.status ?? "married").trim().toLowerCase();
+    out.status = s === "divorced" || s === "separated" ? s : "married";
+  } else {
+    out.status = String(r.status ?? "single").trim().toLowerCase() === "married" ? "married" : "single";
+    // A married child brings their own spouse / children (one level deep).
+    if (out.status === "married" && depth === 0) {
+      out.relatives = civicRelList(r.relatives, 20)
+        .map((x) => civicCleanRel(x, depth + 1))
+        .filter((x): x is CivicRel => x !== null);
+    }
+  }
+  const own = String(r.ownRegistryId ?? "").trim();
+  if (own) out.ownRegistryId = own;
+  return out;
+}
+
+/** Same child in two records = same name + birthday/age. */
+function civicChildKey(r: CivicRel): string {
+  const n = String(r.fullName ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!n) return "";
+  const d = String(r.dob ?? "").trim() || (r.age ? `age${r.age}` : "");
+  return `${n}|${d}`;
+}
+
+/** Who still lives in this household (spun-off people have their own). */
+function civicHouseholdRels(rels: CivicRel[]): CivicRel[] {
+  return rels.filter((r) => {
+    if (String(r.ownRegistryId ?? "").trim()) return false;
+    if (r.relation === "spouse") return r.status === "married";
+    return r.status !== "married";
+  });
+}
+
+function civicFamilyCounts(
+  selfGender: string,
+  rels: CivicRel[],
+): { total: number; males: number; females: number; allKnown: boolean } {
+  const inHouse = civicHouseholdRels(rels);
+  const genders = [selfGender, ...inHouse.map((r) => civicGender(r.gender))];
+  return {
+    total: 1 + inHouse.length,
+    males: genders.filter((g) => g === "male").length,
+    females: genders.filter((g) => g === "female").length,
+    allKnown: genders.every((g) => g !== ""),
+  };
+}
+
+/** A married couple's household is shown under the husband. */
+function civicHouseholdHeadName(member: CivicRel): string {
+  const self = String(member.fullName ?? "").trim();
+  if (civicGender(member.gender) !== "female") return self;
+  const husband = civicRelList(member.relatives).find((r) =>
+    r.relation === "spouse" && r.status === "married" && civicGender(r.gender) === "male" &&
+    !String(r.ownRegistryId ?? "").trim()
+  );
+  return husband ? String(husband.fullName ?? "").trim() || self : self;
+}
+
+function civicApplyCounts(member: CivicRel): void {
+  const rels = civicRelList(member.relatives);
+  if (!rels.length && !civicGender(member.gender)) return;
+  const c = civicFamilyCounts(civicGender(member.gender), rels);
+  if (rels.length) {
+    member.familyMembers = c.total;
+    if (c.allKnown) {
+      member.familyMales = c.males;
+      member.familyFemales = c.females;
+    }
+  }
+  member.householdHeadName = civicHouseholdHeadName(member);
+}
+
+/**
+ * Cleans [member]'s family, enforces "a child belongs to at most two parents",
+ * and splits married children / divorced spouses into their own member rows.
+ * [others] = every other member row (not this one).
+ */
+function applyCivicFamily(
+  member: CivicRel,
+  others: CivicRel[],
+  existingIds: Set<string>,
+): { error?: string; spawned: CivicRel[] } {
+  const spawned: CivicRel[] = [];
+  member.gender = civicGender(member.gender);
+  const ms = String(member.maritalStatus ?? "").trim().toLowerCase();
+  member.maritalStatus = ["single", "married", "divorced", "separated", "widowed"].includes(ms) ? ms : "";
+  const rels = civicRelList(member.relatives)
+    .map((r) => civicCleanRel(r))
+    .filter((x): x is CivicRel => x !== null);
+
+  // A child can only be listed under their mother and father.
+  for (const r of rels) {
+    if (r.relation !== "child" || String(r.ownRegistryId ?? "").trim()) continue;
+    const key = civicChildKey(r);
+    if (!key) continue;
+    let parents = 0;
+    for (const o of others) {
+      if (civicRelList(o.relatives).some((x) =>
+        x.relation === "child" && !String(x.ownRegistryId ?? "").trim() && civicChildKey(x) === key
+      )) parents++;
+    }
+    if (parents >= 2) {
+      return {
+        error: `${r.fullName} is already listed as a child in two families (their mother and father). A child can only be added under two parents.`,
+        spawned,
+      };
+    }
+  }
+
+  const state = String(member.state ?? "").trim();
+  const now = new Date().toISOString();
+  const headRidKey = String(member.registryId ?? "").trim().toUpperCase();
+  // Already has their own household? (enrolled before, or split off earlier from this family)
+  const findExisting = (r: CivicRel): CivicRel | undefined => {
+    const n = String(r.fullName ?? "").trim().toLowerCase();
+    const d = String(r.dob ?? "").trim();
+    if (!n) return undefined;
+    return others.find((o) => {
+      if (String(o.fullName ?? "").trim().toLowerCase() !== n) return false;
+      if (canonicalStateKey(String(o.state ?? "")) !== canonicalStateKey(state)) return false;
+      const od = String(o.dob ?? "").trim();
+      if (d && od) return d === od;
+      const parents = Array.isArray(o.parentRegistryIds) ? o.parentRegistryIds.map((x) => String(x).trim().toUpperCase()) : [];
+      return parents.includes(headRidKey) || String(o.formerSpouseRegistryId ?? "").trim().toUpperCase() === headRidKey;
+    });
+  };
+  const spawn = (r: CivicRel, extra: CivicRel): string => {
+    const already = findExisting(r);
+    if (already && String(already.registryId ?? "").trim()) return String(already.registryId).trim();
+    const rid = generateRegistryId(state, existingIds);
+    existingIds.add(rid.toUpperCase());
+    const row: CivicRel = {
+      email: `civic.${rid.toLowerCase()}@guest.ngmy`,
+      fullName: r.fullName,
+      gender: civicGender(r.gender),
+      dob: r.dob ?? "",
+      phone: r.phone ?? "",
+      homeAddress: String(r.homeAddress ?? member.homeAddress ?? ""),
+      city: String(member.city ?? ""),
+      room: String(member.room ?? ""),
+      state,
+      idType: "",
+      registryId: rid,
+      familyMembers: 1,
+      familyMales: 0,
+      familyFemales: 0,
+      enrollmentSource: "family_split",
+      registeredByToken: member.registeredByToken ?? "",
+      enrolledAt: now,
+      updatedAt: now,
+      restoredAt: now,
+      ...extra,
+    };
+    civicApplyCounts(row);
+    spawned.push(row);
+    return rid;
+  };
+
+  const headRid = String(member.registryId ?? "").trim();
+  for (const r of rels) {
+    if (String(r.ownRegistryId ?? "").trim()) continue;
+    if (r.relation === "child" && r.status === "married") {
+      // Married child → their own household, with their own spouse / kids.
+      r.ownRegistryId = spawn(r, {
+        maritalStatus: "married",
+        relatives: civicRelList(r.relatives),
+        parentRegistryIds: headRid ? [headRid] : [],
+      });
+    } else if (r.relation === "spouse" && (r.status === "divorced" || r.status === "separated")) {
+      // Divorced / separated → counted on their own from now on.
+      r.ownRegistryId = spawn(r, {
+        maritalStatus: r.status,
+        relatives: [],
+        formerSpouseRegistryId: headRid,
+      });
+    }
+  }
+  member.relatives = rels;
+  civicApplyCounts(member);
+  return { spawned };
+}
+
 async function handleCivicUpsertMember(
   req: Request,
   body: Record<string, unknown>,
@@ -6683,7 +6907,19 @@ async function handleCivicUpsertMember(
   }
   member.registryId = registryId;
 
-  const nextMembers = mergeMemberLists(members, [member]);
+  // Spouse / children / married-child splits (see applyCivicFamily).
+  const famIds = new Set(
+    members.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  famIds.add(registryId.toUpperCase());
+  const fam = applyCivicFamily(
+    member,
+    members.filter((m) => String(m.registryId ?? "").trim().toUpperCase() !== registryId.toUpperCase()),
+    famIds,
+  );
+  if (fam.error) return jsonOk({ ok: false, error: fam.error }, 400);
+
+  const nextMembers = mergeMemberLists(members, [member, ...fam.spawned]);
   const memberEmail = emailKey(String(member.email ?? ""));
   const memberRid = String(member.registryId ?? "").trim().toUpperCase();
   const nextRemoved = removed.filter((r) => {
@@ -6701,7 +6937,14 @@ async function handleCivicUpsertMember(
     source: "civicUpsertMember",
   });
   if (!saved.ok) return jsonOk({ ok: false, error: saved.error ?? "Save failed" }, 500);
-  return jsonOk({ ok: true, registryId, memberCount: nextMembers.length });
+  return jsonOk({
+    ok: true,
+    registryId,
+    memberCount: nextMembers.length,
+    // New households split off from this family (married children, divorced spouses).
+    spawned: fam.spawned.map((s) => ({ registryId: s.registryId, fullName: s.fullName })),
+    relatives: member.relatives ?? [],
+  });
 }
 
 async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Response> {
@@ -6713,11 +6956,13 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
   const familyMales = Number(body.familyMales ?? 0) || 0;
   const familyFemales = Number(body.familyFemales ?? 0) || 0;
   const registrarToken = String(body.registeredByToken ?? body.registrarToken ?? "").trim();
+  const guestRelatives = civicRelList(body.relatives);
 
   if (!fullName || !phone || !homeAddress || !state) {
     return jsonOk({ error: "fullName, phone, homeAddress, and state are required" }, 400);
   }
-  if (familyMales + familyFemales !== familyMembers) {
+  // With family members listed, the counts are worked out from them.
+  if (!guestRelatives.length && familyMales + familyFemales !== familyMembers) {
     return jsonOk({ error: "familyMales + familyFemales must equal familyMembers" }, 400);
   }
 
@@ -6803,6 +7048,9 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
     registeredByToken: registrarToken,
     enrolledAt: now,
     updatedAt: now,
+    gender: civicGender(body.gender),
+    maritalStatus: String(body.maritalStatus ?? "").trim().toLowerCase(),
+    relatives: guestRelatives,
   };
 
   // Re-load right before write so concurrent self-enrolls are not overwritten.
@@ -6824,7 +7072,13 @@ async function handleCivicGuestEnroll(body: Record<string, unknown>): Promise<Re
       ok: false,
     }, 409);
   }
-  const nextMembers = mergeMemberLists(latestMembers, [member]);
+  const guestIds = new Set(
+    latestMembers.map((m) => String(m.registryId ?? "").trim().toUpperCase()).filter(Boolean),
+  );
+  guestIds.add(registryId.toUpperCase());
+  const guestFam = applyCivicFamily(member, latestMembers, guestIds);
+  if (guestFam.error) return jsonOk({ ok: false, error: guestFam.error }, 400);
+  const nextMembers = mergeMemberLists(latestMembers, [member, ...guestFam.spawned]);
   const nextRemoved = latestRemoved.filter(
     (r) => emailKey(String(r.email ?? "")) !== emailKey(guestEmail),
   );

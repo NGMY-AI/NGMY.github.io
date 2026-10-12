@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_civic_enroll_link.dart';
+import 'ngmy_civic_family.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_id_card.dart';
 import 'ngmy_civic_registry_stats.dart';
@@ -123,6 +124,10 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
   final _familyMembersC = TextEditingController();
   final _familyMalesC = TextEditingController();
   final _familyFemalesC = TextEditingController();
+  /// Self gender / marital status and spouse + children (+ Family).
+  String _gender = '';
+  String _marital = '';
+  List<Map<String, dynamic>> _relatives = [];
   final _dobC = TextEditingController();
   final _registryIdC = TextEditingController();
 
@@ -335,11 +340,13 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Andika ukubwa wa familia (1–99).');
       return;
     }
-    if (malesRaw.isEmpty) {
+    // With + Family the people added give the counts; M/F only when typed.
+    final hasFamily = _relatives.isNotEmpty;
+    if (malesRaw.isEmpty && !hasFamily) {
       _toast('Wanaume (M) wanahitajika — andika idadi.');
       return;
     }
-    if (femalesRaw.isEmpty) {
+    if (femalesRaw.isEmpty && !hasFamily) {
       _toast('Wanawake (F) wanahitajika — andika idadi.');
       return;
     }
@@ -351,7 +358,7 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       _toast('Wanawake lazima iwe nambari halali.');
       return;
     }
-    if (males + females != familyMembers) {
+    if ((malesRaw.isNotEmpty || femalesRaw.isNotEmpty || !hasFamily) && males + females != familyMembers) {
       _toast('Wanaume + wanawake lazima iwe sawa na ukubwa wa familia ($familyMembers).');
       return;
     }
@@ -413,6 +420,9 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
         'familyMembers': familyMembers,
         'familyMales': males,
         'familyFemales': females,
+        'gender': _gender,
+        'maritalStatus': _marital,
+        if (_relatives.isNotEmpty) 'relatives': _relatives,
         'registeredByToken': _registrarToken,
         if (_linkVersion > 0) 'k': _linkVersion,
         if (_legacyLinkToken.isNotEmpty) 'linkToken': _legacyLinkToken,
@@ -536,6 +546,24 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
       return;
     }
     setState(() => _unlockedRegistryId = id);
+  }
+
+  /// Family size and M/F follow the people added with + Family.
+  void _setFamily({String? gender, List<Map<String, dynamic>>? relatives}) {
+    setState(() {
+      if (gender != null) _gender = gender;
+      if (relatives != null) _relatives = relatives;
+      if (_relatives.isEmpty && relatives == null) return;
+      final c = ngmyCivicFamilyCounts(_gender, _relatives);
+      _familyMembersC.text = '${c.total}';
+      if (c.allKnown) {
+        _familyMalesC.text = '${c.males}';
+        _familyFemalesC.text = '${c.females}';
+      } else {
+        _familyMalesC.clear();
+        _familyFemalesC.clear();
+      }
+    });
   }
 
   void _toast(String msg) {
@@ -1135,6 +1163,20 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
+                          'Jinsia yako / Your gender',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        NgmyCivicGenderPicker(value: _gender, onChanged: (v) => _setFamily(gender: v)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Hali ya ndoa / Marital status',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 13, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 8),
+                        NgmyCivicMaritalPicker(value: _marital, onChanged: (v) => setState(() => _marital = v)),
+                        const SizedBox(height: 14),
+                        Text(
                           'Ukubwa wa familia',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.78),
@@ -1164,6 +1206,14 @@ class _NgmyGuestCivicEnrollScreenState extends State<NgmyGuestCivicEnrollScreen>
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 10),
+                        NgmyCivicFamilyButton(
+                          relatives: _relatives,
+                          onTap: () async {
+                            final next = await showNgmyCivicFamilyEditor(context, relatives: _relatives, headName: _nameC.text);
+                            if (next != null && mounted) _setFamily(relatives: next);
+                          },
                         ),
                         const SizedBox(height: 4),
                         Text(

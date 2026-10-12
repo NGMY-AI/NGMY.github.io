@@ -46,6 +46,7 @@ import 'ngmy_invoice_guest.dart';
 import 'ngmy_menu_guest.dart';
 import 'ngmy_bio_guest.dart';
 import 'ngmy_civic_enroll_guest.dart';
+import 'ngmy_civic_family.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -32042,6 +32043,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   String? _editingMemberRegistryId;
   /// Quiet registrar notes: fieldKey → {status, notedAt, notedBy}.
   Map<String, Map<String, dynamic>> _enrollmentFlags = {};
+  /// Enrollee's gender / marital status and their spouse + children.
+  String _enrollGender = '';
+  String _enrollMarital = '';
+  List<Map<String, dynamic>> _enrollRelatives = [];
   final Set<String> _dismissedReceiptKeys = {};
   final Set<String> _openedReceiptKeys = {};
   Map<String, dynamic>? _localRegistrarBackup;
@@ -34157,6 +34162,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     _familyMalesC.clear();
     _familyFemalesC.clear();
     _enrollmentFlags = {};
+    _enrollGender = '';
+    _enrollMarital = '';
+    _enrollRelatives = [];
     if (clearEditing) {
       _editingMemberOriginalEmail = null;
       _editingMemberRegistryId = null;
@@ -34189,6 +34197,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       final formEmail = (raw?['email'] ?? u.email).toString();
       _editingMemberRegistryId = registryId;
       _enrollmentFlags = ngmyReadProfileFlags(raw);
+      _enrollGender = '${raw?['gender'] ?? ''}'.trim().toLowerCase();
+      _enrollMarital = '${raw?['maritalStatus'] ?? ''}'.trim().toLowerCase();
+      _enrollRelatives = ngmyCivicRelativesOf(raw);
       if (state.isNotEmpty) _selectedState = state;
       _fullNameC.text = (raw?['fullName'] ?? u.fullName ?? u.username).toString();
       if (_fullNameC.text.trim() == '***') {
@@ -34216,6 +34227,69 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         backgroundColor: const Color(0xFF2563EB),
       ),
     );
+  }
+
+  /// Adds the enrollee's gender / marital status / family to [m] and returns it.
+  Map<String, dynamic> _putEnrollFamily(Map<String, dynamic> m) {
+    m['gender'] = _enrollGender;
+    m['maritalStatus'] = _enrollMarital;
+    m['relatives'] = _enrollRelatives.map((r) => Map<String, dynamic>.from(r)).toList();
+    return m;
+  }
+
+  /// A child can only be under two parents — checked before saving.
+  bool _enrollFamilyOk({String excludeRegistryId = ''}) {
+    final msg = ngmyCivicChildParentConflict(
+      NgmyCivicRegistryMembers.listFrom(widget.config),
+      _enrollRelatives,
+      excludeRegistryId: excludeRegistryId,
+    );
+    if (msg == null) return true;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: Colors.red, duration: const Duration(seconds: 8)),
+    );
+    return false;
+  }
+
+  /// Keeps the server's family (with the ids of split-off households) on the
+  /// local row so the next save does not split them again.
+  void _applyFamilySaveResult(String registryId) {
+    final rels = ngmyCivicLastUpsertRelatives;
+    final rid = registryId.trim().toUpperCase();
+    if (rels.isNotEmpty && rid.isNotEmpty) {
+      final list = NgmyCivicRegistryMembers.listFrom(widget.config);
+      final i = list.indexWhere((m) => '${m['registryId'] ?? ''}'.trim().toUpperCase() == rid);
+      if (i >= 0) {
+        list[i] = {...list[i], 'relatives': rels};
+        NgmyCivicRegistryMembers.setList(widget.config, list);
+      }
+    }
+    if (ngmyCivicLastUpsertSpawned.isNotEmpty) unawaited(_loadSharedCivicDirectory());
+  }
+
+  String _familySpawnedNote() {
+    final s = ngmyCivicLastUpsertSpawned;
+    if (s.isEmpty) return '';
+    final names = s.map((e) => '${e['fullName'] ?? ''}'.trim()).where((n) => n.isNotEmpty).join(', ');
+    return ' $names now ${s.length == 1 ? 'has their' : 'have their'} own family in Members.';
+  }
+
+  /// Family size and male/female follow the people added with + Family.
+  void _setEnrollFamily({String? gender, List<Map<String, dynamic>>? relatives}) {
+    setState(() {
+      if (gender != null) _enrollGender = gender;
+      if (relatives != null) _enrollRelatives = relatives;
+      if (_enrollRelatives.isEmpty && relatives == null) return;
+      final c = ngmyCivicFamilyCounts(_enrollGender, _enrollRelatives);
+      _familyMembersC.text = '${c.total}';
+      if (c.allKnown) {
+        _familyMalesC.text = '${c.males}';
+        _familyFemalesC.text = '${c.females}';
+      } else {
+        _familyMalesC.clear();
+        _familyFemalesC.clear();
+      }
+    });
   }
 
   Future<void> _registerMember({UserData? targetUser, BuildContext? closeSelfSheet}) async {
@@ -34338,6 +34412,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       );
       return;
     }
+    if (!_enrollFamilyOk()) return;
 
     final accountIdx = email.isEmpty
         ? -1
@@ -34368,6 +34443,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     );
     final flagsJson = ngmyProfileFlagsToJson(_enrollmentFlags);
     if (flagsJson.isNotEmpty) member['profileFlags'] = flagsJson;
+    _putEnrollFamily(member);
 
     setState(() {
       NgmyCivicRegistryMembers.upsert(
@@ -34395,6 +34471,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       state: _selectedState,
     );
     var saved = upsert.ok;
+    final familyError = ngmyCivicLastUpsertFamilyError;
+    if (familyError != null) {
+      // Refused for its family (a child already under two parents) — undo it here.
+      setState(() => NgmyCivicRegistryMembers.setList(
+            widget.config,
+            NgmyCivicRegistryMembers.listFrom(widget.config)
+                .where((m) => '${m['registryId'] ?? ''}'.trim().toUpperCase() != registryId.toUpperCase())
+                .toList(),
+          ));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(familyError), backgroundColor: Colors.red, duration: const Duration(seconds: 8)),
+      );
+      return;
+    }
+    if (saved) _applyFamilySaveResult(registryId);
     if (!saved) {
       saved = await _persistRegistryMember(displayUser);
     } else {
@@ -34411,7 +34503,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       SnackBar(
         content: Text(
           saved
-              ? 'Member enrolled and saved to database.'
+              ? 'Member enrolled and saved to database.${_familySpawnedNote()}'
               : 'Could not save to database${upsert.error != null ? ': ${upsert.error}' : ''}. Sign in again and retry.',
         ),
         backgroundColor: saved ? Colors.green : Colors.red,
@@ -34550,6 +34642,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       );
       return;
     }
+    if (!_enrollFamilyOk(excludeRegistryId: registryId)) return;
 
     final saveState = () {
       final selected = _selectedState.trim();
@@ -34596,6 +34689,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         'familyMales': familyMales < 0 ? 0 : familyMales,
         'familyFemales': familyFemales < 0 ? 0 : familyFemales,
         'profileFlags': ngmyProfileFlagsToJson(_enrollmentFlags),
+        ..._putEnrollFamily(<String, dynamic>{}),
       },
     );
     if (updated == null) {
@@ -34637,6 +34731,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       state: _selectedState,
     );
     var saved = upsert.ok;
+    final familyError = ngmyCivicLastUpsertFamilyError;
+    if (familyError != null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(familyError), backgroundColor: Colors.red, duration: const Duration(seconds: 8)),
+      );
+      return;
+    }
+    if (saved) _applyFamilySaveResult(registryId);
     if (!saved) {
       saved = await ngmyPersistCivicRegistryMembers(
         widget.config,
@@ -34678,7 +34781,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       SnackBar(
         content: Text(
           saved
-              ? 'Member profile updated and saved to database.'
+              ? 'Member profile updated and saved to database.${_familySpawnedNote()}'
               : 'Member updated here, but cloud save failed — tap Sync in Registry Backup.',
         ),
         backgroundColor: saved ? Colors.green : Colors.orange,
@@ -44905,6 +45008,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ),
               const SizedBox(height: 20),
 
+              const Text('Gender', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              NgmyCivicGenderPicker(value: _enrollGender, isDark: isDark, onChanged: (v) => _setEnrollFamily(gender: v)),
+              const SizedBox(height: 16),
+              const Text('Marital status', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              NgmyCivicMaritalPicker(value: _enrollMarital, isDark: isDark, onChanged: (v) => setState(() => _enrollMarital = v)),
+              const SizedBox(height: 20),
+
               _enrollFlagLabel('Family Size *', 'familyMembers'),
               const SizedBox(height: 8),
               TextField(
@@ -44971,6 +45083,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              NgmyCivicFamilyButton(
+                relatives: _enrollRelatives,
+                isDark: isDark,
+                onTap: () async {
+                  final next = await showNgmyCivicFamilyEditor(context, relatives: _enrollRelatives, headName: _fullNameC.text);
+                  if (next != null && mounted) _setEnrollFamily(relatives: next);
+                },
               ),
               const SizedBox(height: 30),
 

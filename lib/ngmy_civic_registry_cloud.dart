@@ -302,6 +302,15 @@ Future<({bool ok, String url, String linkToken, int linkVersion, String? error})
   );
 }
 
+/// Family details from the last [ngmyCivicUpsertMember]: the server's cleaned
+/// relatives list (with ids of split-off households) and the new households it made.
+List<Map<String, dynamic>> ngmyCivicLastUpsertRelatives = const [];
+List<Map<String, dynamic>> ngmyCivicLastUpsertSpawned = const [];
+
+/// Set when the server refused the family (e.g. a child already under two parents).
+/// Callers must not fall back to a bulk roster save in that case.
+String? ngmyCivicLastUpsertFamilyError;
+
 /// Immediate single-member save to database (registrar / admin enroll).
 Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
   required String email,
@@ -311,6 +320,9 @@ Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
   bool heal = false,
 }) async {
   final slim = _slimMemberForCloud(member);
+  ngmyCivicLastUpsertRelatives = const [];
+  ngmyCivicLastUpsertSpawned = const [];
+  ngmyCivicLastUpsertFamilyError = null;
   Future<({bool ok, String? registryId, String? error})> once() async {
     final data = await ngmyCivicInvoke({
       'action': 'civicUpsertMember',
@@ -322,18 +334,24 @@ Future<({bool ok, String? registryId, String? error})> ngmyCivicUpsertMember({
     if (data == null) {
       return (ok: false, registryId: null, error: 'Could not reach server.');
     }
+    List<Map<String, dynamic>> maps(dynamic v) =>
+        v is List ? v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
     if (data['ok'] == true) {
+      ngmyCivicLastUpsertRelatives = maps(data['relatives']);
+      ngmyCivicLastUpsertSpawned = maps(data['spawned']);
       return (
         ok: true,
         registryId: (data['registryId'] ?? slim['registryId'] ?? '').toString(),
         error: null,
       );
     }
-    return (ok: false, registryId: null, error: _civicCloudError(data, 'Cloud save failed'));
+    final err = _civicCloudError(data, 'Cloud save failed');
+    if (err.contains('two families') || err.contains('two parents')) ngmyCivicLastUpsertFamilyError = err;
+    return (ok: false, registryId: null, error: err);
   }
 
   var result = await once();
-  if (!result.ok) {
+  if (!result.ok && ngmyCivicLastUpsertFamilyError == null) {
     // One retry after forced session refresh.
     try {
       await Supabase.instance.client.auth.refreshSession();
