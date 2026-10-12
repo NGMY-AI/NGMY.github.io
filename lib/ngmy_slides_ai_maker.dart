@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -338,7 +339,7 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({required String description, requi
 }
 
 /// The "describe it" sheet. Returns the finished deck, or null if closed.
-Future<NgmySlideDeck?> showNgmySlidesAiMaker(BuildContext context, {bool startListening = true}) {
+Future<NgmySlideDeck?> showNgmySlidesAiMaker(BuildContext context, {bool startListening = false}) {
   return showModalBottomSheet<NgmySlideDeck>(
     context: context,
     isScrollControlled: true,
@@ -375,21 +376,37 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
 
   @override
   void dispose() {
+    _micWatch?.cancel();
     unawaited(NgmyVoiceInput.stop());
     _pulse.dispose();
     _desc.dispose();
     super.dispose();
   }
 
+  Timer? _micWatch;
+  DateTime? _micStartedAt;
+  bool _heardSomething = false;
+  String _live = '';
+
+  Future<void> _stopMic() async {
+    _micWatch?.cancel();
+    _micWatch = null;
+    await NgmyVoiceInput.stop();
+    _pulse.stop();
+    if (mounted) setState(() => _listening = false);
+  }
+
+  /// Only ever started by a tap — browsers block the microphone otherwise.
   Future<void> _toggleMic() async {
     if (_listening) {
-      await NgmyVoiceInput.stop();
-      if (mounted) setState(() => _listening = false);
-      _pulse.stop();
+      await _stopMic();
       return;
     }
     HapticFeedback.mediumImpact();
     _before = _desc.text.trim();
+    _live = '';
+    _heardSomething = false;
+    _micStartedAt = DateTime.now();
     setState(() {
       _listening = true;
       _error = null;
@@ -397,19 +414,44 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
     _pulse.repeat(reverse: true);
     final ok = await NgmyVoiceInput.listen(onText: (t, {bool isFinal = false}) {
       if (!mounted) return;
-      final joined = [_before, t.trim()].where((s) => s.isNotEmpty).join(' ');
-      _desc.value = TextEditingValue(text: joined, selection: TextSelection.collapsed(offset: joined.length));
-      if (isFinal) {
-        _before = joined;
+      final heard = t.trim();
+      if (heard.isEmpty) return;
+      // Each update is everything heard in this listening session. When the
+      // browser quietly restarts listening, a new session starts from scratch —
+      // keep what was already heard instead of losing or repeating it.
+      if (_live.isNotEmpty && !heard.startsWith(_live.substring(0, math.min(8, _live.length)))) {
+        _before = [_before, _live].where((s) => s.isNotEmpty).join(' ');
       }
+      _live = heard;
+      _heardSomething = true;
+      final joined = [_before, _live].where((s) => s.isNotEmpty).join(' ');
+      _desc.value = TextEditingValue(text: joined, selection: TextSelection.collapsed(offset: joined.length));
+      if (_error != null) setState(() => _error = null);
     });
-    if (!ok && mounted) {
+    if (!mounted) return;
+    if (!ok) {
       _pulse.stop();
       setState(() {
         _listening = false;
-        _error = 'The microphone could not start. Allow microphone access, or type your idea below.';
+        _error = NgmyVoiceInput.userMessageForError(NgmyVoiceInput.lastError);
       });
+      return;
     }
+    // Keep an eye on it: surface a blocked mic or silence instead of pretending.
+    _micWatch = Timer.periodic(const Duration(milliseconds: 600), (_) {
+      if (!mounted || !_listening) return;
+      final err = NgmyVoiceInput.lastError;
+      if (err != null && err.isNotEmpty && !err.contains('no-speech') && !err.contains('aborted')) {
+        unawaited(_stopMic());
+        setState(() => _error = NgmyVoiceInput.userMessageForError(err));
+        return;
+      }
+      final secs = DateTime.now().difference(_micStartedAt ?? DateTime.now()).inSeconds;
+      if (!_heardSomething && secs >= 7 && _error == null) {
+        setState(() => _error =
+            'I can\'t hear anything yet. Check that NGMY is allowed to use the microphone (lock icon in the address bar → Microphone → Allow) and speak close to the mic. Chrome works best — or type below.');
+      }
+    });
   }
 
   Future<void> _create() async {
@@ -418,7 +460,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
       setState(() => _error = 'Tell me a little about the presentation first.');
       return;
     }
-    if (_listening) await _toggleMic();
+    if (_listening) await _stopMic();
     setState(() {
       _busy = true;
       _error = null;
@@ -503,7 +545,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _listening ? 'Listening… tap to stop' : 'Tap to speak',
+                  _listening ? (_heardSomething ? 'Got it — keep talking, tap to stop' : 'Listening… speak now') : 'Tap the mic to speak',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: _listening ? const Color(0xFFFCA5A5) : Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
                 ),

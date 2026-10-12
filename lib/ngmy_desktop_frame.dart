@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 /// the content is told the screen is that wide (so cards sized from the screen
 /// width shrink too). Phones and small tablets are left exactly as they are.
 class NgmyDesktopColumn extends StatelessWidget {
-  const NgmyDesktopColumn({super.key, required this.child, this.maxWidth = 680, this.background});
+  const NgmyDesktopColumn({super.key, required this.child, this.maxWidth = 940, this.background});
 
   final Widget child;
   final double maxWidth;
@@ -14,7 +14,7 @@ class NgmyDesktopColumn extends StatelessWidget {
   /// Colour beside the column. Defaults to the theme's page colour.
   final Color? background;
 
-  static bool isWide(BuildContext context, {double maxWidth = 680}) =>
+  static bool isWide(BuildContext context, {double maxWidth = 940}) =>
       MediaQuery.sizeOf(context).width > maxWidth + 80;
 
   @override

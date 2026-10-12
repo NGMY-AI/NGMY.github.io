@@ -899,28 +899,36 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     });
   }
 
-  /// Mic on Blank Presentation: describe it, the AI builds a styled deck, open it.
+  /// Mic next to View: describe the presentation, the AI writes styled slides.
+  /// An empty presentation is filled; one with content gets the new slides
+  /// after the current slide (nothing the user made is replaced). Undo works.
   Future<void> _createWithAi() async {
-    final deck = await showNgmySlidesAiMaker(context);
-    if (deck == null || !mounted) return;
-    _pushUndoIfEditing();
-    setState(() {
-      _activeDeck = deck.copy();
-      _slideIndex = 0;
+    if (_activeDeck == null || _guardTransferredEdit()) return;
+    final made = await showNgmySlidesAiMaker(context);
+    if (made == null || !mounted || _activeDeck == null) return;
+    final deck = _activeDeck!;
+    final empty = deck.slides.every((s) => s.elements.isEmpty);
+    _mutate(() {
+      if (empty) {
+        deck.slides
+          ..clear()
+          ..addAll(made.slides);
+        final n = deck.name.trim().toLowerCase();
+        if (n.isEmpty || n.startsWith('untitled')) deck.name = made.name;
+        _slideIndex = 0;
+      } else {
+        deck.slides.insertAll(_slideIndex + 1, made.slides);
+        _slideIndex++;
+      }
       _selectedElementId = null;
-      _isDraft = true;
-      _undo.clear();
-      _redo.clear();
-      _clearTextControllers();
     });
-    // Save it right away — the user asked for it, so it shouldn't vanish as an untouched draft.
-    _commitDraftIfNeeded();
-    unawaited(_persistDecks());
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Your ${deck.slides.length}-slide presentation is ready — tap any text to edit it.')),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(empty
+            ? 'Your ${made.slides.length}-slide presentation is ready — tap any text to edit it.'
+            : 'Added ${made.slides.length} AI slides after this one.'),
+      ),
+    );
   }
 
   void _createDeck({String? name, bool sample = false}) {
@@ -2887,42 +2895,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             Row(
               children: [
                 Expanded(
-                  child: Stack(
-                    children: [
-                      _actionCard(
-                        icon: Icons.add_rounded,
-                        label: 'Blank Presentation',
-                        color: const Color(0xFF2563EB),
-                        onTap: () => _createDeck(),
-                      ),
-                      // Little mic: describe the presentation and the AI makes it.
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Tooltip(
-                          message: 'Describe it — AI creates the slides',
-                          child: Material(
-                            color: Colors.transparent,
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: _createWithAi,
-                              child: Ink(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.5),
-                                  boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5), blurRadius: 12)],
-                                ),
-                                child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: _actionCard(
+                    icon: Icons.add_rounded,
+                    label: 'Blank Presentation',
+                    color: const Color(0xFF2563EB),
+                    onTap: () => _createDeck(),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -3906,7 +3883,29 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                     ),
                   ),
                 );
-              }).toList(),
+              }).toList()
+                // Little mic next to View: describe it, AI creates the slides.
+                ..add(
+                  Padding(
+                  padding: const EdgeInsets.only(left: 2),
+                  child: Tooltip(
+                    message: 'Describe it — AI creates the slides',
+                    child: GestureDetector(
+                      onTap: _createWithAi,
+                      child: Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                          boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 10)],
+                        ),
+                        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
+                      ),
+                    ),
+                  ),
+                  ),
+                ),
             ),
           ),
           SingleChildScrollView(
