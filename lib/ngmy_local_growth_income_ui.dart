@@ -865,15 +865,15 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   ];
 
   Widget _buildLocalBottomNavBar() {
-    const barHeight = 66.0;
-    const orb = 50.0;
+    const barHeight = 54.0;
+    const orb = 40.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: SafeArea(
         top: false,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 440),
+            constraints: const BoxConstraints(maxWidth: 330),
             child: Container(
               height: barHeight,
               decoration: BoxDecoration(
@@ -950,17 +950,17 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
               child: selected
-                  ? Icon(tab.icon, key: ValueKey('on$i'), size: 25, color: const Color(0xFF1A1405))
+                  ? Icon(tab.icon, key: ValueKey('on$i'), size: 21, color: const Color(0xFF1A1405))
                   : Column(
                       key: ValueKey('off$i'),
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(tab.icon, size: 22, color: Colors.white.withValues(alpha: 0.62)),
-                        const SizedBox(height: 3),
+                        Icon(tab.icon, size: 19, color: Colors.white.withValues(alpha: 0.62)),
+                        const SizedBox(height: 2),
                         Text(
                           tab.label,
                           maxLines: 1,
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 10.5),
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontWeight: FontWeight.w700, fontSize: 9.5),
                         ),
                       ],
                     ),

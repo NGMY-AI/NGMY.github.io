@@ -69,6 +69,8 @@ enum NgmyBioLayoutStyle {
   proKaleido,
   proFireflies,
   proRoseBloom,
+  proKoiPond,
+  proStainedGlass,
 }
 
 enum NgmyBioLinkStyle { rowIcon, outline, pill, goldBar, minimalLine, glass, neonOutline }
@@ -612,6 +614,9 @@ const List<NgmyBioTemplate> kNgmyBioTemplates = [
     serifTitle: false,
     sceneEffect: NgmyBioSceneEffect.prismShimmer,
   ),
+  // ── Showpieces: koi pond and stained glass ───────────────────────────────
+  NgmyBioTemplate(id: 'pro_zen_koi', name: 'Zen Koi', layout: NgmyBioLayoutStyle.proKoiPond, pageBg: Color(0xFF0B4A54), pageBgEnd: Color(0xFF062026), panelBg: Color(0xFF0B3B46), cardBg: Color(0x1FFFFFFF), cardBorder: Color(0x5599F6E4), accent: Color(0xFFFB923C), titleColor: Colors.white, subtitleColor: Color(0xFF99F6E4), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.glass, cardRadius: 20, cardShadow: false),
+  NgmyBioTemplate(id: 'pro_cathedral_light', name: 'Cathedral Light', layout: NgmyBioLayoutStyle.proStainedGlass, pageBg: Color(0xFF120B22), pageBgEnd: Color(0xFF1E1233), panelBg: Color(0xFF1E1233), cardBg: Color(0x1AFFFFFF), cardBorder: Color(0x88FBBF24), accent: Color(0xFFFBBF24), titleColor: Color(0xFFFFF7E6), subtitleColor: Color(0xFFE9D5FF), linkTextColor: Colors.white, linkStyle: NgmyBioLinkStyle.goldBar, headerGradient: [Color(0xFFB91C1C), Color(0xFF1D4ED8), Color(0xFF047857), Color(0xFF7E22CE), Color(0xFFD97706)], cardRadius: 10, cardShadow: false),
 ];
 
 NgmyBioTemplate ngmyBioTemplateById(String id) {

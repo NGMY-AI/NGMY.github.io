@@ -150,6 +150,14 @@ class _NgmyCardRenderBody extends StatelessWidget {
       're_floor_plan' => _layoutReFloorPlan(ctx),
       're_estate' => _layoutReEstate(ctx),
       're_map_pin' => _layoutReMapPin(ctx),
+      're_sold_stamp' => _layoutReSoldStamp(ctx),
+      're_open_house' => _layoutReOpenHouse(ctx),
+      're_just_listed' => _layoutReJustListed(ctx),
+      're_neon_rent' => _layoutReNeonRent(ctx),
+      're_marquee' => _layoutReMarquee(ctx),
+      're_door_hanger' => _layoutReDoorHanger(ctx),
+      're_forest_cabin' => _layoutReForestCabin(ctx),
+      're_brick_facade' => _layoutReBrickFacade(ctx),
       _ => _layoutVerticalSplit(ctx),
     };
     // Templates with their own logo placement (Orbit ring, hero strip, etc.).
@@ -179,6 +187,14 @@ class _NgmyCardRenderBody extends StatelessWidget {
       're_yard_sign',
       're_window',
       're_map_pin',
+      're_sold_stamp',
+      're_open_house',
+      're_just_listed',
+      're_neon_rent',
+      're_marquee',
+      're_door_hanger',
+      're_forest_cabin',
+      're_brick_facade',
     };
     final hasLogo = document.logoBytes != null;
     final needsLogoOverlay = hasLogo && !stylesWithBuiltInLogo.contains(tpl.renderStyle);
@@ -2381,4 +2397,698 @@ class _StreetMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _StreetMapPainter old) => old.ground != ground || old.accent != accent;
+}
+
+// ─── Real estate signs & homes (each one its own scene) ─────────────────────
+
+/// Short taglines ("SOLD", "OPEN HOUSE") replace the sign word; long ones would be cut off.
+String _reSignWord(_CardRenderCtx c, String fallback) {
+  final t = c.doc.tagline.trim();
+  return (t.isEmpty || t.length > 12 ? fallback : t).toUpperCase();
+}
+
+/// Name, title, company and contacts stacked from [left] / [top].
+List<Widget> _reInfoColumn(
+  _CardRenderCtx c, {
+  required double left,
+  double top = 16,
+  double? width,
+  Color? nameColor,
+  Color? subColor,
+}) {
+  final w = width ?? (c.w - left - 12);
+  Widget box(Widget child) => SizedBox(width: w, child: child);
+  return [
+    c.slot('name', box(c.txt(c.doc.fullName, size: c.h * 0.095, weight: FontWeight.w900, color: nameColor)), left: left, top: top),
+    c.slot('title', box(c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.046, weight: FontWeight.w800, maxLines: 1)), left: left, top: top + c.h * 0.135),
+    c.slot('company', box(c.txt(c.doc.company, color: subColor ?? c.sub, size: c.h * 0.043, maxLines: 1)), left: left, top: top + c.h * 0.21),
+    c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone, color: subColor), left: left, bottom: c.h * 0.3),
+    c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email, color: subColor), left: left, bottom: c.h * 0.17),
+    c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website, color: subColor), left: left, bottom: c.h * 0.05),
+  ];
+}
+
+// SOLD — a red rubber stamp pressed onto a navy card.
+Widget _layoutReSoldStamp(_CardRenderCtx c) {
+  final d = c.h * 0.68;
+  const ink = Color(0xFFDC2626);
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
+      // Faint "paperwork" lines behind the stamp.
+      for (var i = 0; i < 6; i++)
+        Positioned(
+          left: 14,
+          width: c.w * 0.36,
+          top: c.h * (0.18 + i * 0.12),
+          height: 1.2,
+          child: Container(color: Colors.white.withValues(alpha: 0.10)),
+        ),
+      Positioned(
+        left: c.w * 0.05,
+        top: (c.h - d) / 2,
+        width: d,
+        height: d,
+        child: Transform.rotate(
+          angle: -0.28,
+          child: Container(
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ink, width: 3.5)),
+            padding: EdgeInsets.all(d * 0.045),
+            child: Container(
+              decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: ink.withValues(alpha: 0.9), width: 1.4)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('★ ★ ★', style: TextStyle(color: ink, fontSize: d * 0.07, letterSpacing: 2)),
+                  Container(
+                    margin: EdgeInsets.symmetric(vertical: d * 0.02),
+                    padding: EdgeInsets.symmetric(horizontal: d * 0.06, vertical: d * 0.005),
+                    decoration: BoxDecoration(border: Border.symmetric(horizontal: BorderSide(color: ink, width: 2.5))),
+                    child: Text(
+                      _reSignWord(c, 'SOLD'),
+                      maxLines: 1,
+                      style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: d * 0.22, letterSpacing: 2, height: 1.05),
+                    ),
+                  ),
+                  Text('CLOSED · THANK YOU', style: TextStyle(color: ink, fontSize: d * 0.055, fontWeight: FontWeight.w800, letterSpacing: 1.2)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      Positioned(left: c.w * 0.47, top: 16, bottom: 16, width: 1.5, child: Container(color: c.accent.withValues(alpha: 0.6))),
+      c.slot('logo', c.logo(c.h * 0.2), right: 12, bottom: 12),
+      ..._reInfoColumn(c, left: c.w * 0.51, width: c.w * 0.36),
+    ],
+  );
+}
+
+// OPEN HOUSE — a sidewalk A-frame board with balloons.
+Widget _layoutReOpenHouse(_CardRenderCtx c) {
+  final bw = c.w * 0.34;
+  final bh = c.h * 0.6;
+  final bl = c.w * 0.06;
+  final bt = c.h * 0.26;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      // Sidewalk.
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.1, child: Container(color: const Color(0xFFD6D3D1))),
+      Positioned(left: 0, right: 0, bottom: c.h * 0.1, height: 2, child: Container(color: const Color(0xFFA8A29E))),
+      Positioned.fill(child: CustomPaint(painter: _BalloonPainter(Rect.fromLTWH(bl, bt, bw, bh), c.accent))),
+      Positioned(left: bl, top: bt, width: bw, height: bh, child: CustomPaint(painter: _AFramePainter(c.accent))),
+      Positioned(
+        left: bl + bw * 0.12,
+        top: bt + bh * 0.1,
+        width: bw * 0.76,
+        height: bh * 0.62,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FittedBox(
+              child: Text(
+                _reSignWord(c, 'OPEN HOUSE'),
+                style: TextStyle(color: c.accent, fontWeight: FontWeight.w900, fontSize: c.h * 0.07, letterSpacing: 0.6),
+              ),
+            ),
+            SizedBox(height: c.h * 0.015),
+            Text('TODAY', style: TextStyle(color: const Color(0xFF1F2937), fontWeight: FontWeight.w800, fontSize: c.h * 0.045, letterSpacing: 2)),
+            Icon(Icons.arrow_forward_rounded, color: c.accent, size: c.h * 0.11),
+          ],
+        ),
+      ),
+      c.slot('logo', c.logo(c.h * 0.2), right: 12, top: 12),
+      ..._reInfoColumn(c, left: c.w * 0.46, width: c.w * 0.38),
+    ],
+  );
+}
+
+class _AFramePainter extends CustomPainter {
+  _AFramePainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final wood = Paint()..color = const Color(0xFF7C4A21);
+    // Legs splay out at the bottom.
+    final legs = Path()
+      ..moveTo(s.width * 0.08, s.height * 0.05)
+      ..lineTo(-s.width * 0.02, s.height)
+      ..lineTo(s.width * 0.06, s.height)
+      ..lineTo(s.width * 0.14, s.height * 0.1)
+      ..moveTo(s.width * 0.92, s.height * 0.05)
+      ..lineTo(s.width * 1.02, s.height)
+      ..lineTo(s.width * 0.94, s.height)
+      ..lineTo(s.width * 0.86, s.height * 0.1);
+    canvas.drawPath(legs, wood);
+    final board = RRect.fromRectAndRadius(Rect.fromLTWH(s.width * 0.06, s.height * 0.04, s.width * 0.88, s.height * 0.8), const Radius.circular(6));
+    canvas.drawRRect(board.shift(const Offset(2, 3)), Paint()..color = Colors.black.withValues(alpha: 0.18));
+    canvas.drawRRect(board, Paint()..color = Colors.white);
+    canvas.drawRRect(board, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..color = accent);
+    // Hinge at the top.
+    canvas.drawCircle(Offset(s.width * 0.5, s.height * 0.04), s.width * 0.035, wood);
+  }
+
+  @override
+  bool shouldRepaint(covariant _AFramePainter old) => old.accent != accent;
+}
+
+class _BalloonPainter extends CustomPainter {
+  _BalloonPainter(this.board, this.accent);
+  final Rect board;
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final anchor = Offset(board.left + board.width * 0.3, board.top + board.height * 0.1);
+    final balloons = [
+      (Offset(anchor.dx - board.width * 0.2, board.top - s.height * 0.16), accent),
+      (Offset(anchor.dx + board.width * 0.02, board.top - s.height * 0.2), const Color(0xFFFBBF24)),
+      (Offset(anchor.dx + board.width * 0.22, board.top - s.height * 0.13), const Color(0xFF38BDF8)),
+    ];
+    final r = s.height * 0.065;
+    for (final (o, col) in balloons) {
+      canvas.drawLine(o + Offset(0, r * 1.15), anchor, Paint()
+        ..color = const Color(0xFF6B7280)
+        ..strokeWidth = 1);
+      canvas.drawOval(Rect.fromCenter(center: o, width: r * 1.7, height: r * 2.2), Paint()..color = col);
+      canvas.drawCircle(o + Offset(-r * 0.3, -r * 0.4), r * 0.22, Paint()..color = Colors.white.withValues(alpha: 0.55));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BalloonPainter old) => old.board != board || old.accent != accent;
+}
+
+// JUST LISTED — corner sash with a row of homes along the bottom.
+Widget _layoutReJustListed(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.3, child: CustomPaint(painter: _StreetPainter(c.accent))),
+      // Corner sash.
+      Positioned(
+        left: -c.w * 0.1,
+        top: c.h * 0.11,
+        width: c.w * 0.42,
+        child: Transform.rotate(
+          angle: -0.62,
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: c.h * 0.022),
+            decoration: BoxDecoration(
+              color: c.accent,
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 3))],
+            ),
+            child: Text(
+              _reSignWord(c, 'JUST LISTED'),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: c.h * 0.05, letterSpacing: 1.4),
+            ),
+          ),
+        ),
+      ),
+      c.slot('logo', c.logo(c.h * 0.2), right: 12, top: 12),
+      c.slot('name', SizedBox(width: c.w * 0.62, child: c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900)), left: c.w * 0.25, top: c.h * 0.12),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.048, weight: FontWeight.w800, maxLines: 1), left: c.w * 0.25, top: c.h * 0.27),
+      c.slot('company', c.txt(c.doc.company, size: c.h * 0.043, maxLines: 1, color: c.sub), left: c.w * 0.25, top: c.h * 0.35),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: c.w * 0.25, top: c.h * 0.46),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: c.w * 0.25, top: c.h * 0.55),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website, color: Colors.white), left: 14, bottom: c.h * 0.03),
+    ],
+  );
+}
+
+class _StreetPainter extends CustomPainter {
+  _StreetPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final ground = s.height * 0.55;
+    // Little homes of different shapes and heights.
+    final homes = [(0.0, 0.16, 0.7), (0.15, 0.13, 0.9), (0.27, 0.2, 0.6), (0.46, 0.12, 1.0), (0.57, 0.17, 0.75), (0.73, 0.14, 0.85), (0.86, 0.16, 0.65)];
+    for (var i = 0; i < homes.length; i++) {
+      final (x, w, hf) = homes[i];
+      final left = s.width * x;
+      final width = s.width * w;
+      final top = ground - s.height * 0.42 * hf;
+      final col = Color.lerp(accent, Colors.white, i.isEven ? 0.55 : 0.75)!;
+      canvas.drawRect(Rect.fromLTRB(left, top, left + width, ground), Paint()..color = col);
+      final roof = Path()
+        ..moveTo(left - 2, top)
+        ..lineTo(left + width / 2, top - s.height * 0.2 * hf)
+        ..lineTo(left + width + 2, top)
+        ..close();
+      canvas.drawPath(roof, Paint()..color = Color.lerp(accent, Colors.black, 0.15)!);
+      canvas.drawRect(
+        Rect.fromLTWH(left + width * 0.38, ground - s.height * 0.18 * hf, width * 0.24, s.height * 0.18 * hf),
+        Paint()..color = Color.lerp(accent, Colors.black, 0.35)!,
+      );
+    }
+    canvas.drawRect(Rect.fromLTRB(0, ground, s.width, s.height), Paint()..color = Color.lerp(accent, Colors.black, 0.25)!);
+  }
+
+  @override
+  bool shouldRepaint(covariant _StreetPainter old) => old.accent != accent;
+}
+
+// FOR RENT — a glowing neon sign in a window at night.
+Widget _layoutReNeonRent(_CardRenderCtx c) {
+  final glow = c.accent;
+  final winL = c.w * 0.56;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
+      Positioned(left: winL, top: c.h * 0.12, right: c.w * 0.05, bottom: c.h * 0.12, child: CustomPaint(painter: _NightWindowPainter(glow))),
+      Positioned(
+        left: winL,
+        top: c.h * 0.12,
+        right: c.w * 0.05,
+        bottom: c.h * 0.12,
+        child: Center(
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: c.w * 0.025, vertical: c.h * 0.03),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: glow, width: 2),
+              boxShadow: [BoxShadow(color: glow.withValues(alpha: 0.7), blurRadius: 14, spreadRadius: 1)],
+            ),
+            child: FittedBox(
+              child: Text(
+                _reSignWord(c, 'FOR RENT'),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                  fontSize: c.h * 0.085,
+                  letterSpacing: 1.5,
+                  shadows: [
+                    Shadow(color: glow, blurRadius: 6),
+                    Shadow(color: glow, blurRadius: 16),
+                    Shadow(color: glow.withValues(alpha: 0.8), blurRadius: 28),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      c.slot('logo', c.logo(c.h * 0.18), left: 14, top: 14),
+      c.slot('name', SizedBox(width: c.w * 0.48, child: c.txt(c.doc.fullName, size: c.h * 0.095, weight: FontWeight.w900)), left: 14, top: c.h * 0.28),
+      c.slot('title', c.txt(c.doc.jobTitle, color: glow, size: c.h * 0.045, weight: FontWeight.w800, maxLines: 1), left: 14, top: c.h * 0.42),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone), left: 14, bottom: c.h * 0.29),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email), left: 14, bottom: c.h * 0.17),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website), left: 14, bottom: c.h * 0.05),
+    ],
+  );
+}
+
+class _NightWindowPainter extends CustomPainter {
+  _NightWindowPainter(this.glow);
+  final Color glow;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final r = RRect.fromRectAndRadius(Offset.zero & s, const Radius.circular(8));
+    canvas.drawRRect(r, Paint()
+      ..shader = RadialGradient(colors: [glow.withValues(alpha: 0.28), const Color(0xFF0B1020)]).createShader(Offset.zero & s));
+    final frame = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..color = const Color(0xFF475569);
+    canvas.drawRRect(r, frame);
+    canvas.drawLine(Offset(s.width / 2, 0), Offset(s.width / 2, s.height), frame..strokeWidth = 2);
+    canvas.drawLine(Offset(0, s.height / 2), Offset(s.width, s.height / 2), frame);
+    // Sill.
+    canvas.drawRect(Rect.fromLTWH(-4, s.height - 2, s.width + 8, 5), Paint()..color = const Color(0xFF64748B));
+  }
+
+  @override
+  bool shouldRepaint(covariant _NightWindowPainter old) => old.glow != glow;
+}
+
+// NEW LISTING — a roadside billboard ringed with marquee bulbs.
+Widget _layoutReMarquee(_CardRenderCtx c) {
+  final bl = c.w * 0.05;
+  final bw = c.w * 0.9;
+  final bt = c.h * 0.07;
+  final bh = c.h * 0.5;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      // Legs.
+      for (final x in [0.28, 0.68])
+        Positioned(left: c.w * x, top: bt + bh, width: c.w * 0.025, bottom: c.h * 0.26, child: Container(color: const Color(0xFF475569))),
+      Positioned(left: 0, right: 0, bottom: 0, height: c.h * 0.27, child: Container(color: Colors.white.withValues(alpha: 0.92))),
+      Positioned(left: 0, right: 0, bottom: c.h * 0.27, height: 3, child: Container(color: c.accent)),
+      Positioned(left: bl, top: bt, width: bw, height: bh, child: CustomPaint(painter: _MarqueePainter(c.accent))),
+      Positioned(
+        left: bl + bw * 0.06,
+        top: bt + bh * 0.13,
+        width: bw * 0.88,
+        height: bh * 0.74,
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_reSignWord(c, 'NEW LISTING'), maxLines: 1, style: TextStyle(color: c.accent, fontWeight: FontWeight.w900, fontSize: c.h * 0.05, letterSpacing: 2)),
+                  SizedBox(height: c.h * 0.01),
+                  c.txt(c.doc.fullName, size: c.h * 0.09, weight: FontWeight.w900, color: Colors.white, maxLines: 1),
+                  c.txt(c.doc.jobTitle, size: c.h * 0.042, color: Colors.white70, maxLines: 1),
+                ],
+              ),
+            ),
+            c.logo(c.h * 0.2),
+          ],
+        ),
+      ),
+      c.slot('phone', _iconLine(c, Icons.call_rounded, c.doc.phone, color: const Color(0xFF1F2937)), left: 14, bottom: c.h * 0.14),
+      c.slot('email', _iconLine(c, Icons.mail_rounded, c.doc.email, color: const Color(0xFF1F2937)), left: 14, bottom: c.h * 0.035),
+      c.slot('website', _iconLine(c, Icons.language_rounded, c.doc.website, color: const Color(0xFF1F2937)), right: 14, bottom: c.h * 0.14),
+      c.slot('company', c.txt(c.doc.company, size: c.h * 0.042, color: const Color(0xFF475569), maxLines: 1), right: 14, bottom: c.h * 0.035),
+    ],
+  );
+}
+
+class _MarqueePainter extends CustomPainter {
+  _MarqueePainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final r = RRect.fromRectAndRadius(Offset.zero & s, const Radius.circular(10));
+    canvas.drawRRect(r.shift(const Offset(0, 4)), Paint()..color = Colors.black.withValues(alpha: 0.25));
+    canvas.drawRRect(r, Paint()..color = accent);
+    final inner = RRect.fromRectAndRadius(Rect.fromLTWH(s.width * 0.04, s.height * 0.1, s.width * 0.92, s.height * 0.8), const Radius.circular(6));
+    canvas.drawRRect(inner, Paint()..color = const Color(0xFF111827));
+    // Bulbs around the edge.
+    final bulb = Paint()..color = const Color(0xFFFEF3C7);
+    final halo = Paint()..color = const Color(0xFFFDE68A).withValues(alpha: 0.45);
+    final step = s.height * 0.1;
+    final rad = s.height * 0.025;
+    for (double x = step; x < s.width - step / 2; x += step) {
+      for (final y in [s.height * 0.05, s.height * 0.95]) {
+        canvas.drawCircle(Offset(x, y), rad * 1.9, halo);
+        canvas.drawCircle(Offset(x, y), rad, bulb);
+      }
+    }
+    for (double y = step * 1.5; y < s.height - step; y += step) {
+      for (final x in [s.width * 0.02, s.width * 0.98]) {
+        canvas.drawCircle(Offset(x, y), rad * 1.9, halo);
+        canvas.drawCircle(Offset(x, y), rad, bulb);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MarqueePainter old) => old.accent != accent;
+}
+
+// WELCOME HOME — a door hanger beside the details.
+Widget _layoutReDoorHanger(_CardRenderCtx c) {
+  final hw = c.w * 0.27;
+  final hl = c.w * 0.06;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c.bg1, c.bg2]))),
+      // Door edge with a knob, where the hanger hangs.
+      Positioned(left: hl - c.w * 0.03, top: 0, bottom: 0, width: hw + c.w * 0.06, child: Container(color: Color.lerp(c.accent, Colors.black, 0.25)!.withValues(alpha: 0.18))),
+      Positioned(left: hl, top: -c.h * 0.02, width: hw, height: c.h * 0.98, child: CustomPaint(painter: _DoorHangerPainter(c.accent))),
+      Positioned(
+        left: hl,
+        top: c.h * 0.36,
+        width: hw,
+        bottom: c.h * 0.06,
+        child: Column(
+          children: [
+            c.logo(c.h * 0.2),
+            SizedBox(height: c.h * 0.03),
+            FittedBox(
+              child: Text(
+                _reSignWord(c, 'WELCOME'),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: c.h * 0.07, letterSpacing: 1.2),
+              ),
+            ),
+            Text('HOME', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: c.h * 0.045, letterSpacing: 4)),
+          ],
+        ),
+      ),
+      ..._reInfoColumn(c, left: c.w * 0.41, width: c.w * 0.55),
+    ],
+  );
+}
+
+class _DoorHangerPainter extends CustomPainter {
+  _DoorHangerPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    final body = RRect.fromRectAndCorners(
+      Rect.fromLTWH(0, 0, s.width, s.height),
+      topLeft: Radius.circular(s.width * 0.5),
+      topRight: Radius.circular(s.width * 0.5),
+      bottomLeft: const Radius.circular(10),
+      bottomRight: const Radius.circular(10),
+    );
+    final hole = Offset(s.width / 2, s.height * 0.2);
+    final holeR = s.width * 0.2;
+    final shape = Path.combine(
+      PathOperation.difference,
+      Path()..addRRect(body),
+      Path()
+        ..addOval(Rect.fromCircle(center: hole, radius: holeR))
+        // Slit so it slides over the knob.
+        ..addRect(Rect.fromLTWH(s.width / 2 - 1.5, 0, 3, hole.dy)),
+    );
+    canvas.drawShadow(shape, Colors.black, 4, false);
+    canvas.drawPath(shape, Paint()
+      ..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [accent, Color.lerp(accent, Colors.black, 0.3)!])
+          .createShader(Offset.zero & s));
+    canvas.drawCircle(hole, holeR, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = Colors.white.withValues(alpha: 0.6));
+  }
+
+  @override
+  bool shouldRepaint(covariant _DoorHangerPainter old) => old.accent != accent;
+}
+
+// FOREST HOME — a cabin among pine-covered hills.
+Widget _layoutReForestCabin(_CardRenderCtx c) {
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [c.bg1, c.bg2]))),
+      Positioned.fill(child: CustomPaint(painter: _ForestPainter(c.accent))),
+      c.slot('logo', c.logo(c.h * 0.2), right: 12, top: 12),
+      c.slot('name', SizedBox(width: c.w * 0.6, child: c.txt(c.doc.fullName, size: c.h * 0.1, weight: FontWeight.w900)), left: 16, top: 14),
+      c.slot('title', c.txt(c.doc.jobTitle, color: c.accent, size: c.h * 0.047, weight: FontWeight.w800, maxLines: 1), left: 16, top: c.h * 0.17),
+      c.slot('company', c.txt(c.doc.company, color: c.sub, size: c.h * 0.043, maxLines: 1), left: 16, top: c.h * 0.25),
+      Positioned(
+        right: 12,
+        bottom: 10,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 10, vertical: c.h * 0.03),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8)],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (ngmyCardElementVisible(c.doc, 'phone')) _iconLine(c, Icons.call_rounded, c.doc.phone),
+              if (ngmyCardElementVisible(c.doc, 'email')) _iconLine(c, Icons.mail_rounded, c.doc.email),
+              if (ngmyCardElementVisible(c.doc, 'website')) _iconLine(c, Icons.cabin_rounded, c.doc.website),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _ForestPainter extends CustomPainter {
+  _ForestPainter(this.accent);
+  final Color accent;
+
+  void _pine(Canvas canvas, double x, double base, double h, Color col) {
+    canvas.drawRect(Rect.fromLTWH(x - h * 0.04, base - h * 0.12, h * 0.08, h * 0.12), Paint()..color = const Color(0xFF5B3A1E));
+    for (var i = 0; i < 3; i++) {
+      final top = base - h * (0.45 + i * 0.25);
+      final half = h * (0.26 - i * 0.06);
+      final tri = Path()
+        ..moveTo(x, top - h * 0.12)
+        ..lineTo(x - half, top + h * 0.3)
+        ..lineTo(x + half, top + h * 0.3)
+        ..close();
+      canvas.drawPath(tri, Paint()..color = col);
+    }
+  }
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final far = Color.lerp(accent, Colors.white, 0.55)!;
+    final mid = Color.lerp(accent, Colors.white, 0.25)!;
+    final near = Color.lerp(accent, Colors.black, 0.2)!;
+    // Sun.
+    canvas.drawCircle(Offset(s.width * 0.82, s.height * 0.36), s.height * 0.09, Paint()..color = const Color(0xFFFDE68A).withValues(alpha: 0.85));
+    // Far hills.
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, s.height * 0.62)
+        ..quadraticBezierTo(s.width * 0.25, s.height * 0.42, s.width * 0.5, s.height * 0.58)
+        ..quadraticBezierTo(s.width * 0.75, s.height * 0.72, s.width, s.height * 0.5)
+        ..lineTo(s.width, s.height)
+        ..lineTo(0, s.height)
+        ..close(),
+      Paint()..color = far,
+    );
+    for (final (x, h) in [(0.08, 0.2), (0.14, 0.24), (0.42, 0.18), (0.9, 0.22), (0.96, 0.18)]) {
+      _pine(canvas, s.width * x, s.height * 0.66, s.height * h, mid);
+    }
+    // Near hill.
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, s.height * 0.8)
+        ..quadraticBezierTo(s.width * 0.3, s.height * 0.66, s.width * 0.62, s.height * 0.82)
+        ..lineTo(s.width * 0.62, s.height)
+        ..lineTo(0, s.height)
+        ..close(),
+      Paint()..color = near,
+    );
+    // Cabin.
+    final cx = s.width * 0.3;
+    final cy = s.height * 0.78;
+    final cw = s.width * 0.13;
+    final ch = s.height * 0.15;
+    canvas.drawRect(Rect.fromLTWH(cx - cw / 2, cy - ch, cw, ch), Paint()..color = const Color(0xFF92400E));
+    for (var i = 1; i < 4; i++) {
+      canvas.drawLine(Offset(cx - cw / 2, cy - ch * i / 4), Offset(cx + cw / 2, cy - ch * i / 4), Paint()
+        ..color = const Color(0xFF78350F)
+        ..strokeWidth = 1);
+    }
+    canvas.drawPath(
+      Path()
+        ..moveTo(cx - cw * 0.65, cy - ch)
+        ..lineTo(cx, cy - ch * 1.85)
+        ..lineTo(cx + cw * 0.65, cy - ch)
+        ..close(),
+      Paint()..color = const Color(0xFF3F2A1B),
+    );
+    canvas.drawRect(Rect.fromLTWH(cx + cw * 0.12, cy - ch * 0.75, cw * 0.24, ch * 0.32), Paint()..color = const Color(0xFFFCD34D));
+    canvas.drawRect(Rect.fromLTWH(cx - cw * 0.32, cy - ch * 0.62, cw * 0.22, ch * 0.62), Paint()..color = const Color(0xFF451A03));
+    // Chimney smoke.
+    for (var i = 0; i < 3; i++) {
+      canvas.drawCircle(Offset(cx + cw * 0.3 + i * 4, cy - ch * (2.0 + i * 0.35)), 2.5 + i * 1.5, Paint()..color = Colors.white.withValues(alpha: 0.55 - i * 0.12));
+    }
+    for (final (x, h) in [(0.06, 0.3), (0.14, 0.36), (0.47, 0.32), (0.55, 0.26)]) {
+      _pine(canvas, s.width * x, s.height * 0.92, s.height * h, near);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ForestPainter old) => old.accent != accent;
+}
+
+// BRICK HOME — a brick facade with an arched front door.
+Widget _layoutReBrickFacade(_CardRenderCtx c) {
+  final wallW = c.w * 0.4;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      Container(color: c.bg1),
+      Positioned(left: 0, top: 0, bottom: 0, width: wallW, child: CustomPaint(painter: _BrickPainter(c.accent))),
+      // Arched doorway with the logo as the door window.
+      Positioned(
+        left: wallW * 0.24,
+        top: c.h * 0.2,
+        width: wallW * 0.52,
+        bottom: 0,
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAF7F2),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(wallW * 0.26)),
+            border: Border.all(color: Colors.white, width: 3),
+          ),
+          padding: EdgeInsets.all(wallW * 0.035),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Color.lerp(c.accent, Colors.black, 0.45),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(wallW * 0.22)),
+            ),
+            child: Stack(
+              children: [
+                Align(alignment: const Alignment(0, -0.45), child: c.logo(c.h * 0.22)),
+                Align(
+                  alignment: const Alignment(0.7, 0.35),
+                  child: Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFFD4AF37))),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      // Porch light.
+      Positioned(
+        left: wallW * 0.83,
+        top: c.h * 0.36,
+        child: Container(
+          width: 8,
+          height: 12,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFDE68A),
+            borderRadius: BorderRadius.circular(2),
+            boxShadow: [BoxShadow(color: const Color(0xFFFDE68A).withValues(alpha: 0.8), blurRadius: 10, spreadRadius: 2)],
+          ),
+        ),
+      ),
+      Positioned(left: wallW, top: 0, bottom: 0, width: 4, child: Container(color: Color.lerp(c.accent, Colors.black, 0.3))),
+      ..._reInfoColumn(c, left: wallW + 16, width: c.w - wallW - 28),
+    ],
+  );
+}
+
+class _BrickPainter extends CustomPainter {
+  _BrickPainter(this.accent);
+  final Color accent;
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.clipRect(Offset.zero & s);
+    canvas.drawRect(Offset.zero & s, Paint()..color = const Color(0xFFE7E5E4));
+    final rows = 12;
+    final bh = s.height / rows;
+    final bw = bh * 2.3;
+    final shades = [
+      accent,
+      Color.lerp(accent, Colors.black, 0.15)!,
+      Color.lerp(accent, Colors.white, 0.12)!,
+      Color.lerp(accent, const Color(0xFF7C2D12), 0.3)!,
+    ];
+    for (var r = 0; r < rows; r++) {
+      final offset = r.isEven ? 0.0 : -bw / 2;
+      var i = 0;
+      for (double x = offset; x < s.width; x += bw) {
+        final rect = Rect.fromLTWH(x + 1, r * bh + 1, bw - 2, bh - 2);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(1.5)),
+          Paint()..color = shades[(r * 3 + i * 7) % shades.length],
+        );
+        i++;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BrickPainter old) => old.accent != accent;
 }
