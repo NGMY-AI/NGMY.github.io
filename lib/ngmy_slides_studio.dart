@@ -22,6 +22,7 @@ import 'ngmy_slides_marriage_agreement.dart';
 import 'ngmy_slides_payments.dart';
 import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_render.dart';
+import 'ngmy_fullscreen_stub.dart' if (dart.library.html) 'ngmy_fullscreen_web.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
 import 'ngmy_stripe_payments.dart';
@@ -920,13 +921,50 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         deck.slides.insertAll(_slideIndex + 1, made.slides);
         _slideIndex++;
       }
+      deck
+        ..aiOutlineJson = made.aiOutlineJson
+        ..aiSlideIds = made.aiSlideIds
+        ..aiExtras = made.aiExtras
+        ..cinematic = deck.cinematic || made.cinematic;
       _selectedElementId = null;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(empty
-            ? 'Your ${made.slides.length}-slide presentation is ready — tap any text to edit it.'
-            : 'Added ${made.slides.length} AI slides after this one.'),
+            ? 'Your ${made.slides.length}-slide presentation is ready. The mic is green now — tap it to tell the AI what to change.'
+            : 'Added ${made.slides.length} AI slides after this one. Tap the green mic to change them.'),
+      ),
+    );
+  }
+
+  /// Green mic: the AI changes the slides it wrote (add, rewrite, translate…).
+  /// Its slides are swapped for the new set in the same place. Undo works.
+  Future<void> _editWithAi() async {
+    final deck = _activeDeck;
+    if (deck == null || !deck.aiMade || _guardTransferredEdit()) return;
+    final made = await showNgmySlidesAiEditor(context, deck: deck, currentSlide: _slideIndex + 1);
+    if (made == null || !mounted || _activeDeck != deck) return;
+    final ids = (deck.aiSlideIds ?? const <String>[]).toSet();
+    var at = deck.slides.indexWhere((s) => ids.contains(s.id));
+    final oldCount = deck.slides.length;
+    _mutate(() {
+      if (at < 0) at = deck.slides.length;
+      deck.slides.removeWhere((s) => ids.contains(s.id));
+      at = at.clamp(0, deck.slides.length);
+      deck.slides.insertAll(at, made.slides);
+      deck
+        ..aiOutlineJson = made.aiOutlineJson
+        ..aiSlideIds = made.aiSlideIds;
+      _slideIndex = _slideIndex.clamp(0, deck.slides.length - 1);
+      _selectedElementId = null;
+      _clearTextControllers();
+    });
+    final diff = deck.slides.length - oldCount;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(diff > 0
+            ? 'Done — added $diff slide${diff == 1 ? '' : 's'}. Undo brings back the old version.'
+            : 'Done — your slides are updated. Undo brings back the old version.'),
       ),
     );
   }
@@ -3741,11 +3779,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                     ),
                   );
                   if (picked != null) _mutate(() => d.autoAdvanceSeconds = picked);
+                case 'motion':
+                  final d = _activeDeck;
+                  if (d == null) return;
+                  _mutate(() => d.cinematic = !d.cinematic);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d.cinematic ? 'Video motion on — press Play to watch it like a video.' : 'Video motion off.')));
               }
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'share', child: Text('Share text outline')),
               PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
+              PopupMenuItem(value: 'motion', child: Text('Video motion: ${(_activeDeck?.cinematic ?? false) ? 'On' : 'Off'}')),
             ],
           ),
           const SizedBox(width: 4),
@@ -3888,22 +3932,28 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 ..add(
                   Padding(
                   padding: const EdgeInsets.only(left: 2),
-                  child: Tooltip(
-                    message: 'Describe it — AI creates the slides',
-                    child: GestureDetector(
-                      onTap: _createWithAi,
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                          boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 10)],
+                  child: Builder(builder: (context) {
+                    // Purple: type a description, AI creates the slides.
+                    // Green (after that): type what to change or add.
+                    final ai = _activeDeck?.aiMade ?? false;
+                    final colors = ai ? const [Color(0xFF22C55E), Color(0xFF15803D)] : const [Color(0xFF8B5CF6), Color(0xFFDB2777)];
+                    return Tooltip(
+                      message: ai ? 'Tell the AI what to change or add' : 'Type it — AI creates the slides',
+                      child: GestureDetector(
+                        onTap: ai ? _editWithAi : _createWithAi,
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(colors: colors),
+                            boxShadow: [BoxShadow(color: colors.first.withValues(alpha: 0.45), blurRadius: 10)],
+                          ),
+                          child: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
                         ),
-                        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   ),
                 ),
             ),
@@ -5871,12 +5921,23 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   NgmySlideTransition _lastTransition = NgmySlideTransition.fade;
   Timer? _autoTimer;
   bool _autoPlaying = true;
+  /// Locked: every button and number is hidden — only the slides show.
+  /// Double-tap the top-right corner (where "Auto 5s" is) to lock / unlock.
+  /// Remembered for the next time Play is pressed.
+  static bool _locked = false;
+  /// Video motion: which way the next slide glides in (changes every slide).
+  int _glide = 0;
+  /// Which way the slides last moved (back = reverse the glide).
+  bool _back = false;
+
+  bool get _cinematic => widget.deck.cinematic;
 
   @override
   void initState() {
     super.initState();
     _index = widget.startIndex.clamp(0, widget.deck.slides.length - 1);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    ngmyEnterFullscreen();
     _scheduleAutoAdvance();
   }
 
@@ -5884,7 +5945,56 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   void dispose() {
     _autoTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    ngmyExitFullscreen();
     super.dispose();
+  }
+
+  void _toggleLock() {
+    HapticFeedback.mediumImpact();
+    setState(() => _locked = !_locked);
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    if (_locked) {
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Buttons hidden. Double-tap the top-right corner to show them again.'),
+        duration: Duration(milliseconds: 1800),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
+  /// Video motion: both slides move together so it plays like one video.
+  Widget _cinematicTransition(Widget child, Animation<double> animation) {
+    final kind = _glide % 4;
+    final back = _back;
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, c) {
+        // The leaving slide runs this animation backwards (1 → 0).
+        final leaving = animation.status == AnimationStatus.reverse;
+        final v = Curves.easeInOutCubic.transform(animation.value);
+        final rest = 1 - v; // 1 = fully off screen, 0 = in place
+        final size = MediaQuery.sizeOf(context);
+        final sign = leaving ? -1.0 : 1.0;
+        switch (kind) {
+          case 0: // glide sideways
+            return Transform.translate(offset: Offset(sign * (back ? -1 : 1) * rest * size.width, 0), child: c);
+          case 2: // glide up
+            return Transform.translate(offset: Offset(0, sign * (back ? -1 : 1) * rest * size.height), child: c);
+          case 1: // fly through: the old slide grows past you, the new one comes from behind
+            return Opacity(
+              opacity: v.clamp(0.0, 1.0),
+              child: Transform.scale(scale: leaving ? 1 + rest * 0.25 : 1 - rest * 0.14, child: c),
+            );
+          default: // diagonal sweep with a slight tilt
+            final dx = sign * (back ? -1 : 1) * rest * size.width;
+            return Transform.translate(
+              offset: Offset(dx, dx * 0.3),
+              child: Transform.rotate(angle: sign * rest * 0.05, child: c),
+            );
+        }
+      },
+    );
   }
 
   void _scheduleAutoAdvance() {
@@ -5913,6 +6023,8 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
       setState(() {
         _lastTransition = widget.deck.slides[_index + 1].transition;
         _index++;
+        _glide++;
+        _back = false;
       });
       _scheduleAutoAdvance();
     }
@@ -5923,12 +6035,26 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
       setState(() {
         _lastTransition = widget.deck.slides[_index].transition;
         _index--;
+        _glide++;
+        _back = true;
       });
       _scheduleAutoAdvance();
     }
   }
 
   Widget _slideshowSwitcher(Widget slideContent) {
+    if (_cinematic) {
+      return AnimatedSwitcher(
+        duration: const Duration(milliseconds: 950),
+        layoutBuilder: (currentChild, previousChildren) => Stack(
+          fit: StackFit.expand,
+          children: [...previousChildren, if (currentChild != null) currentChild],
+        ),
+        // A new closure each time so the leaving slide picks up the new direction.
+        transitionBuilder: (child, animation) => _cinematicTransition(child, animation),
+        child: KeyedSubtree(key: ValueKey(_index), child: slideContent),
+      );
+    }
     if (_lastTransition == NgmySlideTransition.none) {
       return KeyedSubtree(key: ValueKey(_index), child: slideContent);
     }
@@ -6062,23 +6188,50 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   @override
   Widget build(BuildContext context) {
     final slide = widget.deck.slides[_index];
-    final slideContent = ColoredBox(
-      color: Color(slide.background),
-      child: SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true)),
-    );
+    Widget render = SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true));
+    if (_cinematic) {
+      // Slow camera drift while the slide is on screen, like a video.
+      render = _SlideKenBurns(
+        key: ValueKey('kb$_index'),
+        seconds: widget.deck.durationForSlide(_index).clamp(2, 120) + 1,
+        variant: _index,
+        child: render,
+      );
+    }
+    final slideContent = ColoredBox(color: Color(slide.background), child: ClipRect(child: render));
     final body = _slideshowSwitcher(slideContent);
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _autoPlaying ? 'Auto ${widget.deck.durationForSlide(_index)}s' : 'Manual',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
+          ),
+          const SizedBox(width: 6),
+          const Icon(Icons.lock_open_rounded, color: Colors.white70, size: 13),
+        ],
+      ),
+    );
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      // Black around the slide, like a video player.
+      backgroundColor: Colors.black,
       body: GestureDetector(
         onTapUp: (d) {
           final w = MediaQuery.sizeOf(context).width;
-          if (d.localPosition.dx > w * 0.55) _next();
-          else _prev();
+          if (d.localPosition.dx > w * 0.55) {
+            _next();
+          } else {
+            _prev();
+          }
         },
         child: Stack(
           fit: StackFit.expand,
           children: [
+            // The slide as big as the screen allows, keeping its shape.
             Center(
               child: AspectRatio(
                 aspectRatio: widget.deck.aspectValue,
@@ -6087,44 +6240,57 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
                 ),
               ),
             ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: Row(
-                children: [
-                  IconButton.filled(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
+            if (!_locked) ...[
+              Positioned(
+                top: 12,
+                left: 12,
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      IconButton.filled(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                        style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: _toggleAuto,
+                        icon: Icon(_autoPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                        style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _toggleAuto,
-                    icon: Icon(_autoPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                child: Text(
-                  _autoPlaying ? 'Auto ${widget.deck.durationForSlide(_index)}s' : 'Manual',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11),
                 ),
               ),
-            ),
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: SafeArea(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
+                    child: Text('${_index + 1} / ${widget.deck.slides.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ),
+            ],
+            // Top-right corner: double-tap to hide everything (lock) or bring it back.
+            // The spot stays there, invisible, while locked.
             Positioned(
-              bottom: 16,
-              right: 16,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                child: Text('${_index + 1} / ${widget.deck.slides.length}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onDoubleTap: _toggleLock,
+                  child: Container(
+                    width: 150,
+                    height: 64,
+                    alignment: Alignment.topRight,
+                    padding: const EdgeInsets.only(top: 16, right: 16),
+                    child: _locked ? const SizedBox.shrink() : pill,
+                  ),
+                ),
               ),
             ),
           ],
@@ -6170,4 +6336,48 @@ class _SlideWipeClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
+}
+
+/// Slow camera drift (zoom and pan) over a slide while it plays — video motion.
+class _SlideKenBurns extends StatefulWidget {
+  const _SlideKenBurns({super.key, required this.child, required this.seconds, required this.variant});
+  final Widget child;
+  final int seconds;
+  final int variant;
+
+  @override
+  State<_SlideKenBurns> createState() => _SlideKenBurnsState();
+}
+
+class _SlideKenBurnsState extends State<_SlideKenBurns> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds))..forward();
+
+  // Where the camera drifts towards, and whether it zooms in or out.
+  static const _paths = <(Alignment, bool)>[
+    (Alignment(-0.6, -0.4), true),
+    (Alignment(0.6, 0.3), false),
+    (Alignment(0.5, -0.5), true),
+    (Alignment(-0.5, 0.5), false),
+    (Alignment.center, true),
+  ];
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (focus, zoomIn) = _paths[widget.variant % _paths.length];
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (_, child) {
+        final t = Curves.easeInOutSine.transform(_c.value);
+        final scale = zoomIn ? 1.0 + 0.07 * t : 1.07 - 0.07 * t;
+        return Transform.scale(scale: scale, alignment: focus, child: child);
+      },
+    );
+  }
 }

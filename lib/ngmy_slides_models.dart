@@ -332,6 +332,10 @@ class NgmySlideDeck {
     this.signatureStrokeWidth,
     this.signatureInkColor,
     this.kiapoSignedAt,
+    this.cinematic = false,
+    this.aiOutlineJson,
+    this.aiSlideIds,
+    this.aiExtras,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -362,6 +366,15 @@ class NgmySlideDeck {
   int? signatureInkColor;
   /// When the president first signed Hati ya Kiapo — starts a 5-hour edit window.
   String? kiapoSignedAt;
+  /// Video motion: slides glide into each other and drift slowly, like a video.
+  bool cinematic;
+  /// The AI's outline (JSON) for slides it wrote, so "Tell the AI" can change them.
+  String? aiOutlineJson;
+  /// Which slides came from that outline (replaced when the AI changes them).
+  List<String>? aiSlideIds;
+  /// Extras the AI used (emojis, pictures, 3D icons, animations, video motion).
+  List<String>? aiExtras;
+  bool get aiMade => (aiOutlineJson ?? '').isNotEmpty;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
 
@@ -406,6 +419,10 @@ class NgmySlideDeck {
         signatureStrokeWidth: signatureStrokeWidth,
         signatureInkColor: signatureInkColor,
         kiapoSignedAt: kiapoSignedAt,
+        cinematic: cinematic,
+        aiOutlineJson: aiOutlineJson,
+        aiSlideIds: aiSlideIds == null ? null : List.of(aiSlideIds!),
+        aiExtras: aiExtras == null ? null : List.of(aiExtras!),
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -426,6 +443,10 @@ class NgmySlideDeck {
         if (signatureStrokeWidth != null) 'signatureStrokeWidth': signatureStrokeWidth,
         if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
         if (kiapoSignedAt != null && kiapoSignedAt!.trim().isNotEmpty) 'kiapoSignedAt': kiapoSignedAt,
+        if (cinematic) 'cinematic': true,
+        if (aiMade) 'aiOutlineJson': aiOutlineJson,
+        if (aiSlideIds != null) 'aiSlideIds': aiSlideIds,
+        if (aiExtras != null) 'aiExtras': aiExtras,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -444,6 +465,10 @@ class NgmySlideDeck {
         signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         kiapoSignedAt: json['kiapoSignedAt']?.toString(),
+        cinematic: json['cinematic'] == true,
+        aiOutlineJson: json['aiOutlineJson']?.toString(),
+        aiSlideIds: (json['aiSlideIds'] as List?)?.map((e) => '$e').toList(),
+        aiExtras: (json['aiExtras'] as List?)?.map((e) => '$e').toList(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))

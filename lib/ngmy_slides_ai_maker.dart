@@ -1,6 +1,4 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +6,6 @@ import 'package:http/http.dart' as http;
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_slides_models.dart';
-import 'ngmy_voice_capture.dart';
 
 /// "Describe it and the AI makes it": speak (or type) what the presentation is
 /// about, pick how many slides and a look, and get a finished, colourful deck.
@@ -135,7 +132,7 @@ NgmySlidesAiStyle ngmySlidesAiStyleById(String id) =>
     kNgmySlidesAiStyles.firstWhere((s) => s.id == id.trim().toLowerCase(), orElse: () => kNgmySlidesAiStyles.first);
 
 /// Extras the AI can add on top of the words.
-enum NgmySlidesAiExtra { emojis, pictures, icons3d, animations }
+enum NgmySlidesAiExtra { emojis, pictures, icons3d, animations, videoMotion }
 
 extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
   String get label => switch (this) {
@@ -143,12 +140,14 @@ extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
         NgmySlidesAiExtra.pictures => 'Pictures',
         NgmySlidesAiExtra.icons3d => '3D icons & animals',
         NgmySlidesAiExtra.animations => 'Animations',
+        NgmySlidesAiExtra.videoMotion => 'Video motion',
       };
   IconData get icon => switch (this) {
         NgmySlidesAiExtra.emojis => Icons.emoji_emotions_rounded,
         NgmySlidesAiExtra.pictures => Icons.photo_library_rounded,
         NgmySlidesAiExtra.icons3d => Icons.view_in_ar_rounded,
         NgmySlidesAiExtra.animations => Icons.animation_rounded,
+        NgmySlidesAiExtra.videoMotion => Icons.movie_filter_rounded,
       };
 }
 
@@ -217,6 +216,55 @@ class NgmySlidesAiOutline {
   final List<NgmySlidesAiOutlineSlide> slides;
 }
 
+const _kLanguageRule = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "en français", "en español", "in Arabic"), write EVERY title, subtitle, bullet and note in that language, with correct spelling and accents. If no language is named, write in the language the request itself is written in. Keep the JSON keys and the "kind", "style", "icon3d" and "image_query" values in English.';
+
+extension NgmySlidesAiOutlineJson on NgmySlidesAiOutline {
+  String toJsonString() => jsonEncode({
+        'title': title,
+        'style': style,
+        'slides': [
+          for (final s in slides)
+            {
+              'kind': s.kind,
+              'title': s.title,
+              'subtitle': s.subtitle,
+              'bullets': s.bullets,
+              'notes': s.notes,
+              'emoji': s.emoji,
+              'icon3d': s.icon3d,
+              'image_query': s.imageQuery,
+            },
+        ],
+      });
+}
+
+/// Prompt for changing a presentation the AI already wrote.
+String ngmySlidesAiEditPrompt({
+  required String outlineJson,
+  required String request,
+  required int currentSlide,
+  Set<NgmySlidesAiExtra> extras = const {},
+}) {
+  final styles = kNgmySlidesAiStyles.map((s) => s.id).join(', ');
+  return '''
+You edit an existing presentation. Here it is as JSON:
+$outlineJson
+
+The presenter is looking at slide $currentSlide.
+
+WHAT THEY WANT CHANGED (may be informal):
+"""$request"""
+
+Rules:
+- Do exactly what they ask: add, remove, move, shorten, lengthen or rewrite slides, change the tone, the language or the style ($styles). "This slide" / "here" means slide $currentSlide. New slides go where they say (or right after slide $currentSlide).
+- Keep every slide they did not ask about exactly as it is.
+- Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.
+- LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
+${extras.contains(NgmySlidesAiExtra.emojis) ? '- New slides get an "emoji".\n' : ''}${extras.contains(NgmySlidesAiExtra.icons3d) ? '- New slides get an "icon3d" from: ${kNgmySlides3dIcons.join(', ')}.\n' : ''}${extras.contains(NgmySlidesAiExtra.pictures) ? '- New content slides get an "image_query" (2-3 English words).\n' : ''}- Reply with the WHOLE presentation as JSON only, no markdown, same shape:
+{"title":"...","style":"...","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
+''';
+}
+
 String ngmySlidesAiPrompt({
   required String description,
   required int slideCount,
@@ -246,6 +294,7 @@ Rules:
 - Middle slides mostly kind "bullets" (3 to 5 short bullets, max 12 words each). You may use one "section" divider and one "quote" slide when it fits.
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
 - "notes": 1-2 sentences the presenter can say.
+$_kLanguageRule
 - "style": ${styleId == 'auto' ? 'pick the best of: $styles (match the mood they describe: nature, vibe, celebration, colorful, professional...)' : 'use "$styleId"'}.
 $extraRules- Reply with JSON only, no markdown, in this shape:
 {"title":"...","style":"...","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
@@ -492,18 +541,22 @@ Future<String?> _fetchPicture(String query) async {
   return null;
 }
 
+// Kept for the session so changing a presentation reuses its pictures.
+final _iconCache = <String, Future<String?>>{};
+final _pictureCache = <String, Future<String?>>{};
+
 /// Downloads the pictures / 3D icons the outline asks for (in parallel).
 Future<Map<int, NgmySlidesAiAssets>> ngmyFetchSlidesAiAssets(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras) async {
   final wantPics = extras.contains(NgmySlidesAiExtra.pictures);
   final want3d = extras.contains(NgmySlidesAiExtra.icons3d);
   if (!wantPics && !want3d) return const {};
-  final iconCache = <String, Future<String?>>{};
+  final iconCache = _iconCache;
   final jobs = <Future<MapEntry<int, NgmySlidesAiAssets>>>[];
   for (var i = 0; i < outline.slides.length; i++) {
     final o = outline.slides[i];
     jobs.add(() async {
       // Photos on content slides; 3D icons everywhere they were asked for.
-      final pic = wantPics && (o.kind == 'bullets' || o.kind == 'section') && o.imageQuery.isNotEmpty ? await _fetchPicture(o.imageQuery) : null;
+      final pic = wantPics && (o.kind == 'bullets' || o.kind == 'section') && o.imageQuery.isNotEmpty ? await _pictureCache.putIfAbsent(o.imageQuery.trim().toLowerCase(), () => _fetchPicture(o.imageQuery)) : null;
       String? icon;
       if (want3d && o.icon3d.isNotEmpty) {
         icon = await iconCache.putIfAbsent(o.icon3d, () => _fetchAsDataUri(ngmySlides3dIconUrl(o.icon3d)));
@@ -523,32 +576,71 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
   Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
   void Function(String status)? onStatus,
 }) async {
+  onStatus?.call('Writing your $slideCount slides…');
+  final outline = await _askForOutline(
+    ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras),
+    fallbackStyle: styleId == 'auto' ? 'colorful' : styleId,
+    failMessage: 'The AI could not write the slides. Try describing it again.',
+  );
+  return _finishAiDeck(outline, extras, onStatus);
+}
+
+/// Changes a presentation the AI wrote: [request] is what the user typed.
+/// Returns the whole new set of AI slides (the caller swaps them in).
+Future<NgmySlideDeck> ngmyEditSlidesWithAi({
+  required String outlineJson,
+  required String request,
+  required int currentSlide,
+  Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
+  void Function(String status)? onStatus,
+}) async {
+  onStatus?.call('Making your changes…');
+  final current = ngmyParseSlidesAiOutline(outlineJson, fallbackStyle: 'colorful');
+  final outline = await _askForOutline(
+    ngmySlidesAiEditPrompt(outlineJson: outlineJson, request: request, currentSlide: currentSlide, extras: extras),
+    fallbackStyle: current?.style ?? 'colorful',
+    failMessage: 'The AI could not make that change. Try saying it another way.',
+  );
+  return _finishAiDeck(outline, extras, onStatus);
+}
+
+Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallbackStyle, required String failMessage}) async {
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
   final creds = ngmyParseAiCredentials(key);
-  final prompt = ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras);
-  NgmySlidesAiOutline? outline;
   String? lastError;
-  onStatus?.call('Writing your $slideCount slides…');
-  for (var attempt = 0; attempt < 2 && outline == null; attempt++) {
+  for (var attempt = 0; attempt < 2; attempt++) {
     final r = await ngmyAiGenerateWithCredentials(creds, prompt);
     if (r.text != null) {
-      outline = ngmyParseSlidesAiOutline(r.text!, fallbackStyle: styleId == 'auto' ? 'colorful' : styleId);
+      final outline = ngmyParseSlidesAiOutline(r.text!, fallbackStyle: fallbackStyle);
+      if (outline != null) return outline;
     } else {
       lastError = r.error;
     }
   }
-  if (outline == null) {
-    throw lastError != null && ngmyIsOfflineOrNetworkError(lastError)
-        ? 'No internet connection — try again when you are online.'
-        : 'The AI could not write the slides. Try describing it again.';
-  }
+  throw lastError != null && ngmyIsOfflineOrNetworkError(lastError) ? 'No internet connection — try again when you are online.' : failMessage;
+}
+
+/// Downloads extras, builds the slides and remembers the outline for later changes.
+Future<NgmySlideDeck> _finishAiDeck(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras, void Function(String status)? onStatus) async {
   var assets = const <int, NgmySlidesAiAssets>{};
   if (extras.contains(NgmySlidesAiExtra.pictures) || extras.contains(NgmySlidesAiExtra.icons3d)) {
     onStatus?.call('Adding pictures and 3D art…');
     assets = await ngmyFetchSlidesAiAssets(outline, extras);
   }
-  return ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets);
+  final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets);
+  deck
+    ..aiOutlineJson = outline.toJsonString()
+    ..aiSlideIds = deck.slides.map((s) => s.id).toList()
+    ..aiExtras = extras.map((e) => e.name).toList()
+    ..cinematic = extras.contains(NgmySlidesAiExtra.videoMotion);
+  return deck;
+}
+
+/// The extras a deck's AI slides were made with.
+Set<NgmySlidesAiExtra> ngmySlidesAiExtrasOf(NgmySlideDeck deck) {
+  final names = deck.aiExtras ?? const [];
+  return {for (final e in NgmySlidesAiExtra.values) if (names.contains(e.name)) e};
 }
 
 /// The "describe it" sheet. Returns the finished deck, or null if closed.
@@ -569,98 +661,32 @@ class _SlidesAiMakerSheet extends StatefulWidget {
 
 class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _desc = TextEditingController();
-  bool _recording = false;
-  bool _transcribing = false;
   bool _busy = false;
   String _status = '';
-  double _level = 0;
-  double _peakSeen = 0;
-  DateTime? _recStarted;
-  Timer? _recTimer;
   int _count = 7;
   String _style = 'auto';
-  final Set<NgmySlidesAiExtra> _extras = {NgmySlidesAiExtra.animations, NgmySlidesAiExtra.emojis, NgmySlidesAiExtra.icons3d};
+  final Set<NgmySlidesAiExtra> _extras = {
+    NgmySlidesAiExtra.animations,
+    NgmySlidesAiExtra.videoMotion,
+    NgmySlidesAiExtra.emojis,
+    NgmySlidesAiExtra.icons3d,
+  };
   String? _error;
 
   static const _counts = [3, 5, 7, 10, 12, 15];
-  static const _maxRecordSeconds = 60;
 
   @override
   void dispose() {
-    _recTimer?.cancel();
-    if (_recording) NgmyVoiceCapture.cancel();
     _desc.dispose();
     super.dispose();
-  }
-
-  /// Tap to record, tap again to stop — then the AI writes down what was said.
-  Future<void> _toggleMic() async {
-    if (_transcribing || _busy) return;
-    if (_recording) {
-      await _finishRecording();
-      return;
-    }
-    HapticFeedback.mediumImpact();
-    setState(() {
-      _error = null;
-      _level = 0;
-      _peakSeen = 0;
-    });
-    try {
-      await NgmyVoiceCapture.start((v) {
-        if (!mounted) return;
-        _peakSeen = math.max(_peakSeen, v);
-        setState(() => _level = v);
-      });
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-      return;
-    }
-    _recStarted = DateTime.now();
-    setState(() => _recording = true);
-    _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_recording) return;
-      final secs = DateTime.now().difference(_recStarted!).inSeconds;
-      if (secs >= _maxRecordSeconds) {
-        unawaited(_finishRecording());
-      } else {
-        setState(() {});
-      }
-    });
-  }
-
-  Future<void> _finishRecording() async {
-    _recTimer?.cancel();
-    final audio = await NgmyVoiceCapture.stop();
-    if (!mounted) return;
-    setState(() {
-      _recording = false;
-      _level = 0;
-    });
-    if (_peakSeen < 0.02) {
-      setState(() => _error = 'Your microphone isn\'t picking up any sound. Check the right microphone is selected (and not muted), then try again.');
-      return;
-    }
-    setState(() => _transcribing = true);
-    try {
-      final text = await NgmyVoiceCapture.transcribe(audio);
-      if (!mounted) return;
-      final joined = [_desc.text.trim(), text.trim()].where((s) => s.isNotEmpty).join(' ');
-      _desc.value = TextEditingValue(text: joined, selection: TextSelection.collapsed(offset: joined.length));
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _transcribing = false);
-    }
   }
 
   Future<void> _create() async {
     final d = _desc.text.trim();
     if (d.length < 6) {
-      setState(() => _error = 'Tell me a little about the presentation first — tap the mic or type it.');
+      setState(() => _error = 'Type a little about the presentation first.');
       return;
     }
-    if (_recording) await _finishRecording();
     setState(() {
       _busy = true;
       _error = null;
@@ -692,12 +718,6 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
     const panel = Color(0xFF111827);
     const accent = Color(0xFF8B5CF6);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    final secs = _recording && _recStarted != null ? DateTime.now().difference(_recStarted!).inSeconds : 0;
-    final micLabel = _transcribing
-        ? 'Writing down what you said…'
-        : _recording
-            ? (_peakSeen > 0.05 ? 'Recording ${secs}s — I can hear you. Tap to finish.' : 'Recording ${secs}s — start talking…')
-            : 'Tap the mic and describe your presentation';
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
@@ -724,57 +744,31 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Say what it\'s about, who it\'s for, the mood (nature, vibe, celebration…) and anything it must include.',
+                  'Type what it\'s about, who it\'s for, the mood (nature, vibe, celebration…) and anything it must include. Want it in another language? Just say so — e.g. "in Swahili" or "en français".',
                   style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
                 ),
                 const SizedBox(height: 18),
+                // The mic stays here but is switched off — the AI works from typing.
                 Center(
-                  child: GestureDetector(
-                    onTap: _toggleMic,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 90),
-                      width: 92,
-                      height: 92,
+                  child: Tooltip(
+                    message: 'Voice is off — type your idea below',
+                    child: Container(
+                      width: 72,
+                      height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: _recording ? const [Color(0xFFEF4444), Color(0xFFDB2777)] : const [accent, Color(0xFF6366F1)],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (_recording ? const Color(0xFFEF4444) : accent).withValues(alpha: 0.45),
-                            blurRadius: 16 + _level * 40,
-                            spreadRadius: _level * 14,
-                          ),
-                        ],
+                        color: Colors.white.withValues(alpha: 0.06),
+                        border: Border.all(color: Colors.white12),
                       ),
-                      child: _transcribing
-                          ? const Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                          : Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.white, size: 42),
+                      child: const Icon(Icons.mic_off_rounded, color: Colors.white30, size: 32),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                if (_recording)
-                  // Live sound bars — proof the mic is hearing you.
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      for (var i = 0; i < 9; i++)
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 90),
-                          margin: const EdgeInsets.symmetric(horizontal: 2),
-                          width: 5,
-                          height: 6 + (_level * 34 * (1 - (i - 4).abs() / 5)).clamp(0, 34),
-                          decoration: BoxDecoration(color: const Color(0xFFFCA5A5), borderRadius: BorderRadius.circular(3)),
-                        ),
-                    ],
-                  ),
-                const SizedBox(height: 6),
-                Text(
-                  micLabel,
+                const SizedBox(height: 8),
+                const Text(
+                  'Type your presentation below',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _recording ? const Color(0xFFFCA5A5) : Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
+                  style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -846,7 +840,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 SizedBox(
                   height: 54,
                   child: ElevatedButton.icon(
-                    onPressed: _busy || _transcribing ? null : _create,
+                    onPressed: _busy ? null : _create,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
                       foregroundColor: Colors.white,
@@ -919,6 +913,180 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
             const SizedBox(width: 7),
             Text(label, style: TextStyle(color: Colors.white, fontWeight: selected ? FontWeight.w900 : FontWeight.w600, fontSize: 12.5)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The green mic after the AI made a presentation: type what to change
+/// ("add a slide about prices", "make it in French"…). Returns the new AI
+/// slides, or null if closed.
+Future<NgmySlideDeck?> showNgmySlidesAiEditor(BuildContext context, {required NgmySlideDeck deck, required int currentSlide}) {
+  return showModalBottomSheet<NgmySlideDeck>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _SlidesAiEditSheet(deck: deck, currentSlide: currentSlide),
+  );
+}
+
+class _SlidesAiEditSheet extends StatefulWidget {
+  const _SlidesAiEditSheet({required this.deck, required this.currentSlide});
+  final NgmySlideDeck deck;
+  final int currentSlide;
+  @override
+  State<_SlidesAiEditSheet> createState() => _SlidesAiEditSheetState();
+}
+
+class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
+  final _ask = TextEditingController();
+  bool _busy = false;
+  String _status = '';
+  String? _error;
+
+  static const _ideas = [
+    'Add a slide about…',
+    'Make this slide shorter',
+    'Translate everything to Swahili',
+    'Add a slide with our contact details',
+    'Change the style to luxury',
+    'Remove the last slide',
+  ];
+
+  @override
+  void dispose() {
+    _ask.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final request = _ask.text.trim();
+    if (request.length < 3) {
+      setState(() => _error = 'Type what you want changed or added.');
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      _busy = true;
+      _error = null;
+      _status = 'Making your changes…';
+    });
+    try {
+      final made = await ngmyEditSlidesWithAi(
+        outlineJson: widget.deck.aiOutlineJson ?? '',
+        request: request,
+        currentSlide: widget.currentSlide,
+        extras: ngmySlidesAiExtrasOf(widget.deck),
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
+      );
+      if (mounted) Navigator.of(context).pop(made);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = '$e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const green = Color(0xFF22C55E);
+    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85, maxWidth: 680),
+        decoration: const BoxDecoration(color: Color(0xFF111827), borderRadius: BorderRadius.vertical(top: Radius.circular(26))),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)))),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF22C55E), Color(0xFF15803D)])),
+                      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(child: Text('Tell the AI what to change', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'You\'re on slide ${widget.currentSlide}. Ask for new slides, changes to any slide, a different style or another language.',
+                  style: const TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _ask,
+                  autofocus: true,
+                  minLines: 2,
+                  maxLines: 5,
+                  style: const TextStyle(color: Colors.white, height: 1.35),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. Add a slide after this one about how to sign up, and make the title slide more exciting.',
+                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: green)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final idea in _ideas)
+                      ActionChip(
+                        label: Text(idea, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        backgroundColor: Colors.white.withValues(alpha: 0.06),
+                        side: const BorderSide(color: Colors.white12),
+                        onPressed: _busy
+                            ? null
+                            : () {
+                                final t = idea.endsWith('…') ? idea.substring(0, idea.length - 1) : idea;
+                                _ask.value = TextEditingValue(text: t, selection: TextSelection.collapsed(offset: t.length));
+                              },
+                      ),
+                  ],
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 12),
+                  Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35)),
+                ],
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: _busy ? null : _send,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: green,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: green.withValues(alpha: 0.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                    ),
+                    icon: _busy
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                        : const Icon(Icons.send_rounded),
+                    label: Text(_busy ? _status : 'Make the change', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
