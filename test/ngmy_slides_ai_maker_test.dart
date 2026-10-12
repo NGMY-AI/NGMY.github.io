@@ -28,7 +28,7 @@ void main() {
   });
 
   test('builds styled slides: gradients, real text, bullet list, transition', () {
-    final deck = ngmyBuildSlidesAiDeck(ngmyParseSlidesAiOutline(_reply, fallbackStyle: 'colorful')!);
+    final deck = ngmyBuildSlidesAiDeck(ngmyParseSlidesAiOutline(_reply, fallbackStyle: 'colorful')!, extras: const {});
     expect(deck.name, 'NGMY: Next Generation');
     expect(deck.slides.length, 4);
     for (final s in deck.slides) {
@@ -46,5 +46,33 @@ void main() {
     final p = ngmySlidesAiPrompt(description: 'about NGMY', slideCount: 9, styleId: 'nature');
     expect(p, contains('Exactly 9 slides'));
     expect(p, contains('"nature"'));
+  });
+  test('3D icon names the AI writes loosely are matched to real icons', () {
+    final o = ngmyParseSlidesAiOutline(
+      '{"title":"x","slides":[{"kind":"title","title":"a","icon3d":"rocket"},{"kind":"bullets","title":"b","icon3d":"Lion"},{"kind":"bullets","title":"c","icon3d":"made up thing"}]}',
+      fallbackStyle: 'colorful',
+    )!;
+    expect(o.slides[0].icon3d, 'Rocket');
+    expect(o.slides[1].icon3d, 'Lion');
+    expect(o.slides[2].icon3d, '');
+    expect(ngmySlides3dIconUrl('Party popper'), endsWith('/Party%20popper/3D/party_popper_3d.png'));
+  });
+
+  test('prompt only asks for the extras that were picked', () {
+    final p = ngmySlidesAiPrompt(description: 'x', slideCount: 5, styleId: 'auto', extras: {NgmySlidesAiExtra.emojis});
+    expect(p, contains('"emoji"'));
+    expect(p, isNot(contains('one name copied exactly')));
+    expect(p, isNot(contains('real photo')));
+  });
+
+  test('animations off = nothing animates; art is placed when provided', () {
+    final o = ngmyParseSlidesAiOutline(_reply, fallbackStyle: 'colorful')!;
+    final still = ngmyBuildSlidesAiDeck(o, extras: const {});
+    expect(still.slides.expand((s) => s.elements).every((e) => e.textTransition == NgmySlideTransition.none), isTrue);
+    const px = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    final rich = ngmyBuildSlidesAiDeck(o, extras: {NgmySlidesAiExtra.animations, NgmySlidesAiExtra.icons3d}, assets: {0: (picture: null, icon3d: px), 1: (picture: px, icon3d: null)});
+    expect(rich.slides[0].elements.where((e) => e.type == NgmySlideElementType.image).length, 1);
+    expect(rich.slides[1].elements.where((e) => e.type == NgmySlideElementType.image).length, 1);
+    expect(rich.slides.expand((s) => s.elements).any((e) => e.textTransition != NgmySlideTransition.none), isTrue);
   });
 }

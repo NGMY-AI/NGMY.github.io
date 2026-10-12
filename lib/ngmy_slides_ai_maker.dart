@@ -4,10 +4,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_slides_models.dart';
-import 'ngmy_voice_input.dart';
+import 'ngmy_voice_capture.dart';
 
 /// "Describe it and the AI makes it": speak (or type) what the presentation is
 /// about, pick how many slides and a look, and get a finished, colourful deck.
@@ -133,14 +134,80 @@ const kNgmySlidesAiStyles = <NgmySlidesAiStyle>[
 NgmySlidesAiStyle ngmySlidesAiStyleById(String id) =>
     kNgmySlidesAiStyles.firstWhere((s) => s.id == id.trim().toLowerCase(), orElse: () => kNgmySlidesAiStyles.first);
 
+/// Extras the AI can add on top of the words.
+enum NgmySlidesAiExtra { emojis, pictures, icons3d, animations }
+
+extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
+  String get label => switch (this) {
+        NgmySlidesAiExtra.emojis => 'Emojis',
+        NgmySlidesAiExtra.pictures => 'Pictures',
+        NgmySlidesAiExtra.icons3d => '3D icons & animals',
+        NgmySlidesAiExtra.animations => 'Animations',
+      };
+  IconData get icon => switch (this) {
+        NgmySlidesAiExtra.emojis => Icons.emoji_emotions_rounded,
+        NgmySlidesAiExtra.pictures => Icons.photo_library_rounded,
+        NgmySlidesAiExtra.icons3d => Icons.view_in_ar_rounded,
+        NgmySlidesAiExtra.animations => Icons.animation_rounded,
+      };
+}
+
+/// 3D icons (Microsoft Fluent Emoji 3D, MIT licence) the AI may pick from.
+/// Every name here was checked to exist.
+const kNgmySlides3dIcons = <String>[
+  'Rocket', 'Trophy', 'Party popper', 'Confetti ball', 'Balloon', 'Wrapped gift', 'Birthday cake', 'Sparkles', 'Star',
+  'Glowing star', 'Fire', 'Light bulb', 'Gem stone', 'Crown', 'Money bag', 'Dollar banknote', 'Chart increasing',
+  'Bar chart', 'Bullseye', 'Globe showing americas', 'Globe showing europe-africa', 'Sun', 'Rainbow', 'Cloud',
+  'High voltage', 'Red heart', 'Handshake', 'Graduation cap', 'Books', 'Open book', 'Pencil', 'Laptop', 'Mobile phone',
+  'Microphone', 'Musical notes', 'Camera', 'Video camera', 'Megaphone', 'Bell', 'Calendar', 'Alarm clock',
+  'Hourglass done', 'Key', 'Locked', 'Shield', 'Gear', 'Hammer and wrench', 'Magnifying glass tilted left', 'Package',
+  'Shopping cart', 'House', 'Office building', 'Hospital', 'Ballot box with ballot', 'Automobile', 'Airplane', 'Seedling',
+  'Deciduous tree', 'Evergreen tree', 'Palm tree', 'Sunflower', 'Cherry blossom', 'Herb', 'Four leaf clover', 'Water wave',
+  'Mountain', 'Lion', 'Tiger face', 'Dog face', 'Cat face', 'Elephant', 'Unicorn', 'Butterfly', 'Honeybee', 'Owl', 'Eagle',
+  'Dolphin', 'Turtle', 'Panda', 'Fox', 'Rabbit face', 'Monkey face', 'Penguin', 'Horse', 'Bird', 'Peacock', 'Parrot',
+  'Red apple', 'Pizza', 'Hot beverage', 'Soccer ball', 'Basketball', 'Artist palette', 'Clapper board', 'Robot', 'Brain',
+  'Check mark button', 'Red question mark', 'Speech balloon', 'Compass', 'Crystal ball', 'Puzzle piece', '1st place medal',
+  'Smiling face with sunglasses', 'Grinning face with big eyes', 'Star-struck', 'Partying face', 'Thinking face',
+  'Hundred points',
+];
+
+String? _match3dIcon(String raw) {
+  final r = raw.trim().toLowerCase();
+  if (r.isEmpty) return null;
+  for (final n in kNgmySlides3dIcons) {
+    if (n.toLowerCase() == r) return n;
+  }
+  for (final n in kNgmySlides3dIcons) {
+    if (n.toLowerCase().contains(r) || r.contains(n.toLowerCase())) return n;
+  }
+  return null;
+}
+
+String ngmySlides3dIconUrl(String name) {
+  final file = name.toLowerCase().replaceAll(' ', '_');
+  return 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@main/assets/${Uri.encodeComponent(name)}/3D/${file}_3d.png';
+}
+
 /// One slide as the AI outlines it.
 class NgmySlidesAiOutlineSlide {
-  NgmySlidesAiOutlineSlide({required this.kind, required this.title, this.subtitle = '', this.bullets = const [], this.notes = ''});
+  NgmySlidesAiOutlineSlide({
+    required this.kind,
+    required this.title,
+    this.subtitle = '',
+    this.bullets = const [],
+    this.notes = '',
+    this.emoji = '',
+    this.icon3d = '',
+    this.imageQuery = '',
+  });
   final String kind; // title, bullets, section, quote, closing
   final String title;
   final String subtitle;
   final List<String> bullets;
   final String notes;
+  final String emoji;
+  final String icon3d;
+  final String imageQuery;
 }
 
 class NgmySlidesAiOutline {
@@ -150,8 +217,23 @@ class NgmySlidesAiOutline {
   final List<NgmySlidesAiOutlineSlide> slides;
 }
 
-String ngmySlidesAiPrompt({required String description, required int slideCount, required String styleId}) {
+String ngmySlidesAiPrompt({
+  required String description,
+  required int slideCount,
+  required String styleId,
+  Set<NgmySlidesAiExtra> extras = const {},
+}) {
   final styles = kNgmySlidesAiStyles.map((s) => s.id).join(', ');
+  final extraRules = StringBuffer();
+  if (extras.contains(NgmySlidesAiExtra.emojis)) {
+    extraRules.writeln('- "emoji": ONE emoji that fits the slide (e.g. 🎉 🚀 🌿 💡).');
+  }
+  if (extras.contains(NgmySlidesAiExtra.icons3d)) {
+    extraRules.writeln('- "icon3d": ONE name copied exactly from this list that fits the slide: ${kNgmySlides3dIcons.join(', ')}.');
+  }
+  if (extras.contains(NgmySlidesAiExtra.pictures)) {
+    extraRules.writeln('- "image_query": 2-3 simple English words for a real photo that fits the slide (e.g. "city skyline", "students classroom").');
+  }
   return '''
 You design presentation slides. Write a presentation from the user's request.
 
@@ -165,8 +247,8 @@ Rules:
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
 - "notes": 1-2 sentences the presenter can say.
 - "style": ${styleId == 'auto' ? 'pick the best of: $styles (match the mood they describe: nature, vibe, celebration, colorful, professional...)' : 'use "$styleId"'}.
-- Reply with JSON only, no markdown, in this shape:
-{"title":"...","style":"...","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"..."}]}
+$extraRules- Reply with JSON only, no markdown, in this shape:
+{"title":"...","style":"...","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
 ''';
 }
 
@@ -192,6 +274,9 @@ NgmySlidesAiOutline? ngmyParseSlidesAiOutline(String raw, {required String fallb
         subtitle: '${e['subtitle'] ?? ''}'.trim(),
         bullets: bullets,
         notes: '${e['notes'] ?? ''}'.trim(),
+        emoji: '${e['emoji'] ?? ''}'.trim(),
+        icon3d: _match3dIcon('${e['icon3d'] ?? ''}') ?? '',
+        imageQuery: '${e['image_query'] ?? e['imageQuery'] ?? ''}'.trim(),
       ));
     }
     if (slides.isEmpty) return null;
@@ -208,14 +293,28 @@ NgmySlidesAiOutline? ngmyParseSlidesAiOutline(String raw, {required String fallb
 
 int _withAlpha(int argb, int alpha) => (alpha.clamp(0, 255) << 24) | (argb & 0x00FFFFFF);
 
-/// Turns an outline into real slides with the style's colours and decorations.
-NgmySlideDeck ngmyBuildSlidesAiDeck(NgmySlidesAiOutline outline) {
+/// Pictures / 3D icons downloaded for a slide (data URIs, so they work offline and in PDFs).
+typedef NgmySlidesAiAssets = ({String? picture, String? icon3d});
+
+/// Turns an outline into real slides with the style's colours, decorations and extras.
+NgmySlideDeck ngmyBuildSlidesAiDeck(
+  NgmySlidesAiOutline outline, {
+  Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
+  Map<int, NgmySlidesAiAssets> assets = const {},
+}) {
   final st = ngmySlidesAiStyleById(outline.style);
+  final animate = extras.contains(NgmySlidesAiExtra.animations);
+  final useEmoji = extras.contains(NgmySlidesAiExtra.emojis);
   String id() => NgmySlidesTemplates.newId();
   final slides = <NgmySlide>[];
 
+  // A different entrance for each slide keeps the deck lively.
+  const titleIns = [NgmySlideTransition.zoom, NgmySlideTransition.slideUp, NgmySlideTransition.flip, NgmySlideTransition.slideLeft, NgmySlideTransition.bounce];
+  const artIns = [NgmySlideTransition.bounce, NgmySlideTransition.rotate3d, NgmySlideTransition.zoom, NgmySlideTransition.flip, NgmySlideTransition.spiral];
+  const slideTrans = [NgmySlideTransition.fade, NgmySlideTransition.zoom, NgmySlideTransition.slideLeft, NgmySlideTransition.cube, NgmySlideTransition.flip, NgmySlideTransition.push];
+
   NgmySlideElement text(String t, double x, double y, double w, double h, double size,
-      {FontWeight weight = FontWeight.w600, int? color, TextAlign align = TextAlign.left, bool bullets = false, FontStyle style = FontStyle.normal, int delay = 0}) {
+      {FontWeight weight = FontWeight.w600, int? color, TextAlign align = TextAlign.left, bool bullets = false, FontStyle style = FontStyle.normal, NgmySlideTransition anim = NgmySlideTransition.fade, int delay = 0}) {
     return NgmySlideElement(
       id: id(),
       type: NgmySlideElementType.text,
@@ -230,8 +329,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(NgmySlidesAiOutline outline) {
       color: color ?? st.text,
       align: align,
       bulletList: bullets,
-      textTransition: delay > 0 ? NgmySlideTransition.fade : NgmySlideTransition.none,
-      textAnimDelayMs: delay,
+      textTransition: animate ? anim : NgmySlideTransition.none,
+      textAnimDelayMs: animate ? delay : 0,
     );
   }
 
@@ -251,51 +350,96 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(NgmySlidesAiOutline outline) {
     );
   }
 
+  NgmySlideElement image(String dataUri, double x, double y, double w, double h, {NgmySlideTransition anim = NgmySlideTransition.bounce, int delay = 350}) {
+    return NgmySlideElement(
+      id: id(),
+      type: NgmySlideElementType.image,
+      x: x,
+      y: y,
+      w: w,
+      h: h,
+      imageRef: dataUri,
+      textTransition: animate ? anim : NgmySlideTransition.none,
+      textAnimDelayMs: animate ? delay : 0,
+    );
+  }
+
   for (var i = 0; i < outline.slides.length; i++) {
     final o = outline.slides[i];
     final (bg, bgEnd) = st.backgrounds[i % st.backgrounds.length];
     final a1 = st.accents[i % st.accents.length];
     final a2 = st.accents[(i + 1) % st.accents.length];
+    final tIn = titleIns[i % titleIns.length];
+    final artIn = artIns[i % artIns.length];
     final els = <NgmySlideElement>[];
     var layout = NgmySlideLayout.titleContent;
+    final asset = assets[i];
+    final icon = asset?.icon3d;
+    final picture = asset?.picture;
+    final emoji = useEmoji ? o.emoji : '';
+    // Bullet slides prefer a photo; title/section/closing prefer the 3D icon.
+    final sideArt = picture ?? icon;
+    final heroArt = icon ?? picture;
 
     switch (o.kind) {
       case 'title':
         layout = NgmySlideLayout.title;
         els
           ..add(shape(NgmySlideShapeKind.circle, 0.70, -0.25, 0.46, 0.82, _withAlpha(a1, 0x33)))
-          ..add(shape(NgmySlideShapeKind.circle, -0.08, 0.68, 0.24, 0.43, _withAlpha(a2, 0x2E)))
-          ..add(shape(NgmySlideShapeKind.rectangle, 0.40, 0.62, 0.20, 0.012, a1))
-          ..add(text(o.title, 0.08, 0.28, 0.84, 0.30, 56, weight: FontWeight.w900, align: TextAlign.center))
-          ..add(text(o.subtitle, 0.12, 0.66, 0.76, 0.14, 24, color: st.muted, align: TextAlign.center, delay: 300));
+          ..add(shape(NgmySlideShapeKind.circle, -0.08, 0.68, 0.24, 0.43, _withAlpha(a2, 0x2E)));
+        if (heroArt != null) {
+          els.add(image(heroArt, 0.42, 0.04, 0.16, 0.28, anim: artIn, delay: 500));
+        } else if (emoji.isNotEmpty) {
+          els.add(text(emoji, 0.40, 0.04, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500));
+        }
+        els
+          ..add(shape(NgmySlideShapeKind.rectangle, 0.40, 0.66, 0.20, 0.012, a1))
+          ..add(text(o.title, 0.08, 0.33, 0.84, 0.30, 54, weight: FontWeight.w900, align: TextAlign.center, anim: tIn))
+          ..add(text(o.subtitle, 0.12, 0.70, 0.76, 0.14, 24, color: st.muted, align: TextAlign.center, delay: 300));
       case 'section':
         layout = NgmySlideLayout.section;
+        if (heroArt != null) {
+          els.add(image(heroArt, 0.70, 0.22, 0.24, 0.44, anim: artIn));
+        } else {
+          els.add(shape(NgmySlideShapeKind.hexagon, 0.78, 0.10, 0.18, 0.32, _withAlpha(a1, 0x40), rotation: 0.3));
+        }
         els
-          ..add(shape(NgmySlideShapeKind.hexagon, 0.78, 0.10, 0.18, 0.32, _withAlpha(a1, 0x40), rotation: 0.3))
           ..add(shape(NgmySlideShapeKind.rectangle, 0.08, 0.60, 0.14, 0.014, a1))
-          ..add(text(o.title, 0.08, 0.34, 0.74, 0.24, 48, weight: FontWeight.w900))
-          ..add(text(o.subtitle, 0.08, 0.64, 0.70, 0.14, 22, color: st.muted, delay: 250));
+          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.08, 0.34, 0.62, 0.24, 46, weight: FontWeight.w900, anim: tIn))
+          ..add(text(o.subtitle, 0.08, 0.64, 0.60, 0.14, 22, color: st.muted, delay: 250));
       case 'quote':
         els
-          ..add(text('“', 0.06, 0.02, 0.2, 0.36, 140, weight: FontWeight.w900, color: _withAlpha(a1, 0xCC)))
-          ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center))
+          ..add(text('“', 0.06, 0.02, 0.2, 0.36, 140, weight: FontWeight.w900, color: _withAlpha(a1, 0xCC), anim: NgmySlideTransition.zoom))
+          ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center, anim: tIn))
           ..add(text(o.subtitle.isEmpty ? '' : '— ${o.subtitle}', 0.12, 0.68, 0.76, 0.12, 22, color: st.muted, align: TextAlign.center, delay: 300))
           ..add(shape(NgmySlideShapeKind.circle, 0.82, 0.66, 0.26, 0.46, _withAlpha(a2, 0x26)));
+        if (emoji.isNotEmpty) els.add(text(emoji, 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500));
       case 'closing':
         layout = NgmySlideLayout.title;
         els
           ..add(shape(NgmySlideShapeKind.circle, -0.15, -0.30, 0.50, 0.90, _withAlpha(a1, 0x2E)))
-          ..add(shape(NgmySlideShapeKind.circle, 0.78, 0.62, 0.30, 0.54, _withAlpha(a2, 0x33)))
-          ..add(text(o.title, 0.10, 0.30, 0.80, 0.26, 54, weight: FontWeight.w900, align: TextAlign.center))
-          ..add(text(o.subtitle, 0.14, 0.60, 0.72, 0.16, 24, color: st.muted, align: TextAlign.center, delay: 300));
+          ..add(shape(NgmySlideShapeKind.circle, 0.78, 0.62, 0.30, 0.54, _withAlpha(a2, 0x33)));
+        if (heroArt != null) {
+          els.add(image(heroArt, 0.42, 0.05, 0.16, 0.28, anim: artIn, delay: 450));
+        } else if (emoji.isNotEmpty) {
+          els.add(text(emoji, 0.40, 0.05, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 450));
+        }
+        els
+          ..add(text(o.title, 0.10, 0.34, 0.80, 0.26, 52, weight: FontWeight.w900, align: TextAlign.center, anim: tIn))
+          ..add(text(o.subtitle, 0.14, 0.63, 0.72, 0.16, 24, color: st.muted, align: TextAlign.center, delay: 300));
       default:
         final points = o.bullets.isEmpty && o.subtitle.isNotEmpty ? [o.subtitle] : o.bullets;
+        final hasArt = sideArt != null;
         els
           ..add(shape(NgmySlideShapeKind.circle, 0.80, 0.52, 0.30, 0.54, _withAlpha(a2, 0x24)))
           ..add(shape(NgmySlideShapeKind.rectangle, 0.0, 0.0, 0.012, 1.0, a1))
-          ..add(text(o.title, 0.07, 0.08, 0.86, 0.16, 38, weight: FontWeight.w900))
+          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.07, 0.08, hasArt ? 0.60 : 0.86, 0.16, 38, weight: FontWeight.w900, anim: tIn))
           ..add(shape(NgmySlideShapeKind.rectangle, 0.07, 0.25, 0.12, 0.012, a1))
-          ..add(text(points.join('\n'), 0.07, 0.31, 0.70, 0.60, points.length > 4 ? 22 : 25, color: st.muted, bullets: true, delay: 250));
+          ..add(text(points.join('\n'), 0.07, 0.31, hasArt ? 0.58 : 0.70, 0.60, points.length > 4 ? 21 : 24, color: st.muted, bullets: true, anim: NgmySlideTransition.slideRight, delay: 250));
+        if (hasArt) {
+          final isPhoto = picture != null;
+          els.add(image(sideArt, isPhoto ? 0.67 : 0.70, isPhoto ? 0.22 : 0.26, isPhoto ? 0.29 : 0.24, isPhoto ? 0.56 : 0.44, anim: artIn, delay: 400));
+        }
     }
 
     slides.add(NgmySlide(
@@ -305,7 +449,7 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(NgmySlidesAiOutline outline) {
       layout: layout,
       background: bg,
       backgroundEnd: bgEnd,
-      transition: st.transition,
+      transition: animate ? slideTrans[i % slideTrans.length] : st.transition,
       elements: els,
     ));
   }
@@ -314,14 +458,78 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(NgmySlidesAiOutline outline) {
   return NgmySlideDeck(id: id(), name: name.length > 60 ? name.substring(0, 60) : name, slides: slides);
 }
 
-/// Asks the AI for the outline and builds the deck. Throws a readable message on failure.
-Future<NgmySlideDeck> ngmyCreateSlidesWithAi({required String description, required int slideCount, required String styleId}) async {
+Future<String?> _fetchAsDataUri(String url, {String fallbackMime = 'image/png'}) async {
+  try {
+    final r = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+    if (r.statusCode != 200 || r.bodyBytes.isEmpty || r.bodyBytes.length > 900000) return null;
+    final type = (r.headers['content-type'] ?? fallbackMime).split(';').first.trim();
+    if (!type.startsWith('image/')) return null;
+    return 'data:$type;base64,${base64Encode(r.bodyBytes)}';
+  } catch (_) {
+    return null;
+  }
+}
+
+/// A free, openly licensed photo for [query] (Openverse), as a data URI.
+Future<String?> _fetchPicture(String query) async {
+  final q = query.trim();
+  if (q.isEmpty) return null;
+  try {
+    final r = await http
+        .get(Uri.parse('https://api.openverse.org/v1/images/?q=${Uri.encodeQueryComponent(q)}&page_size=6&license_type=commercial&mature=false'))
+        .timeout(const Duration(seconds: 10));
+    if (r.statusCode != 200) return null;
+    final results = (jsonDecode(r.body) as Map)['results'];
+    if (results is! List) return null;
+    for (final item in results.take(4)) {
+      if (item is! Map) continue;
+      final thumb = '${item['thumbnail'] ?? ''}';
+      if (thumb.isEmpty) continue;
+      final data = await _fetchAsDataUri(thumb, fallbackMime: 'image/jpeg');
+      if (data != null) return data;
+    }
+  } catch (_) {}
+  return null;
+}
+
+/// Downloads the pictures / 3D icons the outline asks for (in parallel).
+Future<Map<int, NgmySlidesAiAssets>> ngmyFetchSlidesAiAssets(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras) async {
+  final wantPics = extras.contains(NgmySlidesAiExtra.pictures);
+  final want3d = extras.contains(NgmySlidesAiExtra.icons3d);
+  if (!wantPics && !want3d) return const {};
+  final iconCache = <String, Future<String?>>{};
+  final jobs = <Future<MapEntry<int, NgmySlidesAiAssets>>>[];
+  for (var i = 0; i < outline.slides.length; i++) {
+    final o = outline.slides[i];
+    jobs.add(() async {
+      // Photos on content slides; 3D icons everywhere they were asked for.
+      final pic = wantPics && (o.kind == 'bullets' || o.kind == 'section') && o.imageQuery.isNotEmpty ? await _fetchPicture(o.imageQuery) : null;
+      String? icon;
+      if (want3d && o.icon3d.isNotEmpty) {
+        icon = await iconCache.putIfAbsent(o.icon3d, () => _fetchAsDataUri(ngmySlides3dIconUrl(o.icon3d)));
+      }
+      return MapEntry(i, (picture: pic, icon3d: icon));
+    }());
+  }
+  final done = await Future.wait(jobs);
+  return {for (final e in done) e.key: e.value};
+}
+
+/// Asks the AI for the outline, fetches extras and builds the deck. Throws a readable message on failure.
+Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
+  required String description,
+  required int slideCount,
+  required String styleId,
+  Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
+  void Function(String status)? onStatus,
+}) async {
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
   final creds = ngmyParseAiCredentials(key);
-  final prompt = ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId);
+  final prompt = ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras);
   NgmySlidesAiOutline? outline;
   String? lastError;
+  onStatus?.call('Writing your $slideCount slides…');
   for (var attempt = 0; attempt < 2 && outline == null; attempt++) {
     final r = await ngmyAiGenerateWithCredentials(creds, prompt);
     if (r.text != null) {
@@ -335,138 +543,139 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({required String description, requi
         ? 'No internet connection — try again when you are online.'
         : 'The AI could not write the slides. Try describing it again.';
   }
-  return ngmyBuildSlidesAiDeck(outline);
+  var assets = const <int, NgmySlidesAiAssets>{};
+  if (extras.contains(NgmySlidesAiExtra.pictures) || extras.contains(NgmySlidesAiExtra.icons3d)) {
+    onStatus?.call('Adding pictures and 3D art…');
+    assets = await ngmyFetchSlidesAiAssets(outline, extras);
+  }
+  return ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets);
 }
 
 /// The "describe it" sheet. Returns the finished deck, or null if closed.
-Future<NgmySlideDeck?> showNgmySlidesAiMaker(BuildContext context, {bool startListening = false}) {
+Future<NgmySlideDeck?> showNgmySlidesAiMaker(BuildContext context) {
   return showModalBottomSheet<NgmySlideDeck>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _SlidesAiMakerSheet(startListening: startListening),
+    builder: (ctx) => const _SlidesAiMakerSheet(),
   );
 }
 
 class _SlidesAiMakerSheet extends StatefulWidget {
-  const _SlidesAiMakerSheet({required this.startListening});
-  final bool startListening;
+  const _SlidesAiMakerSheet();
   @override
   State<_SlidesAiMakerSheet> createState() => _SlidesAiMakerSheetState();
 }
 
-class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTickerProviderStateMixin {
+class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _desc = TextEditingController();
-  late final AnimationController _pulse;
-  bool _listening = false;
+  bool _recording = false;
+  bool _transcribing = false;
   bool _busy = false;
-  String _before = '';
+  String _status = '';
+  double _level = 0;
+  double _peakSeen = 0;
+  DateTime? _recStarted;
+  Timer? _recTimer;
   int _count = 7;
   String _style = 'auto';
+  final Set<NgmySlidesAiExtra> _extras = {NgmySlidesAiExtra.animations, NgmySlidesAiExtra.emojis, NgmySlidesAiExtra.icons3d};
   String? _error;
 
   static const _counts = [3, 5, 7, 10, 12, 15];
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
-    if (widget.startListening) WidgetsBinding.instance.addPostFrameCallback((_) => _toggleMic());
-  }
+  static const _maxRecordSeconds = 60;
 
   @override
   void dispose() {
-    _micWatch?.cancel();
-    unawaited(NgmyVoiceInput.stop());
-    _pulse.dispose();
+    _recTimer?.cancel();
+    if (_recording) NgmyVoiceCapture.cancel();
     _desc.dispose();
     super.dispose();
   }
 
-  Timer? _micWatch;
-  DateTime? _micStartedAt;
-  bool _heardSomething = false;
-  String _live = '';
-
-  Future<void> _stopMic() async {
-    _micWatch?.cancel();
-    _micWatch = null;
-    await NgmyVoiceInput.stop();
-    _pulse.stop();
-    if (mounted) setState(() => _listening = false);
-  }
-
-  /// Only ever started by a tap — browsers block the microphone otherwise.
+  /// Tap to record, tap again to stop — then the AI writes down what was said.
   Future<void> _toggleMic() async {
-    if (_listening) {
-      await _stopMic();
+    if (_transcribing || _busy) return;
+    if (_recording) {
+      await _finishRecording();
       return;
     }
     HapticFeedback.mediumImpact();
-    _before = _desc.text.trim();
-    _live = '';
-    _heardSomething = false;
-    _micStartedAt = DateTime.now();
     setState(() {
-      _listening = true;
       _error = null;
+      _level = 0;
+      _peakSeen = 0;
     });
-    _pulse.repeat(reverse: true);
-    final ok = await NgmyVoiceInput.listen(onText: (t, {bool isFinal = false}) {
-      if (!mounted) return;
-      final heard = t.trim();
-      if (heard.isEmpty) return;
-      // Each update is everything heard in this listening session. When the
-      // browser quietly restarts listening, a new session starts from scratch —
-      // keep what was already heard instead of losing or repeating it.
-      if (_live.isNotEmpty && !heard.startsWith(_live.substring(0, math.min(8, _live.length)))) {
-        _before = [_before, _live].where((s) => s.isNotEmpty).join(' ');
-      }
-      _live = heard;
-      _heardSomething = true;
-      final joined = [_before, _live].where((s) => s.isNotEmpty).join(' ');
-      _desc.value = TextEditingValue(text: joined, selection: TextSelection.collapsed(offset: joined.length));
-      if (_error != null) setState(() => _error = null);
-    });
-    if (!mounted) return;
-    if (!ok) {
-      _pulse.stop();
-      setState(() {
-        _listening = false;
-        _error = NgmyVoiceInput.userMessageForError(NgmyVoiceInput.lastError);
+    try {
+      await NgmyVoiceCapture.start((v) {
+        if (!mounted) return;
+        _peakSeen = math.max(_peakSeen, v);
+        setState(() => _level = v);
       });
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
       return;
     }
-    // Keep an eye on it: surface a blocked mic or silence instead of pretending.
-    _micWatch = Timer.periodic(const Duration(milliseconds: 600), (_) {
-      if (!mounted || !_listening) return;
-      final err = NgmyVoiceInput.lastError;
-      if (err != null && err.isNotEmpty && !err.contains('no-speech') && !err.contains('aborted')) {
-        unawaited(_stopMic());
-        setState(() => _error = NgmyVoiceInput.userMessageForError(err));
-        return;
-      }
-      final secs = DateTime.now().difference(_micStartedAt ?? DateTime.now()).inSeconds;
-      if (!_heardSomething && secs >= 7 && _error == null) {
-        setState(() => _error =
-            'I can\'t hear anything yet. Check that NGMY is allowed to use the microphone (lock icon in the address bar → Microphone → Allow) and speak close to the mic. Chrome works best — or type below.');
+    _recStarted = DateTime.now();
+    setState(() => _recording = true);
+    _recTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_recording) return;
+      final secs = DateTime.now().difference(_recStarted!).inSeconds;
+      if (secs >= _maxRecordSeconds) {
+        unawaited(_finishRecording());
+      } else {
+        setState(() {});
       }
     });
+  }
+
+  Future<void> _finishRecording() async {
+    _recTimer?.cancel();
+    final audio = await NgmyVoiceCapture.stop();
+    if (!mounted) return;
+    setState(() {
+      _recording = false;
+      _level = 0;
+    });
+    if (_peakSeen < 0.02) {
+      setState(() => _error = 'Your microphone isn\'t picking up any sound. Check the right microphone is selected (and not muted), then try again.');
+      return;
+    }
+    setState(() => _transcribing = true);
+    try {
+      final text = await NgmyVoiceCapture.transcribe(audio);
+      if (!mounted) return;
+      final joined = [_desc.text.trim(), text.trim()].where((s) => s.isNotEmpty).join(' ');
+      _desc.value = TextEditingValue(text: joined, selection: TextSelection.collapsed(offset: joined.length));
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
+    } finally {
+      if (mounted) setState(() => _transcribing = false);
+    }
   }
 
   Future<void> _create() async {
     final d = _desc.text.trim();
     if (d.length < 6) {
-      setState(() => _error = 'Tell me a little about the presentation first.');
+      setState(() => _error = 'Tell me a little about the presentation first — tap the mic or type it.');
       return;
     }
-    if (_listening) await _stopMic();
+    if (_recording) await _finishRecording();
     setState(() {
       _busy = true;
       _error = null;
+      _status = 'Writing your $_count slides…';
     });
     try {
-      final deck = await ngmyCreateSlidesWithAi(description: d, slideCount: _count, styleId: _style);
+      final deck = await ngmyCreateSlidesWithAi(
+        description: d,
+        slideCount: _count,
+        styleId: _style,
+        extras: _extras,
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
+      );
       if (mounted) Navigator.of(context).pop(deck);
     } catch (e) {
       if (mounted) {
@@ -483,10 +692,16 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
     const panel = Color(0xFF111827);
     const accent = Color(0xFF8B5CF6);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final secs = _recording && _recStarted != null ? DateTime.now().difference(_recStarted!).inSeconds : 0;
+    final micLabel = _transcribing
+        ? 'Writing down what you said…'
+        : _recording
+            ? (_peakSeen > 0.05 ? 'Recording ${secs}s — I can hear you. Tap to finish.' : 'Recording ${secs}s — start talking…')
+            : 'Tap the mic and describe your presentation';
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
       child: Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92, maxWidth: 640),
+        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.92, maxWidth: 680),
         decoration: const BoxDecoration(
           color: panel,
           borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
@@ -509,45 +724,57 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Tap the mic and describe it: what it\'s about, who it\'s for, the mood (nature, vibe, celebration…) and anything it must say.',
+                  'Say what it\'s about, who it\'s for, the mood (nature, vibe, celebration…) and anything it must include.',
                   style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
                 ),
                 const SizedBox(height: 18),
                 Center(
                   child: GestureDetector(
-                    onTap: _busy ? null : _toggleMic,
-                    child: AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (_, child) {
-                        final p = _listening ? _pulse.value : 0.0;
-                        return Container(
-                          width: 92,
-                          height: 92,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: _listening ? const [Color(0xFFEF4444), Color(0xFFDB2777)] : const [accent, Color(0xFF6366F1)],
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (_listening ? const Color(0xFFEF4444) : accent).withValues(alpha: 0.45),
-                                blurRadius: 18 + p * 22,
-                                spreadRadius: p * 8,
-                              ),
-                            ],
+                    onTap: _toggleMic,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 90),
+                      width: 92,
+                      height: 92,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: _recording ? const [Color(0xFFEF4444), Color(0xFFDB2777)] : const [accent, Color(0xFF6366F1)],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_recording ? const Color(0xFFEF4444) : accent).withValues(alpha: 0.45),
+                            blurRadius: 16 + _level * 40,
+                            spreadRadius: _level * 14,
                           ),
-                          child: child,
-                        );
-                      },
-                      child: Icon(_listening ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.white, size: 42),
+                        ],
+                      ),
+                      child: _transcribing
+                          ? const Padding(padding: EdgeInsets.all(30), child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                          : Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded, color: Colors.white, size: 42),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
+                if (_recording)
+                  // Live sound bars — proof the mic is hearing you.
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (var i = 0; i < 9; i++)
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 90),
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          width: 5,
+                          height: 6 + (_level * 34 * (1 - (i - 4).abs() / 5)).clamp(0, 34),
+                          decoration: BoxDecoration(color: const Color(0xFFFCA5A5), borderRadius: BorderRadius.circular(3)),
+                        ),
+                    ],
+                  ),
+                const SizedBox(height: 6),
                 Text(
-                  _listening ? (_heardSomething ? 'Got it — keep talking, tap to stop' : 'Listening… speak now') : 'Tap the mic to speak',
+                  micLabel,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: _listening ? const Color(0xFFFCA5A5) : Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
+                  style: TextStyle(color: _recording ? const Color(0xFFFCA5A5) : Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -592,6 +819,14 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
                   ],
                 ),
                 const SizedBox(height: 18),
+                const Text('Add to the slides', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [for (final x in NgmySlidesAiExtra.values) _extraChip(x)],
+                ),
+                const SizedBox(height: 18),
                 const Text('Look & feel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 Wrap(
@@ -605,13 +840,13 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 14),
-                  Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700, fontSize: 12.5)),
+                  Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35)),
                 ],
                 const SizedBox(height: 18),
                 SizedBox(
                   height: 54,
                   child: ElevatedButton.icon(
-                    onPressed: _busy ? null : _create,
+                    onPressed: _busy || _transcribing ? null : _create,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accent,
                       foregroundColor: Colors.white,
@@ -622,7 +857,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
                         : const Icon(Icons.auto_awesome_rounded),
                     label: Text(
-                      _busy ? 'Designing your $_count slides…' : 'Create my presentation',
+                      _busy ? _status : 'Create my presentation',
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
                     ),
                   ),
@@ -630,6 +865,31 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _extraChip(NgmySlidesAiExtra x) {
+    final on = _extras.contains(x);
+    return GestureDetector(
+      onTap: () => setState(() => on ? _extras.remove(x) : _extras.add(x)),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(99),
+          gradient: on ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]) : null,
+          color: on ? null : Colors.white.withValues(alpha: 0.05),
+          border: Border.all(color: on ? Colors.white54 : Colors.white12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(on ? Icons.check_circle_rounded : x.icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(x.label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 12.5)),
+          ],
         ),
       ),
     );
@@ -664,4 +924,3 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> with SingleTic
     );
   }
 }
-

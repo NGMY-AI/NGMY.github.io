@@ -1265,7 +1265,7 @@ class NgmyBusinessCardStudioState extends State<NgmyBusinessCardStudio> {
       builder: (ctx) {
         final w = MediaQuery.of(ctx).size.width;
         // Roomy on computers, unchanged on phones.
-      final dialogW = w > 1100 ? 820.0 : (w > 540 ? 520.0 : w - 24);
+      final dialogW = w > 1300 ? 1040.0 : (w > 1100 ? 820.0 : (w > 540 ? 520.0 : w - 24));
         return Dialog(
           insetPadding: const EdgeInsets.all(12),
           backgroundColor: Colors.transparent,
@@ -1328,7 +1328,7 @@ void showNgmyBusinessCardStudioDialog(
     pageBuilder: (ctx, a1, a2) {
       final w = MediaQuery.of(ctx).size.width;
       // Roomy on computers, unchanged on phones.
-      final dialogW = w > 1100 ? 820.0 : (w > 540 ? 520.0 : w - 24);
+      final dialogW = w > 1300 ? 1040.0 : (w > 1100 ? 820.0 : (w > 540 ? 520.0 : w - 24));
       return PopScope(
         canPop: false,
         child: Dialog(
