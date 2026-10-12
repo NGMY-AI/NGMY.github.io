@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'ngmy_desktop_frame.dart';
 import 'ngmy_offline_close_button.dart';
 import 'ngmy_offline_icons.dart';
 import 'ngmy_platform_graphics.dart';
@@ -624,8 +623,7 @@ class NgmyToolkitAlivePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = NgmyHudInk.isDark(context);
     return Container(
-      // Pop-up tools open as wide as the NGMY Hub column on computers.
-      width: width == null ? null : ngmyDesktopPanelWidth(context, width!),
+      width: width,
       constraints: maxHeight == null ? null : BoxConstraints(maxHeight: maxHeight!),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),

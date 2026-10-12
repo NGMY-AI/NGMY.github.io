@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_desktop_frame.dart';
 import 'ngmy_studio_colors.dart';
 import 'ngmy_doc_share_gate_ui.dart';
 import 'ngmy_fun_games.dart';
@@ -514,7 +515,8 @@ class _StandaloneQuoteCalcDialogState extends State<_StandaloneQuoteCalcDialog> 
     final city = _cityC.text.trim();
     final service = _serviceC.text.trim();
     final showPriceResult = mine > 0 || others > 0;
-    final dialogW = MediaQuery.of(context).size.width > 480 ? 400.0 : MediaQuery.of(context).size.width - 28;
+    // As wide as the NGMY Hub column on computers; unchanged on phones.
+    final dialogW = ngmyDesktopPanelWidth(context, MediaQuery.of(context).size.width > 480 ? 400.0 : MediaQuery.of(context).size.width - 28);
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),

@@ -1,4 +1,3 @@
-import 'ngmy_desktop_frame.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
@@ -587,10 +586,7 @@ class _NgmyVideoStudioPageState extends State<_NgmyVideoStudioPage> {
   }
 
   @override
-  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
-
-  // The page itself — kept NGMY Hub width on computers by the wrapper above.
-  Widget _buildDesktopInner(BuildContext context) {
+  Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width > 760;
     return PopScope(
       canPop: !_picking,

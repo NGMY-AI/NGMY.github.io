@@ -1,4 +1,3 @@
-import 'ngmy_desktop_frame.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -247,10 +246,7 @@ class _NgmyCreatorRecorderStudioPageState extends State<NgmyCreatorRecorderStudi
   }
 
   @override
-  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
-
-  // The page itself — kept NGMY Hub width on computers by the wrapper above.
-  Widget _buildDesktopInner(BuildContext context) {
+  Widget build(BuildContext context) {
     final recording = _session.recording;
     return NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {

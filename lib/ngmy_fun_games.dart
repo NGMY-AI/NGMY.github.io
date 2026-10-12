@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'generated/ngmy_confidence_quotes.g.dart';
 import 'generated/ngmy_fortune.g.dart';
 import 'generated/ngmy_riddles.g.dart';
+import 'ngmy_desktop_frame.dart';
 import 'ngmy_fun_games_cache.dart';
 import 'ngmy_fun_games_limits.dart';
 import 'ngmy_fun_games_popups.dart';
@@ -204,7 +205,8 @@ class _NgmyFunGamesDialogState extends State<_NgmyFunGamesDialog> with TickerPro
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final dialogW = w > 520 ? 420.0 : w - 28;
+    // As wide as the NGMY Hub column on computers; unchanged on phones.
+    final dialogW = ngmyDesktopPanelWidth(context, w > 520 ? 420.0 : w - 28);
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 24),

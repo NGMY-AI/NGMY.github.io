@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'ngmy_desktop_frame.dart';
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_hud_tech_shell.dart';
 import 'ngmy_qr_download.dart';
@@ -551,7 +552,8 @@ class _NgmyQrGeneratorDialogState extends State<_NgmyQrGeneratorDialog> {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
-    final dialogW = w > 520 ? 440.0 : w - 28;
+    // As wide as the NGMY Hub column on computers; unchanged on phones.
+    final dialogW = ngmyDesktopPanelWidth(context, w > 520 ? 440.0 : w - 28);
     final payload = _buildPayload();
     final hasQr = payload.isNotEmpty;
     final onSavedTab = _type == _savedTabIndex;

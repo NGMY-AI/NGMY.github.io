@@ -1,5 +1,4 @@
-import 'ngmy_desktop_frame.dart';
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -354,10 +353,7 @@ class _NgmySwahiliSchoolPageState extends State<NgmySwahiliSchoolPage> with Widg
   }
 
   @override
-  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
-
-  // The page itself — kept NGMY Hub width on computers by the wrapper above.
-  Widget _buildDesktopInner(BuildContext context) {
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F1419) : const Color(0xFFF5F7FA);
 

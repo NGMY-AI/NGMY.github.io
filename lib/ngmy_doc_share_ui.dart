@@ -1,4 +1,3 @@
-import 'ngmy_desktop_frame.dart';
 import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
@@ -1146,10 +1145,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   }
 
   @override
-  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
-
-  // The page itself — kept NGMY Hub width on computers by the wrapper above.
-  Widget _buildDesktopInner(BuildContext context) {
+  Widget build(BuildContext context) {
     final c = _docShareColors(context);
     return Scaffold(
       backgroundColor: c.bg,
