@@ -1,3 +1,4 @@
+import 'ngmy_desktop_frame.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -623,7 +624,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
+
+  // The page itself — kept NGMY Hub width on computers by the wrapper above.
+  Widget _buildDesktopInner(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF121212) : const Color(0xFFF0F4FF);
     final services = _cfg.activeServices();

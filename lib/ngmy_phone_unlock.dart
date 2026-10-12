@@ -1,3 +1,4 @@
+import 'ngmy_desktop_frame.dart';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -112,7 +113,10 @@ class NgmyPhoneUnlockPage extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
+
+  // The page itself — kept NGMY Hub width on computers by the wrapper above.
+  Widget _buildDesktopInner(BuildContext context) {
     return NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {
         return Scaffold(

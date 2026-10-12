@@ -53329,7 +53329,10 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => NgmyDesktopColumn(child: Builder(builder: _buildDesktopInner));
+
+  // The page itself — kept NGMY Hub width on computers by the wrapper above.
+  Widget _buildDesktopInner(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final shop = _activeShopListings();
     final mine = _myListings();
