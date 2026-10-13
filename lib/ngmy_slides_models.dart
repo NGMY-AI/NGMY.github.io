@@ -97,6 +97,8 @@ class NgmySlideElement {
     this.textAnimDelayMs = 0,
     this.morphKey = '',
     this.loopFx = '',
+    this.frame = '',
+    this.ring = '',
   });
 
   final String id;
@@ -127,6 +129,10 @@ class NgmySlideElement {
   String morphKey;
   /// Living animation while shown: 'float3d', 'drift' or 'pulse'.
   String loopFx;
+  /// Picture shape: circle, rounded, triangle, hexagon, diamond, arch ('' = as is).
+  String frame;
+  /// Ring around a picture: gold, platinum, glow, rainbow, double, neon, framed.
+  String ring;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -155,6 +161,8 @@ class NgmySlideElement {
         textAnimDelayMs: textAnimDelayMs,
         morphKey: morphKey,
         loopFx: loopFx,
+        frame: frame,
+        ring: ring,
       );
 
   Map<String, dynamic> toJson() => {
@@ -184,6 +192,8 @@ class NgmySlideElement {
         'textAnimDelayMs': textAnimDelayMs,
         if (morphKey.isNotEmpty) 'morphKey': morphKey,
         if (loopFx.isNotEmpty) 'loopFx': loopFx,
+        if (frame.isNotEmpty) 'frame': frame,
+        if (ring.isNotEmpty) 'ring': ring,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -217,6 +227,8 @@ class NgmySlideElement {
       textAnimDelayMs: (json['textAnimDelayMs'] as num?)?.toInt() ?? 0,
       morphKey: (json['morphKey'] ?? '').toString(),
       loopFx: (json['loopFx'] ?? '').toString(),
+      frame: (json['frame'] ?? '').toString(),
+      ring: (json['ring'] ?? '').toString(),
     );
   }
 }

@@ -7198,10 +7198,10 @@ async function handleCivicGive(req: Request, action: string, body: any): Promise
 }
 
 /**
- * While married, a household's contributions are recorded on the household
- * (shown under the husband) with who gave how much ("givers"). When a spouse
- * separates and gets their own member row, the money they gave moves with
- * them and each side keeps their own contribution count.
+ * A married couple is one household (shown under the husband). When they
+ * separate, everything the household built up is divided 50 / 50: the
+ * contribution count, the missed count, and the money on each contribution
+ * record — half stays with the household, half goes to the spouse's new row.
  */
 async function civicSplitSpouseContributions(
   db: any,
@@ -7209,74 +7209,65 @@ async function civicSplitSpouseContributions(
   spawned: Record<string, unknown>[],
 ): Promise<void> {
   const headEmail = emailKey(String(head.email ?? ""));
-  if (!headEmail) return;
   for (const row of spawned) {
-    const relId = String(row.fromRelId ?? "").trim();
-    if (!relId || !row.formerSpouseRegistryId) continue;
+    if (!row.formerSpouseRegistryId) continue;
     const toEmail = emailKey(String(row.email ?? ""));
-    if (!toEmail) continue;
+    const relId = String(row.fromRelId ?? "").trim() || String(row.registryId ?? "");
+
+    // Counts: half each (an odd one stays with the household).
+    const helps = Number(head.helps ?? 0) || 0;
+    const missed = Number(head.missed ?? 0) || 0;
+    const helpsHalf = Math.floor(helps / 2);
+    const missedHalf = Math.floor(missed / 2);
+    head.helps = helps - helpsHalf;
+    head.missed = missed - missedHalf;
+    row.helps = (Number(row.helps ?? 0) || 0) + helpsHalf;
+    row.missed = (Number(row.missed ?? 0) || 0) + missedHalf;
+    // Fresh stamps so these counts win over older copies on other phones.
+    head.activityAt = new Date().toISOString();
+    row.activityAt = head.activityAt;
+
+    // Money on each contribution record: half each.
+    if (!headEmail || !toEmail) continue;
     const { data, error } = await db.from("transactions")
       .select("id,amount,sourceDetails,timestamp")
       .eq("type", 5)
       .eq("status", 1)
       .ilike("userEmail", headEmail)
-      .ilike("sourceDetails", `%${relId}%`)
-      .limit(500);
+      .limit(1000);
     if (error || !Array.isArray(data)) continue;
-    let movedWhole = 0;
-    let gained = 0;
     for (const tx of data) {
-      let meta: Record<string, any> = {};
+      const total = Number(tx.amount ?? 0);
+      if (!(total > 0)) continue;
+      let meta: Record<string, unknown> = {};
       try {
         meta = JSON.parse(String(tx.sourceDetails ?? "{}"));
       } catch {
-        continue;
+        meta = { note: String(tx.sourceDetails ?? "") };
       }
-      const givers = meta.givers && typeof meta.givers === "object" ? { ...meta.givers } : null;
-      const theirs = Number(givers?.[relId] ?? 0);
-      if (!givers || !(theirs > 0)) continue;
-      const total = Number(tx.amount ?? 0);
-      const theirMeta = {
-        ...meta,
-        givers: { [relId]: theirs },
-        memberEmail: toEmail,
-        memberName: String(row.fullName ?? ""),
-        registryId: String(row.registryId ?? ""),
-        splitFrom: tx.id,
-      };
-      if (theirs >= total - 0.001) {
-        // All of it was theirs: the whole record moves to them.
-        await db.from("transactions").update({ userEmail: toEmail, sourceDetails: JSON.stringify(theirMeta) }).eq("id", tx.id);
-        movedWhole++;
-      } else {
-        // Both gave in that campaign: each keeps their own part (and a count).
-        delete givers[relId];
-        await db.from("transactions").update({
-          amount: Math.round((total - theirs) * 100) / 100,
-          sourceDetails: JSON.stringify({ ...meta, givers }),
-        }).eq("id", tx.id);
-        await db.from("transactions").upsert({
-          id: `${tx.id}_sp_${relId}`.slice(0, 180),
-          userEmail: toEmail,
-          amount: theirs,
-          type: 5,
-          method: 2,
-          sourceDetails: JSON.stringify(theirMeta),
-          status: 1,
-          timestamp: tx.timestamp,
-        }, { onConflict: "id" });
-      }
-      gained++;
-    }
-    if (gained > 0) {
-      head.helps = Math.max(0, (Number(head.helps ?? 0) || 0) - movedWhole);
-      row.helps = (Number(row.helps ?? 0) || 0) + gained;
-      // Fresh stamps so these counts win over older copies on other phones.
-      head.activityAt = new Date().toISOString();
-      row.activityAt = head.activityAt;
+      const half = Math.round((total / 2) * 100) / 100;
+      await db.from("transactions").update({ amount: Math.round((total - half) * 100) / 100 }).eq("id", tx.id);
+      await db.from("transactions").upsert({
+        id: `${tx.id}_sp_${relId}`.slice(0, 180),
+        userEmail: toEmail,
+        amount: half,
+        type: 5,
+        method: 2,
+        sourceDetails: JSON.stringify({
+          ...meta,
+          memberEmail: toEmail,
+          memberName: String(row.fullName ?? ""),
+          registryId: String(row.registryId ?? ""),
+          splitFrom: tx.id,
+          splitShare: "50/50 at separation",
+        }),
+        status: 1,
+        timestamp: tx.timestamp,
+      }, { onConflict: "id" });
     }
   }
 }
+
 async function handleCivicUpsertMember(
   req: Request,
   body: Record<string, unknown>,

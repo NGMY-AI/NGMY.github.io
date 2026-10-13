@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_render.dart';
 
 /// "Describe it and the AI makes it": speak (or type) what the presentation is
 /// about, pick how many slides and a look, and get a finished, colourful deck.
@@ -233,11 +234,26 @@ class NgmySlidesAiOutlineSlide {
 }
 
 class NgmySlidesAiOutline {
-  NgmySlidesAiOutline({required this.title, required this.style, required this.slides});
+  NgmySlidesAiOutline({
+    required this.title,
+    required this.style,
+    required this.slides,
+    this.logoFrame = '',
+    this.logoRing = '',
+    this.photoFrame = '',
+    this.photoRing = '',
+  });
   final String title;
   final String style;
   final List<NgmySlidesAiOutlineSlide> slides;
+  /// Picture shape / ring the AI chose from the description (or "" = plain).
+  final String logoFrame;
+  final String logoRing;
+  final String photoFrame;
+  final String photoRing;
 }
+
+const _kFrameRule = '- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: circle, rounded, triangle, hexagon, diamond, arch, or "" (as is). "logo_ring" and "photo_ring" are one of: gold, platinum, glow, rainbow, double, neon, framed, or "" (none). Follow what the request says (e.g. "my picture in a circle with a gold ring"); if it says nothing, choose what suits the look (luxury → gold, neon/night → neon, clean → rounded with no ring).';
 
 const _kLanguageRule = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "en français", "en español", "in Arabic"), write EVERY title, subtitle, bullet and note in that language, with correct spelling and accents. If no language is named, write in the language the request itself is written in. Keep the JSON keys and the "kind", "style", "icon3d" and "image_query" values in English.';
 
@@ -245,6 +261,10 @@ extension NgmySlidesAiOutlineJson on NgmySlidesAiOutline {
   String toJsonString() => jsonEncode({
         'title': title,
         'style': style,
+        'logo_frame': logoFrame,
+        'logo_ring': logoRing,
+        'photo_frame': photoFrame,
+        'photo_ring': photoRing,
         'slides': [
           for (final s in slides)
             {
@@ -283,8 +303,10 @@ Rules:
 - Keep every slide they did not ask about exactly as it is.
 - Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
+- Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
+$_kFrameRule
 ${extras.contains(NgmySlidesAiExtra.emojis) ? '- New slides get an "emoji".\n' : ''}${extras.contains(NgmySlidesAiExtra.icons3d) ? '- New slides get an "icon3d" from: ${kNgmySlides3dIcons.join(', ')}.\n' : ''}${extras.contains(NgmySlidesAiExtra.pictures) ? '- New content slides get an "image_query" (2-3 English words).\n' : ''}- Reply with the WHOLE presentation as JSON only, no markdown, same shape:
-{"title":"...","style":"...","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
+{"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
 ''';
 }
 
@@ -318,9 +340,10 @@ Rules:
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
 - "notes": 1-2 sentences the presenter can say.
 $_kLanguageRule
+$_kFrameRule
 - "style": ${styleId == 'auto' ? 'pick the best of: $styles (match the mood they describe: nature, vibe, celebration, colorful, professional...)' : 'use "$styleId"'}.
 $extraRules- Reply with JSON only, no markdown, in this shape:
-{"title":"...","style":"...","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
+{"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
 ''';
 }
 
@@ -357,6 +380,10 @@ NgmySlidesAiOutline? ngmyParseSlidesAiOutline(String raw, {required String fallb
       title: '${m['title'] ?? slides.first.title}'.trim(),
       style: kNgmySlidesAiStyles.any((x) => x.id == style) ? style : fallbackStyle,
       slides: slides,
+      logoFrame: _pickOne(m['logo_frame'], kNgmySlideFrames),
+      logoRing: _pickOne(m['logo_ring'], kNgmySlideRings),
+      photoFrame: _pickOne(m['photo_frame'], kNgmySlideFrames),
+      photoRing: _pickOne(m['photo_ring'], kNgmySlideRings),
     );
   } catch (_) {
     return null;
@@ -375,6 +402,11 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
   Map<int, NgmySlidesAiAssets> assets = const {},
   String? logo,
   List<String> userPictures = const [],
+  /// Your choices from the dropdowns; null = let the AI decide.
+  String? logoFrame,
+  String? logoRing,
+  String? photoFrame,
+  String? photoRing,
 }) {
   final st = ngmySlidesAiStyleById(outline.style);
   final animate = extras.contains(NgmySlidesAiExtra.animations);
@@ -559,6 +591,17 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       els.add(image(logo!, 0.885, 0.035, 0.085, 0.13, anim: NgmySlideTransition.fade, delay: 200, key: 'logo'));
     }
 
+    // Logo and photos in their chosen shape and ring.
+    for (final e in els) {
+      if (e.morphKey == 'logo') {
+        e.frame = logoFrame ?? outline.logoFrame;
+        e.ring = logoRing ?? outline.logoRing;
+      } else if (e.morphKey == 'photo') {
+        e.frame = photoFrame ?? outline.photoFrame;
+        e.ring = photoRing ?? outline.photoRing;
+      }
+    }
+
     slides.add(NgmySlide(
       id: id(),
       title: o.title,
@@ -645,6 +688,7 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
   void Function(String status)? onStatus,
   String? logo,
   List<String> pictures = const [],
+  NgmySlidesAiLook look = const NgmySlidesAiLook(),
 }) async {
   onStatus?.call('Writing your $slideCount slides…');
   final outline = await _askForOutline(
@@ -652,7 +696,7 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
     fallbackStyle: styleId == 'auto' ? 'colorful' : styleId,
     failMessage: 'The AI could not write the slides. Try describing it again.',
   );
-  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures);
+  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures, look: look);
 }
 
 /// Changes a presentation the AI wrote: [request] is what the user typed.
@@ -665,6 +709,7 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
   void Function(String status)? onStatus,
   String? logo,
   List<String> pictures = const [],
+  NgmySlidesAiLook look = const NgmySlidesAiLook(),
 }) async {
   onStatus?.call('Making your changes…');
   final current = ngmyParseSlidesAiOutline(outlineJson, fallbackStyle: 'colorful');
@@ -673,7 +718,7 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
     fallbackStyle: current?.style ?? 'colorful',
     failMessage: 'The AI could not make that change. Try saying it another way.',
   );
-  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures);
+  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures, look: look);
 }
 
 Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallbackStyle, required String failMessage}) async {
@@ -695,16 +740,25 @@ Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallb
 
 /// Downloads extras, builds the slides and remembers the outline for later changes.
 Future<NgmySlideDeck> _finishAiDeck(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras, void Function(String status)? onStatus,
-    {String? logo, List<String> pictures = const []}) async {
+    {String? logo, List<String> pictures = const [], NgmySlidesAiLook look = const NgmySlidesAiLook()}) async {
   var assets = const <int, NgmySlidesAiAssets>{};
   if (extras.contains(NgmySlidesAiExtra.pictures) || extras.contains(NgmySlidesAiExtra.icons3d)) {
     onStatus?.call('Adding pictures and 3D art…');
     // Your own pictures replace stock photos; 3D icons are still fetched.
     assets = await ngmyFetchSlidesAiAssets(outline, pictures.isEmpty ? extras : ({...extras}..remove(NgmySlidesAiExtra.pictures)));
   }
-  final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets, logo: logo, userPictures: pictures);
+  final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets, logo: logo, userPictures: pictures,
+      logoFrame: look.logoFrame, logoRing: look.logoRing, photoFrame: look.photoFrame, photoRing: look.photoRing);
   deck
-    ..aiOutlineJson = outline.toJsonString()
+    ..aiOutlineJson = NgmySlidesAiOutline(
+      title: outline.title,
+      style: outline.style,
+      slides: outline.slides,
+      logoFrame: look.logoFrame ?? outline.logoFrame,
+      logoRing: look.logoRing ?? outline.logoRing,
+      photoFrame: look.photoFrame ?? outline.photoFrame,
+      photoRing: look.photoRing ?? outline.photoRing,
+    ).toJsonString()
     ..aiSlideIds = deck.slides.map((s) => s.id).toList()
     ..aiExtras = extras.map((e) => e.name).toList()
     ..cinematic = extras.contains(NgmySlidesAiExtra.videoMotion);
@@ -741,6 +795,11 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   /// Your own logo and pictures (data URIs), used instead of made-up art.
   String? _logo;
   List<String> _pictures = [];
+  /// Picture shape / ring for the logo and your pictures (null = Auto: the AI picks).
+  String? _logoFrame;
+  String? _logoRing;
+  String? _photoFrame;
+  String? _photoRing;
   bool _busy = false;
   String _status = '';
   int _count = 7;
@@ -787,6 +846,42 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
       }
       if (mounted) setState(() => _pictures = out);
     } catch (_) {}
+  }
+
+  /// Small dropdown: picture shape or ring. "Auto" lets the AI follow your description.
+  Widget _lookDropdown(IconData icon, String? value, List<(String, String)> options, ValueChanged<String?> onChanged) {
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.only(left: 8, right: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: value == null ? Colors.white12 : const Color(0xFF8B5CF6).withValues(alpha: 0.6)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          dropdownColor: const Color(0xFF1F2937),
+          iconSize: 18,
+          iconEnabledColor: Colors.white54,
+          hint: Row(
+            children: [
+              Icon(icon, size: 14, color: Colors.white54),
+              const SizedBox(width: 4),
+              const Text('Auto', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+          items: [
+            const DropdownMenuItem<String?>(value: null, child: Text('Auto (AI)')),
+            for (final (id, label) in options) DropdownMenuItem<String?>(value: id, child: Text(label, overflow: TextOverflow.ellipsis)),
+          ],
+          onChanged: onChanged,
+        ),
+      ),
+    );
   }
 
   Widget _mediaButton({required IconData icon, required String label, String? thumb, required VoidCallback onTap, VoidCallback? onClear}) {
@@ -850,6 +945,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
         extras: _extras,
         logo: _logo,
         pictures: _pictures,
+        look: NgmySlidesAiLook(logoFrame: _logoFrame, logoRing: _logoRing, photoFrame: _photoFrame, photoRing: _photoRing),
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
@@ -950,27 +1046,56 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 const SizedBox(height: 18),
                 // Your logo and your own pictures (optional).
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _mediaButton(
-                      icon: Icons.verified_rounded,
-                      label: _logo == null ? 'Add your logo' : 'Logo added',
-                      thumb: _logo,
-                      onTap: _pickLogo,
-                      onClear: _logo == null ? null : () => setState(() => _logo = null),
-                    )),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _mediaButton(
+                            icon: Icons.verified_rounded,
+                            label: _logo == null ? 'Add your logo' : 'Logo added',
+                            thumb: _logo,
+                            onTap: _pickLogo,
+                            onClear: _logo == null ? null : () => setState(() => _logo = null),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(child: _lookDropdown(Icons.crop_square_rounded, _logoFrame, kNgmySlideFrames, (v) => setState(() => _logoFrame = v))),
+                              const SizedBox(width: 6),
+                              Expanded(child: _lookDropdown(Icons.radio_button_checked_rounded, _logoRing, kNgmySlideRings, (v) => setState(() => _logoRing = v))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(width: 10),
-                    Expanded(child: _mediaButton(
-                      icon: Icons.add_photo_alternate_rounded,
-                      label: _pictures.isEmpty ? 'Add your pictures' : '${_pictures.length} picture${_pictures.length == 1 ? '' : 's'}',
-                      thumb: _pictures.isEmpty ? null : _pictures.first,
-                      onTap: _pickPictures,
-                      onClear: _pictures.isEmpty ? null : () => setState(() => _pictures = []),
-                    )),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _mediaButton(
+                            icon: Icons.add_photo_alternate_rounded,
+                            label: _pictures.isEmpty ? 'Add your pictures' : '${_pictures.length} picture${_pictures.length == 1 ? '' : 's'}',
+                            thumb: _pictures.isEmpty ? null : _pictures.first,
+                            onTap: _pickPictures,
+                            onClear: _pictures.isEmpty ? null : () => setState(() => _pictures = []),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(child: _lookDropdown(Icons.crop_square_rounded, _photoFrame, kNgmySlideFrames, (v) => setState(() => _photoFrame = v))),
+                              const SizedBox(width: 6),
+                              Expanded(child: _lookDropdown(Icons.radio_button_checked_rounded, _photoRing, kNgmySlideRings, (v) => setState(() => _photoRing = v))),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Your logo goes on every slide. Your pictures are used instead of stock photos.',
+                  'Your logo goes on every slide; your pictures replace stock photos. Pick a shape and ring under each, or just describe it (e.g. "my logo in a circle with a gold ring").',
                   style: TextStyle(color: Colors.white38, fontSize: 11.5),
                 ),
                 const SizedBox(height: 18),
@@ -1338,4 +1463,19 @@ List<String> ngmySlidesAiPhotosOf(NgmySlideDeck deck) {
     }
   }
   return out;
+}
+
+/// A frame / ring value the AI wrote, only if it is one we can draw.
+String _pickOne(dynamic raw, List<(String, String)> options) {
+  final v = '${raw ?? ''}'.trim().toLowerCase();
+  return options.any((o) => o.$1 == v) ? v : '';
+}
+
+/// Picture shapes / rings picked in the sheet (null = Auto, the AI decides).
+class NgmySlidesAiLook {
+  const NgmySlidesAiLook({this.logoFrame, this.logoRing, this.photoFrame, this.photoRing});
+  final String? logoFrame;
+  final String? logoRing;
+  final String? photoFrame;
+  final String? photoRing;
 }

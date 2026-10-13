@@ -187,17 +187,21 @@ class NgmySlideElementView extends StatelessWidget {
         child: img,
       );
     }
+    if (element.frame.isNotEmpty || element.ring.isNotEmpty) {
+      // Shaped picture (circle, triangle…) with its ring: fill the shape.
+      return ngmyFramedPicture(image: _buildImageMemory(ref, cover: true), frame: element.frame, ring: element.ring);
+    }
     return img;
   }
 
-  Widget _buildImageMemory(String ref) {
+  Widget _buildImageMemory(String ref, {bool cover = false}) {
     try {
       final bytes = base64Decode(ref.split(',').last);
       final coverBg = element.fileName == 'marriage_locked_bg' || element.fileName.endsWith('_bg');
       return Image.memory(
         bytes,
         key: ValueKey('img_${element.id}_${bytes.length}'),
-        fit: coverBg ? BoxFit.cover : BoxFit.contain,
+        fit: coverBg || cover ? BoxFit.cover : BoxFit.contain,
         gaplessPlayback: true,
         errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)),
       );
@@ -1005,4 +1009,166 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
       },
     );
   }
+}
+
+// ── Picture shapes and rings (presentation style) ───────────────────────────
+
+const kNgmySlideFrames = <(String, String)>[
+  ('', 'Original'),
+  ('circle', 'Circle'),
+  ('rounded', 'Rounded'),
+  ('triangle', 'Triangle'),
+  ('hexagon', 'Hexagon'),
+  ('diamond', 'Diamond'),
+  ('arch', 'Arch'),
+];
+
+const kNgmySlideRings = <(String, String)>[
+  ('', 'No ring'),
+  ('gold', 'Gold'),
+  ('platinum', 'Platinum'),
+  ('glow', 'Glow'),
+  ('rainbow', 'Rainbow'),
+  ('double', 'Double line'),
+  ('neon', 'Neon'),
+  ('framed', 'Gallery frame'),
+];
+
+/// The outline of a picture shape inside [r].
+Path ngmySlideFramePath(String frame, Rect r) {
+  switch (frame) {
+    case 'circle':
+      return Path()..addOval(r);
+    case 'rounded':
+      return Path()..addRRect(RRect.fromRectAndRadius(r, Radius.circular(r.shortestSide * 0.18)));
+    case 'triangle':
+      return Path()
+        ..moveTo(r.center.dx, r.top)
+        ..lineTo(r.right, r.bottom)
+        ..lineTo(r.left, r.bottom)
+        ..close();
+    case 'hexagon':
+      final p = Path();
+      for (var i = 0; i < 6; i++) {
+        final a = math.pi / 6 + i * math.pi / 3;
+        final pt = Offset(r.center.dx + math.cos(a) * r.width / 2, r.center.dy + math.sin(a) * r.height / 2);
+        i == 0 ? p.moveTo(pt.dx, pt.dy) : p.lineTo(pt.dx, pt.dy);
+      }
+      return p..close();
+    case 'diamond':
+      return Path()
+        ..moveTo(r.center.dx, r.top)
+        ..lineTo(r.right, r.center.dy)
+        ..lineTo(r.center.dx, r.bottom)
+        ..lineTo(r.left, r.center.dy)
+        ..close();
+    case 'arch':
+      return Path()
+        ..moveTo(r.left, r.bottom)
+        ..lineTo(r.left, r.top + r.width / 2)
+        ..arcToPoint(Offset(r.right, r.top + r.width / 2), radius: Radius.circular(r.width / 2))
+        ..lineTo(r.right, r.bottom)
+        ..close();
+    default:
+      return Path()..addRect(r);
+  }
+}
+
+class _FrameClipper extends CustomClipper<Path> {
+  _FrameClipper(this.frame, this.inset);
+  final String frame;
+  final double inset;
+  @override
+  Path getClip(Size s) => ngmySlideFramePath(frame, (Offset.zero & s).deflate(inset));
+  @override
+  bool shouldReclip(covariant _FrameClipper old) => old.frame != frame || old.inset != inset;
+}
+
+class _RingPainter extends CustomPainter {
+  _RingPainter(this.frame, this.ring, this.inset);
+  final String frame;
+  final String ring;
+  final double inset;
+
+  @override
+  void paint(Canvas canvas, Size s) {
+    final r = (Offset.zero & s).deflate(inset);
+    final path = ngmySlideFramePath(frame, r);
+    final w = s.shortestSide;
+    Paint stroke(double width) => Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width
+      ..strokeJoin = StrokeJoin.round;
+    switch (ring) {
+      case 'gold':
+        canvas.drawPath(path, stroke(w * 0.045)
+          ..shader = const SweepGradient(colors: [Color(0xFFFDE68A), Color(0xFFB8860B), Color(0xFFF5C451), Color(0xFF8A6417), Color(0xFFFDE68A)]).createShader(r));
+        canvas.drawPath(ngmySlideFramePath(frame, r.deflate(w * 0.03)), stroke(w * 0.006)..color = const Color(0x99FFF7E6));
+      case 'platinum':
+        canvas.drawPath(path, stroke(w * 0.04)
+          ..shader = const SweepGradient(colors: [Color(0xFFF8FAFC), Color(0xFF94A3B8), Color(0xFFE2E8F0), Color(0xFF64748B), Color(0xFFF8FAFC)]).createShader(r));
+      case 'glow':
+        canvas.drawPath(path, stroke(w * 0.05)
+          ..color = Colors.white.withValues(alpha: 0.55)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.04));
+        canvas.drawPath(path, stroke(w * 0.012)..color = Colors.white);
+      case 'rainbow':
+        canvas.drawPath(path, stroke(w * 0.04)
+          ..shader = const SweepGradient(colors: [Color(0xFFF472B6), Color(0xFFA78BFA), Color(0xFF22D3EE), Color(0xFF4ADE80), Color(0xFFFACC15), Color(0xFFF472B6)]).createShader(r));
+      case 'double':
+        canvas.drawPath(path, stroke(w * 0.012)..color = Colors.white);
+        canvas.drawPath(ngmySlideFramePath(frame, r.inflate(w * 0.03)), stroke(w * 0.008)..color = Colors.white.withValues(alpha: 0.75));
+      case 'neon':
+        canvas.drawPath(path, stroke(w * 0.06)
+          ..color = const Color(0xFF22D3EE).withValues(alpha: 0.7)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.035));
+        canvas.drawPath(path, stroke(w * 0.016)..color = const Color(0xFFA5F3FC));
+      case 'framed':
+        canvas.drawPath(path, stroke(w * 0.07)..color = Colors.white);
+        canvas.drawPath(ngmySlideFramePath(frame, r.deflate(w * 0.035)), stroke(w * 0.004)..color = const Color(0x33000000));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) => old.frame != frame || old.ring != ring || old.inset != inset;
+}
+
+/// A picture in its shape, with its ring, as big as fits.
+Widget ngmyFramedPicture({required Widget image, required String frame, required String ring}) {
+  final square = const {'circle', 'triangle', 'hexagon', 'diamond'}.contains(frame);
+  return LayoutBuilder(builder: (context, c) {
+    final side = math.min(c.maxWidth, c.maxHeight);
+    final size = square || frame.isEmpty && ring.isNotEmpty ? Size.square(side) : Size(c.maxWidth, c.maxHeight);
+    final shape = frame.isEmpty ? 'rounded' : frame;
+    final inset = ring.isEmpty ? 0.0 : size.shortestSide * (ring == 'framed' ? 0.07 : 0.05);
+    return Center(
+      child: SizedBox(
+        width: size.width,
+        height: size.height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (ring == 'framed' || ring == 'gold')
+              // Soft drop shadow under the picture.
+              CustomPaint(painter: _ShadowPainter(shape, inset)),
+            ClipPath(clipper: _FrameClipper(shape, inset), child: image),
+            if (ring.isNotEmpty) CustomPaint(painter: _RingPainter(shape, ring, inset)),
+          ],
+        ),
+      ),
+    );
+  });
+}
+
+class _ShadowPainter extends CustomPainter {
+  _ShadowPainter(this.frame, this.inset);
+  final String frame;
+  final double inset;
+  @override
+  void paint(Canvas canvas, Size s) {
+    canvas.drawShadow(ngmySlideFramePath(frame, (Offset.zero & s).deflate(inset)), Colors.black, s.shortestSide * 0.05, false);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShadowPainter old) => old.frame != frame || old.inset != inset;
 }
