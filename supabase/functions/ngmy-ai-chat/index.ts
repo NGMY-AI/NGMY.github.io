@@ -382,6 +382,9 @@ const ADVISOR_AGENT_RULES =
   "- LOGINS: Never guess an existing password. If you need to log in, stop and say: " +
   "'Please log in in the browser window, then tell me to continue.'\n" +
   "- EMAIL / SMS CODES and CAPTCHAs: stop and ask the user to enter the code or solve it in the browser window.\n" +
+  "- FINDING WHAT'S AVAILABLE (e.g. 'find the open positions at KFC in Macon GA'): search the company's own careers " +
+  "site (or a major job site if it has none) for that place, collect the real open job titles (with pay/hours if shown), " +
+  "and finish with them in \"options\" so the user can pick one. Do NOT start an application in that case.\n" +
   "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
   "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
   "list what you filled; submit only when the user's message says to submit.\n" +
@@ -393,7 +396,8 @@ const ADVISOR_AGENT_RULES =
   "- FINAL ANSWER FORMAT: your final result must be ONLY a JSON object (no markdown, no extra text):\n" +
   '{"title": "short title", "summary": "1-2 plain sentences", ' +
   '"sections": [{"heading": "e.g. Property taxes", "rows": [{"label": "2025", "value": "$1,234"}]}], ' +
-  '"notes": ["anything missing, blocked or that needs the user"], "sources": [{"name": "site name", "url": "https://..."}]}\n' +
+  '"notes": ["anything missing, blocked or that needs the user"], "sources": [{"name": "site name", "url": "https://..."}], ' +
+  '"options": ["when the user has to choose next — e.g. each open job title you found — one short choice per item, else []"]}\n' +
   "  Group facts into clear sections (e.g. Overview, Estimates, Property taxes by year, Sale history, Details). " +
   "Copy numbers, dates, names and balances exactly as shown on the page. Use an empty list when a part doesn't apply.";
 
@@ -549,6 +553,8 @@ function agentStructuredResult(raw: unknown): Record<string, unknown> | null {
     sections,
     notes: (Array.isArray(obj.notes) ? obj.notes : []).slice(0, 8).map((n: unknown) => str(n, 300)).filter(Boolean),
     sources,
+    // Choices for the user's next step (e.g. the open job titles found) — shown as buttons.
+    options: (Array.isArray(obj.options) ? obj.options : []).map((o: unknown) => str(o, 48)).filter(Boolean).slice(0, 8),
   };
   return out.title || out.summary || sections.length ? out : null;
 }
@@ -636,6 +642,103 @@ async function ensureCursorExtensionId(): Promise<string> {
   }
   cursorExtensionCache = "";
   return "";
+}
+
+// ── Live snapshots of the advisor's cloud browser (for iPhone, where the live video
+// stream crashes the web app): one small JPEG of the current screen per request. ──
+const agentCdpCache = new Map<string, { ws: string; at: number }>();
+const agentShotHits = new Map<string, { start: number; n: number }>();
+
+async function agentCdpWsUrl(sessionId: string): Promise<string> {
+  const hit = agentCdpCache.get(sessionId);
+  if (hit && Date.now() - hit.at < 5 * 60_000) return hit.ws;
+  const r = await browserUseFetch(`/browsers?agentSessionId=${sessionId}&filterBy=active&pageSize=5`);
+  const item = (Array.isArray(r.data?.items) ? r.data.items : []).find((b: any) => b?.status === "active" && b?.cdpUrl);
+  let url = String(item?.cdpUrl ?? "");
+  if (!url) return "";
+  if (/^https?:/i.test(url)) {
+    const v: any = await fetch(url.replace(/\/$/, "") + "/json/version", { signal: AbortSignal.timeout(5000) })
+      .then((x) => x.json()).catch(() => null);
+    url = String(v?.webSocketDebuggerUrl ?? "");
+  }
+  if (url) agentCdpCache.set(sessionId, { ws: url, at: Date.now() });
+  return url;
+}
+
+/** Screenshot of the page the agent is on (JPEG base64), or null. Read-only — never clicks. */
+function cdpScreenshot(wsUrl: string, timeoutMs = 7000): Promise<string | null> {
+  return new Promise((resolve) => {
+    let done = false;
+    let nextId = 0;
+    const pending = new Map<number, (m: any) => void>();
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch {
+      resolve(null);
+      return;
+    }
+    const finish = (v: string | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* closed */ }
+      resolve(v);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    const send = (method: string, params: Record<string, unknown> = {}, sessionId?: string) =>
+      new Promise<any>((res) => {
+        const id = ++nextId;
+        pending.set(id, res);
+        ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }));
+      });
+    ws.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(String(ev.data));
+        const cb = m?.id ? pending.get(m.id) : undefined;
+        if (cb) {
+          pending.delete(m.id);
+          cb(m);
+        }
+      } catch { /* ignore */ }
+    };
+    ws.onerror = () => finish(null);
+    ws.onclose = () => finish(null);
+    ws.onopen = async () => {
+      try {
+        const t = await send("Target.getTargets");
+        const pages = (t?.result?.targetInfos ?? []).filter((x: any) =>
+          x?.type === "page" && /^(https?:|about:blank)/.test(String(x?.url ?? ""))
+        );
+        // The agent's tab: the last real web page (not a blank tab).
+        const page = [...pages].reverse().find((x: any) => /^https?:/.test(String(x.url))) ?? pages[pages.length - 1];
+        if (!page) return finish(null);
+        const a = await send("Target.attachToTarget", { targetId: page.targetId, flatten: true });
+        const sid = a?.result?.sessionId;
+        if (!sid) return finish(null);
+        const shot = await send("Page.captureScreenshot", { format: "jpeg", quality: 55, optimizeForSpeed: true }, sid);
+        finish(typeof shot?.result?.data === "string" ? shot.result.data : null);
+      } catch {
+        finish(null);
+      }
+    };
+  });
+}
+
+async function handleAgentShot(req: Request, body: any): Promise<Response> {
+  if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
+  const sessionId = String(body?.sessionId ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return jsonOk({ ok: false, error: "sessionId is required" }, 400);
+  const ws = await agentCdpWsUrl(sessionId);
+  if (!ws) return jsonOk({ ok: false, error: "No live browser right now." });
+  let shot = await cdpScreenshot(ws);
+  if (!shot) {
+    // The connection address may have changed (new browser) — look it up again once.
+    agentCdpCache.delete(sessionId);
+    const again = await agentCdpWsUrl(sessionId);
+    if (again) shot = await cdpScreenshot(again);
+  }
+  return jsonOk(shot ? { ok: true, jpegBase64: shot } : { ok: false, error: "No picture yet." });
 }
 
 async function handleAgentStop(body: any): Promise<Response> {
@@ -9274,6 +9377,7 @@ serve(async (req) => {
       g2: "agentPoll",
       g3: "agentStop",
       g4: "agentStatus",
+      g5: "agentShot",
       f1: "freeTimeGet",
       f2: "freeTimeAdd",
       h1: "hwList",
@@ -9574,6 +9678,20 @@ serve(async (req) => {
       return await handleAgentPoll(req, body);
     }
     if (action === "agentStop") return await handleAgentStop(body);
+    if (action === "agentShot") {
+      // ~1 per second while a task runs and the chat is open. In-memory limit (no database
+      // write per picture, so this costs nothing extra in the database).
+      const ip = clientIp(req);
+      const now = Date.now();
+      const slot = agentShotHits.get(ip);
+      if (!slot || now - slot.start > 60_000) {
+        agentShotHits.set(ip, { start: now, n: 1 });
+      } else if (++slot.n > 120) {
+        return rateLimitedResponse();
+      }
+      if (agentShotHits.size > 5000) agentShotHits.clear();
+      return await handleAgentShot(req, body);
+    }
     if (action === "agentStatus") {
       const configured = !!browserUseKey();
       if (!configured || !body?.verify) return jsonOk({ ok: true, configured });

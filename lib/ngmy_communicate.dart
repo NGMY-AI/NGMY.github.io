@@ -3961,9 +3961,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             ? 'Done! ${(run.result ?? '').trim().isNotEmpty ? run.result!.trim() : 'Take a look in the Browser window.'}'
             : 'I couldn\'t finish that one${(run.error ?? '').isNotEmpty ? ' — ${run.error}' : ''}. Want me to try again?';
       }
+      final st = run.structured;
+      // Choices it found (e.g. the open positions at that place) — the card goes first, then
+      // the advisor's question with the choices as buttons, so the buttons are on the latest message.
+      final found = [
+        for (final o in (st?['options'] is List ? st!['options'] as List : const []))
+          if ('$o'.trim().isNotEmpty) '$o'.trim(),
+      ];
+      if (found.isNotEmpty) {
+        final json = jsonEncode(st);
+        final title = '${st!['title'] ?? ''}'.trim();
+        final cardText = '📋 ${title.isNotEmpty ? title : 'What I found'}';
+        await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'ai', text: cardText, kind: 'result', resultJson: json);
+        if (mounted) setState(() => _messages.add({'role': 'ai', 'kind': 'result', 'text': cardText, 'resultJson': json}));
+        await _deliverAiReply(sendGen: _sendGen, text: reply, options: found);
+        _scrollBottom();
+        return;
+      }
       await _deliverAiReply(sendGen: _sendGen, text: reply);
       // The details, organized into boxes, right under the advisor's short message.
-      final st = run.structured;
       if (st != null) {
         final json = jsonEncode(st);
         final title = '${st['title'] ?? ''}'.trim();
@@ -5396,6 +5412,22 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           text.trim().length <= 160 &&
           ((_agentRun.result ?? '').contains('?') || _agentRun.latestStep.contains('?'))) {
         agentTask = (url: null, continuing: true);
+      }
+      // They tapped (or typed) one of the choices the advisor just offered after a browser task
+      // (e.g. "Crew Member" from the open positions it found) → carry on with that task.
+      if (agentTask == null && webAllowed && _webDraft.isEmpty && _agentRun.task.isNotEmpty) {
+        Map<String, String>? lastAi;
+        for (final m in _messages.reversed) {
+          if (m['role'] == 'ai') {
+            lastAi = m;
+            break;
+          }
+        }
+        final offered = (lastAi?['options'] ?? '').split('|').map((s) => s.trim().toLowerCase()).where((s) => s.isNotEmpty);
+        if (offered.contains(text.trim().toLowerCase())) {
+          _webDraft = 'Earlier browser task: ${_agentRun.task}';
+          _webDraftAt = DateTime.now();
+        }
       }
       // They are answering the questions asked about a web task — think about it again with the answers.
       final answeringDraft = agentTask == null &&

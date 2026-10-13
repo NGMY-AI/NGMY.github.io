@@ -4,6 +4,7 @@
 // (e.g. to log in). Money actions are never completed by the agent (server-side rules).
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -113,12 +114,19 @@ String ngmyAdvisorWebTaskPlanPrompt({
     'Recent chat (oldest first):\n$recentChat\n\n'
     'What they want done (everything they said about it):\n$request\n\n'
     'RULES:\n'
-    '- READY only if it is clear WHAT to do and WHERE (a specific company, website or thing). '
-    '"Apply for a job at Burger King" or "check flights to Miami on Delta" = ready. "Help me apply for a job", "find me a car", "book something" = NOT ready.\n'
-    '- When not ready, ask what you need like a real person texting: what kind of job / which company or area / budget etc. '
-    'For job, school or other applications also ask the basics the form will need that they have not given yet: full name, age, which position, city or ZIP. '
-    'Ask whether they already have an account on that site ONLY if that site usually needs an account for this. '
-    'At most 3 short questions in one friendly message. Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
+    '- ONE STEP AT A TIME, in this order, and never ask something the browser can look up itself:\n'
+    '  1. WHERE: if a place matters (jobs, stores, services) and you do not know the city/area yet, ask ONLY for the location. '
+    '"Find me a job at KFC" → ask which city or ZIP. Nothing else in that message.\n'
+    '  2. WHAT IS AVAILABLE: once you know the company/kind AND the place but they have not picked a role/item yet, do NOT ask them '
+    'to guess — set ready=true with a RESEARCH task for the browser: "Find the open positions at KFC near Macon, GA on KFC\'s careers site '
+    '(or a big job site), list the real job titles, and finish with them as options. Do not apply yet." '
+    '"Find me a job in Macon GA" (place known, no company) → research task: find the open jobs/employers hiring in Macon, GA and list them as options.\n'
+    '  3. DO IT: once they picked (e.g. "Crew Member at KFC Macon"), set ready=true with the real task (e.g. start the application). '
+    'Only then, if the form will clearly need it and they have not given it: their full name, age and phone/email — ask once, briefly. '
+    'Ask whether they already have an account on that site ONLY if that site needs one.\n'
+    '- Clear requests that already say what and where ("apply for the cashier job at the Burger King on Pio Nono Ave", '
+    '"check flights to Miami on Delta") = ready right away.\n'
+    '- Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
     '- If it is ready, ask nothing.\n'
     '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
     'Answer with JSON only, no markdown:\n'
@@ -447,6 +455,11 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   } else {
     buf.writeln('Tell them what you did and found. Put each fact on its own line like "Taxes 2025: \$1,234" — '
         'short lines, no long paragraph.');
+  }
+  final options = run.structured?['options'];
+  if (options is List && options.isNotEmpty) {
+    buf.writeln('You found these choices for them: ${options.join(', ')}. They appear as buttons under your message — '
+        'say in one short line what you found and ask which one they want (do not list them all again).');
   }
   buf.writeln('Be truthful: if you stopped for a login or a final confirm/payment button, say what they need '
       'to do in the Browser window, then "tell me to continue". Never claim money was moved.');
@@ -963,86 +976,136 @@ Future<void> ngmyOpenAdvisorLiveExternal(NgmyAdvisorAgentRun run) async {
   await launchUrl(Uri.parse(run.liveUrl), mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
 }
 
-/// What the advisor is doing right now, step by step, with a button to watch it live.
-class _NgmyLiveStepsPreview extends StatelessWidget {
+/// What the advisor is doing right now: a fresh picture of its browser screen about once a
+/// second (page, mouse and clicks — light enough for iPhone, unlike the live video), the
+/// latest step, and a button to watch the full live screen.
+class _NgmyLiveStepsPreview extends StatefulWidget {
   const _NgmyLiveStepsPreview({required this.run, required this.onWatch});
   final NgmyAdvisorAgentRun run;
   final VoidCallback onWatch;
 
   @override
+  State<_NgmyLiveStepsPreview> createState() => _NgmyLiveStepsPreviewState();
+}
+
+class _NgmyLiveStepsPreviewState extends State<_NgmyLiveStepsPreview> with WidgetsBindingObserver {
+  Uint8List? _shot;
+  Timer? _timer;
+  bool _fetching = false;
+  bool _foreground = true;
+  DateTime? _stoppedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _timer = Timer.periodic(const Duration(milliseconds: 1100), (_) => _tick());
+    _tick();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _tick() async {
+    final r = widget.run;
+    final sid = r.sessionId ?? '';
+    if (_fetching || !_foreground || sid.isEmpty || r.browserClosed) return;
+    // Keep updating while it works, plus a few seconds after so the last screen shows.
+    if (r.running) {
+      _stoppedAt = null;
+    } else {
+      _stoppedAt ??= DateTime.now();
+      if (DateTime.now().difference(_stoppedAt!) > const Duration(seconds: 6)) return;
+    }
+    _fetching = true;
+    try {
+      final res = await ngmyEdgeInvoke({'action': 'agentShot', 'sessionId': sid}, timeout: const Duration(seconds: 10));
+      final b64 = (res?['jpegBase64'] ?? '').toString();
+      if (res?['ok'] == true && b64.isNotEmpty && mounted) {
+        setState(() => _shot = base64Decode(b64));
+      }
+    } catch (e) {
+      debugPrint('[advisor-agent] shot: $e');
+    } finally {
+      _fetching = false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final steps = run.steps.length > 4 ? run.steps.sublist(run.steps.length - 4) : run.steps;
+    final run = widget.run;
     final host = Uri.tryParse(run.pageUrl)?.host ?? '';
+    final latest = run.latestStep;
+    final shot = _shot;
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)]),
-      ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      color: const Color(0xFF0F172A),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (host.isNotEmpty)
-            Row(children: [
-              const Icon(Icons.lock_rounded, size: 13, color: Colors.white38),
-              const SizedBox(width: 4),
-              Expanded(child: Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 12))),
-            ]),
-          const SizedBox(height: 6),
           Expanded(
-            child: steps.isEmpty
-                ? Center(child: Text(run.running ? 'Getting started…' : 'Ready', style: const TextStyle(color: Colors.white54, fontSize: 13)))
-                : ListView(
-                    padding: EdgeInsets.zero,
-                    physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      for (var i = 0; i < steps.length; i++)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Icon(
-                              i == steps.length - 1 && run.running ? Icons.radio_button_checked_rounded : Icons.check_circle_rounded,
-                              size: 15,
-                              color: i == steps.length - 1 && run.running ? const Color(0xFF60A5FA) : const Color(0xFF4ADE80),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(steps[i].text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.3)),
-                            ),
-                          ]),
-                        ),
-                    ],
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: ngmyLiveViewExternalOnly
-                ? const Text(
-                    'The live screen opens in its own window so the app stays smooth — watch every click and tap in there.',
-                    style: TextStyle(color: Colors.white54, fontSize: 11),
+            child: GestureDetector(
+              onTap: widget.onWatch,
+              child: Stack(fit: StackFit.expand, children: [
+                if (shot != null)
+                  Image.memory(
+                    shot,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                    cacheWidth: 900,
+                    filterQuality: FilterQuality.medium,
                   )
-                : Row(children: [
-                    const Expanded(
-                      child: Text(
-                        'Showing steps because the live screen made your phone restart the app.',
-                        style: TextStyle(color: Colors.white54, fontSize: 11),
+                else
+                  Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
+                      const SizedBox(height: 10),
+                      Text(run.running ? 'Opening the screen…' : 'Ready', style: const TextStyle(color: Colors.white54, fontSize: 12.5)),
+                    ]),
+                  ),
+                // Where it is + what it's doing, over the bottom of the picture.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(10, 14, 10, 6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black.withValues(alpha: 0.75)],
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        ngmyLiveViewResetCrashes();
-                        run.reconnect();
-                      },
-                      child: const Text('Show live here', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-                    ),
-                  ]),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      if (host.isNotEmpty)
+                        Text('🔒 $host', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                      if (latest.isNotEmpty)
+                        Text(latest, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600, height: 1.25)),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
           ),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onWatch,
-              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(vertical: 11)),
-              icon: const Icon(Icons.live_tv_rounded, size: 18),
-              label: const Text('Watch live · tap in to sign in', style: TextStyle(fontWeight: FontWeight.w800)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: widget.onWatch,
+                style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(vertical: 9)),
+                icon: const Icon(Icons.live_tv_rounded, size: 17),
+                label: const Text('Full live screen · tap in to sign in', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+              ),
             ),
           ),
         ],
