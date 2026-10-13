@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_advisor_live_view.dart';
 import 'ngmy_edge_invoke.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── Intent ─────────────────────────────────────────────────────────────────
 
@@ -577,6 +578,7 @@ class NgmyAdvisorResultCard extends StatelessWidget {
 // ── Full screen (can turn sideways like a video) ───────────────────────────
 
 Future<void> ngmyOpenAdvisorLiveFullscreen(BuildContext context, NgmyAdvisorAgentRun run) async {
+  if (ngmyLiveViewExternalOnly) return ngmyOpenAdvisorLiveExternal(run);
   run.setFullscreen(true);
   try {
     await Navigator.of(context, rootNavigator: true).push(
@@ -944,10 +946,22 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
 /// The live browser plays right inside the chat, so they watch the mouse move in real time.
 /// Only if the phone has killed the app twice recently while it was showing do we switch
 /// to the step list (with Watch live full screen) — and they can switch back.
+/// iPhone / iPad web app: the live browser video must never play inside the app's page —
+/// Safari runs out of graphics memory and kills the whole app ("A problem repeatedly
+/// occurred"). There it opens in Safari's own window instead (separate, stable).
+bool get ngmyLiveViewExternalOnly => kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+
+/// Show the step list in the chat instead of the live video: always on iPhone; on other
+/// phones only if the live view made the app restart twice recently.
 bool get ngmyLiveViewOnOwnScreen =>
-    kIsWeb &&
-    (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) &&
-    ngmyLiveViewRecentCrashes() >= 2;
+    ngmyLiveViewExternalOnly ||
+    (kIsWeb && defaultTargetPlatform == TargetPlatform.android && ngmyLiveViewRecentCrashes() >= 2);
+
+/// Opens the live browser in its own Safari window (iPhone) — real time, tap in to sign in.
+Future<void> ngmyOpenAdvisorLiveExternal(NgmyAdvisorAgentRun run) async {
+  if (run.liveUrl.isEmpty) return;
+  await launchUrl(Uri.parse(run.liveUrl), mode: LaunchMode.externalApplication, webOnlyWindowName: '_blank');
+}
 
 /// What the advisor is doing right now, step by step, with a button to watch it live.
 class _NgmyLiveStepsPreview extends StatelessWidget {
@@ -1001,21 +1015,26 @@ class _NgmyLiveStepsPreview extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
-            child: Row(children: [
-              const Expanded(
-                child: Text(
-                  'Showing steps because the live screen made your phone restart the app.',
-                  style: TextStyle(color: Colors.white54, fontSize: 11),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  ngmyLiveViewResetCrashes();
-                  run.reconnect();
-                },
-                child: const Text('Show live here', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-              ),
-            ]),
+            child: ngmyLiveViewExternalOnly
+                ? const Text(
+                    'The live screen opens in its own window so the app stays smooth — watch every click and tap in there.',
+                    style: TextStyle(color: Colors.white54, fontSize: 11),
+                  )
+                : Row(children: [
+                    const Expanded(
+                      child: Text(
+                        'Showing steps because the live screen made your phone restart the app.',
+                        style: TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        ngmyLiveViewResetCrashes();
+                        run.reconnect();
+                      },
+                      child: const Text('Show live here', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
           ),
           SizedBox(
             width: double.infinity,
