@@ -126,6 +126,14 @@ String ngmyAdvisorWebTaskPlanPrompt({
     '"task": "if ready: ONE complete instruction for the browser with every detail they gave (names, position, place, dates)", '
     '"url": "the website to start on if you know it, else empty"}';
 
+/// A page that never loaded because the connection was refused — worth retrying on a
+/// direct connection (not a real "site is down").
+bool ngmyAgentTextShowsNetworkBlock(String text) => RegExp(
+      r"ERR_TUNNEL|ERR_PROXY|NETWORK_BLOCKED|ERR_CONNECTION_(RESET|REFUSED|CLOSED|TIMED_OUT|FAILED)|ERR_TIMED_OUT|"
+      r"site can[’']?t be reached|couldn[’']?t (load|reach|open) the (site|page|website)|wouldn[’']?t load",
+      caseSensitive: false,
+    ).hasMatch(text);
+
 // ── Run controller ─────────────────────────────────────────────────────────
 
 enum NgmyAgentStartResult { started, notConfigured, failed }
@@ -201,6 +209,16 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     });
   }
 
+  bool _retriedDirect = false;
+  String? _lastStartUrl;
+  List<String> _lastRecent = const [];
+
+  /// The page never loaded because the connection was refused (proxy tunnel failure etc.).
+  bool get _networkBlocked {
+    final all = [result ?? '', error ?? '', structured == null ? '' : '$structured', ...steps.map((s) => s.text)].join('\n');
+    return ngmyAgentTextShowsNetworkBlock(all);
+  }
+
   bool get running => status == 'queued' || status == 'dispatching' || status == 'running' || status == 'starting';
   bool get hasSession => (sessionId ?? '').isNotEmpty;
   String get latestStep => steps.isEmpty ? '' : steps.last.text;
@@ -221,8 +239,14 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     String? startUrl,
     bool continueSession = true,
     List<String> recentUserMessages = const [],
+    /// Open a fresh browser without the managed proxy (after a site refused the proxy).
+    bool direct = false,
+    bool isRetry = false,
   }) async {
     if (running) await stop();
+    if (!isRetry) _retriedDirect = false;
+    _lastStartUrl = startUrl;
+    _lastRecent = recentUserMessages;
     // A follow-up in the same browser needs the earlier task as context.
     final prevTask = continueSession && hasSession ? this.task : '';
     _liveUrlLockedForRun = false;
@@ -247,6 +271,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         if (continueSession && hasSession) 'sessionId': sessionId,
         if (prevTask.isNotEmpty) 'prevTask': prevTask,
         if (recentUserMessages.isNotEmpty) 'recentUserMessages': recentUserMessages,
+        if (direct) 'network': 'direct',
       },
       timeout: const Duration(seconds: 40),
     );
@@ -339,6 +364,14 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
       }
       if (running) {
         _schedulePoll(const Duration(milliseconds: 2500));
+      } else if (!_retriedDirect && _networkBlocked) {
+        // The site refused the browser's connection — reopen it on a direct connection and
+        // do the same task again, instead of giving up.
+        _retriedDirect = true;
+        final again = task;
+        steps.add(const NgmyAdvisorAgentStep(0, 'That site blocked my connection — reconnecting another way…'));
+        _notify();
+        unawaited(start(task: again, startUrl: _lastStartUrl, continueSession: false, recentUserMessages: _lastRecent, direct: true, isRetry: true));
       } else {
         _armIdleClose();
         onFinished?.call(this);

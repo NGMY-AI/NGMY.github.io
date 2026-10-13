@@ -367,6 +367,9 @@ const ADVISOR_AGENT_RULES =
   "use the best-known site for the job.\n" +
   "- The user types fast: read past typos (e.g. 'texs' = taxes) and use the recent chat context given above.\n" +
   "- Close cookie banners / pop-ups and accept read-only terms needed to view public information.\n" +
+  "- PAGE WON'T LOAD ('This site can't be reached', ERR_TUNNEL_CONNECTION_FAILED, ERR_PROXY..., ERR_CONNECTION...): " +
+  "reload once. If it still fails, STOP right away and finish with the word NETWORK_BLOCKED in your notes — the app " +
+  "will reopen the browser on another connection and try again. Don't wander to other sites first.\n" +
   "- CAR VIN (17 characters): decode it on the official free NHTSA decoder " +
   "(https://vpic.nhtsa.dot.gov/decoder/) for year, make, model, trim, engine and plant; check " +
   "https://www.nhtsa.gov/recalls for open recalls; look for odometer/mileage readings on free history sites. " +
@@ -459,21 +462,26 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     `THE USER'S REQUEST NOW: ${task}` + ADVISOR_AGENT_RULES;
   // Visible mouse pointer in the live view (NGMY Agent Cursor extension, if uploaded).
   const cursorExt = await ensureCursorExtensionId();
+  // "direct" = no managed proxy. The default US proxy sometimes can't reach a site at all
+  // (ERR_TUNNEL_CONNECTION_FAILED) — then the app retries the task on a direct connection.
+  const direct = String(body?.network ?? "") === "direct";
   const freshBrowser = () => ({
-    screenWidth: 1100,
-    screenHeight: 760,
+    // 1024 wide keeps sites in their desktop layout while streaming lighter/smoother to a phone.
+    screenWidth: 1024,
+    screenHeight: 720,
+    ...(direct ? { proxyCountryCode: null } : {}),
     ...(/^[0-9a-f-]{36}$/i.test(cursorExt) ? { extensionIds: [cursorExt] } : {}),
   });
   const payload: Record<string, unknown> = {
     task: fullTask,
-    // Same model as the default, but LOW reasoning effort per step — the default "high"
-    // made the pointer sit still for 5-10 s between actions.
-    model: "gpt-6-luna",
-    modelParams: { reasoning: { effort: "low" } },
+    // Browser Use's own fast browsing preset first (quick, smooth steps); if this account
+    // can't use it, the same default model with LOW reasoning effort (the default "high"
+    // made the pointer sit still for 5-10 s between actions).
+    model: "bu-fast",
     maxCostUsd: 0.75,
     browserSettings: freshBrowser(),
   };
-  if (/^[0-9a-f-]{36}$/i.test(sessionId)) {
+  if (/^[0-9a-f-]{36}$/i.test(sessionId) && !direct) {
     payload.sessionId = sessionId;
     delete payload.browserSettings; // continuing an existing browser
   }
@@ -486,6 +494,12 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     payload.browserSettings = freshBrowser();
     r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   }
+  if ((r.status === 400 || r.status === 403 || r.status === 422) && payload.model === "bu-fast") {
+    // Fast preset not available on this account → default model, low effort per step.
+    payload.model = "gpt-6-luna";
+    payload.modelParams = { reasoning: { effort: "low" } };
+    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  }
   if ((r.status === 400 || r.status === 422) && payload.model) {
     // Speed setting rejected → fall back to Browser Use defaults rather than failing the task.
     delete payload.model;
@@ -494,7 +508,7 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   }
   if (r.status === 400 && payload.browserSettings && cursorExt) {
     // Never let the cursor extension block a task — retry without it.
-    payload.browserSettings = { screenWidth: 1100, screenHeight: 760 };
+    payload.browserSettings = { screenWidth: 1024, screenHeight: 720, ...(direct ? { proxyCountryCode: null } : {}) };
     r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   }
   if (r.status !== 200 && r.status !== 201) {

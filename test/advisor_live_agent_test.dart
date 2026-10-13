@@ -35,4 +35,11 @@ void main() {
     expect(ngmyAdvisorAgentTaskIntent('thank you so much'), isNull);
     expect(ngmyAdvisorAgentTaskIntent('I want to find a wife', currentUrl: 'https://beebots.tech'), isNull);
   });
+
+  test('a page that would not load is retried on another connection', () {
+    expect(ngmyAgentTextShowsNetworkBlock('This site can’t be reached ERR_TUNNEL_CONNECTION_FAILED'), isTrue);
+    expect(ngmyAgentTextShowsNetworkBlock('notes: NETWORK_BLOCKED'), isTrue);
+    expect(ngmyAgentTextShowsNetworkBlock("The official McDonald's job site wouldn't load for me"), isTrue);
+    expect(ngmyAgentTextShowsNetworkBlock('Found 3 cashier jobs in Macon'), isFalse);
+  });
 }
