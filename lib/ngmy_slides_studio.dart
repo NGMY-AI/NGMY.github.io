@@ -23,6 +23,7 @@ import 'ngmy_slides_payments.dart';
 import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_fullscreen_stub.dart' if (dart.library.html) 'ngmy_fullscreen_web.dart';
+import 'ngmy_slides_motion.dart';
 import 'ngmy_slides_toolkit.dart';
 import 'ngmy_slides_transfer.dart';
 import 'ngmy_stripe_payments.dart';
@@ -5923,7 +5924,7 @@ class _NgmySlideshowPage extends StatefulWidget {
   State<_NgmySlideshowPage> createState() => _NgmySlideshowPageState();
 }
 
-class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
+class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTickerProviderStateMixin {
   late int _index;
   NgmySlideTransition _lastTransition = NgmySlideTransition.fade;
   Timer? _autoTimer;
@@ -5932,12 +5933,18 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   /// Double-tap the top-right corner (where "Auto 5s" is) to lock / unlock.
   /// Remembered for the next time Play is pressed.
   static bool _locked = false;
-  /// Video motion: which way the next slide glides in (changes every slide).
-  int _glide = 0;
-  /// Which way the slides last moved (back = reverse the glide).
-  bool _back = false;
 
   bool get _cinematic => widget.deck.cinematic;
+
+  /// Video motion: the morph from [_morphFrom] into the current slide.
+  late final AnimationController _morph = AnimationController(vsync: this, duration: const Duration(milliseconds: 1250));
+  int? _morphFrom;
+
+  void _startMorph(int from) {
+    if (!_cinematic) return;
+    _morphFrom = from;
+    _morph.forward(from: 0);
+  }
 
   @override
   void initState() {
@@ -5951,6 +5958,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   @override
   void dispose() {
     _autoTimer?.cancel();
+    _morph.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     ngmyExitFullscreen();
     super.dispose();
@@ -5969,40 +5977,6 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
     }
   }
 
-  /// Video motion: both slides move together so it plays like one video.
-  Widget _cinematicTransition(Widget child, Animation<double> animation) {
-    final kind = _glide % 4;
-    final back = _back;
-    return AnimatedBuilder(
-      animation: animation,
-      child: child,
-      builder: (context, c) {
-        // The leaving slide runs this animation backwards (1 → 0).
-        final leaving = animation.status == AnimationStatus.reverse;
-        final v = Curves.easeInOutCubic.transform(animation.value);
-        final rest = 1 - v; // 1 = fully off screen, 0 = in place
-        final size = MediaQuery.sizeOf(context);
-        final sign = leaving ? -1.0 : 1.0;
-        switch (kind) {
-          case 0: // glide sideways
-            return Transform.translate(offset: Offset(sign * (back ? -1 : 1) * rest * size.width, 0), child: c);
-          case 2: // glide up
-            return Transform.translate(offset: Offset(0, sign * (back ? -1 : 1) * rest * size.height), child: c);
-          case 1: // fly through: the old slide grows past you, the new one comes from behind
-            return Opacity(
-              opacity: v.clamp(0.0, 1.0),
-              child: Transform.scale(scale: leaving ? 1 + rest * 0.25 : 1 - rest * 0.14, child: c),
-            );
-          default: // diagonal sweep with a slight tilt
-            final dx = sign * (back ? -1 : 1) * rest * size.width;
-            return Transform.translate(
-              offset: Offset(dx, dx * 0.3),
-              child: Transform.rotate(angle: sign * rest * 0.05, child: c),
-            );
-        }
-      },
-    );
-  }
 
   void _scheduleAutoAdvance() {
     _autoTimer?.cancel();
@@ -6030,12 +6004,12 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
     final n = widget.deck.slides.length;
     if (_index < n - 1 || (widget.deck.loop && n > 1)) {
       final to = (_index + 1) % n;
+      final was = _index;
       setState(() {
         _lastTransition = widget.deck.slides[to].transition;
         _index = to;
-        _glide++;
-        _back = false;
       });
+      _startMorph(was);
       _scheduleAutoAdvance();
     }
   }
@@ -6047,26 +6021,13 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
       setState(() {
         _lastTransition = widget.deck.slides[from].transition;
         _index = (_index - 1 + n) % n;
-        _glide++;
-        _back = true;
       });
+      _startMorph(from);
       _scheduleAutoAdvance();
     }
   }
 
   Widget _slideshowSwitcher(Widget slideContent) {
-    if (_cinematic) {
-      return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 950),
-        layoutBuilder: (currentChild, previousChildren) => Stack(
-          fit: StackFit.expand,
-          children: [...previousChildren, if (currentChild != null) currentChild],
-        ),
-        // A new closure each time so the leaving slide picks up the new direction.
-        transitionBuilder: (child, animation) => _cinematicTransition(child, animation),
-        child: KeyedSubtree(key: ValueKey(_index), child: slideContent),
-      );
-    }
     if (_lastTransition == NgmySlideTransition.none) {
       return KeyedSubtree(key: ValueKey(_index), child: slideContent);
     }
@@ -6200,18 +6161,36 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   @override
   Widget build(BuildContext context) {
     final slide = widget.deck.slides[_index];
-    Widget render = SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true));
+    final Widget body;
     if (_cinematic) {
-      // Slow camera drift while the slide is on screen, like a video.
-      render = _SlideKenBurns(
-        key: ValueKey('kb$_index'),
-        seconds: widget.deck.durationForSlide(_index).clamp(2, 120) + 1,
-        variant: _index,
-        child: render,
+      // Video motion: one continuous scene. While moving between slides the
+      // shared elements morph from one slide into the next; the camera keeps
+      // drifting across the whole show without a cut.
+      final from = _morphFrom;
+      body = ClipRect(
+        child: NgmyCinematicCamera(
+          child: AnimatedBuilder(
+            animation: _morph,
+            builder: (context, _) {
+              if (from != null && _morph.isAnimating) {
+                return NgmySlideMorph(from: widget.deck.slides[from], to: slide, t: _morph.value);
+              }
+              return NgmySlideAnimatedRender(
+                key: ValueKey('cine$_index'),
+                slide: slide,
+                // The first slide makes its entrance; later ones arrived by morph.
+                animate: from == null,
+                livingFx: true,
+              );
+            },
+          ),
+        ),
       );
+    } else {
+      final render = SizedBox.expand(child: NgmySlideAnimatedRender(slide: slide, animate: true));
+      final slideContent = ColoredBox(color: Color(slide.background), child: ClipRect(child: render));
+      body = _slideshowSwitcher(slideContent);
     }
-    final slideContent = ColoredBox(color: Color(slide.background), child: ClipRect(child: render));
-    final body = _slideshowSwitcher(slideContent);
     final pill = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
@@ -6348,48 +6327,4 @@ class _SlideWipeClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
-}
-
-/// Slow camera drift (zoom and pan) over a slide while it plays — video motion.
-class _SlideKenBurns extends StatefulWidget {
-  const _SlideKenBurns({super.key, required this.child, required this.seconds, required this.variant});
-  final Widget child;
-  final int seconds;
-  final int variant;
-
-  @override
-  State<_SlideKenBurns> createState() => _SlideKenBurnsState();
-}
-
-class _SlideKenBurnsState extends State<_SlideKenBurns> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(vsync: this, duration: Duration(seconds: widget.seconds))..forward();
-
-  // Where the camera drifts towards, and whether it zooms in or out.
-  static const _paths = <(Alignment, bool)>[
-    (Alignment(-0.6, -0.4), true),
-    (Alignment(0.6, 0.3), false),
-    (Alignment(0.5, -0.5), true),
-    (Alignment(-0.5, 0.5), false),
-    (Alignment.center, true),
-  ];
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final (focus, zoomIn) = _paths[widget.variant % _paths.length];
-    return AnimatedBuilder(
-      animation: _c,
-      child: widget.child,
-      builder: (_, child) {
-        final t = Curves.easeInOutSine.transform(_c.value);
-        final scale = zoomIn ? 1.0 + 0.07 * t : 1.07 - 0.07 * t;
-        return Transform.scale(scale: scale, alignment: focus, child: child);
-      },
-    );
-  }
 }

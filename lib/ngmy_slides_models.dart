@@ -95,6 +95,8 @@ class NgmySlideElement {
     this.pdfPage = 0,
     this.textTransition = NgmySlideTransition.none,
     this.textAnimDelayMs = 0,
+    this.morphKey = '',
+    this.loopFx = '',
   });
 
   final String id;
@@ -121,6 +123,10 @@ class NgmySlideElement {
   int pdfPage;
   NgmySlideTransition textTransition;
   int textAnimDelayMs;
+  /// Video motion: elements with the same key on the next slide glide into it.
+  String morphKey;
+  /// Living animation while shown: 'float3d', 'drift' or 'pulse'.
+  String loopFx;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -147,6 +153,8 @@ class NgmySlideElement {
         pdfPage: pdfPage,
         textTransition: textTransition,
         textAnimDelayMs: textAnimDelayMs,
+        morphKey: morphKey,
+        loopFx: loopFx,
       );
 
   Map<String, dynamic> toJson() => {
@@ -174,6 +182,8 @@ class NgmySlideElement {
         'pdfPage': pdfPage,
         'textTransition': textTransition.name,
         'textAnimDelayMs': textAnimDelayMs,
+        if (morphKey.isNotEmpty) 'morphKey': morphKey,
+        if (loopFx.isNotEmpty) 'loopFx': loopFx,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -205,6 +215,8 @@ class NgmySlideElement {
       pdfPage: (json['pdfPage'] as num?)?.toInt() ?? 0,
       textTransition: _transitionFromJson(json['textTransition']),
       textAnimDelayMs: (json['textAnimDelayMs'] as num?)?.toInt() ?? 0,
+      morphKey: (json['morphKey'] ?? '').toString(),
+      loopFx: (json['loopFx'] ?? '').toString(),
     );
   }
 }

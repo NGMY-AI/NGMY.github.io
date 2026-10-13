@@ -49,6 +49,7 @@ import 'ngmy_civic_enroll_guest.dart';
 import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
+import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -9958,7 +9959,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startCurrentUserPullLoop() {
     _currentUserPullTimer?.cancel();
     if (_currentUser == null) return;
-    _currentUserPullTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _currentUserPullTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
       if (ngmyAppInBackground()) return;
       unawaited(_refreshCurrentUserFromCloud());
@@ -42151,6 +42152,15 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ? widget.config.helpPurposeFor(state)
               : 'Community contribution'),
     );
+    // Married household: the money counts for the household (shown under the
+    // husband), but we remember which spouse gave it so each keeps their own
+    // count if they ever separate.
+    final famRaw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email) ??
+        ((u.registryId ?? '').trim().isEmpty ? null : NgmyCivicRegistryMembers.findByRegistryId(widget.config, u.registryId!));
+    final spouseRel = ngmyCivicRelativesOf(famRaw)
+        .where((r) => r['relation'] == 'spouse' && (r['status'] ?? 'married') == 'married' && '${r['ownRegistryId'] ?? ''}'.trim().isEmpty)
+        .firstOrNull;
+    final givenBy = ValueNotifier<String>('self');
     // A rapid double-tap on Save (common on mobile, especially with any UI
     // lag before the dialog actually closes) would otherwise fire
     // onPressed twice and record the SAME contribution twice — money
@@ -42434,6 +42444,35 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             style: TextStyle(color: ink),
                             decoration: framedInput('Details'),
                           ),
+                          if (spouseRel != null) ...[
+                            const SizedBox(height: 14),
+                            Text('Who gave it?', style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 13)),
+                            const SizedBox(height: 6),
+                            ValueListenableBuilder<String>(
+                              valueListenable: givenBy,
+                              builder: (_, who, _) => Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [
+                                  ChoiceChip(
+                                    label: Text(((u.fullName ?? '').trim().isNotEmpty ? u.fullName! : u.username).trim()),
+                                    selected: who == 'self',
+                                    onSelected: (_) => givenBy.value = 'self',
+                                  ),
+                                  ChoiceChip(
+                                    label: Text('${spouseRel['fullName'] ?? 'Spouse'}'),
+                                    selected: who == '${spouseRel['id']}',
+                                    onSelected: (_) => givenBy.value = '${spouseRel['id']}',
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Counts for the household. If they ever separate, each keeps what they gave.',
+                              style: TextStyle(color: ink.withValues(alpha: 0.55), fontSize: 11.5),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -42465,7 +42504,20 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                               final memberEmail = NgmyCivicRegistryMembers.emailKey(u.email);
                               final memberRid = (u.registryId ?? '').trim().toUpperCase();
                               final note = noteC.text.trim().isEmpty ? widget.config.helpPurposeFor(state) : noteC.text.trim();
+                              // Who gave how much in this campaign ('self' or the spouse's id).
+                              final priorForGivers = _activeCampaignContributionForMember(u, forState: state) ?? existing;
+                              final givers = <String, double>{};
+                              if (priorForGivers != null) {
+                                final g = _decodeContributionMeta(priorForGivers)['givers'];
+                                if (g is Map) {
+                                  g.forEach((k, v) => givers['$k'] = (v is num) ? v.toDouble() : (double.tryParse('$v') ?? 0));
+                                } else {
+                                  givers['self'] = priorForGivers.amount;
+                                }
+                              }
+                              givers[givenBy.value] = (givers[givenBy.value] ?? 0) + amount;
                               final payload = jsonEncode({
+                                if (spouseRel != null || givers.length > 1) 'givers': givers,
                                 'kind': 'contribution',
                                 'purpose': widget.config.helpPurposeFor(state),
                                 'note': note,
@@ -49481,7 +49533,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                                 borderRadius: BorderRadius.circular(13),
                                 gradient: const LinearGradient(colors: [Color(0xFF818CF8), Color(0xFF7C3AED)]),
                               ),
-                              child: const Icon(Icons.forum_rounded, color: Colors.white, size: 20),
+                              child: const Center(child: NgmyModernChatIcon(size: 21, dotColor: Color(0xFF6D5BF0))),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -51109,7 +51161,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                   border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
                   boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
-                child: const Icon(Icons.forum_rounded, color: Colors.white, size: 21),
+                child: const Center(child: NgmyModernChatIcon(size: 22, dotColor: Color(0xFF6D5BF0))),
               ),
               if (unread > 0)
                 Positioned(

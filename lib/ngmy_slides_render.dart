@@ -689,9 +689,27 @@ class _NgmyElementEntranceState extends State<NgmyElementEntrance> with SingleTi
     super.dispose();
   }
 
-  Widget _buildAnimated(Widget child, Animation<double> a) {
-    final t = Curves.easeOutCubic.transform(a.value);
-    switch (widget.element.textTransition) {
+  Widget _buildAnimated(Widget child, Animation<double> a) =>
+      ngmyEntranceAt(widget.element.textTransition, a.value, child);
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.element.textTransition == NgmySlideTransition.none || !widget.animate) {
+      return widget.child;
+    }
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, child) => _buildAnimated(child!, _ctrl),
+      child: widget.child,
+    );
+  }
+}
+
+/// An element's entrance at progress [p] (0 → hidden, 1 → in place).
+/// Shared by Present mode and the video-motion morph.
+Widget ngmyEntranceAt(NgmySlideTransition transition, double p, Widget child) {
+    final t = Curves.easeOutCubic.transform(p.clamp(0.0, 1.0));
+    switch (transition) {
       case NgmySlideTransition.none:
         return child;
       case NgmySlideTransition.fade:
@@ -744,25 +762,14 @@ class _NgmyElementEntranceState extends State<NgmyElementEntrance> with SingleTi
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (widget.element.textTransition == NgmySlideTransition.none || !widget.animate) {
-      return widget.child;
-    }
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (_, child) => _buildAnimated(child!, _ctrl),
-      child: widget.child,
-    );
-  }
-}
-
 /// Slide renderer with animated text/element entrances for Present mode.
 class NgmySlideAnimatedRender extends StatelessWidget {
-  const NgmySlideAnimatedRender({super.key, required this.slide, this.animate = true});
+  const NgmySlideAnimatedRender({super.key, required this.slide, this.animate = true, this.livingFx = false});
 
   final NgmySlide slide;
   final bool animate;
+  /// Keep 3D art floating even when entrances are off (after a morph).
+  final bool livingFx;
 
   @override
   Widget build(BuildContext context) {
@@ -787,11 +794,16 @@ class NgmySlideAnimatedRender extends StatelessWidget {
                 top: e.y * h,
                 width: e.w * w,
                 height: e.h * h,
-                child: NgmyElementEntrance(
-                  element: e,
-                  animate: animate,
-                  staggerIndex: stagger,
-                  child: NgmySlideElementView(element: e, scale: w / 960, showEmptyHint: false),
+                child: NgmyLoopFx(
+                  fx: e.loopFx,
+                  enabled: animate || livingFx,
+                  seed: e.id.hashCode,
+                  child: NgmyElementEntrance(
+                    element: e,
+                    animate: animate,
+                    staggerIndex: stagger,
+                    child: NgmySlideElementView(element: e, scale: w / 960, showEmptyHint: false),
+                  ),
                 ),
               );
             }).toList(),
@@ -916,6 +928,81 @@ class _ElementAnimationPreviewState extends State<_ElementAnimationPreview> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Keeps an element alive while its slide is on screen:
+/// 'float3d' — bobs and tilts in 3D (3D icons, emoji),
+/// 'drift'   — slow wander (background orbs),
+/// 'pulse'   — gentle breathing (accent bars).
+class NgmyLoopFx extends StatefulWidget {
+  const NgmyLoopFx({super.key, required this.fx, required this.child, this.enabled = true, this.seed = 0});
+  final String fx;
+  final Widget child;
+  final bool enabled;
+  final int seed;
+
+  @override
+  State<NgmyLoopFx> createState() => _NgmyLoopFxState();
+}
+
+class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateMixin {
+  AnimationController? _c;
+
+  bool get _on => widget.enabled && const {'float3d', 'drift', 'pulse'}.contains(widget.fx);
+
+  @override
+  void initState() {
+    super.initState();
+    if (_on) {
+      _c = AnimationController(
+        vsync: this,
+        duration: Duration(milliseconds: widget.fx == 'drift' ? 9000 : (widget.fx == 'pulse' ? 2600 : 4200)),
+      )..repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _c;
+    if (!_on || c == null) return widget.child;
+    final phase = (widget.seed % 7) / 7 * math.pi * 2;
+    return AnimatedBuilder(
+      animation: c,
+      child: widget.child,
+      builder: (context, child) {
+        // From the clock, not the controller, so the motion carries on
+        // seamlessly when one slide view hands over to the next.
+        final dur = c.duration!.inMilliseconds;
+        final a = (DateTime.now().millisecondsSinceEpoch % dur) / dur * math.pi * 2 + phase;
+        switch (widget.fx) {
+          case 'float3d':
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.0016)
+                ..translate(0.0, math.sin(a) * 7)
+                ..rotateY(math.sin(a) * 0.32)
+                ..rotateX(math.cos(a) * 0.12)
+                ..scale(1 + math.sin(a * 2) * 0.025),
+              child: child,
+            );
+          case 'drift':
+            return Transform.translate(
+              offset: Offset(math.sin(a) * 14, math.cos(a * 0.8) * 10),
+              child: Transform.scale(scale: 1 + math.sin(a * 0.5) * 0.05, child: child),
+            );
+          default: // pulse
+            return Opacity(opacity: 0.82 + math.sin(a) * 0.18, child: Transform.scale(scale: 1 + math.sin(a) * 0.04, child: child));
+        }
+      },
     );
   }
 }

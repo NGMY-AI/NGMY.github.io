@@ -118,7 +118,12 @@ void ngmyCivicGivesStartWatcher(String email) {
   }
 
   unawaited(tick());
-  _watchTimer = Timer.periodic(const Duration(minutes: 2), (_) => unawaited(tick()));
+  // Every 5 minutes, only while the app is on screen (one small read each).
+  _watchTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+    final s = WidgetsBinding.instance.lifecycleState;
+    if (s == AppLifecycleState.hidden || s == AppLifecycleState.paused || s == AppLifecycleState.detached) return;
+    unawaited(tick());
+  });
 }
 
 void ngmyCivicGivesStopWatcher() {

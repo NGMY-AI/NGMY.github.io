@@ -6655,6 +6655,7 @@ function civicCleanRel(r: CivicRel, depth = 0): CivicRel | null {
     age: Number(r.age ?? 0) > 0 && Number(r.age) < 130 ? Math.floor(Number(r.age)) : null,
     phone: String(r.phone ?? "").replace(/\D/g, "").slice(0, 15),
     idType: String(r.idType ?? "").trim().slice(0, 40),
+    address: String(r.address ?? "").replace(/\s+/g, " ").trim().slice(0, 200),
     email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(r.email ?? "").trim()) ? String(r.email).trim().toLowerCase().slice(0, 120) : "",
     status: "",
   };
@@ -6796,7 +6797,7 @@ function applyCivicFamily(
       gender: civicGender(r.gender),
       dob: r.dob ?? "",
       phone: r.phone ?? "",
-      homeAddress: String(r.homeAddress ?? member.homeAddress ?? ""),
+      homeAddress: String(r.address ?? "").trim() || String(member.homeAddress ?? ""),
       city: String(member.city ?? ""),
       room: String(member.room ?? ""),
       state,
@@ -6833,6 +6834,7 @@ function applyCivicFamily(
         maritalStatus: r.status,
         relatives: [],
         formerSpouseRegistryId: headRid,
+        fromRelId: String(r.id ?? ""),
       });
     }
   }
@@ -7047,28 +7049,32 @@ async function handleCivicGive(req: Request, action: string, body: any): Promise
   if (!caller) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
   const db = adminClient();
   if (!db) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
-  const live = await giveLiveMembers(db);
   let items = await giveLoad(db);
-  const swept = await giveSweep(db, items, live);
-  if (swept) await giveSave(db, items);
 
-  // Light inbox for notifications: no birthday needed, only the account's own records.
+  // Light inbox for notifications: one small read, matched by account email.
+  // (No roster load and no claim sweep here — those run on real actions and
+  // in the 6-hourly housekeeping, so idle phones cost almost nothing.)
   if (action === "civicGiveInbox") {
-    const mine = await giveRidsForAccount(db, live, caller);
+    const isGiver = (g: CivicGive) => g.giver?.account === caller || g.giver?.email === caller;
+    const isReceiver = (g: CivicGive) => g.recipient?.email === caller || g.recipient?.account === caller;
     const rows = items
-      .filter((g) => mine.has(String(g.giver?.rid ?? "")) || mine.has(String(g.recipient?.rid ?? "")))
+      .filter((g) => isGiver(g) || isReceiver(g))
       .slice(-60)
       .map((g) => ({
         id: g.id,
         status: g.status,
-        role: mine.has(String(g.giver?.rid ?? "")) ? "giver" : "receiver",
+        role: isGiver(g) ? "giver" : "receiver",
         kind: g.kind,
         what: giveWhat(g),
-        other: mine.has(String(g.giver?.rid ?? "")) ? g.recipient?.name : g.giver?.name,
+        other: isGiver(g) ? g.recipient?.name : g.giver?.name,
         updatedAt: g.updatedAt,
       }));
     return jsonOk({ ok: true, items: rows });
   }
+
+  const live = await giveLiveMembers(db);
+  const swept = await giveSweep(db, items, live);
+  if (swept) await giveSave(db, items);
 
   const v = await giveVerify(db, live, caller, body?.rid, body?.dob);
   if (!v.ok) return jsonOk({ ok: false, error: v.error }, 403);
@@ -7125,7 +7131,7 @@ async function handleCivicGive(req: Request, action: string, body: any): Promise
       dueAt,
       qa,
       note: giveText(body?.note, 300),
-      giver: { rid: me, name: myName, state: String(v.member.state ?? ""), email: emailKey(String(v.member.email ?? "")) || caller },
+      giver: { rid: me, name: myName, state: String(v.member.state ?? ""), email: emailKey(String(v.member.email ?? "")) || caller, account: caller },
       recipient: {
         rid: toRid,
         name: giveMemberName(to),
@@ -7144,6 +7150,7 @@ async function handleCivicGive(req: Request, action: string, body: any): Promise
 
   if (action === "civicGiveRespond") {
     if (g.recipient?.rid !== me) return jsonOk({ ok: false, error: "Only the receiver can answer this." }, 403);
+    if (g.recipient) g.recipient.account = caller;
     if (g.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
     if (body?.accept === true) {
       const signName = giveText(body?.signName, 80);
@@ -7188,6 +7195,87 @@ async function handleCivicGive(req: Request, action: string, body: any): Promise
   }
 
   return jsonOk({ ok: false, error: "Unknown action." }, 400);
+}
+
+/**
+ * While married, a household's contributions are recorded on the household
+ * (shown under the husband) with who gave how much ("givers"). When a spouse
+ * separates and gets their own member row, the money they gave moves with
+ * them and each side keeps their own contribution count.
+ */
+async function civicSplitSpouseContributions(
+  db: any,
+  head: Record<string, unknown>,
+  spawned: Record<string, unknown>[],
+): Promise<void> {
+  const headEmail = emailKey(String(head.email ?? ""));
+  if (!headEmail) return;
+  for (const row of spawned) {
+    const relId = String(row.fromRelId ?? "").trim();
+    if (!relId || !row.formerSpouseRegistryId) continue;
+    const toEmail = emailKey(String(row.email ?? ""));
+    if (!toEmail) continue;
+    const { data, error } = await db.from("transactions")
+      .select("id,amount,sourceDetails,timestamp")
+      .eq("type", 5)
+      .eq("status", 1)
+      .ilike("userEmail", headEmail)
+      .ilike("sourceDetails", `%${relId}%`)
+      .limit(500);
+    if (error || !Array.isArray(data)) continue;
+    let movedWhole = 0;
+    let gained = 0;
+    for (const tx of data) {
+      let meta: Record<string, any> = {};
+      try {
+        meta = JSON.parse(String(tx.sourceDetails ?? "{}"));
+      } catch {
+        continue;
+      }
+      const givers = meta.givers && typeof meta.givers === "object" ? { ...meta.givers } : null;
+      const theirs = Number(givers?.[relId] ?? 0);
+      if (!givers || !(theirs > 0)) continue;
+      const total = Number(tx.amount ?? 0);
+      const theirMeta = {
+        ...meta,
+        givers: { [relId]: theirs },
+        memberEmail: toEmail,
+        memberName: String(row.fullName ?? ""),
+        registryId: String(row.registryId ?? ""),
+        splitFrom: tx.id,
+      };
+      if (theirs >= total - 0.001) {
+        // All of it was theirs: the whole record moves to them.
+        await db.from("transactions").update({ userEmail: toEmail, sourceDetails: JSON.stringify(theirMeta) }).eq("id", tx.id);
+        movedWhole++;
+      } else {
+        // Both gave in that campaign: each keeps their own part (and a count).
+        delete givers[relId];
+        await db.from("transactions").update({
+          amount: Math.round((total - theirs) * 100) / 100,
+          sourceDetails: JSON.stringify({ ...meta, givers }),
+        }).eq("id", tx.id);
+        await db.from("transactions").upsert({
+          id: `${tx.id}_sp_${relId}`.slice(0, 180),
+          userEmail: toEmail,
+          amount: theirs,
+          type: 5,
+          method: 2,
+          sourceDetails: JSON.stringify(theirMeta),
+          status: 1,
+          timestamp: tx.timestamp,
+        }, { onConflict: "id" });
+      }
+      gained++;
+    }
+    if (gained > 0) {
+      head.helps = Math.max(0, (Number(head.helps ?? 0) || 0) - movedWhole);
+      row.helps = (Number(row.helps ?? 0) || 0) + gained;
+      // Fresh stamps so these counts win over older copies on other phones.
+      head.activityAt = new Date().toISOString();
+      row.activityAt = head.activityAt;
+    }
+  }
 }
 async function handleCivicUpsertMember(
   req: Request,
@@ -7276,6 +7364,8 @@ async function handleCivicUpsertMember(
     famIds,
   );
   if (fam.error) return jsonOk({ ok: false, error: fam.error }, 400);
+  // A spouse who separated takes the contributions they gave with them.
+  await civicSplitSpouseContributions(admin, member, fam.spawned);
 
   const nextMembers = mergeMemberLists(members, [member, ...fam.spawned]);
   const memberEmail = emailKey(String(member.email ?? ""));

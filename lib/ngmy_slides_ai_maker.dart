@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
 import 'ngmy_slides_models.dart';
@@ -125,6 +126,28 @@ const kNgmySlidesAiStyles = <NgmySlidesAiStyle>[
     muted: 0xE6E7E5E4,
     accents: [0xFFD4AF37, 0xFFFDE68A, 0xFFA8A29E],
     transition: NgmySlideTransition.dissolve,
+  ),
+  // Luxury: deep royal purple and navy with rich gold.
+  NgmySlidesAiStyle(
+    id: 'royal',
+    label: 'Royal Gold',
+    icon: Icons.workspace_premium_rounded,
+    backgrounds: [(0xFF1E0B3A, 0xFF3B0764), (0xFF0B1437, 0xFF1E1B4B), (0xFF2E1065, 0xFF0B1437), (0xFF14082B, 0xFF4C1D95)],
+    text: 0xFFFFF7E6,
+    muted: 0xE6E9D5FF,
+    accents: [0xFFF5C451, 0xFFD4AF37, 0xFFC4B5FD],
+    transition: NgmySlideTransition.zoom,
+  ),
+  // Neon night: teal-to-violet aurora glow.
+  NgmySlidesAiStyle(
+    id: 'aurora',
+    label: 'Aurora Glow',
+    icon: Icons.auto_awesome_rounded,
+    backgrounds: [(0xFF042F2E, 0xFF1E1B4B), (0xFF0B1437, 0xFF134E4A), (0xFF1E1B4B, 0xFF4A044E), (0xFF022C22, 0xFF312E81)],
+    text: 0xFFF0FDFA,
+    muted: 0xE6A7F3D0,
+    accents: [0xFF2DD4BF, 0xFFA78BFA, 0xFFF472B6],
+    transition: NgmySlideTransition.fade,
   ),
 ];
 
@@ -350,20 +373,25 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
   NgmySlidesAiOutline outline, {
   Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
   Map<int, NgmySlidesAiAssets> assets = const {},
+  String? logo,
+  List<String> userPictures = const [],
 }) {
   final st = ngmySlidesAiStyleById(outline.style);
   final animate = extras.contains(NgmySlidesAiExtra.animations);
   final useEmoji = extras.contains(NgmySlidesAiExtra.emojis);
+  final video = extras.contains(NgmySlidesAiExtra.videoMotion);
   String id() => NgmySlidesTemplates.newId();
   final slides = <NgmySlide>[];
 
-  // A different entrance for each slide keeps the deck lively.
-  const titleIns = [NgmySlideTransition.zoom, NgmySlideTransition.slideUp, NgmySlideTransition.flip, NgmySlideTransition.slideLeft, NgmySlideTransition.bounce];
-  const artIns = [NgmySlideTransition.bounce, NgmySlideTransition.rotate3d, NgmySlideTransition.zoom, NgmySlideTransition.flip, NgmySlideTransition.spiral];
+  // 3D-feeling entrances, a different one each slide.
+  const titleIns = [NgmySlideTransition.zoom, NgmySlideTransition.flip, NgmySlideTransition.slideUp, NgmySlideTransition.rotate3d, NgmySlideTransition.slideLeft];
+  const artIns = [NgmySlideTransition.rotate3d, NgmySlideTransition.flip, NgmySlideTransition.spiral, NgmySlideTransition.bounce, NgmySlideTransition.flipVertical];
   const slideTrans = [NgmySlideTransition.fade, NgmySlideTransition.zoom, NgmySlideTransition.slideLeft, NgmySlideTransition.cube, NgmySlideTransition.flip, NgmySlideTransition.push];
 
+  // Every element gets a "key" (the same actor on every slide), so in video
+  // motion it travels from where it was to where it goes next.
   NgmySlideElement text(String t, double x, double y, double w, double h, double size,
-      {FontWeight weight = FontWeight.w600, int? color, TextAlign align = TextAlign.left, bool bullets = false, FontStyle style = FontStyle.normal, NgmySlideTransition anim = NgmySlideTransition.fade, int delay = 0}) {
+      {FontWeight weight = FontWeight.w600, int? color, TextAlign align = TextAlign.left, bool bullets = false, FontStyle style = FontStyle.normal, NgmySlideTransition anim = NgmySlideTransition.fade, int delay = 0, String key = '', String fx = ''}) {
     return NgmySlideElement(
       id: id(),
       type: NgmySlideElementType.text,
@@ -380,10 +408,12 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       bulletList: bullets,
       textTransition: animate ? anim : NgmySlideTransition.none,
       textAnimDelayMs: animate ? delay : 0,
+      morphKey: key,
+      loopFx: animate ? fx : '',
     );
   }
 
-  NgmySlideElement shape(NgmySlideShapeKind kind, double x, double y, double w, double h, int fill, {double rotation = 0}) {
+  NgmySlideElement shape(NgmySlideShapeKind kind, double x, double y, double w, double h, int fill, {double rotation = 0, String key = '', String fx = ''}) {
     return NgmySlideElement(
       id: id(),
       type: NgmySlideElementType.shape,
@@ -396,10 +426,13 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       strokeColor: fill,
       strokeWidth: 0,
       rotation: rotation,
+      morphKey: key,
+      loopFx: animate ? fx : '',
     );
   }
 
-  NgmySlideElement image(String dataUri, double x, double y, double w, double h, {NgmySlideTransition anim = NgmySlideTransition.bounce, int delay = 350}) {
+  NgmySlideElement image(String dataUri, double x, double y, double w, double h,
+      {NgmySlideTransition anim = NgmySlideTransition.bounce, int delay = 350, String key = '', String fx = ''}) {
     return NgmySlideElement(
       id: id(),
       type: NgmySlideElementType.image,
@@ -410,8 +443,13 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       imageRef: dataUri,
       textTransition: animate ? anim : NgmySlideTransition.none,
       textAnimDelayMs: animate ? delay : 0,
+      morphKey: key,
+      loopFx: animate ? fx : '',
     );
   }
+
+  final hasLogo = (logo ?? '').isNotEmpty;
+  var picIndex = 0;
 
   for (var i = 0; i < outline.slides.length; i++) {
     final o = outline.slides[i];
@@ -424,71 +462,101 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
     var layout = NgmySlideLayout.titleContent;
     final asset = assets[i];
     final icon = asset?.icon3d;
-    final picture = asset?.picture;
+    var picture = asset?.picture;
+    // Your own pictures come first on content slides.
+    if (userPictures.isNotEmpty && (o.kind == 'bullets' || o.kind == 'section' || !const {'title', 'quote', 'closing'}.contains(o.kind))) {
+      picture = userPictures[picIndex++ % userPictures.length];
+    }
     final emoji = useEmoji ? o.emoji : '';
-    // Bullet slides prefer a photo; title/section/closing prefer the 3D icon.
     final sideArt = picture ?? icon;
     final heroArt = icon ?? picture;
+    final heroIsIcon = icon != null;
+
+    // A giant soft shape that sweeps across the show — on each slide you see
+    // a different part of it, so moving between slides feels like one scene.
+    if (video) {
+      els.add(shape(NgmySlideShapeKind.circle, 0.62 - (i % 5) * 0.36, -0.55 + (i % 3) * 0.18, 1.15, 2.0, _withAlpha(a1, 0x1F), key: 'pano'));
+    }
 
     switch (o.kind) {
       case 'title':
         layout = NgmySlideLayout.title;
         els
-          ..add(shape(NgmySlideShapeKind.circle, 0.70, -0.25, 0.46, 0.82, _withAlpha(a1, 0x33)))
-          ..add(shape(NgmySlideShapeKind.circle, -0.08, 0.68, 0.24, 0.43, _withAlpha(a2, 0x2E)));
-        if (heroArt != null) {
-          els.add(image(heroArt, 0.42, 0.04, 0.16, 0.28, anim: artIn, delay: 500));
+          ..add(shape(NgmySlideShapeKind.circle, 0.70, -0.25, 0.46, 0.82, _withAlpha(a1, 0x33), key: 'orb1', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.circle, -0.08, 0.68, 0.24, 0.43, _withAlpha(a2, 0x2E), key: 'orb2', fx: 'drift'));
+        if (hasLogo) {
+          els.add(image(logo!, 0.41, 0.04, 0.18, 0.27, anim: NgmySlideTransition.zoom, delay: 450, key: 'logo'));
+        } else if (heroArt != null) {
+          els.add(image(heroArt, 0.42, 0.04, 0.16, 0.28, anim: artIn, delay: 500, key: 'hero', fx: heroIsIcon ? 'float3d' : ''));
         } else if (emoji.isNotEmpty) {
-          els.add(text(emoji, 0.40, 0.04, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500));
+          els.add(text(emoji, 0.40, 0.04, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
         }
         els
-          ..add(shape(NgmySlideShapeKind.rectangle, 0.40, 0.66, 0.20, 0.012, a1))
-          ..add(text(o.title, 0.08, 0.33, 0.84, 0.30, 54, weight: FontWeight.w900, align: TextAlign.center, anim: tIn))
-          ..add(text(o.subtitle, 0.12, 0.70, 0.76, 0.14, 24, color: st.muted, align: TextAlign.center, delay: 300));
+          ..add(shape(NgmySlideShapeKind.rectangle, 0.40, 0.66, 0.20, 0.012, a1, key: 'bar', fx: 'pulse'))
+          ..add(text(o.title, 0.08, 0.33, 0.84, 0.30, 54, weight: FontWeight.w900, align: TextAlign.center, anim: tIn, key: 'title'))
+          ..add(text(o.subtitle, 0.12, 0.70, 0.76, 0.14, 24, color: st.muted, align: TextAlign.center, delay: 300, key: 'sub'));
       case 'section':
         layout = NgmySlideLayout.section;
+        els.add(shape(NgmySlideShapeKind.circle, 0.64, 0.46, 0.42, 0.75, _withAlpha(a1, 0x2A), key: 'orb1', fx: 'drift'));
         if (heroArt != null) {
-          els.add(image(heroArt, 0.70, 0.22, 0.24, 0.44, anim: artIn));
+          els.add(image(heroArt, 0.70, 0.20, 0.24, 0.44, anim: artIn, key: picture != null && !heroIsIcon ? 'photo' : 'hero', fx: heroIsIcon ? 'float3d' : ''));
         } else {
-          els.add(shape(NgmySlideShapeKind.hexagon, 0.78, 0.10, 0.18, 0.32, _withAlpha(a1, 0x40), rotation: 0.3));
+          els.add(shape(NgmySlideShapeKind.hexagon, 0.78, 0.10, 0.18, 0.32, _withAlpha(a2, 0x40), rotation: 0.3, key: 'orb2', fx: 'drift'));
         }
         els
-          ..add(shape(NgmySlideShapeKind.rectangle, 0.08, 0.60, 0.14, 0.014, a1))
-          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.08, 0.34, 0.62, 0.24, 46, weight: FontWeight.w900, anim: tIn))
-          ..add(text(o.subtitle, 0.08, 0.64, 0.60, 0.14, 22, color: st.muted, delay: 250));
+          ..add(shape(NgmySlideShapeKind.rectangle, 0.08, 0.60, 0.14, 0.014, a1, key: 'bar', fx: 'pulse'))
+          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.08, 0.34, 0.62, 0.24, 46, weight: FontWeight.w900, anim: tIn, key: 'title'))
+          ..add(text(o.subtitle, 0.08, 0.64, 0.60, 0.14, 22, color: st.muted, delay: 250, key: 'sub'));
       case 'quote':
         els
-          ..add(text('“', 0.06, 0.02, 0.2, 0.36, 140, weight: FontWeight.w900, color: _withAlpha(a1, 0xCC), anim: NgmySlideTransition.zoom))
-          ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center, anim: tIn))
-          ..add(text(o.subtitle.isEmpty ? '' : '— ${o.subtitle}', 0.12, 0.68, 0.76, 0.12, 22, color: st.muted, align: TextAlign.center, delay: 300))
-          ..add(shape(NgmySlideShapeKind.circle, 0.82, 0.66, 0.26, 0.46, _withAlpha(a2, 0x26)));
-        if (emoji.isNotEmpty) els.add(text(emoji, 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500));
+          ..add(shape(NgmySlideShapeKind.circle, -0.12, -0.2, 0.36, 0.64, _withAlpha(a1, 0x24), key: 'orb1', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.circle, 0.82, 0.66, 0.26, 0.46, _withAlpha(a2, 0x26), key: 'orb2', fx: 'drift'))
+          ..add(text('“', 0.06, 0.02, 0.2, 0.36, 140, weight: FontWeight.w900, color: _withAlpha(a1, 0xCC), anim: NgmySlideTransition.zoom, key: 'quote', fx: 'pulse'))
+          ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center, anim: tIn, key: 'title'))
+          ..add(text(o.subtitle.isEmpty ? '' : '— ${o.subtitle}', 0.12, 0.68, 0.76, 0.12, 22, color: st.muted, align: TextAlign.center, delay: 300, key: 'sub'));
+        if (emoji.isNotEmpty) els.add(text(emoji, 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
       case 'closing':
         layout = NgmySlideLayout.title;
         els
-          ..add(shape(NgmySlideShapeKind.circle, -0.15, -0.30, 0.50, 0.90, _withAlpha(a1, 0x2E)))
-          ..add(shape(NgmySlideShapeKind.circle, 0.78, 0.62, 0.30, 0.54, _withAlpha(a2, 0x33)));
-        if (heroArt != null) {
-          els.add(image(heroArt, 0.42, 0.05, 0.16, 0.28, anim: artIn, delay: 450));
+          ..add(shape(NgmySlideShapeKind.circle, -0.15, -0.30, 0.50, 0.90, _withAlpha(a1, 0x2E), key: 'orb1', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.circle, 0.78, 0.62, 0.30, 0.54, _withAlpha(a2, 0x33), key: 'orb2', fx: 'drift'));
+        if (hasLogo) {
+          els.add(image(logo!, 0.41, 0.05, 0.18, 0.27, anim: NgmySlideTransition.zoom, delay: 400, key: 'logo'));
+        } else if (heroArt != null) {
+          els.add(image(heroArt, 0.42, 0.05, 0.16, 0.28, anim: artIn, delay: 450, key: 'hero', fx: heroIsIcon ? 'float3d' : ''));
         } else if (emoji.isNotEmpty) {
-          els.add(text(emoji, 0.40, 0.05, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 450));
+          els.add(text(emoji, 0.40, 0.05, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 450, key: 'hero', fx: 'float3d'));
         }
         els
-          ..add(text(o.title, 0.10, 0.34, 0.80, 0.26, 52, weight: FontWeight.w900, align: TextAlign.center, anim: tIn))
-          ..add(text(o.subtitle, 0.14, 0.63, 0.72, 0.16, 24, color: st.muted, align: TextAlign.center, delay: 300));
+          ..add(shape(NgmySlideShapeKind.rectangle, 0.42, 0.61, 0.16, 0.012, a1, key: 'bar', fx: 'pulse'))
+          ..add(text(o.title, 0.10, 0.34, 0.80, 0.26, 52, weight: FontWeight.w900, align: TextAlign.center, anim: tIn, key: 'title'))
+          ..add(text(o.subtitle, 0.14, 0.65, 0.72, 0.16, 24, color: st.muted, align: TextAlign.center, delay: 300, key: 'sub'));
       default:
         final points = o.bullets.isEmpty && o.subtitle.isNotEmpty ? [o.subtitle] : o.bullets;
         final hasArt = sideArt != null;
+        // Alternate the art side so the show keeps moving left and right.
+        final artLeft = i.isOdd && hasArt;
+        final textX = artLeft ? 0.40 : 0.07;
         els
-          ..add(shape(NgmySlideShapeKind.circle, 0.80, 0.52, 0.30, 0.54, _withAlpha(a2, 0x24)))
-          ..add(shape(NgmySlideShapeKind.rectangle, 0.0, 0.0, 0.012, 1.0, a1))
-          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.07, 0.08, hasArt ? 0.60 : 0.86, 0.16, 38, weight: FontWeight.w900, anim: tIn))
-          ..add(shape(NgmySlideShapeKind.rectangle, 0.07, 0.25, 0.12, 0.012, a1))
-          ..add(text(points.join('\n'), 0.07, 0.31, hasArt ? 0.58 : 0.70, 0.60, points.length > 4 ? 21 : 24, color: st.muted, bullets: true, anim: NgmySlideTransition.slideRight, delay: 250));
+          ..add(shape(NgmySlideShapeKind.circle, artLeft ? -0.10 : 0.80, 0.52, 0.30, 0.54, _withAlpha(a2, 0x24), key: 'orb2', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.circle, artLeft ? 0.86 : -0.12, -0.18, 0.26, 0.46, _withAlpha(a1, 0x1E), key: 'orb1', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.rectangle, artLeft ? 0.988 : 0.0, 0.0, 0.012, 1.0, a1, key: 'rail'))
+          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', textX, 0.08, hasArt ? 0.53 : 0.86, 0.16, 38, weight: FontWeight.w900, anim: tIn, key: 'title'))
+          ..add(shape(NgmySlideShapeKind.rectangle, textX, 0.25, 0.12, 0.012, a1, key: 'bar', fx: 'pulse'))
+          ..add(text(points.join('\n'), textX, 0.31, hasArt ? 0.53 : 0.70, 0.60, points.length > 4 ? 21 : 24, color: st.muted, bullets: true, anim: NgmySlideTransition.slideRight, delay: 250, key: 'sub'));
         if (hasArt) {
           final isPhoto = picture != null;
-          els.add(image(sideArt, isPhoto ? 0.67 : 0.70, isPhoto ? 0.22 : 0.26, isPhoto ? 0.29 : 0.24, isPhoto ? 0.56 : 0.44, anim: artIn, delay: 400));
+          final w = isPhoto ? 0.29 : 0.24;
+          final x = artLeft ? 0.06 : (isPhoto ? 0.67 : 0.70);
+          els.add(image(sideArt, x, isPhoto ? 0.22 : 0.26, w, isPhoto ? 0.56 : 0.44,
+              anim: artIn, delay: 400, key: isPhoto ? 'photo' : 'hero', fx: isPhoto ? '' : 'float3d'));
         }
+    }
+
+    // Your logo stays in the corner of every other slide (and grows into the
+    // centre on the first and last slides).
+    if (hasLogo && o.kind != 'title' && o.kind != 'closing') {
+      els.add(image(logo!, 0.885, 0.035, 0.085, 0.13, anim: NgmySlideTransition.fade, delay: 200, key: 'logo'));
     }
 
     slides.add(NgmySlide(
@@ -575,6 +643,8 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
   required String styleId,
   Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
   void Function(String status)? onStatus,
+  String? logo,
+  List<String> pictures = const [],
 }) async {
   onStatus?.call('Writing your $slideCount slides…');
   final outline = await _askForOutline(
@@ -582,7 +652,7 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
     fallbackStyle: styleId == 'auto' ? 'colorful' : styleId,
     failMessage: 'The AI could not write the slides. Try describing it again.',
   );
-  return _finishAiDeck(outline, extras, onStatus);
+  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures);
 }
 
 /// Changes a presentation the AI wrote: [request] is what the user typed.
@@ -593,6 +663,8 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
   required int currentSlide,
   Set<NgmySlidesAiExtra> extras = const {NgmySlidesAiExtra.animations},
   void Function(String status)? onStatus,
+  String? logo,
+  List<String> pictures = const [],
 }) async {
   onStatus?.call('Making your changes…');
   final current = ngmyParseSlidesAiOutline(outlineJson, fallbackStyle: 'colorful');
@@ -601,7 +673,7 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
     fallbackStyle: current?.style ?? 'colorful',
     failMessage: 'The AI could not make that change. Try saying it another way.',
   );
-  return _finishAiDeck(outline, extras, onStatus);
+  return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures);
 }
 
 Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallbackStyle, required String failMessage}) async {
@@ -622,13 +694,15 @@ Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallb
 }
 
 /// Downloads extras, builds the slides and remembers the outline for later changes.
-Future<NgmySlideDeck> _finishAiDeck(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras, void Function(String status)? onStatus) async {
+Future<NgmySlideDeck> _finishAiDeck(NgmySlidesAiOutline outline, Set<NgmySlidesAiExtra> extras, void Function(String status)? onStatus,
+    {String? logo, List<String> pictures = const []}) async {
   var assets = const <int, NgmySlidesAiAssets>{};
   if (extras.contains(NgmySlidesAiExtra.pictures) || extras.contains(NgmySlidesAiExtra.icons3d)) {
     onStatus?.call('Adding pictures and 3D art…');
-    assets = await ngmyFetchSlidesAiAssets(outline, extras);
+    // Your own pictures replace stock photos; 3D icons are still fetched.
+    assets = await ngmyFetchSlidesAiAssets(outline, pictures.isEmpty ? extras : ({...extras}..remove(NgmySlidesAiExtra.pictures)));
   }
-  final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets);
+  final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets, logo: logo, userPictures: pictures);
   deck
     ..aiOutlineJson = outline.toJsonString()
     ..aiSlideIds = deck.slides.map((s) => s.id).toList()
@@ -664,6 +738,9 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _descFocus = FocusNode();
   /// Non-stop: the show starts over after the last slide.
   bool _loop = false;
+  /// Your own logo and pictures (data URIs), used instead of made-up art.
+  String? _logo;
+  List<String> _pictures = [];
   bool _busy = false;
   String _status = '';
   int _count = 7;
@@ -685,10 +762,79 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
     super.dispose();
   }
 
+  static String _dataUri(List<int> bytes, String name) {
+    final lower = name.toLowerCase();
+    final mime = lower.endsWith('.png') ? 'image/png' : (lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+    return 'data:$mime;base64,${base64Encode(bytes)}';
+  }
+
+  Future<void> _pickLogo() async {
+    try {
+      final img = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 700, maxHeight: 700, imageQuality: 90);
+      if (img == null) return;
+      final bytes = await img.readAsBytes();
+      if (mounted) setState(() => _logo = _dataUri(bytes, img.name));
+    } catch (_) {}
+  }
+
+  Future<void> _pickPictures() async {
+    try {
+      final imgs = await ImagePicker().pickMultiImage(maxWidth: 1100, maxHeight: 1100, imageQuality: 78, limit: 12);
+      if (imgs.isEmpty) return;
+      final out = <String>[];
+      for (final img in imgs.take(12)) {
+        out.add(_dataUri(await img.readAsBytes(), img.name));
+      }
+      if (mounted) setState(() => _pictures = out);
+    } catch (_) {}
+  }
+
+  Widget _mediaButton({required IconData icon, required String label, String? thumb, required VoidCallback onTap, VoidCallback? onClear}) {
+    Widget? preview;
+    if (thumb != null && thumb.contains(',')) {
+      try {
+        preview = ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(base64Decode(thumb.split(',').last), width: 30, height: 30, fit: BoxFit.cover),
+        );
+      } catch (_) {}
+    }
+    return Material(
+      color: Colors.white.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: thumb == null ? Colors.white12 : const Color(0xFF22C55E).withValues(alpha: 0.6)),
+          ),
+          child: Row(
+            children: [
+              preview ?? Icon(icon, color: const Color(0xFF86EFAC), size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5))),
+              if (onClear != null)
+                GestureDetector(onTap: onClear, child: const Icon(Icons.close_rounded, color: Colors.white54, size: 18)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _create() async {
     final d = _desc.text.trim();
     if (d.length < 6) {
       setState(() => _error = 'Type a little about the presentation first.');
+      return;
+    }
+    // They asked for their logo but have not given it yet: ask for it.
+    if (_logo == null && RegExp(r'\blogo\b', caseSensitive: false).hasMatch(d)) {
+      setState(() => _error = 'You mentioned your logo — tap "Add your logo" below to upload it, so the AI puts the real one in.');
       return;
     }
     setState(() {
@@ -702,6 +848,8 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
         slideCount: _count,
         styleId: _style,
         extras: _extras,
+        logo: _logo,
+        pictures: _pictures,
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
@@ -798,6 +946,32 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accent)),
                   ),
+                ),
+                const SizedBox(height: 18),
+                // Your logo and your own pictures (optional).
+                Row(
+                  children: [
+                    Expanded(child: _mediaButton(
+                      icon: Icons.verified_rounded,
+                      label: _logo == null ? 'Add your logo' : 'Logo added',
+                      thumb: _logo,
+                      onTap: _pickLogo,
+                      onClear: _logo == null ? null : () => setState(() => _logo = null),
+                    )),
+                    const SizedBox(width: 10),
+                    Expanded(child: _mediaButton(
+                      icon: Icons.add_photo_alternate_rounded,
+                      label: _pictures.isEmpty ? 'Add your pictures' : '${_pictures.length} picture${_pictures.length == 1 ? '' : 's'}',
+                      thumb: _pictures.isEmpty ? null : _pictures.first,
+                      onTap: _pickPictures,
+                      onClear: _pictures.isEmpty ? null : () => setState(() => _pictures = []),
+                    )),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Your logo goes on every slide. Your pictures are used instead of stock photos.',
+                  style: TextStyle(color: Colors.white38, fontSize: 11.5),
                 ),
                 const SizedBox(height: 18),
                 const Text('How many slides?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
@@ -1008,6 +1182,8 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
         request: request,
         currentSlide: widget.currentSlide,
         extras: ngmySlidesAiExtrasOf(widget.deck),
+        logo: ngmySlidesAiLogoOf(widget.deck),
+        pictures: ngmySlidesAiPhotosOf(widget.deck),
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
@@ -1140,4 +1316,26 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
       ),
     );
   }
+}
+
+/// The logo used on an AI deck (so changes keep it).
+String? ngmySlidesAiLogoOf(NgmySlideDeck deck) {
+  for (final s in deck.slides) {
+    for (final e in s.elements) {
+      if (e.morphKey == 'logo' && (e.imageRef ?? '').isNotEmpty) return e.imageRef;
+    }
+  }
+  return null;
+}
+
+/// The photos already in an AI deck, in order (so changes keep them).
+List<String> ngmySlidesAiPhotosOf(NgmySlideDeck deck) {
+  final out = <String>[];
+  for (final s in deck.slides) {
+    for (final e in s.elements) {
+      final ref = e.imageRef ?? '';
+      if (e.morphKey == 'photo' && ref.isNotEmpty && !out.contains(ref)) out.add(ref);
+    }
+  }
+  return out;
 }

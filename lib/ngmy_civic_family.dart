@@ -443,6 +443,7 @@ class _FamilyEditorSheetState extends State<_FamilyEditorSheet> {
       spouse ? (status == 'married' ? 'Spouse' : 'Former spouse ($status)') : (status == 'married' ? 'Child · married' : 'Child'),
       if (g.isNotEmpty) g == 'male' ? 'Male' : 'Female',
       if ('${r['dob'] ?? ''}'.trim().isNotEmpty) 'Born ${r['dob']}' else if (age != null && '$age'.isNotEmpty) 'Age $age',
+      if ('${r['address'] ?? ''}'.trim().isNotEmpty) 'Lives at ${r['address']}',
       if (_splitOff(r)) 'Own family (${r['ownRegistryId']})',
       if (!spouse && status == 'married' && (r['relatives'] is List) && (r['relatives'] as List).isNotEmpty) '${(r['relatives'] as List).length} in their family',
     ];
@@ -487,6 +488,8 @@ class _RelativeDialogState extends State<_RelativeDialog> {
   late final _age = TextEditingController(text: widget.existing?['age'] == null ? '' : '${widget.existing!['age']}');
   late final _phone = TextEditingController(text: '${widget.existing?['phone'] ?? ''}');
   late final _email = TextEditingController(text: '${widget.existing?['email'] ?? ''}');
+  late final _address = TextEditingController(text: '${widget.existing?['address'] ?? ''}');
+  late bool _livesElsewhere = '${widget.existing?['address'] ?? ''}'.trim().isNotEmpty;
   late String _idType = () {
     final v = '${widget.existing?['idType'] ?? ''}'.trim();
     return kNgmyCivicIdTypes.contains(v) ? v : 'National ID';
@@ -509,6 +512,7 @@ class _RelativeDialogState extends State<_RelativeDialog> {
     _age.dispose();
     _phone.dispose();
     _email.dispose();
+    _address.dispose();
     super.dispose();
   }
 
@@ -555,6 +559,7 @@ class _RelativeDialogState extends State<_RelativeDialog> {
       if (widget.home.askIdType) 'idType': _idType,
       if (widget.home.askEmail) 'email': email,
       'status': _status,
+      'address': !_spouse && _livesElsewhere ? _address.text.trim() : '',
     };
     if (!_spouse && _status == 'married' && widget.allowNested) {
       out['relatives'] = ngmyCivicAlignSpouses(gender, _nested);
@@ -648,7 +653,7 @@ class _RelativeDialogState extends State<_RelativeDialog> {
                 const SizedBox(height: 12),
                 TextField(controller: _email, keyboardType: TextInputType.emailAddress, decoration: deco('Email (optional)')),
               ],
-              if (where.isNotEmpty) ...[
+              if (!_livesElsewhere && where.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -662,6 +667,37 @@ class _RelativeDialogState extends State<_RelativeDialog> {
                     ),
                   ],
                 ),
+              ],
+              // Optional: a child who doesn't live with the parents.
+              if (!_spouse) ...[
+                const SizedBox(height: 8),
+                if (!_livesElsewhere)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _livesElsewhere = true),
+                      icon: const Icon(Icons.add_location_alt_rounded, size: 18),
+                      label: const Text('Lives somewhere else? Add their address', style: TextStyle(fontWeight: FontWeight.w800)),
+                    ),
+                  )
+                else ...[
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _address,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: deco('Where this child lives (optional)', hint: 'Street, city'),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: () => setState(() {
+                        _livesElsewhere = false;
+                        _address.clear();
+                      }),
+                      child: const Text('Lives with the parents'),
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(height: 14),
               Text(_spouse ? 'Status' : 'Is this child married?', style: const TextStyle(fontWeight: FontWeight.w800)),
