@@ -50,6 +50,8 @@ import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_modern_chat_icon.dart';
+import 'ngmy_arcade_games.dart';
+import 'ngmy_arcade_host.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -19172,7 +19174,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     super.dispose();
   }
 
-  final List<_GameDef> _games = const [
+  static const List<_GameDef> _baseGames = [
     _GameDef(id: 'dice', title: 'Dice Roll', subtitle: 'Roll for cash & prizes!', emoji: '🎲', icon: Icons.casino_rounded, colors: [Color(0xFF6D28D9), Color(0xFF7C3AED)]),
     _GameDef(id: 'puzzle', title: '8-Puzzle Solver', subtitle: 'Solve puzzle, win up to \$10', emoji: '🧩', icon: Icons.grid_view_rounded, colors: [Color(0xFF0EA5E9), Color(0xFF1D4ED8)]),
     _GameDef(id: 'typing', title: 'Sentence Typing', subtitle: 'Type sentences — solo or invite a friend', emoji: '⌨️', icon: Icons.keyboard_rounded, colors: [Color(0xFF16A34A), Color(0xFF2563EB)]),
@@ -19183,6 +19185,13 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
     _GameDef(id: 'sequence', title: 'Number Sequence', subtitle: 'Find patterns, win rewards', emoji: '🔢', icon: Icons.numbers_rounded, colors: [Color(0xFF2563EB), Color(0xFF4F46E5)]),
     _GameDef(id: 'checkers_deluxe', title: 'Checkers Deluxe', subtitle: 'Wood board — play solo or invite a friend', emoji: '⚫', icon: Icons.grid_on_rounded, colors: [Color(0xFF8B4513), Color(0xFF5D4037)]),
     _GameDef(id: 'tic_tac_go', title: 'Tic Tac Go', subtitle: '3 in a row — real-time multiplayer', emoji: '❌', icon: Icons.close_rounded, colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)]),
+  ];
+
+  /// The original games, then the 20 arcade money games.
+  final List<_GameDef> _games = [
+    ..._baseGames,
+    for (final a in kNgmyArcadeGames)
+      _GameDef(id: a.id, title: a.title, subtitle: a.subtitle, emoji: a.emoji, icon: a.icon, colors: a.colors),
   ];
 
   void _sendInvite(_GameDef g, String toAccountId, int matchesTotal) async {
@@ -19841,6 +19850,24 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
       ),
     );
     widget.onDataChanged();
+    if (kNgmyArcadeGameIds.contains(widget.gameId)) {
+      // The 20 arcade games: same stake, payout and receipts, own play screen.
+      NgmyNavigator.push(
+        context,
+        NgmyArcadePlayScreen(
+          user: widget.user,
+          config: widget.config,
+          gameId: widget.gameId,
+          gameTitle: widget.gameTitle,
+          colors: widget.colors,
+          wager: wager,
+          onAddTransaction: widget.onAddTransaction,
+          onDataChanged: widget.onDataChanged,
+        ),
+        routeName: kRouteGamePlay,
+      );
+      return;
+    }
     NgmyNavigator.push(
       context,
       GamePlayScreen(
