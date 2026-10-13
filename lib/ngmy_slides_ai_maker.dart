@@ -661,6 +661,9 @@ class _SlidesAiMakerSheet extends StatefulWidget {
 
 class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _desc = TextEditingController();
+  final _descFocus = FocusNode();
+  /// Non-stop: the show starts over after the last slide.
+  bool _loop = false;
   bool _busy = false;
   String _status = '';
   int _count = 7;
@@ -678,6 +681,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   @override
   void dispose() {
     _desc.dispose();
+    _descFocus.dispose();
     super.dispose();
   }
 
@@ -702,6 +706,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
           if (mounted) setState(() => _status = s);
         },
       );
+      deck.loop = _loop;
       if (mounted) Navigator.of(context).pop(deck);
     } catch (e) {
       if (mounted) {
@@ -748,19 +753,27 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                   style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
                 ),
                 const SizedBox(height: 18),
-                // The mic stays here but is switched off — the AI works from typing.
+                // Green mic (no recording — the AI works from typing). Tapping it
+                // just puts the cursor in the box below.
                 Center(
-                  child: Tooltip(
-                    message: 'Voice is off — type your idea below',
+                  child: GestureDetector(
+                    onTap: () => _descFocus.requestFocus(),
                     child: Container(
-                      width: 72,
-                      height: 72,
+                      width: 84,
+                      height: 84,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.06),
-                        border: Border.all(color: Colors.white12),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF4ADE80), Color(0xFF16A34A), Color(0xFF15803D)],
+                        ),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
+                        boxShadow: [
+                          BoxShadow(color: const Color(0xFF22C55E).withValues(alpha: 0.5), blurRadius: 24, spreadRadius: 2),
+                        ],
                       ),
-                      child: const Icon(Icons.mic_off_rounded, color: Colors.white30, size: 32),
+                      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 40),
                     ),
                   ),
                 ),
@@ -768,11 +781,12 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 const Text(
                   'Type your presentation below',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w700, fontSize: 12),
+                  style: TextStyle(color: Color(0xFF86EFAC), fontWeight: FontWeight.w800, fontSize: 12),
                 ),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _desc,
+                  focusNode: _descFocus,
                   minLines: 3,
                   maxLines: 6,
                   style: const TextStyle(color: Colors.white, height: 1.35),
@@ -831,6 +845,22 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                     for (final s in kNgmySlidesAiStyles)
                       _styleChip(s.id, s.label, s.icon, [Color(s.backgrounds.first.$1), Color(s.backgrounds.first.$2)]),
                   ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _loop ? const Color(0xFF22C55E).withValues(alpha: 0.5) : Colors.white12),
+                  ),
+                  child: SwitchListTile(
+                    value: _loop,
+                    onChanged: (v) => setState(() => _loop = v),
+                    activeThumbColor: const Color(0xFF22C55E),
+                    secondary: const Icon(Icons.all_inclusive_rounded, color: Color(0xFF86EFAC)),
+                    title: const Text('Non-stop (loop)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    subtitle: const Text('After the last slide it starts again from the first', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  ),
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 14),

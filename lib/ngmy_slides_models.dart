@@ -333,6 +333,7 @@ class NgmySlideDeck {
     this.signatureInkColor,
     this.kiapoSignedAt,
     this.cinematic = false,
+    this.loop = false,
     this.aiOutlineJson,
     this.aiSlideIds,
     this.aiExtras,
@@ -368,6 +369,8 @@ class NgmySlideDeck {
   String? kiapoSignedAt;
   /// Video motion: slides glide into each other and drift slowly, like a video.
   bool cinematic;
+  /// Non-stop: after the last slide the show starts again from the first.
+  bool loop;
   /// The AI's outline (JSON) for slides it wrote, so "Tell the AI" can change them.
   String? aiOutlineJson;
   /// Which slides came from that outline (replaced when the AI changes them).
@@ -420,6 +423,7 @@ class NgmySlideDeck {
         signatureInkColor: signatureInkColor,
         kiapoSignedAt: kiapoSignedAt,
         cinematic: cinematic,
+        loop: loop,
         aiOutlineJson: aiOutlineJson,
         aiSlideIds: aiSlideIds == null ? null : List.of(aiSlideIds!),
         aiExtras: aiExtras == null ? null : List.of(aiExtras!),
@@ -444,6 +448,7 @@ class NgmySlideDeck {
         if (signatureInkColor != null) 'signatureInkColor': signatureInkColor,
         if (kiapoSignedAt != null && kiapoSignedAt!.trim().isNotEmpty) 'kiapoSignedAt': kiapoSignedAt,
         if (cinematic) 'cinematic': true,
+        if (loop) 'loop': true,
         if (aiMade) 'aiOutlineJson': aiOutlineJson,
         if (aiSlideIds != null) 'aiSlideIds': aiSlideIds,
         if (aiExtras != null) 'aiExtras': aiExtras,
@@ -466,6 +471,7 @@ class NgmySlideDeck {
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         kiapoSignedAt: json['kiapoSignedAt']?.toString(),
         cinematic: json['cinematic'] == true,
+        loop: json['loop'] == true,
         aiOutlineJson: json['aiOutlineJson']?.toString(),
         aiSlideIds: (json['aiSlideIds'] as List?)?.map((e) => '$e').toList(),
         aiExtras: (json['aiExtras'] as List?)?.map((e) => '$e').toList(),

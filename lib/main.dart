@@ -14662,13 +14662,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   final newStatus = approve ? TransactionStatus.approved : TransactionStatus.rejected;
                   await NgmyWalletDecisionLedger.record(t.id, newStatus.index);
                   _walletDecisionLedger[t.id] = newStatus.index;
-                  await NgmyWalletDecisionLedger.recordCloud(
+                  // Apply the decision right away; the cloud ledger write used to
+                  // be awaited first and a slow connection left Approve stuck.
+                  unawaited(NgmyWalletDecisionLedger.recordCloud(
                     transactionId: t.id,
                     statusIndex: newStatus.index,
                     userEmail: t.userEmail,
                     amount: t.amount,
                     typeIndex: t.type.index,
-                  );
+                  ).timeout(const Duration(seconds: 20), onTimeout: () => false).catchError((_) => false));
                   setState(() {
                     t.status = newStatus;
                     var targetIndex = _allUsers.indexWhere(
@@ -14775,7 +14777,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   }
                   await _persistLocalOnly();
                   final syncedUserCopy = syncedUser;
-                  final cloudSynced = await _syncWalletApprovalInBackground(t, syncedUserCopy);
+                  final cloudSynced = await _syncWalletApprovalInBackground(t, syncedUserCopy)
+                      .timeout(const Duration(seconds: 25), onTimeout: () => false)
+                      .catchError((_) => false);
                   if (mounted) {
                     final label = approve ? 'approved' : 'rejected';
                     ScaffoldMessenger.of(context).showSnackBar(

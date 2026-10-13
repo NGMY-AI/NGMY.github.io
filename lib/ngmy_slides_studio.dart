@@ -925,7 +925,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         ..aiOutlineJson = made.aiOutlineJson
         ..aiSlideIds = made.aiSlideIds
         ..aiExtras = made.aiExtras
-        ..cinematic = deck.cinematic || made.cinematic;
+        ..cinematic = deck.cinematic || made.cinematic
+        ..loop = deck.loop || made.loop;
       _selectedElementId = null;
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3784,12 +3785,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   if (d == null) return;
                   _mutate(() => d.cinematic = !d.cinematic);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d.cinematic ? 'Video motion on — press Play to watch it like a video.' : 'Video motion off.')));
+                case 'loop':
+                  final d = _activeDeck;
+                  if (d == null) return;
+                  _mutate(() => d.loop = !d.loop);
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d.loop ? 'Non-stop on — the show starts over after the last slide.' : 'Non-stop off — the show stops on the last slide.')));
               }
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'share', child: Text('Share text outline')),
               PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
               PopupMenuItem(value: 'motion', child: Text('Video motion: ${(_activeDeck?.cinematic ?? false) ? 'On' : 'Off'}')),
+              PopupMenuItem(value: 'loop', child: Text('Non-stop loop: ${(_activeDeck?.loop ?? false) ? 'On' : 'Off'}')),
             ],
           ),
           const SizedBox(width: 4),
@@ -6003,7 +6010,8 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
     final seconds = widget.deck.durationForSlide(_index).clamp(1, 120);
     _autoTimer = Timer(Duration(seconds: seconds), () {
       if (!mounted || !_autoPlaying) return;
-      if (_index < widget.deck.slides.length - 1) {
+      // Non-stop decks go back to the first slide after the last one.
+      if (_index < widget.deck.slides.length - 1 || widget.deck.loop) {
         _next();
       }
     });
@@ -6019,10 +6027,12 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   }
 
   void _next() {
-    if (_index < widget.deck.slides.length - 1) {
+    final n = widget.deck.slides.length;
+    if (_index < n - 1 || (widget.deck.loop && n > 1)) {
+      final to = (_index + 1) % n;
       setState(() {
-        _lastTransition = widget.deck.slides[_index + 1].transition;
-        _index++;
+        _lastTransition = widget.deck.slides[to].transition;
+        _index = to;
         _glide++;
         _back = false;
       });
@@ -6031,10 +6041,12 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> {
   }
 
   void _prev() {
-    if (_index > 0) {
+    final n = widget.deck.slides.length;
+    if (_index > 0 || (widget.deck.loop && n > 1)) {
+      final from = _index;
       setState(() {
-        _lastTransition = widget.deck.slides[_index].transition;
-        _index--;
+        _lastTransition = widget.deck.slides[from].transition;
+        _index = (_index - 1 + n) % n;
         _glide++;
         _back = true;
       });

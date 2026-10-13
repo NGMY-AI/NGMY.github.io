@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
 import 'ngmy_db_relay.dart';
+import 'ngmy_gi_deposit_page.dart';
 import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_feature_sync_session.dart';
@@ -1871,12 +1872,11 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   void _openDepositPaymentPage(double amount) {
     NgmyNavigator.push(
       context,
-      SubmitPaymentPage(
+      NgmyGiDepositPage(
         user: widget.user,
         amount: amount,
         onAdd: _submitDeposit,
         config: widget.config,
-        requestTitle: 'Submit Deposit',
         successHint:
             'Your deposit is pending. Admin will verify your payment proof and credit your balance.',
       ),
@@ -2182,96 +2182,178 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     );
   }
 
+  // The Deposit / Withdraw box: a big amount like a banking app, quick picks,
+  // and for withdrawals the Cash App tag and a clear fee breakdown.
   Widget _moneyForm() {
     final deposit = _view == 0;
-    final fieldBg = Colors.white.withValues(alpha: 0.05);
-    final fieldBorder = Colors.white.withValues(alpha: 0.10);
-    InputDecoration deco(String hint, {String? prefix}) => InputDecoration(
-          filled: true,
-          fillColor: fieldBg,
-          hintText: hint,
-          prefixText: prefix,
-          prefixStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontWeight: FontWeight.w700),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: fieldBorder)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _green.withValues(alpha: 0.6))),
+    final a = double.tryParse(_amt.text) ?? 0;
+    final accent = deposit ? _green : const Color(0xFF60A5FA);
+    final hasAmount = a > 0;
+
+    Widget quick(num v) {
+      final on = _amt.text == '$v';
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              setState(() => _amt.text = '$v');
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: on ? accent.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.04),
+                border: Border.all(color: on ? accent.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.08)),
+              ),
+              child: Text('\$$v', style: TextStyle(fontWeight: FontWeight.w900, color: on ? accent : Colors.white70, fontSize: 13)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget line(String label, String value, {Color? color, bool bold = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 12.5, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text(value, style: TextStyle(color: color ?? Colors.white, fontSize: bold ? 15 : 13, fontWeight: bold ? FontWeight.w900 : FontWeight.w700)),
+            ],
+          ),
         );
+
     return Container(
       key: ValueKey('form$_view'),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        color: _panel,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))],
+        borderRadius: BorderRadius.circular(26),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [accent.withValues(alpha: 0.10), _panel, _panel],
+          stops: const [0, 0.45, 1],
+        ),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 22, offset: const Offset(0, 10))],
       ),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            deposit ? 'How much are you adding?' : 'How much are you taking out?',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: accent.withValues(alpha: 0.15)),
+                child: Icon(deposit ? Icons.south_west_rounded : Icons.north_east_rounded, color: accent, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  deposit ? 'Add money' : 'Take money out',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(99)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.attach_money_rounded, size: 14, color: accent),
+                    Text('Cash App', style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontWeight: FontWeight.w800, fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 18),
+          // Big amount, centred.
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('\$', style: TextStyle(color: hasAmount ? accent : Colors.white38, fontWeight: FontWeight.w900, fontSize: 26)),
+              ),
+              const SizedBox(width: 4),
+              IntrinsicWidth(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 90),
+                  child: TextField(
+                    controller: _amt,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+                    textAlign: TextAlign.center,
+                    cursorColor: accent,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 44, letterSpacing: -1, height: 1.1),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: '0',
+                      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2), fontWeight: FontWeight.w900, fontSize: 44),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 3,
+              width: hasAmount ? 120 : 60,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(99), gradient: LinearGradient(colors: [accent.withValues(alpha: 0), accent, accent.withValues(alpha: 0)])),
+            ),
+          ),
+          const SizedBox(height: 8),
           Text(
             deposit
-                ? 'Send your payment, upload proof, and admin credits your wallet.'
-                : 'Admin sends it to your Cash App. A 15% fee applies · minimum \$${formatCurrency(kNgmyMinimumWithdrawalAmount)}.',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.35),
+                ? 'Pay NGMY Pay, add your screenshot, and admin credits your wallet.'
+                : 'Minimum \$${formatCurrency(kNgmyMinimumWithdrawalAmount)} · admin sends it to your Cash App.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.35),
           ),
           const SizedBox(height: 14),
-          TextField(
-            controller: _amt,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 30),
-            decoration: deco('0.00', prefix: '\$ '),
-            onChanged: (_) => setState(() {}),
-          ),
-          if (deposit) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (final v in const [10, 50, 100, 200])
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: GestureDetector(
-                        onTap: () => setState(() => _amt.text = v.toString()),
-                        child: Container(
-                          height: 40,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: _amt.text == '$v' ? _green.withValues(alpha: 0.16) : fieldBg,
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(color: _amt.text == '$v' ? _green.withValues(alpha: 0.6) : fieldBorder),
-                          ),
-                          child: Text('\$$v', style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white)),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ] else ...[
-            const SizedBox(height: 12),
+          Row(children: [for (final v in deposit ? const [10, 50, 100, 200] : const [25, 50, 100, 250]) quick(v)]),
+          if (!deposit) ...[
+            const SizedBox(height: 14),
             TextField(
               controller: _cashAppTag,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
-              decoration: deco('YourCashTag', prefix: '\$ ').copyWith(labelText: 'Your Cash App tag', labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6))),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.04),
+                prefixIcon: Icon(Icons.attach_money_rounded, color: accent),
+                hintText: 'Your Cash App tag',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.35), fontWeight: FontWeight.w700),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: accent)),
+              ),
             ),
-            Builder(builder: (_) {
-              final a = double.tryParse(_amt.text) ?? 0;
-              if (a <= 0) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'You receive \$${formatCurrency(a * 0.85)} after the \$${formatCurrency(a * 0.15)} fee',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: _green, fontWeight: FontWeight.w800, fontSize: 12),
+            if (hasAmount) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  children: [
+                    line('Amount', '\$${formatCurrency(a)}'),
+                    line('Fee (15%)', '− \$${formatCurrency(a * 0.15)}', color: const Color(0xFFFCA5A5)),
+                    Divider(color: Colors.white.withValues(alpha: 0.08), height: 14),
+                    line('You receive', '\$${formatCurrency(a * 0.85)}', color: _green, bold: true),
+                  ],
                 ),
-              );
-            }),
+              ),
+            ],
           ],
           const SizedBox(height: 16),
           SizedBox(
@@ -2279,13 +2361,18 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
             child: DecoratedBox(
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(18),
-                gradient: const LinearGradient(colors: [Color(0xFF10B981), _emerald]),
-                boxShadow: [BoxShadow(color: _emerald.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
+                gradient: LinearGradient(colors: deposit ? const [Color(0xFF10B981), _emerald] : const [Color(0xFF3B82F6), Color(0xFF1D4ED8)]),
+                boxShadow: [BoxShadow(color: (deposit ? _emerald : const Color(0xFF1D4ED8)).withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
               ),
               child: ElevatedButton.icon(
                 onPressed: deposit ? _startDeposit : _withdraw,
                 icon: Icon(deposit ? Icons.add_circle_outline_rounded : Icons.send_rounded, size: 20),
-                label: Text(deposit ? 'Deposit funds' : 'Request withdrawal', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                label: Text(
+                  deposit
+                      ? (hasAmount ? 'Deposit \$${formatCurrency(a)}' : 'Deposit funds')
+                      : (hasAmount ? 'Withdraw \$${formatCurrency(a)}' : 'Request withdrawal'),
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,

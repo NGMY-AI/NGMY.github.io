@@ -120,6 +120,12 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     try {
       await widget.onProcess(t, approve);
       if (mounted) setState(() {});
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not ${approve ? 'approve' : 'reject'}: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
       if (mounted) setState(() => _processingTxnId = null);
     }
@@ -319,143 +325,214 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     return UserData(email: t.userEmail, username: t.userEmail.split('@').first);
   }
 
+  // A deposit to review: who, how much, the code to match in the payment note,
+  // and the payment screenshot shown large right in the card (tap = full screen).
   Widget _depositCard(AppTransaction t, bool isDark, {bool showActions = true, bool archived = false}) {
     final user = _userFor(t);
     final isInvestment = isInvestmentRequestDetails(t.sourceDetails);
     final meta = parseInvestmentRequestDetails(t.sourceDetails);
     final pending = t.status == TransactionStatus.pending;
+    final busy = _processingTxnId == t.id;
+    final proof = (t.screenshotPath ?? '').trim();
+    final statusColor = t.status == TransactionStatus.approved
+        ? const Color(0xFF00B25A)
+        : (t.status == TransactionStatus.rejected ? Colors.redAccent : const Color(0xFFF59E0B));
+    final card = isDark ? const Color(0xFF161A26) : Colors.white;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : Colors.black54;
+    final code = (t.verificationCode ?? '').trim();
+    final payer = isInvestment ? (meta['payer'] ?? '') : (t.sourceDetails ?? '');
+    final when = '${t.timestamp.month}/${t.timestamp.day} · ${t.timestamp.hour.toString().padLeft(2, '0')}:${t.timestamp.minute.toString().padLeft(2, '0')}';
+
+    Widget info(IconData icon, String label, String value, {Color? color}) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: muted),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(color: muted, fontSize: 12, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color ?? ink, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        );
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: pending ? Colors.orange.withValues(alpha: 0.5) : (isDark ? Colors.white10 : const Color(0xFFE5E7EB))),
+        color: card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: statusColor.withValues(alpha: pending ? 0.55 : 0.3), width: 1.4),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08), blurRadius: 18, offset: const Offset(0, 8))],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: t.status == TransactionStatus.approved
-                  ? const Color(0xFF00B25A)
-                  : (t.status == TransactionStatus.rejected ? Colors.redAccent : Colors.orange),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
-            ),
+          // Who and how much.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
             child: Row(
               children: [
-                CircleAvatar(backgroundColor: Colors.white24, child: Text(user.username.isNotEmpty ? user.username[0].toUpperCase() : '?', style: const TextStyle(color: Colors.white))),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('@${user.username}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                  ]),
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: statusColor.withValues(alpha: 0.15),
+                  child: Text(
+                    user.username.isNotEmpty ? user.username[0].toUpperCase() : '?',
+                    style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 18),
+                  ),
                 ),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text('\$${formatCurrency(t.amount)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                  Text('${t.status.name.toUpperCase()}${archived ? ' · ARCHIVE' : ''}', style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold)),
-                ]),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('@${user.username}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 15)),
+                      Text(user.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('\$${formatCurrency(t.amount)}', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 22)),
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(99)),
+                      child: Text(
+                        '${t.status.name.toUpperCase()}${archived ? ' · ARCHIVE' : ''}',
+                        style: TextStyle(color: statusColor, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Builder(builder: (context) {
-                  final proof = (t.screenshotPath ?? '').trim();
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (isInvestment)
-                              Text(
-                                'Investment: ${meta['plan'] ?? ''} · \$${meta['amount'] ?? ''}',
-                                style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? Colors.orangeAccent : Colors.orange.shade800, fontSize: 12),
-                              )
-                            else
-                              Text(
-                                'Method: ${t.method.name.toUpperCase()} · ${t.sourceDetails ?? 'N/A'}',
-                                style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black87),
-                              ),
-                            if (t.verificationCode != null && t.verificationCode!.trim().isNotEmpty) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                'Code: ${t.verificationCode}',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: isDark ? Colors.purpleAccent : Colors.purple),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      if (proof.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: TextButton(
-                            onPressed: () => _openDepositScreenshot(proof),
-                            style: TextButton.styleFrom(
-                              foregroundColor: isDark ? Colors.greenAccent : const Color(0xFF15803D),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            child: const Text('View proof', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
-                          ),
-                        )
-                      else if (!pending && t.status == TransactionStatus.approved && !isInvestment)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8, top: 2),
-                          child: Text(
-                            'Proof expired',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: isDark ? Colors.white38 : Colors.black38),
-                          ),
-                        )
-                      else if (pending && !isInvestment)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8, top: 2),
-                          child: Text(
-                            'No proof',
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.orange.shade800),
-                          ),
-                        ),
-                    ],
-                  );
-                }),
-                if (showActions && pending) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(onPressed: _processingTxnId == t.id ? null : () => _process(t, false), child: Text(_processingTxnId == t.id ? '…' : 'REJECT')),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: _processingTxnId == t.id ? null : () => _process(t, true),
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                        child: Text(_processingTxnId == t.id ? 'SAVING…' : 'APPROVE'),
-                      ),
-                    ],
-                  ),
-                ] else if (showActions && !pending && !archived) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => widget.onArchiveRemove(t),
-                      icon: const Icon(Icons.archive_outlined, size: 16),
-                      label: const Text('Archive & remove'),
-                    ),
-                  ),
-                ],
+                if (isInvestment) info(Icons.trending_up_rounded, 'Investment', '${meta['plan'] ?? ''} · \$${meta['amount'] ?? ''}', color: Colors.orange),
+                info(t.method == PaymentMethod.bitcoin ? Icons.currency_bitcoin : Icons.attach_money_rounded, t.method == PaymentMethod.bitcoin ? 'Paid by Bitcoin' : 'Paid from Cash App', payer.isEmpty ? '—' : payer),
+                if (code.isNotEmpty) info(Icons.tag_rounded, 'Code in payment note', code, color: const Color(0xFF8B5CF6)),
+                info(Icons.schedule_rounded, 'Sent', when),
               ],
             ),
           ),
+          // The payment screenshot, big enough to read.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: proof.isNotEmpty
+                ? GestureDetector(
+                    onTap: () => _openDepositScreenshot(proof),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        color: Colors.black,
+                        constraints: const BoxConstraints(minHeight: 160, maxHeight: 420),
+                        width: double.infinity,
+                        child: Stack(
+                          children: [
+                            Center(child: NgmyPaymentProofImage(path: proof)),
+                            Positioned(
+                              right: 10,
+                              bottom: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(99)),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.zoom_out_map_rounded, color: Colors.white, size: 14),
+                                    SizedBox(width: 5),
+                                    Text('Tap to enlarge', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.04),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.image_not_supported_outlined, size: 18, color: muted),
+                        const SizedBox(width: 8),
+                        Text(
+                          !pending && t.status == TransactionStatus.approved ? 'Proof expired' : (isInvestment ? 'No screenshot needed' : 'No screenshot attached'),
+                          style: TextStyle(color: muted, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          if (showActions && pending)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: busy ? null : () => _process(t, false),
+                      icon: const Icon(Icons.close_rounded, size: 18),
+                      label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w900)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent),
+                        minimumSize: const Size(0, 50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton.icon(
+                      onPressed: busy ? null : () => _process(t, true),
+                      icon: busy
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.check_rounded, size: 20),
+                      label: Text(busy ? 'Saving…' : 'Approve \$${formatCurrency(t.amount)}', style: const TextStyle(fontWeight: FontWeight.w900)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00B25A),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF00B25A).withValues(alpha: 0.5),
+                        disabledForegroundColor: Colors.white,
+                        minimumSize: const Size(0, 50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (showActions && !pending && !archived)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => widget.onArchiveRemove(t),
+                  icon: const Icon(Icons.archive_outlined, size: 16),
+                  label: const Text('Archive & remove'),
+                ),
+              ),
+            ),
         ],
       ),
     );
