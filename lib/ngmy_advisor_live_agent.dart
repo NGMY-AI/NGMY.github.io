@@ -5,6 +5,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_advisor_live_view.dart';
@@ -865,6 +866,8 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
                             ),
                           ),
                         )
+                      : r.liveUrl.isNotEmpty && ngmyLiveViewOnOwnScreen
+                      ? _NgmyLiveStepsPreview(run: r, onWatch: () => ngmyOpenAdvisorLiveFullscreen(context, r))
                       : r.liveUrl.isNotEmpty
                       ? NgmyAdvisorLiveView(key: ValueKey('${r.liveUrl}#${r.viewNonce}'), url: r.liveUrl)
                       : ColoredBox(
@@ -899,6 +902,77 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Phones (web app): the live browser video is shown on its own full screen, not inside
+/// the chat. Streaming it under the chat's glass, animations and messages used so much
+/// memory that iPhones killed and reloaded the app during browser tasks.
+bool get ngmyLiveViewOnOwnScreen =>
+    kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android);
+
+/// What the advisor is doing right now, step by step, with a button to watch it live.
+class _NgmyLiveStepsPreview extends StatelessWidget {
+  const _NgmyLiveStepsPreview({required this.run, required this.onWatch});
+  final NgmyAdvisorAgentRun run;
+  final VoidCallback onWatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = run.steps.length > 4 ? run.steps.sublist(run.steps.length - 4) : run.steps;
+    final host = Uri.tryParse(run.pageUrl)?.host ?? '';
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)]),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (host.isNotEmpty)
+            Row(children: [
+              const Icon(Icons.lock_rounded, size: 13, color: Colors.white38),
+              const SizedBox(width: 4),
+              Expanded(child: Text(host, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 12))),
+            ]),
+          const SizedBox(height: 6),
+          Expanded(
+            child: steps.isEmpty
+                ? Center(child: Text(run.running ? 'Getting started…' : 'Ready', style: const TextStyle(color: Colors.white54, fontSize: 13)))
+                : ListView(
+                    padding: EdgeInsets.zero,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      for (var i = 0; i < steps.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Icon(
+                              i == steps.length - 1 && run.running ? Icons.radio_button_checked_rounded : Icons.check_circle_rounded,
+                              size: 15,
+                              color: i == steps.length - 1 && run.running ? const Color(0xFF60A5FA) : const Color(0xFF4ADE80),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(steps[i].text, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, height: 1.3)),
+                            ),
+                          ]),
+                        ),
+                    ],
+                  ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onWatch,
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFF2563EB), padding: const EdgeInsets.symmetric(vertical: 11)),
+              icon: const Icon(Icons.live_tv_rounded, size: 18),
+              label: const Text('Watch live · tap in to sign in', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ],
       ),
     );
   }

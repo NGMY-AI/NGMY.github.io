@@ -116,8 +116,8 @@ const _categoryArt = <String, _CategoryArt>{
   ),
   'Where I Put It': _CategoryArt(
     icon: Icons.place_rounded,
-    accent: Color(0xFFA78BFA),
-    gradient: [Color(0xFF7C3AED), Color(0xFFA78BFA)],
+    accent: Color(0xFF818CF8),
+    gradient: [Color(0xFF4338CA), Color(0xFF6366F1)],
   ),
   'Paint Mix': _CategoryArt(
     icon: Icons.palette_outlined,
@@ -438,6 +438,20 @@ class _BusinessEssentialsHubState extends State<_BusinessEssentialsHub> {
   }
 }
 
+/// One line under each category name.
+const _categoryBlurb = <String, String>{
+  'Notes': 'Ideas, lists & plans',
+  'Where I Put It': 'Never lose a thing',
+  'Contacts': 'People you work with',
+  'Medicines': 'Doses & reminders',
+  'Site Map': 'Saved places',
+  'Quick Tasks': 'Get things done',
+  'Hotlines': 'Help numbers',
+  'Paint Mix': 'Your color recipes',
+  'Bible Dictionary': 'Words & meanings',
+  'Quick Dial': 'Call in one tap',
+};
+
 class _CompactCategoryCard extends StatelessWidget {
   const _CompactCategoryCard({
     required this.title,
@@ -460,57 +474,149 @@ class _CompactCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final art = _categoryArt[title]!;
-    return NgmyToolkitAliveSection(
-      colors: art.gradient,
-      pulse: pulse,
-      scan: scan,
-      orbit: orbit,
-      phase: phase,
-      padding: const EdgeInsets.all(10),
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          NgmyHudMiniOrb(
-            colors: art.gradient,
-            pulse: pulse,
-            orbit: orbit + phase,
-            size: 48,
-            icon: art.icon,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: NgmyHudInk.title(context),
-              fontWeight: FontWeight.w900,
-              fontSize: 12.5,
-              height: 1.15,
+    final c1 = art.gradient.first, c2 = art.gradient.last;
+    final deep = Color.lerp(c1, Colors.black, 0.35)!;
+    // A soft band of light drifts across each card, a little out of step with the others.
+    final sweep = ((scan + phase) % 1.0) * 2.6 - 0.8;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [c2, c1, deep],
+              stops: const [0, 0.55, 1],
             ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
+            boxShadow: [
+              BoxShadow(color: c1.withValues(alpha: 0.28 + pulse * 0.08), blurRadius: 16, offset: const Offset(0, 8)),
+            ],
           ),
-          if (count > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: 5),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: art.accent.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    color: art.accent,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 10,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: Stack(
+              children: [
+                // Big faint icon in the corner.
+                Positioned(
+                  right: -14,
+                  bottom: -18,
+                  child: Transform.rotate(
+                    angle: -0.18,
+                    child: Icon(art.icon, size: 92, color: Colors.white.withValues(alpha: 0.13)),
                   ),
                 ),
-              ),
+                // Glossy top highlight.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 46,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.white.withValues(alpha: 0.18), Colors.white.withValues(alpha: 0)],
+                      ),
+                    ),
+                  ),
+                ),
+                // Moving light sweep.
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: FractionalTranslation(
+                      translation: Offset(sweep, 0),
+                      child: Transform.rotate(
+                        angle: 0.45,
+                        child: FractionallySizedBox(
+                          widthFactor: 0.35,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: [
+                                Colors.white.withValues(alpha: 0),
+                                Colors.white.withValues(alpha: 0.16),
+                                Colors.white.withValues(alpha: 0),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 11),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(13),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                            ),
+                            child: Icon(art.icon, color: Colors.white, size: 22),
+                          ),
+                          const Spacer(),
+                          if (count > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const Spacer(),
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14.5,
+                          height: 1.1,
+                          shadows: [Shadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _categoryBlurb[title] ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w600, fontSize: 11),
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white.withValues(alpha: 0.8)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

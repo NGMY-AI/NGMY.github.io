@@ -3983,8 +3983,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
   }
 
+  // Redraw the whole chat only when a panel opens or closes — the live browser reports
+  // progress every couple of seconds and its own panel redraws itself for that.
+  String _panelLayoutKey = '';
+
   void _onBrowserSessionChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final key = '${_agentRun.visible}|${_browserSession.visible}|${_browserSession.url}|${_browserSession.previewHeight}';
+    if (key == _panelLayoutKey) return;
+    _panelLayoutKey = key;
+    setState(() {});
   }
 
   void _onBrowserLiftDelta(double dy) {

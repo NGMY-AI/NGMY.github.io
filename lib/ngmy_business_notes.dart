@@ -345,11 +345,10 @@ String _notePlainText(String body, List<NgmyNoteTextAnim> anims) {
     text = lines.map((line) {
       if (line.startsWith('# ')) return line.substring(2);
       if (line.startsWith('> ')) return line.substring(2);
-      if (line.startsWith('- [ ] ') || line.startsWith('- [x] ')) return line.substring(6);
-      if (line.startsWith('• ')) return line.substring(2);
-      if (line.startsWith('- ')) return line.substring(2);
-      final numbered = RegExp(r'^(\d+)\. (.*)$').firstMatch(line);
-      if (numbered != null) return numbered.group(2) ?? line;
+      // Lists keep their numbers and bullets ("1. ", "• ") — only formatting codes are hidden.
+      if (line.startsWith('- [ ] ')) return '☐ ${line.substring(6)}';
+      if (line.startsWith('- [x] ')) return '☑ ${line.substring(6)}';
+      if (line.startsWith('- ')) return '• ${line.substring(2)}';
       return line;
     }).join('\n');
     return text.replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
