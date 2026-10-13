@@ -9,6 +9,8 @@ import 'ngmy_vault_arcade_wave.dart';
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_sync.dart';
 import 'ngmy_vault_word_match.dart';
+import 'ngmy_vault_lv_host.dart';
+import 'ngmy_vault_lv_registry.dart';
 
 /// Vault Channel arcade — offline tech games with local level progress.
 class NgmyVaultArcadeScreen extends StatefulWidget {
@@ -50,7 +52,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
     _adPage = PageController();
     _adTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!_ready || !mounted || !_adPage.hasClients) return;
-      final next = (_adIndex + 1) % kVaultGames.length;
+      final next = (_adIndex + 1) % _featured.length;
       _adPage.animateToPage(next, duration: const Duration(milliseconds: 520), curve: Curves.easeInOutCubic);
     });
     unawaited(_loadProgress());
@@ -78,9 +80,14 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
     });
   }
 
-  int get _cleared => _progress.values.fold(0, (a, b) => a + b.level.clamp(0, 10));
+  /// The carousel features a handful of games (the grid below lists all of them).
+  List<VaultGameDef> get _featured => kVaultGames.take(10).toList();
+
+  int get _cleared => _progress.values.fold(0, (a, b) => a + (b.level - 1).clamp(0, 30));
 
   Widget _pageFor(VaultGameDef game) {
+    final lv = ngmyVaultLvDef(game.id);
+    if (lv != null) return NgmyVaultLevelMap(def: lv);
     switch (game.id) {
       case 'vault_sync':
         return const NgmyVaultSyncScreen();
@@ -264,10 +271,10 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                 children: [
                   PageView.builder(
                     controller: _adPage,
-                    itemCount: kVaultGames.length,
+                    itemCount: _featured.length,
                     onPageChanged: (i) => setState(() => _adIndex = i),
                     itemBuilder: (context, i) {
-                      final g = kVaultGames[i];
+                      final g = _featured[i];
                       return _GameAdCard(
                         game: g,
                         progress: _progress[g.id],
@@ -282,7 +289,7 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
                     bottom: 12,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(kVaultGames.length, (i) {
+                      children: List.generate(_featured.length, (i) {
                         final on = i == _adIndex;
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
@@ -369,7 +376,7 @@ class _GameAdCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final level = (progress?.level ?? 1).clamp(1, 10);
+    final level = (progress?.level ?? 1).clamp(1, 30);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -424,7 +431,7 @@ class _GameAdCard extends StatelessWidget {
                           child: const Text('PLAY', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.2)),
                         ),
                         const SizedBox(width: 12),
-                        Text('Level $level / 10', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+                        Text('Level $level / 30', style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
                       ],
                     ),
                   ],
@@ -448,7 +455,7 @@ class _GameTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final level = (progress?.level ?? 1).clamp(1, 10);
+    final level = (progress?.level ?? 1).clamp(1, 30);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -496,7 +503,7 @@ class _GameTile extends StatelessWidget {
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11, height: 1.15),
                   ),
                   const SizedBox(height: 4),
-                  Text('LV $level', style: TextStyle(color: game.colors.first.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 10)),
+                  Text('LV $level/30', style: TextStyle(color: game.colors.first.withValues(alpha: 0.85), fontWeight: FontWeight.w800, fontSize: 10)),
                 ],
               ),
             ),

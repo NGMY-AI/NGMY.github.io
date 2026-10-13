@@ -146,7 +146,7 @@ class VaultGameProgress {
       best: (map['best'] as num?)?.toInt() ?? 0,
       plays: (map['plays'] as num?)?.toInt() ?? 0,
       coins: coins,
-      level: ((map['level'] as num?)?.toInt() ?? 1).clamp(1, 10),
+      level: ((map['level'] as num?)?.toInt() ?? 1).clamp(1, 31),
       bestCombo: (map['bestCombo'] as num?)?.toInt() ?? 0,
     );
   }
@@ -227,7 +227,7 @@ class VaultProgressStore {
       best: math.max(prev.best, score),
       plays: prev.plays + 1,
       coins: prev.coins + coinsEarned,
-      level: math.max(prev.level, level.clamp(1, 10)),
+      level: math.max(prev.level, level.clamp(1, 31)),
       bestCombo: prev.bestCombo,
     );
     all[gameId] = next;

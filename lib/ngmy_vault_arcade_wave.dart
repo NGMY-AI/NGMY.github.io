@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'ngmy_vault_drive_games.dart';
 import 'ngmy_vault_games.dart';
 import 'ngmy_vault_premium_games.dart';
+import 'ngmy_vault_lv_registry.dart';
 
 /// Hub games after the core first row: previous premium set + one redesigned car game.
 const kVaultArcadeWaveGames = <VaultGameDef>[
@@ -109,7 +110,8 @@ const kVaultArcadeWaveGames = <VaultGameDef>[
   ),
 ];
 
-const kVaultGames = [...kVaultCoreGames, ...kVaultArcadeWaveGames];
+/// The Vault hub now lists the level games (30 levels each); the older games are retired.
+final kVaultGames = [for (final d in kVaultLvGames) d.asHubDef];
 
 Widget ngmyVaultArcadeWaveScreen(VaultGameDef game) {
   if (ngmyVaultIsDriveGame(game.id)) {
