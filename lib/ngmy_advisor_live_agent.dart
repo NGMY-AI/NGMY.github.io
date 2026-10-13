@@ -233,11 +233,31 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     _idleTimer = Timer(const Duration(minutes: 10), () {
       if (running || _disposed) return;
       browserClosed = true;
-      // The next task gets a fresh browser instead of trying a stopped one.
-      sessionId = null;
+      // Keep the session id: the next task continues in the SAME browser if it's still up
+      // (the server only opens a new, paid browser if this one has really ended).
       liveUrl = '';
       _notify();
     });
+  }
+
+  /// Short summary of the last result: title, notes and each source link.
+  String _lastFindings() {
+    final st = structured;
+    final buf = StringBuffer();
+    if (st != null) {
+      if ('${st['title'] ?? ''}'.isNotEmpty) buf.writeln('${st['title']}: ${st['summary'] ?? ''}');
+      for (final s in (st['sources'] is List ? st['sources'] as List : const [])) {
+        if (s is Map && '${s['url'] ?? ''}'.isNotEmpty) buf.writeln('- ${s['name'] ?? ''}: ${s['url']}');
+      }
+      for (final n in (st['notes'] is List ? st['notes'] as List : const [])) {
+        buf.writeln('note: $n');
+      }
+    } else if ((result ?? '').trim().isNotEmpty) {
+      buf.writeln(result!.trim());
+    }
+    if (pageUrl.isNotEmpty) buf.writeln('Last page open: $pageUrl');
+    final s = buf.toString().trim();
+    return s.length > 2400 ? s.substring(0, 2400) : s;
   }
 
   bool _retriedDirect = false;
@@ -280,6 +300,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     _lastRecent = recentUserMessages;
     // A follow-up in the same browser needs the earlier task as context.
     final prevTask = continueSession && hasSession ? this.task : '';
+    // What it found last time (titles + links), so a follow-up goes straight there.
+    final prevResult = continueSession ? _lastFindings() : '';
     _liveUrlLockedForRun = false;
     browserClosed = false;
     _idleTimer?.cancel();
@@ -301,6 +323,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         if ((startUrl ?? '').isNotEmpty) 'startUrl': startUrl,
         if (continueSession && hasSession) 'sessionId': sessionId,
         if (prevTask.isNotEmpty) 'prevTask': prevTask,
+        if (prevResult.isNotEmpty) 'prevResult': prevResult,
         if (recentUserMessages.isNotEmpty) 'recentUserMessages': recentUserMessages,
         if (direct) 'network': 'direct',
       },
@@ -483,6 +506,10 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
     buf.writeln('You found these choices for them: ${options.join(', ')}. They appear as buttons under your message — '
         'say in one short line what you found and ask which one they want (do not list them all again).');
   }
+  buf.writeln('NEVER say a job, item or appointment "is available" unless the result shows its own page was opened '
+      '(a link for it in sources). If something was only seen in a search list, or the notes say it could not be opened '
+      'or verified, say exactly that — e.g. "it shows up in their search, but the listing page wouldn\'t open, so I can\'t '
+      'confirm it\'s still open". Don\'t sound sure about anything the result doesn\'t prove.');
   buf.writeln('Be truthful: if you stopped for a login or a final confirm/payment button, say what they need '
       'to do in the Browser window, then "tell me to continue". Never claim money was moved.');
   return buf.toString();
@@ -1016,6 +1043,7 @@ class _NgmyLiveStepsPreviewState extends State<_NgmyLiveStepsPreview> with Widge
   bool _fetching = false;
   bool _foreground = true;
   DateTime? _stoppedAt;
+  int _misses = 0;
 
   @override
   void initState() {
@@ -1050,10 +1078,13 @@ class _NgmyLiveStepsPreviewState extends State<_NgmyLiveStepsPreview> with Widge
     }
     _fetching = true;
     try {
-      final res = await ngmyEdgeInvoke({'action': 'agentShot', 'sessionId': sid}, timeout: const Duration(seconds: 10));
+      final res = await ngmyEdgeInvoke({'action': 'agentShot', 'sessionId': sid, if ((r.runId ?? '').isNotEmpty) 'runId': r.runId, 'after': r._after}, timeout: const Duration(seconds: 10));
       final b64 = (res?['jpegBase64'] ?? '').toString();
       if (res?['ok'] == true && b64.isNotEmpty && mounted) {
+        _misses = 0;
         setState(() => _shot = base64Decode(b64));
+      } else if (mounted) {
+        setState(() => _misses++);
       }
     } catch (e) {
       debugPrint('[advisor-agent] shot: $e');
@@ -1090,7 +1121,11 @@ class _NgmyLiveStepsPreviewState extends State<_NgmyLiveStepsPreview> with Widge
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                       const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
                       const SizedBox(height: 10),
-                      Text(run.running ? 'Opening the screen…' : 'Ready', style: const TextStyle(color: Colors.white54, fontSize: 12.5)),
+                      Text(
+                        _misses >= 6 ? 'Live pictures aren’t coming through — tap Full live screen below' : (run.running ? 'Opening the screen…' : 'Ready'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white54, fontSize: 12.5),
+                      ),
                     ]),
                   ),
                 // Where it is + what it's doing, over the bottom of the picture.

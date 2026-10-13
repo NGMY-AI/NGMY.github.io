@@ -3941,6 +3941,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Live task finished → the advisor tells them what it did / found (truthfully).
   Future<void> _onAgentFinished(NgmyAdvisorAgentRun run) async {
     unawaited(_clearPendingAgentRun());
+    if ((run.sessionId ?? '').isNotEmpty) {
+      unawaited(SharedPreferences.getInstance().then((p) => p.setString('${_pendingAgentKey}_session', run.sessionId!)));
+    }
     unawaited(SharedPreferences.getInstance().then((p) => p.setString(
           '${_pendingAgentKey}_finished_at',
           DateTime.now().toUtc().toIso8601String(),
@@ -4960,6 +4963,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final prefs = await SharedPreferences.getInstance();
       if (_agentRun.task.isEmpty) _agentRun.task = prefs.getString('${_pendingAgentKey}_last_task') ?? '';
       _agentRun.finishedAt ??= DateTime.tryParse(prefs.getString('${_pendingAgentKey}_finished_at') ?? '')?.toLocal();
+      // Same cloud browser as before (survives the app reloading) — no new paid browser.
+      if ((_agentRun.sessionId ?? '').isEmpty) {
+        final sid = prefs.getString('${_pendingAgentKey}_session') ?? '';
+        if (sid.isNotEmpty) _agentRun.sessionId = sid;
+      }
       final raw = prefs.getString(_pendingAgentKey);
       if (raw == null || raw.isEmpty) return;
       final m = jsonDecode(raw);

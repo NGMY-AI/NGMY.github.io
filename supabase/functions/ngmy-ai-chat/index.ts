@@ -385,6 +385,10 @@ const ADVISOR_AGENT_RULES =
   "- FINDING WHAT'S AVAILABLE (e.g. 'find the open positions at KFC in Macon GA'): search the company's own careers " +
   "site (or a major job site if it has none) for that place, collect the real open job titles (with pay/hours if shown), " +
   "and finish with them in \"options\" so the user can pick one. Do NOT start an application in that case.\n" +
+  "  VERIFY BEFORE YOU LIST: only list a job/item as available if you actually OPENED its own page and it is live; put " +
+  "that page's exact URL for each one in \"sources\" (name = the job title + location). If a search page shows a listing " +
+  "but its own page won't open, list it under notes as 'listed but could not be opened' — never as available.\n" +
+  "- FOLLOW-UPS: if 'What you found last time' gives a link for what the user picked, open that link directly.\n" +
   "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
   "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
   "list what you filled; submit only when the user's message says to submit.\n" +
@@ -456,6 +460,7 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const safeStart = startUrl ? advisorBrowseSafeUrl(startUrl) : null;
   const sessionId = String(body?.sessionId ?? "").trim();
   const prevTask = String(body?.prevTask ?? "").trim().slice(0, 1500);
+  const prevResult = String(body?.prevResult ?? "").trim().slice(0, 2500);
   // Recent things the user said in this chat (e.g. "open Zillow" two messages ago).
   const recent = (Array.isArray(body?.recentUserMessages) ? body.recentUserMessages : [])
     .map((m: unknown) => String(m ?? "").trim().slice(0, 400)).filter((m: string) => m).slice(-4);
@@ -463,6 +468,7 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const fullTask = (safeStart ? `Start at ${safeStart.toString()}\n` : "") +
     (recent.length ? `Recent chat from the user (oldest first), for context:\n- ${recent.join("\n- ")}\n` : "") +
     (prevTask ? `Context — the previous task in this same browser was: "${prevTask}".\n` : "") +
+    (prevResult ? `What you found last time in this browser (go straight to these pages and links — do NOT search from scratch again):\n${prevResult}\n` : "") +
     `THE USER'S REQUEST NOW: ${task}` + ADVISOR_AGENT_RULES;
   // Visible mouse pointer in the live view (NGMY Agent Cursor extension, if uploaded).
   const cursorExt = await ensureCursorExtensionId();
@@ -489,26 +495,43 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     payload.sessionId = sessionId;
     delete payload.browserSettings; // continuing an existing browser
   }
-  let r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
-  if (r.status !== 200 && r.status !== 201 && r.status !== 402 && r.status !== 429 && payload.sessionId) {
-    // The earlier browser has shut down (idle timeout) or is unusable — start a fresh one.
-    console.log("[agent] session reuse failed", r.status, "— starting a new browser");
-    // Old browser expired — start fresh.
-    delete payload.sessionId;
-    payload.browserSettings = freshBrowser();
-    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
-  }
-  if ((r.status === 400 || r.status === 403 || r.status === 422) && payload.model === "bu-fast") {
-    // Fast preset not available on this account → default model, low effort per step.
+  // This account can't use the fast preset → don't even try (every failed try used to look
+  // like a dead browser and threw the session away, opening a NEW paid browser each time).
+  if (agentFastUnsupported) {
     payload.model = "gpt-6-luna";
     payload.modelParams = { reasoning: { effort: "low" } };
-    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   }
-  if ((r.status === 400 || r.status === 422) && payload.model) {
-    // Speed setting rejected → fall back to Browser Use defaults rather than failing the task.
+  const post = () => browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+  const ok = (s: number) => s === 200 || s === 201;
+  const sessionGone = (res: { status: number; data: any }) => {
+    if (res.status === 404 || res.status === 410) return true;
+    const msg = JSON.stringify(res.data ?? "").toLowerCase();
+    return /session|browser/.test(msg) && /(not found|ended|stopped|expired|closed|terminated|no longer)/.test(msg);
+  };
+  let r = await post();
+  // 1) Model settings rejected → change the model only; keep the same browser session.
+  if (!ok(r.status) && (r.status === 400 || r.status === 403 || r.status === 422) && payload.model === "bu-fast" && !sessionGone(r)) {
+    agentFastUnsupported = true;
+    payload.model = "gpt-6-luna";
+    payload.modelParams = { reasoning: { effort: "low" } };
+    r = await post();
+  }
+  if (!ok(r.status) && (r.status === 400 || r.status === 422) && payload.model && !sessionGone(r)) {
     delete payload.model;
     delete payload.modelParams;
-    r = await browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
+    r = await post();
+  }
+  // 2) The same browser is still finishing the last task → wait for it, don't open another.
+  for (let i = 0; i < 5 && r.status === 409 && payload.sessionId; i++) {
+    await new Promise((res) => setTimeout(res, 1500));
+    r = await post();
+  }
+  // 3) Only if that browser has really ended do we open a new one.
+  if (!ok(r.status) && payload.sessionId && sessionGone(r)) {
+    console.log("[agent] session ended", r.status, "— starting a new browser");
+    delete payload.sessionId;
+    payload.browserSettings = freshBrowser();
+    r = await post();
   }
   if (r.status === 400 && payload.browserSettings && cursorExt) {
     // Never let the cursor extension block a task — retry without it.
@@ -648,6 +671,7 @@ async function ensureCursorExtensionId(): Promise<string> {
 // stream crashes the web app): one small JPEG of the current screen per request. ──
 const agentCdpCache = new Map<string, { ws: string; at: number }>();
 const agentShotHits = new Map<string, { start: number; n: number }>();
+let agentFastUnsupported = false;
 
 async function agentCdpWsUrl(sessionId: string): Promise<string> {
   const hit = agentCdpCache.get(sessionId);
@@ -725,19 +749,61 @@ function cdpScreenshot(wsUrl: string, timeoutMs = 7000): Promise<string | null> 
   });
 }
 
+/** Latest screenshot found in the run's recent events (URL or base64), as JPEG/PNG base64. */
+async function agentStepScreenshot(runId: string, latest: number): Promise<string | null> {
+  const total = Math.max(0, latest);
+  const r = await browserUseFetch(`/runs/${runId}/events?after=${Math.max(0, total - 12)}&limit=12&include_output=true`);
+  const evs = Array.isArray(r.data?.events) ? r.data.events : [];
+  const found: string[] = [];
+  const walk = (v: any, key = "") => {
+    if (found.length || v == null) return;
+    if (typeof v === "string") {
+      if (/screenshot|image|frame/i.test(key) && (v.startsWith("http") || v.length > 2000)) found.push(v);
+      return;
+    }
+    if (Array.isArray(v)) {
+      for (const x of v) walk(x, key);
+      return;
+    }
+    if (typeof v === "object") for (const [k, x] of Object.entries(v)) walk(x, k);
+  };
+  for (const ev of [...evs].reverse()) {
+    walk(ev?.data);
+    if (found.length) break;
+  }
+  const v = found[0];
+  if (!v) return null;
+  if (!v.startsWith("http")) return v.replace(/^data:image\/\w+;base64,/, "");
+  try {
+    const img = await fetch(v, { signal: AbortSignal.timeout(6000) });
+    if (!img.ok) return null;
+    const bytes = new Uint8Array(await img.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  } catch {
+    return null;
+  }
+}
+
 async function handleAgentShot(req: Request, body: any): Promise<Response> {
   if (!browserUseKey()) return jsonOk({ ok: false, code: "not_configured" });
   const sessionId = String(body?.sessionId ?? "").trim();
   if (!/^[0-9a-f-]{36}$/i.test(sessionId)) return jsonOk({ ok: false, error: "sessionId is required" }, 400);
   const ws = await agentCdpWsUrl(sessionId);
-  if (!ws) return jsonOk({ ok: false, error: "No live browser right now." });
-  let shot = await cdpScreenshot(ws);
-  if (!shot) {
+  let shot: string | null = ws ? await cdpScreenshot(ws) : null;
+  if (!shot && ws) {
     // The connection address may have changed (new browser) — look it up again once.
     agentCdpCache.delete(sessionId);
     const again = await agentCdpWsUrl(sessionId);
     if (again) shot = await cdpScreenshot(again);
   }
+  if (!shot) {
+    // Second way: the newest screenshot the agent recorded in its own steps.
+    const runId = String(body?.runId ?? "").trim();
+    if (/^[0-9a-f-]{36}$/i.test(runId)) shot = await agentStepScreenshot(runId, Number(body?.after ?? 0) || 0);
+  }
+  if (!shot) console.log("[agent-shot] no picture", { cdp: !!ws, session: sessionId.slice(0, 8) });
   return jsonOk(shot ? { ok: true, jpegBase64: shot } : { ok: false, error: "No picture yet." });
 }
 
@@ -9700,7 +9766,12 @@ serve(async (req) => {
       // Cheap authenticated call — confirms the key is accepted (never returns the key).
       const r = await browserUseFetch("/runs?limit=1");
       const cursorReady = r.status === 200 ? !!(await ensureCursorExtensionId()) : false;
-      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady });
+      // Counts only (no task text): how many recent tasks and how many separate browsers they used.
+      const recent = await browserUseFetch("/runs?limit=30");
+      const list = Array.isArray(recent.data?.items) ? recent.data.items : (Array.isArray(recent.data?.runs) ? recent.data.runs : (Array.isArray(recent.data) ? recent.data : []));
+      const sessions = new Set(list.map((x: any) => String(x?.sessionId ?? x?.session_id ?? "")).filter((s: string) => s));
+      const models = [...new Set(list.map((x: any) => String(x?.model ?? "")).filter((s: string) => s))];
+      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady, recentRuns: list.length, recentBrowsers: sessions.size, models });
     }
 
     // Rendered picture of a page for the mini browser (sites that can't be re-hosted).
