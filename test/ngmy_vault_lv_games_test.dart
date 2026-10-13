@@ -7,7 +7,8 @@ import 'package:ngmy/ngmy_vault_lv_host.dart';
 import 'package:ngmy/ngmy_vault_lv_registry.dart';
 
 void main() {
-  test('vault games have unique ids and 30 levels', () {
+  test('100 vault games with unique ids and 30 levels', () {
+    expect(kVaultLvGames.length, 100);
     expect(kVaultLvGames.map((g) => g.id).toSet().length, kVaultLvGames.length);
     expect(kVaultLevels, greaterThanOrEqualTo(20));
   });

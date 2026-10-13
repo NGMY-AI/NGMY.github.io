@@ -312,9 +312,9 @@ class _NgmyVaultArcadeScreenState extends State<NgmyVaultArcadeScreen> with Tick
             padding: const EdgeInsets.fromLTRB(18, 14, 18, 6),
             child: Row(
               children: [
-                Text('TECH GAMES', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 12)),
-                const Spacer(),
-                Text('Coins · addictive offline play', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w600, fontSize: 11)),
+                Text('${kVaultGames.length} GAMES', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 12)),
+                const SizedBox(width: 10),
+                Expanded(child: Text('30 levels each · earn coins every level', textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w600, fontSize: 11))),
               ],
             ),
           ),
