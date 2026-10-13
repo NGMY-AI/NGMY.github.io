@@ -849,36 +849,130 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   }
 
   /// Small dropdown: picture shape or ring. "Auto" lets the AI follow your description.
-  Widget _lookDropdown(IconData icon, String? value, List<(String, String)> options, ValueChanged<String?> onChanged) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.only(left: 8, right: 2),
+
+  /// The picture to preview looks on: your logo / first picture, or a sample.
+  Widget _sampleImage(String? thumb) {
+    if (thumb != null && thumb.contains(',')) {
+      try {
+        return Image.memory(base64Decode(thumb.split(',').last), fit: BoxFit.cover, gaplessPlayback: true);
+      } catch (_) {}
+    }
+    return const DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: value == null ? Colors.white12 : const Color(0xFF8B5CF6).withValues(alpha: 0.6)),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFF97316), Color(0xFFDB2777), Color(0xFF7C3AED)]),
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String?>(
-          value: value,
-          isExpanded: true,
-          isDense: true,
-          dropdownColor: const Color(0xFF1F2937),
-          iconSize: 18,
-          iconEnabledColor: Colors.white54,
-          hint: Row(
+      child: Center(child: Icon(Icons.person_rounded, color: Colors.white70)),
+    );
+  }
+
+  /// One look drawn for real: [frame] shape with [ring] on the sample picture.
+  Widget _lookPreview(String? thumb, String frame, String ring, double size) {
+    final shown = frame.isEmpty && ring.isEmpty ? 'rounded' : frame;
+    return SizedBox.square(
+      dimension: size,
+      child: ngmyFramedPicture(image: _sampleImage(thumb), frame: shown, ring: ring),
+    );
+  }
+
+  /// Small button showing the chosen shape (or ring) itself — tap to see them all.
+  Widget _lookPicker({required bool rings, required String? value, required String? otherValue, required String? thumb, required ValueChanged<String?> onChanged}) {
+    // Shapes are previewed with the chosen ring and rings on the chosen shape.
+    String frameFor(String? v) => rings ? (otherValue ?? 'circle') : (v ?? '');
+    String ringFor(String? v) => rings ? (v ?? '') : (otherValue ?? '');
+    return Material(
+      color: Colors.white.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
+          final picked = await showModalBottomSheet<String>(
+            context: context,
+            backgroundColor: const Color(0xFF111827),
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+            builder: (ctx) {
+              Widget tile(String id, Widget child) {
+                final on = (id == '__auto' && value == null) || id == value;
+                return GestureDetector(
+                  onTap: () => Navigator.pop(ctx, id),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      color: on ? const Color(0xFF8B5CF6).withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.04),
+                      border: Border.all(color: on ? const Color(0xFFA78BFA) : Colors.white10, width: on ? 2 : 1),
+                    ),
+                    child: child,
+                  ),
+                );
+              }
+
+              return SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: GridView.count(
+                    shrinkWrap: true,
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    children: [
+                      // Auto: let the AI choose from what you describe.
+                      tile(
+                        '__auto',
+                        Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)]),
+                          ),
+                          child: const Center(child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28)),
+                        ),
+                      ),
+                      for (final (id, _) in rings ? kNgmySlideRings : kNgmySlideFrames)
+                        tile(id, _lookPreview(thumb, frameFor(id), ringFor(id), 64)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+          if (picked == null) return;
+          onChanged(picked == '__auto' ? null : picked);
+        },
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: value == null ? Colors.white12 : const Color(0xFF8B5CF6).withValues(alpha: 0.6)),
+          ),
+          child: Row(
             children: [
-              Icon(icon, size: 14, color: Colors.white54),
-              const SizedBox(width: 4),
-              const Text('Auto', style: TextStyle(color: Colors.white70, fontSize: 11.5, fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Center(
+                  child: value == null
+                      // Auto: a hint of what this button changes (shapes / ring) + AI sparkle.
+                      ? SizedBox(
+                          width: 34,
+                          height: 30,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Center(
+                                child: Icon(
+                                  rings ? Icons.radio_button_unchecked_rounded : Icons.category_rounded,
+                                  color: Colors.white38,
+                                  size: 26,
+                                ),
+                              ),
+                              const Positioned(right: -2, top: -2, child: Icon(Icons.auto_awesome_rounded, color: Color(0xFFC4B5FD), size: 14)),
+                            ],
+                          ),
+                        )
+                      : _lookPreview(thumb, frameFor(value), ringFor(value), 34),
+                ),
+              ),
+              const Icon(Icons.expand_more_rounded, color: Colors.white54, size: 18),
             ],
           ),
-          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
-          items: [
-            const DropdownMenuItem<String?>(value: null, child: Text('Auto (AI)')),
-            for (final (id, label) in options) DropdownMenuItem<String?>(value: id, child: Text(label, overflow: TextOverflow.ellipsis)),
-          ],
-          onChanged: onChanged,
         ),
       ),
     );
@@ -1061,9 +1155,9 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              Expanded(child: _lookDropdown(Icons.crop_square_rounded, _logoFrame, kNgmySlideFrames, (v) => setState(() => _logoFrame = v))),
+                              Expanded(child: _lookPicker(rings: false, value: _logoFrame, otherValue: _logoRing, thumb: _logo, onChanged: (v) => setState(() => _logoFrame = v))),
                               const SizedBox(width: 6),
-                              Expanded(child: _lookDropdown(Icons.radio_button_checked_rounded, _logoRing, kNgmySlideRings, (v) => setState(() => _logoRing = v))),
+                              Expanded(child: _lookPicker(rings: true, value: _logoRing, otherValue: _logoFrame, thumb: _logo, onChanged: (v) => setState(() => _logoRing = v))),
                             ],
                           ),
                         ],
@@ -1083,9 +1177,9 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                           const SizedBox(height: 6),
                           Row(
                             children: [
-                              Expanded(child: _lookDropdown(Icons.crop_square_rounded, _photoFrame, kNgmySlideFrames, (v) => setState(() => _photoFrame = v))),
+                              Expanded(child: _lookPicker(rings: false, value: _photoFrame, otherValue: _photoRing, thumb: _pictures.isEmpty ? null : _pictures.first, onChanged: (v) => setState(() => _photoFrame = v))),
                               const SizedBox(width: 6),
-                              Expanded(child: _lookDropdown(Icons.radio_button_checked_rounded, _photoRing, kNgmySlideRings, (v) => setState(() => _photoRing = v))),
+                              Expanded(child: _lookPicker(rings: true, value: _photoRing, otherValue: _photoFrame, thumb: _pictures.isEmpty ? null : _pictures.first, onChanged: (v) => setState(() => _photoRing = v))),
                             ],
                           ),
                         ],
