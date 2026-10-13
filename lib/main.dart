@@ -10932,16 +10932,40 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await prefs.setString('ngmy_last_session_email', email);
         }
       }
-      await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-      await prefs.setString('app_config', jsonEncode(_config.toJson()));
-      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
+      // Each piece is saved on its own: on the web this storage is only ~5 MB,
+      // and one oversized write used to throw and skip every write after it
+      // (history, users, settings) — so after a refresh things "disappeared".
+      await _safeSetPref(prefs, 'all_transactions', () => jsonEncode(_allTransactions.map(_txnForLocalCache).toList()));
+      await _safeSetPref(prefs, 'all_users', () => jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'investment_plans', () => jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'app_config', () => jsonEncode(_config.toJson()));
+      await _safeSetPref(prefs, 'all_media', () => jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'all_announcements', () => jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
       await _persistLocalSnapshot();
     } catch (e) {
       debugPrint('[ngmy] local persist: $e');
     }
+  }
+
+  Future<void> _safeSetPref(SharedPreferences prefs, String key, String Function() value) async {
+    try {
+      await prefs.setString(key, value());
+    } catch (e) {
+      debugPrint('[ngmy] local persist $key: $e');
+    }
+  }
+
+  /// A transaction as kept on this phone. Payment screenshots (big pictures)
+  /// stay in the cloud; only your own pending ones are kept here in case they
+  /// are still uploading.
+  Map<String, dynamic> _txnForLocalCache(AppTransaction t) {
+    final row = t.toJson();
+    final shot = (t.screenshotPath ?? '');
+    if (shot.startsWith('data:') && shot.length > 12000) {
+      final mine = _currentUser != null && ngmyNormalizeEmail(t.userEmail) == ngmyNormalizeEmail(_currentUser!.email);
+      if (!(mine && t.status == TransactionStatus.pending)) row.remove('screenshotPath');
+    }
+    return row;
   }
 
   bool _userNeedsAdminCloudSync(UserData u) {
@@ -14264,12 +14288,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
 
       // Always persist locally first so slow/offline Wi‑Fi never blocks the UI.
-      await prefs.setString('all_transactions', jsonEncode(_allTransactions.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_users', jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
-      await prefs.setString('investment_plans', jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
-      await prefs.setString('app_config', jsonEncode(_config.toJson()));
-      await prefs.setString('all_media', jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
-      await prefs.setString('all_announcements', jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
+      // Each piece on its own so one full storage write can't skip the rest.
+      await _safeSetPref(prefs, 'all_transactions', () => jsonEncode(_allTransactions.map(_txnForLocalCache).toList()));
+      await _safeSetPref(prefs, 'all_users', () => jsonEncode(_allUsers.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'investment_plans', () => jsonEncode(_globalPlans.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'app_config', () => jsonEncode(_config.toJson()));
+      await _safeSetPref(prefs, 'all_media', () => jsonEncode(_allMedia.map((e) => e.toJson()).toList()));
+      await _safeSetPref(prefs, 'all_announcements', () => jsonEncode(_allAnnouncements.map((e) => e.toJson()).toList()));
       await _persistLocalSnapshot();
       NgmySupabaseSyncThrottle.scheduleCriticalConfigPersist(_config, _persistCriticalConfigFields);
 

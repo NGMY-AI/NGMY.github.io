@@ -1849,6 +1849,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   final TextEditingController _amt = TextEditingController();
   final TextEditingController _cashAppTag = TextEditingController();
   int _view = 0; // 0 Deposit, 1 Withdraw, 2 History
+  int _historyShown = 80;
 
   @override
   void dispose() {
@@ -2448,8 +2449,17 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 ],
               ),
             )
-          else
-            for (final t in wallet.take(80)) _historyRow(t),
+          else ...[
+            for (final t in wallet.take(_historyShown)) _historyRow(t),
+            // Older rows are never dropped — load them on request.
+            if (wallet.length > _historyShown)
+              TextButton.icon(
+                onPressed: () => setState(() => _historyShown += 80),
+                icon: const Icon(Icons.expand_more_rounded),
+                label: Text('Show more (${wallet.length - _historyShown} older)', style: const TextStyle(fontWeight: FontWeight.w800)),
+                style: TextButton.styleFrom(foregroundColor: _green),
+              ),
+          ],
         ],
       ),
     );
@@ -2512,7 +2522,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(99)),
                 child: Text(
-                  approved ? 'Done' : (pending ? 'Pending' : t.status.name),
+                  approved ? 'Done' : (pending ? 'Pending' : 'Rejected'),
                   style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 9.5),
                 ),
               ),
@@ -2524,7 +2534,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
   }
 
   bool _isGrowthIncomeHistoryRow(AppTransaction t) {
-    if (t.status == TransactionStatus.rejected) return false;
+    // Rejected requests stay in history (marked Rejected) instead of vanishing.
     final details = (t.sourceDetails ?? '').toLowerCase();
     if (details.contains('clock-in session started')) return false;
     if (t.type == TransactionType.contribution) return false;

@@ -8,8 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_db_relay.dart';
 import 'ngmy_network_resilience.dart';
 
-const int kNgmyGameNotificationMax = 50;
-const Duration kNgmyGameNotificationRetention = Duration(days: 5);
+const int kNgmyGameNotificationMax = 300;
+const Duration kNgmyGameNotificationRetention = Duration(days: 90);
 const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
 /// Bumped when game win/lose receipts change (Game Center badge).
@@ -249,7 +249,9 @@ class NgmyGameNotifications {
   static Future<int> countFor(String email) async {
     await syncFromCloud(email, force: false);
     final list = await listFor(email, syncCloud: false);
-    return list.length;
+    // Badge = today's results (receipts are now kept for 90 days).
+    final since = DateTime.now().subtract(const Duration(hours: 24));
+    return list.where((e) => e.timestamp.isAfter(since)).length;
   }
 
   static Future<List<NgmyGameNotification>> listFor(String email, {bool syncCloud = true}) async {
@@ -335,7 +337,7 @@ Future<void> showNgmyGameReceiptSheet(
                           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
                         ),
                         Text(
-                          'Wins & losses · last 5 days · max $kNgmyGameNotificationMax · oldest removed when full',
+                          'Your wins & losses · kept for 90 days',
                           style: const TextStyle(color: Colors.white60, fontSize: 11),
                         ),
                       ],

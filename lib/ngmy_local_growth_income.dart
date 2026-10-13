@@ -131,18 +131,24 @@ class NgmyLocalGrowthIncomeStore {
     }
     final at = updatedAt ?? DateTime.now().toUtc();
     final credited = creditedTxnIds ?? await loadCreditedIds(realEmail);
-    await prefs.setString(
-      _key(realEmail),
-      jsonEncode(_toMap(
-        user,
-        transactions,
-        ownerEmail: realEmail,
-        walletStateRevision: revision,
-        updatedAt: at,
-        creditedTxnIds: credited,
-      )),
-    );
-    await saveCreditedIds(realEmail, credited);
+    // A full browser storage must never stop the cloud copy from being saved
+    // (callers push to the cloud right after this) — so don't throw here.
+    try {
+      await prefs.setString(
+        _key(realEmail),
+        jsonEncode(_toMap(
+          user,
+          transactions,
+          ownerEmail: realEmail,
+          walletStateRevision: revision,
+          updatedAt: at,
+          creditedTxnIds: credited,
+        )),
+      );
+      await saveCreditedIds(realEmail, credited);
+    } catch (e) {
+      debugPrint('[growth income] local save: $e');
+    }
     unawaited(ngmySyncLocalLiveSnapshotIfRegistered(
       ownerEmail: realEmail,
       user: user,
@@ -587,15 +593,24 @@ class NgmyLocalGrowthIncomeStore {
     required List<String> creditedTxnIds,
   }) async {
     try {
+      // Merge with what's already in the cloud first: another phone may have
+      // added rows since this one last looked, and they must not be wiped.
+      var history = transactions;
+      var credited = creditedTxnIds;
+      final cloud = await fetchCloudWallet(realEmail);
+      if (cloud != null) {
+        history = mergeTransactionHistories(transactions, cloud.transactions);
+        credited = {...creditedTxnIds, ...cloud.creditedTxnIds}.toList();
+      }
       await ngmyDbRelaySettingsUpsert(
         cloudSettingsKey(realEmail),
         _toMap(
           user,
-          transactions,
+          history,
           ownerEmail: realEmail,
           walletStateRevision: walletStateRevision,
           updatedAt: updatedAt.toUtc(),
-          creditedTxnIds: creditedTxnIds,
+          creditedTxnIds: credited,
         ),
         updatedAt: updatedAt.toUtc().toIso8601String(),
         timeout: kNgmyCloudWriteTimeout,
@@ -773,7 +788,7 @@ class NgmyLocalGrowthIncomeStore {
     }
     final out = byId.values.toList()..sort((x, y) => y.timestamp.compareTo(x.timestamp));
     // Keep the wallet copy a sensible size.
-    return out.length > 600 ? out.sublist(0, 600) : out;
+    return out.length > 2000 ? out.sublist(0, 2000) : out;
   }
 }
 
