@@ -3658,6 +3658,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// A web task they described but that needs a few answers before the browser opens.
   String _webDraft = '';
   DateTime? _webDraftAt;
+  bool _redirectingClaim = false;
   final _reactionDecided = Expando<bool>();
   String _lastReactionBase = '';
   String _lastReactionEmoji = '';
@@ -5005,6 +5006,38 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     );
   }
 
+
+  /// Turns a "searching now…" reply into the real thing. True when it handled the turn.
+  Future<bool> _startWebTaskInsteadOfClaim(String userText, int sendGen) async {
+    final apiKey = await _resolveApiKey();
+    if (apiKey.isEmpty) return false;
+    final creds = ngmyParseAiCredentials(apiKey);
+    final recentUser = _messages
+        .where((m) => m['role'] == 'user' && (m['text'] ?? '').trim().isNotEmpty)
+        .map((m) => m['text']!.trim())
+        .toList();
+    final tail = recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser;
+    final request = _webDraft.isNotEmpty ? '$_webDraft\nThen they answered: $userText' : tail.join('\n');
+    final plan = await _planWebTask(creds, request);
+    if (plan == null || !plan.web) return false;
+    if (!plan.ready) {
+      _webDraft = request;
+      _webDraftAt = DateTime.now();
+      await _deliverAiReply(sendGen: sendGen, text: plan.ask, options: plan.options);
+      return true;
+    }
+    _webDraft = '';
+    final started = await _agentRun.start(
+      task: plan.task.isNotEmpty ? plan.task : request,
+      startUrl: plan.url.isNotEmpty ? plan.url : null,
+      recentUserMessages: tail,
+    );
+    if (started != NgmyAgentStartResult.started) return false;
+    unawaited(_savePendingAgentRun());
+    if (_browserSession.visible) unawaited(_browserSession.hide());
+    await _deliverAiReply(sendGen: sendGen, text: 'On it! I\'m doing that now in my browser — watch my screen below.');
+    return true;
+  }
   Future<bool> _deliverAiReply({
     required int sendGen,
     required String text,
@@ -5013,6 +5046,23 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     List<String> options = const [],
   }) async {
     final photo = (imageB64 ?? '').trim();
+    // The reply says it's searching / "keep an eye on the browser" but nothing is running —
+    // make it true: start the real browser task (or ask what's needed first).
+    final userAsked = (parseExtrasForUserText ?? '').trim();
+    if (userAsked.isNotEmpty &&
+        photo.isEmpty &&
+        !_redirectingClaim &&
+        !_agentRun.running &&
+        !_isTextCoach &&
+        !_isDebater &&
+        ngmyAdvisorReplyClaimsBrowsing(text)) {
+      _redirectingClaim = true;
+      try {
+        if (await _startWebTaskInsteadOfClaim(userAsked, sendGen)) return true;
+      } finally {
+        _redirectingClaim = false;
+      }
+    }
     final (bodyNoOptions, replyOptions) = ngmyExtractAdvisorOptions(text.trim());
     var body = bodyNoOptions;
     var browserUrl = '';
@@ -5435,9 +5485,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           !chitChat &&
           _webDraft.isNotEmpty &&
           DateTime.now().difference(_webDraftAt ?? DateTime(2000)) < const Duration(minutes: 20);
+      // Anything that might be an online task ("find me a job at KFC") goes to the planner,
+      // which asks the right first question or starts the browser — instead of normal chat
+      // pretending to search.
+      final maybeTask = agentTask == null && webAllowed && !chitChat && _webDraft.isEmpty && !answeringDraft &&
+          !_agentRun.running && ngmyMessageMightBeWebTask(text);
       String? plannedTask;
       String? plannedUrl;
-      if ((agentTask != null && !agentTask.continuing) || answeringDraft) {
+      if ((agentTask != null && !agentTask.continuing) || answeringDraft || maybeTask) {
         final request = _webDraft.isEmpty ? text : '$_webDraft\nThen they answered: $text';
         final plan = await _planWebTask(creds, request);
         if (plan == null || !plan.web) {

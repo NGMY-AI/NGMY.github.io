@@ -42,4 +42,17 @@ void main() {
     expect(ngmyAgentTextShowsNetworkBlock("The official McDonald's job site wouldn't load for me"), isTrue);
     expect(ngmyAgentTextShowsNetworkBlock('Found 3 cashier jobs in Macon'), isFalse);
   });
+
+  test('job and lookup requests go to the browser planner; chatting does not', () {
+    expect(ngmyMessageMightBeWebTask('find me a job at KFC'), isTrue);
+    expect(ngmyMessageMightBeWebTask('I want to work at Walmart in Macon GA'), isTrue);
+    expect(ngmyMessageMightBeWebTask('thank you baby'), isFalse);
+    expect(ngmyMessageMightBeWebTask('how was your day'), isFalse);
+  });
+
+  test('a reply that only pretends to search is caught', () {
+    expect(ngmyAdvisorReplyClaimsBrowsing("I'm searching for that now on their careers site. Keep an eye on the browser."), isTrue);
+    expect(ngmyAdvisorReplyClaimsBrowsing("Got it, Macon, GA! I'm putting that into the KFC search now"), isTrue);
+    expect(ngmyAdvisorReplyClaimsBrowsing('That sounds like a great plan, I am proud of you'), isFalse);
+  });
 }

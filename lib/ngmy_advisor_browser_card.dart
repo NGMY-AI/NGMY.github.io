@@ -1,8 +1,12 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'ngmy_advisor_browser_session.dart';
 import 'ngmy_advisor_chat_extras.dart';
 import 'ngmy_advisor_embedded_browser.dart';
+import 'ngmy_edge_invoke.dart';
 
 /// Draggable in-chat browser port — clipped preview; never full-app takeover.
 class NgmyAdvisorBrowserPanel extends StatefulWidget {
@@ -146,6 +150,10 @@ class _NgmyAdvisorBrowserPanelState extends State<NgmyAdvisorBrowserPanel> {
                         ),
                       ),
                     )
+                  : (kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+                  // iPhone web app: a whole website inside the page runs Safari out of memory
+                  // (the app crashed) — show a picture of the page; tap opens the real page.
+                  ? _NgmyPagePicture(url: widget.session.url, height: widget.session.previewHeight)
                   : NgmyAdvisorEmbeddedBrowser(
                       key: const ValueKey('ngmy_advisor_embedded_browser'),
                       session: widget.session,
@@ -185,4 +193,74 @@ class NgmyAdvisorMessageReactionBadge extends StatelessWidget {
       child: Text(emoji, style: const TextStyle(fontSize: 14, height: 1.1)),
     );
   }
+}
+
+/// A picture of the page (rendered by the server) — light for iPhone. Tap to open the page.
+class _NgmyPagePicture extends StatefulWidget {
+  const _NgmyPagePicture({required this.url, required this.height});
+  final String url;
+  final double height;
+  @override
+  State<_NgmyPagePicture> createState() => _NgmyPagePictureState();
+}
+
+class _NgmyPagePictureState extends State<_NgmyPagePicture> {
+  Uint8List? _bytes;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NgmyPagePicture old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url) {
+      _bytes = null;
+      _failed = false;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    final url = widget.url;
+    try {
+      final res = await ngmyEdgeInvoke({'action': 'advisorBrowserShot', 'url': url}, timeout: const Duration(seconds: 25));
+      final b64 = (res?['screenshotBase64'] ?? '').toString();
+      if (!mounted || url != widget.url) return;
+      setState(() {
+        if (b64.isNotEmpty) {
+          _bytes = base64Decode(b64);
+        } else {
+          _failed = true;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: () => ngmyOpenInRealBrowser(widget.url),
+        child: SizedBox(
+          height: widget.height,
+          width: double.infinity,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: ColoredBox(
+              color: const Color(0xFF0F172A),
+              child: _bytes != null
+                  ? Image.memory(_bytes!, fit: BoxFit.cover, alignment: Alignment.topCenter, cacheWidth: 900, gaplessPlayback: true)
+                  : Center(
+                      child: _failed
+                          ? const Text('Tap to open the page', style: TextStyle(color: Colors.white70))
+                          : const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+            ),
+          ),
+        ),
+      );
 }

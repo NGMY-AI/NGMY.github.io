@@ -143,6 +143,28 @@ bool ngmyAgentTextShowsNetworkBlock(String text) => RegExp(
       caseSensitive: false,
     ).hasMatch(text);
 
+/// Could this be something to do online (find a job, look something up, book, buy…)?
+/// Broad on purpose — the planner then decides for real (and says "not a web task" if not).
+bool ngmyMessageMightBeWebTask(String text) {
+  final t = text.trim();
+  if (t.length < 6 || ngmyUserMessageIsChitChat(t)) return false;
+  return RegExp(
+    r"\b(jobs?|hiring|careers?|work at|position|apply|application|find (me )?(a |an |the |some )?|search|look (for|up|into)|"
+    r"check|book|reserve|order|buy|purchase|price|cheapest|compare|near me|sign up|register|enroll|schedule|appointment|"
+    r"tickets?|flights?|hotels?|apartments?|rent|for sale|listings?|websites?|site|online|download|get me|show me|where can i)\b",
+    caseSensitive: false,
+  ).hasMatch(t);
+}
+
+/// The advisor's chat reply claims it is browsing / searching right now ("keep an eye on the
+/// browser", "I'm searching for that now") — only true if a browser task is actually running.
+bool ngmyAdvisorReplyClaimsBrowsing(String reply) => RegExp(
+      r"(keep an eye on|watch|check) (the|my) (browser|screen)|in the browser below|"
+      r"\bi'?m (now )?(searching|looking|putting|typing|checking|pulling up|opening|browsing|heading to|going to)\b.{0,60}\b(now|site|website|browser|page|careers|search)\b|"
+      r"\b(searching|looking) (for )?(that|it|those|them) (up )?now\b",
+      caseSensitive: false,
+    ).hasMatch(reply);
+
 // ── Run controller ─────────────────────────────────────────────────────────
 
 enum NgmyAgentStartResult { started, notConfigured, failed }
