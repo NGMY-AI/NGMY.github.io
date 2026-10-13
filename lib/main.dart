@@ -52,6 +52,7 @@ import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
+import 'ngmy_wallet_memory.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -345,6 +346,7 @@ String? _ngmyPrefsJson(SharedPreferences prefs, String key) {
 Future<NgmyLaunchBootstrap> ngmyLoadLaunchBootstrap() async {
   try {
     final prefs = await SharedPreferences.getInstance();
+    await NgmyWalletMemory.load(prefs);
     var themeMode = _kNgmyDefaultThemeMode;
     final savedTheme = (prefs.getString('theme_mode') ?? '').trim();
     if (savedTheme == 'light') themeMode = ThemeMode.light;
@@ -920,6 +922,10 @@ double ngmyResolveAccountBalance(
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
   final stored = storedBalance.clamp(0.0, double.infinity);
+  // Until the account's full history has downloaded, the phone only holds
+  // part of it — adding that part up gave $0 or too little, and replaced the
+  // real (saved / cloud) balance. Keep the saved balance until then.
+  if (!ngmyUserWalletLedgerSettled) return stored;
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
   if (txnCount == 0) return stored;
   return ngmyBalanceFromApprovedTransactions(email, transactions);
@@ -10215,6 +10221,39 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (_currentUser != null && mounted) setState(() {});
   }
 
+  /// Show the money this phone last saw for [u] right away (balance, profit,
+  /// today's earnings, plan). The history saved on the phone can be incomplete,
+  /// and recalculating from it showed $0 until the cloud caught up.
+  void _applyRememberedWallet(UserData u) {
+    final mem = NgmyWalletMemory.of(u.email);
+    if (mem == null) return;
+    final bal = (mem['balance'] as num?)?.toDouble();
+    if (bal != null && bal >= 0) u.accountBalance = bal;
+    final profit = (mem['totalProfit'] as num?)?.toDouble();
+    if (profit != null && u.totalProfit <= 0.001) u.totalProfit = profit;
+    final today = (mem['todayEarned'] as num?)?.toDouble();
+    if (today != null && u.todayClockInEarned <= 0.001) u.todayClockInEarned = today;
+    final inv = mem['investment'];
+    if (u.activeInvestment == null && inv is Map) {
+      try {
+        u.activeInvestment = ActiveInvestment.fromJson(Map<String, dynamic>.from(inv));
+      } catch (_) {}
+    }
+  }
+
+  /// Remember what Growth Income shows for the signed-in account.
+  void _rememberCurrentWallet() {
+    final u = _currentUser;
+    if (u == null) return;
+    NgmyWalletMemory.rememberWallet(
+      u.email,
+      balance: u.accountBalance,
+      totalProfit: u.totalProfit,
+      todayEarned: u.todayClockInEarned,
+      investment: u.activeInvestment?.toJson(),
+    );
+  }
+
   void _hydrateFromLaunchBootstrap(NgmyLaunchBootstrap b) {
     _resetWalletLedgerSyncState();
     _themeMode = b.themeMode;
@@ -10241,6 +10280,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     _appShellSig = _computeAppShellSig();
     _reconcileAllUserBalances();
     if (_currentUser != null) {
+      _applyRememberedWallet(_currentUser!);
       _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(_currentUser!.email);
       ngmySeedLiveBalance(
         _currentUser!.email,
@@ -10526,6 +10566,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _allUsers[idx] = _currentUser!;
         }
       });
+      // Show the saved money now — don't wait for the whole history to download.
+      ngmySeedLiveBalance(email, _currentUser!.accountBalance, allowIncrease: true);
+      _rememberCurrentWallet();
     } catch (e) {
       debugPrint('[user] growth income pull: $e');
     }
@@ -10934,6 +10977,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           await prefs.setString('ngmy_last_session_email', email);
         }
       }
+      _rememberCurrentWallet();
       // Each piece is saved on its own: on the web this storage is only ~5 MB,
       // and one oversized write used to throw and skip every write after it
       // (history, users, settings) — so after a refresh things "disappeared".
@@ -14289,6 +14333,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       }
 
+      _rememberCurrentWallet();
       // Always persist locally first so slow/offline Wi‑Fi never blocks the UI.
       // Each piece on its own so one full storage write can't skip the rest.
       await _safeSetPref(prefs, 'all_transactions', () => jsonEncode(_allTransactions.map(_txnForLocalCache).toList()));

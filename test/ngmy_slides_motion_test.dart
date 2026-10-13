@@ -26,4 +26,16 @@ void main() {
     expect(deck.slides[1].elements.any((e) => e.type == NgmySlideElementType.image && e.imageRef == 'data:image/jpeg;base64,BBBB'), isTrue);
     expect(ngmySlidesAiLogoOf(deck), 'data:image/png;base64,AAAA');
   });
+  test('your pictures go where the AI placed them (picture 2 on slide 2)', () {
+    final outline = ngmyParseSlidesAiOutline(
+      '{"title":"X","style":"ocean","slides":[{"kind":"title","title":"Hi","picture":1},{"kind":"bullets","title":"Team","bullets":["a"],"picture":2},{"kind":"bullets","title":"Plan","bullets":["b"]}]}',
+      fallbackStyle: 'ocean',
+    )!;
+    const p1 = 'data:image/jpeg;base64,ONE', p2 = 'data:image/jpeg;base64,TWO';
+    final deck = ngmyBuildSlidesAiDeck(outline, userPictures: [p1, p2]);
+    bool has(int i, String ref) => deck.slides[i].elements.any((e) => e.imageRef == ref);
+    expect(has(0, p1), isTrue);
+    expect(has(1, p2), isTrue);
+    expect(deck.slides[2].elements.any((e) => e.imageRef == p1 || e.imageRef == p2), isFalse);
+  });
 }

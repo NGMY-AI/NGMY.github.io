@@ -222,6 +222,7 @@ class NgmySlidesAiOutlineSlide {
     this.emoji = '',
     this.icon3d = '',
     this.imageQuery = '',
+    this.picture = 0,
   });
   final String kind; // title, bullets, section, quote, closing
   final String title;
@@ -231,6 +232,8 @@ class NgmySlidesAiOutlineSlide {
   final String emoji;
   final String icon3d;
   final String imageQuery;
+  /// Which of your own pictures goes on this slide (1-based; 0 = AI picks).
+  final int picture;
 }
 
 class NgmySlidesAiOutline {
@@ -276,6 +279,7 @@ extension NgmySlidesAiOutlineJson on NgmySlidesAiOutline {
               'emoji': s.emoji,
               'icon3d': s.icon3d,
               'image_query': s.imageQuery,
+              if (s.picture > 0) 'picture': s.picture,
             },
         ],
       });
@@ -287,6 +291,7 @@ String ngmySlidesAiEditPrompt({
   required String request,
   required int currentSlide,
   Set<NgmySlidesAiExtra> extras = const {},
+  int pictureCount = 0,
 }) {
   final styles = kNgmySlidesAiStyles.map((s) => s.id).join(', ');
   return '''
@@ -305,6 +310,7 @@ Rules:
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
 - Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
 $_kFrameRule
+${_pictureRule(pictureCount)}
 ${extras.contains(NgmySlidesAiExtra.emojis) ? '- New slides get an "emoji".\n' : ''}${extras.contains(NgmySlidesAiExtra.icons3d) ? '- New slides get an "icon3d" from: ${kNgmySlides3dIcons.join(', ')}.\n' : ''}${extras.contains(NgmySlidesAiExtra.pictures) ? '- New content slides get an "image_query" (2-3 English words).\n' : ''}- Reply with the WHOLE presentation as JSON only, no markdown, same shape:
 {"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
 ''';
@@ -315,6 +321,7 @@ String ngmySlidesAiPrompt({
   required int slideCount,
   required String styleId,
   Set<NgmySlidesAiExtra> extras = const {},
+  int pictureCount = 0,
 }) {
   final styles = kNgmySlidesAiStyles.map((s) => s.id).join(', ');
   final extraRules = StringBuffer();
@@ -341,6 +348,7 @@ Rules:
 - "notes": 1-2 sentences the presenter can say.
 $_kLanguageRule
 $_kFrameRule
+${_pictureRule(pictureCount)}
 - "style": ${styleId == 'auto' ? 'pick the best of: $styles (match the mood they describe: nature, vibe, celebration, colorful, professional...)' : 'use "$styleId"'}.
 $extraRules- Reply with JSON only, no markdown, in this shape:
 {"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"title","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
@@ -372,6 +380,7 @@ NgmySlidesAiOutline? ngmyParseSlidesAiOutline(String raw, {required String fallb
         emoji: '${e['emoji'] ?? ''}'.trim(),
         icon3d: _match3dIcon('${e['icon3d'] ?? ''}') ?? '',
         imageQuery: '${e['image_query'] ?? e['imageQuery'] ?? ''}'.trim(),
+        picture: int.tryParse('${e['picture'] ?? 0}') ?? 0,
       ));
     }
     if (slides.isEmpty) return null;
@@ -482,6 +491,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
 
   final hasLogo = (logo ?? '').isNotEmpty;
   var picIndex = 0;
+  // When the AI placed your pictures slide by slide, follow that exactly.
+  final placedByAi = outline.slides.any((s) => s.picture > 0 && s.picture <= userPictures.length);
 
   for (var i = 0; i < outline.slides.length; i++) {
     final o = outline.slides[i];
@@ -495,14 +506,19 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
     final asset = assets[i];
     final icon = asset?.icon3d;
     var picture = asset?.picture;
-    // Your own pictures come first on content slides.
-    if (userPictures.isNotEmpty && (o.kind == 'bullets' || o.kind == 'section' || !const {'title', 'quote', 'closing'}.contains(o.kind))) {
+    // Your own pictures: where you said (picture N), otherwise in order on
+    // the content slides.
+    final chosen = o.picture > 0 && o.picture <= userPictures.length;
+    if (chosen) {
+      picture = userPictures[o.picture - 1];
+    } else if (userPictures.isNotEmpty && !placedByAi && !const {'title', 'quote', 'closing'}.contains(o.kind)) {
       picture = userPictures[picIndex++ % userPictures.length];
     }
     final emoji = useEmoji ? o.emoji : '';
     final sideArt = picture ?? icon;
-    final heroArt = icon ?? picture;
-    final heroIsIcon = icon != null;
+    // A picture you placed on this slide takes the spotlight over a 3D icon.
+    final heroArt = chosen ? picture : (icon ?? picture);
+    final heroIsIcon = !chosen && icon != null;
 
     // A giant soft shape that sweeps across the show — on each slide you see
     // a different part of it, so moving between slides feels like one scene.
@@ -519,7 +535,7 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
         if (hasLogo) {
           els.add(image(logo!, 0.41, 0.04, 0.18, 0.27, anim: NgmySlideTransition.zoom, delay: 450, key: 'logo'));
         } else if (heroArt != null) {
-          els.add(image(heroArt, 0.42, 0.04, 0.16, 0.28, anim: artIn, delay: 500, key: 'hero', fx: heroIsIcon ? 'float3d' : ''));
+          els.add(image(heroArt, 0.42, 0.04, 0.16, 0.28, anim: artIn, delay: 500, key: heroIsIcon ? 'hero' : 'photo', fx: heroIsIcon ? 'float3d' : ''));
         } else if (emoji.isNotEmpty) {
           els.add(text(emoji, 0.40, 0.04, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
         }
@@ -555,7 +571,7 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
         if (hasLogo) {
           els.add(image(logo!, 0.41, 0.05, 0.18, 0.27, anim: NgmySlideTransition.zoom, delay: 400, key: 'logo'));
         } else if (heroArt != null) {
-          els.add(image(heroArt, 0.42, 0.05, 0.16, 0.28, anim: artIn, delay: 450, key: 'hero', fx: heroIsIcon ? 'float3d' : ''));
+          els.add(image(heroArt, 0.42, 0.05, 0.16, 0.28, anim: artIn, delay: 450, key: heroIsIcon ? 'hero' : 'photo', fx: heroIsIcon ? 'float3d' : ''));
         } else if (emoji.isNotEmpty) {
           els.add(text(emoji, 0.40, 0.05, 0.20, 0.24, 64, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 450, key: 'hero', fx: 'float3d'));
         }
@@ -692,7 +708,7 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
 }) async {
   onStatus?.call('Writing your $slideCount slides…');
   final outline = await _askForOutline(
-    ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras),
+    ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras, pictureCount: pictures.length),
     fallbackStyle: styleId == 'auto' ? 'colorful' : styleId,
     failMessage: 'The AI could not write the slides. Try describing it again.',
   );
@@ -714,7 +730,7 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
   onStatus?.call('Making your changes…');
   final current = ngmyParseSlidesAiOutline(outlineJson, fallbackStyle: 'colorful');
   final outline = await _askForOutline(
-    ngmySlidesAiEditPrompt(outlineJson: outlineJson, request: request, currentSlide: currentSlide, extras: extras),
+    ngmySlidesAiEditPrompt(outlineJson: outlineJson, request: request, currentSlide: currentSlide, extras: extras, pictureCount: pictures.length),
     fallbackStyle: current?.style ?? 'colorful',
     failMessage: 'The AI could not make that change. Try saying it another way.',
   );
@@ -836,12 +852,18 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
     } catch (_) {}
   }
 
+  static const _maxPictures = 20;
+
+  /// Pick one or many; each pick adds to the pictures already chosen (max 20).
   Future<void> _pickPictures() async {
+    final room = _maxPictures - _pictures.length;
+    if (room <= 0) return;
     try {
-      final imgs = await ImagePicker().pickMultiImage(maxWidth: 1100, maxHeight: 1100, imageQuality: 78, limit: 12);
+      final imgs = await ImagePicker().pickMultiImage(maxWidth: 1100, maxHeight: 1100, imageQuality: 78, limit: room > 1 ? room : null);
       if (imgs.isEmpty) return;
-      final out = <String>[];
-      for (final img in imgs.take(12)) {
+      final out = List<String>.from(_pictures);
+      for (final img in imgs) {
+        if (out.length >= _maxPictures) break;
         out.add(_dataUri(await img.readAsBytes(), img.name));
       }
       if (mounted) setState(() => _pictures = out);
@@ -1572,4 +1594,12 @@ class NgmySlidesAiLook {
   final String? logoRing;
   final String? photoFrame;
   final String? photoRing;
+}
+
+/// Tells the AI about the person's own pictures, numbered in the order picked.
+String _pictureRule(int count) {
+  if (count <= 0) return '';
+  return '- THEIR PICTURES: they uploaded $count picture${count == 1 ? '' : 's'} of their own, numbered 1 to $count in the order they picked them. '
+      'Put "picture": <number> on each slide where one belongs, following exactly what they say (e.g. "picture 2 on the team slide", "first picture on the title"). '
+      'If they don\'t say, spread them over the content slides in order. Use 0 where no picture is wanted.';
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'ngmy_wallet_memory.dart';
+
 String _ngmyEmailKey(String email) => email.toLowerCase().trim();
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 
@@ -20,6 +22,8 @@ void _ngmyWriteLiveBalance(String email, double balance, {required bool allowInc
   final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
   next[key] = balance;
   ngmyLiveBalanceCache.value = next;
+  // Kept on the phone so the next launch shows this money instantly.
+  NgmyWalletMemory.rememberBalance(key, balance);
 }
 
 void ngmySeedLiveBalance(String email, double balance, {bool allowIncrease = true}) {
