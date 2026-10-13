@@ -147,7 +147,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       if (mounted) unawaited(_load());
     });
     // Each pull is a wallet fetch plus deposit-status fetches; resume also pulls.
-    _balancePoll = Timer.periodic(const Duration(seconds: 30), (_) {
+    _balancePoll = Timer.periodic(const Duration(seconds: 12), (_) {
       final s = WidgetsBinding.instance.lifecycleState;
       if (s == AppLifecycleState.hidden || s == AppLifecycleState.paused) return;
       unawaited(_pullCloudWallet());
@@ -476,13 +476,14 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _user = user;
       _transactions = transactions;
       _walletStateRevision = revision;
-      _walletUpdatedAt = DateTime.now().toUtc();
     });
-    unawaited(_persist(
-      bumpWalletRevision: payoutAdded,
-      syncBalance: true,
-      allowDecrease: false,
-    ));
+    if (payoutAdded) {
+      unawaited(_persist(bumpWalletRevision: true, syncBalance: true, allowDecrease: false));
+    } else {
+      // Just opening the wallet must not re-stamp it as "newest" — that let a
+      // phone with older figures overwrite another phone's newer ones.
+      unawaited(_syncBalanceToCloud(allowDecrease: false));
+    }
   }
 
   Future<void> _persist({bool bumpWalletRevision = false, bool syncBalance = false, bool allowDecrease = false}) async {

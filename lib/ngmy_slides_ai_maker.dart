@@ -1098,20 +1098,39 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
                   Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700, fontSize: 12.5, height: 1.35)),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: _busy ? null : _send,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: green,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: green.withValues(alpha: 0.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                // Glossy green pill with a sparkle badge — no paper-plane icon.
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _busy ? null : _send,
+                    borderRadius: BorderRadius.circular(18),
+                    child: Ink(
+                      height: 54,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: LinearGradient(
+                          colors: _busy
+                              ? [green.withValues(alpha: 0.5), const Color(0xFF15803D).withValues(alpha: 0.5)]
+                              : const [Color(0xFF4ADE80), Color(0xFF22C55E), Color(0xFF15803D)],
+                        ),
+                        boxShadow: [BoxShadow(color: green.withValues(alpha: 0.35), blurRadius: 16, offset: const Offset(0, 6))],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.22)),
+                            child: _busy
+                                ? const Padding(padding: EdgeInsets.all(7), child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
+                                : const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 17),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(_busy ? _status : 'Make the change', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                        ],
+                      ),
                     ),
-                    icon: _busy
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                        : const Icon(Icons.send_rounded),
-                    label: Text(_busy ? _status : 'Make the change', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                   ),
                 ),
               ],

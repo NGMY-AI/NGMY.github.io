@@ -674,6 +674,11 @@ class NgmyLocalGrowthIncomeStore {
       );
     }
 
+    // History is never chosen side-by-side: rows from this phone and the cloud
+    // are merged by id, so a sync can't make wallet history disappear.
+    final mergedTxns = mergeTransactionHistories(localTransactions, cloud.transactions);
+    final mergedCredited = {...localCreditedIds, ...cloud.creditedTxnIds}.toList();
+
     final takeCloud = cloudWalletShouldWin(
       localUser: localUser,
       localTransactions: localTransactions,
@@ -684,52 +689,91 @@ class NgmyLocalGrowthIncomeStore {
       cloudRevision: cloud.walletStateRevision,
       cloudUpdatedAt: cloud.updatedAt,
     );
+    final cloudMissingRows = mergedTxns.length != cloud.transactions.length;
+    final localMissingRows = mergedTxns.length != localTransactions.length;
     if (takeCloud) {
       await save(
         realEmail,
         cloud.user,
-        cloud.transactions,
+        mergedTxns,
         walletStateRevision: cloud.walletStateRevision,
         updatedAt: cloud.updatedAt,
-        creditedTxnIds: cloud.creditedTxnIds.isNotEmpty ? cloud.creditedTxnIds : localCreditedIds,
+        creditedTxnIds: mergedCredited,
       );
+      // This phone had rows the cloud didn't — put them back in the cloud copy.
+      if (cloudMissingRows) {
+        await pushCloudWallet(
+          realEmail: realEmail,
+          user: cloud.user,
+          transactions: mergedTxns,
+          walletStateRevision: cloud.walletStateRevision,
+          updatedAt: cloud.updatedAt,
+          creditedTxnIds: mergedCredited,
+        );
+      }
       return (
         user: cloud.user,
-        transactions: cloud.transactions,
+        transactions: mergedTxns,
         walletStateRevision: cloud.walletStateRevision,
         updatedAt: cloud.updatedAt,
-        creditedTxnIds: cloud.creditedTxnIds.isNotEmpty ? cloud.creditedTxnIds : localCreditedIds,
+        creditedTxnIds: mergedCredited,
         adoptedCloud: true,
       );
     }
 
     final at = localUpdatedAt ?? DateTime.now().toUtc();
-    if (pushIfLocalWins) {
+    if (pushIfLocalWins || cloudMissingRows) {
       await save(
         realEmail,
         localUser,
-        localTransactions,
+        mergedTxns,
         walletStateRevision: localRevision,
         updatedAt: at,
-        creditedTxnIds: localCreditedIds,
+        creditedTxnIds: mergedCredited,
       );
       await pushCloudWallet(
         realEmail: realEmail,
         user: localUser,
-        transactions: localTransactions,
+        transactions: mergedTxns,
         walletStateRevision: localRevision,
         updatedAt: at,
-        creditedTxnIds: localCreditedIds,
+        creditedTxnIds: mergedCredited,
+      );
+    } else if (localMissingRows) {
+      await save(
+        realEmail,
+        localUser,
+        mergedTxns,
+        walletStateRevision: localRevision,
+        updatedAt: at,
+        creditedTxnIds: mergedCredited,
       );
     }
     return (
       user: localUser,
-      transactions: localTransactions,
+      transactions: mergedTxns,
       walletStateRevision: localRevision,
       updatedAt: at,
-      creditedTxnIds: localCreditedIds,
-      adoptedCloud: false,
+      creditedTxnIds: mergedCredited,
+      // Rows from the cloud were added here, so the screen must refresh too.
+      adoptedCloud: localMissingRows,
     );
+  }
+
+  /// Every history row from both copies, once each (newest first). When the
+  /// same row exists twice, a decided status (approved / rejected) beats pending.
+  static List<AppTransaction> mergeTransactionHistories(List<AppTransaction> a, List<AppTransaction> b) {
+    final byId = <String, AppTransaction>{};
+    for (final t in [...a, ...b]) {
+      if (t.id.isEmpty) continue;
+      final have = byId[t.id];
+      if (have == null || (have.status == TransactionStatus.pending && t.status != TransactionStatus.pending)) {
+        byId[t.id] = t;
+      }
+    }
+    final out = byId.values.toList()..sort((x, y) => y.timestamp.compareTo(x.timestamp));
+    // Keep the wallet copy a sensible size.
+    return out.length > 600 ? out.sublist(0, 600) : out;
   }
 }
 

@@ -156,3 +156,25 @@ Future<void> ngmyNotifyGameWin(String gameTitle, String body) async {
     await notify(gameTitle, body);
   }
 }
+
+/// When this device last saved a wallet change (balance, clock-in, plan) for
+/// an account. A cloud pull right after must not overwrite it with the older
+/// figures that are still on the server.
+final Map<String, DateTime> ngmyLocalWalletChangeAt = {};
+
+const _kWalletMoneyFields = {
+  'accountBalance', 'activeInvestment', 'isClockedIn', 'clockInStartTime', 'totalProfit',
+  'todayClockInEarned', 'lastClockInEarningsDate', 'pendingInvestmentName', 'pendingInvestmentAmount',
+};
+
+void ngmyMarkLocalWalletChange(Map<String, dynamic> row) {
+  final email = (row['email'] ?? '').toString().toLowerCase().trim();
+  if (email.isEmpty || !row.keys.any(_kWalletMoneyFields.contains)) return;
+  ngmyLocalWalletChangeAt[email] = DateTime.now();
+}
+
+/// True while a local wallet save may still be on its way to the server.
+bool ngmyWalletChangedLocallyRecently(String email, {Duration window = const Duration(seconds: 25)}) {
+  final at = ngmyLocalWalletChangeAt[email.toLowerCase().trim()];
+  return at != null && DateTime.now().difference(at) < window;
+}

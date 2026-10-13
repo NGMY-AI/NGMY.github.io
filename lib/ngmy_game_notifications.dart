@@ -281,15 +281,22 @@ Future<void> showNgmyGameReceiptSheet(
   BuildContext context, {
   required String email,
 }) async {
-  await NgmyGameNotifications.syncFromCloud(email);
-  final items = await NgmyGameNotifications.listFor(email, syncCloud: false);
+  // Open right away with what's on this phone; the cloud copy refreshes it.
+  final initial = await NgmyGameNotifications.listFor(email, syncCloud: false);
   if (!context.mounted) return;
+  unawaited(NgmyGameNotifications.syncFromCloud(email).then((_) => ngmyGameNotificationsTick.value++).catchError((_) {}));
 
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) {
+    builder: (ctx) => ValueListenableBuilder<int>(
+        valueListenable: ngmyGameNotificationsTick,
+        builder: (ctx, _, _) => FutureBuilder<List<NgmyGameNotification>>(
+        future: NgmyGameNotifications.listFor(email, syncCloud: false),
+        initialData: initial,
+        builder: (ctx, snap) {
+      final items = snap.data ?? initial;
       final bottom = MediaQuery.paddingOf(ctx).bottom;
       return Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.82),
@@ -459,6 +466,6 @@ Future<void> showNgmyGameReceiptSheet(
           ],
         ),
       );
-    },
+    })),
   );
 }

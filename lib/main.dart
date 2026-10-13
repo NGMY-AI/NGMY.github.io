@@ -1174,13 +1174,18 @@ List<AppTransaction> ngmyReplaceUserTransactionsFromCloud(
   if (key.isEmpty) return all;
   final dirty = dirtyTransactionIds ?? const {};
   final cloudOwn = cloudTxns.where((t) => ngmyNormalizeEmail(t.userEmail) == key).toList();
+  // An empty answer while this phone has history is a failed / cut-short
+  // fetch, not "everything was deleted" — keep what we have.
+  if (cloudOwn.isEmpty && all.any((t) => ngmyNormalizeEmail(t.userEmail) == key)) return all;
   final cloudIds = cloudOwn.map((t) => t.id).where((id) => id.isNotEmpty).toSet();
+  final recent = DateTime.now().subtract(const Duration(days: 2));
   final localPendingOnly = all.where((t) {
     if (ngmyNormalizeEmail(t.userEmail) != key) return false;
     if (t.id.isEmpty) return false;
     if (cloudIds.contains(t.id)) return false;
-    // Only keep rows this device created and has not finished syncing yet.
-    return dirty.contains(t.id);
+    // Keep rows this device made that may still be uploading — the in-memory
+    // dirty list is gone after a page refresh, so recent rows count too.
+    return dirty.contains(t.id) || t.timestamp.isAfter(recent);
   }).toList();
   final preserved = all.where((t) => ngmyNormalizeEmail(t.userEmail) != key).toList();
   return [...preserved, ...cloudOwn, ...localPendingOnly]
@@ -1733,6 +1738,7 @@ Future<bool> _safeUpsertUserRow(Map<String, dynamic> row) async {
   if (row.isEmpty) return true;
   var working = NgmyCloudPolicy.filterUserRowForCloud(row);
   if (working.isEmpty || !working.containsKey('email')) return true;
+  ngmyMarkLocalWalletChange(working);
   for (var i = 0; i < 12; i++) {
     try {
       // users.id is the table's primary key, but every row here is keyed by
@@ -9951,7 +9957,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _startCurrentUserPullLoop() {
     _currentUserPullTimer?.cancel();
     if (_currentUser == null) return;
-    _currentUserPullTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _currentUserPullTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted || _currentUser == null || _backgroundSyncPaused || _userExplicitlyLoggedOut) return;
       if (ngmyAppInBackground()) return;
       unawaited(_refreshCurrentUserFromCloud());
@@ -10061,6 +10067,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _reconcileAllUserBalances(ledgerSettled: true);
       });
       unawaited(_persistLocalOnly());
+      // Own rows from the last 2 days that the server still doesn't have
+      // (an upload that failed or was cut off by a refresh) go up again, so
+      // every phone on this account ends up with the same history.
+      if (!_ngmySessionIsAdmin(_currentUser) && remote.isNotEmpty) {
+        final key = ngmyNormalizeEmail(_currentUser!.email);
+        final cloudIds = remote.map((t) => t.id).toSet();
+        final recent = DateTime.now().subtract(const Duration(days: 2));
+        for (final t in _allTransactions) {
+          if (t.id.isEmpty || cloudIds.contains(t.id)) continue;
+          if (ngmyNormalizeEmail(t.userEmail) != key || !t.timestamp.isAfter(recent)) continue;
+          unawaited(_pushTransactionToCloudReliable(t));
+        }
+      }
     } catch (e) {
       debugPrint('[user] transactions refresh: $e');
     }
@@ -10475,6 +10494,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         timeout: kNgmyCloudLoadTimeout,
       );
       if (rows.isEmpty || !mounted || _currentUser == null) return;
+      // This phone just saved a money / clock-in / plan change; the server may
+      // still hold the older figures. Applying them now made money vanish and
+      // come back, and plans drop. The next pull picks up the saved values.
+      if (ngmyWalletChangedLocallyRecently(email)) return;
       final remote = UserData.fromJson({
         ..._currentUser!.toJson(),
         ...rows.first,
@@ -19463,12 +19486,11 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
                                     onTap: () async {
-                                      await NgmyGameNotifications.syncFromCloud(widget.user.email);
-                                      await ngmyBackfillGameWinNotificationsFromLedger(
+                                      // Open at once; wins from the ledger fill in behind it.
+                                      unawaited(ngmyBackfillGameWinNotificationsFromLedger(
                                         widget.user.email,
                                         widget.allTransactions,
-                                      );
-                                      if (!context.mounted) return;
+                                      ).catchError((_) {}));
                                       await showNgmyGameReceiptSheet(
                                         context,
                                         email: widget.user.email,
@@ -32133,6 +32155,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     _subscribeToCivicHelpBroadcasts();
     WidgetsBinding.instance.addObserver(this);
     _showRememberedCivicTrialBanner();
+    unawaited(_loadCachedNationwideStats());
     // Seed in-memory civic contributions immediately so Contribution Receipts
     // are not empty while async local/cloud hydration runs (e.g. right after
     // help mode deactivation or app reopen).
@@ -32531,6 +32554,26 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     await showNgmyHelperGiftReceivedDialog(context, gifts.first);
   }
 
+  static const _kNationwideStatsCacheKey = 'ngmy_civic_nationwide_stats_cache_v1';
+
+  /// Last money totals from the server, shown right away after a refresh.
+  Future<void> _loadCachedNationwideStats() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kNationwideStatsCacheKey);
+      if (raw == null || !mounted || _sharedNationwideStats != null) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) setState(() => _sharedNationwideStats = Map<String, dynamic>.from(decoded));
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedNationwideStats(Map<String, dynamic> stats) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kNationwideStatsCacheKey, jsonEncode(stats));
+    } catch (_) {}
+  }
+
   Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
     if (_helpRefreshInFlight) {
       final pending = _helpRefreshCompleter;
@@ -32566,6 +32609,13 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     ];
     final priorClaims = List<AppTransaction>.from(_communityClaims);
     final nationwideStatsFuture = ngmyCivicFetchNationwideStats();
+    // Show the server's money totals the moment they arrive (they used to wait
+    // for the whole contribution download), and keep them for the next open.
+    unawaited(nationwideStatsFuture.then((stats) {
+      if (stats == null || !mounted) return;
+      setState(() => _sharedNationwideStats = Map<String, dynamic>.from(stats));
+      unawaited(_saveCachedNationwideStats(stats));
+    }).catchError((_) {}));
     final results = await Future.wait([
       // Nationwide totals and each state case use the same complete ledger.
       // A state-scoped fetch left every unvisited state absent from the
@@ -44269,47 +44319,6 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
                 ],
               ),
-            const SizedBox(height: 15),
-            // Give & Lend: your own requests and loans (to give to someone,
-            // search them and tap the badge on their member card).
-            Material(
-              color: isDark ? const Color(0xFF0F2A22) : const Color(0xFFECFDF5),
-              borderRadius: BorderRadius.circular(18),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => unawaited(showNgmyCivicGives(context)),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(colors: [Color(0xFF10B981), Color(0xFF065F46)]),
-                        ),
-                        child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Give & Lend', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF064E3B))),
-                            Text(
-                              'Your requests and loans · to give, search a member and tap the badge on their card',
-                              style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white60 : const Color(0xFF065F46)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF10B981)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
             const SizedBox(height: 30),
 
             // Search/Action Box — voting card only on Search, at the bottom.
@@ -49419,13 +49428,13 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(8),
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
-                                color: _storePurple.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: _storePurple.withOpacity(0.35)),
+                                borderRadius: BorderRadius.circular(13),
+                                gradient: const LinearGradient(colors: [Color(0xFF818CF8), Color(0xFF7C3AED)]),
                               ),
-                              child: const Icon(Icons.chat_bubble_rounded, color: _storePurple),
+                              child: const Icon(Icons.forum_rounded, color: Colors.white, size: 20),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
@@ -51039,14 +51048,21 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
           child: Stack(
             clipBehavior: Clip.none,
             children: [
+              // Messages / payment updates: glossy gradient squircle.
               Container(
-                padding: const EdgeInsets.all(8),
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6, offset: const Offset(0, 2))],
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF818CF8), Color(0xFF6366F1), Color(0xFF7C3AED)],
+                  ),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+                  boxShadow: [BoxShadow(color: const Color(0xFF6366F1).withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(0, 4))],
                 ),
-                child: const Icon(Icons.chat_bubble_rounded, color: _storeAccent, size: 21),
+                child: const Icon(Icons.forum_rounded, color: Colors.white, size: 21),
               ),
               if (unread > 0)
                 Positioned(

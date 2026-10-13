@@ -99,7 +99,7 @@ void ngmyCivicGivesStartWatcher(String email) {
       String? body;
       if (!mine && status == 'pending') {
         title = 'New request in Civic Registry';
-        body = '$other wants to give you $what. Open your Civic Registry profile to accept.';
+        body = '$other wants to give you $what. In Civic Registry, search your name and tap the giving badge on your card to accept.';
       } else if (mine && status == 'accepted') {
         title = '$other accepted and signed';
         body = 'Your receipt for $what is ready in Civic Registry.';
