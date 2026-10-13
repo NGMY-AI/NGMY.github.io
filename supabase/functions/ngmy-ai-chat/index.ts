@@ -2205,7 +2205,15 @@ async function ngmyRunMaintenance(db: any): Promise<boolean> {
   const { data: s1 } = await db.from("ngmy_settings").delete().like("key", "ngmy_doc_share_stash_v2_%").lt("updated_at", stashCutoff).select("key");
   const { data: s2 } = await db.from("ngmy_settings").delete().like("key", "%_qr_stashes_v1").lt("updated_at", stashCutoff).select("key");
 
-  // 4) Logs.
+  // 4) Overdue gives in Civic Registry: file the automatic claims.
+  try {
+    const giveItems = await giveLoad(db);
+    if (await giveSweep(db, giveItems, await giveLiveMembers(db))) await giveSave(db, giveItems);
+  } catch (e) {
+    console.log("[maintenance] civic gives", String(e));
+  }
+
+  // 5) Logs.
   await db.from("ngmy_security_events").delete().lt("at", new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString());
   await db.from("ngmy_rate_limits").delete().lt("window_start", new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString());
 
@@ -6833,6 +6841,354 @@ function applyCivicFamily(
   return { spawned };
 }
 
+
+// ── Civic Registry: Give & Lend ─────────────────────────────────────────────
+// A member gives (or lends) money, an item or a service to another member.
+// Both sides unlock it with their own Registry ID + date of birth. The
+// receiver accepts and signs; the giver gets a receipt. If it is not paid
+// back / returned within 3 days after the due date, an AI-written claim is
+// filed on the receiver's Civic Registry record automatically.
+
+const CIVIC_GIVES_KEY = "civic_gives_v1";
+const CIVIC_GIVE_ACTIONS = new Set([
+  "civicGiveUnlock", "civicGiveList", "civicGiveCreate", "civicGiveRespond", "civicGiveUpdate", "civicGiveInbox",
+]);
+const CIVIC_GIVE_GRACE_MS = 3 * 24 * 3600 * 1000;
+const CIVIC_GIVE_MAX_SIGNATURE = 260 * 1024;
+
+type CivicGive = Record<string, any>;
+
+function giveText(v: unknown, max: number): string {
+  return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+}
+
+/** Digits of a birthday as MMDDYYYY (accepts MM/DD/YYYY and YYYY-MM-DD). */
+function giveDobKey(v: unknown): string {
+  const s = String(v ?? "").trim();
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[2].padStart(2, "0")}${iso[3].padStart(2, "0")}${iso[1]}`;
+  const us = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (us) return `${us[1].padStart(2, "0")}${us[2].padStart(2, "0")}${us[3]}`;
+  return s.replace(/\D/g, "");
+}
+
+function giveIsGuestEmail(e: string): boolean {
+  return !e || e.endsWith("@guest.ngmy") || e.startsWith("civic.");
+}
+
+async function giveLiveMembers(db: any): Promise<Record<string, unknown>[]> {
+  const payload = await loadCivicPayload(db);
+  return filterTombstonedMembers(
+    asMemberList(payload.members),
+    asMemberList(payload.removed),
+    asMemberList(payload.deceased),
+  );
+}
+
+function giveMemberByRid(live: Record<string, unknown>[], rid: string): Record<string, unknown> | undefined {
+  const want = rid.trim().toUpperCase();
+  if (!want) return undefined;
+  return live.find((m) => String(m.registryId ?? "").trim().toUpperCase() === want);
+}
+
+function giveMemberName(m: Record<string, unknown>): string {
+  return giveText(m.fullName ?? m.username ?? "Member", 80) || "Member";
+}
+
+/** The caller's own account's Registry ID (users row), if any. */
+async function giveAccountRid(db: any, email: string): Promise<string> {
+  try {
+    const { data } = await db.from("users").select("*").eq("email", email).maybeSingle();
+    return String(data?.registryId ?? data?.registry_id ?? "").trim().toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+/** Checks Registry ID + birthday, and that this Registry ID is not someone else's account. */
+async function giveVerify(db: any, live: Record<string, unknown>[], caller: string, rid: unknown, dob: unknown):
+  Promise<{ ok: true; member: Record<string, unknown>; rid: string } | { ok: false; error: string }> {
+  const id = String(rid ?? "").trim().toUpperCase();
+  const m = giveMemberByRid(live, id);
+  const wantDob = giveDobKey(dob);
+  if (!m || !wantDob || giveDobKey(m.dob) !== wantDob) {
+    return { ok: false, error: "That Registry ID and date of birth don't match a member." };
+  }
+  const linked = [emailKey(String(m.email ?? "")), emailKey(String(m.linkedAppEmail ?? ""))].filter((e) => !giveIsGuestEmail(e));
+  if (linked.length > 0 && !linked.includes(caller)) {
+    const accountRid = await giveAccountRid(db, caller);
+    if (accountRid !== id) return { ok: false, error: "This Registry ID belongs to another account." };
+  }
+  return { ok: true, member: m, rid: id };
+}
+
+/** Every Registry ID that belongs to this signed-in account (for notifications). */
+async function giveRidsForAccount(db: any, live: Record<string, unknown>[], caller: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (const m of live) {
+    const id = String(m.registryId ?? "").trim().toUpperCase();
+    if (!id) continue;
+    if (emailKey(String(m.email ?? "")) === caller || emailKey(String(m.linkedAppEmail ?? "")) === caller) out.add(id);
+  }
+  const accountRid = await giveAccountRid(db, caller);
+  if (accountRid) out.add(accountRid);
+  return out;
+}
+
+async function giveLoad(db: any): Promise<CivicGive[]> {
+  const value = await loadSettingsObject(db, CIVIC_GIVES_KEY);
+  return Array.isArray(value.items) ? (value.items as CivicGive[]).filter((x) => x && typeof x === "object") : [];
+}
+
+async function giveSave(db: any, items: CivicGive[]): Promise<boolean> {
+  // Keep the newest 5000 (finished ones older than 2 years drop off first).
+  const cutoff = Date.now() - 2 * 365 * 24 * 3600 * 1000;
+  const kept = items
+    .filter((g) => ["pending", "accepted"].includes(g.status) || Date.parse(String(g.updatedAt ?? "")) > cutoff)
+    .slice(-5000);
+  return (await saveSettingsObject(db, CIVIC_GIVES_KEY, { items: kept })).ok;
+}
+
+function giveWhat(g: CivicGive): string {
+  if (g.kind === "money") return `$${Number(g.amount ?? 0).toFixed(2)}`;
+  return giveText(g.title, 80) || "an item";
+}
+
+function giveFallbackClaim(g: CivicGive): string {
+  const due = String(g.dueAt ?? "").slice(0, 10);
+  const verb = g.kind === "money" ? "pay back" : "return";
+  return `Unpaid ${g.kind === "money" ? "loan" : "give"}: ${g.recipient?.name} received ${giveWhat(g)} from ${g.giver?.name} ` +
+    `on ${String(g.givenAt ?? "").slice(0, 10)} and agreed to ${verb} it by ${due}. ` +
+    `It was not ${g.kind === "money" ? "paid back" : "returned"} within 3 days after that date. Receipt ${g.receiptNo}.`;
+}
+
+/** AI writes the claim from everything collected when it was given. */
+async function giveWriteClaim(g: CivicGive): Promise<string> {
+  const fallback = giveFallbackClaim(g);
+  try {
+    const key = await resolveServerAiApiKey();
+    if (!key) return fallback;
+    const qa = (Array.isArray(g.qa) ? g.qa : []).map((x: any) => `Q: ${x.q}\nA: ${x.a}`).join("\n");
+    const prompt = `You write short, factual claim records for a community registry.
+Something was given and not paid back / returned on time. Write the claim (max 90 words, plain sentences, no markdown, no headings).
+Say who gave what to whom, the dates, what was agreed, and that it was not ${g.kind === "money" ? "paid back" : "returned"} within the 3-day grace period. Only use the facts below; never invent anything.
+
+Kind: ${g.kind}
+What: ${giveWhat(g)}${g.kind !== "money" && g.description ? ` — ${g.description}` : ""}${g.itemValue ? ` (value about $${g.itemValue})` : ""}
+Giver: ${g.giver?.name} (Registry ID ${g.giver?.rid})
+Receiver: ${g.recipient?.name} (Registry ID ${g.recipient?.rid})
+Given on: ${String(g.givenAt ?? "").slice(0, 10)}
+Due back: ${String(g.dueAt ?? "").slice(0, 10)}
+Receiver signed as: ${g.signature?.name ?? ""} on ${String(g.signature?.at ?? "").slice(0, 10)}
+Receipt: ${g.receiptNo}
+Details given at the time:
+${qa || "(none)"}
+${g.note ? `Note: ${g.note}` : ""}`;
+    const text = (await geminiChat(key, prompt)).replace(/[*#`]/g, "").trim();
+    return text.length > 20 ? text.slice(0, 900) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Files the automatic claims that are due. Returns true when something changed. */
+async function giveSweep(db: any, items: CivicGive[], live: Record<string, unknown>[]): Promise<boolean> {
+  let changed = false;
+  const now = Date.now();
+  for (const g of items) {
+    if (g.status !== "accepted" || g.claimId) continue;
+    const due = Date.parse(String(g.dueAt ?? ""));
+    if (!Number.isFinite(due) || now < due + 24 * 3600 * 1000 + CIVIC_GIVE_GRACE_MS) continue;
+    const text = await giveWriteClaim(g);
+    const member = giveMemberByRid(live, String(g.recipient?.rid ?? ""));
+    const who = emailKey(String(member?.email ?? g.recipient?.email ?? "")) ||
+      `civic.${String(g.recipient?.rid ?? "").toLowerCase()}@guest.ngmy`;
+    const claimId = `claim_give_${g.id}`;
+    const { error } = await db.from("transactions").upsert({
+      id: claimId,
+      userEmail: who,
+      amount: 0,
+      type: 6,
+      method: 2,
+      sourceDetails: text,
+      status: 0,
+      timestamp: new Date().toISOString(),
+    }, { onConflict: "id" });
+    if (error) {
+      console.log("[civic-give] claim insert failed", error.message);
+      continue;
+    }
+    g.status = "claimed";
+    g.claimId = claimId;
+    g.claimAt = new Date().toISOString();
+    g.claimText = text;
+    g.updatedAt = g.claimAt;
+    changed = true;
+  }
+  return changed;
+}
+
+function givePublic(g: CivicGive, myRids: Set<string>): CivicGive {
+  const out = { ...g };
+  out.role = myRids.has(String(g.giver?.rid ?? "")) ? "giver" : "receiver";
+  if (out.giver) out.giver = { rid: out.giver.rid, name: out.giver.name, state: out.giver.state };
+  if (out.recipient) out.recipient = { rid: out.recipient.rid, name: out.recipient.name, state: out.recipient.state };
+  return out;
+}
+
+function giveDateIso(v: unknown): string {
+  const s = String(v ?? "").trim();
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? new Date(t).toISOString() : "";
+}
+
+async function handleCivicGive(req: Request, action: string, body: any): Promise<Response> {
+  const caller = await requireJwtEmail(req);
+  if (!caller) return jsonOk({ ok: false, error: "Please sign in first." }, 401);
+  const db = adminClient();
+  if (!db) return jsonOk({ ok: false, error: "Server misconfigured" }, 500);
+  const live = await giveLiveMembers(db);
+  let items = await giveLoad(db);
+  const swept = await giveSweep(db, items, live);
+  if (swept) await giveSave(db, items);
+
+  // Light inbox for notifications: no birthday needed, only the account's own records.
+  if (action === "civicGiveInbox") {
+    const mine = await giveRidsForAccount(db, live, caller);
+    const rows = items
+      .filter((g) => mine.has(String(g.giver?.rid ?? "")) || mine.has(String(g.recipient?.rid ?? "")))
+      .slice(-60)
+      .map((g) => ({
+        id: g.id,
+        status: g.status,
+        role: mine.has(String(g.giver?.rid ?? "")) ? "giver" : "receiver",
+        kind: g.kind,
+        what: giveWhat(g),
+        other: mine.has(String(g.giver?.rid ?? "")) ? g.recipient?.name : g.giver?.name,
+        updatedAt: g.updatedAt,
+      }));
+    return jsonOk({ ok: true, items: rows });
+  }
+
+  const v = await giveVerify(db, live, caller, body?.rid, body?.dob);
+  if (!v.ok) return jsonOk({ ok: false, error: v.error }, 403);
+  const me = v.rid;
+  const myName = giveMemberName(v.member);
+  const mine = new Set([me]);
+
+  if (action === "civicGiveUnlock") {
+    return jsonOk({ ok: true, me: { rid: me, name: myName, state: String(v.member.state ?? "") } });
+  }
+
+  if (action === "civicGiveList") {
+    const rows = items
+      .filter((g) => g.giver?.rid === me || g.recipient?.rid === me)
+      .sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")))
+      .slice(0, 200)
+      .map((g) => givePublic(g, mine));
+    return jsonOk({ ok: true, me: { rid: me, name: myName }, items: rows });
+  }
+
+  if (action === "civicGiveCreate") {
+    const to = giveMemberByRid(live, String(body?.to ?? ""));
+    if (!to) return jsonOk({ ok: false, error: "That member was not found." }, 404);
+    const toRid = String(to.registryId ?? "").trim().toUpperCase();
+    if (toRid === me) return jsonOk({ ok: false, error: "You can't give to yourself." }, 400);
+    const kind = ["money", "item", "service", "other"].includes(String(body?.kind)) ? String(body.kind) : "money";
+    const amount = Math.round(Number(body?.amount ?? 0) * 100) / 100;
+    if (kind === "money" && !(amount > 0 && amount <= 1_000_000)) {
+      return jsonOk({ ok: false, error: "Enter the amount of money." }, 400);
+    }
+    const title = giveText(body?.title, 80);
+    if (kind !== "money" && !title) return jsonOk({ ok: false, error: "Say what you're giving." }, 400);
+    const givenAt = giveDateIso(body?.givenAt) || new Date().toISOString();
+    const dueAt = giveDateIso(body?.dueAt);
+    if (!dueAt) return jsonOk({ ok: false, error: "Pick the date it must be paid back / returned." }, 400);
+    if (Date.parse(dueAt) < Date.parse(givenAt)) return jsonOk({ ok: false, error: "The return date must be after the date it's given." }, 400);
+    const qa = (Array.isArray(body?.qa) ? body.qa : []).slice(0, 10)
+      .map((x: any) => ({ q: giveText(x?.q, 200), a: giveText(x?.a, 500) }))
+      .filter((x: any) => x.q && x.a);
+    const pendingSame = items.filter((g) => g.giver?.rid === me && g.status === "pending").length;
+    if (pendingSame >= 20) return jsonOk({ ok: false, error: "You have too many requests waiting. Wait for answers first." }, 429);
+    const now = new Date().toISOString();
+    const g: CivicGive = {
+      id: `give_${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`,
+      createdAt: now,
+      updatedAt: now,
+      status: "pending",
+      kind,
+      amount: kind === "money" ? amount : 0,
+      title: kind === "money" ? (title || "Money") : title,
+      description: giveText(body?.description, 400),
+      itemValue: kind === "money" ? 0 : Math.max(0, Math.round(Number(body?.itemValue ?? 0) * 100) / 100),
+      givenAt,
+      dueAt,
+      qa,
+      note: giveText(body?.note, 300),
+      giver: { rid: me, name: myName, state: String(v.member.state ?? ""), email: emailKey(String(v.member.email ?? "")) || caller },
+      recipient: {
+        rid: toRid,
+        name: giveMemberName(to),
+        state: String(to.state ?? ""),
+        email: emailKey(String(to.linkedAppEmail ?? "")) || emailKey(String(to.email ?? "")),
+      },
+    };
+    items.push(g);
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  const g = items.find((x) => x.id === String(body?.id ?? ""));
+  if (!g) return jsonOk({ ok: false, error: "That request was not found." }, 404);
+  const now = new Date().toISOString();
+
+  if (action === "civicGiveRespond") {
+    if (g.recipient?.rid !== me) return jsonOk({ ok: false, error: "Only the receiver can answer this." }, 403);
+    if (g.status !== "pending") return jsonOk({ ok: false, error: "This request was already answered." }, 409);
+    if (body?.accept === true) {
+      const signName = giveText(body?.signName, 80);
+      const signImage = String(body?.signImage ?? "");
+      if (signName.length < 3) return jsonOk({ ok: false, error: "Type your full name to sign." }, 400);
+      if (!signImage.startsWith("data:image/png;base64,") || signImage.length > CIVIC_GIVE_MAX_SIGNATURE) {
+        return jsonOk({ ok: false, error: "Please sign in the box." }, 400);
+      }
+      g.status = "accepted";
+      g.signature = { name: signName, image: signImage, at: now };
+      g.receiptNo = `NGMY-${Date.now().toString(36).toUpperCase().slice(-6)}-${g.id.slice(-4).toUpperCase()}`;
+      g.acceptedAt = now;
+    } else {
+      g.status = "declined";
+      g.declinedAt = now;
+    }
+    g.updatedAt = now;
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  if (action === "civicGiveUpdate") {
+    if (g.giver?.rid !== me) return jsonOk({ ok: false, error: "Only the giver can change this." }, 403);
+    const op = String(body?.op ?? "");
+    if (op === "cancel") {
+      if (g.status !== "pending") return jsonOk({ ok: false, error: "Only a waiting request can be cancelled." }, 409);
+      g.status = "cancelled";
+    } else if (op === "returned") {
+      if (g.status !== "accepted" && g.status !== "claimed") {
+        return jsonOk({ ok: false, error: "Only an accepted give can be marked paid back." }, 409);
+      }
+      g.status = "returned";
+      g.returnedAt = now;
+      // Paid after a claim was filed: the claim is closed (resolved).
+      if (g.claimId) await db.from("transactions").update({ status: 1 }).eq("id", g.claimId);
+    } else {
+      return jsonOk({ ok: false, error: "Unknown change." }, 400);
+    }
+    g.updatedAt = now;
+    if (!(await giveSave(db, items))) return jsonOk({ ok: false, error: "Could not save. Try again." }, 500);
+    return jsonOk({ ok: true, item: givePublic(g, mine) });
+  }
+
+  return jsonOk({ ok: false, error: "Unknown action." }, 400);
+}
 async function handleCivicUpsertMember(
   req: Request,
   body: Record<string, unknown>,
@@ -8798,6 +9154,12 @@ serve(async (req) => {
       cw: "civicUserGroupsJoin",
       cx: "civicGuestSelfUpdate",
       cy: "civicDeleteRegistrarApplication",
+      k1: "civicGiveUnlock",
+      k2: "civicGiveList",
+      k3: "civicGiveCreate",
+      k4: "civicGiveRespond",
+      k5: "civicGiveUpdate",
+      k6: "civicGiveInbox",
       a1: "aiKeyConfigured",
       a2: "saveAiApiKey",
       a3: "verifyPasswordLogin",
@@ -9098,6 +9460,11 @@ serve(async (req) => {
 
     if (action === "freeTimeGet" || action === "freeTimeAdd") return await handleFreeTime(req, action, body);
     if (HW_ACTIONS.has(action)) return await handleHouseWorkers(req, action, body);
+    if (CIVIC_GIVE_ACTIONS.has(action)) {
+      const limited = await enforceRateLimit(req, action === "civicGiveInbox" ? "civic_give_inbox" : "civic_give", clientIp(req), action === "civicGiveInbox" ? 120 : 40, 3600);
+      if (limited) return limited;
+      return await handleCivicGive(req, action, body);
+    }
     if (STORE_ACTIONS.has(action)) return await handleStoreAccess(req, action, body);
 
     if (["relStatus", "relTouch", "relStart", "relEnd"].includes(action)) {

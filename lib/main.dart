@@ -47,6 +47,7 @@ import 'ngmy_menu_guest.dart';
 import 'ngmy_bio_guest.dart';
 import 'ngmy_civic_enroll_guest.dart';
 import 'ngmy_civic_family.dart';
+import 'ngmy_civic_gives.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -14323,6 +14324,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Future<void> _clearAllAnnouncementsRemote() async {}
 
   @override Widget build(BuildContext context) {
+    // Give & Lend notifications follow whoever is signed in (no-op when unchanged).
+    final giveEmail = _currentUser?.email.trim() ?? '';
+    if (giveEmail.isEmpty) {
+      ngmyCivicGivesStopWatcher();
+    } else {
+      ngmyCivicGivesStartWatcher(giveEmail);
+    }
     final isDarkMode = _effectiveThemeMode == ThemeMode.dark;
     final style = isDarkMode
         ? const SystemUiOverlayStyle(
@@ -40420,6 +40428,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       ],
                     ),
                     const SizedBox(height: 14),
+                    // Give & Lend badge sits on the frame's top corner, like the Rankings award.
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
@@ -40461,6 +40473,21 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           ],
                         ],
                       ),
+                    ),
+                        if (!isDeceased && (u.registryId ?? '').trim().isNotEmpty)
+                          Positioned(
+                            top: -11,
+                            right: 10,
+                            child: NgmyCivicGiveBadge(
+                              isDark: isDark,
+                              onTap: () => unawaited(showNgmyCivicGives(
+                                ctx,
+                                targetRid: (u.registryId ?? '').trim(),
+                                targetName: displayName,
+                              )),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     Row(
@@ -44242,6 +44269,47 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
                 ],
               ),
+            const SizedBox(height: 15),
+            // Give & Lend: your own requests and loans (to give to someone,
+            // search them and tap the badge on their member card).
+            Material(
+              color: isDark ? const Color(0xFF0F2A22) : const Color(0xFFECFDF5),
+              borderRadius: BorderRadius.circular(18),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () => unawaited(showNgmyCivicGives(context)),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(colors: [Color(0xFF10B981), Color(0xFF065F46)]),
+                        ),
+                        child: const Icon(Icons.volunteer_activism_rounded, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Give & Lend', style: TextStyle(fontWeight: FontWeight.w900, color: isDark ? Colors.white : const Color(0xFF064E3B))),
+                            Text(
+                              'Your requests and loans · to give, search a member and tap the badge on their card',
+                              style: TextStyle(fontSize: 11.5, color: isDark ? Colors.white60 : const Color(0xFF065F46)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, color: Color(0xFF10B981)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 30),
 
             // Search/Action Box — voting card only on Search, at the bottom.
