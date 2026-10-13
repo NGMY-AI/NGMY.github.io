@@ -162,7 +162,9 @@ class NgmyAdvisorBrowserChatCard extends StatelessWidget {
       Widget img;
       try {
         img = Image.memory(
-          base64Decode(shot),
+          _ngmyShotBytes(shot),
+          // A small preview card — decode it small, not at full screenshot size.
+          cacheWidth: 640,
           fit: BoxFit.cover,
           alignment: Alignment.topCenter,
           gaplessPlayback: true,
@@ -277,4 +279,19 @@ class NgmyAdvisorReactionBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+// Screenshots decoded once (the chat redraws often while the browser works).
+final _ngmyShotCache = <int, Uint8List>{};
+
+Uint8List _ngmyShotBytes(String b64) {
+  final key = Object.hash(b64.length, b64.substring(0, b64.length < 128 ? b64.length : 128), b64.substring(b64.length > 128 ? b64.length - 128 : 0));
+  final hit = _ngmyShotCache[key];
+  if (hit != null) return hit;
+  final bytes = base64Decode(b64);
+  _ngmyShotCache[key] = bytes;
+  while (_ngmyShotCache.length > 8) {
+    _ngmyShotCache.remove(_ngmyShotCache.keys.first);
+  }
+  return bytes;
 }

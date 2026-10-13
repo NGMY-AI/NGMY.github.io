@@ -40,5 +40,20 @@ class _NgmyAdvisorLiveViewState extends State<NgmyAdvisorLiveView> {
   }
 
   @override
+  void dispose() {
+    // Stop the live video stream right away — an old view left streaming (after a
+    // reconnect, hide or full screen) kept eating memory until the phone reloaded the app.
+    final f = _frame;
+    _frame = null;
+    if (f != null) {
+      try {
+        f.src = 'about:blank';
+        f.remove();
+      } catch (_) {}
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => HtmlElementView(viewType: _viewType);
 }

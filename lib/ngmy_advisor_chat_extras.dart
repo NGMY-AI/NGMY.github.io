@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -99,7 +100,7 @@ List<NgmyAdvisorBrowserCommand> ngmyParseAdvisorBrowserCommands(String raw) {
 
 String ngmyStripAdvisorBrowserCommandTags(String raw) => raw.replaceAll(_browserCmdTag, '').trim();
 
-const _allowedReactions = {'❤️', '💕', '🥰', '👍', '😂', '🙏', '🔥', '✨', '💖', '😊', '🎉', '😢', '😮', '💯'};
+const _allowedReactions = {'❤️', '💕', '🥰', '👍', '😂', '🙏', '🔥', '✨', '💖', '😊', '🎉', '😢', '😮', '💯', '🫂'};
 
 String _normalizeReaction(String raw) {
   final t = raw.trim();
@@ -241,6 +242,10 @@ String ngmyAdvisorPickReactionEmoji({
   if (has(r"\b(passed away|died|funeral|lost my (job|mom|dad|mother|father|baby|friend)|got fired|laid off|broke up|heartbroken|depressed|so sad|i'?m sad|crying|in the hospital|diagnosed|miscarriage|divorce)\b")) {
     return '😢';
   }
+  // Upset or angry — a hug, not a thumbs up.
+  if (has(r"\b(so mad|i'?m mad|angry|pissed( off)?|furious|frustrated|annoyed|fed up|i hate (this|it|my)|sick of|stressed( out)?|overwhelmed|can'?t take (it|this))\b")) {
+    return '🫂';
+  }
   if (has(r'\b(thank|thanks|thx|appreciate|grateful|bless you|god bless)\b')) return '🙏';
   if (has(r'\b(pray for|praying|prayer|amen|church|lord|jesus)\b')) return '🙏';
   if (has(r'(\b(lol|lmao|lmfao|haha+|hehe|rofl|funny|hilarious|joke)\b|😂|🤣)')) return '😂';
@@ -321,4 +326,34 @@ String ngmyAdvisorBrowserHostLabel(String url) {
   } catch (_) {
     return 'Website';
   }
+}
+
+/// How likely a real person is to react to this kind of message (0–1). Big feelings
+/// (laughing, sad, upset, a win, a surprise, love) usually get one; thanks or "ok" only sometimes.
+double ngmyAdvisorReactionChance(String base) => switch (base) {
+      '😂' || '😢' || '🫂' || '🎉' || '😮' || '❤️' => 0.8,
+      '🔥' || '💯' || '🥰' => 0.5,
+      '🙏' => 0.35,
+      _ => 0.22,
+    };
+
+/// A natural variation of the reaction, so it isn't the same emoji every time.
+String ngmyAdvisorVaryReaction(String base, math.Random r, {required bool dating, String avoid = ''}) {
+  final options = switch (base) {
+    '🙏' => dating ? ['🙏', '🥰', '❤️'] : ['🙏', '😊', '🫶'],
+    '😂' => ['😂', '🤣', '😆'],
+    '❤️' => dating ? ['❤️', '🥰', '😘', '💕'] : ['🥰', '😊', '❤️'],
+    '👍' => ['👍', '👌', '💪'],
+    '🎉' => ['🎉', '🥳', '🙌'],
+    '😢' => ['😢', '🥺', '💔'],
+    '🫂' => ['🫂', '🥺', '😔'],
+    '😮' => ['😮', '😳', '🤯'],
+    '🔥' => ['🔥', '💪', '🙌'],
+    '💯' => ['💯', '🙌'],
+    '😊' => ['😊', '☀️'],
+    _ => [base],
+  };
+  final pool = options.where((e) => e != avoid).toList();
+  final list = pool.isEmpty ? options : pool;
+  return list[r.nextInt(list.length)];
 }

@@ -523,7 +523,7 @@ class NgmyCommunicateSyncService {
     final ids = await profileIdsWithLocalChats(email);
     final rows = <({String id, String name, int count})>[];
     for (final id in ids) {
-      final msgs = await NgmyCommunicateMemoryStore.load(email, id);
+      final msgs = await NgmyCommunicateMemoryStore.load(email, id, hydrateRecent: 0);
       if (msgs.isEmpty) continue;
       rows.add((id: id, name: _profileNameFromConfig(config, id), count: msgs.length));
     }

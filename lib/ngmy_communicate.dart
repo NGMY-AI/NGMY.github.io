@@ -27,6 +27,7 @@ import 'ngmy_register_ai_tools.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_ai_memory.dart';
 import 'ngmy_bottom_nav_frame.dart';
+import 'ngmy_communicate_chat_images.dart';
 import 'ngmy_communicate_debater.dart';
 import 'ngmy_communicate_payments.dart';
 import 'ngmy_stripe_payments.dart';
@@ -2041,7 +2042,7 @@ Future<void> showNgmyAdvisorBadgeCard(
   var sentPhotos = <String>[];
   final email = (chatterEmail ?? '').trim();
   if (email.isNotEmpty && profile.id.trim().isNotEmpty) {
-    final mem = await NgmyCommunicateMemoryStore.load(email, profile.id);
+    final mem = await NgmyCommunicateMemoryStore.load(email, profile.id, hydrateRecent: 1 << 30);
     sentPhotos = ngmyAdvisorSentPhotoB64List(mem);
   }
   if (!context.mounted) return;
@@ -3651,6 +3652,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   DateTime? _paidOkAt;
   Map<String, String>? _replyTo;
   String _jobReplyTo = '';
+  /// A web task they described but that needs a few answers before the browser opens.
+  String _webDraft = '';
+  DateTime? _webDraftAt;
+  final _reactionDecided = Expando<bool>();
+  String _lastReactionBase = '';
+  String _lastReactionEmoji = '';
+  DateTime? _lastReactionAt;
   bool _loaded = false;
   String? _activityCaption;
   /// Server's answer: is this advisor dating THIS user? (professional with everyone else)
@@ -3777,6 +3785,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
     final buf = StringBuffer();
+    buf.writeln(
+      'TEXT LIKE A REAL PERSON: answer what they actually said and how they feel — if they laugh, laugh with them; '
+      'if they are sad, upset or angry, be kind and caring first; if they thank you, accept it warmly in a fresh way '
+      '(never the same line twice in this chat) and keep the conversation going. Vary your wording, keep it short like a text, '
+      'ask a natural follow-up when it fits. Never say you are opening or using a browser unless they asked you to do something online.',
+    );
     final replyTo = _jobReplyTo.trim();
     if (replyTo.isNotEmpty) {
       buf.writeln('THEY SWIPED TO REPLY TO THIS EARLIER MESSAGE: "$replyTo" — their new text answers or refers to that message, so reply in that context.');
@@ -4064,7 +4078,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
-        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson', 'replyTo', 'replyToRole']) {
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson', 'replyTo', 'replyToRole', 'imageId', 'browserShotId']) {
           final v = (m[key] ?? '').toString().trim();
           if (v.isNotEmpty) row[key] = v;
         }
@@ -4324,9 +4338,30 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     go();
   }
 
-  Widget _chatImageBubble(String b64) {
+  Widget _chatImageBubble(String b64, {String imageId = ''}) {
+    // An older picture that wasn't loaded into memory: fetch it when it's shown.
+    if (b64.isEmpty && imageId.isNotEmpty) {
+      return FutureBuilder<String?>(
+        future: _ngmyChatImageFuture(imageId),
+        builder: (context, snap) {
+          final data = snap.data ?? '';
+          if (data.isEmpty) {
+            return SizedBox(
+              width: 220,
+              height: 160,
+              child: Center(
+                child: snap.connectionState == ConnectionState.done
+                    ? const Icon(Icons.image_not_supported_outlined, color: Colors.white38)
+                    : const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38)),
+              ),
+            );
+          }
+          return _chatImageBubble(data);
+        },
+      );
+    }
     try {
-      final bytes = base64Decode(b64);
+      final bytes = _ngmyDecodeChatImage(b64);
       if (bytes.isEmpty) throw StateError('empty');
       return GestureDetector(
         onTap: () {
@@ -4340,6 +4375,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           bytes,
           width: 220,
           fit: BoxFit.contain,
+          // Decode at the size it is shown, not the full camera size (much less memory).
+          cacheWidth: 660,
           gaplessPlayback: true,
           filterQuality: FilterQuality.high,
           errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined, color: Colors.white54),
@@ -4617,6 +4654,45 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     return (cleaned: cleaned, error: result.error);
   }
 
+
+  /// Before opening the browser: is the task clear (what + where)? If not, what to ask.
+  /// Null when the check itself failed — then the task is treated as clear only if it
+  /// names a website, otherwise it stays normal chat.
+  Future<({bool web, bool ready, String ask, String task, String url})?> _planWebTask(NgmyAiCredentials creds, String request) async {
+    final recent = _messages
+        .where((m) => (m['text'] ?? '').trim().isNotEmpty && (m['kind'] ?? '').isEmpty)
+        .toList();
+    final tail = recent.length > 10 ? recent.sublist(recent.length - 10) : recent;
+    final chat = tail
+        .map((m) => '${m['role'] == 'user' ? 'Them' : ngmyAdvisorFirstName(widget.profile.name)}: ${(m['text'] ?? '').replaceAll('\n', ' ')}')
+        .join('\n');
+    try {
+      final r = await ngmyAiGenerateCommunicateFast(
+        creds,
+        ngmyAdvisorWebTaskPlanPrompt(advisorName: widget.profile.name, request: request, recentChat: chat),
+        budget: const Duration(seconds: 14),
+      );
+      final raw = (r.text ?? '').trim();
+      final start = raw.indexOf('{'), end = raw.lastIndexOf('}');
+      if (start < 0 || end <= start) throw const FormatException('no json');
+      final j = jsonDecode(raw.substring(start, end + 1));
+      if (j is! Map) throw const FormatException('not a map');
+      final ask = _cleanAdvisorReply('${j['ask'] ?? ''}', userTextForPoetry: request);
+      final ready = j['ready'] == true;
+      return (
+        web: j['web'] != false,
+        // "Not ready" with nothing to ask would leave them hanging — then just start.
+        ready: ready || ask.trim().isEmpty,
+        ask: ask,
+        task: '${j['task'] ?? ''}'.trim(),
+        url: '${j['url'] ?? ''}'.trim(),
+      );
+    } catch (e) {
+      debugPrint('[communicate] web task plan: $e');
+      final namesSite = RegExp(r'https?://|\b[a-z0-9-]+\.(com|org|net|gov|edu|io|co)\b', caseSensitive: false).hasMatch(request);
+      return namesSite ? (web: true, ready: true, ask: '', task: request, url: '') : null;
+    }
+  }
   Future<({String cleaned, String? error})> _generateAndCleanAdvisorReply({
     required NgmyAiCredentials creds,
     required String prompt,
@@ -4745,9 +4821,24 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// The advisor "reads" the message and reacts within a second, like a real
   /// person — with an emoji that fits what was said (or none for plain questions).
   void _reactSoon(Map<String, String> row, String text) {
-    final emoji = ngmyAdvisorPickReactionEmoji(userMessage: text, aiReply: '');
-    if (emoji.isEmpty) return;
-    Timer(Duration(milliseconds: 650 + math.Random().nextInt(600)), () {
+    final base = ngmyAdvisorPickReactionEmoji(userMessage: text, aiReply: '');
+    if (base.isEmpty) return;
+    // This message has been "felt" — the reply's own reaction tag won't add another.
+    _reactionDecided[row] = true;
+    final r = math.Random();
+    var chance = ngmyAdvisorReactionChance(base);
+    final now = DateTime.now();
+    // The same kind of message again soon (a second "thank you") — a real person just replies.
+    if (_lastReactionBase == base && now.difference(_lastReactionAt ?? DateTime(2000)) < const Duration(minutes: 15)) chance *= 0.2;
+    // Just reacted to their last message → less likely to react again straight away.
+    final users = _messages.where((m) => m['role'] == 'user').toList();
+    if (users.length >= 2 && (users[users.length - 2]['reaction'] ?? '').isNotEmpty) chance *= 0.6;
+    if (r.nextDouble() >= chance) return;
+    final emoji = ngmyAdvisorVaryReaction(base, r, dating: _relationship.datingYou, avoid: _lastReactionEmoji);
+    _lastReactionBase = base;
+    _lastReactionEmoji = emoji;
+    _lastReactionAt = now;
+    Timer(Duration(milliseconds: 700 + r.nextInt(1400)), () {
       if (!mounted) return;
       final i = _messages.indexWhere((m) => identical(m, row));
       if (i < 0 || (_messages[i]['reaction'] ?? '').isNotEmpty) return;
@@ -4765,9 +4856,14 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<void> _applyReactionToLatestUser(String emoji) async {
     final e = emoji.trim();
     if (e.isEmpty) return;
-    // Already reacted the moment they sent it — keep that one.
+    // Already decided when they sent it (reacted, or chose not to) — keep that.
     final lastUser = _messages.lastWhere((m) => m['role'] == 'user', orElse: () => const {});
-    if ((lastUser['reaction'] ?? '').isNotEmpty) return;
+    if ((lastUser['reaction'] ?? '').isNotEmpty || _reactionDecided[lastUser] == true) return;
+    // The model's own suggestion only now and then, so it never reacts to everything.
+    if (math.Random().nextDouble() > 0.35) return;
+    if (!_relationship.datingYou && const {'❤️', '💕', '💖'}.contains(e)) return;
+    _lastReactionEmoji = e;
+    _lastReactionAt = DateTime.now();
     await NgmyCommunicateMemoryStore.setReactionOnLastUser(_email, widget.profile.id, e);
     if (!mounted) return;
     setState(() {
@@ -5246,25 +5342,56 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         }
       }
       // Asked to DO something on a website → the advisor does it in a live browser they watch.
-      var agentTask = (imageB64 == null && !_isTextCoach && !_isDebater)
+      final webAllowed = imageB64 == null && !_isTextCoach && !_isDebater;
+      // Thanks, love, laughs, "ok"… are conversation — never a reason to open the browser.
+      final chitChat = ngmyUserMessageIsChitChat(text) || ngmyUserMessageIsShortChatPing(text);
+      if (_webDraft.isNotEmpty && ngmyUserCancelsWebTask(text)) _webDraft = '';
+      var agentTask = (webAllowed && !chitChat)
           ? ngmyAdvisorAgentTaskIntent(
               text,
               currentUrl: _browserSession.url,
-              // A closed browser still has a task to pick up — "continue" restarts it in a fresh browser.
-              hasLiveSession: _agentRun.hasSession || _agentRun.task.isNotEmpty,
+              // "continue" only means the browser while a browser task is actually fresh.
+              hasLiveSession: (_agentRun.hasSession && !_agentRun.browserClosed) || _agentRun.recentlyFinished,
             )
           : null;
-      // Shortly after a browser task, a short reply (phone number, email, code, "yes", a name) is
-      // the answer the browser was waiting for — send it back to the task, not to normal chat.
+      // Right after a browser task that ASKED them something, a short answer (phone number,
+      // email, code, a name) goes back to that task — not thank-yous or chatting.
       if (agentTask == null &&
-          imageB64 == null &&
-          !_isTextCoach &&
-          !_isDebater &&
+          webAllowed &&
+          !chitChat &&
+          _webDraft.isEmpty &&
           _agentRun.recentlyFinished &&
           !_agentRun.running &&
           text.trim().length <= 160 &&
-          !ngmyUserMessageIsShortChatPing(text)) {
+          ((_agentRun.result ?? '').contains('?') || _agentRun.latestStep.contains('?'))) {
         agentTask = (url: null, continuing: true);
+      }
+      // They are answering the questions asked about a web task — think about it again with the answers.
+      final answeringDraft = agentTask == null &&
+          webAllowed &&
+          !chitChat &&
+          _webDraft.isNotEmpty &&
+          DateTime.now().difference(_webDraftAt ?? DateTime(2000)) < const Duration(minutes: 20);
+      String? plannedTask;
+      String? plannedUrl;
+      if ((agentTask != null && !agentTask.continuing) || answeringDraft) {
+        final request = _webDraft.isEmpty ? text : '$_webDraft\nThen they answered: $text';
+        final plan = await _planWebTask(creds, request);
+        if (plan == null || !plan.web) {
+          // Not really a web job — normal chat.
+          if (answeringDraft && plan != null) _webDraft = '';
+          agentTask = null;
+        } else if (!plan.ready) {
+          _webDraft = request;
+          _webDraftAt = DateTime.now();
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: plan.ask, parseExtrasForUserText: text);
+          return;
+        } else {
+          _webDraft = '';
+          plannedTask = plan.task.isNotEmpty ? plan.task : request;
+          plannedUrl = plan.url.isNotEmpty ? plan.url : null;
+          agentTask = (url: agentTask?.url ?? plannedUrl, continuing: false);
+        }
       }
       if (agentTask != null) {
         final continuing = agentTask.continuing;
@@ -5272,7 +5399,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             (_agentRun.hasSession ? null : (_browserSession.url.isNotEmpty ? _browserSession.url : null));
         final taskText = continuing
             ? 'Continue this task (open the site again if the browser is fresh): "${_agentRun.task}". The user says: "$text"'
-            : text;
+            : (plannedTask ?? text);
         // Last few things they said (before this message) — e.g. "open Zillow" two texts ago.
         final recentUser = _messages
             .where((m) => m['role'] == 'user' && (m['text'] ?? '').trim().isNotEmpty)
@@ -5863,12 +5990,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           who: (m['replyToRole'] ?? 'ai') == 'user' ? 'You' : ngmyAdvisorFirstName(widget.profile.name),
                           text: m['replyTo']!,
                         ),
-                      if ((m['imageB64'] ?? '').toString().isNotEmpty)
+                      if ((m['imageB64'] ?? '').toString().isNotEmpty || (m['imageId'] ?? '').toString().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(14),
-                            child: _chatImageBubble((m['imageB64'] ?? '').toString()),
+                            child: _chatImageBubble((m['imageB64'] ?? '').toString(), imageId: (m['imageId'] ?? '').toString()),
                           ),
                         ),
                       if (msgText.isNotEmpty)
@@ -6385,4 +6512,32 @@ class _NgmyReplyPreview extends StatelessWidget {
           ],
         ),
       );
+}
+
+// Decoded chat pictures, kept for the few most recent so redraws (reactions, the
+// live browser updating) don't decode every photo again.
+final _ngmyChatImageBytes = <String, Uint8List>{};
+final _ngmyChatImageLoads = <String, Future<String?>>{};
+
+Uint8List _ngmyDecodeChatImage(String b64) {
+  final key = '${b64.length}:${b64.substring(0, math.min(96, b64.length))}:${b64.substring(math.max(0, b64.length - 96))}';
+  final hit = _ngmyChatImageBytes.remove(key);
+  if (hit != null) {
+    _ngmyChatImageBytes[key] = hit;
+    return hit;
+  }
+  final bytes = base64Decode(b64);
+  _ngmyChatImageBytes[key] = bytes;
+  while (_ngmyChatImageBytes.length > 24) {
+    _ngmyChatImageBytes.remove(_ngmyChatImageBytes.keys.first);
+  }
+  return bytes;
+}
+
+Future<String?> _ngmyChatImageFuture(String imageId) {
+  final f = _ngmyChatImageLoads[imageId] ??= NgmyCommunicateChatImageStore.getBase64(imageId);
+  while (_ngmyChatImageLoads.length > 12) {
+    _ngmyChatImageLoads.remove(_ngmyChatImageLoads.keys.first);
+  }
+  return f;
 }

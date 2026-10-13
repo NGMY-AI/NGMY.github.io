@@ -30,8 +30,7 @@ final RegExp _agentAction = RegExp(
 /// Requests that are clearly online tasks even without the word "website".
 final RegExp _agentSelfContained = RegExp(
   r"\b(apply|application|enroll|admissions?|register for|sign up for|book (a|an|my)|order (a|an|my|some))\b"
-  // A car VIN (17 chars, no I/O/Q) — looking it up needs the web.
-  r"|\b(?=[A-HJ-NPR-Z0-9]*\d)[A-HJ-NPR-Z0-9]{17}\b"
+  // (A car VIN is answered straight from the government records in chat — no browser needed.)
   r"|\b(open (it |that |this )?live|live browser|use (the|your) (live )?browser|search (it|this|that) (out|up)|look (it|this|that) up)\b",
   caseSensitive: false,
 );
@@ -75,6 +74,55 @@ final RegExp _agentContinue = RegExp(
   if (!webContext) return null;
   return (url: url, continuing: false);
 }
+
+/// Thanks, love, laughs, greetings, "ok", emojis… — conversation, never a browser job.
+bool ngmyUserMessageIsChitChat(String text) {
+  final t = text.trim().toLowerCase();
+  if (t.isEmpty) return true;
+  // Only emojis / punctuation.
+  if (!RegExp(r'[a-z0-9]').hasMatch(t)) return true;
+  if (t.length > 80) return false;
+  return RegExp(
+    r"^(ok(ay)?|k|kk|cool|nice|great|awesome|perfect|alright|bet|sure|yes|yeah|yep|no|nope|nah|wow|omg|lol|lmao|haha+|hehe|"
+    r"thanks?( you)?|thank u|ty|thx|appreciate (it|you)|god bless( you)?|bless you|love (you|u|it)|i love (you|u|it)|miss (you|u)|"
+    r"good (morning|night|afternoon|evening)|gm|gn|hi+|hey+|hello|bye|see (you|ya)|later|talk (to you )?later|"
+    r"you'?re (the best|amazing|sweet|so sweet|funny|beautiful|cute)|that'?s (it|all|good|great|nice|cool|funny|crazy)|"
+    r"no problem|np|my pleasure|how are you|wyd|what'?s up|sup)\b"
+    r"[\w\s,.!?'💕❤️😘🥰😂🤣🙏😊👍]*$",
+  ).hasMatch(t);
+}
+
+/// "Never mind" — drop the web task they were describing.
+bool ngmyUserCancelsWebTask(String text) => RegExp(
+      r"\b(never ?mind|nvm|forget (it|that|about it)|cancel( it| that)?|don'?t (do it|worry about it)|stop it|not now|leave it)\b",
+      caseSensitive: false,
+    ).hasMatch(text);
+
+/// Asks the AI whether a browser task is clear enough to start, or what to ask first.
+/// [request] = everything they said about the task so far. Returns
+/// (ready, ask = what to text them if not ready, task = full instruction if ready).
+String ngmyAdvisorWebTaskPlanPrompt({
+  required String advisorName,
+  required String request,
+  required String recentChat,
+}) =>
+    'You are $advisorName, an advisor in the NGMY app who can do tasks for people in a live web browser they watch.\n'
+    'Decide if you should open the browser NOW for this, or ask questions first.\n\n'
+    'Recent chat (oldest first):\n$recentChat\n\n'
+    'What they want done (everything they said about it):\n$request\n\n'
+    'RULES:\n'
+    '- READY only if it is clear WHAT to do and WHERE (a specific company, website or thing). '
+    '"Apply for a job at Burger King" or "check flights to Miami on Delta" = ready. "Help me apply for a job", "find me a car", "book something" = NOT ready.\n'
+    '- When not ready, ask what you need like a real person texting: what kind of job / which company or area / budget etc. '
+    'For job, school or other applications also ask the basics the form will need that they have not given yet: full name, age, which position, city or ZIP. '
+    'Ask whether they already have an account on that site ONLY if that site usually needs an account for this. '
+    'At most 3 short questions in one friendly message. Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
+    '- If it is ready, ask nothing.\n'
+    '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
+    'Answer with JSON only, no markdown:\n'
+    '{"web": true, "ready": true or false, "ask": "your text to them if not ready", '
+    '"task": "if ready: ONE complete instruction for the browser with every detail they gave (names, position, place, dates)", '
+    '"url": "the website to start on if you know it, else empty"}';
 
 // ── Run controller ─────────────────────────────────────────────────────────
 

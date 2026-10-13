@@ -87,11 +87,14 @@ class NgmyCommunicateMemoryStore {
   static String _chatKey(String email, String profileId) =>
       'ngmy_communicate_chat_${email.toLowerCase().trim()}_${profileId.trim()}';
 
-  static Future<List<Map<String, dynamic>>> load(String email, String profileId) async {
+  /// [hydrateRecent] = how many of the newest photos / browser screenshots come into memory
+  /// (older ones stay on disk and load when shown). Loading every picture of a long chat on
+  /// each message used so much memory that phones killed and reloaded the app.
+  static Future<List<Map<String, dynamic>>> load(String email, String profileId, {int hydrateRecent = 16}) async {
     if (profileId.trim().isEmpty) return [];
     // Wait for any in-flight write so we never load a stale snapshot mid-save.
     await _writeChain.catchError((_) {});
-    return _loadUnlocked(_storageEmail(email), profileId);
+    return _loadUnlocked(_storageEmail(email), profileId, hydrateRecent: hydrateRecent);
   }
 
   /// Prefer account email; fall back so chats still persist on-device without login email.
@@ -100,7 +103,7 @@ class NgmyCommunicateMemoryStore {
     return e.isEmpty ? 'local' : e;
   }
 
-  static Future<List<Map<String, dynamic>>> _loadUnlocked(String email, String profileId) async {
+  static Future<List<Map<String, dynamic>>> _loadUnlocked(String email, String profileId, {int hydrateRecent = 0}) async {
     // Full history (IndexedDB / file) merged with the quick copy (prefs) — either alone may be
     // incomplete (old app versions, storage quota), together nothing is lost.
     final fromLog = await _readLog(email, profileId);
@@ -149,26 +152,39 @@ class NgmyCommunicateMemoryStore {
             imageId = '';
           }
         }
-        if (imageId.isNotEmpty && imageB64.isEmpty) {
-          imageB64 = (await NgmyCommunicateChatImageStore.getBase64(imageId)) ?? '';
-        }
         if (imageId.isNotEmpty) row['imageId'] = imageId;
         if (imageB64.isNotEmpty) row['imageB64'] = imageB64;
         final mime = (map['imageMime'] ?? '').toString().trim();
         if (mime.isNotEmpty) row['imageMime'] = mime;
         // Keep reactions / browser links — dropping them here erased them on the next save.
         _copyAdvisorMeta(map, row);
-        final shotId = (row['browserShotId'] ?? '').toString();
-        if (shotId.isNotEmpty) {
-          final shot = await NgmyCommunicateChatImageStore.getBase64(shotId);
-          if (shot != null && shot.isNotEmpty) row['browserShotB64'] = shot;
-        }
       } catch (e) {
         debugPrint('[communicate] chat row restore: $e');
         if (text.isEmpty) continue;
         _copyAdvisorMeta(map, row);
       }
       kept.add(row);
+    }
+    // Only the newest pictures come into memory.
+    var budget = hydrateRecent;
+    for (var i = kept.length - 1; i >= 0 && budget > 0; i--) {
+      final row = kept[i];
+      final imageId = (row['imageId'] ?? '').toString();
+      final shotId = (row['browserShotId'] ?? '').toString();
+      if (imageId.isEmpty && shotId.isEmpty) continue;
+      budget--;
+      try {
+        if (imageId.isNotEmpty && (row['imageB64'] ?? '').toString().isEmpty) {
+          final b = await NgmyCommunicateChatImageStore.getBase64(imageId);
+          if (b != null && b.isNotEmpty) row['imageB64'] = b;
+        }
+        if (shotId.isNotEmpty) {
+          final shot = await NgmyCommunicateChatImageStore.getBase64(shotId);
+          if (shot != null && shot.isNotEmpty) row['browserShotB64'] = shot;
+        }
+      } catch (e) {
+        debugPrint('[communicate] picture load: $e');
+      }
     }
     if (migratedInlineImages || fromLog.length < kept.length) {
       // Back-fill the full log (first run after this update / old chats only in prefs).
@@ -399,7 +415,7 @@ class NgmyCommunicateMemoryStore {
   /// Full history for backup export (no message cap).
   static Future<List<Map<String, dynamic>>> loadAllForExport(String email, String profileId) async {
     // Hydrated load — export includes base64 for portability.
-    return load(email, profileId);
+    return load(email, profileId, hydrateRecent: 1 << 30);
   }
 
   /// Merge imported messages into local chat (keeps all history).

@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_advisor_chat_extras.dart';
+import 'package:ngmy/ngmy_advisor_live_agent.dart';
 import 'package:ngmy/ngmy_vin_lookup.dart';
 
 void main() {
@@ -22,5 +25,28 @@ void main() {
     expect(r('I got the job!!'), '🎉');
     expect(r('wow no way'), '😮');
     expect(r('what should I put on my resume?'), '');
+  });
+
+  test('thank-yous and chatting never open the browser; real tasks do', () {
+    for (final m in ['thank you baby', 'thanks!', 'lol', 'I love you', 'ok', '🙏', 'good night', "you're the best"]) {
+      expect(ngmyUserMessageIsChitChat(m), isTrue, reason: m);
+    }
+    for (final m in ['help me apply for a job at Burger King', 'check my balance on chase.com', 'find me a 2 bedroom in Atlanta']) {
+      expect(ngmyUserMessageIsChitChat(m), isFalse, reason: m);
+    }
+    expect(ngmyAdvisorAgentTaskIntent('help me apply for a job at Burger King'), isNotNull);
+    // A VIN is answered from the records in chat, not by opening the browser.
+    expect(ngmyAdvisorAgentTaskIntent('1HGCM82633A004352'), isNull);
+    expect(ngmyUserCancelsWebTask('never mind'), isTrue);
+  });
+
+  test('reactions feel human: big feelings often, thanks only sometimes, and they vary', () {
+    expect(ngmyAdvisorPickReactionEmoji(userMessage: "I'm so frustrated with work", aiReply: ''), '🫂');
+    expect(ngmyAdvisorReactionChance('😂'), greaterThan(ngmyAdvisorReactionChance('🙏')));
+    expect(ngmyAdvisorReactionChance('🙏'), lessThan(0.5));
+    final r = math.Random(3);
+    final seen = {for (var i = 0; i < 30; i++) ngmyAdvisorVaryReaction('😂', r, dating: false)};
+    expect(seen.length, greaterThan(1));
+    expect(ngmyAdvisorVaryReaction('🙏', r, dating: false, avoid: '🙏'), isNot('🙏'));
   });
 }
