@@ -472,46 +472,84 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     );
   }
 
+  // A withdrawal to send, same compact style as deposits.
   Widget _withdrawalCard(AppTransaction t, bool isDark, {bool showActions = true}) {
     final user = _userFor(t);
     final trial = user.isOnFreeTrial || (t.sourceDetails ?? '').contains('Free trial');
     final feeRate = trial ? 0.0 : 0.15;
     final pending = t.status == TransactionStatus.pending;
+    final busy = _processingTxnId == t.id;
     final net = t.amount * (1 - feeRate);
+    final statusColor = t.status == TransactionStatus.approved
+        ? const Color(0xFF00B25A)
+        : (t.status == TransactionStatus.rejected ? Colors.redAccent : const Color(0xFF3B82F6));
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : Colors.black54;
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1F2E) : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: pending ? Colors.blue.withValues(alpha: 0.4) : (isDark ? Colors.white10 : const Color(0xFFE5E7EB))),
+        color: isDark ? const Color(0xFF161A26) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border(left: BorderSide(color: statusColor, width: 4)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(children: [
-            Expanded(child: Text('@${user.username}', style: TextStyle(fontWeight: FontWeight.w800, color: isDark ? Colors.white : Colors.black))),
-            Text('\$${formatCurrency(t.amount)}', style: const TextStyle(color: Color(0xFF00B25A), fontWeight: FontWeight.w900)),
-          ]),
-          Text(user.email, style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: statusColor.withValues(alpha: 0.15),
+                child: Icon(Icons.north_east_rounded, size: 18, color: statusColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Withdrawal · @${user.username}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 13.5)),
+                    Text(
+                      'Send \$${formatCurrency(net)} · fee ${(feeRate * 100).toInt()}%${pending ? '' : ' · ${t.status.name}'}',
+                      style: TextStyle(color: muted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Text('\$${formatCurrency(t.amount)}', style: TextStyle(color: statusColor, fontWeight: FontWeight.w900, fontSize: 18)),
+            ],
+          ),
           const SizedBox(height: 8),
-          Text('Send to user: \$${formatCurrency(net)} · Fee ${(feeRate * 100).toInt()}% · ${t.status.name.toUpperCase()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54)),
-          Text('Payout: ${t.sourceDetails ?? t.method.name}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
-          if (showActions && pending) ...[
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(onPressed: _processingTxnId == t.id ? null : () => _process(t, false), child: const Text('REJECT')),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _processingTxnId == t.id ? null : () => _process(t, true),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00B25A), foregroundColor: Colors.white),
-                  child: Text(_processingTxnId == t.id ? 'SAVING…' : 'APPROVE'),
+          Row(
+            children: [
+              Icon(Icons.attach_money_rounded, size: 14, color: muted),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(t.sourceDetails ?? t.method.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
+              ),
+              if (showActions && pending) ...[
+                TextButton(
+                  onPressed: busy ? null : () => _process(t, false),
+                  style: TextButton.styleFrom(foregroundColor: Colors.redAccent, visualDensity: VisualDensity.compact),
+                  child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.w900)),
+                ),
+                const SizedBox(width: 4),
+                FilledButton.icon(
+                  onPressed: busy ? null : () => _process(t, true),
+                  icon: busy
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.check_rounded, size: 16),
+                  label: Text(busy ? 'Saving…' : 'Mark sent', style: const TextStyle(fontWeight: FontWeight.w900)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF00B25A),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ],
       ),
     );

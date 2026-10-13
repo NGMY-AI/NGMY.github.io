@@ -48,6 +48,7 @@ import 'ngmy_bio_guest.dart';
 import 'ngmy_civic_enroll_guest.dart';
 import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
+import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_light_notice_dialog.dart';
 import 'ngmy_local_menu_guest.dart';
 import 'ngmy_local_bio_guest.dart';
@@ -22602,25 +22603,93 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override Widget build(BuildContext context) {
     bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final p = NgmyAdminPalette.of(isDark);
+    final items = _adminNavItems();
+    void select(int i) {
+      setState(() => _idx = i);
+      if (i == 1 || i == 2) unawaited(_pullAdminCloudData());
+    }
+
+    final header = NgmyAdminHeader(
+      isDark: isDark,
+      section: _menuName(),
+      onBack: _adminBack,
+      onRefresh: () => unawaited(_pullAdminCloudData()),
+    );
     return NgmyTabBackScope(
       activeTab: _idx,
       onTabBack: () => setState(() => _idx = (_idx - 1).clamp(0, 3)),
       child: Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F111A) : const Color(0xFFF9FAFC),
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF161922) : Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new_rounded, color: isDark ? Colors.white : Colors.black, size: 18), onPressed: _adminBack),
-        title: Text(_menuName(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(72),
-          child: _topNav(isDark),
+        backgroundColor: p.bg,
+        body: LayoutBuilder(
+          builder: (context, c) {
+            // Computers: side menu + content. Phones: header, tabs, content.
+            if (c.maxWidth >= 1000) {
+              return Row(
+                children: [
+                  NgmyAdminSideNav(
+                    isDark: isDark,
+                    items: items,
+                    selected: _idx,
+                    onSelect: select,
+                    onBack: _adminBack,
+                    adminName: widget.user.username,
+                  ),
+                  Expanded(
+                    child: SafeArea(
+                      left: false,
+                      child: Column(
+                        children: [
+                          NgmyAdminHeader(
+                            isDark: isDark,
+                            section: _menuName(),
+                            onBack: _adminBack,
+                            showBack: false,
+                            onRefresh: () => unawaited(_pullAdminCloudData()),
+                          ),
+                          Expanded(child: _adminPageFor(_idx, isDark)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return SafeArea(
+              child: Column(
+                children: [
+                  header,
+                  NgmyAdminTabBar(isDark: isDark, items: items, selected: _idx, onSelect: select),
+                  Expanded(child: _adminPageFor(_idx, isDark)),
+                ],
+              ),
+            );
+          },
         ),
       ),
-      body: _adminPageFor(_idx, isDark),
-    ),
     );
+  }
+
+  List<NgmyAdminNavItem> _adminNavItems() {
+    final pendingDeposits = widget.allTransactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .length;
+    final pendingWithdrawals = widget.allTransactions
+        .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
+        .length;
+    return [
+      const NgmyAdminNavItem(Icons.space_dashboard_rounded, 'Overview'),
+      const NgmyAdminNavItem(Icons.group_rounded, 'Users'),
+      NgmyAdminNavItem(
+        Icons.account_balance_wallet_rounded,
+        'Payments',
+        badge: NgmyAdminMenuCounts.pendingWalletAdminCount(
+          pendingDeposits: pendingDeposits,
+          pendingWithdrawals: pendingWithdrawals,
+        ),
+      ),
+      const NgmyAdminNavItem(Icons.calendar_month_rounded, 'Calendar'),
+    ];
   }
 
   Widget _adminPageFor(int i, bool isDark) {
@@ -22636,48 +22705,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
         return _adminHome(isDark);
     }
   }
-
-  Widget _topNav(bool isDark) {
-    final frameBg = isDark ? const Color(0xFF121726) : const Color(0xFFF8FAFC);
-    final frameBorder = isDark ? const Color(0xFF4B5563) : const Color(0xFFD5DCE5);
-    final pendingDeposits = widget.allTransactions
-        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
-        .length;
-    final pendingWithdrawals = widget.allTransactions
-        .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
-        .length;
-    return Container(
-      height: 72,
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF161922) : Colors.white,
-        border: Border(top: BorderSide(color: isDark ? Colors.white10 : Colors.black12, width: 0.5)),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _navItem(0, Icons.home_outlined, 'Home', isDark, frameBg, frameBorder),
-            _navItem(1, Icons.people_outline, 'Users', isDark, frameBg, frameBorder),
-            _navItem(
-              2,
-              Icons.trending_up_rounded,
-              'Growth Income',
-              isDark,
-              frameBg,
-              frameBorder,
-              badgeCount: NgmyAdminMenuCounts.pendingWalletAdminCount(
-                pendingDeposits: pendingDeposits,
-                pendingWithdrawals: pendingWithdrawals,
-              ),
-            ),
-            _navItem(3, Icons.calendar_month_rounded, 'Calendar', isDark, frameBg, frameBorder),
-          ],
-        ),
-      ),
-    );
-  }
-
 
   Future<bool> _persistManagementConfig() async {
     if (widget.onPersistManagementConfig != null) {
@@ -22699,82 +22726,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     if (mounted) setState(() {});
   }
 
-  Widget _navItem(int i, IconData icon, String label, bool isDark, Color frameBg, Color frameBorder, {int badgeCount = 0}) {
-    final selected = _idx == i;
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() => _idx = i);
-            if (i == 1 || i == 2) unawaited(_pullAdminCloudData());
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Ink(
-                decoration: BoxDecoration(
-                  color: selected ? (isDark ? const Color(0xFF1F2937) : Colors.white) : frameBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: selected ? const Color(0xFF00B25A) : frameBorder,
-                    width: selected ? 2.2 : 1.8,
-                  ),
-                  boxShadow: selected
-                      ? [BoxShadow(color: const Color(0xFF00B25A).withOpacity(isDark ? 0.22 : 0.12), blurRadius: 8, offset: const Offset(0, 3))]
-                      : null,
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(icon, color: selected ? const Color(0xFF00B25A) : (isDark ? Colors.white54 : Colors.grey), size: 20),
-                      const SizedBox(height: 2),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: selected ? (isDark ? Colors.white : Colors.black) : (isDark ? Colors.white54 : Colors.grey),
-                          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                          fontSize: 9,
-                          height: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (badgeCount > 0)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white, width: 1.2),
-                    ),
-                    child: Text(
-                      badgeCount > 99 ? '99+' : '$badgeCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, height: 1),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  String _menuName() => const ["DASHBOARD", "USERS", "GROWTH INCOME", "CALENDAR"][_idx];
+  String _menuName() => const ["Overview", "Users", "Payments · Growth Income", "Calendar"][_idx];
 
   Widget _adminGrowthIncome(bool isDark) {
     return NgmyAdminWalletTab(
@@ -22829,40 +22782,84 @@ class _AdminDashboardState extends State<AdminDashboard> {
         .where((t) => t.status == TransactionStatus.approved && t.type == TransactionType.deposit)
         .fold(0.0, (s, t) => s + t.amount);
     final registrarPending = NgmyAdminMenuCounts.pendingRegistrarApplications(widget.config.civicRegistrarApplications);
+    final pendingDeposits = widget.allTransactions
+        .where((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)
+        .length;
+    final pendingWithdrawals = widget.allTransactions
+        .where((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)
+        .length;
+    final giftsPending = NgmyCivicHelperGifts.openPendingCount(widget.config);
+    final loansPending = NgmyAdminMenuCounts.pendingLoanApplications(widget.config.loanApplications);
+    final activeUsers = widget.allUsers.where((u) => u.status == 'active' || u.status == 'verified').length;
+    final now = DateTime.now();
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    final attention = [
+      if (pendingDeposits > 0)
+        NgmyAdminAttentionRow(isDark: isDark, icon: Icons.south_west_rounded, color: const Color(0xFF00B25A), label: 'Deposits to review', count: pendingDeposits, onTap: () => setState(() => _idx = 2)),
+      if (pendingWithdrawals > 0)
+        NgmyAdminAttentionRow(isDark: isDark, icon: Icons.north_east_rounded, color: const Color(0xFF3B82F6), label: 'Withdrawals to send', count: pendingWithdrawals, onTap: () => setState(() => _idx = 2)),
+      if (registrarPending > 0)
+        NgmyAdminAttentionRow(isDark: isDark, icon: Icons.badge_rounded, color: const Color(0xFF7C3AED), label: 'Registrar applications', count: registrarPending, onTap: () => unawaited(_openCivicRegistryAdmin(isDark))),
+      if (giftsPending > 0)
+        NgmyAdminAttentionRow(isDark: isDark, icon: Icons.card_giftcard_rounded, color: const Color(0xFFEC4899), label: 'Helper gifts to send', count: giftsPending, onTap: () => unawaited(_openHelperGiftPendingSheet())),
+      if (loansPending > 0)
+        NgmyAdminAttentionRow(isDark: isDark, icon: Icons.request_quote_rounded, color: const Color(0xFFF59E0B), label: 'Loan applications', count: loansPending, onTap: () => _openLoansAdmin(isDark)),
+    ];
 
+    return LayoutBuilder(builder: (context, box) {
+      final wide = box.maxWidth >= 900;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 40),
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.92, end: 1),
-            duration: const Duration(milliseconds: 560),
-            curve: Curves.easeOutBack,
-            builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-            child: _AdminDashboardHeroBanner(
-              isDark: isDark,
-              title: 'System Hub',
-              subtitle: 'Command center for registry, payments & pop-ups',
-            ),
-          ),
-          const SizedBox(height: 12),
-          NgmyHelperGiftAdminBanner(
-            pendingCount: NgmyCivicHelperGifts.openPendingCount(widget.config),
-            onOpen: () => unawaited(_openHelperGiftPendingSheet()),
-          ),
-          const SizedBox(height: 10),
-          Text('Management', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink, letterSpacing: 0.2)),
-          const SizedBox(height: 4),
-          Text('Tap a tile to open tools', style: TextStyle(fontSize: 12, color: mute, fontWeight: FontWeight.w600)),
+          Text('Welcome back, ${widget.user.username}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: ink)),
+          Text('${days[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}', style: TextStyle(fontSize: 12.5, color: mute, fontWeight: FontWeight.w600)),
           const SizedBox(height: 14),
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
+            crossAxisCount: wide ? 4 : 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 0.92,
+            childAspectRatio: wide ? 1.55 : 1.3,
+            children: [
+              NgmyAdminStatCard(isDark: isDark, icon: Icons.group_rounded, color: const Color(0xFF6366F1), label: 'Accounts', value: '${widget.allUsers.length}', hint: '$activeUsers active', onTap: () => setState(() => _idx = 1)),
+              NgmyAdminStatCard(isDark: isDark, icon: Icons.pending_actions_rounded, color: const Color(0xFFF59E0B), label: 'Waiting for you', value: '$pendingTx', hint: pendingTx == 0 ? 'All caught up' : 'Tap to review', onTap: () => setState(() => _idx = 2)),
+              NgmyAdminStatCard(isDark: isDark, icon: Icons.payments_rounded, color: const Color(0xFF00B25A), label: 'Deposits approved', value: '\$${formatCurrency(revenue)}'),
+              NgmyAdminStatCard(isDark: isDark, icon: Icons.account_balance_rounded, color: const Color(0xFF7C3AED), label: 'Civic members', value: '${NgmyCivicRegistryMembers.listFrom(widget.config).length}', hint: registrarPending > 0 ? '$registrarPending registrar apps' : null, onTap: () => unawaited(_openCivicRegistryAdmin(isDark))),
+            ],
+          ),
+          const SizedBox(height: 14),
+          NgmyAdminSection(
+            isDark: isDark,
+            title: 'Needs attention',
+            subtitle: attention.isEmpty ? null : 'Tap a line to handle it',
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+            child: attention.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.verified_rounded, color: Color(0xFF00B25A), size: 20),
+                        const SizedBox(width: 8),
+                        Text('All clear — nothing is waiting.', style: TextStyle(color: mute, fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  )
+                : Column(children: attention),
+          ),
+          const SizedBox(height: 18),
+          Text('Tools', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: ink)),
+          const SizedBox(height: 10),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: wide ? 6 : 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.98,
             children: [
               _menuFrame(
                 'Civic Registry',
@@ -22917,17 +22914,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          _AdminLiveStatsPanel(
-            isDark: isDark,
-            users: '${widget.allUsers.length}',
-            pending: '$pendingTx',
-            revenue: '\$${formatCurrency(revenue)}',
-          ),
           const SizedBox(height: 28),
         ],
       ),
     );
+    });
   }
 
   Future<void> _openLoansAdmin(bool isDark) async {
@@ -24340,12 +24331,12 @@ class _AdminDashboardState extends State<AdminDashboard> {
           opacity: t.clamp(0.0, 1.0),
           child: Transform.translate(offset: Offset(0, (1 - t) * 14), child: child),
         ),
-        child: _AdminPulseMenuTile(
+        child: NgmyAdminToolTile(
           title: title,
           icon: icon,
           color: color,
           isDark: isDark,
-          badgeCount: badgeCount,
+          badge: badgeCount,
           onTap: onTap,
         ),
       );
@@ -24515,39 +24506,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => Material(
-    color: color,
-    elevation: 1,
-    shadowColor: color.withOpacity(0.25),
-    borderRadius: BorderRadius.circular(6),
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+  Widget _adminActionBtn(String label, IconData icon, Color color, VoidCallback onTap) => NgmyAdminActionButton(
+        label: label,
+        icon: icon,
+        color: color,
+        onTap: onTap,
+        isDark: Theme.of(context).brightness == Brightness.dark,
+      );
+
+  Widget _adminSectionTitle(String title, bool isDark, {String? subtitle}) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 11, color: Colors.white),
-            const SizedBox(height: 1),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 7, fontWeight: FontWeight.w800, color: Colors.white, height: 1.05),
-            ),
+            Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : const Color(0xFF0F172A))),
+            if (subtitle != null)
+              Text(subtitle, style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF8C9AB5) : const Color(0xFF64748B))),
           ],
         ),
-      ),
-    ),
-  );
+      );
 
   Widget _adminUserDetail(UserData u, bool isDark) {
     final displayBalance = ngmyAdminDisplayBalance(u, widget.allTransactions);
-    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
-    final border = isDark ? Colors.white12 : const Color(0xFFE2E8F0);
+    final panelBg = NgmyAdminPalette.of(isDark).panel;
+    final border = NgmyAdminPalette.of(isDark).border;
     final statusColor = u.status == 'active'
         ? Colors.green
         : u.status == 'suspended'
@@ -24648,15 +24630,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 18),
-          Text('Account Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          _adminSectionTitle('Account actions', isDark, subtitle: 'Status, money and account tools'),
           const SizedBox(height: 10),
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 3,
-            mainAxisSpacing: 5,
-            crossAxisSpacing: 5,
-            childAspectRatio: 3.4,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            childAspectRatio: 2.5,
             children: [
               _adminActionBtn('Active', Icons.person_outline, const Color(0xFF22C55E), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'active', snack: '${u.username} set to active.'))),
               _adminActionBtn('Suspend', Icons.block, const Color(0xFFF59E0B), () => unawaited(_applyAdminUserAccountChange(u, apply: () => u.status = 'suspended', snack: '${u.username} suspended.'))),
@@ -24756,7 +24738,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ],
           ),
           const SizedBox(height: 22),
-          Text('👑 Assign Crown Badge', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          _adminSectionTitle('Crown badge', isDark, subtitle: 'King or Queen crown shown on their profile'),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -24772,7 +24754,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             Text('Current badge: ${u.crownBadge.toUpperCase()}', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54)),
           ],
           const SizedBox(height: 22),
-          Text('🔧 Free Fix Badge', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          _adminSectionTitle('Free fix credit', isDark),
           const SizedBox(height: 6),
           Text('Grant this user free work credit from your team.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
           const SizedBox(height: 10),
@@ -24808,7 +24790,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
           const SizedBox(height: 22),
-          Text('🎁 Free Trial', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, color: isDark ? Colors.white : Colors.black87)),
+          _adminSectionTitle('Free trial', isDark),
           const SizedBox(height: 6),
           Text('Grant clock-in any day, 1-minute payout, and fee-free withdrawals.', style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54)),
           const SizedBox(height: 10),
@@ -24951,104 +24933,169 @@ class _AdminDashboardState extends State<AdminDashboard> {
       if (selected != null) return _adminUserDetail(selected, isDark);
       _selectedUserEmail = null;
     }
-    final panelBg = isDark ? const Color(0xFF1C1F2E) : Colors.white;
-    final subtitle = _adminUserListMode == 'civic'
-        ? 'Civic Registry (${filtered.length})'
-        : 'NGMY accounts (${filtered.length})';
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(15, 12, 15, 0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
-              ),
+    final p = NgmyAdminPalette.of(isDark);
+    Widget modeChip(String id, String label, IconData icon) {
+      final on = _adminUserListMode == id;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() {
+            _adminUserListMode = id;
+            _selectedUserEmail = null;
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            height: 38,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: on ? NgmyAdminPalette.accent.withValues(alpha: isDark ? 0.18 : 0.12) : Colors.transparent,
             ),
-            SizedBox(
-              height: 28,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _adminUserListMode,
-                  isDense: true,
-                  iconSize: 16,
-                  style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black87),
-                  dropdownColor: panelBg,
-                  items: const [
-                    DropdownMenuItem(value: 'login', child: Text('Accounts')),
-                    DropdownMenuItem(value: 'civic', child: Text('Civic Registry')),
-                  ],
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() {
-                      _adminUserListMode = v;
-                      _selectedUserEmail = null;
-                    });
-                  },
-                ),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: on ? NgmyAdminPalette.accent : p.muted),
+                const SizedBox(width: 6),
+                Text(label, style: TextStyle(fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 12.5, color: on ? p.ink : p.muted)),
+              ],
             ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.all(15),
-        child: TextField(
-          controller: _search,
-          style: TextStyle(color: isDark ? Colors.white : Colors.black),
-          decoration: InputDecoration(
-            hintText: 'Search by name, email, or account ID...',
-            hintStyle: TextStyle(color: isDark ? Colors.white38 : Colors.grey),
-            prefixIcon: Icon(Icons.search, color: isDark ? Colors.white38 : Colors.grey),
-            filled: true,
-            fillColor: panelBg,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
           ),
-          onChanged: (v) => setState(() => _query = v.toLowerCase()),
+        ),
+      );
+    }
+
+    Widget statusPill(String status) {
+      final c = status == 'active'
+          ? const Color(0xFF22C55E)
+          : status == 'verified'
+              ? const Color(0xFF3B82F6)
+              : status == 'suspended'
+                  ? const Color(0xFFF59E0B)
+                  : const Color(0xFFEF4444);
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(99)),
+        child: Text(status.isEmpty ? 'active' : status, style: TextStyle(color: c, fontWeight: FontWeight.w800, fontSize: 10.5)),
+      );
+    }
+
+    return Column(children: [
+      // Toolbar: search, which list, how many.
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 2, 14, 10),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: p.card(),
+          child: Column(
+            children: [
+              TextField(
+                controller: _search,
+                style: TextStyle(color: p.ink),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Search name, email or account ID',
+                  hintStyle: TextStyle(color: p.muted),
+                  prefixIcon: Icon(Icons.search_rounded, color: p.muted),
+                  filled: true,
+                  fillColor: p.panelAlt,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: p.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: NgmyAdminPalette.accent)),
+                ),
+                onChanged: (v) => setState(() => _query = v.toLowerCase()),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(color: p.panelAlt, borderRadius: BorderRadius.circular(12), border: Border.all(color: p.border)),
+                      child: Row(
+                        children: [
+                          modeChip('login', 'Accounts', Icons.person_rounded),
+                          modeChip('civic', 'Civic Registry', Icons.account_balance_rounded),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(color: NgmyAdminPalette.indigo.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(12)),
+                    child: Text('${filtered.length}', style: const TextStyle(color: NgmyAdminPalette.indigo, fontWeight: FontWeight.w900)),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       Expanded(
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          itemCount: filtered.length,
-          itemBuilder: (_, i) {
-            final u = filtered[i];
-            final displayBalance = ngmyAdminDisplayBalance(u, widget.allTransactions);
-            final statusColor = u.status == 'active' ? Colors.green : u.status == 'suspended' ? Colors.orange : Colors.red;
-            return Card(
-              elevation: 0,
-              color: panelBg,
-              margin: const EdgeInsets.only(bottom: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: ListTile(
-                onTap: () => setState(() => _selectedUserEmail = u.email),
-                leading: _adminUserAvatar(u, fallback: statusColor),
-                title: Text(u.username, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: isDark ? Colors.white : Colors.black)),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(u.email, style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black54)),
-                    Text(ngmyUserDisplayAccountId(u), style: TextStyle(fontSize: 10, color: isDark ? Colors.white30 : Colors.black38)),
-                  ],
-                ),
-                isThreeLine: true,
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '\$${formatCurrency(displayBalance)}',
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF00B25A)),
+        child: filtered.isEmpty
+            ? Center(child: Text('No one matches that search.', style: TextStyle(color: p.muted)))
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final u = filtered[i];
+                  final displayBalance = ngmyAdminDisplayBalance(u, widget.allTransactions);
+                  final statusColor = u.status == 'active' ? Colors.green : u.status == 'suspended' ? Colors.orange : Colors.red;
+                  final first = i == 0;
+                  final last = i == filtered.length - 1;
+                  return Material(
+                    color: p.panel,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(first ? 16 : 0), bottom: Radius.circular(last ? 16 : 0)),
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedUserEmail = u.email),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(first ? 16 : 0), bottom: Radius.circular(last ? 16 : 0)),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(color: p.border),
+                            right: BorderSide(color: p.border),
+                            top: first ? BorderSide(color: p.border) : BorderSide.none,
+                            bottom: BorderSide(color: p.border, width: last ? 1 : 0.6),
+                          ),
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(first ? 16 : 0), bottom: Radius.circular(last ? 16 : 0)),
+                        ),
+                        child: Row(
+                          children: [
+                            _adminUserAvatar(u, fallback: statusColor),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(u.username, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: p.ink)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      statusPill(u.status),
+                                    ],
+                                  ),
+                                  Text(u.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: p.muted)),
+                                  Text(ngmyUserDisplayAccountId(u), maxLines: 1, style: TextStyle(fontSize: 10.5, color: p.muted.withValues(alpha: 0.8))),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('\$${formatCurrency(displayBalance)}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: NgmyAdminPalette.accent)),
+                                Text('balance', style: TextStyle(fontSize: 10, color: p.muted)),
+                              ],
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: p.muted, size: 20),
+                          ],
+                        ),
+                      ),
                     ),
-                    Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.black38, size: 18),
-                  ],
-                ),
+                  );
+                },
               ),
-            );
-          },
-        ),
       ),
     ]);
   }
