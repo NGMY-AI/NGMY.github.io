@@ -32,3 +32,8 @@ class _NgmyAdvisorLiveViewState extends State<NgmyAdvisorLiveView> {
   @override
   Widget build(BuildContext context) => WebViewWidget(controller: _controller);
 }
+
+/// Apps use a native web view — no crash tracking needed.
+int ngmyLiveViewRecentCrashes() => 0;
+
+void ngmyLiveViewResetCrashes() {}

@@ -122,6 +122,7 @@ String ngmyAdvisorWebTaskPlanPrompt({
     '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
     'Answer with JSON only, no markdown:\n'
     '{"web": true, "ready": true or false, "ask": "your text to them if not ready", '
+    '"options": ["if your question has clear choices — e.g. the real job positions that place hires, shifts, yes/no — list 2-6 short ones here (they become buttons), else []"], '
     '"task": "if ready: ONE complete instruction for the browser with every detail they gave (names, position, place, dates)", '
     '"url": "the website to start on if you know it, else empty"}';
 
@@ -907,11 +908,13 @@ class _NgmyAdvisorLivePanelState extends State<NgmyAdvisorLivePanel> with Single
   }
 }
 
-/// Phones (web app): the live browser video is shown on its own full screen, not inside
-/// the chat. Streaming it under the chat's glass, animations and messages used so much
-/// memory that iPhones killed and reloaded the app during browser tasks.
+/// The live browser plays right inside the chat, so they watch the mouse move in real time.
+/// Only if the phone has killed the app twice recently while it was showing do we switch
+/// to the step list (with Watch live full screen) — and they can switch back.
 bool get ngmyLiveViewOnOwnScreen =>
-    kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android);
+    kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.android) &&
+    ngmyLiveViewRecentCrashes() >= 2;
 
 /// What the advisor is doing right now, step by step, with a button to watch it live.
 class _NgmyLiveStepsPreview extends StatelessWidget {
@@ -962,6 +965,24 @@ class _NgmyLiveStepsPreview extends StatelessWidget {
                         ),
                     ],
                   ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              const Expanded(
+                child: Text(
+                  'Showing steps because the live screen made your phone restart the app.',
+                  style: TextStyle(color: Colors.white54, fontSize: 11),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  ngmyLiveViewResetCrashes();
+                  run.reconnect();
+                },
+                child: const Text('Show live here', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              ),
+            ]),
           ),
           SizedBox(
             width: double.infinity,

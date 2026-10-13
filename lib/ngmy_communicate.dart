@@ -3443,13 +3443,16 @@ class _LoveWorldBackground extends StatelessWidget {
   final AnimationController ctrl;
   final AnimationController floatCtrl;
   final bool isDark;
+  /// Hold still (no redraw every frame) while the live browser streams, so the phone
+  /// has its power for the video.
+  final bool still;
 
-  const _LoveWorldBackground({required this.ctrl, required this.floatCtrl, required this.isDark});
+  const _LoveWorldBackground({required this.ctrl, required this.floatCtrl, required this.isDark, this.still = false});
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([ctrl, floatCtrl]),
+      animation: still ? const AlwaysStoppedAnimation<double>(0) : Listenable.merge([ctrl, floatCtrl]),
       builder: (context, _) {
         final t = ctrl.value;
         final emojiOpacity = isDark ? 0.18 : 0.34;
@@ -3989,7 +3992,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   void _onBrowserSessionChanged() {
     if (!mounted) return;
-    final key = '${_agentRun.visible}|${_browserSession.visible}|${_browserSession.url}|${_browserSession.previewHeight}';
+    final key = '${_agentRun.visible}|${_agentRun.liveUrl.isNotEmpty}|${_browserSession.visible}|${_browserSession.url}|${_browserSession.previewHeight}';
     if (key == _panelLayoutKey) return;
     _panelLayoutKey = key;
     setState(() {});
@@ -4086,7 +4089,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
-        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson', 'replyTo', 'replyToRole', 'imageId', 'browserShotId']) {
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson', 'replyTo', 'replyToRole', 'imageId', 'browserShotId', 'options']) {
           final v = (m[key] ?? '').toString().trim();
           if (v.isNotEmpty) row[key] = v;
         }
@@ -4562,7 +4565,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         'emojis only when they fit the moment (usually none), no asterisks or little stars, not overly eager:';
   }
 
+  /// Cleans the reply text but keeps any [[NGMY_OPTIONS]] choices for the buttons.
   String _cleanAdvisorReply(String? raw, {String? userTextForPoetry}) {
+    final (withoutOptions, options) = ngmyExtractAdvisorOptions((raw ?? '').trim());
+    final cleaned = _cleanAdvisorReplyText(withoutOptions, userTextForPoetry: userTextForPoetry);
+    if (options.isEmpty || cleaned.isEmpty) return cleaned;
+    return '$cleaned\n[[NGMY_OPTIONS]]${options.join('|')}[[/NGMY_OPTIONS]]';
+  }
+
+  String _cleanAdvisorReplyText(String? raw, {String? userTextForPoetry}) {
     final t = (raw ?? '').trim();
     if (t.isEmpty) return '';
     var cleaned = ngmySanitizeAdvisorChatReply(t);
@@ -4666,7 +4677,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Before opening the browser: is the task clear (what + where)? If not, what to ask.
   /// Null when the check itself failed — then the task is treated as clear only if it
   /// names a website, otherwise it stays normal chat.
-  Future<({bool web, bool ready, String ask, String task, String url})?> _planWebTask(NgmyAiCredentials creds, String request) async {
+  Future<({bool web, bool ready, String ask, String task, String url, List<String> options})?> _planWebTask(NgmyAiCredentials creds, String request) async {
     final recent = _messages
         .where((m) => (m['text'] ?? '').trim().isNotEmpty && (m['kind'] ?? '').isEmpty)
         .toList();
@@ -4694,11 +4705,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         ask: ask,
         task: '${j['task'] ?? ''}'.trim(),
         url: '${j['url'] ?? ''}'.trim(),
+        options: [
+          for (final o in (j['options'] is List ? j['options'] as List : const []))
+            if ('$o'.trim().isNotEmpty && '$o'.trim().length <= 48) '$o'.trim(),
+        ].take(8).toList(),
       );
     } catch (e) {
       debugPrint('[communicate] web task plan: $e');
       final namesSite = RegExp(r'https?://|\b[a-z0-9-]+\.(com|org|net|gov|edu|io|co)\b', caseSensitive: false).hasMatch(request);
-      return namesSite ? (web: true, ready: true, ask: '', task: request, url: '') : null;
+      return namesSite ? (web: true, ready: true, ask: '', task: request, url: '', options: const <String>[]) : null;
     }
   }
   Future<({String cleaned, String? error})> _generateAndCleanAdvisorReply({
@@ -4979,9 +4994,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     required String text,
     String? imageB64,
     String? parseExtrasForUserText,
+    List<String> options = const [],
   }) async {
     final photo = (imageB64 ?? '').trim();
-    var body = text.trim();
+    final (bodyNoOptions, replyOptions) = ngmyExtractAdvisorOptions(text.trim());
+    var body = bodyNoOptions;
     var browserUrl = '';
     var browserLabel = '';
     var phoneActionsJson = '';
@@ -5004,6 +5021,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         phoneActionsJson = ngmyAdvisorPhoneActionsToJson(chipActions);
       }
     }
+    // Choices offered as buttons (read from the reply first, or passed in).
+    final choiceList = replyOptions.isNotEmpty ? replyOptions : options;
+    final optionsText = choiceList.join('|');
     if (body.isEmpty && lookups.isNotEmpty) body = 'Let me check that for you.';
 
     if (body.isEmpty && photo.isEmpty) {
@@ -5033,6 +5053,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         browserUrl: browserUrl,
         browserLabel: browserLabel,
         phoneActions: phoneActionsJson,
+        options: optionsText,
       );
     } else {
       await NgmyCommunicateMemoryStore.append(
@@ -5043,6 +5064,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         browserUrl: browserUrl,
         browserLabel: browserLabel,
         phoneActions: phoneActionsJson,
+        options: optionsText,
       );
     }
     final away = !mounted || sendGen != _sendGen;
@@ -5058,6 +5080,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (browserUrl.isNotEmpty) row['browserUrl'] = browserUrl;
     if (browserLabel.isNotEmpty) row['browserLabel'] = browserLabel;
     if (phoneActionsJson.isNotEmpty) row['phoneActions'] = phoneActionsJson;
+    if (optionsText.isNotEmpty) row['options'] = optionsText;
     setState(() => _messages.add(row));
     _scrollBottom();
     if (lookups.isNotEmpty || goNow.isNotEmpty) {
@@ -5392,7 +5415,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         } else if (!plan.ready) {
           _webDraft = request;
           _webDraftAt = DateTime.now();
-          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: plan.ask, parseExtrasForUserText: text);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: plan.ask, parseExtrasForUserText: text, options: plan.options);
           return;
         } else {
           _webDraft = '';
@@ -5899,7 +5922,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.floatCtrl, isDark: isDark),
+          _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.floatCtrl, isDark: isDark, still: _agentRun.visible && _agentRun.liveUrl.isNotEmpty),
           Positioned.fill(
             child: ListView.builder(
               controller: _scroll,
@@ -6073,6 +6096,29 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                             ? Padding(padding: const EdgeInsets.only(bottom: 12), child: bubbleStack)
                             : bubbleStack,
                       ),
+                      // Choices the advisor offered — tap one to answer (only on its latest message).
+                      if (!user && (m['options'] ?? '').isNotEmpty && msgIndex == _messages.length - 1)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8, left: 2),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.86),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final o in m['options']!.split('|').where((s) => s.trim().isNotEmpty))
+                                  _NgmyChoiceButton(
+                                    label: o.trim(),
+                                    accent: accent,
+                                    onTap: () {
+                                      _controller.text = o.trim();
+                                      unawaited(_send());
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
                       if (!user && phoneActions.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, left: 4),
@@ -6548,4 +6594,40 @@ Future<String?> _ngmyChatImageFuture(String imageId) {
     _ngmyChatImageLoads.remove(_ngmyChatImageLoads.keys.first);
   }
   return f;
+}
+
+/// One tappable choice under the advisor's question.
+class _NgmyChoiceButton extends StatelessWidget {
+  const _NgmyChoiceButton({required this.label, required this.accent, required this.onTap});
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: accent.withValues(alpha: 0.16),
+              border: Border.all(color: accent.withValues(alpha: 0.7), width: 1.3),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Color.lerp(accent, Colors.black, 0.35),
+                fontWeight: FontWeight.w800,
+                fontSize: 13.5,
+              ),
+            ),
+          ),
+        ),
+      );
 }

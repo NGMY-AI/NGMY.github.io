@@ -44,6 +44,12 @@ agree to a plan, thank you, or deserve encouragement, append ONE emoji reaction 
 
 Pick the emoji that FITS the message: 👍 agreeing/plans/ok, 😂 jokes, 😮 surprises, 😢 sad news, 🙏 thanks or prayer, 🎉 wins and celebrations, 🔥 hype, 💯 facts, ❤️ ONLY for real affection. Omit the block on bland or professional-only messages.
 Do not write "I reacted with…" — use the tag silently.
+
+CHOICES AS BUTTONS — Whenever you ask them to pick something that has clear choices (a job position, a shift, a size,
+a day, a plan, yes/no), put the choices at the very end so the app shows them as buttons they can tap:
+[[NGMY_OPTIONS]]Cashier|Crew Member|Shift Manager|Not sure[[/NGMY_OPTIONS]]
+2–6 short choices (a few words each), the real ones for that place when you know them, plus "Other" or "Not sure" when it helps.
+Still ask the question in words — the buttons are extra. No buttons for open questions like their name.
 ''';
 }
 
@@ -54,6 +60,8 @@ class NgmyAdvisorParsedReply {
   final String reactionEmoji;
   final String browserUrl;
   final String browserLabel;
+  /// Choices the advisor offered (shown as buttons they can tap).
+  final List<String> options;
 
   const NgmyAdvisorParsedReply({
     required this.text,
@@ -62,6 +70,7 @@ class NgmyAdvisorParsedReply {
     this.reactionEmoji = '',
     this.browserUrl = '',
     this.browserLabel = '',
+    this.options = const [],
   });
 }
 
@@ -119,6 +128,8 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
   var reaction = '';
   final browserCommands = ngmyParseAdvisorBrowserCommands(text);
   text = ngmyStripAdvisorBrowserCommandTags(text);
+  final (withoutOptions, options) = ngmyExtractAdvisorOptions(text);
+  text = withoutOptions;
 
   final reactMatch = _reactTag.firstMatch(text);
   if (reactMatch != null) {
@@ -177,6 +188,7 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
     reactionEmoji: reaction,
     browserUrl: browserUrl,
     browserLabel: browserLabel,
+    options: options,
   );
 }
 
@@ -356,4 +368,20 @@ String ngmyAdvisorVaryReaction(String base, math.Random r, {required bool dating
   final pool = options.where((e) => e != avoid).toList();
   final list = pool.isEmpty ? options : pool;
   return list[r.nextInt(list.length)];
+}
+
+final _optionsTag = RegExp(r'\[\[NGMY_OPTIONS\]\](.*?)\[\[/NGMY_OPTIONS\]\]', dotAll: true);
+
+/// Pulls the [[NGMY_OPTIONS]] choices out of a reply: (text without the tag, choices).
+(String, List<String>) ngmyExtractAdvisorOptions(String text) {
+  final m = _optionsTag.firstMatch(text);
+  if (m == null) return (text, const []);
+  final options = <String>[];
+  for (final raw in (m.group(1) ?? '').split(RegExp(r'[|\n]'))) {
+    final o = raw.replaceAll(RegExp(r'^[\s\-•*\d.)]+'), '').trim();
+    if (o.isEmpty || o.length > 48 || options.contains(o)) continue;
+    options.add(o);
+    if (options.length == 8) break;
+  }
+  return (text.replaceAll(_optionsTag, '').trim(), options);
 }

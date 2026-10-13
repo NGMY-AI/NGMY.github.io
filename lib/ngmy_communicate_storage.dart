@@ -208,6 +208,7 @@ class NgmyCommunicateMemoryStore {
     String? resultJson,
     String? replyTo,
     String? replyToRole,
+    String? options,
   }) async =>
       appendWithMime(
         email,
@@ -224,6 +225,7 @@ class NgmyCommunicateMemoryStore {
         resultJson: resultJson,
         replyTo: replyTo,
         replyToRole: replyToRole,
+        options: options,
       );
 
   static Future<void> appendWithMime(
@@ -242,6 +244,7 @@ class NgmyCommunicateMemoryStore {
     String? resultJson,
     String? replyTo,
     String? replyToRole,
+    String? options,
   }) async {
     if (profileId.trim().isEmpty) return;
     final storeEmail = _storageEmail(email);
@@ -270,6 +273,8 @@ class NgmyCommunicateMemoryStore {
         final rt = (replyTo ?? '').trim();
         if (rt.isNotEmpty) row['replyTo'] = rt.length > 300 ? '${rt.substring(0, 300)}…' : rt;
         if (rt.isNotEmpty && (replyToRole ?? '').isNotEmpty) row['replyToRole'] = replyToRole!;
+        final opts = (options ?? '').trim();
+        if (opts.isNotEmpty) row['options'] = opts;
         final shot = (browserShotB64 ?? '').trim();
         if (shot.isNotEmpty) {
           final shotId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);
@@ -386,7 +391,7 @@ class NgmyCommunicateMemoryStore {
   }
 
   static void _copyAdvisorMeta(Map<String, dynamic> from, Map<String, dynamic> to) {
-    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'browserShotId', 'kind', 'resultJson']) {
+    for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'browserShotId', 'kind', 'resultJson', 'replyTo', 'replyToRole', 'options']) {
       final v = (from[key] ?? '').toString().trim();
       if (v.isNotEmpty) to[key] = v;
     }

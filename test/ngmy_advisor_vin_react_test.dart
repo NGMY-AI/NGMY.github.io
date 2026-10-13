@@ -49,4 +49,15 @@ void main() {
     expect(seen.length, greaterThan(1));
     expect(ngmyAdvisorVaryReaction('🙏', r, dating: false, avoid: '🙏'), isNot('🙏'));
   });
+
+  test('choices in a reply become buttons and are removed from the text', () {
+    final (text, options) = ngmyExtractAdvisorOptions(
+      'Which position do you want?\n[[NGMY_OPTIONS]]Cashier|Crew Member| Shift Manager |Not sure[[/NGMY_OPTIONS]]',
+    );
+    expect(text, 'Which position do you want?');
+    expect(options, ['Cashier', 'Crew Member', 'Shift Manager', 'Not sure']);
+    final parsed = ngmyParseAdvisorAssistantReply('Pick a shift [[NGMY_OPTIONS]]Morning|Night[[/NGMY_OPTIONS]]', userMessage: 'ok');
+    expect(parsed.options, ['Morning', 'Night']);
+    expect(parsed.text.contains('NGMY_OPTIONS'), isFalse);
+  });
 }
