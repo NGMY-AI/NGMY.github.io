@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 
@@ -156,7 +158,7 @@ NgmySlidesAiStyle ngmySlidesAiStyleById(String id) =>
     kNgmySlidesAiStyles.firstWhere((s) => s.id == id.trim().toLowerCase(), orElse: () => kNgmySlidesAiStyles.first);
 
 /// Extras the AI can add on top of the words.
-enum NgmySlidesAiExtra { emojis, pictures, icons3d, animations, videoMotion }
+enum NgmySlidesAiExtra { emojis, pictures, icons3d, animations, videoMotion, luxe }
 
 extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
   String get label => switch (this) {
@@ -165,6 +167,7 @@ extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
         NgmySlidesAiExtra.icons3d => '3D icons & animals',
         NgmySlidesAiExtra.animations => 'Animations',
         NgmySlidesAiExtra.videoMotion => 'Video motion',
+        NgmySlidesAiExtra.luxe => 'Luxury FX',
       };
   IconData get icon => switch (this) {
         NgmySlidesAiExtra.emojis => Icons.emoji_emotions_rounded,
@@ -172,6 +175,7 @@ extension NgmySlidesAiExtraLabel on NgmySlidesAiExtra {
         NgmySlidesAiExtra.icons3d => Icons.view_in_ar_rounded,
         NgmySlidesAiExtra.animations => Icons.animation_rounded,
         NgmySlidesAiExtra.videoMotion => Icons.movie_filter_rounded,
+        NgmySlidesAiExtra.luxe => Icons.diamond_rounded,
       };
 }
 
@@ -421,6 +425,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
   final animate = extras.contains(NgmySlidesAiExtra.animations);
   final useEmoji = extras.contains(NgmySlidesAiExtra.emojis);
   final video = extras.contains(NgmySlidesAiExtra.videoMotion);
+  final luxe = extras.contains(NgmySlidesAiExtra.luxe);
+  const luxeTrans = [NgmySlideTransition.cube, NgmySlideTransition.zoom, NgmySlideTransition.flip, NgmySlideTransition.cube, NgmySlideTransition.push];
   String id() => NgmySlidesTemplates.newId();
   final slides = <NgmySlide>[];
 
@@ -618,6 +624,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       }
     }
 
+    if (luxe) _addLuxe(els, i, id);
+
     slides.add(NgmySlide(
       id: id(),
       title: o.title,
@@ -625,13 +633,63 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       layout: layout,
       background: bg,
       backgroundEnd: bgEnd,
-      transition: animate ? slideTrans[i % slideTrans.length] : st.transition,
+      transition: luxe ? luxeTrans[i % luxeTrans.length] : (animate ? slideTrans[i % slideTrans.length] : st.transition),
       elements: els,
     ));
   }
 
   final name = outline.title.trim().isEmpty ? 'AI Presentation' : outline.title.trim();
   return NgmySlideDeck(id: id(), name: name.length > 60 ? name.substring(0, 60) : name, slides: slides);
+}
+
+/// Luxury FX on one slide: a moving spotlight behind everything, gold dust in
+/// the air, a gold frame with a light streak racing round it, twinkling corner
+/// jewels, two orbiting gems, and a light sweep across the title and bar.
+/// The same keys on every slide, so with video motion they glide between slides.
+void _addLuxe(List<NgmySlideElement> els, int i, String Function() id) {
+  const gold = kNgmyLuxeGold;
+  NgmySlideElement deco(NgmySlideShapeKind kind, double x, double y, double w, double h, int fill, String key, String fx,
+          {int stroke = 0, double strokeWidth = 0, double rotation = 0, NgmySlideTransition anim = NgmySlideTransition.none, int delay = 0}) =>
+      NgmySlideElement(
+        id: id(),
+        type: NgmySlideElementType.shape,
+        x: x,
+        y: y,
+        w: w,
+        h: h,
+        shape: kind,
+        fillColor: fill,
+        strokeColor: stroke,
+        strokeWidth: strokeWidth,
+        rotation: rotation,
+        textTransition: anim,
+        textAnimDelayMs: delay,
+        morphKey: key,
+        loopFx: fx,
+      );
+
+  NgmySlideElement jewel(double cx, double cy, String key, int delay) =>
+      deco(NgmySlideShapeKind.rectangle, cx - 0.011, cy - 0.0195, 0.022, 0.039, gold, key, 'twinkle',
+          stroke: 0xFFFFF4D6, strokeWidth: 1.2, rotation: 0.785, anim: NgmySlideTransition.zoom, delay: delay);
+
+  // Behind the content: a soft golden spotlight wandering over the slide.
+  els.insert(0, deco(NgmySlideShapeKind.circle, 0.18 + (i % 3) * 0.22, 0.12 + (i % 2) * 0.18, 0.42, 0.7, _withAlpha(gold, 0x38), 'lux_spot', 'spotlight'));
+  for (final e in els) {
+    if (e.morphKey == 'title' || e.morphKey == 'bar') e.loopFx = 'shimmer';
+  }
+  els
+    ..add(deco(NgmySlideShapeKind.rectangle, 0.022, 0.038, 0.956, 0.924, 0x00000000, 'lux_frame', 'goldframe',
+        stroke: _withAlpha(gold, 0xB0), strokeWidth: 1.6, anim: NgmySlideTransition.fade, delay: 150))
+    // Small jewels sitting exactly on the frame's corners, and two gems gliding on its edges.
+    ..add(jewel(0.022, 0.038, 'lux_c1', 300))
+    ..add(jewel(0.978, 0.038, 'lux_c2', 380))
+    ..add(jewel(0.022, 0.962, 'lux_c3', 460))
+    ..add(jewel(0.978, 0.962, 'lux_c4', 540))
+    ..add(deco(NgmySlideShapeKind.rectangle, (i.isEven ? 0.30 : 0.62) - 0.008, 0.038 - 0.014, 0.016, 0.028, _withAlpha(0xFFFDE68A, 0xF2), 'lux_g1', 'orbit',
+        stroke: 0xFFFFFFFF, strokeWidth: 1, rotation: 0.785, anim: NgmySlideTransition.bounce, delay: 600))
+    ..add(deco(NgmySlideShapeKind.circle, (i.isEven ? 0.66 : 0.34) - 0.007, 0.962 - 0.0125, 0.014, 0.025, _withAlpha(0xFFFFFBEB, 0xF2), 'lux_g2', 'orbit', anim: NgmySlideTransition.bounce, delay: 700))
+    // In front of everything: gold dust in the air.
+    ..add(deco(NgmySlideShapeKind.rectangle, 0, 0, 1, 1, 0x00000000, 'lux_dust', 'golddust'));
 }
 
 Future<String?> _fetchAsDataUri(String url, {String fallbackMime = 'image/png'}) async {
@@ -820,12 +878,8 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   String _status = '';
   int _count = 7;
   String _style = 'auto';
-  final Set<NgmySlidesAiExtra> _extras = {
-    NgmySlidesAiExtra.animations,
-    NgmySlidesAiExtra.videoMotion,
-    NgmySlidesAiExtra.emojis,
-    NgmySlidesAiExtra.icons3d,
-  };
+  // Only Emojis is on when the maker opens; they switch on what else they want.
+  final Set<NgmySlidesAiExtra> _extras = {NgmySlidesAiExtra.emojis};
   String? _error;
 
   static const _counts = [3, 5, 7, 10, 12, 15];
@@ -1244,11 +1298,15 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 const SizedBox(height: 18),
                 const Text('Add to the slides', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [for (final x in NgmySlidesAiExtra.values) _extraChip(x)],
-                ),
+                // Three in a row.
+                LayoutBuilder(builder: (context, c) {
+                  final w = (c.maxWidth - 16) / 3;
+                  return Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [for (final x in NgmySlidesAiExtra.values) SizedBox(width: w, child: _extraChip(x))],
+                  );
+                }),
                 const SizedBox(height: 18),
                 const Text('Look & feel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
@@ -1311,23 +1369,29 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
 
   Widget _extraChip(NgmySlidesAiExtra x) {
     final on = _extras.contains(x);
+    void toggle() => setState(() => on ? _extras.remove(x) : _extras.add(x));
+    if (x == NgmySlidesAiExtra.luxe) return _NgmyLuxeTile(on: on, onTap: toggle);
     return GestureDetector(
-      onTap: () => setState(() => on ? _extras.remove(x) : _extras.add(x)),
+      onTap: toggle,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        height: 64,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(99),
+          borderRadius: BorderRadius.circular(16),
           gradient: on ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]) : null,
           color: on ? null : Colors.white.withValues(alpha: 0.05),
           border: Border.all(color: on ? Colors.white54 : Colors.white12),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(on ? Icons.check_circle_rounded : x.icon, size: 16, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(x.label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 12.5)),
+            Icon(on ? Icons.check_circle_rounded : x.icon, size: 20, color: Colors.white),
+            const SizedBox(height: 4),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(x.label, style: TextStyle(color: Colors.white, fontWeight: on ? FontWeight.w900 : FontWeight.w600, fontSize: 12)),
+            ),
           ],
         ),
       ),
@@ -1602,4 +1666,117 @@ String _pictureRule(int count) {
   return '- THEIR PICTURES: they uploaded $count picture${count == 1 ? '' : 's'} of their own, numbered 1 to $count in the order they picked them. '
       'Put "picture": <number> on each slide where one belongs, following exactly what they say (e.g. "picture 2 on the team slide", "first picture on the title"). '
       'If they don\'t say, spread them over the content slides in order. Use 0 where no picture is wanted.';
+}
+
+/// The "Luxury FX" choice: black and gold, with a light sweeping across it and
+/// gold sparkles — it previews the effect it adds to the slides.
+class _NgmyLuxeTile extends StatefulWidget {
+  const _NgmyLuxeTile({required this.on, required this.onTap});
+  final bool on;
+  final VoidCallback onTap;
+  @override
+  State<_NgmyLuxeTile> createState() => _NgmyLuxeTileState();
+}
+
+class _NgmyLuxeTileState extends State<_NgmyLuxeTile> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const gold = Color(0xFFE9C46A);
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) {
+          final a = _c.value * 6.283;
+          return Container(
+            height: 64,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: widget.on ? const [Color(0xFF3B2A06), Color(0xFF0B0A08), Color(0xFF3B2A06)] : const [Color(0xFF1C1710), Color(0xFF0B0A08)],
+              ),
+              border: Border.all(color: gold.withValues(alpha: widget.on ? 1 : 0.55), width: widget.on ? 1.8 : 1.2),
+              boxShadow: [BoxShadow(color: gold.withValues(alpha: widget.on ? 0.35 + 0.15 * _c.value : 0.12), blurRadius: widget.on ? 16 : 8)],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Stack(children: [
+                // Gold dust preview.
+                Positioned.fill(child: CustomPaint(painter: _LuxeTileSparkles(a))),
+                // Light sweep.
+                Positioned.fill(
+                  child: FractionalTranslation(
+                    translation: Offset(_c.value * 2.4 - 1.2, 0),
+                    child: Transform.rotate(
+                      angle: 0.5,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFFFF4D6).withValues(alpha: 0.28), Colors.transparent]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Center(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(widget.on ? Icons.check_circle_rounded : Icons.diamond_rounded, size: 20, color: gold),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: ShaderMask(
+                        shaderCallback: (r) => const LinearGradient(colors: [Color(0xFFF7E3A1), gold, Color(0xFFB8860B)]).createShader(r),
+                        child: const Text('Luxury FX', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.4)),
+                      ),
+                    ),
+                  ]),
+                ),
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(color: gold, borderRadius: BorderRadius.circular(6)),
+                    child: const Text('NEW', style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ]),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LuxeTileSparkles extends CustomPainter {
+  _LuxeTileSparkles(this.a);
+  final double a;
+  @override
+  void paint(Canvas canvas, Size size) {
+    const pts = [(0.12, 0.3), (0.26, 0.75), (0.8, 0.22), (0.9, 0.7), (0.5, 0.15), (0.65, 0.85), (0.08, 0.85)];
+    for (var i = 0; i < pts.length; i++) {
+      final tw = (0.5 + 0.5 * math.sin(a * 2 + i * 1.7));
+      final p = Offset(pts[i].$1 * size.width, pts[i].$2 * size.height);
+      final paint = Paint()..color = const Color(0xFFE9C46A).withValues(alpha: 0.25 + tw * 0.6);
+      canvas.drawCircle(p, 1 + tw * 1.4, paint);
+      if (tw > 0.85) {
+        final s = 4 * (tw - 0.85) / 0.15;
+        canvas.drawLine(p - Offset(s, 0), p + Offset(s, 0), paint..strokeWidth = 1);
+        canvas.drawLine(p - Offset(0, s), p + Offset(0, s), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LuxeTileSparkles old) => old.a != a;
 }

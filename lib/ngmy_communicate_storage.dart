@@ -190,6 +190,8 @@ class NgmyCommunicateMemoryStore {
     String? browserShotB64,
     String? kind,
     String? resultJson,
+    String? replyTo,
+    String? replyToRole,
   }) async =>
       appendWithMime(
         email,
@@ -204,6 +206,8 @@ class NgmyCommunicateMemoryStore {
         browserShotB64: browserShotB64,
         kind: kind,
         resultJson: resultJson,
+        replyTo: replyTo,
+        replyToRole: replyToRole,
       );
 
   static Future<void> appendWithMime(
@@ -220,6 +224,8 @@ class NgmyCommunicateMemoryStore {
     String? browserShotB64,
     String? kind,
     String? resultJson,
+    String? replyTo,
+    String? replyToRole,
   }) async {
     if (profileId.trim().isEmpty) return;
     final storeEmail = _storageEmail(email);
@@ -245,6 +251,9 @@ class NgmyCommunicateMemoryStore {
         final rj = (resultJson ?? '').trim();
         if (rj.isNotEmpty && rj.length < 60000) row['resultJson'] = rj;
         if (k.isNotEmpty) row['kind'] = k;
+        final rt = (replyTo ?? '').trim();
+        if (rt.isNotEmpty) row['replyTo'] = rt.length > 300 ? '${rt.substring(0, 300)}…' : rt;
+        if (rt.isNotEmpty && (replyToRole ?? '').isNotEmpty) row['replyToRole'] = replyToRole!;
         final shot = (browserShotB64 ?? '').trim();
         if (shot.isNotEmpty) {
           final shotId = NgmyCommunicateChatImageStore.newId(email: storeEmail, profileId: profileId);

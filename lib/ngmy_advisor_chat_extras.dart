@@ -39,9 +39,9 @@ Never claim "logged in", "placed the trades", "bought it" or "done" for actions 
 MESSAGE REACTIONS — React to THEIR last message like a real person (not every text). When they share good news, say something sweet,
 agree to a plan, thank you, or deserve encouragement, append ONE emoji reaction on their message:
 
-[[NGMY_REACT_USER]]❤️[[/NGMY_REACT_USER]]
+[[NGMY_REACT_USER]]👍[[/NGMY_REACT_USER]]
 
-Allowed: ❤️ 💕 🥰 👍 😂 🙏 🔥 ✨ — omit the block on bland or professional-only messages.
+Pick the emoji that FITS the message: 👍 agreeing/plans/ok, 😂 jokes, 😮 surprises, 😢 sad news, 🙏 thanks or prayer, 🎉 wins and celebrations, 🔥 hype, 💯 facts, ❤️ ONLY for real affection. Omit the block on bland or professional-only messages.
 Do not write "I reacted with…" — use the tag silently.
 ''';
 }
@@ -99,7 +99,7 @@ List<NgmyAdvisorBrowserCommand> ngmyParseAdvisorBrowserCommands(String raw) {
 
 String ngmyStripAdvisorBrowserCommandTags(String raw) => raw.replaceAll(_browserCmdTag, '').trim();
 
-const _allowedReactions = {'❤️', '💕', '🥰', '👍', '😂', '🙏', '🔥', '✨', '💖', '😊', '🎉'};
+const _allowedReactions = {'❤️', '💕', '🥰', '👍', '😂', '🙏', '🔥', '✨', '💖', '😊', '🎉', '😢', '😮', '💯'};
 
 String _normalizeReaction(String raw) {
   final t = raw.trim();
@@ -136,8 +136,13 @@ NgmyAdvisorParsedReply ngmyParseAdvisorAssistantReply(
     ];
   }
 
-  if (reaction.isEmpty) {
-    reaction = ngmyAdvisorPickReactionEmoji(userMessage: userMessage, aiReply: text);
+  // The emoji has to fit the message: the reading of their words wins, and the model's
+  // own heart is dropped when the message was not affectionate (no hearts on "ok").
+  final picked = ngmyAdvisorPickReactionEmoji(userMessage: userMessage, aiReply: text);
+  if (picked.isNotEmpty) {
+    reaction = picked;
+  } else if (const {'❤️', '💕', '🥰', '💖'}.contains(reaction)) {
+    reaction = '';
   }
 
   String browserUrl = '';
@@ -227,32 +232,33 @@ String ngmyAdvisorPickReactionEmoji({
   required String userMessage,
   required String aiReply,
 }) {
-  final u = userMessage.toLowerCase();
+  final u = userMessage.toLowerCase().trim();
   final a = aiReply.toLowerCase();
   if (u.isEmpty) return '';
+  bool has(String pattern) => RegExp(pattern, caseSensitive: false).hasMatch(u);
 
-  if (RegExp(r'\b(thank|thanks|appreciate|grateful|bless you|god bless)\b').hasMatch(u)) {
-    return '🙏';
+  // Bad news first — never answer sadness with a heart or a thumbs up.
+  if (has(r"\b(passed away|died|funeral|lost my (job|mom|dad|mother|father|baby|friend)|got fired|laid off|broke up|heartbroken|depressed|so sad|i'?m sad|crying|in the hospital|diagnosed|miscarriage|divorce)\b")) {
+    return '😢';
   }
-  if (RegExp(r'\b(love you|miss you|marry|baby|babe|my love|❤)\b').hasMatch(u)) {
+  if (has(r'\b(thank|thanks|thx|appreciate|grateful|bless you|god bless)\b')) return '🙏';
+  if (has(r'\b(pray for|praying|prayer|amen|church|lord|jesus)\b')) return '🙏';
+  if (has(r'(\b(lol|lmao|lmfao|haha+|hehe|rofl|funny|hilarious|joke)\b|😂|🤣)')) return '😂';
+  if (has(r'\b(got the job|hired|promoted|promotion|passed|graduated|won|i did it|we did it|closed the deal|paid off|bought (a|my) (house|car))\b')) return '🎉';
+  if (has(r'\b(birthday|anniversary|engaged|wedding|congrats|new baby)\b')) return '🎉';
+  if (has(r'\b(wow|no way|omg|really\?|seriously\?|crazy|unbelievable|shocked)\b')) return '😮';
+  if (has(r'\b(amazing|awesome|let'"'"'?s go|killed it|nailed it|proud of myself|on fire|crushed it)\b')) return '🔥';
+  // Real affection only gets a heart.
+  if (has(r"(\b(i love you|love you|luv you|miss you|marry me|my love|babe|baby|sweetheart|you'?re (so )?(sweet|cute|beautiful|handsome))\b|❤|💕|😘|🥰)")) {
     return '❤️';
   }
-  if (RegExp(r'\b(lol|lmao|haha|funny|😂)\b').hasMatch(u)) {
-    return '😂';
-  }
-  if (RegExp(r"\b(yes|yeah|yep|sure|let's do|demo again|sounds good|deal|ok let's|i agree)\b").hasMatch(u)) {
+  if (has(r"\b(yes|yeah|yep|yup|sure|ok|okay|k|deal|done|got it|sounds good|i agree|agreed|will do|on it|perfect|cool|bet|alright|let'?s do it|i'?ll do (it|that)|i understand|makes sense)\b")) {
     return '👍';
   }
-  if (RegExp(r'\b(amazing|awesome|great job|proud|won|passed|got the job)\b').hasMatch(u)) {
-    return '🔥';
-  }
-  if (RegExp(r'\b(pray|prayer|church|lord)\b').hasMatch(u)) {
-    return '🙏';
-  }
-  // Advisor warmth mirrored back
-  if (RegExp(r'\b(proud of you|so happy for you|congrats|congratulations)\b').hasMatch(a)) {
-    return '🥰';
-  }
+  if (has(r'\b(good morning|good night|gm|gn)\b')) return '😊';
+  if (has(r'\b(exactly|facts|true|so true|for real|100)\b')) return '💯';
+  // The advisor's own warmth mirrored back.
+  if (RegExp(r'\b(proud of you|so happy for you|congrats|congratulations)\b').hasMatch(a)) return '🥰';
   return '';
 }
 

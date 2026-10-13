@@ -38,4 +38,20 @@ void main() {
     expect(has(1, p2), isTrue);
     expect(deck.slides[2].elements.any((e) => e.imageRef == p1 || e.imageRef == p2), isFalse);
   });
+
+  test('Luxury FX adds its gold frame, jewels, dust and spotlight to every slide', () {
+    final outline = ngmyParseSlidesAiOutline(
+      '{"title":"X","style":"royal","slides":[{"kind":"title","title":"Hi"},{"kind":"bullets","title":"A","bullets":["x"]}]}',
+      fallbackStyle: 'royal',
+    )!;
+    final plain = ngmyBuildSlidesAiDeck(outline, extras: {NgmySlidesAiExtra.emojis});
+    final luxe = ngmyBuildSlidesAiDeck(outline, extras: {NgmySlidesAiExtra.emojis, NgmySlidesAiExtra.luxe});
+    for (var i = 0; i < luxe.slides.length; i++) {
+      final keys = luxe.slides[i].elements.map((e) => e.morphKey).toSet();
+      expect(keys, containsAll(['lux_frame', 'lux_dust', 'lux_spot', 'lux_c1', 'lux_c4', 'lux_g1']));
+      expect(luxe.slides[i].elements.firstWhere((e) => e.morphKey == 'title').loopFx, 'shimmer');
+      // Without Luxury FX nothing changes.
+      expect(plain.slides[i].elements.any((e) => e.morphKey.startsWith('lux_')), isFalse);
+    }
+  });
 }

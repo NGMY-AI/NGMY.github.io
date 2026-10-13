@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'ngmy_hati_kiapo_uongozi.dart';
+import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_pdf_embed_stub.dart'
     if (dart.library.html) 'ngmy_slides_pdf_embed_web.dart';
@@ -954,7 +955,7 @@ class NgmyLoopFx extends StatefulWidget {
 class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateMixin {
   AnimationController? _c;
 
-  bool get _on => widget.enabled && const {'float3d', 'drift', 'pulse'}.contains(widget.fx);
+  bool get _on => widget.enabled && const {'float3d', 'drift', 'pulse', ...kNgmyLuxeFx}.contains(widget.fx);
 
   @override
   void initState() {
@@ -962,7 +963,7 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
     if (_on) {
       _c = AnimationController(
         vsync: this,
-        duration: Duration(milliseconds: widget.fx == 'drift' ? 9000 : (widget.fx == 'pulse' ? 2600 : 4200)),
+        duration: Duration(milliseconds: ngmyLuxeFxMillis(widget.fx) ?? (widget.fx == 'drift' ? 9000 : (widget.fx == 'pulse' ? 2600 : 4200))),
       )..repeat();
     }
   }
@@ -986,6 +987,7 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
         // seamlessly when one slide view hands over to the next.
         final dur = c.duration!.inMilliseconds;
         final a = (DateTime.now().millisecondsSinceEpoch % dur) / dur * math.pi * 2 + phase;
+        if (kNgmyLuxeFx.contains(widget.fx)) return ngmyLuxeFxBuild(widget.fx, a, widget.seed, child!);
         switch (widget.fx) {
           case 'float3d':
             return Transform(

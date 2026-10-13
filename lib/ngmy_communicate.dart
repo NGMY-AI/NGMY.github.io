@@ -42,6 +42,7 @@ import 'ngmy_nav.dart';
 import 'ngmy_platform_graphics.dart';
 import 'ngmy_push_notifications.dart';
 import 'ngmy_voice_input.dart';
+import 'ngmy_vin_lookup.dart';
 
 /// All admin-selectable companion roles.
 const kNgmyCommunicateRoles = <String, String>{
@@ -3646,6 +3647,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   final _photoPicker = ImagePicker();
   final List<Map<String, String>> _messages = [];
   bool _busy = false;
+  bool _sendStarting = false;
+  DateTime? _paidOkAt;
+  Map<String, String>? _replyTo;
+  String _jobReplyTo = '';
   bool _loaded = false;
   String? _activityCaption;
   /// Server's answer: is this advisor dating THIS user? (professional with everyone else)
@@ -3772,6 +3777,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<String> _advisorExtraContext(String text, List<Map<String, dynamic>> mem) async {
     final buf = StringBuffer();
+    final replyTo = _jobReplyTo.trim();
+    if (replyTo.isNotEmpty) {
+      buf.writeln('THEY SWIPED TO REPLY TO THIS EARLIER MESSAGE: "$replyTo" — their new text answers or refers to that message, so reply in that context.');
+    }
+    final vin = ngmyFindVin(text);
+    if (vin != null) {
+      if (mounted) setState(() => _activityCaption = '${ngmyAdvisorFirstName(widget.profile.name)} is pulling the vehicle records…');
+      buf.writeln(await ngmyVinReportBlock(vin));
+    }
     buf.writeln(
       NgmyAdvisorAppKnowledge.forChat(
         chatterIsBoss: _isBoss,
@@ -4050,7 +4064,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         };
         final img = (m['imageB64'] ?? '').toString().trim();
         if (img.isNotEmpty) row['imageB64'] = img;
-        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson']) {
+        for (final key in ['reaction', 'browserUrl', 'browserLabel', 'phoneActions', 'kind', 'browserShotB64', 'resultJson', 'replyTo', 'replyToRole']) {
           final v = (m[key] ?? '').toString().trim();
           if (v.isNotEmpty) row[key] = v;
         }
@@ -4354,6 +4368,25 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     );
   }
 
+  /// Same as [_ensurePaid], but a pass already confirmed in the last few minutes is
+  /// trusted so each message doesn't wait on a network check before it sends.
+  Future<bool> _ensurePaidQuick() async {
+    if (_isAdmin) return true;
+    final ok = _paidOkAt;
+    if (ok != null && DateTime.now().difference(ok) < const Duration(minutes: 5)) return true;
+    if (NgmyCommunicatePayments.hasActivePass(widget.config, _email)) {
+      _paidOkAt = DateTime.now();
+      return true;
+    }
+    final paid = await NgmyStripePayments.hasActiveAccess(_email, NgmyStripeProduct.advisors)
+        .timeout(const Duration(seconds: 4), onTimeout: () => false);
+    if (paid) {
+      _paidOkAt = DateTime.now();
+      return true;
+    }
+    return _ensurePaid();
+  }
+
   Future<void> _pickHomeworkPhoto() async {
     if (_busy || !_allowsPhotoUpload) return;
     try {
@@ -4601,6 +4634,17 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     // Always use the hard-budget fast path — multi-model retry hangs for minutes on weak signal.
     var result = await ngmyAiGenerateCommunicateFast(creds, prompt, images: images);
     var cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    // A server hiccup or a reply that cleaned away to nothing: try once more before
+    // showing a "glitched" bubble (that bubble is the last resort, not the first).
+    if (cleaned.trim().isEmpty && !ngmyIsOfflineOrNetworkError(result.error ?? '')) {
+      result = await ngmyAiGenerateCommunicateFast(
+        creds,
+        '$prompt\n(Answer now in your own voice, 1–3 short sentences, staying in your role — never leave it empty.)',
+        images: images,
+        budget: const Duration(seconds: 18),
+      );
+      cleaned = _cleanAdvisorReply(result.text, userTextForPoetry: userText);
+    }
     if (poemMode && ngmyAdvisorPoemReplyLooksIncomplete(cleaned)) {
       final retryPrompt = '$prompt\n'
           'CRITICAL — YOU DID NOT WRITE THE POEM YET. Your reply must be the COMPLETE rhyming spoken-word poem. '
@@ -4697,9 +4741,33 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   /// Persist advisor reply even if user left chat; notify when away.
   /// Empty text + no photo is rejected so typing never ends on a blank bubble.
   /// Returns true when a reply was accepted (UI and/or memory).
+
+  /// The advisor "reads" the message and reacts within a second, like a real
+  /// person — with an emoji that fits what was said (or none for plain questions).
+  void _reactSoon(Map<String, String> row, String text) {
+    final emoji = ngmyAdvisorPickReactionEmoji(userMessage: text, aiReply: '');
+    if (emoji.isEmpty) return;
+    Timer(Duration(milliseconds: 650 + math.Random().nextInt(600)), () {
+      if (!mounted) return;
+      final i = _messages.indexWhere((m) => identical(m, row));
+      if (i < 0 || (_messages[i]['reaction'] ?? '').isNotEmpty) return;
+      HapticFeedback.selectionClick();
+      setState(() => _messages[i] = Map<String, String>.from(_messages[i])..['reaction'] = emoji);
+      unawaited(NgmyCommunicateMemoryStore.setReactionMatching(
+        _email,
+        widget.profile.id,
+        role: 'user',
+        text: row['text'] ?? '',
+        emoji: emoji,
+      ));
+    });
+  }
   Future<void> _applyReactionToLatestUser(String emoji) async {
     final e = emoji.trim();
     if (e.isEmpty) return;
+    // Already reacted the moment they sent it — keep that one.
+    final lastUser = _messages.lastWhere((m) => m['role'] == 'user', orElse: () => const {});
+    if ((lastUser['reaction'] ?? '').isNotEmpty) return;
     await NgmyCommunicateMemoryStore.setReactionOnLastUser(_email, widget.profile.id, e);
     if (!mounted) return;
     setState(() {
@@ -4975,30 +5043,58 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   Future<String> _resolveApiKey() => ngmyResolveGeminiApiKey(localKey: widget.apiKey, config: widget.config);
 
   Future<void> _send() async {
+    // One send at a time: extra taps while this one is starting do nothing, so a
+    // message can never go out twice (or ten times).
+    if (_sendStarting) return;
     final text = _controller.text.trim();
     final imageB64 = _pendingImageB64;
     if ((text.isEmpty && imageB64 == null) || !_loaded) return;
-    if (!await _ensurePaid()) return;
-
-    _cancelRomanticNudge();
-    HapticFeedback.lightImpact();
-    final displayText = text.isEmpty ? '📷 Homework photo' : text;
     final imageMime = _pendingImageMime;
+    final replyTo = _replyTo;
 
-    // Clear composer immediately so the next message can be typed.
+    // Clear the composer on the first tap so it feels instant.
+    _sendStarting = true;
+    HapticFeedback.lightImpact();
     setState(() {
       _controller.clear();
       _pendingImageB64 = null;
       _pendingImageMime = 'image/jpeg';
+      _replyTo = null;
     });
+    final bool paid;
+    try {
+      paid = await _ensurePaidQuick();
+    } finally {
+      _sendStarting = false;
+    }
+    if (!paid) {
+      // Not sent — give them their message back.
+      if (mounted && _controller.text.isEmpty) {
+        setState(() {
+          _controller.text = text;
+          _pendingImageB64 = imageB64;
+          _pendingImageMime = imageMime;
+          _replyTo = replyTo;
+        });
+      }
+      return;
+    }
+
+    _cancelRomanticNudge();
+    final displayText = text.isEmpty ? '📷 Homework photo' : text;
 
     final userRow = <String, String>{'role': 'user', 'text': displayText};
+    if (replyTo != null && (replyTo['text'] ?? '').isNotEmpty) {
+      userRow['replyTo'] = replyTo['text']!;
+      userRow['replyToRole'] = replyTo['role'] ?? 'ai';
+    }
     if (imageB64 != null) userRow['imageB64'] = imageB64;
     // Show immediately — never block chat on storage.
     if (mounted) {
       setState(() => _messages.add(userRow));
     }
     _scrollBottom();
+    _reactSoon(userRow, text);
 
     // Save locally in the background; never surface "could not save" to the user.
     unawaited(() async {
@@ -5011,9 +5107,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             text: displayText,
             imageB64: imageB64,
             imageMime: imageMime,
+            replyTo: userRow['replyTo'],
+            replyToRole: userRow['replyToRole'],
           );
         } else {
-          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText);
+          await NgmyCommunicateMemoryStore.append(_email, widget.profile.id, role: 'user', text: displayText, replyTo: userRow['replyTo'], replyToRole: userRow['replyToRole']);
         }
       } catch (e) {
         debugPrint('[communicate] persist user message: $e');
@@ -5027,6 +5125,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
 
     final job = <String, String>{'text': text.isEmpty ? displayText : text};
+    if (userRow['replyTo'] != null) job['replyTo'] = userRow['replyTo']!;
     if (imageB64 != null) {
       job['imageB64'] = imageB64;
       job['imageMime'] = imageMime;
@@ -5072,6 +5171,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   Future<void> _processOutboundJob(Map<String, String> job) async {
     final text = (job['text'] ?? '').trim();
+    _jobReplyTo = job['replyTo'] ?? '';
     final imageB64 = job['imageB64'];
     final imageMime = job['imageMime'] ?? 'image/jpeg';
     final sendGen = ++_sendGen;
@@ -5758,6 +5858,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if ((m['replyTo'] ?? '').isNotEmpty)
+                        _NgmyReplyQuote(
+                          who: (m['replyToRole'] ?? 'ai') == 'user' ? 'You' : ngmyAdvisorFirstName(widget.profile.name),
+                          text: m['replyTo']!,
+                        ),
                       if ((m['imageB64'] ?? '').toString().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
@@ -5820,11 +5925,19 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   child: Column(
                     crossAxisAlignment: user ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                     children: [
-                      // Room under the bubble for the reaction badge.
-                      if (reaction.isNotEmpty)
-                        Padding(padding: const EdgeInsets.only(bottom: 12), child: bubbleStack)
-                      else
-                        bubbleStack,
+                      // Swipe a message sideways to reply to it. Room under the bubble for the reaction badge.
+                      _NgmySwipeToReply(
+                        accent: accent,
+                        onReply: msgText.trim().isEmpty
+                            ? null
+                            : () {
+                                HapticFeedback.mediumImpact();
+                                setState(() => _replyTo = {'text': msgText, 'role': user ? 'user' : 'ai'});
+                              },
+                        child: reaction.isNotEmpty
+                            ? Padding(padding: const EdgeInsets.only(bottom: 12), child: bubbleStack)
+                            : bubbleStack,
+                      ),
                       if (!user && phoneActions.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4, left: 4),
@@ -6012,6 +6125,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ),
                         ),
                       ),
+                    if (_replyTo != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _NgmyReplyPreview(
+                          who: _replyTo!['role'] == 'user' ? 'You' : ngmyAdvisorFirstName(widget.profile.name),
+                          text: _replyTo!['text'] ?? '',
+                          accent: accent,
+                          onClose: () => setState(() => _replyTo = null),
+                        ),
+                      ),
                     _loveGlassPanel(
                       context: context,
                       isDark: isDark,
@@ -6065,7 +6188,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                             Material(
                               color: Colors.transparent,
                               child: InkWell(
-                                onTap: _busy ? null : _send,
+                                onTap: _send,
                                 customBorder: const CircleBorder(),
                                 child: Container(
                                   width: 38,
@@ -6118,4 +6241,148 @@ class NgmyCommunicatePanel extends StatelessWidget {
     });
     return const Center(child: CircularProgressIndicator(color: Color(0xFFEC4899)));
   }
+}
+
+/// Drag a chat bubble sideways to reply to it (like WhatsApp / iMessage).
+class _NgmySwipeToReply extends StatefulWidget {
+  const _NgmySwipeToReply({required this.child, required this.onReply, required this.accent});
+  final Widget child;
+  final VoidCallback? onReply;
+  final Color accent;
+
+  @override
+  State<_NgmySwipeToReply> createState() => _NgmySwipeToReplyState();
+}
+
+class _NgmySwipeToReplyState extends State<_NgmySwipeToReply> with SingleTickerProviderStateMixin {
+  static const _trigger = 58.0, _max = 84.0;
+  late final AnimationController _back = AnimationController(vsync: this, duration: const Duration(milliseconds: 220))
+    ..addListener(() => setState(() => _dx = _from * (1 - Curves.easeOut.transform(_back.value))));
+  double _dx = 0, _from = 0;
+  bool _armed = false;
+
+  @override
+  void dispose() {
+    _back.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.onReply == null) return widget.child;
+    final p = (_dx / _trigger).clamp(0.0, 1.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) {
+        _back.stop();
+        _armed = false;
+      },
+      onHorizontalDragUpdate: (d) {
+        setState(() => _dx = (_dx + d.delta.dx).clamp(0.0, _max));
+        if (!_armed && _dx >= _trigger) {
+          _armed = true;
+          HapticFeedback.selectionClick();
+        } else if (_armed && _dx < _trigger) {
+          _armed = false;
+        }
+      },
+      onHorizontalDragEnd: (_) {
+        if (_armed) widget.onReply!();
+        _armed = false;
+        _from = _dx;
+        _back.forward(from: 0);
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.centerLeft,
+        children: [
+          Positioned(
+            left: -6,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Opacity(
+                opacity: p,
+                child: Transform.scale(
+                  scale: 0.6 + 0.4 * p,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _armed ? widget.accent : Colors.white.withValues(alpha: 0.15),
+                    ),
+                    child: const Icon(Icons.reply_rounded, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Transform.translate(offset: Offset(_dx, 0), child: widget.child),
+        ],
+      ),
+    );
+  }
+}
+
+/// The quoted message shown at the top of a reply bubble.
+class _NgmyReplyQuote extends StatelessWidget {
+  const _NgmyReplyQuote({required this.who, required this.text});
+  final String who, text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(10),
+          border: const Border(left: BorderSide(color: Colors.white70, width: 3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(who, style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 2),
+            Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12.5)),
+          ],
+        ),
+      );
+}
+
+/// "Replying to …" bar above the message box.
+class _NgmyReplyPreview extends StatelessWidget {
+  const _NgmyReplyPreview({required this.who, required this.text, required this.accent, required this.onClose});
+  final String who, text;
+  final Color accent;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1B4B).withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: accent.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.reply_rounded, color: accent, size: 20),
+            const SizedBox(width: 8),
+            Container(width: 3, height: 34, decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Replying to $who', style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w800)),
+                  Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 12.5)),
+                ],
+              ),
+            ),
+            IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20), visualDensity: VisualDensity.compact),
+          ],
+        ),
+      );
 }
