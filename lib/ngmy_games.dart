@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_dice_config.dart';
 import 'ngmy_dice_cube.dart';
+import 'ngmy_earned_frame.dart';
 import 'ngmy_game_nav.dart';
 import 'ngmy_game_result_popup.dart';
 import 'ngmy_game_session.dart';
@@ -352,6 +353,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
   int? _rollPreview;
   bool _rolling = false;
   bool _betLocked = false;
+  double _earned = 0;
 
   double get _profit => _effectiveBet() * 0.46;
 
@@ -417,6 +419,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
     if (win) {
       final payout = wager * 1.46 + bonus;
       widget.onPayout(payout, 'Dice Roll $label', bonus: bonus);
+      setState(() => _earned += payout);
       await showNgmyGameResultPopup(
         context,
         win: true,
@@ -536,6 +539,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
                 ],
               ),
             ),
+            NgmyEarnedSoFar(earned: _earned, prize: wager * 1.46, stake: wager),
             Expanded(
               child: Column(
                 children: [

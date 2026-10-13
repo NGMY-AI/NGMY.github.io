@@ -10,6 +10,9 @@ import 'ngmy_game_notifications.dart';
 import 'ngmy_game_session.dart';
 import 'ngmy_games.dart';
 import 'ngmy_nav.dart';
+import 'ngmy_earned_frame.dart';
+
+export 'ngmy_earned_frame.dart';
 
 /// Arcade games in the Game Center: you stake money, play, and are paid like
 /// the other skill games — finish = 1.46× the stake; time up or knocked out =
@@ -216,6 +219,8 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
                 ],
               ),
             ),
+            // Money made so far, front and centre.
+            NgmyEarnedSoFar(earned: _prize * (_done / _total), prize: _prize, stake: widget.wager),
             // Progress toward the full prize.
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),

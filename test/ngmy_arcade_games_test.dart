@@ -6,8 +6,9 @@ import 'package:ngmy/ngmy_arcade_games.dart';
 import 'package:ngmy/ngmy_arcade_host.dart';
 
 void main() {
-  test('20 unique arcade games with their own ids', () {
-    expect(kNgmyArcadeGames.length, 20);
+  test('70 unique arcade games with their own ids', () {
+    expect(kNgmyArcadeGames.length, 70);
+    expect(kNgmyArcadeGameIds.length, 70);
     expect(kNgmyArcadeGames.map((g) => g.id).toSet(), kNgmyArcadeGameIds);
   });
 

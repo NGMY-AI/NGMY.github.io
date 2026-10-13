@@ -21609,7 +21609,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
                   children: [
                     Expanded(
                       child: Text(
-                        'Bet \$${widget.wager.toStringAsFixed(2)} • Progress ${_gameProgressDone()}/${_gameProgressTotal()} • Paid by progress',
+                        'Win \$${(widget.wager * 1.46).toStringAsFixed(2)} · stake \$${widget.wager.toStringAsFixed(2)} • Progress ${_gameProgressDone()}/${_gameProgressTotal()}',
                         style: const TextStyle(color: Colors.white70, fontSize: 9),
                       ),
                     ),
@@ -21619,6 +21619,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              Builder(builder: (_) {
+                final total = _gameProgressTotal();
+                final ratio = total <= 0 ? 0.0 : (_gameProgressDone() / total).clamp(0.0, 1.0);
+                final prize = widget.wager * 1.46;
+                return NgmyEarnedSoFar(earned: _won ? prize : prize * ratio, prize: prize, stake: widget.wager);
+              }),
               const SizedBox(height: 6),
               Expanded(
                 child: Container(

@@ -5,9 +5,10 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_arcade_games_b.dart';
+import 'ngmy_arcade_games_more.dart';
 import 'ngmy_arcade_host.dart';
 
-/// The 20 arcade money games. Each reports progress to the host
+/// The 70 arcade money games (20 here, 50 in ngmy_arcade_games_more.dart). Each reports progress to the host
 /// (NgmyArcadePlayScreen), which handles the stake, timer and payout.
 
 class NgmyArcadeDef {
@@ -42,12 +43,14 @@ const kNgmyArcadeGames = <NgmyArcadeDef>[
   NgmyArcadeDef('number_rush', 'Number Rush', 'Tap 1 to 25 in order, fast', '🔟', Icons.format_list_numbered_rounded, [Color(0xFF8B5CF6), Color(0xFF6D28D9)], 60),
   NgmyArcadeDef('mini_sudoku', 'Mini Sudoku', 'Solve 2 quick 4×4 sudokus', '🧮', Icons.grid_on_rounded, [Color(0xFF0EA5E9), Color(0xFF075985)], 150),
   NgmyArcadeDef('space_dodge', 'Space Dodge', 'Steer through asteroids for 30 seconds', '🚀', Icons.rocket_launch_rounded, [Color(0xFF1E1B4B), Color(0xFF7C3AED)], 45),
+  ...kNgmyArcadeGamesMore,
 ];
 
 const kNgmyArcadeGameIds = <String>{
   'bubble_pop', 'fruit_slash', 'whack_mole', 'sky_stack', 'snake_rush', 'sky_hopper', 'brick_breaker',
   'mystery_word', 'higher_lower', 'mine_sweep', 'merge_2048', 'lights_out', 'odd_one', 'speed_sort',
   'flag_frenzy', 'balloon_darts', 'coin_catcher', 'number_rush', 'mini_sudoku', 'space_dodge',
+  ...kNgmyArcadeGameIdsMore,
 };
 
 int ngmyArcadeDefaultSeconds(String id) =>

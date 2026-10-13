@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_arcade_games.dart';
+import 'ngmy_arcade_games_more.dart';
 import 'ngmy_arcade_host.dart';
 
 /// Arcade games 11–20.
@@ -30,7 +31,7 @@ Widget ngmyBuildArcadeGameB(String id, NgmyArcadeArgs a) {
     case 'space_dodge':
       return SpaceDodgeGame(args: a);
     default:
-      return const Center(child: Text('Game not found', style: TextStyle(color: Colors.white)));
+      return ngmyBuildArcadeGameMore(id, a);
   }
 }
 
