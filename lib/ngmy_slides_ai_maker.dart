@@ -11,6 +11,8 @@ import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 
+part 'ngmy_slides_luxe_recipe.dart';
+
 /// "Describe it and the AI makes it": speak (or type) what the presentation is
 /// about, pick how many slides and a look, and get a finished, colourful deck.
 
@@ -421,12 +423,14 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
   String? photoFrame,
   String? photoRing,
 }) {
-  final st = ngmySlidesAiStyleById(outline.style);
-  final animate = extras.contains(NgmySlidesAiExtra.animations);
+  final luxe = extras.contains(NgmySlidesAiExtra.luxe);
+  // Luxury FX: every deck gets its own royal theme and its own ornaments and moving light,
+  // so no two Luxury FX presentations look the same.
+  final luxeRecipe = luxe ? _NgmyLuxeRecipe.random() : null;
+  final st = luxeRecipe?.style ?? ngmySlidesAiStyleById(outline.style);
+  final animate = extras.contains(NgmySlidesAiExtra.animations) || luxe;
   final useEmoji = extras.contains(NgmySlidesAiExtra.emojis);
   final video = extras.contains(NgmySlidesAiExtra.videoMotion);
-  final luxe = extras.contains(NgmySlidesAiExtra.luxe);
-  const luxeTrans = [NgmySlideTransition.cube, NgmySlideTransition.zoom, NgmySlideTransition.flip, NgmySlideTransition.cube, NgmySlideTransition.push];
   String id() => NgmySlidesTemplates.newId();
   final slides = <NgmySlide>[];
 
@@ -624,7 +628,7 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       }
     }
 
-    if (luxe) _addLuxe(els, i, id);
+    if (luxeRecipe != null) _addLuxe(els, i, id, luxeRecipe);
 
     slides.add(NgmySlide(
       id: id(),
@@ -633,63 +637,13 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
       layout: layout,
       background: bg,
       backgroundEnd: bgEnd,
-      transition: luxe ? luxeTrans[i % luxeTrans.length] : (animate ? slideTrans[i % slideTrans.length] : st.transition),
+      transition: luxeRecipe != null ? luxeRecipe.transitions[i % luxeRecipe.transitions.length] : (animate ? slideTrans[i % slideTrans.length] : st.transition),
       elements: els,
     ));
   }
 
   final name = outline.title.trim().isEmpty ? 'AI Presentation' : outline.title.trim();
   return NgmySlideDeck(id: id(), name: name.length > 60 ? name.substring(0, 60) : name, slides: slides);
-}
-
-/// Luxury FX on one slide: a moving spotlight behind everything, gold dust in
-/// the air, a gold frame with a light streak racing round it, twinkling corner
-/// jewels, two orbiting gems, and a light sweep across the title and bar.
-/// The same keys on every slide, so with video motion they glide between slides.
-void _addLuxe(List<NgmySlideElement> els, int i, String Function() id) {
-  const gold = kNgmyLuxeGold;
-  NgmySlideElement deco(NgmySlideShapeKind kind, double x, double y, double w, double h, int fill, String key, String fx,
-          {int stroke = 0, double strokeWidth = 0, double rotation = 0, NgmySlideTransition anim = NgmySlideTransition.none, int delay = 0}) =>
-      NgmySlideElement(
-        id: id(),
-        type: NgmySlideElementType.shape,
-        x: x,
-        y: y,
-        w: w,
-        h: h,
-        shape: kind,
-        fillColor: fill,
-        strokeColor: stroke,
-        strokeWidth: strokeWidth,
-        rotation: rotation,
-        textTransition: anim,
-        textAnimDelayMs: delay,
-        morphKey: key,
-        loopFx: fx,
-      );
-
-  NgmySlideElement jewel(double cx, double cy, String key, int delay) =>
-      deco(NgmySlideShapeKind.rectangle, cx - 0.011, cy - 0.0195, 0.022, 0.039, gold, key, 'twinkle',
-          stroke: 0xFFFFF4D6, strokeWidth: 1.2, rotation: 0.785, anim: NgmySlideTransition.zoom, delay: delay);
-
-  // Behind the content: a soft golden spotlight wandering over the slide.
-  els.insert(0, deco(NgmySlideShapeKind.circle, 0.18 + (i % 3) * 0.22, 0.12 + (i % 2) * 0.18, 0.42, 0.7, _withAlpha(gold, 0x38), 'lux_spot', 'spotlight'));
-  for (final e in els) {
-    if (e.morphKey == 'title' || e.morphKey == 'bar') e.loopFx = 'shimmer';
-  }
-  els
-    ..add(deco(NgmySlideShapeKind.rectangle, 0.022, 0.038, 0.956, 0.924, 0x00000000, 'lux_frame', 'goldframe',
-        stroke: _withAlpha(gold, 0xB0), strokeWidth: 1.6, anim: NgmySlideTransition.fade, delay: 150))
-    // Small jewels sitting exactly on the frame's corners, and two gems gliding on its edges.
-    ..add(jewel(0.022, 0.038, 'lux_c1', 300))
-    ..add(jewel(0.978, 0.038, 'lux_c2', 380))
-    ..add(jewel(0.022, 0.962, 'lux_c3', 460))
-    ..add(jewel(0.978, 0.962, 'lux_c4', 540))
-    ..add(deco(NgmySlideShapeKind.rectangle, (i.isEven ? 0.30 : 0.62) - 0.008, 0.038 - 0.014, 0.016, 0.028, _withAlpha(0xFFFDE68A, 0xF2), 'lux_g1', 'orbit',
-        stroke: 0xFFFFFFFF, strokeWidth: 1, rotation: 0.785, anim: NgmySlideTransition.bounce, delay: 600))
-    ..add(deco(NgmySlideShapeKind.circle, (i.isEven ? 0.66 : 0.34) - 0.007, 0.962 - 0.0125, 0.014, 0.025, _withAlpha(0xFFFFFBEB, 0xF2), 'lux_g2', 'orbit', anim: NgmySlideTransition.bounce, delay: 700))
-    // In front of everything: gold dust in the air.
-    ..add(deco(NgmySlideShapeKind.rectangle, 0, 0, 1, 1, 0x00000000, 'lux_dust', 'golddust'));
 }
 
 Future<String?> _fetchAsDataUri(String url, {String fallbackMime = 'image/png'}) async {

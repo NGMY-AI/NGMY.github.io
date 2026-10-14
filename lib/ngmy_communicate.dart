@@ -3755,6 +3755,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   /// Lasting details they told any advisor (shared by all advisors on this account).
   NgmySharedProfile _shared = const NgmySharedProfile({});
+  /// The advisor's live browser is open (a task running, or its browser still up).
+  bool get _liveBrowserOn => _agentRun.running || (_agentRun.hasSession && !_agentRun.browserClosed);
   String get _applicantDetails => _shared.detailsLine(accountEmail: _email, accountPhone: _accountPhone);
 
   /// Picks their own name / email / phone / address / age out of what they just wrote.
@@ -5222,6 +5224,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     String? imageB64,
     String? parseExtrasForUserText,
     List<String> options = const [],
+    /// Questions in frames: only while the live browser is on (or for an application's details).
+    bool? framed,
   }) async {
     final photo = (imageB64 ?? '').trim();
     // The reply says it's searching / "keep an eye on the browser" but nothing is running —
@@ -5273,6 +5277,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             ? options
             : ngmyInferReplyOptions(body, profile: _shared, accountPhone: _accountPhone, accountEmail: _email));
     final optionsText = choiceList.join('|');
+    final useFrames = framed ?? _liveBrowserOn;
     if (body.isEmpty && lookups.isNotEmpty) body = 'Let me check that for you.';
 
     if (body.isEmpty && photo.isEmpty) {
@@ -5303,6 +5308,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         browserLabel: browserLabel,
         phoneActions: phoneActionsJson,
         options: optionsText,
+        framed: useFrames,
       );
     } else {
       await NgmyCommunicateMemoryStore.append(
@@ -5314,6 +5320,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         browserLabel: browserLabel,
         phoneActions: phoneActionsJson,
         options: optionsText,
+        framed: useFrames,
       );
     }
     final away = !mounted || sendGen != _sendGen;
@@ -5330,6 +5337,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     if (browserLabel.isNotEmpty) row['browserLabel'] = browserLabel;
     if (phoneActionsJson.isNotEmpty) row['phoneActions'] = phoneActionsJson;
     if (optionsText.isNotEmpty) row['options'] = optionsText;
+    if (useFrames) row['framed'] = '1';
     setState(() => _messages.add(row));
     _scrollBottom();
     if (lookups.isNotEmpty || goNow.isNotEmpty) {
@@ -5657,7 +5665,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           return;
         } else {
           // They typed a correction — it was saved above; show the updated list to confirm.
-          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(updated: true), options: const ['Yes, use these', 'Change something']);
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(updated: true), options: const ['Yes, use these', 'Change something'], framed: true);
           return;
         }
       }
@@ -5766,7 +5774,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       // (each in its own frame) and let them confirm first, to be safe.
       if (agentTask != null && !agentTask.continuing && _needsDetailsConfirm(plannedTask ?? text)) {
         _pendingConfirm = (task: plannedTask ?? text, url: agentTask.url);
-        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(), options: const ['Yes, use these', 'Change something']);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(), options: const ['Yes, use these', 'Change something'], framed: true);
         return;
       }
       if (agentTask != null) {
@@ -6378,7 +6386,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ),
                         ),
                       if (msgText.isNotEmpty)
-                        user
+                        // Frames only on messages sent while the live browser was on; normal
+                        // chat stays plain text.
+                        user || m['framed'] != '1'
                             ? Text(msgText, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white))
                             : NgmyFramedMessageText(msgText, hasButtons: (m['options'] ?? '').toString().isNotEmpty),
                       if (!user && _isTextCoach && msgText.trim().isNotEmpty)

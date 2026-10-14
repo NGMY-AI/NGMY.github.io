@@ -955,7 +955,7 @@ class NgmyLoopFx extends StatefulWidget {
 class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateMixin {
   AnimationController? _c;
 
-  bool get _on => widget.enabled && const {'float3d', 'drift', 'pulse', ...kNgmyLuxeFx}.contains(widget.fx);
+  bool get _on => widget.enabled && (const {'float3d', 'drift', 'pulse'}.contains(widget.fx) || ngmyIsLuxeFx(widget.fx));
 
   @override
   void initState() {
@@ -987,7 +987,7 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
         // seamlessly when one slide view hands over to the next.
         final dur = c.duration!.inMilliseconds;
         final a = (DateTime.now().millisecondsSinceEpoch % dur) / dur * math.pi * 2 + phase;
-        if (kNgmyLuxeFx.contains(widget.fx)) return ngmyLuxeFxBuild(widget.fx, a, widget.seed, child!);
+        if (ngmyIsLuxeFx(widget.fx)) return ngmyLuxeFxBuild(widget.fx, a, widget.seed, child!);
         switch (widget.fx) {
           case 'float3d':
             return Transform(
