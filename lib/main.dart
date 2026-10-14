@@ -129,6 +129,7 @@ import 'ngmy_qr_download.dart';
 import 'ngmy_qr_generator.dart';
 import 'ngmy_share_image.dart';
 import 'ngmy_local_growth_income_ui.dart';
+import 'ngmy_local_growth_income.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_virtual_device_media.dart';
 import 'ngmy_virtual_device_media_view.dart';
@@ -959,6 +960,70 @@ bool ngmyIsGameLedgerTransaction(AppTransaction t) {
   if (d.contains('multiplayer payout:')) return true;
   if (d.contains('dice') && t.method == PaymentMethod.system) return true;
   return false;
+}
+
+/// The account's transactions, for Growth Income's wallet history (set by the app shell).
+List<AppTransaction> Function()? ngmyAppTransactionsForWallet;
+
+String _ngmyBaseGameEmail(String e) {
+  final k = ngmyNormalizeEmail(e);
+  return k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+}
+
+/// Works out each receipt's missing stake and balance before/after from the account's history:
+/// the stake is that game's bet just before the result; the balance after is today's balance
+/// minus everything that happened since; the balance before follows from the stake and payout.
+Future<List<NgmyGameNotification>> ngmyFillGameReceipts(
+  String email,
+  List<NgmyGameNotification> items,
+  List<AppTransaction> appTransactions,
+) async {
+  final me = _ngmyBaseGameEmail(email);
+  final byId = <String, AppTransaction>{};
+  for (final t in appTransactions) {
+    if (t.id.isNotEmpty && _ngmyBaseGameEmail(t.userEmail) == me) byId[t.id] = t;
+  }
+  // Games played in Growth Income before they were copied into the account's list.
+  try {
+    final gi = await NgmyLocalGrowthIncomeStore.load(me, UserData(email: me));
+    for (final t in gi.transactions) {
+      if (t.id.isNotEmpty && ngmyIsGameLedgerTransaction(t)) byId.putIfAbsent(t.id, () => t);
+    }
+  } catch (_) {}
+  final txns = byId.values.toList()..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+  double effect(AppTransaction t) {
+    if (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) return -t.amount;
+    if (t.status != TransactionStatus.approved) return 0;
+    return _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
+  }
+
+  final now = ngmyLiveBalanceFor(me);
+  return [
+    for (final n in items)
+      if (!n.missingNumbers)
+        n
+      else
+        () {
+          final title = n.gameTitle.toLowerCase().trim();
+          AppTransaction? bet;
+          for (final t in txns.reversed) {
+            if (t.timestamp.isAfter(n.timestamp.add(const Duration(seconds: 5)))) continue;
+            if (n.timestamp.difference(t.timestamp) > const Duration(minutes: 45)) break;
+            final d = (t.sourceDetails ?? '').toLowerCase();
+            if (t.type == TransactionType.adminRemove && d.contains('game bet') && (title.isEmpty || d.contains(title))) {
+              bet = t;
+              break;
+            }
+          }
+          final stake = n.stake ?? bet?.amount ?? (n.won ? null : n.amount);
+          var after = now;
+          for (final t in txns) {
+            if (t.timestamp.isAfter(n.timestamp)) after -= effect(t);
+          }
+          final before = stake == null ? null : after + stake - (n.won ? n.amount : 0);
+          return n.withNumbers(stake: stake, balanceBefore: before, balanceAfter: after < 0 ? 0 : after);
+        }(),
+  ];
 }
 
 Future<void> ngmyBackfillGameWinNotificationsFromLedger(
@@ -10327,6 +10392,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       // Game wins also create AppTransaction rows — _notifyTransactionEvent sends one alert per txn.
     };
     NgmyAdminLiveRefresh.addListener(_scheduleAdminAlertSweep);
+    ngmyReceiptFiller = (email, items) => ngmyFillGameReceipts(email, items, _allTransactions);
+    ngmyAppTransactionsForWallet = () => _allTransactions;
     ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
         _pushInAppNotification(title: title, body: body, tag: tag, cooldown: cooldown);
     ngmyOnStoreOrdersChanged = (prevOrders, nextOrders) {
@@ -19867,7 +19934,8 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
   @override
   Widget build(BuildContext context) {
     return NgmyDiceGameScreen(
-      balanceOf: () => widget.user.accountBalance,
+      // The same live balance the screen shows (the stored copy could be stale → false "Insufficient").
+      balanceOf: () => ngmyLiveBalanceFor(widget.user.email, fallback: () => widget.user.accountBalance),
       userEmail: widget.user.email,
       diceSettings: _dice,
       onDiceSettingsChanged: () {
@@ -20012,8 +20080,10 @@ class _GameBetScreenState extends State<GameBetScreen> with NgmyBalanceListener 
       return;
     }
     final balance = ngmyLiveBalanceFor(widget.user.email, fallback: () => widget.user.accountBalance);
-    if (balance < wager) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Insufficient balance for this bet.')));
+    if (balance + 0.001 < wager) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Not enough balance for this bet — you have \$${formatCurrency(balance)}, the bet is \$${formatCurrency(wager)}.'),
+      ));
       return;
     }
     widget.user.points += 20;

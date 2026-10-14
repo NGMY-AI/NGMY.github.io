@@ -16,6 +16,9 @@ const int kNgmyGameNotificationMax = 5000;
 const Duration kNgmyGameNotificationRetention = Duration(days: 36500);
 const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
+/// Set by the app: works out a receipt's missing stake / balances from the transaction history.
+Future<List<NgmyGameNotification>> Function(String email, List<NgmyGameNotification> items)? ngmyReceiptFiller;
+
 /// Bumped when game win/lose receipts change (Game Center badge).
 final ValueNotifier<int> ngmyGameNotificationsTick = ValueNotifier<int>(0);
 
@@ -55,6 +58,21 @@ class NgmyGameNotification {
     this.balanceBefore,
     this.balanceAfter,
   });
+
+  bool get missingNumbers => stake == null || balanceBefore == null || balanceAfter == null;
+
+  NgmyGameNotification withNumbers({double? stake, double? balanceBefore, double? balanceAfter}) => NgmyGameNotification(
+        id: id,
+        gameTitle: gameTitle,
+        won: won,
+        amount: amount,
+        detail: detail,
+        timestamp: timestamp,
+        txnId: txnId,
+        stake: this.stake ?? stake,
+        balanceBefore: this.balanceBefore ?? balanceBefore,
+        balanceAfter: this.balanceAfter ?? balanceAfter,
+      );
 
   String get _mergeKey =>
       (txnId != null && txnId!.trim().isNotEmpty) ? 'txn:${txnId!.trim()}' : 'id:${id.trim()}';
@@ -316,6 +334,23 @@ class NgmyGameNotifications {
     await _saveMerged(key, items);
   }
 
+  /// Fills in the stake and balance before/after on receipts that don't have them (older
+  /// receipts, or games that didn't record them) from the account's transaction history.
+  static Future<void> fillMissing(String email) async {
+    final filler = ngmyReceiptFiller;
+    final key = _emailKey(email);
+    if (filler == null || key.isEmpty) return;
+    final items = await _loadRaw(key);
+    if (!items.any((e) => e.missingNumbers)) return;
+    final filled = await filler(key, items);
+    if (filled.length != items.length) return;
+    var changed = false;
+    for (var i = 0; i < items.length; i++) {
+      if (jsonEncode(items[i].toJson()) != jsonEncode(filled[i].toJson())) changed = true;
+    }
+    if (changed) await _saveMerged(key, filled);
+  }
+
   static Future<int> countFor(String email) async {
     await syncFromCloud(email, force: false);
     final list = await listFor(email, syncCloud: false);
@@ -360,7 +395,10 @@ Future<void> showNgmyGameReceiptSheet(
   // Open right away with what's on this phone; the cloud copy refreshes it.
   final initial = await NgmyGameNotifications.listFor(email, syncCloud: false);
   if (!context.mounted) return;
-  unawaited(NgmyGameNotifications.syncFromCloud(email).then((_) => ngmyGameNotificationsTick.value++).catchError((_) {}));
+  unawaited(NgmyGameNotifications.syncFromCloud(email)
+      .then((_) => NgmyGameNotifications.fillMissing(email))
+      .then<void>((_) { ngmyGameNotificationsTick.value++; })
+      .catchError((_) {}));
 
   await showModalBottomSheet<void>(
     context: context,
@@ -458,7 +496,7 @@ class _NgmyGameReceiptsSheet extends StatelessWidget {
               child: ListView.separated(
                 padding: EdgeInsets.fromLTRB(14, 2, 14, 16 + bottom),
                 itemCount: items.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
                 itemBuilder: (_, i) => _NgmyGameReceiptCard(n: items[i]),
               ),
             ),
@@ -492,89 +530,70 @@ class _NgmyGameReceiptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final partial = n.won && n.detail.toLowerCase().contains('%') ||
-        n.won && n.stake != null && n.amount < n.stake!;
-    final label = !n.won ? 'LOST' : (partial ? 'PARTIAL WIN' : 'WON');
+    final partial = n.won && (n.detail.toLowerCase().contains('%') || (n.stake != null && n.amount < n.stake!));
+    final label = !n.won ? 'LOST' : (partial ? 'PARTIAL' : 'WON');
     final accent = !n.won
         ? const Color(0xFFF87171)
         : (partial ? const Color(0xFFFBBF24) : const Color(0xFF34D399));
     final net = n.net;
+    String m(double? v) => v == null ? '…' : _money(v);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.16), const Color(0xFF241542)],
+          colors: [accent.withValues(alpha: 0.13), const Color(0xFF221440)],
         ),
-        border: Border.all(color: accent.withValues(alpha: 0.45)),
-        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 14, offset: const Offset(0, 5))],
+        border: Border.all(color: accent.withValues(alpha: 0.4)),
       ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: accent.withValues(alpha: 0.18), border: Border.all(color: accent.withValues(alpha: 0.6))),
-                child: Icon(n.won ? Icons.emoji_events_rounded : Icons.close_rounded, color: accent, size: 20),
-              ),
-              const SizedBox(width: 10),
+              Icon(n.won ? Icons.emoji_events_rounded : Icons.close_rounded, color: accent, size: 16),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(n.gameTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
-                    Text(ngmyFormatGameNotificationWhen(n.timestamp),
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w600)),
-                  ],
+                child: Text(
+                  n.gameTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(99)),
-                    child: Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 0.8)),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    net != null ? '${net >= 0 ? '+' : '-'}${_money(net)}' : '${n.won ? '+' : '-'}${_money(n.amount)}',
-                    style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 16),
-                  ),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(99)),
+                child: Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 8.5, letterSpacing: 0.6)),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _frame('STAKE', n.stake != null ? _money(n.stake!) : '—', Colors.white),
               const SizedBox(width: 6),
-              _frame('PAID BACK', n.won ? _money(n.amount) : _money(0), accent),
+              Text(
+                net != null ? '${net >= 0 ? '+' : '-'}${_money(net)}' : '${n.won ? '+' : '-'}${_money(n.amount)}',
+                style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 13),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           Row(
             children: [
-              _frame('BALANCE BEFORE', n.balanceBefore != null ? _money(n.balanceBefore!) : '—', const Color(0xFFC4B5FD)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Icon(Icons.arrow_forward_rounded, color: Colors.white.withValues(alpha: 0.5), size: 16),
-              ),
-              _frame('BALANCE AFTER', n.balanceAfter != null ? _money(n.balanceAfter!) : '—', const Color(0xFF93C5FD)),
+              _frame('STAKE', m(n.stake), Colors.white),
+              const SizedBox(width: 4),
+              _frame('PAID', _money(n.won ? n.amount : 0), accent),
+              const SizedBox(width: 4),
+              _frame('BEFORE', m(n.balanceBefore), const Color(0xFFC4B5FD)),
+              const SizedBox(width: 4),
+              _frame('AFTER', m(n.balanceAfter), const Color(0xFF93C5FD)),
             ],
           ),
-          if (n.detail.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(n.detail, maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
-          ],
+          const SizedBox(height: 4),
+          Text(
+            '${ngmyFormatGameNotificationWhen(n.timestamp)}${n.detail.trim().isEmpty ? '' : ' · ${n.detail.trim()}'}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 10),
+          ),
         ],
       ),
     );
@@ -582,22 +601,20 @@ class _NgmyGameReceiptCard extends StatelessWidget {
 
   static Widget _frame(String label, String value, Color color) => Expanded(
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.3)),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withValues(alpha: 0.28)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
-              const SizedBox(height: 2),
+              Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 7.5, fontWeight: FontWeight.w900, letterSpacing: 0.6)),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
-                child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 14)),
+                child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 11.5)),
               ),
             ],
           ),

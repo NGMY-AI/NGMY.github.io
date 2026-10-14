@@ -778,7 +778,18 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       );
     }
 
-    final sorted = List<AppTransaction>.from(_transactions)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    // Wallet history = this wallet's rows + every other money movement on the account (store,
+    // fees, transfers…) — games excluded (they have their own receipts in the Game Center).
+    final byId = <String, AppTransaction>{for (final t in _transactions) if (t.id.isNotEmpty) t.id: t};
+    final me = widget.liveUser.email.toLowerCase().trim();
+    for (final t in ngmyAppTransactionsForWallet?.call() ?? const <AppTransaction>[]) {
+      if (t.id.isEmpty || byId.containsKey(t.id) || ngmyIsGameLedgerTransaction(t)) continue;
+      if (t.userEmail.toLowerCase().trim() != me) continue;
+      if ((t.sourceDetails ?? '').toLowerCase().contains('clock-in')) continue; // this wallet keeps its own clock-in rows
+      byId[t.id] = t;
+    }
+    final sorted = [...byId.values, ..._transactions.where((t) => t.id.isEmpty)]
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
     final pages = <Widget>[
       _LocalGrowthHomeTab(

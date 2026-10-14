@@ -33,11 +33,11 @@ class NgmyIncomeSound {
 
   /// While the app opens and the account reloads, money that was already there is "found"
   /// again — that must never ring. Only money that arrives after this moment does.
-  static DateTime _quietUntil = DateTime.now().add(const Duration(seconds: 25));
+  static DateTime _quietUntil = DateTime.now().add(const Duration(seconds: 15));
 
   static void bindSession(String? email) {
     final next = email?.toLowerCase().trim();
-    if (next != _sessionEmail) _quietUntil = DateTime.now().add(const Duration(seconds: 25));
+    if (next != _sessionEmail) _quietUntil = DateTime.now().add(const Duration(seconds: 15));
     _sessionEmail = next;
     if (_sessionEmail != null && _sessionEmail!.isEmpty) _sessionEmail = null;
     unawaited(preload());
@@ -178,8 +178,14 @@ class NgmyIncomeSound {
     DateTime? happenedAt,
   }) async {
     if (amount < 0.01) return;
-    final ben = beneficiaryEmail.toLowerCase().trim();
-    final me = _sessionEmail ?? '';
+    // Growth Income plays as "you@x.com+local.ngmy" — still you, so a win there rings too.
+    String base(String e) {
+      final k = e.toLowerCase().trim();
+      return k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+    }
+
+    final ben = base(beneficiaryEmail);
+    final me = base(_sessionEmail ?? '');
     if (me.isEmpty || ben != me) return;
 
     await _ensurePlayedKeysLoaded();
