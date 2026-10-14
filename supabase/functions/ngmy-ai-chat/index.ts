@@ -392,9 +392,14 @@ const ADVISOR_AGENT_RULES =
   "- FOLLOW-UPS: if 'What you found last time' gives a link for what the user picked, open that link directly.\n" +
   "- NONE NEARBY: if there is no match in the place asked, look in the nearest towns and report the closest real one " +
   "(with its link and roughly how far), and add an option like 'Check other job boards'.\n" +
-  "- YOU ARE THE GO-BETWEEN WHILE FILLING A FORM: answer every question you can from the user's details. The moment the form " +
-  "asks something you were NOT told (work eligibility, start date, previous employer, availability details, a yes/no question…), " +
-  "STOP right there without guessing, and finish with that exact question in \"question\" and its choices in \"options\" " +
+  "- YOU ARE THE GO-BETWEEN WHILE FILLING A FORM — AND BE FAST: every stop makes the user wait, so stop as rarely as possible. " +
+  "Answer every question you can from the user's details. Skip optional fields nobody gave you. Use the obvious answer for " +
+  "low-stakes fields instead of stopping: 'How did you hear about us' → 'Online job search'; 'Preferred name' → their first name; " +
+  "'Desired pay' → 'Open' / 'Negotiable' (or leave blank if allowed); 'Can you start' → 'Immediately' unless the task says otherwise. " +
+  "For things only the user can answer (work eligibility, criminal history, previous employer, a personal yes/no…): FIRST fill " +
+  "everything else on the page, THEN collect ALL such questions on this page and stop ONCE, putting them all in \"question\" one per " +
+  "line (e.g. '1. Are you eligible to work in the United States?\\n2. Have you ever been convicted of a felony?'). Never guess those. " +
+  "If there is just one, give its choices in \"options\" " +
   "(e.g. question 'Are you eligible to work in the United States?', options ['Yes', 'No']). Give options ONLY when the form " +
   "shows real choices (a dropdown, radio buttons, a yes/no question) — for a typed field (name, phone, email, address…) give []. " +
   "Name, email, phone, address, age and availability written in the task ARE the user's answers — type them in, never stop to ask " +
@@ -694,6 +699,8 @@ const agentShotHits = new Map<string, { start: number; n: number }>();
 // The first one Browser Use accepts is remembered so later tasks don't retry rejected ones.
 const AGENT_MODELS: { model: string; modelParams?: Record<string, unknown> }[] = [
   { model: "bu-fast" },
+  // Minimal thinking = quickest clicks (each step was ~5 s of thinking at "low").
+  { model: "gemini-3.6-flash", modelParams: { thinkingConfig: { thinkingLevel: "minimal" } } },
   { model: "gemini-3.6-flash", modelParams: { thinkingConfig: { thinkingLevel: "low" } } },
   { model: "gemini-3.6-flash" },
   { model: "gpt-6-luna", modelParams: { reasoning: { effort: "low" } } },
@@ -9798,7 +9805,43 @@ serve(async (req) => {
       const list = Array.isArray(recent.data?.items) ? recent.data.items : (Array.isArray(recent.data?.runs) ? recent.data.runs : (Array.isArray(recent.data) ? recent.data : []));
       const sessions = new Set(list.map((x: any) => String(x?.sessionId ?? x?.session_id ?? "")).filter((s: string) => s));
       const models = [...new Set(list.map((x: any) => String(x?.model ?? "")).filter((s: string) => s))];
-      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady, recentRuns: list.length, recentBrowsers: sessions.size, models });
+      // Timing only (no task text, no pages): how long recent tasks took and seconds per step.
+      let timings: unknown[] = [];
+      if (body?.timings) {
+        const t = (v: unknown) => { const n = Date.parse(String(v ?? "")); return Number.isFinite(n) ? n : 0; };
+        timings = await Promise.all(list.slice(0, 6).map(async (x: any) => {
+          const id = String(x?.id ?? "");
+          const ev = id ? await browserUseFetch(`/runs/${id}/events?limit=200`) : { status: 0, data: null };
+          const items: any[] = Array.isArray(ev.data?.items) ? ev.data.items : (Array.isArray(ev.data?.events) ? ev.data.events : (Array.isArray(ev.data) ? ev.data : []));
+          const at = (e: any) => t(e?.createdAt ?? e?.timestamp ?? e?.created_at ?? e?.ts ?? e?.time ?? e?.occurredAt);
+          const stamps = items.map(at).filter((n) => n > 0).sort((a, b) => a - b);
+          // Time the AI took to think each step (request → response), and time spent acting between steps.
+          const think: number[] = [], act: number[] = [];
+          let lastReq = 0, lastResp = 0;
+          for (const e of items) {
+            const ty = String(e?.type ?? ""), n = at(e);
+            if (!n) continue;
+            if (ty === "llm.request") { if (lastResp) act.push((n - lastResp) / 1000); lastReq = n; }
+            if (ty === "llm.response" && lastReq) { think.push((n - lastReq) / 1000); lastResp = n; }
+          }
+          const avg = (a: number[]) => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : null;
+          const gaps = stamps.slice(1).map((n, i) => (n - stamps[i]) / 1000);
+          const start = t(x?.createdAt ?? x?.startedAt), end = t(x?.finishedAt ?? x?.completedAt ?? x?.updatedAt);
+          return {
+            model: x?.model, status: x?.status, events: items.length,
+            totalSec: start && end ? Math.round((end - start) / 1000) : null,
+            avgGapSec: gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
+            maxGapSec: gaps.length ? Math.round(Math.max(...gaps)) : null,
+            steps: think.length, thinkAvgSec: avg(think), thinkMaxSec: think.length ? Math.round(Math.max(...think)) : null,
+            actAvgSec: avg(act), actMaxSec: act.length ? Math.round(Math.max(...act)) : null,
+            inTokens: x?.totalInputTokens, outTokens: x?.totalOutputTokens, cost: x?.totalCostUsd,
+            eventKeys: Object.keys(items[0] ?? {}).slice(0, 12),
+            error: String(x?.error ?? "").slice(0, 160), flags: x?.flags, contextLimit: x?.contextLimit,
+            cursor: ev.data?.nextCursor ?? ev.data?.next ?? ev.data?.hasMore ?? null,
+          };
+        }));
+      }
+      return jsonOk({ ok: true, configured, keyValid: r.status === 200, keyStatus: r.status, cursorReady, recentRuns: list.length, recentBrowsers: sessions.size, models, modelIdx: agentModelIdx, timings });
     }
 
     // Rendered picture of a page for the mini browser (sites that can't be re-hosted).

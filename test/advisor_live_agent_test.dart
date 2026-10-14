@@ -64,4 +64,11 @@ void main() {
     expect(ngmyFormQuestionOptions('What is your home address?', const ['Yes', 'No']), isEmpty);
     expect(ngmyFormQuestionOptions('Which shift do you prefer?', const ['Morning', 'Night']), ['Morning', 'Night']);
   });
+
+  test('several form questions at once are typed, not Yes/No', () {
+    const q = '1. Are you eligible to work in the United States?\n2. Have you ever been convicted of a felony?';
+    expect(ngmyFormQuestionCount(q), 2);
+    expect(ngmyFormQuestionOptions(q, const ['Yes', 'No']), isEmpty);
+    expect(ngmyFormQuestionOptions('Are you 18 or older?', const []), ['Yes', 'No']);
+  });
 }

@@ -135,8 +135,13 @@ String ngmyAdvisorWebTaskPlanPrompt({
     'Details marked "not confirmed yet" (their account email/phone): show it and let them tap, e.g. options ["Use 478-555-1234", "Use a different number"]. '
     'If everything is known already, do not ask for details at all — go to step 4. '
     'Ask whether they have an account on that site ONLY if that site needs one.\n'
+    '     For a JOB application, in that SAME message also ask the questions almost every job form has, so the browser '
+    'never has to stop for them (skip any already answered in the chat): "• Are you legally allowed to work in the US?", '
+    '"• Are you 18 or older?", "• Have you ever been convicted of a felony?", "• When can you start?", '
+    '"• Your most recent job (place and dates), if any?". Fewer stops = the application finishes much faster.\n'
     '  4. APPLY: set ready=true with a task that opens the apply link and fills the application, writing EVERY detail into the task '
-    '("First name: …, Last name: …, Email: …, Phone: …, Address: …, Age: …, Availability: …") so the browser never has to ask again. '
+    '("First name: …, Last name: …, Email: …, Phone: …, Address: …, Age: …, Availability: …, Allowed to work in US: …, '
+    '18+: …, Felony: …, Can start: …, Recent job: …") so the browser never has to ask again. '
     'It pauses only for things nobody could have guessed (like a yes/no eligibility question).\n'
     '- NEVER ask the same question twice. If the recent chat shows they already answered it, use that answer.\n'
     '- If they say continue, go ahead, do it, apply, start, or "open the live computer/browser", set ready=true NOW with the best '
@@ -538,14 +543,20 @@ bool ngmyQuestionIsYesNo(String q) {
   final t = q.trim().toLowerCase();
   if (t.isEmpty) return false;
   if (RegExp(r'^(what|which|when|where|who|whom|whose|why|how|please|enter|provide|list|type)\b').hasMatch(t)) return false;
-  if (RegExp(r'\bor\b').hasMatch(t) && !RegExp(r'\bor not\b').hasMatch(t)) return false;
+  if (RegExp(r'\bor\b').hasMatch(t) && !RegExp(r'\bor (not|older|over|more|above|higher)\b').hasMatch(t)) return false;
   return RegExp(r'^(are|is|am|do|does|did|have|has|had|can|could|will|would|should|shall|may|were|was)\b').hasMatch(t);
 }
 
 /// Buttons for a question the application paused on. Uses the choices the browser saw when they
 /// fit; a phone/email question offers the one on their account plus "a different one";
 /// Yes/No only for real yes/no questions; otherwise none (they type it).
+/// How many questions the form paused on (the browser lists several one per line).
+int ngmyFormQuestionCount(String question) =>
+    question.split('\n').where((l) => l.trim().endsWith('?') || RegExp(r'^\s*\d+[.)]\s').hasMatch(l)).length;
+
 List<String> ngmyFormQuestionOptions(String question, List<String> found, {String accountPhone = '', String accountEmail = ''}) {
+  // Several questions at once → they type all the answers in one message.
+  if (ngmyFormQuestionCount(question) > 1) return const [];
   final q = question.toLowerCase();
   final yesNo = ngmyQuestionIsYesNo(question);
   final foundIsYesNo = found.length == 2 && found.every((o) => RegExp(r'^(yes|no)$', caseSensitive: false).hasMatch(o.trim()));
@@ -577,6 +588,12 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   }
   final question = '${run.structured?['question'] ?? ''}'.trim();
   if (question.isNotEmpty) {
+    if (ngmyFormQuestionCount(question) > 1) {
+      buf.writeln('You paused the application because it asks these, all at once:\n$question\n'
+          'Write ONE short friendly line, then each question on its OWN line ending with "?" in plain everyday words '
+          '(same order, numbered), then: "Answer them all in one message, like 1. Yes 2. No". Nothing else.');
+      return buf.toString();
+    }
     buf.writeln('You paused the application because it asks: "$question". Ask them that in ONE short line in plain everyday words (explain any form jargon), like '
         '"Quick one from the application — $question". If it is a yes/no question, Yes and No appear as buttons; '
         'otherwise they just type the answer (if it asks for their phone or email, the one on their account is a button they can tap). Nothing else.');
