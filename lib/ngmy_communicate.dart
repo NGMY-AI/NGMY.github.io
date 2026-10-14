@@ -3743,6 +3743,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   String _translatorLearningLang = '';
 
   String get _email => ((widget.user as dynamic).email as String?) ?? '';
+  String get _accountPhone {
+    try {
+      return (((widget.user as dynamic).phone as String?) ?? '').trim();
+    } catch (_) {
+      return '';
+    }
+  }
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
   bool get _isBoss => ngmyIsNgmyBoss(isAdmin: _isAdmin);
   String get _bossDisplayName {
@@ -3974,7 +3981,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       ];
       // The form paused on a question: just relay it (with its choices as buttons) — no card.
       if ('${st?['question'] ?? ''}'.trim().isNotEmpty) {
-        await _deliverAiReply(sendGen: _sendGen, text: reply, options: found.isEmpty ? const ['Yes', 'No'] : found);
+        await _deliverAiReply(
+          sendGen: _sendGen,
+          text: reply,
+          options: ngmyFormQuestionOptions('${st?['question']}', found, accountPhone: _accountPhone, accountEmail: _email),
+        );
         _scrollBottom();
         return;
       }
@@ -4714,7 +4725,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final r = await ngmyAiGenerateCommunicateFast(
         creds,
-        ngmyAdvisorWebTaskPlanPrompt(advisorName: widget.profile.name, request: request, recentChat: chat),
+        ngmyAdvisorWebTaskPlanPrompt(
+          advisorName: widget.profile.name,
+          request: request,
+          recentChat: chat,
+          accountDetails: [
+            if (_email.isNotEmpty) 'email $_email',
+            if (_accountPhone.isNotEmpty) 'phone $_accountPhone',
+          ].join(', '),
+        ),
         budget: const Duration(seconds: 14),
       );
       final raw = (r.text ?? '').trim();
@@ -5481,6 +5500,16 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       // straight back to the form, like a go-between.
       final formQuestion = _agentRun.pendingQuestion;
       final answeringForm = webAllowed && _agentRun.awaitingAnswer && !ngmyUserCancelsWebTask(text);
+      // "Use a different number / email" isn't the answer yet — ask for it, the form keeps waiting.
+      final differentOne = RegExp(r'^\s*use a different (number|phone|email|one)\s*$', caseSensitive: false).firstMatch(text);
+      if (answeringForm && differentOne != null) {
+        final what = differentOne.group(1)!.toLowerCase() == 'email' ? 'email' : 'number';
+        deliveredOk = await _deliverAiReply(
+          sendGen: sendGen,
+          text: what == 'email' ? 'Sure — what email should I put on it?' : 'Sure — what\'s the best number to put on it?',
+        );
+        return;
+      }
       if (answeringForm) agentTask = (url: null, continuing: true);
       // They tapped (or typed) one of the choices the advisor just offered after a browser task
       // (e.g. "Crew Member" from the open positions it found) → carry on with that task.

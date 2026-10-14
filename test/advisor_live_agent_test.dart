@@ -55,4 +55,13 @@ void main() {
     expect(ngmyAdvisorReplyClaimsBrowsing("Got it, Macon, GA! I'm putting that into the KFC search now"), isTrue);
     expect(ngmyAdvisorReplyClaimsBrowsing('That sounds like a great plan, I am proud of you'), isFalse);
   });
+
+  test('form question buttons fit the question', () {
+    expect(ngmyFormQuestionOptions('Are you eligible to work in the United States?', const []), ['Yes', 'No']);
+    expect(ngmyFormQuestionOptions('What is your phone number?', const ['Yes', 'No'], accountPhone: '4785551234'),
+        ['Use 4785551234', 'Use a different number']);
+    expect(ngmyFormQuestionOptions('Email address', const [], accountEmail: 'a@b.com'), ['Use a@b.com', 'Use a different email']);
+    expect(ngmyFormQuestionOptions('What is your home address?', const ['Yes', 'No']), isEmpty);
+    expect(ngmyFormQuestionOptions('Which shift do you prefer?', const ['Morning', 'Night']), ['Morning', 'Night']);
+  });
 }

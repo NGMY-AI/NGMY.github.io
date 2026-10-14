@@ -108,11 +108,13 @@ String ngmyAdvisorWebTaskPlanPrompt({
   required String advisorName,
   required String request,
   required String recentChat,
+  String accountDetails = '',
 }) =>
     'You are $advisorName, an advisor in the NGMY app who can do tasks for people in a live web browser they watch.\n'
     'Decide if you should open the browser NOW for this, or ask questions first.\n\n'
     'Recent chat (oldest first):\n$recentChat\n\n'
     'What they want done (everything they said about it):\n$request\n\n'
+    '${accountDetails.isEmpty ? '' : 'On their NGMY account: $accountDetails\n\n'}'
     'RULES:\n'
     '- Work like a helpful job/booking assistant, in this order:\n'
     '  1. FIRST QUESTION (one friendly message): ask for everything missing among WHERE (city or area) and WHICH ROLE/ITEM. '
@@ -123,11 +125,15 @@ String ngmyAdvisorWebTaskPlanPrompt({
     'company\'s official careers site. Open each listing to confirm it is live and get its direct apply link. If there is none in <place>, '
     'find the nearest real one in a nearby town and say how far it is. Do not apply yet — finish with the openings (and the nearest one) as options." '
     'If only the place is known ("find me a job in Macon GA"), research who is hiring there and list them as options.\n'
-    '  3. BEFORE APPLYING: when they pick an opening to apply for, first collect in ONE message (bullet list) what applications ask and '
-    'they have not given yet: full legal name, phone number, email, home address, age (or confirm 18+), and the days/hours they can work. '
-    'Ask whether they already have an account on that site ONLY if that site needs one.\n'
+    '  3. BEFORE APPLYING: when they pick an opening to apply for, ask for EVERYTHING the application will need in ONE message '
+    '(bullet list) — never one at a time later: legal first name and last name, email, phone number, home address (street, city, ZIP), '
+    'age (or confirm 18+), and the days/hours they can work. If their account already has an email or phone (shown above), list it and '
+    'ask them to confirm it or give a different one, e.g. "Phone: 478… — is that the best one, or a different number?". '
+    'Skip anything they already told you in this chat. Ask whether they have an account on that site ONLY if that site needs one.\n'
     '  4. APPLY: when you have those details, set ready=true with a task that opens the apply link and fills the application with every '
-    'detail they gave, pausing to ask them anything else the form needs.\n'
+    'detail they gave or confirmed — WRITE EACH DETAIL INTO THE TASK (e.g. "First name: …, Last name: …, Email: …, Phone: …, '
+    'Address: …, Age: …, Availability: …") so the browser never has to ask for them again. It pauses only for things nobody could '
+    'have guessed (like a yes/no eligibility question).\n'
     '- Clear requests that already say what and where ("apply for the cashier job at the Burger King on Pio Nono Ave", '
     '"check flights to Miami on Delta") skip to the matching step.\n'
     '- Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
@@ -135,7 +141,7 @@ String ngmyAdvisorWebTaskPlanPrompt({
     '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
     'Answer with JSON only, no markdown:\n'
     '{"web": true, "ready": true or false, "ask": "your text to them if not ready", '
-    '"options": ["if your question has clear choices — e.g. the real job positions that place hires, shifts, yes/no — list 2-6 short ones here (they become buttons), else []"], '
+    '"options": ["if your question has clear choices — e.g. the real job positions that place hires, shifts — list 2-6 short ones here (they become buttons). Yes/No ONLY when the question is a plain yes/no question. When you ask for several details at once (name, email, phone, address, age) give [] — they type the answers"], '
     '"task": "if ready: ONE complete instruction for the browser with every detail they gave (names, position, place, dates)", '
     '"url": "the website to start on if you know it, else empty"}';
 
@@ -495,6 +501,33 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
 }
 
 /// Prompt block for the advisor's reply after the live task ends.
+/// True for questions that can be answered with just Yes or No
+/// ("Are you eligible to work in the US?") — not "What is your phone number?".
+bool ngmyQuestionIsYesNo(String q) {
+  final t = q.trim().toLowerCase();
+  if (t.isEmpty) return false;
+  if (RegExp(r'^(what|which|when|where|who|whom|whose|why|how|please|enter|provide|list|type)\b').hasMatch(t)) return false;
+  if (RegExp(r'\bor\b').hasMatch(t) && !RegExp(r'\bor not\b').hasMatch(t)) return false;
+  return RegExp(r'^(are|is|am|do|does|did|have|has|had|can|could|will|would|should|shall|may|were|was)\b').hasMatch(t);
+}
+
+/// Buttons for a question the application paused on. Uses the choices the browser saw when they
+/// fit; a phone/email question offers the one on their account plus "a different one";
+/// Yes/No only for real yes/no questions; otherwise none (they type it).
+List<String> ngmyFormQuestionOptions(String question, List<String> found, {String accountPhone = '', String accountEmail = ''}) {
+  final q = question.toLowerCase();
+  final yesNo = ngmyQuestionIsYesNo(question);
+  final foundIsYesNo = found.length == 2 && found.every((o) => RegExp(r'^(yes|no)$', caseSensitive: false).hasMatch(o.trim()));
+  if (found.isNotEmpty && (yesNo || !foundIsYesNo)) return found;
+  if (!yesNo && RegExp(r'\b(phone|mobile|cell|telephone)\b').hasMatch(q)) {
+    return [if (accountPhone.trim().isNotEmpty) 'Use ${accountPhone.trim()}', 'Use a different number'];
+  }
+  if (!yesNo && RegExp(r'\be-?mail\b').hasMatch(q)) {
+    return [if (accountEmail.trim().isNotEmpty) 'Use ${accountEmail.trim()}', 'Use a different email'];
+  }
+  return yesNo ? const ['Yes', 'No'] : const [];
+}
+
 String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   final recent = run.steps.length <= 10 ? run.steps : run.steps.sublist(run.steps.length - 10);
   final buf = StringBuffer()
@@ -514,7 +547,8 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   final question = '${run.structured?['question'] ?? ''}'.trim();
   if (question.isNotEmpty) {
     buf.writeln('You paused the application because it asks: "$question". Ask them exactly that in ONE short line, like '
-        '"Quick one from the application — $question" (the choices appear as buttons). Nothing else.');
+        '"Quick one from the application — $question". If it is a yes/no question, Yes and No appear as buttons; '
+        'otherwise they just type the answer (if it asks for their phone or email, the one on their account is a button they can tap). Nothing else.');
     return buf.toString();
   }
   final options = run.structured?['options'];

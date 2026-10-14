@@ -394,8 +394,10 @@ const ADVISOR_AGENT_RULES =
   "- YOU ARE THE GO-BETWEEN WHILE FILLING A FORM: answer every question you can from the user's details. The moment the form " +
   "asks something you were NOT told (work eligibility, start date, previous employer, availability details, a yes/no question…), " +
   "STOP right there without guessing, and finish with that exact question in \"question\" and its choices in \"options\" " +
-  "(e.g. question 'Are you eligible to work in the United States?', options ['Yes', 'No']). The user answers and you continue " +
-  "in this same browser from the same page.\n" +
+  "(e.g. question 'Are you eligible to work in the United States?', options ['Yes', 'No']). Give options ONLY when the form " +
+  "shows real choices (a dropdown, radio buttons, a yes/no question) — for a typed field (name, phone, email, address…) give []. " +
+  "Name, email, phone, address, age and availability written in the task ARE the user's answers — type them in, never stop to ask " +
+  "for them again. The user answers and you continue in this same browser from the same page.\n" +
   "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
   "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
   "list what you filled; submit only when the user's message says to submit.\n" +
