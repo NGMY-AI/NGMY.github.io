@@ -389,6 +389,13 @@ const ADVISOR_AGENT_RULES =
   "that page's exact URL for each one in \"sources\" (name = the job title + location). If a search page shows a listing " +
   "but its own page won't open, list it under notes as 'listed but could not be opened' — never as available.\n" +
   "- FOLLOW-UPS: if 'What you found last time' gives a link for what the user picked, open that link directly.\n" +
+  "- NONE NEARBY: if there is no match in the place asked, look in the nearest towns and report the closest real one " +
+  "(with its link and roughly how far), and add an option like 'Check other job boards'.\n" +
+  "- YOU ARE THE GO-BETWEEN WHILE FILLING A FORM: answer every question you can from the user's details. The moment the form " +
+  "asks something you were NOT told (work eligibility, start date, previous employer, availability details, a yes/no question…), " +
+  "STOP right there without guessing, and finish with that exact question in \"question\" and its choices in \"options\" " +
+  "(e.g. question 'Are you eligible to work in the United States?', options ['Yes', 'No']). The user answers and you continue " +
+  "in this same browser from the same page.\n" +
   "- FORMS / APPLICATIONS (government, Medicaid, insurance, jobs, banks): fill every field from the user's info. " +
   "If something required is missing, stop and list exactly what you need. Stop BEFORE the final Submit and " +
   "list what you filled; submit only when the user's message says to submit.\n" +
@@ -401,7 +408,7 @@ const ADVISOR_AGENT_RULES =
   '{"title": "short title", "summary": "1-2 plain sentences", ' +
   '"sections": [{"heading": "e.g. Property taxes", "rows": [{"label": "2025", "value": "$1,234"}]}], ' +
   '"notes": ["anything missing, blocked or that needs the user"], "sources": [{"name": "site name", "url": "https://..."}], ' +
-  '"options": ["when the user has to choose next — e.g. each open job title you found — one short choice per item, else []"]}\n' +
+  '"options": ["when the user has to choose next — e.g. each open job title you found — one short choice per item, else []"], "question": "if you stopped because the form asked something you were not told, that exact question; else empty"}\n' +
   "  Group facts into clear sections (e.g. Overview, Estimates, Property taxes by year, Sale history, Details). " +
   "Copy numbers, dates, names and balances exactly as shown on the page. Use an empty list when a part doesn't apply.";
 
@@ -578,8 +585,9 @@ function agentStructuredResult(raw: unknown): Record<string, unknown> | null {
     sources,
     // Choices for the user's next step (e.g. the open job titles found) — shown as buttons.
     options: (Array.isArray(obj.options) ? obj.options : []).map((o: unknown) => str(o, 48)).filter(Boolean).slice(0, 8),
+    question: str(obj.question, 300),
   };
-  return out.title || out.summary || sections.length ? out : null;
+  return out.title || out.summary || sections.length || out.question ? out : null;
 }
 
 async function handleAgentPoll(req: Request, body: any): Promise<Response> {

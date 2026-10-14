@@ -3972,6 +3972,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         for (final o in (st?['options'] is List ? st!['options'] as List : const []))
           if ('$o'.trim().isNotEmpty) '$o'.trim(),
       ];
+      // The form paused on a question: just relay it (with its choices as buttons) — no card.
+      if ('${st?['question'] ?? ''}'.trim().isNotEmpty) {
+        await _deliverAiReply(sendGen: _sendGen, text: reply, options: found.isEmpty ? const ['Yes', 'No'] : found);
+        _scrollBottom();
+        return;
+      }
       if (found.isNotEmpty) {
         final json = jsonEncode(st);
         final title = '${st!['title'] ?? ''}'.trim();
@@ -5471,6 +5477,11 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           ((_agentRun.result ?? '').contains('?') || _agentRun.latestStep.contains('?'))) {
         agentTask = (url: null, continuing: true);
       }
+      // The application paused on a question for them — their reply (even just "Yes") goes
+      // straight back to the form, like a go-between.
+      final formQuestion = _agentRun.pendingQuestion;
+      final answeringForm = webAllowed && _agentRun.awaitingAnswer && !ngmyUserCancelsWebTask(text);
+      if (answeringForm) agentTask = (url: null, continuing: true);
       // They tapped (or typed) one of the choices the advisor just offered after a browser task
       // (e.g. "Crew Member" from the open positions it found) → carry on with that task.
       if (agentTask == null && webAllowed && _webDraft.isEmpty && _agentRun.task.isNotEmpty) {
@@ -5524,7 +5535,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         final startUrl = agentTask.url ??
             (_agentRun.hasSession ? null : (_browserSession.url.isNotEmpty ? _browserSession.url : null));
         final taskText = continuing
-            ? 'Continue this task (open the site again if the browser is fresh): "${_agentRun.task}". The user says: "$text"'
+            ? (answeringForm
+                ? 'The application asked: "$formQuestion". The user answered: "$text". Continue filling the same application from exactly where you stopped.'
+                : 'Continue this task (open the site again if the browser is fresh): "${_agentRun.task}". The user says: "$text"')
             : (plannedTask ?? text);
         // Last few things they said (before this message) — e.g. "open Zillow" two texts ago.
         final recentUser = _messages
@@ -5543,7 +5556,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           deliveredOk = await _deliverAiReply(
             sendGen: sendGen,
             text: continuing
-                ? 'Got it — picking up where we left off. Watch the Browser 👀'
+                ? (answeringForm ? 'Got it — continuing the application with that.' : 'Got it — picking up where we left off. Watch the Browser 👀')
                 : 'On it! I\'m doing that now in my browser — watch me live below. I\'ll tell you what I find.',
           );
           return;

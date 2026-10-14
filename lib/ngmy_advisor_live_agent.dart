@@ -114,18 +114,22 @@ String ngmyAdvisorWebTaskPlanPrompt({
     'Recent chat (oldest first):\n$recentChat\n\n'
     'What they want done (everything they said about it):\n$request\n\n'
     'RULES:\n'
-    '- ONE STEP AT A TIME, in this order, and never ask something the browser can look up itself:\n'
-    '  1. WHERE: if a place matters (jobs, stores, services) and you do not know the city/area yet, ask ONLY for the location. '
-    '"Find me a job at KFC" → ask which city or ZIP. Nothing else in that message.\n'
-    '  2. WHAT IS AVAILABLE: once you know the company/kind AND the place but they have not picked a role/item yet, do NOT ask them '
-    'to guess — set ready=true with a RESEARCH task for the browser: "Find the open positions at KFC near Macon, GA on KFC\'s careers site '
-    '(or a big job site), list the real job titles, and finish with them as options. Do not apply yet." '
-    '"Find me a job in Macon GA" (place known, no company) → research task: find the open jobs/employers hiring in Macon, GA and list them as options.\n'
-    '  3. DO IT: once they picked (e.g. "Crew Member at KFC Macon"), set ready=true with the real task (e.g. start the application). '
-    'Only then, if the form will clearly need it and they have not given it: their full name, age and phone/email — ask once, briefly. '
+    '- Work like a helpful job/booking assistant, in this order:\n'
+    '  1. FIRST QUESTION (one friendly message): ask for everything missing among WHERE (city or area) and WHICH ROLE/ITEM. '
+    'Give the usual choices as options, e.g. for KFC: ["Team member", "Cook", "Cashier", "Shift lead"]; for a store: its common roles. '
+    'Example: "I can help with that. Two quick things so I pull up the right openings: 1. Which area — are you in Macon, or somewhere else? '
+    '2. What role — team member, cook, cashier, or shift lead?" (Only ask what is still unknown.)\n'
+    '  2. SEARCH: once you know where and what, set ready=true with a task like: "Find open <role> jobs at <company> in <place> on the '
+    'company\'s official careers site. Open each listing to confirm it is live and get its direct apply link. If there is none in <place>, '
+    'find the nearest real one in a nearby town and say how far it is. Do not apply yet — finish with the openings (and the nearest one) as options." '
+    'If only the place is known ("find me a job in Macon GA"), research who is hiring there and list them as options.\n'
+    '  3. BEFORE APPLYING: when they pick an opening to apply for, first collect in ONE message (bullet list) what applications ask and '
+    'they have not given yet: full legal name, phone number, email, home address, age (or confirm 18+), and the days/hours they can work. '
     'Ask whether they already have an account on that site ONLY if that site needs one.\n'
+    '  4. APPLY: when you have those details, set ready=true with a task that opens the apply link and fills the application with every '
+    'detail they gave, pausing to ask them anything else the form needs.\n'
     '- Clear requests that already say what and where ("apply for the cashier job at the Burger King on Pio Nono Ave", '
-    '"check flights to Miami on Delta") = ready right away.\n'
+    '"check flights to Miami on Delta") skip to the matching step.\n'
     '- Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
     '- If it is ready, ask nothing.\n'
     '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
@@ -255,10 +259,16 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     } else if ((result ?? '').trim().isNotEmpty) {
       buf.writeln(result!.trim());
     }
+    final q = '${structured?['question'] ?? ''}'.trim();
+    if (q.isNotEmpty) buf.writeln('The form was asking: $q');
     if (pageUrl.isNotEmpty) buf.writeln('Last page open: $pageUrl');
     final s = buf.toString().trim();
     return s.length > 2400 ? s.substring(0, 2400) : s;
   }
+
+  /// The form asked something only the user can answer — their next message is that answer.
+  String get pendingQuestion => running ? '' : '${structured?['question'] ?? ''}'.trim();
+  bool get awaitingAnswer => pendingQuestion.isNotEmpty && recentlyFinished;
 
   bool _retriedDirect = false;
   String? _lastStartUrl;
@@ -500,6 +510,12 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   } else {
     buf.writeln('Tell them what you did and found. Put each fact on its own line like "Taxes 2025: \$1,234" — '
         'short lines, no long paragraph.');
+  }
+  final question = '${run.structured?['question'] ?? ''}'.trim();
+  if (question.isNotEmpty) {
+    buf.writeln('You paused the application because it asks: "$question". Ask them exactly that in ONE short line, like '
+        '"Quick one from the application — $question" (the choices appear as buttons). Nothing else.');
+    return buf.toString();
   }
   final options = run.structured?['options'];
   if (options is List && options.isNotEmpty) {
