@@ -49,6 +49,7 @@ import 'ngmy_civic_enroll_guest.dart';
 import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
+import 'ngmy_admin_alerts.dart';
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
@@ -10322,6 +10323,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     ngmyOnGameWinNotify = (gameTitle, body) async {
       // Game wins also create AppTransaction rows — _notifyTransactionEvent sends one alert per txn.
     };
+    NgmyAdminLiveRefresh.addListener(_scheduleAdminAlertSweep);
     ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
         _pushInAppNotification(title: title, body: body, tag: tag, cooldown: cooldown);
     ngmyOnStoreOrdersChanged = (prevOrders, nextOrders) {
@@ -10631,6 +10633,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (remoteRegistrarStatus == 'revoked' || remoteRegistrarStatus == 'rejected') {
             unawaited(_pushInAppNotification(
               title: 'Registrar access removed',
+              important: true,
               body: 'Your Authorized Registrar access was revoked by an admin.',
               tag: 'registrar_revoked_$email',
               cooldown: const Duration(minutes: 10),
@@ -10650,6 +10653,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     ngmyOnGameWinNotify = null;
     ngmyInAppNotify = null;
+    NgmyAdminLiveRefresh.removeListener(_scheduleAdminAlertSweep);
+    _adminAlertDebounce?.cancel();
     ngmyOnStoreOrdersChanged = null;
     _pauseBackgroundSync(disableRealtimeLoop: true);
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
@@ -10953,6 +10958,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _mergePendingWalletRequestsFromCloud(pendingWallet);
       }
       _applyWalletDecisionLedgerToTransactions();
+      _scheduleAdminAlertSweep();
     } catch (e) {
       debugPrint('[admin] pending txn poll: $e');
     }
@@ -12100,12 +12106,18 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyPushSoundKind sound = NgmyPushSoundKind.spendDefault,
     AppTransaction? incomeTransaction,
     double? incomeAmount,
+    bool banner = true,
   }) async {
     if (_currentUser == null) return;
     final dedupeKey = tag ?? '${title.trim()}|${body.trim()}';
     final last = _notificationCooldown[dedupeKey];
     if (last != null && DateTime.now().difference(last) < cooldown) return;
     _notificationCooldown[dedupeKey] = DateTime.now();
+    // Money in/out, approvals and sales also drop down from the top while the app is open
+    // (never in the middle of a game).
+    if (banner && !NgmyGameSession.suppressExternalNotifications) {
+      _showModernInAppNotice(title: title, body: body, force: true);
+    }
 
     final useCashSound = sound == NgmyPushSoundKind.incomeCash;
     final silentPush = useCashSound;
@@ -12166,8 +12178,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     Duration cooldown = const Duration(seconds: 50),
     bool showInAppBanner = true,
     bool adminDashboardAlert = false,
+    /// Things a user should see right away (money received, a game invite, an approval…):
+    /// these show the top notification even though routine banners are off.
+    bool important = false,
   }) async {
     if (kNgmySuppressInAppBannerPopups &&
+        !important &&
         !(adminDashboardAlert && _ngmyReceivesAdminDashboardAlerts(_currentUser))) {
       return;
     }
@@ -12228,9 +12244,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
     if (showInAppBanner) {
       final showBanner = !kNgmySuppressInAppBannerPopups ||
+          important ||
           (adminDashboardAlert && _ngmyReceivesAdminDashboardAlerts(_currentUser));
       if (showBanner) {
-        _showModernInAppNotice(title: title, body: body);
+        _showModernInAppNotice(title: title, body: body, force: true);
       }
     }
   }
@@ -12239,8 +12256,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     required String title,
     required String body,
     bool isError = false,
+    bool force = false,
   }) {
-    if (kNgmySuppressInAppBannerPopups) return;
+    if (kNgmySuppressInAppBannerPopups && !force) return;
     if (!mounted) return;
     _inAppNoticeEntry?.remove();
     final overlay = NgmyNavigator.root?.overlay;
@@ -12314,6 +12332,77 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     return;
   }
 
+  Timer? _adminAlertDebounce;
+
+  /// After admin data refreshes: tell the admin (top notification) about anything new on the
+  /// dashboard. Uses the data already loaded — no extra database reads.
+  void _scheduleAdminAlertSweep() {
+    if (!_allowConfigDiffNotifications || !_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
+    _adminAlertDebounce?.cancel();
+    _adminAlertDebounce = Timer(const Duration(milliseconds: 1500), () => unawaited(_runAdminAlertSweep()));
+  }
+
+  Future<void> _runAdminAlertSweep() async {
+    final u = _currentUser;
+    if (u == null || !mounted) return;
+    final isAdmin = _ngmySessionIsAdmin(u);
+    final me = ngmyNormalizeEmail(u.email);
+    List<NgmyAdminAlertItem> rows(List<Map<String, dynamic>> list, {bool Function(Map<String, dynamic>)? where}) => [
+          for (final r in list)
+            if (where == null || where(r)) NgmyAdminAlertItem(NgmyAdminAlerts.rowId(r), NgmyAdminAlerts.rowLabel(r)),
+        ];
+    bool pending(Map<String, dynamic> r) => '${r['status'] ?? 'pending'}'.toLowerCase().trim() == 'pending';
+    String who(String email) {
+      final key = ngmyNormalizeEmail(email);
+      for (final x in _allUsers) {
+        if (ngmyNormalizeEmail(x.email) == key) {
+          final n = (x.fullName ?? '').trim().isNotEmpty ? x.fullName!.trim() : x.username.trim();
+          if (n.isNotEmpty && n != 'User') return n;
+        }
+      }
+      return email;
+    }
+
+    List<NgmyAdminAlertItem> txns(bool Function(AppTransaction) test) => [
+          for (final t in _allTransactions)
+            if (t.id.isNotEmpty && test(t))
+              NgmyAdminAlertItem('txn:${t.id}', '\$${formatCurrency(t.amount)} · ${who(t.userEmail)}'),
+        ];
+    final recent = DateTime.now().subtract(const Duration(days: 7));
+    final cats = <NgmyAdminAlertCategory>[
+      NgmyAdminAlertCategory('civic_members', 'New civic registry member', 'new civic registry members', rows(_config.civicRegistryMembers)),
+      NgmyAdminAlertCategory('civic_contributions', 'New civic contribution', 'new civic contributions',
+          txns((t) => t.type == TransactionType.contribution && t.timestamp.isAfter(recent))),
+      if (isAdmin) ...[
+        NgmyAdminAlertCategory('members', 'New member joined', 'new members joined', [
+          for (final x in _allUsers)
+            if (x.email.trim().isNotEmpty && ngmyNormalizeEmail(x.email) != me)
+              NgmyAdminAlertItem('email:${ngmyNormalizeEmail(x.email)}', who(x.email)),
+        ]),
+        NgmyAdminAlertCategory('deposits', 'New deposit request', 'new deposit requests',
+            txns((t) => t.type == TransactionType.deposit && t.status == TransactionStatus.pending)),
+        NgmyAdminAlertCategory('withdrawals', 'New withdrawal request', 'new withdrawal requests',
+            txns((t) => t.type == TransactionType.withdrawal && t.status == TransactionStatus.pending)),
+        NgmyAdminAlertCategory('claims', 'New claim to review', 'new claims to review',
+            txns((t) => t.type == TransactionType.claim && t.status == TransactionStatus.pending)),
+        NgmyAdminAlertCategory('loans', 'New loan application', 'new loan applications', rows(_config.loanApplications)),
+        NgmyAdminAlertCategory('worker_apps', 'New worker application', 'new worker applications',
+            rows(_config.jobWorkerApplications, where: pending)),
+        NgmyAdminAlertCategory('helper_apps', 'New helper application', 'new helper applications',
+            rows(_config.helpHelperApplications, where: pending)),
+        NgmyAdminAlertCategory('help_requests', 'New help request', 'new help requests', rows(_config.helpRequests)),
+        NgmyAdminAlertCategory('store_orders', 'New store order', 'new store orders', rows(_config.storeOrders)),
+        NgmyAdminAlertCategory('store_inquiries', 'New store inquiry', 'new store inquiries', rows(_config.storeInquiries)),
+        NgmyAdminAlertCategory('store_listings', 'New store listing', 'new store listings', rows(_config.storeListings)),
+        NgmyAdminAlertCategory('job_posts', 'New job posted', 'new jobs posted', rows(_config.jobPosts)),
+      ],
+    ];
+    final alerts = await NgmyAdminAlerts.sweep(cats);
+    for (final a in alerts) {
+      await _notifyAdminPendingRequest(title: a.title, body: a.body, tag: a.tag);
+    }
+  }
+
   void _notifyAdminOnNewPendingRegistrarApps(AppConfig prev, AppConfig next) {
     if (!_ngmyReceivesAdminDashboardAlerts(_currentUser)) return;
     final prevIds = prev.civicRegistrarApplications
@@ -12355,6 +12444,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       tag: statusChanged ? 'txn_${t.id}_${t.status.name}' : 'txn_${t.id}',
       sound: isIncome ? NgmyPushSoundKind.incomeCash : NgmyPushSoundKind.spendDefault,
       incomeTransaction: isIncome ? t : null,
+      // Game results have their own popup and receipts.
+      banner: !ngmyIsGameLedgerTransaction(t),
     );
   }
 
@@ -12539,6 +12630,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           _seenRealtimeAnnouncementIds.add(ann.id);
           unawaited(_pushInAppNotification(
             title: 'New announcement',
+            important: true,
             body: ann.title.trim().isNotEmpty ? ann.title : ann.message,
             tag: 'announcement_${ann.id}',
           ));
@@ -12566,6 +12658,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final game = (inv['gameTitle'] ?? 'a game').toString();
       unawaited(_pushInAppNotification(
         title: 'Game invite',
+        important: true,
         body: '$from invited you to play $game. Open Game Center to accept.',
         tag: 'game_invite_$id',
       ));
@@ -12651,6 +12744,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final title = (job['title'] ?? 'New job').toString().trim();
       unawaited(_pushInAppNotification(
         title: 'New job in marketplace',
+        important: true,
         body: title.isEmpty ? 'A new job was posted. Open Job Marketplace to view.' : title,
         tag: 'job_new_$id',
       ));
@@ -14175,6 +14269,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       await _seedTransactionNotificationBaseline();
       _allowConfigDiffNotifications = true;
+      _scheduleAdminAlertSweep();
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
   }
