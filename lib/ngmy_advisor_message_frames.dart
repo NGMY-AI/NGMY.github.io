@@ -78,6 +78,49 @@ String ngmyQuestionFrameFor(String q, {bool hasButtons = false}) {
   return 'question';
 }
 
+const _qStart = r"(?:have|has|had|do|does|did|are|is|am|was|were|can|could|will|would|should|shall|may|might|what|what's|which|when|where|who|whom|whose|why|how|if|whether)\b";
+
+/// Splits "OK my love, the application is asking have you ever done any crime?" into the
+/// lead-in ("OK my love, the application is asking") and the question itself
+/// ("Have you ever done any crime?"). Sentences that are only the question come back whole.
+({String lead, String question}) ngmySplitQuestionLead(String sentence) {
+  final s = sentence.trim();
+  int? cut;
+  // 1) After a colon / dash: "…the application says: Are you 18?"
+  final punct = RegExp(r'(?:[:—–]|\s-\s)\s*(?="?' + _qStart + ')', caseSensitive: false).allMatches(s);
+  if (punct.isNotEmpty) cut = punct.last.end;
+  // 2) After "is asking / asks / says / wants to know (if)" etc.
+  if (cut == null) {
+    final lead = RegExp(
+      r"\b(?:is asking(?: you)?|asks(?: you)?|asked(?: you)?|is saying|says|said|wants to know|would like to know|needs to know|"
+      r"is wondering|question is|asking you|the question)(?:,)?\s+(?:is\s+)?(?:if\s+|whether\s+)?(?=" + _qStart + ")",
+      caseSensitive: false,
+    ).firstMatch(s);
+    if (lead != null) cut = lead.end;
+  }
+  // 3) After a comma: "Okay my love, have you ever…?"
+  if (cut == null) {
+    final comma = RegExp(r',\s+(?=' + _qStart + ')', caseSensitive: false).allMatches(s);
+    if (comma.isNotEmpty) cut = comma.first.end;
+  }
+  if (cut == null || cut <= 0 || cut >= s.length - 2) return (lead: '', question: s);
+  var q = s.substring(cut).trim().replaceFirst(RegExp(r'^"'), '');
+  // "if you have ever…" reads as "Have you ever…" in the frame.
+  final m = RegExp(r'^(?:if|whether)\s+you\s+(have|had|are|were|can|do|did|will|would)\b', caseSensitive: false).firstMatch(q);
+  if (m != null) {
+    final verb = m.group(1)!.toLowerCase();
+    final rest = q.substring(m.end);
+    // "if you have ever…" → "Have you ever…"; "if you have a license" → "Do you have a license".
+    q = verb == 'have' && !RegExp(r'^\s+(ever|been|had|done|worked|lived|used)\b', caseSensitive: false).hasMatch(rest)
+        ? 'Do you have$rest'
+        : '$verb you$rest';
+  }
+  if (q.length < 4) return (lead: '', question: s);
+  q = q[0].toUpperCase() + q.substring(1);
+  final lead = s.substring(0, cut).trim().replaceFirst(RegExp(r'[:—–-]\s*$'), '').trim();
+  return (lead: lead, question: q);
+}
+
 /// One piece of a message: plain text, a detail frame, or a key-sentence frame.
 class NgmyMessagePart {
   final String text;
@@ -122,8 +165,17 @@ List<NgmyMessagePart> ngmySplitMessageIntoFrames(String text, {bool hasButtons =
       final core = q.replaceAll(RegExp(r'[\s\p{So}\p{Sk}\p{Cs}‍️]+$', unicode: true), '');
       final worth = core.endsWith('?') && core.length >= 6 && core.length <= 320;
       if (worth) {
+        // "OK my love, the application is asking have you ever done any crime?" → only
+        // "Have you ever done any crime?" goes in the frame; the lead-in stays normal text.
+        final split = ngmySplitQuestionLead(core);
+        if (split.lead.isNotEmpty) {
+          if (plain.isNotEmpty && !plain.toString().endsWith('\n')) plain.write(' ');
+          plain.write(split.lead);
+        }
         flushPlain();
-        parts.add(NgmyMessagePart(q, frame: ngmyQuestionFrameFor(q, hasButtons: hasButtons)));
+        parts.add(NgmyMessagePart(split.question, frame: ngmyQuestionFrameFor(split.question, hasButtons: hasButtons)));
+        final tail = q.substring(core.length).trim(); // a trailing emoji stays outside the frame
+        if (tail.isNotEmpty) plain.write(tail);
       } else {
         if (plain.isNotEmpty && !plain.toString().endsWith('\n')) plain.write(' ');
         plain.write(q);

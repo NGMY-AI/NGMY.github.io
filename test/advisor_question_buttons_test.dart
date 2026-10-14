@@ -17,9 +17,22 @@ void main() {
 
   test('only the question is framed, even with an emoji after it', () {
     final parts = ngmySplitMessageIntoFrames('Okay, my love, opening it now. What would you like to do first? ❤️');
-    expect(parts.length, 2);
+    expect(parts.length, 3); // lead-in, the question, the emoji
     expect(parts.first.frame, isNull);
-    expect(parts.last.frame, isNotNull);
+    expect(parts[1].frame, isNotNull);
+    expect(parts.last.frame, isNull);
     expect(ngmySplitMessageIntoFrames('Ready?').single.frame, isNotNull);
+  });
+
+  test('only the question itself is framed, not the lead-in', () {
+    String framed(String t) => ngmySplitMessageIntoFrames(t).where((p) => p.frame != null).single.text;
+    String plain(String t) => ngmySplitMessageIntoFrames(t).where((p) => p.frame == null).map((p) => p.text).join(' ');
+    expect(framed('OK my love the application is asking have you ever done any crime?'), 'Have you ever done any crime?');
+    expect(plain('OK my love the application is asking have you ever done any crime?'), 'OK my love the application is asking');
+    expect(framed('OK my love this is what the application says have you ever done any drugs?'), 'Have you ever done any drugs?');
+    expect(framed('Quick one from the application — Are you eligible to work in the US?'), 'Are you eligible to work in the US?');
+    expect(framed('Okay babe, the form wants to know if you have a driver license?'), 'Do you have a driver license?');
+    expect(framed('Okay, my love, opening it now. What would you like to do first? ❤️'), 'What would you like to do first?');
+    expect(framed('Would you like me to apply now?'), 'Would you like me to apply now?');
   });
 }
