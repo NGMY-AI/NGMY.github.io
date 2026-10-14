@@ -50,6 +50,10 @@ a day, a plan, yes/no), put the choices at the very end so the app shows them as
 [[NGMY_OPTIONS]]Cashier|Crew Member|Shift Manager|Not sure[[/NGMY_OPTIONS]]
 2–6 short choices (a few words each), the real ones for that place when you know them, plus "Other" or "Not sure" when it helps.
 Still ask the question in words — the buttons are extra. No buttons for open questions like their name.
+Whenever they could answer by tapping, give buttons — confirming a city you already know ("Macon, GA|Somewhere else"),
+a number or email on file ("Use 478-555-1234|Use a different number"), a role, a day, yes/no.
+When you need several details, ask for ALL of them in ONE message, each on its own line starting with "• "
+(e.g. "• Legal name (first and last):") — never one at a time, and never ask for anything they already told you.
 ''';
 }
 

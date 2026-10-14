@@ -108,16 +108,21 @@ String ngmyAdvisorWebTaskPlanPrompt({
   required String advisorName,
   required String request,
   required String recentChat,
-  String accountDetails = '',
+  /// What they already told any advisor (name, email, phone, address, age) + account email/phone.
+  String knownDetails = '',
+  /// Which application details are still unknown.
+  List<String> missingDetails = const [],
 }) =>
     'You are $advisorName, an advisor in the NGMY app who can do tasks for people in a live web browser they watch.\n'
     'Decide if you should open the browser NOW for this, or ask questions first.\n\n'
     'Recent chat (oldest first):\n$recentChat\n\n'
     'What they want done (everything they said about it):\n$request\n\n'
-    '${accountDetails.isEmpty ? '' : 'On their NGMY account: $accountDetails\n\n'}'
+    '${knownDetails.isEmpty ? '' : 'DETAILS YOU ALREADY KNOW (they told you or another NGMY advisor before — NEVER ask for these again): $knownDetails\n'}'
+    '${missingDetails.isEmpty ? 'Nothing else is missing for an application.\n\n' : 'Still unknown for an application: ${missingDetails.join(', ')}.\n\n'}'
     'RULES:\n'
     '- Work like a helpful job/booking assistant, in this order:\n'
     '  1. FIRST QUESTION (one friendly message): ask for everything missing among WHERE (city or area) and WHICH ROLE/ITEM. '
+    'If you already know their city (above), offer it as a button instead of asking ("Macon, GA" | "Somewhere else"). '
     'Give the usual choices as options, e.g. for KFC: ["Team member", "Cook", "Cashier", "Shift lead"]; for a store: its common roles. '
     'Example: "I can help with that. Two quick things so I pull up the right openings: 1. Which area — are you in Macon, or somewhere else? '
     '2. What role — team member, cook, cashier, or shift lead?" (Only ask what is still unknown.)\n'
@@ -125,15 +130,16 @@ String ngmyAdvisorWebTaskPlanPrompt({
     'company\'s official careers site. Open each listing to confirm it is live and get its direct apply link. If there is none in <place>, '
     'find the nearest real one in a nearby town and say how far it is. Do not apply yet — finish with the openings (and the nearest one) as options." '
     'If only the place is known ("find me a job in Macon GA"), research who is hiring there and list them as options.\n'
-    '  3. BEFORE APPLYING: when they pick an opening to apply for, ask for EVERYTHING the application will need in ONE message '
-    '(bullet list) — never one at a time later: legal first name and last name, email, phone number, home address (street, city, ZIP), '
-    'age (or confirm 18+), and the days/hours they can work. If their account already has an email or phone (shown above), list it and '
-    'ask them to confirm it or give a different one, e.g. "Phone: 478… — is that the best one, or a different number?". '
-    'Skip anything they already told you in this chat. Ask whether they have an account on that site ONLY if that site needs one.\n'
-    '  4. APPLY: when you have those details, set ready=true with a task that opens the apply link and fills the application with every '
-    'detail they gave or confirmed — WRITE EACH DETAIL INTO THE TASK (e.g. "First name: …, Last name: …, Email: …, Phone: …, '
-    'Address: …, Age: …, Availability: …") so the browser never has to ask for them again. It pauses only for things nobody could '
-    'have guessed (like a yes/no eligibility question).\n'
+    '  3. BEFORE APPLYING: when they pick an opening, ask ONLY for what is still unknown (listed above) plus the days/hours they can work, '
+    'ALL in ONE message, one item per line like "• Legal name (first and last):" — never one at a time later. '
+    'Details marked "not confirmed yet" (their account email/phone): show it and let them tap, e.g. options ["Use 478-555-1234", "Use a different number"]. '
+    'If everything is known already, do not ask for details at all — go to step 4. '
+    'Ask whether they have an account on that site ONLY if that site needs one.\n'
+    '  4. APPLY: set ready=true with a task that opens the apply link and fills the application, writing EVERY detail into the task '
+    '("First name: …, Last name: …, Email: …, Phone: …, Address: …, Age: …, Availability: …") so the browser never has to ask again. '
+    'It pauses only for things nobody could have guessed (like a yes/no eligibility question).\n'
+    '- NEVER ask the same question twice. If the recent chat shows they already answered it, use that answer.\n'
+    '- Write in plain, simple, everyday words — no form jargon.\n'
     '- Clear requests that already say what and where ("apply for the cashier job at the Burger King on Pio Nono Ave", '
     '"check flights to Miami on Delta") skip to the matching step.\n'
     '- Never ask for passwords, Social Security, card or bank numbers — they type those themselves in the browser.\n'
@@ -141,7 +147,7 @@ String ngmyAdvisorWebTaskPlanPrompt({
     '- If what they said is not really a web task at all (just chatting, thanking, a feeling), set "web" to false.\n\n'
     'Answer with JSON only, no markdown:\n'
     '{"web": true, "ready": true or false, "ask": "your text to them if not ready", '
-    '"options": ["if your question has clear choices — e.g. the real job positions that place hires, shifts — list 2-6 short ones here (they become buttons). Yes/No ONLY when the question is a plain yes/no question. When you ask for several details at once (name, email, phone, address, age) give [] — they type the answers"], '
+    '"options": ["whenever they could answer by tapping — job positions, shifts, a city to confirm, use-this-number, yes/no — list 2-6 short ones here (they become buttons). Yes/No ONLY for a plain yes/no question. For typed answers like a name or street address give []"], '
     '"task": "if ready: ONE complete instruction for the browser with every detail they gave (names, position, place, dates)", '
     '"url": "the website to start on if you know it, else empty"}';
 
@@ -279,6 +285,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
   bool _retriedDirect = false;
   String? _lastStartUrl;
   List<String> _lastRecent = const [];
+  String _lastApplicant = '';
 
   /// The page never loaded because the connection was refused (proxy tunnel failure etc.).
   bool get _networkBlocked {
@@ -306,6 +313,8 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     String? startUrl,
     bool continueSession = true,
     List<String> recentUserMessages = const [],
+    /// Their saved name / email / phone / address / age — typed into forms without asking again.
+    String applicantDetails = '',
     /// Open a fresh browser without the managed proxy (after a site refused the proxy).
     bool direct = false,
     bool isRetry = false,
@@ -314,6 +323,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
     if (!isRetry) _retriedDirect = false;
     _lastStartUrl = startUrl;
     _lastRecent = recentUserMessages;
+    _lastApplicant = applicantDetails;
     // A follow-up in the same browser needs the earlier task as context.
     final prevTask = continueSession && hasSession ? this.task : '';
     // What it found last time (titles + links), so a follow-up goes straight there.
@@ -341,6 +351,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         if (prevTask.isNotEmpty) 'prevTask': prevTask,
         if (prevResult.isNotEmpty) 'prevResult': prevResult,
         if (recentUserMessages.isNotEmpty) 'recentUserMessages': recentUserMessages,
+        if (applicantDetails.isNotEmpty) 'applicantDetails': applicantDetails,
         if (direct) 'network': 'direct',
       },
       timeout: const Duration(seconds: 40),
@@ -441,7 +452,7 @@ class NgmyAdvisorAgentRun extends ChangeNotifier {
         final again = task;
         steps.add(const NgmyAdvisorAgentStep(0, 'That site blocked my connection — reconnecting another way…'));
         _notify();
-        unawaited(start(task: again, startUrl: _lastStartUrl, continueSession: false, recentUserMessages: _lastRecent, direct: true, isRetry: true));
+        unawaited(start(task: again, startUrl: _lastStartUrl, continueSession: false, recentUserMessages: _lastRecent, applicantDetails: _lastApplicant, direct: true, isRetry: true));
       } else {
         _armIdleClose();
         onFinished?.call(this);
@@ -546,7 +557,7 @@ String ngmyAdvisorAgentResultPromptBlock(NgmyAdvisorAgentRun run) {
   }
   final question = '${run.structured?['question'] ?? ''}'.trim();
   if (question.isNotEmpty) {
-    buf.writeln('You paused the application because it asks: "$question". Ask them exactly that in ONE short line, like '
+    buf.writeln('You paused the application because it asks: "$question". Ask them that in ONE short line in plain everyday words (explain any form jargon), like '
         '"Quick one from the application — $question". If it is a yes/no question, Yes and No appear as buttons; '
         'otherwise they just type the answer (if it asks for their phone or email, the one on their account is a button they can tap). Nothing else.');
     return buf.toString();

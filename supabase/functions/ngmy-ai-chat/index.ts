@@ -470,6 +470,8 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   const sessionId = String(body?.sessionId ?? "").trim();
   const prevTask = String(body?.prevTask ?? "").trim().slice(0, 1500);
   const prevResult = String(body?.prevResult ?? "").trim().slice(0, 2500);
+  // Their saved details (name, email, phone, address, age) — every form uses them, never asks again.
+  const applicant = String(body?.applicantDetails ?? "").trim().slice(0, 800);
   // Recent things the user said in this chat (e.g. "open Zillow" two messages ago).
   const recent = (Array.isArray(body?.recentUserMessages) ? body.recentUserMessages : [])
     .map((m: unknown) => String(m ?? "").trim().slice(0, 400)).filter((m: string) => m).slice(-4);
@@ -478,6 +480,7 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     (recent.length ? `Recent chat from the user (oldest first), for context:\n- ${recent.join("\n- ")}\n` : "") +
     (prevTask ? `Context — the previous task in this same browser was: "${prevTask}".\n` : "") +
     (prevResult ? `What you found last time in this browser (go straight to these pages and links — do NOT search from scratch again):\n${prevResult}\n` : "") +
+    (applicant ? `THE USER'S DETAILS — type these into any form or application exactly as given and never stop to ask for them (use an account email/phone only if the task says they confirmed it): ${applicant}\n` : "") +
     `THE USER'S REQUEST NOW: ${task}` + ADVISOR_AGENT_RULES;
   // Visible mouse pointer in the live view (NGMY Agent Cursor extension, if uploaded).
   const cursorExt = await ensureCursorExtensionId();

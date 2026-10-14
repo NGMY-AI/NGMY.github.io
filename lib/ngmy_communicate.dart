@@ -19,6 +19,8 @@ import 'ngmy_advisor_portraits.dart';
 import 'ngmy_advisor_push.dart';
 import 'ngmy_advisor_roster.dart';
 import 'ngmy_advisor_live_agent.dart';
+import 'ngmy_advisor_shared_profile.dart';
+import 'ngmy_advisor_message_frames.dart';
 import 'ngmy_advisor_web_eyes.dart';
 import 'ngmy_phone_action_ui.dart';
 import 'ngmy_ai_app_bridge.dart';
@@ -3750,6 +3752,64 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       return '';
     }
   }
+
+  /// Lasting details they told any advisor (shared by all advisors on this account).
+  NgmySharedProfile _shared = const NgmySharedProfile({});
+  String get _applicantDetails => _shared.detailsLine(accountEmail: _email, accountPhone: _accountPhone);
+
+  /// Picks their own name / email / phone / address / age out of what they just wrote.
+  Future<void> _learnSharedDetails(NgmyAiCredentials creds, String text) async {
+    String askedBefore = '';
+    for (final m in _messages.reversed) {
+      if (m['role'] == 'ai' && (m['text'] ?? '').trim().isNotEmpty) {
+        askedBefore = m['text']!.trim();
+        break;
+      }
+    }
+    if (!ngmyTextMayHoldPersonalDetails(text, askedBefore: askedBefore)) return;
+    final convo = '${askedBefore.isEmpty ? '' : 'Advisor asked: ${askedBefore.length > 500 ? askedBefore.substring(0, 500) : askedBefore}\n'}They wrote: $text';
+    try {
+      final r = await ngmyAiGenerateCommunicateFast(creds, ngmySharedProfileExtractPrompt(convo), budget: const Duration(seconds: 10));
+      final found = ngmyParseSharedProfileJson((r.text ?? '').trim());
+      if (found != null) _shared = await NgmySharedProfileStore.merge(_email, found);
+    } catch (e) {
+      debugPrint('[communicate] learn details: $e');
+    }
+  }
+
+  /// Once per account: read what they already told every advisor before this existed, so
+  /// nobody asks for their name or address again.
+  Future<void> _scanHistoryForSharedDetails(NgmyAiCredentials creds) async {
+    if (_email.isEmpty || await NgmySharedProfileStore.scannedHistory(_email)) return;
+    await NgmySharedProfileStore.markScanned(_email);
+    try {
+      final snippets = <String>[];
+      for (final p in ngmyCommunicateProfilesFromConfig(widget.config)) {
+        final rows = await NgmyCommunicateMemoryStore.load(_email, p.id, hydrateRecent: 0);
+        var asked = '';
+        for (final m in rows) {
+          final t = '${m['text'] ?? ''}'.trim();
+          if (t.isEmpty) continue;
+          if (m['role'] == 'ai') {
+            asked = t;
+            continue;
+          }
+          if (m['role'] == 'user' && ngmyTextMayHoldPersonalDetails(t, askedBefore: asked)) {
+            final a = asked.length > 240 ? asked.substring(asked.length - 240) : asked;
+            snippets.add('${a.isEmpty ? '' : 'Advisor asked: $a\n'}They wrote: ${t.length > 400 ? t.substring(0, 400) : t}');
+          }
+        }
+      }
+      if (snippets.isEmpty) return;
+      final recent = snippets.length > 40 ? snippets.sublist(snippets.length - 40) : snippets;
+      final r = await ngmyAiGenerateCommunicateFast(creds, ngmySharedProfileExtractPrompt(recent.join('\n---\n')),
+          budget: const Duration(seconds: 20));
+      final found = ngmyParseSharedProfileJson((r.text ?? '').trim());
+      if (found != null) _shared = await NgmySharedProfileStore.merge(_email, found);
+    } catch (e) {
+      debugPrint('[communicate] scan details: $e');
+    }
+  }
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
   bool get _isBoss => ngmyIsNgmyBoss(isAdmin: _isAdmin);
   String get _bossDisplayName {
@@ -3822,6 +3882,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     );
     final promiseBlock = await NgmyCommunicatePromiseStore.promptBlock(_email, widget.profile.id);
     if (promiseBlock.trim().isNotEmpty) buf.writeln(promiseBlock);
+    final knownBlock = ngmySharedProfilePromptBlock(_shared, accountEmail: _email, accountPhone: _accountPhone);
+    if (knownBlock.isNotEmpty) buf.writeln(knownBlock);
     if (ngmyAdvisorWritesDailyQuotes(name: widget.profile.name, id: widget.profile.id) ||
         (_isBoss && ngmyAdvisorIsBossPersonalHelper(name: widget.profile.name, id: widget.profile.id))) {
       final focusBlock = await NgmyCommunicateFocusStore.promptBlock(_email, widget.profile.id);
@@ -3924,6 +3986,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(NgmySharedProfileStore.load(_email).then((p) => _shared = p));
     ngmyRegisterAiAppTools(
       context: () => context,
       userEmail: _email,
@@ -4718,7 +4781,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     final recent = _messages
         .where((m) => (m['text'] ?? '').trim().isNotEmpty && (m['kind'] ?? '').isEmpty)
         .toList();
-    final tail = recent.length > 10 ? recent.sublist(recent.length - 10) : recent;
+    final tail = recent.length > 20 ? recent.sublist(recent.length - 20) : recent;
     final chat = tail
         .map((m) => '${m['role'] == 'user' ? 'Them' : ngmyAdvisorFirstName(widget.profile.name)}: ${(m['text'] ?? '').replaceAll('\n', ' ')}')
         .join('\n');
@@ -4729,10 +4792,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           advisorName: widget.profile.name,
           request: request,
           recentChat: chat,
-          accountDetails: [
-            if (_email.isNotEmpty) 'email $_email',
-            if (_accountPhone.isNotEmpty) 'phone $_accountPhone',
-          ].join(', '),
+          knownDetails: _applicantDetails,
+          missingDetails: _shared.missing(),
         ),
         budget: const Duration(seconds: 14),
       );
@@ -5064,6 +5125,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       task: plan.task.isNotEmpty ? plan.task : request,
       startUrl: plan.url.isNotEmpty ? plan.url : null,
       recentUserMessages: tail,
+      applicantDetails: _applicantDetails,
     );
     if (started != NgmyAgentStartResult.started) return false;
     unawaited(_savePendingAgentRun());
@@ -5418,6 +5480,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
     try {
       final creds = ngmyParseAiCredentials(apiKey);
+      // Their name / email / phone / address / age — learned once, known by every advisor.
+      unawaited(_scanHistoryForSharedDetails(creds));
+      await _learnSharedDetails(creds, text);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       // Dating is decided by the SERVER for all users: professional by default, one partner per
       // advisor, only when they clearly ask, 30 days of silence = breakup, 1-year wait, 2 chances.
@@ -5578,6 +5643,7 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           task: taskText,
           startUrl: startUrl,
           recentUserMessages: recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser,
+          applicantDetails: _applicantDetails,
         );
         if (started == NgmyAgentStartResult.started) {
           unawaited(_savePendingAgentRun());
@@ -6167,7 +6233,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                           ),
                         ),
                       if (msgText.isNotEmpty)
-                        Text(msgText, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white)),
+                        user
+                            ? Text(msgText, style: const TextStyle(fontSize: 14, height: 1.45, color: Colors.white))
+                            : NgmyFramedMessageText(msgText, hasButtons: (m['options'] ?? '').toString().isNotEmpty),
                       if (!user && _isTextCoach && msgText.trim().isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
