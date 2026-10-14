@@ -89,8 +89,32 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _payEarnedOnLeave();
     NgmyGameSession.leavePlayScreen();
     super.dispose();
+  }
+
+  /// Left mid-game: whatever was earned so far still goes to their balance (the stake is
+  /// already spent). Nothing earned → nothing paid, the stake is lost.
+  void _payEarnedOnLeave() {
+    if (_over) return;
+    _over = true;
+    final ratio = _total <= 0 ? 0.0 : (_done / _total).clamp(0.0, 1.0);
+    if (ratio <= 0) return;
+    final payout = double.parse((_prize * ratio).toStringAsFixed(2));
+    if (payout < 0.01) return;
+    widget.user.totalProfit += payout - widget.wager * ratio;
+    widget.onAddTransaction(AppTransaction(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      userEmail: widget.user.email,
+      amount: payout,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Game partial: ${widget.gameTitle} ($_done/$_total, left early)',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+    ));
+    widget.onDataChanged();
   }
 
   Future<void> _settle({bool complete = false, String reason = ''}) async {

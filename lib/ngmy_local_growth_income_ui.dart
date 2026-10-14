@@ -96,7 +96,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   /// that number; it never overwrites it with its own copy.
   void _adoptAppBalance() {
     final user = _user;
-    final live = widget.liveUser.accountBalance.clamp(0.0, double.infinity);
+    // Still loading ($0)? Show the balance saved on this phone instead of making it vanish.
+    final live = ngmyBalanceOrRemembered(widget.liveUser.email, widget.liveUser.accountBalance.clamp(0.0, double.infinity));
     if (user != null) user.accountBalance = live;
     _alignedBase = live;
     if (user != null) ngmySeedLiveBalance(user.email, live, allowIncrease: true);

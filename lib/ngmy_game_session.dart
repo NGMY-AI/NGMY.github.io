@@ -18,8 +18,7 @@ void _ngmyWriteLiveBalance(String email, double balance, {required bool allowInc
   if (!allowIncrease) {
     final prev = ngmyLiveBalanceCache.value[key];
     if (prev != null && balance > prev + 0.001) balance = prev;
-  }
-  final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
+  }  final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
   next[key] = balance;
   ngmyLiveBalanceCache.value = next;
   // Kept on the phone so the next launch shows this money instantly.
@@ -44,13 +43,22 @@ void ngmySyncLiveBalanceFor(String email, double balance, {bool allowIncrease = 
   ngmyNotifyBalanceChanged(email: email, balance: balance, allowIncrease: allowIncrease);
 }
 
+/// While the account is still loading, a $0 balance is just "not loaded yet" — show the money
+/// this phone last saw instead, so the balance never disappears and can be used right away.
+/// Only fills in a $0; it never raises a real balance.
+double ngmyBalanceOrRemembered(String email, double balance) {
+  if (ngmyUserWalletLedgerSettled || balance > 0.009) return balance;
+  final remembered = NgmyWalletMemory.balanceOf(_ngmyEmailKey(email));
+  return remembered != null && remembered > 0 ? remembered : balance;
+}
+
 double ngmyLiveBalanceFor(String email, {double Function()? fallback}) {
   final key = _ngmyEmailKey(email);
   if (key.isNotEmpty) {
     final cached = ngmyLiveBalanceCache.value[key];
-    if (cached != null) return cached;
+    if (cached != null) return ngmyBalanceOrRemembered(key, cached);
   }
-  return fallback?.call() ?? 0.0;
+  return ngmyBalanceOrRemembered(key, fallback?.call() ?? 0.0);
 }
 
 Listenable get ngmyLiveBalanceListenable =>

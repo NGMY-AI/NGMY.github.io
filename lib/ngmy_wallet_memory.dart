@@ -79,7 +79,8 @@ class NgmyWalletMemory {
 
   static void _scheduleSave() {
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 400), () async {
+    // Saved right away — closing the app a moment after a win or bet must not lose it.
+    _saveTimer = Timer(Duration.zero, () async {
       try {
         final p = await SharedPreferences.getInstance();
         await p.setString(_key, jsonEncode(_byEmail));

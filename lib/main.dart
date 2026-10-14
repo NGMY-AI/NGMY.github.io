@@ -925,7 +925,7 @@ double ngmyResolveAccountBalance(
   // Until the account's full history has downloaded, the phone only holds
   // part of it — adding that part up gave $0 or too little, and replaced the
   // real (saved / cloud) balance. Keep the saved balance until then.
-  if (!ngmyUserWalletLedgerSettled) return stored;
+  if (!ngmyUserWalletLedgerSettled) return ngmyBalanceOrRemembered(key, stored);
   final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
   if (txnCount == 0) return stored;
   return ngmyBalanceFromApprovedTransactions(email, transactions);
@@ -5537,6 +5537,8 @@ Future<bool> _pushUserBalanceToCloud(
   final email = u.email.trim();
   if (email.isEmpty) return false;
   final local = u.accountBalance.clamp(0.0, double.infinity);
+  // A $0 from an account that hasn't finished loading must never be saved over real money.
+  if (ngmyBalanceOrRemembered(email, local) > local + 0.009) return false;
   try {
     // A caller with ledger history for this person already knows `local`
     // is authoritative (it's what ngmyResolveAccountBalance/
@@ -14669,6 +14671,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     final userKey = ngmyNormalizeEmail(t.userEmail);
                     final userIdx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == userKey);
                     if (userIdx != -1) {
+                      // Still loading ($0 here) — start from the balance saved on this phone,
+                      // so a bet or win right after opening the app uses the real money.
+                      _allUsers[userIdx].accountBalance =
+                          ngmyBalanceOrRemembered(userKey, _allUsers[userIdx].accountBalance);
                       if (_ngmyIsClockInSessionStartTransaction(t)) {
                         _ngmyReconcileClockInSession(_allUsers[userIdx], _allTransactions);
                       } else if ((t.sourceDetails ?? '')
@@ -20719,6 +20725,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
   void dispose() {
     if (_isMultiplayer && !_won) {
       unawaited(_leaveMultiplayerGate());
+    } else if (!_won) {
+      _payEarnedOnLeave();
     }
     NgmyGameSession.leavePlayScreen();
     _simonPlayGen++;
@@ -21542,6 +21550,36 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       subtitle: partialSubtitle,
     );
     await ngmyNotifyGameWin(widget.gameTitle, partialSubtitle);
+  }
+
+  /// Left mid-game: what they earned so far still goes to their balance (the stake is already
+  /// spent). Nothing earned → nothing paid, the stake is lost.
+  void _payEarnedOnLeave() {
+    if (_won) return;
+    _won = true;
+    int done, total;
+    try {
+      done = _gameProgressDone();
+      total = _gameProgressTotal();
+    } catch (_) {
+      return;
+    }
+    if (total <= 0 || done <= 0) return;
+    final ratio = (done / total).clamp(0.0, 1.0);
+    final payout = double.parse((widget.wager * 1.46 * ratio).toStringAsFixed(2));
+    if (payout < 0.01) return;
+    widget.user.totalProfit += payout - widget.wager * ratio;
+    widget.onAddTransaction(AppTransaction(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      userEmail: widget.user.email,
+      amount: payout,
+      type: TransactionType.reimbursement,
+      method: PaymentMethod.system,
+      sourceDetails: 'Game partial: ${widget.gameTitle} ($done/$total, left early)',
+      status: TransactionStatus.approved,
+      timestamp: DateTime.now(),
+    ));
+    widget.onDataChanged();
   }
 
   Future<void> _gameLose({String reason = 'Try again next time!', String? outcomeLabel}) async {
