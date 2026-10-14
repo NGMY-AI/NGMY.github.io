@@ -3782,6 +3782,71 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
 
   bool _scanningDetails = false;
 
+  /// An application waiting for them to confirm the details it will use.
+  ({String task, String? url})? _pendingConfirm;
+  DateTime? _detailsConfirmedAt;
+
+  /// Filling an application / form with their details → confirm them first (once every few hours).
+  bool _needsDetailsConfirm(String task) {
+    if (!RegExp(r'\b(apply|application|sign ?up|register|enroll|fill (it |the form |out|in)|form)\b', caseSensitive: false).hasMatch(task)) {
+      return false;
+    }
+    // Searching for openings first ("Do not apply yet") isn't filling anything in.
+    if (RegExp(r"do not apply|don'?t apply|not apply yet", caseSensitive: false).hasMatch(task)) return false;
+    final at = _detailsConfirmedAt;
+    if (at != null && DateTime.now().difference(at) < const Duration(hours: 3)) return false;
+    return _applicantDetails.isNotEmpty;
+  }
+
+  /// "Here's what I'll put on it" — one line per detail so each shows in its own frame.
+  String _detailsConfirmText({bool updated = false}) {
+    final p = _shared;
+    final phone = p['phone'].isNotEmpty ? p['phone'] : _accountPhone;
+    final email = p['email'].isNotEmpty ? p['email'] : _email;
+    final lines = <String>[
+      if (p['first_name'].isNotEmpty) '• First name: ${p['first_name']}',
+      if (p['last_name'].isNotEmpty) '• Last name: ${p['last_name']}',
+      if (phone.isNotEmpty) '• Phone: $phone',
+      if (email.isNotEmpty) '• Email: $email',
+      if (p.address.isNotEmpty) '• Home address: ${p.address}',
+      if (p.currentAge.isNotEmpty) '• Age: ${p.currentAge}',
+      if (p['availability'].isNotEmpty) '• Availability: ${p['availability']}',
+    ];
+    final missing = p.missing().where((m) => !(m == 'email' && email.isNotEmpty) && !(m == 'phone number' && phone.isNotEmpty)).toList();
+    return '${updated ? 'Updated! Here\'s what I have now:' : 'Before I fill it out, here\'s what I have for you:'}\n'
+        '${lines.join('\n')}\n'
+        '${missing.isEmpty ? '' : 'I still don\'t have your ${missing.join(', ')} — tap Change something to add it.\n'}'
+        'Is everything correct?';
+  }
+
+  /// Opens the live browser for [task] (after they confirmed their details).
+  Future<bool> _startAgentTask(String task, String? url, int sendGen, String text) async {
+    final startUrl = url ?? (_agentRun.hasSession ? null : (_browserSession.url.isNotEmpty ? _browserSession.url : null));
+    final recentUser = _messages
+        .where((m) => m['role'] == 'user' && (m['text'] ?? '').trim().isNotEmpty)
+        .map((m) => m['text']!.trim())
+        .toList();
+    if (recentUser.isNotEmpty && recentUser.last == text) recentUser.removeLast();
+    final started = await _agentRun.start(
+      task: task,
+      startUrl: startUrl,
+      recentUserMessages: recentUser.length > 4 ? recentUser.sublist(recentUser.length - 4) : recentUser,
+      applicantDetails: _applicantDetails,
+    );
+    if (started == NgmyAgentStartResult.started) {
+      unawaited(_savePendingAgentRun());
+      if (_browserSession.visible) unawaited(_browserSession.hide());
+      return _deliverAiReply(sendGen: sendGen, text: 'Perfect — filling it out now in my browser. Watch me live below 👀');
+    }
+    return _deliverAiReply(
+      sendGen: sendGen,
+      text: started == NgmyAgentStartResult.failed
+          ? 'I tried to open my live browser but it didn\'t start (${_agentRun.startError}). Want me to try again?'
+          : 'My live browser isn\'t available right now. Want me to try again in a moment?',
+      options: const ['Try again'],
+    );
+  }
+
   /// Once per account: read what they already told every advisor before this existed, so
   /// nobody asks for their name or address again.
   Future<void> _scanHistoryForSharedDetails(NgmyAiCredentials creds) async {
@@ -5201,7 +5266,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       }
     }
     // Choices offered as buttons (read from the reply first, or passed in).
-    final choiceList = replyOptions.isNotEmpty ? replyOptions : options;
+    // None given? Offer the answer it already knows, the choices named in the question, or Yes/No.
+    final choiceList = replyOptions.isNotEmpty
+        ? replyOptions
+        : (options.isNotEmpty
+            ? options
+            : ngmyInferReplyOptions(body, profile: _shared, accountPhone: _accountPhone, accountEmail: _email));
     final optionsText = choiceList.join('|');
     if (body.isEmpty && lookups.isNotEmpty) body = 'Let me check that for you.';
 
@@ -5564,6 +5634,33 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       // Thanks, love, laughs, "ok"… are conversation — never a reason to open the browser.
       final chitChat = ngmyUserMessageIsChitChat(text) || ngmyUserMessageIsShortChatPing(text);
       if (_webDraft.isNotEmpty && ngmyUserCancelsWebTask(text)) _webDraft = '';
+      // Waiting for them to confirm the details an application will use.
+      final pending = _pendingConfirm;
+      if (pending != null && webAllowed) {
+        if (ngmyUserCancelsWebTask(text) || RegExp(r'^\s*(no,? )?(cancel|stop|forget it)\b', caseSensitive: false).hasMatch(text)) {
+          _pendingConfirm = null;
+        } else if (ngmyConfirmsDetails(text)) {
+          _pendingConfirm = null;
+          _detailsConfirmedAt = DateTime.now();
+          // Account email/phone they just approved become their saved ones.
+          _shared = await NgmySharedProfileStore.merge(_email, {
+            if (_shared['email'].isEmpty && _email.isNotEmpty) 'email': _email,
+            if (_shared['phone'].isEmpty && _accountPhone.isNotEmpty) 'phone': _accountPhone,
+          });
+          deliveredOk = await _startAgentTask(pending.task, pending.url, sendGen, text);
+          return;
+        } else if (RegExp(r'^\s*(change something|no\b|not (right|correct)|wrong)', caseSensitive: false).hasMatch(text)) {
+          deliveredOk = await _deliverAiReply(
+            sendGen: sendGen,
+            text: 'No problem — what should I change? Just type the right one (for example "Phone: 478-555-1234").',
+          );
+          return;
+        } else {
+          // They typed a correction — it was saved above; show the updated list to confirm.
+          deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(updated: true), options: const ['Yes, use these', 'Change something']);
+          return;
+        }
+      }
       var agentTask = (webAllowed && !chitChat)
           ? ngmyAdvisorAgentTaskIntent(
               text,
@@ -5589,13 +5686,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final formQuestion = _agentRun.pendingQuestion;
       final answeringForm = webAllowed && _agentRun.awaitingAnswer && !ngmyUserCancelsWebTask(text);
       // "Use a different number / email" isn't the answer yet — ask for it, the form keeps waiting.
-      final differentOne = RegExp(r'^\s*use a different (number|phone|email|one)\s*$', caseSensitive: false).firstMatch(text);
+      final differentOne = ngmyDifferentOneRequest(text);
       if (answeringForm && differentOne != null) {
-        final what = differentOne.group(1)!.toLowerCase() == 'email' ? 'email' : 'number';
-        deliveredOk = await _deliverAiReply(
-          sendGen: sendGen,
-          text: what == 'email' ? 'Sure — what email should I put on it?' : 'Sure — what\'s the best number to put on it?',
-        );
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: differentOne);
         return;
       }
       if (answeringForm) agentTask = (url: null, continuing: true);
@@ -5668,6 +5761,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           plannedUrl = plan.url.isNotEmpty ? plan.url : null;
           agentTask = (url: agentTask?.url ?? plannedUrl, continuing: false);
         }
+      }
+      // An application/form is about to be filled with their saved details — show them all
+      // (each in its own frame) and let them confirm first, to be safe.
+      if (agentTask != null && !agentTask.continuing && _needsDetailsConfirm(plannedTask ?? text)) {
+        _pendingConfirm = (task: plannedTask ?? text, url: agentTask.url);
+        deliveredOk = await _deliverAiReply(sendGen: sendGen, text: _detailsConfirmText(), options: const ['Yes, use these', 'Change something']);
+        return;
       }
       if (agentTask != null) {
         final continuing = agentTask.continuing;

@@ -118,7 +118,9 @@ List<NgmyMessagePart> ngmySplitMessageIntoFrames(String text, {bool hasButtons =
     final sentences = line.trim().split(_sentenceSplit);
     for (final s in sentences) {
       final q = s.trim();
-      final worth = q.endsWith('?') && q.length >= 18 && q.length <= 260;
+      // "…do first? ❤️" still counts — trailing emojis don't hide a question.
+      final core = q.replaceAll(RegExp(r'[\s\p{So}\p{Sk}\p{Cs}‍️]+$', unicode: true), '');
+      final worth = core.endsWith('?') && core.length >= 6 && core.length <= 320;
       if (worth) {
         flushPlain();
         parts.add(NgmyMessagePart(q, frame: ngmyQuestionFrameFor(q, hasButtons: hasButtons)));

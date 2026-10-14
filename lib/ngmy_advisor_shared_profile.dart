@@ -243,3 +243,87 @@ String ngmySharedProfilePromptBlock(NgmySharedProfile p, {String accountEmail = 
       'Use these naturally (call them by first name). NEVER ask for any of them again. For an application or form, use them as they are. '
       'Only details marked "not confirmed yet" need a quick "is this still the best one?".\n';
 }
+
+/// The last question in an advisor's message, if it asks one.
+String ngmyLastQuestion(String text) {
+  final qs = RegExp(r'[^.!?\n]*\?').allMatches(text).map((m) => m.group(0)!.trim()).where((q) => q.length > 3).toList();
+  return qs.isEmpty ? '' : qs.last;
+}
+
+/// Buttons for a question the advisor asked when it didn't give any: the answer it already
+/// knows (their phone, email, name, city, address, age), the choices named in the question
+/// ("mornings or evenings?"), or Yes / No for a yes-or-no question. Empty for open questions.
+List<String> ngmyInferReplyOptions(
+  String reply, {
+  NgmySharedProfile profile = const NgmySharedProfile({}),
+  String accountPhone = '',
+  String accountEmail = '',
+}) {
+  final q = ngmyLastQuestion(reply);
+  if (q.isEmpty) return const [];
+  final l = q.toLowerCase();
+  final yesNo = RegExp(r'^(?:\W*(?:so|and|ok(?:ay)?|also|then|great|perfect|alright)[, ]+)*'
+          r'(are|is|am|do|does|did|have|has|had|can|could|will|would|should|shall|may|were|was|want me to|ready)\b')
+      .hasMatch(l);
+  final asksFor = !yesNo || RegExp(r'\b(is (this|that|it) (still )?(the|your) best|still (good|right|correct))\b').hasMatch(l);
+  String known(String v) => v.trim();
+  if (asksFor) {
+    final phone = known(profile['phone'].isNotEmpty ? profile['phone'] : accountPhone);
+    final email = known(profile['email'].isNotEmpty ? profile['email'] : accountEmail);
+    if (RegExp(r'\b(phone|cell|mobile|number)\b').hasMatch(l) && !RegExp(r'\b(how many|what number of)\b').hasMatch(l)) {
+      return [if (phone.isNotEmpty) 'Use $phone', 'A different number'];
+    }
+    if (RegExp(r'\be-?mail\b').hasMatch(l)) return [if (email.isNotEmpty) 'Use $email', 'A different email'];
+    if (RegExp(r'\b(your|legal|full|first|last) name\b').hasMatch(l) && profile.fullName.isNotEmpty) {
+      return [profile.fullName, 'A different name'];
+    }
+    if (RegExp(r'\b(address|where do you live)\b').hasMatch(l) && profile.address.isNotEmpty) {
+      return [profile.address, 'A different address'];
+    }
+    if (RegExp(r'\b(which|what) (city|area|town)|\bwhere (are you|should i look)|\bnear you\b').hasMatch(l) &&
+        profile['city'].isNotEmpty) {
+      final city = [profile['city'], profile['state']].where((s) => s.isNotEmpty).join(', ');
+      return [city, 'Somewhere else'];
+    }
+    if (RegExp(r'\b(how old|your age)\b').hasMatch(l) && profile.currentAge.isNotEmpty) {
+      return [profile.currentAge, 'Different age'];
+    }
+  }
+  // "…mornings, afternoons or evenings?" → the named choices.
+  final tail = RegExp(r'(?:—|–|-|:|,|\b(?:prefer|choose|pick|want|like|rather|be|is it|go with|for))\s+([^—:]+?)\?$', caseSensitive: false)
+      .allMatches(q)
+      .map((m) => m.group(1)!)
+      .lastOrNull;
+  if (tail != null && RegExp(r'\bor\b', caseSensitive: false).hasMatch(tail)) {
+    final parts = tail
+        .split(RegExp(r',\s*(?:or\s+)?|\s+or\s+', caseSensitive: false))
+        .map((s) => s.replaceAll(RegExp(r'^(a|an|the)\s+', caseSensitive: false), '').trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (parts.length >= 2 && parts.length <= 5 && parts.every((p) => p.split(' ').length <= 4 && p.length <= 32)) {
+      return [for (final p in parts) p[0].toUpperCase() + p.substring(1)];
+    }
+  }
+  if (yesNo && !RegExp(r'\bor\b').hasMatch(l)) return const ['Yes', 'No'];
+  return const [];
+}
+
+/// "Yes, use these" / "correct" / "looks good" — they approve the details shown.
+bool ngmyConfirmsDetails(String text) => RegExp(
+      r"^\s*(yes|yeah|yep|yup|correct|right|that'?s (right|correct|it)|all (good|correct|right)|looks (good|right)|"
+      r"use (these|them|it|those)|perfect|good|ok(ay)?|confirm(ed)?|go ahead|sure)\b",
+      caseSensitive: false,
+    ).hasMatch(text);
+
+/// "A different number / email / name / address" — not the answer yet: ask for the new one.
+String? ngmyDifferentOneRequest(String text) {
+  final m = RegExp(r'^\s*(?:use )?a different (number|phone|email|one|name|address|age)\s*$', caseSensitive: false).firstMatch(text);
+  if (m == null) return null;
+  return switch (m.group(1)!.toLowerCase()) {
+    'email' => 'Sure — what email should I put on it?',
+    'name' => 'Sure — what name should I use (first and last)?',
+    'address' => 'Sure — what address should I use (street, city, ZIP)?',
+    'age' => 'Sure — how old are you?',
+    _ => 'Sure — what\'s the best number to put on it?',
+  };
+}

@@ -360,7 +360,8 @@ const ADVISOR_AGENT_RULES =
   "- The user is watching this browser live and can tap into it at any time. Work quickly and finish the job.\n" +
   "- SPEED: take the shortest path. Go straight to the right URL when you can (e.g. a site's search-results URL " +
   "with the query in it) instead of clicking through menus. Don't re-check things you already saw. Read the page " +
-  "content you need in one go, then finish — no extra browsing once you have the answer.\n" +
+  "content you need in one go, then finish — no extra browsing once you have the answer. On forms, fill several fields " +
+  "in one step when you can, skip optional fields nobody gave you, and don't scroll just to look around.\n" +
   "- DO EXACTLY WHAT WAS ASKED. If the user named a website (e.g. Zillow), use THAT site — search it with its own " +
   "search box. If it blocks you (CAPTCHA, 'press and hold', access denied), say so plainly instead of silently " +
   "switching; you may then add what you found on another reputable site, labeled as such. If no site was named, " +
@@ -496,10 +497,6 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   });
   const payload: Record<string, unknown> = {
     task: fullTask,
-    // Browser Use's own fast browsing preset first (quick, smooth steps); if this account
-    // can't use it, the same default model with LOW reasoning effort (the default "high"
-    // made the pointer sit still for 5-10 s between actions).
-    model: "bu-fast",
     maxCostUsd: 0.75,
     browserSettings: freshBrowser(),
   };
@@ -507,12 +504,15 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
     payload.sessionId = sessionId;
     delete payload.browserSettings; // continuing an existing browser
   }
-  // This account can't use the fast preset → don't even try (every failed try used to look
-  // like a dead browser and threw the session away, opening a NEW paid browser each time).
-  if (agentFastUnsupported) {
-    payload.model = "gpt-6-luna";
-    payload.modelParams = { reasoning: { effort: "low" } };
-  }
+  // Fastest model this account accepts (rejected ones are skipped for good — every failed try
+  // used to look like a dead browser and opened a NEW paid browser each time).
+  const useModel = (i: number) => {
+    const m = AGENT_MODELS[Math.min(i, AGENT_MODELS.length - 1)];
+    payload.model = m.model;
+    if (m.modelParams) payload.modelParams = m.modelParams;
+    else delete payload.modelParams;
+  };
+  useModel(agentModelIdx);
   const post = () => browserUseFetch("/runs", { method: "POST", body: JSON.stringify(payload) });
   const ok = (s: number) => s === 200 || s === 201;
   const sessionGone = (res: { status: number; data: any }) => {
@@ -522,10 +522,15 @@ async function handleAgentStart(req: Request, body: any): Promise<Response> {
   };
   let r = await post();
   // 1) Model settings rejected → change the model only; keep the same browser session.
-  if (!ok(r.status) && (r.status === 400 || r.status === 403 || r.status === 422) && payload.model === "bu-fast" && !sessionGone(r)) {
-    agentFastUnsupported = true;
-    payload.model = "gpt-6-luna";
-    payload.modelParams = { reasoning: { effort: "low" } };
+  // Only a complaint about the model moves on to the next one (not e.g. an extension error).
+  const modelRefused = (res: { status: number; data: any }) =>
+    (res.status === 403 || /model|reasoning|thinking|preset|early.?access|not (available|allowed|enabled)|unsupported/i
+      .test(JSON.stringify(res.data ?? "")));
+  while (!ok(r.status) && (r.status === 400 || r.status === 403 || r.status === 422) && !sessionGone(r) &&
+    modelRefused(r) && agentModelIdx < AGENT_MODELS.length - 1) {
+    console.log("[agent] model refused", payload.model, r.status);
+    agentModelIdx++;
+    useModel(agentModelIdx);
     r = await post();
   }
   if (!ok(r.status) && (r.status === 400 || r.status === 422) && payload.model && !sessionGone(r)) {
@@ -684,7 +689,16 @@ async function ensureCursorExtensionId(): Promise<string> {
 // stream crashes the web app): one small JPEG of the current screen per request. ──
 const agentCdpCache = new Map<string, { ws: string; at: number }>();
 const agentShotHits = new Map<string, { start: number; n: number }>();
-let agentFastUnsupported = false;
+// Fastest first. bu-fast is early-access (rejected on this account); Gemini 3.6 Flash with low
+// thinking is the quick everyday driver; GPT-6 Luna (low effort) is the careful fallback.
+// The first one Browser Use accepts is remembered so later tasks don't retry rejected ones.
+const AGENT_MODELS: { model: string; modelParams?: Record<string, unknown> }[] = [
+  { model: "bu-fast" },
+  { model: "gemini-3.6-flash", modelParams: { thinkingConfig: { thinkingLevel: "low" } } },
+  { model: "gemini-3.6-flash" },
+  { model: "gpt-6-luna", modelParams: { reasoning: { effort: "low" } } },
+];
+let agentModelIdx = 0;
 
 async function agentCdpWsUrl(sessionId: string): Promise<string> {
   const hit = agentCdpCache.get(sessionId);
