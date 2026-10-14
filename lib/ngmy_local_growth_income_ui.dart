@@ -525,6 +525,32 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     final user = _user;
     if (user == null) return;
 
+    // Games played from here (bets, payouts, partial wins) must land in the account's real
+    // transaction list. Before, they only lived in this wallet's own history, and every time the
+    // app re-added up the account's transactions the bets vanished — the stake looked "returned"
+    // and wins disappeared. The app applies the money; this wallet just follows its balance.
+    if (!cloudRequest && t.status == TransactionStatus.approved && ngmyIsGameLedgerTransaction(t)) {
+      widget.onCloudAddTransaction?.call(AppTransaction(
+        id: t.id,
+        userEmail: widget.liveUser.email,
+        amount: t.amount,
+        type: t.type,
+        method: t.method,
+        sourceDetails: t.sourceDetails,
+        status: t.status,
+        timestamp: t.timestamp,
+      ));
+      NgmyLocalGrowthIncomeStore.applyTransaction(user, t);
+      final live = ngmyLiveBalanceFor(widget.liveUser.email, fallback: () => widget.liveUser.accountBalance);
+      user.accountBalance = live;
+      widget.liveUser.accountBalance = live;
+      _alignedBase = live;
+      ngmySeedLiveBalance(user.email, live, allowIncrease: true);
+      if (mounted) setState(() => _transactions = [..._transactions, t]);
+      unawaited(_persist(bumpWalletRevision: bumpWalletRevision, syncBalance: false, allowDecrease: true));
+      return;
+    }
+
     if (cloudRequest) {
       final forCloud = AppTransaction(
         id: t.id,

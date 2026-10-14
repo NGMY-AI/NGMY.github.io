@@ -225,6 +225,8 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
                       ],
                     ),
                   ),
+                  NgmyGameBalanceChip(userEmail: widget.user.email, fallback: () => widget.user.accountBalance),
+                  const SizedBox(width: 6),
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),

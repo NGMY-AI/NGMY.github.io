@@ -175,7 +175,8 @@ class NgmyLocalGrowthIncomeStore {
   /// Immediate first frame so Growth Income never shows a spinner.
   static UserData previewUser(UserData live) {
     final user = _freshUser(live.email, live);
-    user.accountBalance = live.accountBalance.clamp(0.0, double.infinity);
+    // Still loading ($0)? Start from the balance saved on this phone so it never shows empty.
+    user.accountBalance = ngmyBalanceOrRemembered(live.email, live.accountBalance.clamp(0.0, double.infinity));
     user.totalProfit = live.totalProfit;
     final inv = live.activeInvestment;
     if (inv != null) {

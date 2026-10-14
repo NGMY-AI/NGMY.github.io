@@ -21651,6 +21651,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
                         style: const TextStyle(color: Colors.white70, fontSize: 9),
                       ),
                     ),
+                    NgmyGameBalanceChip(userEmail: widget.user.email, fallback: () => widget.user.accountBalance),
+                    const SizedBox(width: 8),
                     const Icon(Icons.timer_outlined, color: Colors.white70, size: 13),
                     const SizedBox(width: 4),
                     Text(timerText, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12)),

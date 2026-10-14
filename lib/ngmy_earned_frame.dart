@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_game_session.dart';
+
 /// The middle frame in every money game: what you have made so far, with the
 /// stake and the full prize either side.
 class NgmyEarnedSoFar extends StatelessWidget {
@@ -44,6 +46,37 @@ class NgmyEarnedSoFar extends StatelessWidget {
             ),
           ),
           side('FULL WIN', '\$${prize.toStringAsFixed(2)}', const Color(0xFFFDE68A)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Small frame next to the countdown: the player's account balance, live.
+class NgmyGameBalanceChip extends StatelessWidget {
+  const NgmyGameBalanceChip({super.key, required this.userEmail, required this.fallback});
+  final String userEmail;
+  final double Function() fallback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(99),
+        gradient: const LinearGradient(colors: [Color(0xFF065F46), Color(0xFF047857)]),
+        border: Border.all(color: const Color(0xFF6EE7B7).withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.account_balance_wallet_rounded, color: Color(0xFFA7F3D0), size: 13),
+          const SizedBox(width: 4),
+          NgmyLiveBalance(
+            userEmail: userEmail,
+            fallback: fallback,
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12),
+          ),
         ],
       ),
     );
