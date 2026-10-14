@@ -1052,10 +1052,12 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     const glassGreen = Color(0xFF2EF6A3);
     // Only finished things: a clock-in shows when it completes (with its earnings), never when
     // the session merely starts.
-    final recent = transactions
-        .where((t) => !(t.sourceDetails ?? '').toLowerCase().contains('clock-in session started') && t.amount != 0)
-        .take(3)
-        .toList();
+    // Live Activity = completed clock-ins, deposits and withdrawals only (no games, no starts).
+    final recent = transactions.where((t) {
+      final d = (t.sourceDetails ?? '').toLowerCase();
+      if (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) return true;
+      return t.amount != 0 && (d.contains('clock-in daily earnings') || d.contains('clock-in earnings'));
+    }).take(3).toList();
     final active = user.activeInvestment;
     final now = DateTime.now();
     final clockedIn = user.isClockedIn;
@@ -2588,6 +2590,8 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
     final details = (t.sourceDetails ?? '').toLowerCase();
     if (details.contains('clock-in session started')) return false;
     if (t.type == TransactionType.contribution) return false;
+    // Games have their own receipts in the Game Center — the wallet shows normal transactions only.
+    if (ngmyIsGameLedgerTransaction(t)) return false;
     if (t.type == TransactionType.deposit || t.type == TransactionType.withdrawal) return true;
     if (t.type == TransactionType.adminAdd || t.type == TransactionType.adminRemove) return true;
     if (t.type == TransactionType.claim) return true;

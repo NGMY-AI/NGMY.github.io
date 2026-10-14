@@ -115,6 +115,14 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
       timestamp: DateTime.now(),
     ));
     widget.onDataChanged();
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: true,
+      amount: payout,
+      stake: widget.wager,
+      detail: 'Left early · +\$${payout.toStringAsFixed(2)} ($_done/$_total)',
+    ));
   }
 
   Future<void> _settle({bool complete = false, String reason = ''}) async {
@@ -126,6 +134,7 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
       unawaited(NgmyGameNotifications.record(
         email: widget.user.email,
         gameTitle: widget.gameTitle,
+        stake: widget.wager,
         won: false,
         amount: widget.wager,
         detail: reason.isEmpty ? 'No progress' : reason,
@@ -163,6 +172,7 @@ class _NgmyArcadePlayScreenState extends State<NgmyArcadePlayScreen> {
     unawaited(NgmyGameNotifications.record(
       email: widget.user.email,
       gameTitle: widget.gameTitle,
+        stake: widget.wager,
       won: true,
       amount: payout,
       detail: subtitle,

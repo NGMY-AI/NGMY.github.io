@@ -21322,6 +21322,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     unawaited(NgmyGameNotifications.record(
       email: widget.user.email,
       gameTitle: widget.gameTitle,
+      stake: widget.wager,
       won: true,
       amount: payout,
       detail: winSubtitle,
@@ -21492,6 +21493,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     unawaited(NgmyGameNotifications.record(
       email: widget.user.email,
       gameTitle: widget.gameTitle,
+      stake: widget.wager,
       won: true,
       amount: totalPayout,
       detail: subtitle,
@@ -21538,6 +21540,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     unawaited(NgmyGameNotifications.record(
       email: widget.user.email,
       gameTitle: widget.gameTitle,
+      stake: widget.wager,
       won: true,
       amount: payout,
       detail: partialSubtitle,
@@ -21580,6 +21583,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
       timestamp: DateTime.now(),
     ));
     widget.onDataChanged();
+    unawaited(NgmyGameNotifications.record(
+      email: widget.user.email,
+      gameTitle: widget.gameTitle,
+      won: true,
+      amount: payout,
+      stake: widget.wager,
+      detail: 'Left early · +\$${payout.toStringAsFixed(2)} ($done/$total)',
+    ));
   }
 
   Future<void> _gameLose({String reason = 'Try again next time!', String? outcomeLabel}) async {
@@ -21591,6 +21602,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     unawaited(NgmyGameNotifications.record(
       email: widget.user.email,
       gameTitle: widget.gameTitle,
+      stake: widget.wager,
       won: false,
       amount: widget.wager,
       detail: reason,

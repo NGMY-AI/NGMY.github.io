@@ -455,6 +455,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
       unawaited(NgmyGameNotifications.record(
         email: widget.userEmail,
         gameTitle: 'Dice Roll',
+        stake: wager,
         won: false,
         amount: wager,
         detail: 'Better luck on the next roll! ($label)',

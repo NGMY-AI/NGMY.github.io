@@ -6,16 +6,25 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_db_relay.dart';
+import 'ngmy_game_session.dart';
 import 'ngmy_network_resilience.dart';
 
-const int kNgmyGameNotificationMax = 300;
-const Duration kNgmyGameNotificationRetention = Duration(days: 90);
+/// Game receipts are kept for good (the user wants every one). A very high cap only guards
+/// the phone's storage.
+const int kNgmyGameNotificationMax = 5000;
+/// Kept for the "today" badge and old callers; receipts themselves no longer expire.
+const Duration kNgmyGameNotificationRetention = Duration(days: 36500);
 const Duration _kGameReceiptCloudTimeout = Duration(seconds: 12);
 
 /// Bumped when game win/lose receipts change (Game Center badge).
 final ValueNotifier<int> ngmyGameNotificationsTick = ValueNotifier<int>(0);
 
-String _emailKey(String email) => email.toLowerCase().trim();
+/// Growth Income's copy ("you@x.com+local.ngmy") plays with the same account — its receipts
+/// belong with the account's, so they never seem to vanish when switching between the two.
+String _emailKey(String email) {
+  final k = email.toLowerCase().trim();
+  return k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+}
 
 String _prefsKey(String email) => 'ngmy_game_notifications_${_emailKey(email)}';
 
@@ -29,6 +38,10 @@ class NgmyGameNotification {
   final String detail;
   final DateTime timestamp;
   final String? txnId;
+  /// What was bet, and the account balance before and after the game.
+  final double? stake;
+  final double? balanceBefore;
+  final double? balanceAfter;
 
   const NgmyGameNotification({
     required this.id,
@@ -38,10 +51,20 @@ class NgmyGameNotification {
     required this.detail,
     required this.timestamp,
     this.txnId,
+    this.stake,
+    this.balanceBefore,
+    this.balanceAfter,
   });
 
   String get _mergeKey =>
       (txnId != null && txnId!.trim().isNotEmpty) ? 'txn:${txnId!.trim()}' : 'id:${id.trim()}';
+
+  /// Net result of the game for the balance (payout minus stake), when the stake is known.
+  double? get net {
+    final s = stake;
+    if (s == null) return null;
+    return won ? amount - s : -s;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -51,6 +74,9 @@ class NgmyGameNotification {
         'detail': detail,
         'timestamp': timestamp.toUtc().toIso8601String(),
         if (txnId != null && txnId!.isNotEmpty) 'txnId': txnId,
+        if (stake != null) 'stake': stake,
+        if (balanceBefore != null) 'balanceBefore': balanceBefore,
+        if (balanceAfter != null) 'balanceAfter': balanceAfter,
       };
 
   factory NgmyGameNotification.fromJson(Map<String, dynamic> json) {
@@ -62,6 +88,7 @@ class NgmyGameNotification {
         at = d.isUtc ? d.toLocal() : d;
       } catch (_) {}
     }
+    double? n(Object? v) => v is num ? v.toDouble() : double.tryParse('${v ?? ''}');
     return NgmyGameNotification(
       id: (json['id'] ?? '').toString(),
       gameTitle: (json['gameTitle'] ?? 'Game').toString(),
@@ -70,21 +97,18 @@ class NgmyGameNotification {
       detail: (json['detail'] ?? '').toString(),
       timestamp: at,
       txnId: json['txnId']?.toString(),
+      stake: n(json['stake']),
+      balanceBefore: n(json['balanceBefore']),
+      balanceAfter: n(json['balanceAfter']),
     );
   }
 }
 
 class NgmyGameNotifications {
-  /// Keep newest first. Drop expired rows and anything past [kNgmyGameNotificationMax]
-  /// so the oldest notification is deleted completely (local + cloud on save).
+  /// Newest first; only a very high cap (receipts don't expire).
   static List<NgmyGameNotification> _prune(List<NgmyGameNotification> items) {
-    final cutoff = DateTime.now().subtract(kNgmyGameNotificationRetention);
-    final fresh = items.where((e) => !e.timestamp.isBefore(cutoff)).toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    if (fresh.length > kNgmyGameNotificationMax) {
-      return fresh.sublist(0, kNgmyGameNotificationMax);
-    }
-    return fresh;
+    final sorted = List<NgmyGameNotification>.from(items)..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return sorted.length > kNgmyGameNotificationMax ? sorted.sublist(0, kNgmyGameNotificationMax) : sorted;
   }
 
   static List<NgmyGameNotification> _mergeReceiptLists(
@@ -99,10 +123,23 @@ class NgmyGameNotifications {
         byKey[key] = n;
         return;
       }
-      // Keep the original receipt time (earliest timestamp wins).
-      if (n.timestamp.isBefore(existing.timestamp)) {
-        byKey[key] = n;
-      }
+      // Keep the original receipt time, and whichever copy knows the balances.
+      final keep = n.timestamp.isBefore(existing.timestamp) ? n : existing;
+      final other = identical(keep, n) ? existing : n;
+      byKey[key] = keep.balanceAfter != null || other.balanceAfter == null
+          ? keep
+          : NgmyGameNotification(
+              id: keep.id,
+              gameTitle: keep.gameTitle,
+              won: keep.won,
+              amount: keep.amount,
+              detail: keep.detail,
+              timestamp: keep.timestamp,
+              txnId: keep.txnId,
+              stake: keep.stake ?? other.stake,
+              balanceBefore: other.balanceBefore,
+              balanceAfter: other.balanceAfter,
+            );
     }
 
     for (final n in a) {
@@ -114,11 +151,7 @@ class NgmyGameNotifications {
     return byKey.values.toList();
   }
 
-  static Future<List<NgmyGameNotification>> _loadRaw(String email) async {
-    final key = _emailKey(email);
-    if (key.isEmpty) return [];
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey(key));
+  static List<NgmyGameNotification> _decode(String? raw) {
     if (raw == null || raw.trim().isEmpty) return [];
     try {
       final decoded = jsonDecode(raw);
@@ -132,12 +165,24 @@ class NgmyGameNotifications {
     }
   }
 
-  static Future<List<NgmyGameNotification>> _loadFromCloud(String email) async {
+  static Future<List<NgmyGameNotification>> _loadRaw(String email) async {
     final key = _emailKey(email);
     if (key.isEmpty) return [];
-    if (!await ngmyCanReachCloud()) return [];
+    final prefs = await SharedPreferences.getInstance();
+    final mine = _decode(prefs.getString(_prefsKey(key)));
+    // Receipts saved earlier under Growth Income's copy move in with the account's.
+    final oldKey = 'ngmy_game_notifications_$key+local.ngmy';
+    final old = _decode(prefs.getString(oldKey));
+    if (old.isEmpty) return mine;
+    final merged = _prune(_mergeReceiptLists(mine, old));
+    await prefs.setString(_prefsKey(key), jsonEncode(merged.map((e) => e.toJson()).toList()));
+    await prefs.remove(oldKey);
+    return merged;
+  }
+
+  static Future<List<NgmyGameNotification>> _fetchCloudKey(String settingsKey) async {
     try {
-      final value = await ngmyDbRelaySettingsFetchRaw(_cloudSettingsKey(key), timeout: _kGameReceiptCloudTimeout);
+      final value = await ngmyDbRelaySettingsFetchRaw(settingsKey, timeout: _kGameReceiptCloudTimeout);
       if (value is! List) return [];
       return value
           .whereType<Map>()
@@ -149,14 +194,27 @@ class NgmyGameNotifications {
     }
   }
 
+  static Future<List<NgmyGameNotification>> _loadFromCloud(String email) async {
+    final key = _emailKey(email);
+    if (key.isEmpty) return [];
+    if (!await ngmyCanReachCloud()) return [];
+    final mine = await _fetchCloudKey(_cloudSettingsKey(key));
+    // Plus the ones saved in the cloud under Growth Income's copy.
+    final old = await _fetchCloudKey('ngmy_game_receipts_$key+local.ngmy');
+    return old.isEmpty ? mine : _mergeReceiptLists(mine, old).toList();
+  }
+
+  /// Adds to the cloud copy instead of replacing it — another phone's receipts are never wiped.
   static Future<void> _pushToCloud(String email, List<NgmyGameNotification> items) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
     if (!await ngmyCanReachCloud()) return;
     try {
+      final cloud = await _fetchCloudKey(_cloudSettingsKey(key));
+      final merged = _prune(_mergeReceiptLists(items, cloud));
       await ngmyDbRelaySettingsUpsertRaw(
         _cloudSettingsKey(key),
-        items.map((e) => e.toJson()).toList(),
+        merged.map((e) => e.toJson()).toList(),
         timeout: _kGameReceiptCloudTimeout,
       );
     } catch (e) {
@@ -218,6 +276,8 @@ class NgmyGameNotifications {
     }
   }
 
+  /// Saves a receipt. Call right after the game's payout (or loss) was applied: the balance
+  /// "after" is read now, and "before" is worked out from the stake and the payout.
   static Future<void> record({
     required String email,
     required String gameTitle,
@@ -226,9 +286,17 @@ class NgmyGameNotifications {
     required String detail,
     String? txnId,
     DateTime? at,
+    double? stake,
+    double? balanceAfter,
   }) async {
     final key = _emailKey(email);
     if (key.isEmpty) return;
+    // Read the balance before any await, while it is exactly the after-game figure.
+    final after = balanceAfter ?? (at == null ? ngmyLiveBalanceFor(key) : null);
+    double? before;
+    if (after != null && stake != null) {
+      before = won ? after - amount + stake : after + stake;
+    }
     final items = await _loadRaw(key);
     if (txnId != null && txnId.isNotEmpty && items.any((e) => e.txnId == txnId)) return;
     final when = at ?? DateTime.now();
@@ -240,16 +308,18 @@ class NgmyGameNotifications {
       detail: detail,
       timestamp: when,
       txnId: txnId,
+      stake: stake,
+      balanceBefore: before,
+      balanceAfter: after,
     );
     items.insert(0, entry);
-    // _saveMerged → _prune drops the oldest when over max, then overwrites cloud.
     await _saveMerged(key, items);
   }
 
   static Future<int> countFor(String email) async {
     await syncFromCloud(email, force: false);
     final list = await listFor(email, syncCloud: false);
-    // Badge = today's results (receipts are now kept for 90 days).
+    // Badge = today's results.
     final since = DateTime.now().subtract(const Duration(hours: 24));
     return list.where((e) => e.timestamp.isAfter(since)).length;
   }
@@ -258,14 +328,11 @@ class NgmyGameNotifications {
     final key = _emailKey(email);
     if (key.isEmpty) return [];
     if (syncCloud) await syncFromCloud(email);
-    final raw = await _loadRaw(key);
-    final items = _prune(List<NgmyGameNotification>.from(raw));
-    if (items.length != raw.length) await _saveMerged(key, items);
-    return items;
+    return _prune(await _loadRaw(key));
   }
 }
 
-String ngmyNormalizeEmailForNotifications(String email) => email.toLowerCase().trim();
+String ngmyNormalizeEmailForNotifications(String email) => _emailKey(email);
 
 String ngmyFormatGameNotificationWhen(DateTime at) {
   final now = DateTime.now();
@@ -273,10 +340,17 @@ String ngmyFormatGameNotificationWhen(DateTime at) {
   if (diff.inMinutes < 1) return 'Just now';
   if (diff.inHours < 1) return '${diff.inMinutes}m ago';
   if (diff.inDays < 1) return '${diff.inHours}h ago';
-  if (diff.inDays < 5) return '${diff.inDays}d ago';
-  final m = at.month.toString().padLeft(2, '0');
-  final d = at.day.toString().padLeft(2, '0');
-  return '$m/$d ${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  final h = at.hour % 12 == 0 ? 12 : at.hour % 12;
+  return '${months[at.month - 1]} ${at.day}${at.year == now.year ? '' : ', ${at.year}'} · '
+      '$h:${at.minute.toString().padLeft(2, '0')} ${at.hour < 12 ? 'AM' : 'PM'}';
+}
+
+String _money(double v) {
+  final s = v.abs().toStringAsFixed(2);
+  final parts = s.split('.');
+  final whole = parts[0].replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
+  return '\$$whole.${parts[1]}';
 }
 
 Future<void> showNgmyGameReceiptSheet(
@@ -293,181 +367,240 @@ Future<void> showNgmyGameReceiptSheet(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (ctx) => ValueListenableBuilder<int>(
-        valueListenable: ngmyGameNotificationsTick,
-        builder: (ctx, _, _) => FutureBuilder<List<NgmyGameNotification>>(
+      valueListenable: ngmyGameNotificationsTick,
+      builder: (ctx, _, _) => FutureBuilder<List<NgmyGameNotification>>(
         future: NgmyGameNotifications.listFor(email, syncCloud: false),
         initialData: initial,
-        builder: (ctx, snap) {
-      final items = snap.data ?? initial;
-      final bottom = MediaQuery.paddingOf(ctx).bottom;
-      return Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.82),
-        decoration: const BoxDecoration(
-          color: Color(0xFF2B1454),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+        builder: (ctx, snap) => _NgmyGameReceiptsSheet(items: snap.data ?? initial),
+      ),
+    ),
+  );
+}
+
+class _NgmyGameReceiptsSheet extends StatelessWidget {
+  const _NgmyGameReceiptsSheet({required this.items});
+  final List<NgmyGameNotification> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    final wins = items.where((e) => e.won).length;
+    final nets = items.map((e) => e.net).whereType<double>();
+    final net = nets.fold<double>(0, (a, b) => a + b);
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.88),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E1036), Color(0xFF120A22)]),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 10),
+          Container(width: 42, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 8, 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    gradient: const LinearGradient(colors: [Color(0xFFA855F7), Color(0xFF6366F1)]),
+                    boxShadow: [BoxShadow(color: const Color(0xFFA855F7).withValues(alpha: 0.45), blurRadius: 14)],
+                  ),
+                  child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Game Receipts', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19)),
+                      Text('Every game you play · kept for good', style: TextStyle(color: Colors.white60, fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded, color: Colors.white70)),
+              ],
             ),
+          ),
+          if (items.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 14, 12, 8),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
               child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF5C3B8A),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Game Receipts',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
-                        ),
-                        Text(
-                          'Your wins & losses · kept for 90 days',
-                          style: const TextStyle(color: Colors.white60, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                  ),
+                  _summary('GAMES', '${items.length}', const Color(0xFFC4B5FD)),
+                  const SizedBox(width: 8),
+                  _summary('WON', '$wins', const Color(0xFF6EE7B7)),
+                  const SizedBox(width: 8),
+                  _summary('NET', '${net >= 0 ? '+' : '-'}${_money(net)}', net >= 0 ? const Color(0xFF6EE7B7) : const Color(0xFFFCA5A5)),
                 ],
               ),
             ),
-            const Divider(height: 1, color: Colors.white12),
-            if (items.isEmpty)
-              Padding(
-                padding: EdgeInsets.fromLTRB(24, 36, 24, 24 + bottom),
-                child: Column(
-                  children: [
-                    Icon(Icons.sports_esports_outlined, size: 48, color: Colors.white.withValues(alpha: 0.35)),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No game results yet',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Play skill games to see wins and losses here.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
-                    ),
-                  ],
-                ),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  padding: EdgeInsets.fromLTRB(14, 10, 14, 14 + bottom),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) {
-                    final n = items[i];
-                    final win = n.won;
-                    final accent = win ? const Color(0xFF22C55E) : const Color(0xFFEF4444);
-                    final amountLabel = win
-                        ? '+\$${n.amount.toStringAsFixed(2)}'
-                        : '-\$${n.amount.toStringAsFixed(2)}';
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3D2568),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: accent.withValues(alpha: 0.45)),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              win ? Icons.emoji_events_rounded : Icons.close_rounded,
-                              color: accent,
-                              size: 20,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        n.gameTitle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      amountLabel,
-                                      style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 13),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  win ? 'You won' : 'You lost',
-                                  style: TextStyle(
-                                    color: accent.withValues(alpha: 0.95),
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                if (n.detail.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    n.detail,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11),
-                                  ),
-                                ],
-                                const SizedBox(height: 4),
-                                Text(
-                                  ngmyFormatGameNotificationWhen(n.timestamp),
-                                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+          if (items.isEmpty)
+            Padding(
+              padding: EdgeInsets.fromLTRB(24, 36, 24, 24 + bottom),
+              child: Column(
+                children: [
+                  Icon(Icons.sports_esports_outlined, size: 52, color: Colors.white.withValues(alpha: 0.35)),
+                  const SizedBox(height: 12),
+                  Text('No game receipts yet', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  Text('Play a game and its receipt shows up here.',
+                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13)),
+                ],
               ),
-          ],
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                padding: EdgeInsets.fromLTRB(14, 2, 14, 16 + bottom),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (_, i) => _NgmyGameReceiptCard(n: items[i]),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _summary(String label, String value, Color color) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.35)),
+          ),
+          child: Column(
+            children: [
+              Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              const SizedBox(height: 2),
+              FittedBox(child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15))),
+            ],
+          ),
         ),
       );
-    })),
-  );
+}
+
+class _NgmyGameReceiptCard extends StatelessWidget {
+  const _NgmyGameReceiptCard({required this.n});
+  final NgmyGameNotification n;
+
+  @override
+  Widget build(BuildContext context) {
+    final partial = n.won && n.detail.toLowerCase().contains('%') ||
+        n.won && n.stake != null && n.amount < n.stake!;
+    final label = !n.won ? 'LOST' : (partial ? 'PARTIAL WIN' : 'WON');
+    final accent = !n.won
+        ? const Color(0xFFF87171)
+        : (partial ? const Color(0xFFFBBF24) : const Color(0xFF34D399));
+    final net = n.net;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.16), const Color(0xFF241542)],
+        ),
+        border: Border.all(color: accent.withValues(alpha: 0.45)),
+        boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.12), blurRadius: 14, offset: const Offset(0, 5))],
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: accent.withValues(alpha: 0.18), border: Border.all(color: accent.withValues(alpha: 0.6))),
+                child: Icon(n.won ? Icons.emoji_events_rounded : Icons.close_rounded, color: accent, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(n.gameTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                    Text(ngmyFormatGameNotificationWhen(n.timestamp),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(99)),
+                    child: Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 9.5, letterSpacing: 0.8)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    net != null ? '${net >= 0 ? '+' : '-'}${_money(net)}' : '${n.won ? '+' : '-'}${_money(n.amount)}',
+                    style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _frame('STAKE', n.stake != null ? _money(n.stake!) : '—', Colors.white),
+              const SizedBox(width: 6),
+              _frame('PAID BACK', n.won ? _money(n.amount) : _money(0), accent),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              _frame('BALANCE BEFORE', n.balanceBefore != null ? _money(n.balanceBefore!) : '—', const Color(0xFFC4B5FD)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Icon(Icons.arrow_forward_rounded, color: Colors.white.withValues(alpha: 0.5), size: 16),
+              ),
+              _frame('BALANCE AFTER', n.balanceAfter != null ? _money(n.balanceAfter!) : '—', const Color(0xFF93C5FD)),
+            ],
+          ),
+          if (n.detail.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(n.detail, maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 11)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static Widget _frame(String label, String value, Color color) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.8)),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 14)),
+              ),
+            ],
+          ),
+        ),
+      );
 }
