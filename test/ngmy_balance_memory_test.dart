@@ -15,4 +15,13 @@ void main() {
     ngmyUserWalletLedgerSettled = true;
     expect(ngmyBalanceOrRemembered('a@b.com', 0), 0); // after loading, $0 is real
   });
+
+  test("Growth Income's copy always shows the account balance and can't overwrite it", () {
+    ngmyUserWalletLedgerSettled = true;
+    ngmySeedLiveBalance('me@x.com', 952.51);
+    ngmySeedLiveBalance('me@x.com+local.ngmy', 962.51); // a stale copy — ignored
+    expect(ngmyLiveBalanceFor('me@x.com+local.ngmy'), 952.51);
+    ngmySeedLiveBalance('me@x.com', 941.68); // bet $12, won $1.17
+    expect(ngmyLiveBalanceFor('Me@x.com+local.ngmy'), 941.68);
+  });
 }

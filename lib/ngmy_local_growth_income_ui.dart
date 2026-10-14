@@ -94,10 +94,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   /// The app's account balance is the one real wallet — it already holds every
   /// in-app movement (clock-in, games, fees, admin top-ups). Growth Income shows
   /// that number; it never overwrites it with its own copy.
+  /// The account's balance right now — the app's live figure, not a copy that may be stale.
+  double get _appBalance => ngmyLiveBalanceFor(widget.liveUser.email, fallback: () => widget.liveUser.accountBalance)
+      .clamp(0.0, double.infinity)
+      .toDouble();
+
   void _adoptAppBalance() {
     final user = _user;
     // Still loading ($0)? Show the balance saved on this phone instead of making it vanish.
-    final live = ngmyBalanceOrRemembered(widget.liveUser.email, widget.liveUser.accountBalance.clamp(0.0, double.infinity));
+    final live = _appBalance;
+    widget.liveUser.accountBalance = live;
     if (user != null) user.accountBalance = live;
     _alignedBase = live;
     if (user != null) ngmySeedLiveBalance(user.email, live, allowIncrease: true);
@@ -109,7 +115,7 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
   /// app meanwhile is never lost or double-counted.
   void _publishAppBalance(double balance, {required bool allowDecrease}) {
     final bal = ngmyGrowthIncomeAppliedBalance(
-      appBalance: widget.liveUser.accountBalance,
+      appBalance: _appBalance,
       alignedBase: _alignedBase,
       growthIncomeBalance: balance,
       allowDecrease: allowDecrease,
@@ -1097,14 +1103,19 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _topMetricCard(
-                    icon: Icons.account_balance_rounded,
-                    iconColor: const Color(0xFF6366F1),
-                    title: 'Balance',
-                    value: '\$${formatCurrency(user.accountBalance)}',
-                    valueColor: const Color(0xFF60A5FA),
-                    card: card,
-                    onTap: onOpenWallet,
+                  // Live: redraws the moment the balance loads or changes (it used to stay
+                  // empty until you left and came back).
+                  child: ListenableBuilder(
+                    listenable: ngmyLiveBalanceListenable,
+                    builder: (context, _) => _topMetricCard(
+                      icon: Icons.account_balance_rounded,
+                      iconColor: const Color(0xFF6366F1),
+                      title: 'Balance',
+                      value: '\$${formatCurrency(ngmyLiveBalanceFor(user.email, fallback: () => user.accountBalance))}',
+                      valueColor: const Color(0xFF60A5FA),
+                      card: card,
+                      onTap: onOpenWallet,
+                    ),
                   ),
                 ),
               ],
@@ -2108,8 +2119,9 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      '\$${formatCurrency(widget.user.accountBalance)}',
+                    child: NgmyLiveBalance(
+                      userEmail: widget.user.email,
+                      fallback: () => widget.user.accountBalance,
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38, letterSpacing: -0.8, height: 1.05),
                     ),
                   ),

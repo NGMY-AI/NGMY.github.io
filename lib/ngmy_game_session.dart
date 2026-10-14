@@ -3,7 +3,14 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_wallet_memory.dart';
 
-String _ngmyEmailKey(String email) => email.toLowerCase().trim();
+/// Growth Income's own copy ("you@x.com+local.ngmy") spends the same money as the account,
+/// so its balance is always the account's balance — one number everywhere, never a stale copy.
+String _ngmyEmailKey(String email) {
+  final k = email.toLowerCase().trim();
+  return k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+}
+
+bool _ngmyIsGrowthIncomeCopy(String email) => email.toLowerCase().trim().endsWith('+local.ngmy');
 final ValueNotifier<int> ngmyBalanceTick = ValueNotifier<int>(0);
 
 /// Authoritative live balance per user email (lowercase). Updated on every ledger change.
@@ -13,6 +20,9 @@ final ValueNotifier<Map<String, double>> ngmyLiveBalanceCache = ValueNotifier<Ma
 bool ngmyUserWalletLedgerSettled = false;
 
 void _ngmyWriteLiveBalance(String email, double balance, {required bool allowIncrease}) {
+  // Growth Income's own running figure can lag behind (it showed $962.51 when the account had
+  // $952.51) — only the account itself sets the balance; Growth Income just reads it.
+  if (_ngmyIsGrowthIncomeCopy(email)) return;
   final key = _ngmyEmailKey(email);
   if (key.isEmpty) return;
   if (!allowIncrease) {
