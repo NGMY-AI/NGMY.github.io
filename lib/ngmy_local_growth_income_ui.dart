@@ -1050,7 +1050,12 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     final card = isDark ? const Color(0xFF1C1C1E) : const Color(0xFF1C1C1E);
     final muted = Colors.white.withValues(alpha: 0.58);
     const glassGreen = Color(0xFF2EF6A3);
-    final recent = transactions.take(3).toList();
+    // Only finished things: a clock-in shows when it completes (with its earnings), never when
+    // the session merely starts.
+    final recent = transactions
+        .where((t) => !(t.sourceDetails ?? '').toLowerCase().contains('clock-in session started') && t.amount != 0)
+        .take(3)
+        .toList();
     final active = user.activeInvestment;
     final now = DateTime.now();
     final clockedIn = user.isClockedIn;
@@ -1427,14 +1432,20 @@ class _LocalGrowthHomeTab extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(t.sourceDetails?.trim().isNotEmpty == true ? t.sourceDetails!.trim() : t.type.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w800)),
+                Text(ngmyActivityTitle(t), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w800)),
                 Text(_formatTxnDateTime(t.timestamp), style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          Text(
-            '${isDebit ? '-' : '+'}\$${formatCurrency(t.amount)}',
-            style: TextStyle(color: color, fontWeight: FontWeight.w900),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${isDebit ? '-' : '+'}\$${formatCurrency(t.amount)}',
+                style: TextStyle(color: color, fontWeight: FontWeight.w900),
+              ),
+              Text(ngmyBankStatusLabel(t), style: TextStyle(color: muted, fontSize: 10, fontWeight: FontWeight.w700)),
+            ],
           ),
         ],
       ),
@@ -2561,7 +2572,7 @@ class _LocalWalletTabState extends State<_LocalWalletTab> {
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(99)),
                 child: Text(
-                  approved ? 'Done' : (pending ? 'Pending' : 'Rejected'),
+                  ngmyBankStatusLabel(t),
                   style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 9.5),
                 ),
               ),
@@ -2624,4 +2635,35 @@ class _CardChipLinesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CardChipLinesPainter old) => false;
+}
+
+/// Status words like a bank app: money in → "Received", a deposit → "Completed", a withdrawal →
+/// "Sent", a payment or bet → "Successful"; "Processing" while waiting, "Declined" if refused.
+String ngmyBankStatusLabel(AppTransaction t) {
+  if (t.status == TransactionStatus.pending) return 'Processing';
+  if (t.status == TransactionStatus.rejected) return 'Declined';
+  switch (t.type) {
+    case TransactionType.deposit:
+      return 'Completed';
+    case TransactionType.withdrawal:
+      return 'Sent';
+    case TransactionType.adminAdd:
+    case TransactionType.reimbursement:
+    case TransactionType.claim:
+      return 'Received';
+    case TransactionType.adminRemove:
+    case TransactionType.contribution:
+      return 'Successful';
+  }
+}
+
+/// A short, clear title for the Live Activity list.
+String ngmyActivityTitle(AppTransaction t) {
+  final d = (t.sourceDetails ?? '').trim();
+  final l = d.toLowerCase();
+  if (l.contains('clock-in daily earnings') || l.contains('clock-in earnings')) return 'Clock-in completed';
+  if (l.contains('crown daily reward')) return 'Crown daily reward';
+  if (t.type == TransactionType.deposit) return 'Deposit';
+  if (t.type == TransactionType.withdrawal) return 'Withdrawal';
+  return d.isNotEmpty ? d : t.type.name;
 }
