@@ -34,14 +34,14 @@ final RegExp _agentAction = RegExp(
 final RegExp _agentSelfContained = RegExp(
   r"\b(apply|application|enroll|admissions?|register for|sign up for|book (a|an|my)|order (a|an|my|some))\b"
   // (A car VIN is answered straight from the government records in chat — no browser needed.)
-  r"|\b(open (it |that |this )?live|live browser|use (the|your) (live )?browser|search (it|this|that) (out|up)|look (it|this|that) up)\b",
+  r"|\b(open (it |that |this )?live|live (browser|computer|screen)|(open|use) (the|your) (live )?(browser|computer)|search (it|this|that) (out|up)|look (it|this|that) up)\b",
   caseSensitive: false,
 );
 /// "Find me information about X" style requests — a lookup the live browser can do.
 final RegExp _agentLookup = RegExp(
   r"\b(look (it |this |that )?up|find out|search (it|this|that) (out|up)|(all )?(the )?info(rmation)? (about|on|for)|"
   r"details (about|on|for)|history (of|for|on)|tell me (everything|all) about|open (it |that |this )?live|"
-  r"live browser|use (the|your) (live )?browser)\b",
+  r"live (browser|computer|screen)|(open|use) (the|your) (live )?(browser|computer))\b",
   caseSensitive: false,
 );
 final RegExp _agentWebContext = RegExp(
@@ -139,6 +139,10 @@ String ngmyAdvisorWebTaskPlanPrompt({
     '("First name: …, Last name: …, Email: …, Phone: …, Address: …, Age: …, Availability: …") so the browser never has to ask again. '
     'It pauses only for things nobody could have guessed (like a yes/no eligibility question).\n'
     '- NEVER ask the same question twice. If the recent chat shows they already answered it, use that answer.\n'
+    '- If they say continue, go ahead, do it, apply, start, or "open the live computer/browser", set ready=true NOW with the best '
+    'task from everything known (e.g. "Go to the company\'s official careers site, find open <role> jobs near <city>, pick the closest '
+    'one and fill the application with these details: …"). Never answer that with another question.\n'
+    '- Once you have what you asked for, set ready=true — never reply "I\'ll put that together" with ready=false.\n'
     '- Write in plain, simple, everyday words — no form jargon.\n'
     '- Clear requests that already say what and where ("apply for the cashier job at the Burger King on Pio Nono Ave", '
     '"check flights to Miami on Delta") skip to the matching step.\n'
@@ -177,9 +181,25 @@ bool ngmyMessageMightBeWebTask(String text) {
 bool ngmyAdvisorReplyClaimsBrowsing(String reply) => RegExp(
       r"(keep an eye on|watch|check) (the|my) (browser|screen)|in the browser below|"
       r"\bi'?m (now )?(searching|looking|putting|typing|checking|pulling up|opening|browsing|heading to|going to)\b.{0,60}\b(now|site|website|browser|page|careers|search)\b|"
-      r"\b(searching|looking) (for )?(that|it|those|them) (up )?now\b",
+      r"\b(searching|looking) (for )?(that|it|those|them) (up )?now\b|"
+      r"\b(i'?ll|i will|let me) (get|put) (that|it|this|everything|them)( all)? (put together|done|submitted|started|going|filled( out)?|sent)\b|"
+      r"\b(i'?ll|i will|let me) (submit|fill( out)?|send|start) (it|that|the application|your application|everything)\b|"
+      r"\bopening (the|my|your) live (computer|browser|screen)\b|\bthe live (computer|browser) is (now )?open\b",
       caseSensitive: false,
     ).hasMatch(reply);
+
+/// "Go ahead / continue / open the live computer / apply now" — they want the advisor to DO it now,
+/// not ask more questions.
+bool ngmyUserSaysGo(String text) => RegExp(
+      r"^\s*(ok(ay)?[,!. ]*|yes[,!. ]*|please[,!. ]*)*(continue|keep going|go ahead|go on|proceed|start( it| now)?|do it( now)?|"
+      r"apply( now| for me)?|submit( it)?|let'?s go|let'?s do it|begin)\b"
+      r"|\b(open|start|use) (the |your |my )?(live )?(computer|browser|screen)\b|\blive (computer|browser)\b",
+      caseSensitive: false,
+    ).hasMatch(text);
+
+/// "Go ahead" that names the live computer itself — always means the browser.
+bool ngmyUserNamesLiveBrowser(String text) =>
+    RegExp(r"\b(live (computer|browser|screen)|(open|use|start) (the |your )?(computer|browser))\b", caseSensitive: false).hasMatch(text);
 
 // ── Run controller ─────────────────────────────────────────────────────────
 

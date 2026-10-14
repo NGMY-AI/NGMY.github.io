@@ -3766,6 +3766,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
         break;
       }
     }
+    // Address / email / phone / age / name read straight from the text — saved even if the AI is slow.
+    final quick = ngmyQuickDetails(text, askedBefore: askedBefore);
+    if (quick.isNotEmpty) _shared = await NgmySharedProfileStore.merge(_email, quick);
     if (!ngmyTextMayHoldPersonalDetails(text, askedBefore: askedBefore)) return;
     final convo = '${askedBefore.isEmpty ? '' : 'Advisor asked: ${askedBefore.length > 500 ? askedBefore.substring(0, 500) : askedBefore}\n'}They wrote: $text';
     try {
@@ -3777,11 +3780,13 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     }
   }
 
+  bool _scanningDetails = false;
+
   /// Once per account: read what they already told every advisor before this existed, so
   /// nobody asks for their name or address again.
   Future<void> _scanHistoryForSharedDetails(NgmyAiCredentials creds) async {
-    if (_email.isEmpty || await NgmySharedProfileStore.scannedHistory(_email)) return;
-    await NgmySharedProfileStore.markScanned(_email);
+    if (_email.isEmpty || _scanningDetails || await NgmySharedProfileStore.scannedHistory(_email)) return;
+    _scanningDetails = true;
     try {
       final snippets = <String>[];
       for (final p in ngmyCommunicateProfilesFromConfig(widget.config)) {
@@ -3794,20 +3799,30 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
             asked = t;
             continue;
           }
+          final quick = m['role'] == 'user' ? ngmyQuickDetails(t, askedBefore: asked) : const <String, String>{};
+          if (quick.isNotEmpty) _shared = await NgmySharedProfileStore.merge(_email, quick);
           if (m['role'] == 'user' && ngmyTextMayHoldPersonalDetails(t, askedBefore: asked)) {
             final a = asked.length > 240 ? asked.substring(asked.length - 240) : asked;
             snippets.add('${a.isEmpty ? '' : 'Advisor asked: $a\n'}They wrote: ${t.length > 400 ? t.substring(0, 400) : t}');
           }
         }
       }
-      if (snippets.isEmpty) return;
+      if (snippets.isEmpty) {
+        await NgmySharedProfileStore.markScanned(_email);
+        return;
+      }
       final recent = snippets.length > 40 ? snippets.sublist(snippets.length - 40) : snippets;
       final r = await ngmyAiGenerateCommunicateFast(creds, ngmySharedProfileExtractPrompt(recent.join('\n---\n')),
           budget: const Duration(seconds: 20));
       final found = ngmyParseSharedProfileJson((r.text ?? '').trim());
-      if (found != null) _shared = await NgmySharedProfileStore.merge(_email, found);
+      if (found != null) {
+        _shared = await NgmySharedProfileStore.merge(_email, found);
+        await NgmySharedProfileStore.markScanned(_email);
+      }
     } catch (e) {
       debugPrint('[communicate] scan details: $e');
+    } finally {
+      _scanningDetails = false;
     }
   }
   bool get _isAdmin => (widget.user as dynamic).isAdmin == true;
@@ -4806,8 +4821,9 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       final ready = j['ready'] == true;
       return (
         web: j['web'] != false,
-        // "Not ready" with nothing to ask would leave them hanging — then just start.
-        ready: ready || ask.trim().isEmpty,
+        // "Not ready" with nothing to ask ("Got it, I'll put that together") would leave them
+        // hanging — then just start.
+        ready: ready || ask.trim().isEmpty || (!ask.contains('?') && !ask.contains('•') && !ask.contains(':')),
         ask: ask,
         task: '${j['task'] ?? ''}'.trim(),
         url: '${j['url'] ?? ''}'.trim(),
@@ -4818,8 +4834,10 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       );
     } catch (e) {
       debugPrint('[communicate] web task plan: $e');
+      // The check failed — a clear task (a site, "apply…", "open the live computer") still starts.
       final namesSite = RegExp(r'https?://|\b[a-z0-9-]+\.(com|org|net|gov|edu|io|co)\b', caseSensitive: false).hasMatch(request);
-      return namesSite ? (web: true, ready: true, ask: '', task: request, url: '', options: const <String>[]) : null;
+      final clearTask = namesSite || ngmyAdvisorAgentTaskIntent(request) != null || ngmyUserNamesLiveBrowser(request);
+      return clearTask ? (web: true, ready: true, ask: '', task: request, url: '', options: const <String>[]) : null;
     }
   }
   Future<({String cleaned, String? error})> _generateAndCleanAdvisorReply({
@@ -5481,7 +5499,12 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
     try {
       final creds = ngmyParseAiCredentials(apiKey);
       // Their name / email / phone / address / age — learned once, known by every advisor.
-      unawaited(_scanHistoryForSharedDetails(creds));
+      final scan = _scanHistoryForSharedDetails(creds);
+      if (_webDraft.isNotEmpty || ngmyMessageMightBeWebTask(text) || ngmyUserSaysGo(text)) {
+        await scan; // a task is coming — know their details before planning it
+      } else {
+        unawaited(scan);
+      }
       await _learnSharedDetails(creds, text);
       final mem = await NgmyCommunicateMemoryStore.load(_email, widget.profile.id);
       // Dating is decided by the SERVER for all users: professional by default, one partner per
@@ -5592,12 +5615,26 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
           _webDraftAt = DateTime.now();
         }
       }
+      // "Continue" / "go ahead" / "open the live computer" about the task they were just setting up
+      // (e.g. the Kroger application) → do it now in the live browser, no more questions.
+      final saysGo = webAllowed && ngmyUserSaysGo(text) && !ngmyUserCancelsWebTask(text);
+      if (saysGo && agentTask?.continuing != true && _webDraft.isEmpty && !_agentRun.running) {
+        final recentTask = _agentRun.task.isNotEmpty &&
+            (ngmyUserNamesLiveBrowser(text) ||
+                (_agentRun.finishedAt != null && DateTime.now().difference(_agentRun.finishedAt!) < const Duration(hours: 6)) ||
+                _messages.reversed.take(16).any((m) => (m['text'] ?? '').contains(_agentRun.task)));
+        if (recentTask) {
+          _webDraft = 'Earlier browser task: ${_agentRun.task}';
+          _webDraftAt = DateTime.now();
+          agentTask = null;
+        }
+      }
       // They are answering the questions asked about a web task — think about it again with the answers.
-      final answeringDraft = agentTask == null &&
+      final answeringDraft = (agentTask == null || saysGo) &&
           webAllowed &&
           !chitChat &&
           _webDraft.isNotEmpty &&
-          DateTime.now().difference(_webDraftAt ?? DateTime(2000)) < const Duration(minutes: 20);
+          DateTime.now().difference(_webDraftAt ?? DateTime(2000)) < const Duration(hours: 3);
       // Anything that might be an online task ("find me a job at KFC") goes to the planner,
       // which asks the right first question or starts the browser — instead of normal chat
       // pretending to search.
@@ -5608,7 +5645,15 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       if ((agentTask != null && !agentTask.continuing) || answeringDraft || maybeTask) {
         final request = _webDraft.isEmpty ? text : '$_webDraft\nThen they answered: $text';
         final plan = await _planWebTask(creds, request);
-        if (plan == null || !plan.web) {
+        // They told it to go ("continue", "open the live computer") — it goes, even if the
+        // planner wanted to ask more or could not be reached.
+        final forceGo = saysGo && (answeringDraft || agentTask != null);
+        if (forceGo && (plan == null || !plan.web || !plan.ready)) {
+          _webDraft = '';
+          plannedTask = (plan?.task ?? '').isNotEmpty ? plan!.task : request;
+          plannedUrl = (plan?.url ?? '').isNotEmpty ? plan!.url : null;
+          agentTask = (url: agentTask?.url ?? plannedUrl, continuing: false);
+        } else if (plan == null || !plan.web) {
           // Not really a web job — normal chat.
           if (answeringDraft && plan != null) _webDraft = '';
           agentTask = null;

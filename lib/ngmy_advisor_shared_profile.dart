@@ -17,6 +17,7 @@ class NgmySharedProfile {
     'state': 'State',
     'zip': 'ZIP',
     'age': 'Age',
+    'availability': 'Availability',
   };
 
   final Map<String, String> values;
@@ -70,7 +71,7 @@ class NgmySharedProfile {
 
 class NgmySharedProfileStore {
   static String _key(String email) => 'ngmy_shared_profile_v1_${email.toLowerCase().trim()}';
-  static String _scannedKey(String email) => 'ngmy_shared_profile_scanned_v1_${email.toLowerCase().trim()}';
+  static String _scannedKey(String email) => 'ngmy_shared_profile_scanned_v2_${email.toLowerCase().trim()}';
 
   static Future<NgmySharedProfile> load(String email) async {
     if (email.trim().isEmpty) return const NgmySharedProfile({});
@@ -147,16 +148,80 @@ bool ngmyTextMayHoldPersonalDetails(String text, {String askedBefore = ''}) {
   }
   final a = askedBefore.toLowerCase();
   return t.length <= 400 &&
-      RegExp(r'\b(name|email|e-mail|phone|number|address|street|city|zip|age|how old|where do you live|details)\b').hasMatch(a);
+      RegExp(r'\b(name|email|e-mail|phone|number|address|street|city|zip|age|how old|where do you live|details|availability|available|days and hours)\b').hasMatch(a);
+}
+
+const _kStates = <String, String>{
+  'alabama': 'AL', 'alaska': 'AK', 'arizona': 'AZ', 'arkansas': 'AR', 'california': 'CA', 'colorado': 'CO',
+  'connecticut': 'CT', 'delaware': 'DE', 'florida': 'FL', 'georgia': 'GA', 'hawaii': 'HI', 'idaho': 'ID',
+  'illinois': 'IL', 'indiana': 'IN', 'iowa': 'IA', 'kansas': 'KS', 'kentucky': 'KY', 'louisiana': 'LA',
+  'maine': 'ME', 'maryland': 'MD', 'massachusetts': 'MA', 'michigan': 'MI', 'minnesota': 'MN',
+  'mississippi': 'MS', 'missouri': 'MO', 'montana': 'MT', 'nebraska': 'NE', 'nevada': 'NV',
+  'new hampshire': 'NH', 'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC',
+  'north dakota': 'ND', 'ohio': 'OH', 'oklahoma': 'OK', 'oregon': 'OR', 'pennsylvania': 'PA',
+  'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', 'tennessee': 'TN', 'texas': 'TX',
+  'utah': 'UT', 'vermont': 'VT', 'virginia': 'VA', 'washington': 'WA', 'west virginia': 'WV',
+  'wisconsin': 'WI', 'wyoming': 'WY',
+};
+
+final _streetRe = RegExp(
+  r"\b(\d{1,6}\s+(?:[A-Za-z0-9.'-]+\s+){0,4}(?:St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court|Hwy|Highway|Cir|Circle|Pkwy|Parkway|Pl|Place|Trl|Trail|Ter|Terrace)\.?"
+  r"(?:,?\s*(?:Apt|Apartment|Unit|Suite|Ste|#)\.?\s*[\w-]+)?)"
+  r"(?:,?\s+([A-Za-z][A-Za-z .'-]{1,30}?),?\s+([A-Za-z]{2}|[A-Za-z]+(?:\s[A-Za-z]+)?)\.?,?\s*(\d{5})?)?\b",
+  caseSensitive: false,
+);
+
+/// Details read straight from the text (no AI needed): an address, an email or phone they were
+/// asked for, an age, or a name given right after being asked for it.
+Map<String, String> ngmyQuickDetails(String text, {String askedBefore = ''}) {
+  final out = <String, String>{};
+  final t = text.trim();
+  final l = t.toLowerCase();
+  final a = askedBefore.toLowerCase();
+  final aboutThemselves = !RegExp(r"\b(my (mom|mother|dad|father|wife|husband|friend|sister|brother|boss|son|daughter)|his|her|their)\b").hasMatch(l);
+  if (!aboutThemselves) return out;
+  final street = _streetRe.firstMatch(t);
+  if (street != null) {
+    out['street'] = street.group(1)!.trim();
+    final city = street.group(2)?.trim() ?? '';
+    final st = street.group(3)?.trim() ?? '';
+    final stAbbr = st.length == 2 ? st.toUpperCase() : (_kStates[st.toLowerCase()] ?? '');
+    if (city.isNotEmpty && stAbbr.isNotEmpty) {
+      out['city'] = city;
+      out['state'] = stAbbr;
+    }
+    if ((street.group(4) ?? '').isNotEmpty) out['zip'] = street.group(4)!;
+  }
+  final email = RegExp(r'[\w.+-]+@[\w-]+\.[\w.]+').firstMatch(t)?.group(0);
+  if (email != null && (RegExp(r'\be-?mail\b').hasMatch(a) || RegExp(r'\bmy e-?mail\b').hasMatch(l) || t.length <= 60)) {
+    out['email'] = email;
+  }
+  final phone = RegExp(r'(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}').firstMatch(t)?.group(0);
+  if (phone != null && (RegExp(r'\b(phone|number|cell)\b').hasMatch(a) || RegExp(r'\bmy (phone|number|cell)\b').hasMatch(l) || t.length <= 30)) {
+    out['phone'] = phone.trim();
+  }
+  final age = RegExp(r"\b(?:i'?m|i am|age:?|aged)\s*(\d{2})\b(?:\s*(?:years|yrs|y/o))?").firstMatch(l)?.group(1) ??
+      (RegExp(r'\b(age|how old)\b').hasMatch(a) ? RegExp(r'^\s*(\d{2})\s*$').firstMatch(l)?.group(1) : null);
+  if (age != null) out['age'] = age;
+  final named = RegExp(r"\bmy (?:legal |full )?name is ([A-Za-z'-]+)\s+([A-Za-z'-]+)", caseSensitive: false).firstMatch(t);
+  if (named != null) {
+    out['first_name'] = named.group(1)!;
+    out['last_name'] = named.group(2)!;
+  } else if (RegExp(r'\bname\b').hasMatch(a) && RegExp(r"^\s*([A-Za-z'-]{2,})\s+([A-Za-z'-]{2,})\s*[.!]?\s*$").hasMatch(t)) {
+    final m = RegExp(r"^\s*([A-Za-z'-]{2,})\s+([A-Za-z'-]{2,})").firstMatch(t)!;
+    out['first_name'] = m.group(1)!;
+    out['last_name'] = m.group(2)!;
+  }
+  return out;
 }
 
 /// Prompt that pulls their own lasting details out of what they wrote.
 String ngmySharedProfileExtractPrompt(String conversation) =>
     'Below is what a person wrote in a chat (lines starting "Advisor asked" are the question they were answering).\n'
     'Pick out ONLY facts about THE PERSON THEMSELF (not friends, family, employers or businesses) for these fields:\n'
-    'first_name, last_name (their legal name), email, phone, street (house number + street, apt), city, state (2 letters for US), zip, age (a number).\n'
+    'first_name, last_name (their legal name), email, phone, street (house number + street, apt), city, state (2 letters for US), zip, age (a number), availability (the days/hours they said they can work).\n'
     'Use the latest value when they changed it. Leave a field "" if they did not clearly say it. Never guess.\n'
-    'Answer with JSON only, no markdown, e.g. {"first_name":"","last_name":"","email":"","phone":"","street":"","city":"","state":"","zip":"","age":""}\n\n'
+    'Answer with JSON only, no markdown, e.g. {"first_name":"","last_name":"","email":"","phone":"","street":"","city":"","state":"","zip":"","age":"","availability":""}\n\n'
     '$conversation';
 
 Map<String, dynamic>? ngmyParseSharedProfileJson(String raw) {
