@@ -1075,7 +1075,9 @@ bool ngmyTransactionCountsAsIncome(AppTransaction t) {
   return t.amount >= 0.01;
 }
 
-void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = true}) {
+/// The money sound — only when money really just landed in the account.
+/// [justApproved]: a request approved right now (its own timestamp is when it was asked for).
+void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = true, bool justApproved = false}) {
   if (!ngmyTransactionCountsAsIncome(t)) return;
   if (ngmyIsAutomaticClockOrCrownEarning(t)) return;
   unawaited(NgmyIncomeSound.playForUser(
@@ -1083,6 +1085,7 @@ void ngmyPlayIncomeSoundForTransaction(AppTransaction t, {bool force = true}) {
     amount: t.amount,
     dedupeKey: 'txn_${t.id}',
     force: force,
+    happenedAt: justApproved ? DateTime.now() : t.timestamp,
   ));
 }
 
@@ -1250,7 +1253,7 @@ void _ngmyApplyApprovedTransitionToBalance(
   }
   ngmyApplyApprovedTransactionToBalance(user, tx);
   if (previousStatus == TransactionStatus.pending && ngmyTransactionCountsAsIncome(tx)) {
-    ngmyPlayIncomeSoundForTransaction(tx, force: true);
+    ngmyPlayIncomeSoundForTransaction(tx, force: true, justApproved: true);
   }
 }
 
@@ -10475,6 +10478,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _pauseBackgroundSync();
     }
     if (state == AppLifecycleState.resumed) {
+      unawaited(_checkIncomingGameInvites());
       // Do not force a viewport resettle on every resume — returning from the
       // image picker was making Menu/Bio feel like the app was refreshing/crashing.
       unawaited(() async {
@@ -12333,6 +12337,35 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   }
 
   Timer? _adminAlertDebounce;
+  DateTime? _lastInviteCheck;
+  final Set<String> _notifiedInviteIds = {};
+
+  /// Someone invited this player to a game — top notification (when the app opens or comes back).
+  Future<void> _checkIncomingGameInvites() async {
+    final u = _currentUser;
+    if (u == null || !_allowConfigDiffNotifications) return;
+    final last = _lastInviteCheck;
+    if (last != null && DateTime.now().difference(last) < const Duration(minutes: 1)) return;
+    _lastInviteCheck = DateTime.now();
+    if (ngmyMpSelfEmail.isEmpty) ngmyMpSelfEmail = u.email;
+    try {
+      for (final inv in await ngmyIncomingGameInvites()) {
+        final id = '${inv['id'] ?? ''}';
+        if (id.isEmpty || !_notifiedInviteIds.add(id)) continue;
+        upsertInviteInList(_config.gameInvites, inv);
+        final from = '${inv['fromName'] ?? ''}'.trim().isNotEmpty ? inv['fromName'] : 'A player';
+        await _pushInAppNotification(
+          title: 'Game invite',
+          important: true,
+          body: '$from invited you to play ${inv['gameTitle'] ?? 'a game'}. Open Game Center to accept.',
+          tag: 'game_invite_$id',
+          cooldown: const Duration(days: 30),
+        );
+      }
+    } catch (e) {
+      debugPrint('[game invites] check: $e');
+    }
+  }
 
   /// After admin data refreshes: tell the admin (top notification) about anything new on the
   /// dashboard. Uses the data already loaded — no extra database reads.
@@ -14270,6 +14303,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       await _seedTransactionNotificationBaseline();
       _allowConfigDiffNotifications = true;
       _scheduleAdminAlertSweep();
+      unawaited(_checkIncomingGameInvites());
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
   }
@@ -19290,6 +19324,7 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
   void initState() {
     super.initState();
     NgmyGameSession.enterBetScreen('game_center', 'Game Center');
+    ngmyMpSelfEmail = widget.user.email; // invites from the server map onto this player
     _liveInvites = widget.config.gameInvites.map((e) => Map<String, dynamic>.from(e)).toList();
     unawaited(_loadUsernameMap());
     unawaited(_refreshInvites());
@@ -20501,8 +20536,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> with NgmyBalanceListene
     if (id.isEmpty) return;
 
     final key = widget.user.email.toLowerCase().trim();
-    Map<String, dynamic>? invite = findInviteById(widget.config.gameInvites, id);
-    invite ??= await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites, forceRefresh: publishJoin);
+    // Always check the server copy (throttled) — the phone's own copy never shows the other
+    // player joining, so the match used to wait forever.
+    final invite = await ngmyFetchInviteByIdMerged(id, widget.config.gameInvites, forceRefresh: publishJoin) ??
+        findInviteById(widget.config.gameInvites, id);
     if (invite == null) return;
 
     final fromEmail = (invite['fromEmail'] ?? '').toString().toLowerCase().trim();

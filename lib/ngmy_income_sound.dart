@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
@@ -30,29 +31,52 @@ class NgmyIncomeSound {
     'income_cash.m4a',
   ];
 
+  /// While the app opens and the account reloads, money that was already there is "found"
+  /// again — that must never ring. Only money that arrives after this moment does.
+  static DateTime _quietUntil = DateTime.now().add(const Duration(seconds: 25));
+
   static void bindSession(String? email) {
-    _sessionEmail = email?.toLowerCase().trim();
+    final next = email?.toLowerCase().trim();
+    if (next != _sessionEmail) _quietUntil = DateTime.now().add(const Duration(seconds: 25));
+    _sessionEmail = next;
     if (_sessionEmail != null && _sessionEmail!.isEmpty) _sessionEmail = null;
     unawaited(preload());
   }
 
-  /// Web browsers block audio until a user gesture — prime the player on tap/login.
+  /// A tiny silent clip. Unlocking audio used to play the cash sound itself at "1% volume" —
+  /// but iPhones ignore volume from web pages, so it rang at full volume every time the app
+  /// was opened or tapped.
+  static String _silentWavDataUrl() {
+    const rate = 8000, samples = 400; // 50 ms of silence, 8-bit mono
+    final b = BytesBuilder();
+    void str(String s) => b.add(s.codeUnits);
+    void u32(int v) => b.add([v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255]);
+    void u16(int v) => b.add([v & 255, (v >> 8) & 255]);
+    str('RIFF');
+    u32(36 + samples);
+    str('WAVEfmt ');
+    u32(16);
+    u16(1);
+    u16(1);
+    u32(rate);
+    u32(rate);
+    u16(1);
+    u16(8);
+    str('data');
+    u32(samples);
+    b.add(List<int>.filled(samples, 128));
+    return 'data:audio/wav;base64,${base64Encode(b.toBytes())}';
+  }
+
+  /// Web browsers block audio until a user gesture — prime the player on tap/login (silently).
   static Future<void> unlockForWebUserGesture() async {
     if (!kIsWeb || _webAudioUnlocked) return;
-    await _resolveAssetOnce();
-    if (_resolvedAsset == null) return;
+    _webAudioUnlocked = true;
     try {
-      final url = _webAssetUrl(_resolvedAsset!);
-      if (url != null) {
-        await _player.setVolume(0.01);
-        await _player.play(UrlSource(url), volume: 0.01);
-        await Future<void>.delayed(const Duration(milliseconds: 60));
-        await _player.stop();
-        await _player.setVolume(1.0);
-        _webAudioUnlocked = true;
-        debugPrint('[income sound] web audio unlocked');
-      }
+      await _player.play(UrlSource(_silentWavDataUrl()), volume: 0);
+      debugPrint('[income sound] web audio unlocked (silent)');
     } catch (e) {
+      _webAudioUnlocked = false;
       debugPrint('[income sound] web unlock failed: $e');
     }
   }
@@ -150,27 +174,30 @@ class NgmyIncomeSound {
     required double amount,
     String? dedupeKey,
     bool force = false,
+    /// When the money actually arrived. Older than a few minutes = it's just being reloaded.
+    DateTime? happenedAt,
   }) async {
     if (amount < 0.01) return;
     final ben = beneficiaryEmail.toLowerCase().trim();
     final me = _sessionEmail ?? '';
     if (me.isEmpty || ben != me) return;
-    if (!(await isEnabled())) return;
-
-    if (kIsWeb && !_webAudioUnlocked) {
-      await unlockForWebUserGesture();
-    }
 
     await _ensurePlayedKeysLoaded();
     final key = dedupeKey?.trim();
-    if (force && (key == null || key.isEmpty)) {
-      // No stable id — play once for this call.
-    }
-    // Same earning must not chime again on refresh, even when force is set.
+    // Same money never rings twice (also across refreshes).
     if (key != null && key.isNotEmpty) {
       if (_playedDedupeKeys.contains(key)) return;
       _playedDedupeKeys.add(key);
       unawaited(_persistPlayedKeys());
+    }
+    // App just opened / balance reloading, or old money found again → stay quiet.
+    final now = DateTime.now();
+    if (now.isBefore(_quietUntil)) return;
+    if (happenedAt != null && now.difference(happenedAt).abs() > const Duration(minutes: 5)) return;
+    if (!(await isEnabled())) return;
+
+    if (kIsWeb && !_webAudioUnlocked) {
+      await unlockForWebUserGesture();
     }
 
     await _resolveAssetOnce();

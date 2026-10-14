@@ -8271,6 +8271,109 @@ async function saveSettingsObject(
   return { ok: true };
 }
 
+// ── Multiplayer game invites ──────────────────────────────────────────────────
+// All invites live in one server-only row. A player only ever sees and changes invites they
+// are part of. When both players save at once, each player's own flags (joined, ready,
+// progress — maps keyed by email) are kept from that player, so neither wipes the other.
+const GAME_INVITES_KEY_V2 = "game_invites_v2";
+
+function gameBaseEmail(e: string): string {
+  const k = emailKey(e);
+  return k.endsWith("+local.ngmy") ? k.slice(0, -"+local.ngmy".length) : k;
+}
+
+function inviteTime(i: Record<string, any>): number {
+  for (const k of ["sessionUpdatedAt", "respondedAt", "createdAt"]) {
+    const t = Date.parse(String(i?.[k] ?? ""));
+    if (Number.isFinite(t)) return t;
+  }
+  return 0;
+}
+
+function isPlainObj(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+function mergeInviteForCaller(stored: Record<string, any> | undefined, incoming: Record<string, any>, caller: string): Record<string, any> {
+  if (!stored) return incoming;
+  // A new game in the series (or a decision like accept/decline) → take the incoming copy whole.
+  const played = (x: any) => Number(x?.matchesPlayed ?? 0) || 0;
+  if (played(incoming) > played(stored)) return incoming;
+  if (played(incoming) < played(stored)) return stored;
+  const newer = inviteTime(incoming) >= inviteTime(stored) ? incoming : stored;
+  const out: Record<string, any> = { ...stored, ...newer };
+  // A decided status never goes back to pending.
+  if (stored.status && stored.status !== "pending" && incoming.status === "pending") out.status = stored.status;
+  const ss = isPlainObj(stored.sessionState) ? stored.sessionState : {};
+  const is = isPlainObj(incoming.sessionState) ? incoming.sessionState : {};
+  const session: Record<string, any> = { ...ss, ...(newer === incoming ? is : {}) };
+  for (const k of new Set([...Object.keys(ss), ...Object.keys(is)])) {
+    const a = ss[k], b = is[k];
+    if (isPlainObj(a) || isPlainObj(b)) {
+      const am = isPlainObj(a) ? a : {}, bm = isPlainObj(b) ? b : {};
+      const keysAreEmails = [...Object.keys(am), ...Object.keys(bm)].some((x) => x.includes("@"));
+      if (keysAreEmails) {
+        // Each player owns their own entry.
+        const m: Record<string, any> = { ...am };
+        for (const [ek, ev] of Object.entries(bm)) {
+          if (gameBaseEmail(ek) === caller || !(ek in m)) m[ek] = ev;
+        }
+        session[k] = m;
+      } else {
+        session[k] = { ...am, ...bm };
+      }
+    } else if (Array.isArray(a) && Array.isArray(b)) {
+      session[k] = [...new Set([...a, ...b])]; // e.g. matched memory cards
+    } else if ((k === "startAt" || k.endsWith("Seed")) && a != null && a !== "") {
+      session[k] = a; // the first start time / board seed wins, so both play the same game
+    }
+  }
+  out.sessionState = session;
+  out.sessionUpdatedAt = new Date(Math.max(inviteTime(stored), inviteTime(incoming))).toISOString();
+  return out;
+}
+
+async function handleGameInvitesSync(req: Request, body: Record<string, unknown>): Promise<Response> {
+  const caller = await requireJwtEmail(req);
+  const admin = adminClient();
+  if (!caller || !admin) return jsonOk({ ok: false, error: "Please sign in again." }, 401);
+  const me = emailKey(caller);
+  // Growth Income plays as "you@x.com+local.ngmy" — the same person.
+  const mine = (i: Record<string, any>) => gameBaseEmail(String(i?.fromEmail ?? "")) === me || gameBaseEmail(String(i?.toEmail ?? "")) === me;
+  const incoming = (Array.isArray(body?.invites) ? body.invites : []).filter(isPlainObj).slice(0, 60) as Record<string, any>[];
+  const doc = await loadSettingsObject(admin, GAME_INVITES_KEY_V2);
+  const list = (Array.isArray(doc.items) ? doc.items : []).filter(isPlainObj) as Record<string, any>[];
+  const byId = new Map<string, Record<string, any>>();
+  for (const i of list) if (i.id) byId.set(String(i.id), i);
+  let changed = false;
+  for (const raw of incoming) {
+    const id = String(raw.id ?? "").trim();
+    if (!id || !mine(raw)) continue;
+    const stored = byId.get(id);
+    if (stored && !mine(stored)) continue; // never touch someone else's invite
+    if (!stored && gameBaseEmail(String(raw.fromEmail ?? "")) !== me) continue; // only the sender creates one
+    const merged = mergeInviteForCaller(stored, raw, me);
+    if (JSON.stringify(merged) !== JSON.stringify(stored)) {
+      byId.set(id, merged);
+      changed = true;
+    }
+  }
+  // Drop old ones: unanswered after 14 days, anything else after 30.
+  const now = Date.now();
+  const kept = [...byId.values()].filter((i) => {
+    const age = now - inviteTime(i);
+    return (String(i.status ?? "pending") === "pending" ? age < 14 * 864e5 : age < 30 * 864e5);
+  });
+  if (kept.length !== byId.size) changed = true;
+  if (changed) {
+    const saved = await saveSettingsObject(admin, GAME_INVITES_KEY_V2, { items: kept.slice(-1500) });
+    if (!saved.ok) return jsonOk({ ok: false, error: saved.error });
+  }
+  const onlyId = String(body?.id ?? "").trim();
+  const result = kept.filter((i) => mine(i) && (!onlyId || String(i.id) === onlyId));
+  return jsonOk({ ok: true, invites: result });
+}
+
 const CIVIC_HELPER_GIFT_PENDING_KEY = "civic_helper_gift_pending_v1";
 const CIVIC_HELPER_GIFT_INBOX_KEY = "civic_helper_gift_inbox_v1";
 const CIVIC_HELPER_GIFT_STASH_PREFIX = "ngmy_helper_gift_qr_v1_";
@@ -9478,6 +9581,7 @@ serve(async (req) => {
       g3: "agentStop",
       g4: "agentStatus",
       g5: "agentShot",
+      m9: "gameInvitesSync",
       f1: "freeTimeGet",
       f2: "freeTimeAdd",
       h1: "hwList",
@@ -9778,6 +9882,15 @@ serve(async (req) => {
       return await handleAgentPoll(req, body);
     }
     if (action === "agentStop") return await handleAgentStop(body);
+    if (action === "gameInvitesSync") {
+      // In-memory limit (no database write per check) — the match gate checks every ~2 s.
+      const ip = clientIp(req);
+      const now = Date.now();
+      const slot = agentShotHits.get(`gi:${ip}`);
+      if (!slot || now - slot.start > 60_000) agentShotHits.set(`gi:${ip}`, { start: now, n: 1 });
+      else if (++slot.n > 120) return rateLimitedResponse();
+      return await handleGameInvitesSync(req, body);
+    }
     if (action === "agentShot") {
       // ~1 per second while a task runs and the chat is open. In-memory limit (no database
       // write per picture, so this costs nothing extra in the database).
