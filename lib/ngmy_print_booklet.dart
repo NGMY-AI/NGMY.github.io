@@ -8,36 +8,159 @@ import 'package:pdf/widgets.dart' as pw;
 /// Printable fold-and-staple books.
 ///
 /// Every sheet of normal paper is printed sideways with two book pages on each side and a
-/// thin dashed line down the middle. Print both sides (flip on the short edge), stack the
-/// sheets, fold along the line and staple on it: the pages come out in reading order.
-/// Pages run on to as many sheets as the book needs.
+/// thin dashed line down the middle. Print both sides (flip on the short edge), put the
+/// sheets inside each other, fold along the line and staple on it: the pages come out in
+/// reading order. Pages run on to as many sheets as the book needs.
 
 enum NgmyBookPaper { letter, a4 }
 
 String ngmyBookPaperLabel(NgmyBookPaper p) => p == NgmyBookPaper.letter ? 'Letter (8.5 × 11 in)' : 'A4';
 
+/// `data:image/...;base64,...` → bytes (null when it isn't one).
+Uint8List? ngmyDataUriBytes(String? uri) {
+  if (uri == null || uri.isEmpty) return null;
+  final comma = uri.indexOf(',');
+  if (!uri.startsWith('data:') || comma < 0) return null;
+  try {
+    return base64Decode(uri.substring(comma + 1));
+  } catch (_) {
+    return null;
+  }
+}
+
 class NgmyBookChapter {
-  const NgmyBookChapter({required this.title, required this.body});
+  const NgmyBookChapter({required this.title, required this.body, this.picture = '', this.imageQuery = ''});
   final String title;
   final String body;
 
-  Map<String, dynamic> toJson() => {'title': title, 'body': body};
-  factory NgmyBookChapter.fromJson(Map<String, dynamic> j) =>
-      NgmyBookChapter(title: (j['title'] ?? '').toString(), body: (j['body'] ?? '').toString());
+  /// Optional picture for this page (data URI), printed under the title.
+  final String picture;
+
+  /// What the AI wanted pictured (used to fetch [picture]).
+  final String imageQuery;
+
+  NgmyBookChapter copyWith({String? title, String? body, String? picture}) =>
+      NgmyBookChapter(title: title ?? this.title, body: body ?? this.body, picture: picture ?? this.picture, imageQuery: imageQuery);
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'body': body,
+        if (picture.isNotEmpty) 'picture': picture,
+        if (imageQuery.isNotEmpty) 'image_query': imageQuery,
+      };
+  factory NgmyBookChapter.fromJson(Map<String, dynamic> j) => NgmyBookChapter(
+        title: (j['title'] ?? '').toString(),
+        body: (j['body'] ?? '').toString(),
+        picture: (j['picture'] ?? '').toString(),
+        imageQuery: (j['image_query'] ?? j['imageQuery'] ?? '').toString(),
+      );
+}
+
+/// How the front cover looks: one of the templates plus the user's own changes.
+class NgmyBookCover {
+  const NgmyBookCover({
+    this.template = 'royal',
+    this.bg1,
+    this.bg2,
+    this.accent,
+    this.ink,
+    this.photo = '',
+    this.position = '',
+    this.font = '',
+  });
+
+  final String template;
+  final int? bg1;
+  final int? bg2;
+  final int? accent;
+  final int? ink;
+
+  /// The user's own picture (data URI).
+  final String photo;
+
+  /// '' = template default, else 'top' | 'middle' | 'bottom'.
+  final String position;
+
+  /// '' = template default, else 'classic' | 'modern' | 'display'.
+  final String font;
+
+  NgmyBookCover copyWith({
+    String? template,
+    int? bg1,
+    int? bg2,
+    int? accent,
+    int? ink,
+    String? photo,
+    String? position,
+    String? font,
+    bool resetColors = false,
+  }) =>
+      NgmyBookCover(
+        template: template ?? this.template,
+        bg1: resetColors ? null : bg1 ?? this.bg1,
+        bg2: resetColors ? null : bg2 ?? this.bg2,
+        accent: resetColors ? null : accent ?? this.accent,
+        ink: resetColors ? null : ink ?? this.ink,
+        photo: photo ?? this.photo,
+        position: position ?? this.position,
+        font: font ?? this.font,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'template': template,
+        if (bg1 != null) 'bg1': bg1,
+        if (bg2 != null) 'bg2': bg2,
+        if (accent != null) 'accent': accent,
+        if (ink != null) 'ink': ink,
+        if (photo.isNotEmpty) 'photo': photo,
+        if (position.isNotEmpty) 'position': position,
+        if (font.isNotEmpty) 'font': font,
+      };
+
+  factory NgmyBookCover.fromJson(Map<String, dynamic> j) {
+    int? n(Object? v) => v is int ? v : int.tryParse('${v ?? ''}');
+    return NgmyBookCover(
+      template: (j['template'] ?? 'royal').toString(),
+      bg1: n(j['bg1']),
+      bg2: n(j['bg2']),
+      accent: n(j['accent']),
+      ink: n(j['ink']),
+      photo: (j['photo'] ?? '').toString(),
+      position: (j['position'] ?? '').toString(),
+      font: (j['font'] ?? '').toString(),
+    );
+  }
 }
 
 class NgmyBookDoc {
-  const NgmyBookDoc({required this.title, this.subtitle = '', this.author = '', this.chapters = const []});
+  const NgmyBookDoc({
+    required this.title,
+    this.subtitle = '',
+    this.author = '',
+    this.chapters = const [],
+    this.cover = const NgmyBookCover(),
+  });
   final String title;
   final String subtitle;
   final String author;
   final List<NgmyBookChapter> chapters;
+  final NgmyBookCover cover;
+
+  NgmyBookDoc copyWith({String? title, String? subtitle, String? author, List<NgmyBookChapter>? chapters, NgmyBookCover? cover}) =>
+      NgmyBookDoc(
+        title: title ?? this.title,
+        subtitle: subtitle ?? this.subtitle,
+        author: author ?? this.author,
+        chapters: chapters ?? this.chapters,
+        cover: cover ?? this.cover,
+      );
 
   Map<String, dynamic> toJson() => {
         'title': title,
         'subtitle': subtitle,
         'author': author,
         'chapters': chapters.map((c) => c.toJson()).toList(),
+        'cover': cover.toJson(),
       };
 
   factory NgmyBookDoc.fromJson(Map<String, dynamic> j) => NgmyBookDoc(
@@ -48,6 +171,7 @@ class NgmyBookDoc {
             .whereType<Map>()
             .map((e) => NgmyBookChapter.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
+        cover: j['cover'] is Map ? NgmyBookCover.fromJson(Map<String, dynamic>.from(j['cover'] as Map)) : const NgmyBookCover(),
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -67,12 +191,37 @@ class NgmyBookLine {
   final double y;
 }
 
+/// A chapter picture placed on a page.
+class NgmyBookPicture {
+  const NgmyBookPicture({required this.chapter, required this.y, required this.height});
+  final int chapter;
+  final double y;
+  final double height;
+}
+
+enum NgmyBookPageKind { cover, content, notes, back }
+
 class NgmyBookPage {
-  const NgmyBookPage({this.lines = const [], this.number, this.isCover = false});
+  const NgmyBookPage({
+    this.lines = const [],
+    this.pictures = const [],
+    this.number,
+    this.kind = NgmyBookPageKind.content,
+    this.notesFrom,
+  });
   final List<NgmyBookLine> lines;
+  final List<NgmyBookPicture> pictures;
   final int? number;
-  final bool isCover;
-  bool get isBlank => lines.isEmpty;
+  final NgmyBookPageKind kind;
+
+  /// Ruled "Notes" lines fill the rest of the page from here (writing-area y).
+  final double? notesFrom;
+
+  bool get isCover => kind == NgmyBookPageKind.cover;
+  bool get isBack => kind == NgmyBookPageKind.back;
+
+  /// No written content (a notes page or a filler page).
+  bool get isBlank => kind == NgmyBookPageKind.notes || (kind == NgmyBookPageKind.content && lines.isEmpty && pictures.isEmpty);
 }
 
 /// One book page = half a sheet of the chosen paper.
@@ -82,10 +231,11 @@ class NgmyBookPage {
   return (width: sheet.height / 2, height: sheet.width);
 }
 
-const double kNgmyBookSideMargin = 40;
-const double kNgmyBookTopMargin = 46;
-const double kNgmyBookBottomMargin = 56;
-const double kNgmyBookBodySize = 11;
+const double kNgmyBookSideMargin = 36;
+const double kNgmyBookTopMargin = 40;
+const double kNgmyBookBottomMargin = 50;
+const double kNgmyBookBodySize = 11.5;
+const double kNgmyBookPictureHeight = 170;
 
 /// Breaks one paragraph into lines that fit [maxWidth]; very long words are split.
 List<String> ngmyWrapBookText(String paragraph, double maxWidth, double size, bool bold, NgmyTextWidth measure) {
@@ -114,77 +264,71 @@ List<String> ngmyWrapBookText(String paragraph, double maxWidth, double size, bo
   return lines;
 }
 
-/// Flows the book onto pages: a cover, then each chapter starting on a fresh page and
-/// running on for as many pages as it needs. Blank pages are added at the end so the
-/// count fills whole sheets (4 pages per sheet).
+/// Flows the book onto pages: the cover, then the pages one after another with no big gaps
+/// (a new page only starts a page when the old one is nearly full), pictures under their
+/// titles, and ruled "Notes" lines in leftover space. Extra pages needed to fill the last
+/// sheet become Notes pages, and the back cover is always the very last page.
 List<NgmyBookPage> ngmyPaginateBook(
   NgmyBookDoc doc, {
   required double pageWidth,
   required double pageHeight,
   required NgmyTextWidth measure,
   double bodySize = kNgmyBookBodySize,
+  bool Function(int chapter)? hasPicture,
+  bool backCover = true,
 }) {
   final contentW = pageWidth - kNgmyBookSideMargin * 2;
   final contentH = pageHeight - kNgmyBookTopMargin - kNgmyBookBottomMargin;
-  final pages = <NgmyBookPage>[];
-
-  // Cover.
-  final cover = <(String, double, bool)>[];
-  final title = doc.title.trim().isEmpty ? 'Untitled Book' : doc.title.trim();
-  for (final l in ngmyWrapBookText(title, contentW, 26, true, measure)) {
-    cover.add((l, 26, true));
-  }
-  if (doc.subtitle.trim().isNotEmpty) {
-    cover.add(('', 10, false));
-    for (final l in ngmyWrapBookText(doc.subtitle.trim(), contentW, 14, false, measure)) {
-      cover.add((l, 14, false));
-    }
-  }
-  if (doc.author.trim().isNotEmpty) {
-    cover.add(('', 22, false));
-    for (final l in ngmyWrapBookText(doc.author.trim(), contentW, 12, false, measure)) {
-      cover.add((l, 12, false));
-    }
-  }
-  var coverH = 0.0;
-  for (final c in cover) {
-    coverH += c.$2 * 1.3;
-  }
-  var cy = ((contentH - coverH) * 0.4).clamp(0.0, contentH);
-  final coverLines = <NgmyBookLine>[];
-  for (final c in cover) {
-    if (c.$1.isNotEmpty && cy + c.$2 * 1.3 <= contentH) {
-      coverLines.add(NgmyBookLine(c.$1, size: c.$2, bold: c.$3, center: true, y: cy));
-    }
-    cy += c.$2 * 1.3;
-  }
-  pages.add(NgmyBookPage(lines: coverLines, isCover: true));
+  final pictureOk = hasPicture ?? (int i) => doc.chapters[i].picture.isNotEmpty;
+  final pages = <NgmyBookPage>[const NgmyBookPage(kind: NgmyBookPageKind.cover)];
 
   var lines = <NgmyBookLine>[];
+  var pics = <NgmyBookPicture>[];
   var y = 0.0;
   void newPage() {
-    pages.add(NgmyBookPage(lines: lines, number: pages.length));
+    pages.add(NgmyBookPage(lines: lines, pictures: pics, number: pages.length));
     lines = <NgmyBookLine>[];
+    pics = <NgmyBookPicture>[];
     y = 0;
   }
 
-  void addLine(String text, double size, bool bold, double lineH, {bool center = false}) {
-    if (y + lineH > contentH && lines.isNotEmpty) newPage();
-    lines.add(NgmyBookLine(text, size: size, bold: bold, center: center, y: y));
+  bool pageEmpty() => lines.isEmpty && pics.isEmpty;
+
+  void addLine(String text, double size, bool bold, double lineH) {
+    if (y + lineH > contentH && !pageEmpty()) newPage();
+    lines.add(NgmyBookLine(text, size: size, bold: bold, y: y));
     y += lineH;
   }
 
-  final bodyLineH = bodySize * 1.45;
-  for (final ch in doc.chapters) {
+  final bodyLineH = bodySize * 1.5;
+  const titleSize = 17.0;
+  const titleLineH = titleSize * 1.3;
+  for (var ci = 0; ci < doc.chapters.length; ci++) {
+    final ch = doc.chapters[ci];
     final t = ch.title.trim();
     final body = ch.body.replaceAll('\r\n', '\n').trimRight();
-    if (t.isEmpty && body.trim().isEmpty) continue;
-    if (lines.isNotEmpty) newPage();
-    if (t.isNotEmpty) {
-      for (final l in ngmyWrapBookText(t, contentW, 17, true, measure)) {
-        addLine(l, 17, true, 17 * 1.3);
+    final pic = pictureOk(ci);
+    if (t.isEmpty && body.trim().isEmpty && !pic) continue;
+
+    // Keep going on the same page when there is real room left; otherwise turn the page.
+    if (!pageEmpty()) {
+      final need = titleLineH + 10 + (pic ? kNgmyBookPictureHeight + 12 : 0) + bodyLineH * 4;
+      if (y + 26 + need > contentH) {
+        newPage();
+      } else {
+        y += 26;
       }
-      y += 10;
+    }
+    if (t.isNotEmpty) {
+      for (final l in ngmyWrapBookText(t, contentW, titleSize, true, measure)) {
+        addLine(l, titleSize, true, titleLineH);
+      }
+      y += 8;
+    }
+    if (pic) {
+      if (y + kNgmyBookPictureHeight > contentH && !pageEmpty()) newPage();
+      pics.add(NgmyBookPicture(chapter: ci, y: y, height: kNgmyBookPictureHeight));
+      y += kNgmyBookPictureHeight + 12;
     }
     var gapPending = false;
     for (final para in body.split('\n')) {
@@ -192,24 +336,31 @@ List<NgmyBookPage> ngmyPaginateBook(
         gapPending = true;
         continue;
       }
-      if (gapPending && lines.isNotEmpty) y += bodyLineH * 0.6;
+      if (gapPending && !pageEmpty()) y += bodyLineH * 0.5;
       gapPending = false;
       for (final l in ngmyWrapBookText(para.trim(), contentW, bodySize, false, measure)) {
         addLine(l, bodySize, false, bodyLineH);
       }
-      y += bodyLineH * 0.35;
+      y += bodyLineH * 0.3;
     }
   }
-  if (lines.isNotEmpty) newPage();
-
-  while (pages.length % 4 != 0) {
-    pages.add(const NgmyBookPage());
+  if (!pageEmpty()) {
+    // Leftover space on the last written page becomes ruled lines for notes.
+    final notesFrom = y + 30 < contentH - 90 ? y + 30 : null;
+    pages.add(NgmyBookPage(lines: lines, pictures: pics, number: pages.length, notesFrom: notesFrom));
   }
+
+  final reserved = backCover ? 1 : 0;
+  while ((pages.length + reserved) % 4 != 0) {
+    pages.add(NgmyBookPage(kind: NgmyBookPageKind.notes, number: pages.length, notesFrom: 0));
+  }
+  if (backCover) pages.add(const NgmyBookPage(kind: NgmyBookPageKind.back));
   return pages;
 }
 
 /// Which two pages (0-based, left then right) go on each printed side, in printing order:
-/// sheet 1 front, sheet 1 back, sheet 2 front… Stacked and folded, they read in order.
+/// sheet 1 front, sheet 1 back, sheet 2 front… Put inside each other and folded, they read
+/// in order.
 List<(int, int)> ngmyBookletSides(int pageCount) {
   var n = pageCount;
   if (n < 4) n = 4;
@@ -229,14 +380,17 @@ class _BookFonts {
   final NgmyTextWidth measure;
 }
 
+_BookFonts? _fontsCache;
+
 Future<_BookFonts> _loadBookFonts() async {
+  if (_fontsCache != null) return _fontsCache!;
   try {
     final r = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
     final b = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
     final scratch = PdfDocument();
     final mr = PdfTtfFont(scratch, r);
     final mb = PdfTtfFont(scratch, b);
-    return _BookFonts(pw.Font.ttf(r), pw.Font.ttf(b),
+    return _fontsCache = _BookFonts(pw.Font.ttf(r), pw.Font.ttf(b),
         (t, size, bold) => (bold ? mb : mr).stringMetrics(t).advanceWidth * size);
   } catch (_) {
     final scratch = PdfDocument();
@@ -247,14 +401,32 @@ Future<_BookFonts> _loadBookFonts() async {
   }
 }
 
+/// Chapter pictures the PDF can use (JPEG / PNG), by chapter index.
+Map<int, pw.MemoryImage> _chapterImages(NgmyBookDoc doc) {
+  final out = <int, pw.MemoryImage>{};
+  for (var i = 0; i < doc.chapters.length; i++) {
+    final bytes = ngmyDataUriBytes(doc.chapters[i].picture);
+    if (bytes == null) continue;
+    try {
+      out[i] = pw.MemoryImage(bytes);
+    } catch (_) {}
+  }
+  return out;
+}
+
+List<NgmyBookPage> _layout(NgmyBookDoc doc, NgmyBookPaper paper, _BookFonts fonts, Map<int, pw.MemoryImage> images) {
+  final size = ngmyBookPageSize(paper);
+  return ngmyPaginateBook(doc,
+      pageWidth: size.width, pageHeight: size.height, measure: fonts.measure, hasPicture: images.containsKey);
+}
+
 /// How many pages and sheets a book takes, for the print screen.
-/// [filled] = pages up to the last written one (the rest are blanks that fill the sheet).
+/// [filled] = pages up to the last written one (the rest are Notes pages and the back cover).
 Future<({int pages, int sheets, int filled})> ngmyBookletCount(NgmyBookDoc doc, NgmyBookPaper paper) async {
   final fonts = await _loadBookFonts();
-  final size = ngmyBookPageSize(paper);
-  final pages = ngmyPaginateBook(doc, pageWidth: size.width, pageHeight: size.height, measure: fonts.measure);
+  final pages = _layout(doc, paper, fonts, _chapterImages(doc));
   var filled = pages.length;
-  while (filled > 1 && pages[filled - 1].isBlank) {
+  while (filled > 1 && (pages[filled - 1].isBlank || pages[filled - 1].isBack)) {
     filled--;
   }
   return (pages: pages.length, sheets: pages.length ~/ 4, filled: filled);
@@ -262,19 +434,110 @@ Future<({int pages, int sheets, int filled})> ngmyBookletCount(NgmyBookDoc doc, 
 
 /// The PDF to print. [booklet] = sideways sheets, two pages per side with the fold line;
 /// otherwise one book page per PDF page in reading order (for reading on screen).
-Future<Uint8List> ngmyBuildBookletPdf(NgmyBookDoc doc, {NgmyBookPaper paper = NgmyBookPaper.letter, bool booklet = true}) async {
+/// [coverPng] = the designed front cover, drawn to fill the cover page; [backColor] = the
+/// back cover's colour.
+Future<Uint8List> ngmyBuildBookletPdf(
+  NgmyBookDoc doc, {
+  NgmyBookPaper paper = NgmyBookPaper.letter,
+  bool booklet = true,
+  Uint8List? coverPng,
+  int? backColor,
+  int? accentColor,
+}) async {
   final fonts = await _loadBookFonts();
   final size = ngmyBookPageSize(paper);
-  final pages = ngmyPaginateBook(doc, pageWidth: size.width, pageHeight: size.height, measure: fonts.measure);
+  final images = _chapterImages(doc);
+  final pages = _layout(doc, paper, fonts, images);
   final ink = PdfColor.fromInt(0xFF1F2937);
   final soft = PdfColor.fromInt(0xFF6B7280);
+  final rule = PdfColor.fromInt(0xFFD7DCE3);
+  final accent = PdfColor.fromInt(accentColor ?? 0xFF8B4513);
   final contentW = size.width - kNgmyBookSideMargin * 2;
+  final contentH = size.height - kNgmyBookTopMargin - kNgmyBookBottomMargin;
+  pw.MemoryImage? cover;
+  if (coverPng != null && coverPng.isNotEmpty) {
+    try {
+      cover = pw.MemoryImage(coverPng);
+    } catch (_) {}
+  }
+
+  pw.Widget notes(double from, {bool heading = false}) {
+    final top = kNgmyBookTopMargin + from;
+    final widgets = <pw.Widget>[];
+    var y = top + (heading ? 34 : 0);
+    if (heading) {
+      widgets.add(pw.Positioned(
+        left: kNgmyBookSideMargin,
+        top: top,
+        child: pw.Text('Notes', style: pw.TextStyle(font: fonts.bold, fontSize: 15, color: accent)),
+      ));
+    }
+    while (y < kNgmyBookTopMargin + contentH - 4) {
+      widgets.add(pw.Positioned(
+        left: kNgmyBookSideMargin,
+        top: y,
+        child: pw.Container(width: contentW, height: 0.6, color: rule),
+      ));
+      y += 22;
+    }
+    return pw.Stack(children: widgets);
+  }
 
   pw.Widget half(NgmyBookPage page) {
+    if (page.isCover) {
+      return pw.SizedBox(
+        width: size.width,
+        height: size.height,
+        child: cover != null
+            ? pw.Image(cover, fit: pw.BoxFit.cover, width: size.width, height: size.height)
+            : pw.Center(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.all(kNgmyBookSideMargin),
+                  child: pw.Text(doc.title.trim().isEmpty ? 'Untitled Book' : doc.title.trim(),
+                      textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fonts.bold, fontSize: 26, color: ink)),
+                ),
+              ),
+      );
+    }
+    if (page.isBack) {
+      final bg = PdfColor.fromInt(backColor ?? 0xFF2B1D14);
+      final light = (backColor ?? 0xFF2B1D14) & 0xFFFFFF;
+      final r = (light >> 16) & 0xFF, g = (light >> 8) & 0xFF, b = light & 0xFF;
+      final dark = (r * 299 + g * 587 + b * 114) / 1000 < 150;
+      final text = dark ? PdfColors.white : ink;
+      return pw.Container(
+        width: size.width,
+        height: size.height,
+        color: bg,
+        child: pw.Column(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+          pw.Container(width: 40, height: 2, color: accent),
+          pw.SizedBox(height: 10),
+          pw.Text(doc.title.trim(), textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fonts.bold, fontSize: 12, color: text)),
+          if (doc.author.trim().isNotEmpty)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 4),
+              child: pw.Text(doc.author.trim(), style: pw.TextStyle(font: fonts.regular, fontSize: 9, color: text)),
+            ),
+          pw.SizedBox(height: 60),
+        ]),
+      );
+    }
     return pw.SizedBox(
       width: size.width,
       height: size.height,
       child: pw.Stack(children: [
+        if (page.notesFrom != null) notes(page.notesFrom!, heading: page.kind == NgmyBookPageKind.notes),
+        for (final p in page.pictures)
+          if (images[p.chapter] != null)
+            pw.Positioned(
+              left: kNgmyBookSideMargin,
+              top: kNgmyBookTopMargin + p.y,
+              child: pw.ClipRRect(
+                horizontalRadius: 8,
+                verticalRadius: 8,
+                child: pw.Image(images[p.chapter]!, width: contentW, height: p.height, fit: pw.BoxFit.cover),
+              ),
+            ),
         for (final l in page.lines)
           pw.Positioned(
             left: kNgmyBookSideMargin +
@@ -284,14 +547,14 @@ Future<Uint8List> ngmyBuildBookletPdf(NgmyBookDoc doc, {NgmyBookPaper paper = Ng
               l.text,
               softWrap: false,
               maxLines: 1,
-              style: pw.TextStyle(font: l.bold ? fonts.bold : fonts.regular, fontSize: l.size, color: ink),
+              style: pw.TextStyle(font: l.bold ? fonts.bold : fonts.regular, fontSize: l.size, color: l.bold ? accent : ink),
             ),
           ),
-        if (page.number != null && !page.isBlank)
+        if (page.number != null)
           pw.Positioned(
             left: 0,
             right: 0,
-            bottom: 26,
+            bottom: 24,
             child: pw.Center(
               child: pw.Text('${page.number}', style: pw.TextStyle(font: fonts.regular, fontSize: 9, color: soft)),
             ),
@@ -315,14 +578,14 @@ Future<Uint8List> ngmyBuildBookletPdf(NgmyBookDoc doc, {NgmyBookPaper paper = Ng
           pw.Row(children: [half(pages[left]), half(pages[right])]),
           // Tiny stacking label: sheet 1 is the outside sheet, the last one is the middle.
           pw.Positioned(
-            left: 14,
-            bottom: 10,
+            left: 8,
+            bottom: 8,
             child: pw.Text(
               'Sheet $sheetNo of $sheets · $face${sheetNo == 1 ? ' (outside)' : sheetNo == sheets ? ' (middle)' : ''}',
-              style: pw.TextStyle(font: fonts.regular, fontSize: 6.5, color: PdfColor.fromInt(0xFFB0B5BD)),
+              style: pw.TextStyle(font: fonts.regular, fontSize: 6, color: PdfColor.fromInt(0xFFB0B5BD)),
             ),
           ),
-          // The fold / staple line down the middle of the sheet.
+          // The fold / staple line down the exact middle of the sheet.
           pw.Positioned.fill(
             child: pw.CustomPaint(
               painter: (canvas, s) {
@@ -341,8 +604,7 @@ Future<Uint8List> ngmyBuildBookletPdf(NgmyBookDoc doc, {NgmyBookPaper paper = Ng
     }
   } else {
     final format = PdfPageFormat(size.width, size.height, marginAll: 0);
-    // Reading order: the blank pages that only fill out sheets are left off.
-    for (final p in pages.where((p) => p.isCover || !p.isBlank)) {
+    for (final p in pages) {
       pdf.addPage(pw.Page(pageFormat: format, build: (_) => half(p)));
     }
   }

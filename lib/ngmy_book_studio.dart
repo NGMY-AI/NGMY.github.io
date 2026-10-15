@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_ai_language.dart';
+import 'ngmy_book_cover.dart';
 import 'ngmy_invoice_print.dart';
 import 'ngmy_print_booklet.dart';
+import 'ngmy_slides_ai_maker.dart' show ngmySlidesFetchPicture;
 import 'ngmy_slides_storage_idb_stub.dart' if (dart.library.html) 'ngmy_slides_storage_idb_web.dart';
 
 // ─── Storage (this device) ────────────────────────────────────────────────
@@ -101,13 +107,23 @@ Future<void> deleteNgmyBook(String email, String id) async {
 
 // ─── AI writer ────────────────────────────────────────────────────────────
 
-String ngmyBookAiPrompt({required String description, required int pages}) => '''
-You write short printable books. Write a book about: "$description".
-Make $pages pages (chapters). Each page has a short title and 80-180 words of body text.
-Use plain words, separate paragraphs with a blank line, no markdown, no emojis.
+String ngmyBookAiPrompt({required String description, required int pages}) {
+  final templates = kNgmyCoverTemplates.map((t) => t.id).join(', ');
+  return '''
+You write printable books that are folded and stapled. Write a book from this request:
+"""$description"""
+
+Rules:
+- Exactly $pages pages ("chapters"). Each page has a short title and 230-300 words of body text, so the printed page is full.
+- Split the body into 3-5 paragraphs separated by a blank line. Plain words, no markdown, no emojis, no lists.
+- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write the WHOLE book in it. Otherwise write in the language the request is written in.
+${ngmyLanguageDirective(description)}
+- Give every page an "image_query": 2-3 simple ENGLISH words for a real photo that fits it (e.g. "family dinner", "african village").
+- Design the cover: "cover_template" is the best fit from: $templates (story = children's books, starry = bedtime/faith, vintage = history/family memories, royal = formal/gifts, photo/portrait/split = people and places, sunset/band/geo = modern and bold). "cover_query": 2-3 English words for a cover photo, or "" for none.
 Reply with JSON only:
-{"title":"...","subtitle":"...","chapters":[{"title":"...","body":"..."}]}
+{"title":"...","subtitle":"...","cover_template":"...","cover_query":"...","chapters":[{"title":"...","body":"...","image_query":"..."}]}
 ''';
+}
 
 /// Reads the AI's JSON (tolerates code fences and text around it).
 NgmyBookDoc? ngmyParseBookAi(String text, {String author = ''}) {
@@ -120,22 +136,43 @@ NgmyBookDoc? ngmyParseBookAi(String text, {String author = ''}) {
     final doc = NgmyBookDoc.fromJson(Map<String, dynamic>.from(j));
     final chapters = doc.chapters.where((c) => c.title.trim().isNotEmpty || c.body.trim().isNotEmpty).toList();
     if (chapters.isEmpty) return null;
-    return NgmyBookDoc(title: doc.title, subtitle: doc.subtitle, author: author, chapters: chapters);
+    final template = '${j['cover_template'] ?? ''}'.trim();
+    return NgmyBookDoc(
+      title: doc.title,
+      subtitle: doc.subtitle,
+      author: author,
+      chapters: chapters,
+      cover: NgmyBookCover(template: kNgmyCoverTemplates.any((t) => t.id == template) ? template : 'royal'),
+    );
   } catch (_) {
     return null;
   }
 }
 
-Future<NgmyBookDoc> ngmyWriteBookWithAi({required String description, required int pages, String author = ''}) async {
+String _coverQueryOf(String text) {
+  final m = RegExp(r'"cover_query"\s*:\s*"([^"]*)"').firstMatch(text);
+  return m?.group(1)?.trim() ?? '';
+}
+
+Future<NgmyBookDoc> ngmyWriteBookWithAi({
+  required String description,
+  required int pages,
+  String author = '',
+  void Function(String status)? onStatus,
+}) async {
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
   final creds = ngmyParseAiCredentials(key);
   String? lastError;
   for (var attempt = 0; attempt < 2; attempt++) {
+    onStatus?.call('Writing your $pages pages…');
     final r = await ngmyAiGenerateWithCredentials(creds, ngmyBookAiPrompt(description: description, pages: pages));
     if (r.text != null) {
       final doc = ngmyParseBookAi(r.text!, author: author);
-      if (doc != null) return doc;
+      if (doc != null) {
+        onStatus?.call('Adding pictures…');
+        return _withPictures(doc, _coverQueryOf(r.text!));
+      }
     } else {
       lastError = r.error;
     }
@@ -145,23 +182,49 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({required String description, required i
       : 'The AI could not write the book. Try describing it again.';
 }
 
+/// Fetches a picture for each page (and the cover) in parallel; pages whose picture can't be
+/// found simply print without one.
+Future<NgmyBookDoc> _withPictures(NgmyBookDoc doc, String coverQuery) async {
+  Future<String> pic(String q) async {
+    if (q.trim().isEmpty) return '';
+    try {
+      final uri = await ngmySlidesFetchPicture(q).timeout(const Duration(seconds: 15));
+      // The PDF can print JPEG and PNG only.
+      if (uri == null || !(uri.startsWith('data:image/jpeg') || uri.startsWith('data:image/png') || uri.startsWith('data:image/jpg'))) return '';
+      return uri;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  final results = await Future.wait([
+    for (final c in doc.chapters) pic(c.imageQuery),
+    pic(coverQuery),
+  ]);
+  final chapters = [for (var i = 0; i < doc.chapters.length; i++) doc.chapters[i].copyWith(picture: results[i])];
+  final coverPhoto = results.last;
+  return doc.copyWith(chapters: chapters, cover: doc.cover.copyWith(photo: coverPhoto));
+}
+
 // ─── Print sheet (shared by Family Book and NGMY Slides) ──────────────────
 
 const _kInk = Color(0xFF3D2E1F);
 const _kAccent = Color(0xFF8B4513);
 
-Future<void> showNgmyBookPrintSheet(BuildContext context, NgmyBookDoc doc) {
+/// [onCoverChanged] is told when the cover is redesigned from the print screen.
+Future<void> showNgmyBookPrintSheet(BuildContext context, NgmyBookDoc doc, {ValueChanged<NgmyBookCover>? onCoverChanged}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _BookPrintSheet(doc: doc),
+    builder: (_) => _BookPrintSheet(doc: doc, onCoverChanged: onCoverChanged),
   );
 }
 
 class _BookPrintSheet extends StatefulWidget {
-  const _BookPrintSheet({required this.doc});
+  const _BookPrintSheet({required this.doc, this.onCoverChanged});
   final NgmyBookDoc doc;
+  final ValueChanged<NgmyBookCover>? onCoverChanged;
   @override
   State<_BookPrintSheet> createState() => _BookPrintSheetState();
 }
@@ -172,16 +235,34 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
   ({int pages, int sheets, int filled})? _count;
   Uint8List? _bytes;
   int _job = 0;
+  late NgmyBookDoc _doc = widget.doc;
+  final _coverKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    _prepare();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _prepare());
+  }
+
+  /// Draws the designed cover (as shown on screen) into a sharp picture for the PDF.
+  Future<Uint8List?> _captureCover() async {
+    try {
+      final photo = ngmyDataUriBytes(_doc.cover.photo);
+      if (photo != null && mounted) await precacheImage(MemoryImage(photo), context);
+      await WidgetsBinding.instance.endOfFrame;
+      final boundary = _coverKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      return data?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// The PDF is made as soon as the sheet opens (and again when an option changes), so the
-  /// Print tap opens printing straight away. Phones only allow the print / share window
-  /// right inside a tap; building the PDF first (as before) made Print do nothing.
+  /// Print tap opens it straight away — phones only allow that right inside a tap.
   Future<void> _prepare() async {
     final job = ++_job;
     setState(() {
@@ -189,8 +270,21 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
       _count = null;
     });
     try {
-      final c = await ngmyBookletCount(widget.doc, _paper);
-      final bytes = await ngmyBuildBookletPdf(widget.doc, paper: _paper, booklet: _booklet);
+      final c = await ngmyBookletCount(_doc, _paper);
+      final coverPng = await _captureCover();
+      final colors = ngmyCoverColors(_doc.cover);
+      // Page titles use the cover's accent unless it is too light to read on white paper.
+      final accent = colors.accent.computeLuminance() < 0.45
+          ? colors.accent
+          : (colors.bg1.computeLuminance() < 0.45 ? colors.bg1 : _kAccent);
+      final bytes = await ngmyBuildBookletPdf(
+        _doc,
+        paper: _paper,
+        booklet: _booklet,
+        coverPng: coverPng,
+        backColor: colors.bg1.toARGB32(),
+        accentColor: accent.toARGB32(),
+      );
       if (!mounted || job != _job) return;
       setState(() {
         _count = c;
@@ -203,17 +297,38 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
     }
   }
 
+  Future<void> _designCover() async {
+    final cover = await showNgmyBookCoverDesigner(context, _doc);
+    if (cover == null || !mounted) return;
+    setState(() => _doc = _doc.copyWith(cover: cover));
+    widget.onCoverChanged?.call(cover);
+    await WidgetsBinding.instance.endOfFrame;
+    if (mounted) _prepare();
+  }
+
   String get _fileName {
-    final t = widget.doc.title.trim().isEmpty ? 'book' : widget.doc.title.trim();
+    final t = _doc.title.trim().isEmpty ? 'book' : _doc.title.trim();
     return '${t.replaceAll(RegExp(r'[^\w\- ]+'), '').replaceAll(' ', '_')}${_booklet ? '_booklet' : ''}.pdf';
   }
+
+  bool get _isIPhone => kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS);
 
   void _print() {
     final bytes = _bytes;
     if (bytes == null) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    // Called inside the tap: share sheet (with Print) on iPhone, print window elsewhere.
-    ngmyInvoicePrintPdfDirect(bytes, _fileName).then((ok) async {
+    if (_isIPhone) {
+      // iPhone can't print a PDF from inside the app page: open it in the PDF viewer
+      // (right inside the tap so it isn't blocked), where Share → Print prints it.
+      downloadNgmyPdfBytes(bytes, _fileName).then((_) {
+        messenger?.showSnackBar(const SnackBar(
+          duration: Duration(seconds: 8),
+          content: Text('Your book is open — tap the Share button (square with the arrow), then Print. Choose both sides.'),
+        ));
+      });
+      return;
+    }
+    ngmyInvoicePrintPdfDirect(bytes, _fileName, preferPrintDialog: true).then((ok) async {
       if (ok) return;
       if (await ngmyInvoiceOpenPdfInBrowser(bytes)) return;
       await downloadNgmyPdfBytes(bytes, _fileName);
@@ -334,7 +449,39 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
                   Expanded(child: Text('Print as a book', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _kInk))),
                 ]),
                 const SizedBox(height: 12),
-                const _SheetDiagram(),
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  // The real cover, captured into the PDF exactly as shown.
+                  Container(
+                    decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))]),
+                    child: SizedBox(
+                      width: 96,
+                      height: 96 * 612 / 396,
+                      child: FittedBox(
+                        child: RepaintBoundary(
+                          key: _coverKey,
+                          child: NgmyBookCoverView(doc: _doc),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const _SheetDiagram(),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: _designCover,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _kAccent,
+                          side: const BorderSide(color: _kAccent),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.palette_rounded, size: 18),
+                        label: const Text('Design cover', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ]),
+                  ),
+                ]),
                 const SizedBox(height: 12),
                 Row(children: [
                   _choice('Fold & staple', _booklet, () => _setOption(() => _booklet = true), Icons.auto_stories_rounded),
@@ -433,8 +580,8 @@ class _SheetDiagram extends StatelessWidget {
         );
     return Center(
       child: Container(
-        width: 210,
-        height: 110,
+        width: 170,
+        height: 86,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(6),
@@ -442,7 +589,7 @@ class _SheetDiagram extends StatelessWidget {
         ),
         child: Stack(children: [
           Row(children: [page('Page'), page('Page')]),
-          Center(child: CustomPaint(size: const Size(1, 110), painter: _DashPainter())),
+          Center(child: CustomPaint(size: const Size(1, 86), painter: _DashPainter())),
         ]),
       ),
     );
@@ -631,7 +778,10 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     child: ListTile(
                       onTap: () => _open(b),
-                      leading: const Icon(Icons.menu_book_rounded, color: _kAccent),
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: SizedBox(width: 34, height: 34 * 612 / 396, child: FittedBox(child: NgmyBookCoverView(doc: b.doc))),
+                      ),
                       title: Text(b.doc.title.trim().isEmpty ? 'Untitled Book' : b.doc.title,
                           style: const TextStyle(fontWeight: FontWeight.w900, color: _kInk)),
                       subtitle: Text('${b.doc.chapters.length} page${b.doc.chapters.length == 1 ? '' : 's'} written',
@@ -692,6 +842,7 @@ class _BookAiDialogState extends State<_BookAiDialog> {
   int _pages = 8;
   bool _busy = false;
   String? _error;
+  String _status = 'Writing…';
 
   @override
   void dispose() {
@@ -711,7 +862,14 @@ class _BookAiDialogState extends State<_BookAiDialog> {
       _error = null;
     });
     try {
-      final doc = await ngmyWriteBookWithAi(description: d, pages: _pages, author: _author.text.trim());
+      final doc = await ngmyWriteBookWithAi(
+        description: d,
+        pages: _pages,
+        author: _author.text.trim(),
+        onStatus: (s) {
+          if (mounted) setState(() => _status = s);
+        },
+      );
       if (mounted) Navigator.pop(context, doc);
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
@@ -736,7 +894,7 @@ class _BookAiDialogState extends State<_BookAiDialog> {
             maxLines: 6,
             decoration: const InputDecoration(
               labelText: 'What is the book about?',
-              hintText: 'e.g. A children\'s story about our grandmother growing up in Kigoma',
+              hintText: 'e.g. A children\'s story about our grandmother in Kigoma — or in Kiswahili: Hadithi ya familia yetu',
               border: OutlineInputBorder(),
             ),
           ),
@@ -770,7 +928,7 @@ class _BookAiDialogState extends State<_BookAiDialog> {
           icon: _busy
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.auto_awesome_rounded, size: 18),
-          label: Text(_busy ? 'Writing…' : 'Write it'),
+          label: Text(_busy ? _status : 'Write it'),
         ),
       ],
     );
@@ -785,15 +943,30 @@ class _BookEditorScreen extends StatefulWidget {
   State<_BookEditorScreen> createState() => _BookEditorScreenState();
 }
 
+class _PageCtl {
+  _PageCtl(this.title, this.body, this.picture);
+  final TextEditingController title;
+  final TextEditingController body;
+  String picture;
+  void dispose() {
+    title.dispose();
+    body.dispose();
+  }
+}
+
 class _BookEditorScreenState extends State<_BookEditorScreen> {
   late final TextEditingController _title;
   late final TextEditingController _subtitle;
   late final TextEditingController _author;
-  final List<(TextEditingController, TextEditingController)> _pages = [];
+  late NgmyBookCover _cover;
+  final List<_PageCtl> _pages = [];
   Timer? _autosave;
   bool _dirty = false;
 
   TextEditingController _watch(TextEditingController c) => c..addListener(_changed);
+
+  _PageCtl _page(String title, String body, String picture) =>
+      _PageCtl(_watch(TextEditingController(text: title)), _watch(TextEditingController(text: body)), picture);
 
   /// Every change is saved on the phone a moment after you stop typing.
   void _changed() {
@@ -811,12 +984,11 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
     _title = _watch(TextEditingController(text: d.title));
     _subtitle = _watch(TextEditingController(text: d.subtitle));
     _author = _watch(TextEditingController(text: d.author));
+    _cover = d.cover;
     for (final c in d.chapters) {
-      _pages.add((_watch(TextEditingController(text: c.title)), _watch(TextEditingController(text: c.body))));
+      _pages.add(_page(c.title, c.body, c.picture));
     }
-    if (_pages.isEmpty) {
-      _pages.add((_watch(TextEditingController(text: 'Page 1')), _watch(TextEditingController())));
-    }
+    if (_pages.isEmpty) _pages.add(_page('Page 1', '', ''));
   }
 
   @override
@@ -830,8 +1002,7 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
     _subtitle.dispose();
     _author.dispose();
     for (final p in _pages) {
-      p.$1.dispose();
-      p.$2.dispose();
+      p.dispose();
     }
     super.dispose();
   }
@@ -840,7 +1011,8 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
         title: _title.text.trim(),
         subtitle: _subtitle.text.trim(),
         author: _author.text.trim(),
-        chapters: [for (final p in _pages) NgmyBookChapter(title: p.$1.text.trim(), body: p.$2.text)],
+        cover: _cover,
+        chapters: [for (final p in _pages) NgmyBookChapter(title: p.title.text.trim(), body: p.body.text, picture: p.picture)],
       );
 
   Future<void> _save() async {
@@ -851,7 +1023,7 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
   }
 
   void _addPage() {
-    setState(() => _pages.add((_watch(TextEditingController(text: 'Page ${_pages.length + 1}')), _watch(TextEditingController()))));
+    setState(() => _pages.add(_page('Page ${_pages.length + 1}', '', '')));
     _changed();
   }
 
@@ -870,10 +1042,27 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
     final p = _pages.removeAt(i);
     setState(() {});
     _changed();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      p.$1.dispose();
-      p.$2.dispose();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => p.dispose());
+  }
+
+  Future<void> _pickPicture(_PageCtl p) async {
+    try {
+      final x = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1400, imageQuality: 80);
+      if (x == null) return;
+      final bytes = await x.readAsBytes();
+      final name = x.name.toLowerCase();
+      // The PDF prints JPEG and PNG.
+      final mime = name.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      setState(() => p.picture = 'data:$mime;base64,${base64Encode(bytes)}');
+      _changed();
+    } catch (_) {}
+  }
+
+  Future<void> _designCover() async {
+    final cover = await showNgmyBookCoverDesigner(context, _doc);
+    if (cover == null || !mounted) return;
+    setState(() => _cover = cover);
+    _changed();
   }
 
   InputDecoration _deco(String label) => InputDecoration(
@@ -882,6 +1071,93 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
         fillColor: Colors.white,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       );
+
+  Widget _coverCard() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFF2B1D14), borderRadius: BorderRadius.circular(18)),
+      child: Row(children: [
+        GestureDetector(
+          onTap: _designCover,
+          child: Container(
+            decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 5))]),
+            child: SizedBox(width: 92, height: 92 * 612 / 396, child: FittedBox(child: NgmyBookCoverView(doc: _doc))),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Cover', style: TextStyle(color: Color(0xFFFAF3E8), fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text('${ngmyCoverTemplate(_cover.template).name} template · pick from 10, change colours, add your picture.',
+                style: const TextStyle(color: Color(0xB3FAF3E8), fontSize: 12, height: 1.35)),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(backgroundColor: const Color(0xFFB45309)),
+              onPressed: _designCover,
+              icon: const Icon(Icons.palette_rounded, size: 18),
+              label: const Text('Design cover', style: TextStyle(fontWeight: FontWeight.w800)),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _pictureRow(_PageCtl p) {
+    final bytes = ngmyDataUriBytes(p.picture);
+    if (bytes == null) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => _pickPicture(p),
+          icon: const Icon(Icons.add_photo_alternate_outlined, size: 18, color: _kAccent),
+          label: const Text('Add a picture', style: TextStyle(color: _kAccent, fontWeight: FontWeight.w700)),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Stack(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(bytes, height: 140, width: double.infinity, fit: BoxFit.cover, gaplessPlayback: true),
+        ),
+        Positioned(
+          right: 6,
+          top: 6,
+          child: Row(children: [
+            _roundBtn(Icons.swap_horiz_rounded, () => _pickPicture(p)),
+            const SizedBox(width: 6),
+            _roundBtn(Icons.close_rounded, () {
+              setState(() => p.picture = '');
+              _changed();
+            }),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _roundBtn(IconData icon, VoidCallback onTap) => Material(
+        color: Colors.black54,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, color: Colors.white, size: 18)),
+        ),
+      );
+
+  Future<void> _print() async {
+    await _save();
+    if (!mounted) return;
+    await showNgmyBookPrintSheet(context, _doc, onCoverChanged: (c) {
+      if (!mounted) return;
+      setState(() => _cover = c);
+      _changed();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -896,13 +1172,14 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
           foregroundColor: const Color(0xFFFAF3E8),
           title: const Text('Write your book', style: TextStyle(fontWeight: FontWeight.w900)),
           actions: [
-            IconButton(
-              tooltip: 'Print as a book',
-              icon: const Icon(Icons.print_rounded),
-              onPressed: () async {
-                await _save();
-                if (context.mounted) await showNgmyBookPrintSheet(context, _doc);
-              },
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton.icon(
+                onPressed: _print,
+                style: TextButton.styleFrom(foregroundColor: const Color(0xFFFDE68A)),
+                icon: const Icon(Icons.print_rounded, size: 20),
+                label: const Text('Print', style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
             ),
             IconButton(
               tooltip: 'Save',
@@ -926,6 +1203,8 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
         body: ListView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 90),
           children: [
+            _coverCard(),
+            const SizedBox(height: 14),
             TextField(controller: _title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18), decoration: _deco('Book title')),
             const SizedBox(height: 8),
             TextField(controller: _subtitle, decoration: _deco('Subtitle (optional)')),
@@ -950,10 +1229,11 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
                     IconButton(visualDensity: VisualDensity.compact, tooltip: 'Move down', onPressed: i == _pages.length - 1 ? null : () => _move(i, 1), icon: const Icon(Icons.arrow_downward_rounded, size: 18)),
                     IconButton(visualDensity: VisualDensity.compact, tooltip: 'Remove page', onPressed: _pages.length == 1 ? null : () => _remove(i), icon: Icon(Icons.delete_outline_rounded, size: 18, color: Colors.red.shade400)),
                   ]),
-                  TextField(controller: _pages[i].$1, style: const TextStyle(fontWeight: FontWeight.w800), decoration: _deco('Title')),
-                  const SizedBox(height: 8),
+                  TextField(controller: _pages[i].title, style: const TextStyle(fontWeight: FontWeight.w800), decoration: _deco('Title')),
+                  const SizedBox(height: 6),
+                  _pictureRow(_pages[i]),
                   TextField(
-                    controller: _pages[i].$2,
+                    controller: _pages[i].body,
                     minLines: 5,
                     maxLines: null,
                     decoration: _deco('Write here… long pages flow onto the next paper page'),

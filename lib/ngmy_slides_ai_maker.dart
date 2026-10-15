@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_ai_language.dart';
 import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
@@ -322,6 +323,7 @@ Rules:
 - Keep every slide they did not ask about exactly as it is.
 - Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
+${ngmyLanguageDirective(request)}
 - Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
 $_kFrameRule
 $_kBioRule
@@ -362,6 +364,7 @@ Rules:
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
 - "notes": 1-2 sentences the presenter can say.
 $_kLanguageRule
+${ngmyLanguageDirective(description)}
 $_kFrameRule
 $_kBioRule
 ${_pictureRule(pictureCount)}
@@ -1771,3 +1774,7 @@ class _LuxeTileSparkles extends CustomPainter {
   @override
   bool shouldRepaint(covariant _LuxeTileSparkles old) => old.a != a;
 }
+
+/// A free, openly licensed photo for [query] as a data URI (used by printable books too).
+Future<String?> ngmySlidesFetchPicture(String query) =>
+    _pictureCache.putIfAbsent(query.trim().toLowerCase(), () => _fetchPicture(query));

@@ -188,6 +188,7 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     final doc = NgmyBookDoc(
       title: name.isEmpty ? 'Our Family Book' : name,
       subtitle: 'Family Book',
+      cover: const NgmyBookCover(template: 'vintage'),
       chapters: [
         if (widget.membersPage.trim().isNotEmpty) NgmyBookChapter(title: 'Our Family', body: widget.membersPage),
         for (final e in _entries) NgmyBookChapter(title: e.title, body: e.body),

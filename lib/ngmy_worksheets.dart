@@ -63,13 +63,17 @@ class _NgmyWorksheetsScreenState extends State<NgmyWorksheetsScreen> with Widget
     }
   }
 
+  /// Never leaves the page on a spinner: a slow or failed read still opens the page
+  /// (Family Tree tab included) with whatever loaded.
   Future<void> _reload() async {
-    final list = await loadWorksheetProjects(widget.userEmail);
-    if (!mounted) return;
-    setState(() {
-      _projects = list;
-      _loading = false;
-    });
+    try {
+      final list = await loadWorksheetProjects(widget.userEmail).timeout(const Duration(seconds: 6));
+      if (!mounted) return;
+      setState(() => _projects = list);
+    } catch (_) {
+    } finally {
+      if (mounted && _loading) setState(() => _loading = false);
+    }
   }
 
   Future<void> _createProject([String? presetName]) async {
