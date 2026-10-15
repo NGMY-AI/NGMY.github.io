@@ -455,7 +455,7 @@ class _NgmyCivicVotingScreenState extends State<NgmyCivicVotingScreen> {
     final v = await NgmyCivicVotingStore.load(forceCloud: true);
     if (!mounted) return;
     setState(() => _applyBundle(v));
-    _livePoll = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _livePoll = Timer.periodic(const Duration(seconds: 20), (_) async {
       if (!mounted) return;
       final next = await NgmyCivicVotingStore.refreshWhileOpen();
       if (!mounted) return;

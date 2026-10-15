@@ -316,7 +316,7 @@ class _NgmyCodesInboxPageState extends State<NgmyCodesInboxPage> with WidgetsBin
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _reload();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (mounted && !_busy) unawaited(_reload(silent: true));
     });
   }

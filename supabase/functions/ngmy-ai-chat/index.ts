@@ -3900,7 +3900,7 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
   const DB_RELAY_MAX_ROWS = 50;
 
   if (op === "s") {
-    const readLimited = await enforceRateLimit(req, "db_read", clientIp(req), 120, 60,
+    const readLimited = relayRateLimit(req, "db_read", 120,
       `${table}${settingsRealKey ? ":" + settingsRealKey : ""}`);
     if (readLimited) return readLimited;
     let q = client.from(table).select(String(body.cols ?? "*"));
@@ -3946,7 +3946,7 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
 
   // 240/min: a registrar entering several contributions within seconds used to hit 60 and the
   // last one silently never reached the database (one phone showed $40, the rest $30).
-  const writeLimited = await enforceRateLimit(req, "db_write", clientIp(req), 240, 60,
+  const writeLimited = relayRateLimit(req, "db_write", 240,
     `${table}${settingsRealKey ? ":" + settingsRealKey : ""} ${op}`);
   if (writeLimited) return writeLimited;
 
@@ -10178,3 +10178,33 @@ serve(async (req) => {
     });
   }
 });
+
+// ── Relay rate limit, kept in memory ──────────────────────────────────────────
+// Every database read/write through the relay used to be counted with a database write
+// (and every blocked one wrote a security-log row + an error log line) — that doubled the
+// database traffic and filled the logs. Same limits, counted in memory; a block is logged
+// at most once a minute per connection.
+const relayHits = new Map<string, { start: number; n: number }>();
+const relayBlockLogged = new Map<string, number>();
+
+function relayRateLimit(req: Request, bucket: string, max: number, note: string): Response | null {
+  const ip = clientIp(req);
+  const key = `${bucket}|${ip}`;
+  const now = Date.now();
+  const slot = relayHits.get(key);
+  if (!slot || now - slot.start > 60_000) {
+    relayHits.set(key, { start: now, n: 1 });
+    if (relayHits.size > 20000) relayHits.clear();
+    return null;
+  }
+  if (++slot.n <= max) return null;
+  const last = relayBlockLogged.get(key) ?? 0;
+  if (now - last > 60_000) {
+    relayBlockLogged.set(key, now);
+    if (relayBlockLogged.size > 5000) relayBlockLogged.clear();
+    console.error("[rate-limit]", bucket, ip, note.slice(0, 120));
+    const admin = adminClient();
+    if (admin) void logSecurityEvent(admin, "rate_limit", `${bucket}:${ip} ${note}`.slice(0, 300), ip);
+  }
+  return rateLimitedResponse();
+}

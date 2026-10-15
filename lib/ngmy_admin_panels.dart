@@ -71,7 +71,7 @@ class _NgmyAdminWalletTabState extends State<NgmyAdminWalletTab> {
     _bitcoinC = TextEditingController(text: widget.config.officialBitcoin);
     unawaited(_loadArchive());
     unawaited(_refresh());
-    _livePoll = Timer.periodic(const Duration(seconds: 12), (_) {
+    _livePoll = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!mounted) return;
       unawaited(_refresh());
     });

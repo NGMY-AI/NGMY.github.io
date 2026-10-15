@@ -315,7 +315,7 @@ class _NgmyDocSharePageState extends State<NgmyDocSharePage> {
   void initState() {
     super.initState();
     unawaited(_refresh());
-    _inboxPoll = Timer.periodic(const Duration(seconds: 20), (_) {
+    _inboxPoll = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!_working && mounted) unawaited(_pullMyCodeInbox());
     });
   }

@@ -1993,7 +1993,7 @@ class _NgmyLoanTrackingScreenState extends State<NgmyLoanTrackingScreen> with Wi
     WidgetsBinding.instance.addObserver(this);
     _headerPulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
     unawaited(_pullLatest());
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_pullLatest(silent: true)));
+    _poll = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_pullLatest(silent: true)));
   }
 
   @override
@@ -2729,7 +2729,7 @@ class _NgmyLoanAdminPanelState extends State<_NgmyLoanAdminPanel> {
     super.initState();
     NgmyFeatureSyncSession.enterLoans();
     unawaited(widget.onRefreshLoans?.call());
-    _poll = Timer.periodic(const Duration(seconds: 15), (_) {
+    _poll = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!mounted) return;
       unawaited(widget.onRefreshLoans?.call().then((_) {
         if (mounted) setState(() {});

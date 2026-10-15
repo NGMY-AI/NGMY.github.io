@@ -10977,7 +10977,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!_ngmySessionIsAdmin(_currentUser)) return;
     if (!NgmyFeatureSyncSession.growthIncomeAdminActive) return;
     unawaited(_refreshPendingTransactionsFromCloud());
-    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 12), (_) {
+    _adminPendingTxnPoll = Timer.periodic(const Duration(seconds: 45), (_) {
       if (!mounted || _backgroundSyncPaused || !_ngmySessionIsAdmin(_currentUser)) return;
       if (!NgmyFeatureSyncSession.growthIncomeAdminActive) {
         _adminPendingTxnPoll?.cancel();
@@ -22874,7 +22874,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     NgmyAdminLiveRefresh.addListener(_onAdminLiveRefresh);
     Future.microtask(() => unawaited(_pullAdminCloudData()));
     Future.microtask(() => unawaited(_notifyAdminHelperGiftPendingOnOpen()));
-    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _adminRefreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       unawaited(_pullAdminCloudData());
     });
   }
@@ -48168,7 +48168,7 @@ class _StoreReceiptsPageState extends State<_StoreReceiptsPage> {
   @override
   void initState() {
     super.initState();
-    _poll = Timer.periodic(const Duration(seconds: 20), (_) => unawaited(_runPoll()));
+    _poll = Timer.periodic(const Duration(seconds: 45), (_) => unawaited(_runPoll()));
     unawaited(_runPoll());
   }
 
@@ -48726,7 +48726,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreSellAccessFromCloud());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshStoreListingsFromCloud(silent: true));
     _searchC.addListener(() => setState(() => _searchQuery = _searchC.text.trim().toLowerCase()));
-    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 25), (_) {
+    _liveOrderPollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       if (!mounted) return;
       unawaited(_syncLiveOrders());
     });
@@ -49976,7 +49976,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
         builder: (ctx, setSheet) {
           if (inboxPoll == null) {
             unawaited(refreshInbox(setSheet));
-            inboxPoll = Timer.periodic(const Duration(seconds: 20), (_) => refreshInbox(setSheet));
+            inboxPoll = Timer.periodic(const Duration(seconds: 45), (_) => refreshInbox(setSheet));
           }
           final sheetMessages = _groupedStoreMessageThreads(me);
           final openKey = sheetNav['threadKey'] as String?;

@@ -163,7 +163,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
     _ensureCountdownTicker();
     NgmyCivicWalletRefresh.addListener(_reload);
     unawaited(_refreshCloud());
-    _livePoll = Timer.periodic(const Duration(seconds: 4), (_) {
+    _livePoll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted) return;
       _reload();
       final last = _lastCloudRefreshAt;
@@ -995,7 +995,7 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       barrierDismissible: true,
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheet) {
-          nationwideLivePoll ??= Timer.periodic(const Duration(seconds: 5), (_) async {
+          nationwideLivePoll ??= Timer.periodic(const Duration(seconds: 20), (_) async {
             if (!ctx.mounted) return;
             await _refreshCloud();
             if (!ctx.mounted) return;

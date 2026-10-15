@@ -191,7 +191,7 @@ class _NgmyCivicUserGroupsHubScreenState
     super.initState();
     _owned = NgmyCivicUserGroupsStore.cachedOwnedBy(widget.userEmail);
     _joined = NgmyCivicUserGroupsStore.cachedJoinedBy(widget.userEmail);
-    _liveSync = Timer.periodic(const Duration(seconds: 8), (_) {
+    _liveSync = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       _reload();
     });
@@ -1234,7 +1234,7 @@ class _NgmyCivicUserGroupHomeScreenState
       vsync: this,
       duration: const Duration(seconds: 6),
     )..repeat();
-    _liveSync = Timer.periodic(const Duration(seconds: 8), (_) {
+    _liveSync = Timer.periodic(const Duration(seconds: 20), (_) {
       if (!mounted) return;
       _reload();
     });

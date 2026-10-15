@@ -709,7 +709,7 @@ class _NgmyAccountSnapshotQrPageState extends State<_NgmyAccountSnapshotQrPage> 
   void initState() {
     super.initState();
     unawaited(_refreshLiveQr());
-    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_refreshLiveQr()));
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) => unawaited(_refreshLiveQr()));
   }
 
   @override
