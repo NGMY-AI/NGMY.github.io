@@ -88,13 +88,28 @@ class _NgmyFamilyTreeTabState extends State<NgmyFamilyTreeTab> {
     await _reload();
   }
 
+  /// Shows the trees saved on this phone right away, then swaps in the cloud-merged list.
+  /// Before, the page waited on three database calls (up to 12 s each) and a failed one
+  /// left the spinner up forever.
   Future<void> _reload() async {
-    final trees = await loadFamilyTrees(widget.userEmail);
-    if (!mounted) return;
-    setState(() {
-      _trees = trees;
-      _loading = false;
-    });
+    try {
+      final local = await loadFamilyTreesLocalOnly(widget.userEmail);
+      if (mounted && (_loading || local.isNotEmpty)) {
+        setState(() {
+          if (local.isNotEmpty || _trees.isEmpty) _trees = local;
+          _loading = false;
+        });
+      }
+    } catch (_) {}
+    try {
+      final trees = await loadFamilyTrees(widget.userEmail).timeout(const Duration(seconds: 25));
+      if (!mounted) return;
+      setState(() => _trees = trees);
+    } catch (_) {
+      // Offline / slow: keep what the phone has.
+    } finally {
+      if (mounted && _loading) setState(() => _loading = false);
+    }
   }
 
   Future<void> _forceCloudSync() async {
@@ -1246,11 +1261,20 @@ String familyTreeMembersBookText(FamilyTree tree) {
   for (final m in vis) {
     depth[m.id] = chainDepth(m)!;
   }
-  // A married-in spouse (no parent here) belongs to their partner's generation.
+  // A married-in spouse belongs to their partner's generation: one added under their
+  // partner as "parent" first, then one with no parent here whose partner has one.
+  for (final m in vis) {
+    final p = partnerOf(m);
+    if (p != null && m.parentId == p) depth[m.id] = depth[p]!;
+  }
   for (final m in vis) {
     if (m.parentId != null && byId.containsKey(m.parentId)) continue;
     final p = partnerOf(m);
-    if (p != null && (depth[p] ?? 0) > 0) depth[m.id] = depth[p]!;
+    if (p == null) continue;
+    final partner = byId[p]!;
+    if (partner.parentId != null && byId.containsKey(partner.parentId) && partner.parentId != m.id) {
+      depth[m.id] = depth[p]!;
+    }
   }
   final gens = depth.values.toSet().toList()..sort();
   final out = StringBuffer();

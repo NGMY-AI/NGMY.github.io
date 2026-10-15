@@ -160,7 +160,12 @@ Future<String> downloadNgmyPdfBytesImpl(Uint8List pdfBytes, String filename) asy
   anchor.click();
   await Future<void>.delayed(const Duration(milliseconds: 180));
   anchor.remove();
-  html.Url.revokeObjectUrl(url);
+  // iPhone reads the file after the tap returns — revoking right away left it empty.
+  Timer(const Duration(minutes: 1), () {
+    try {
+      html.Url.revokeObjectUrl(url);
+    } catch (_) {}
+  });
   return 'Downloaded $name';
 }
 

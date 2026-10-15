@@ -1188,23 +1188,23 @@ Future<List<FamilyTree>?> _fetchFamilyTreesFromCloud(String userEmail) async {
   final email = _normalizedEmail(userEmail);
   if (email.isEmpty) return null;
   try {
-    final ownedRows = await ngmyDbRelaySelect('family_trees', eq: {'userEmail': email}, timeout: kNgmyCloudLoadTimeout);
-    List<Map<String, dynamic>> collabRows = const [];
-    try {
-      collabRows = await ngmyDbRelaySelect(
-        'family_trees',
-        contains: {'collaboratorEmails': [email]},
-        timeout: kNgmyCloudLoadTimeout,
-      );
-    } catch (e) {
-      debugPrint('[family_trees] collaborator fetch: $e');
-    }
-    List<Map<String, dynamic>> publicRows = const [];
-    try {
-      publicRows = await ngmyDbRelaySelect('family_trees', eq: {'isPrivate': false}, timeout: kNgmyCloudLoadTimeout);
-    } catch (e) {
-      debugPrint('[family_trees] public fetch: $e');
-    }
+    // All three asked at once (one after another took up to 36 s on a slow connection).
+    Future<List<Map<String, dynamic>>> optional(Future<List<Map<String, dynamic>>> f, String what) =>
+        f.catchError((Object e) {
+          debugPrint('[family_trees] $what fetch: $e');
+          return const <Map<String, dynamic>>[];
+        });
+    final results = await Future.wait([
+      ngmyDbRelaySelect('family_trees', eq: {'userEmail': email}, timeout: kNgmyCloudLoadTimeout),
+      optional(
+        ngmyDbRelaySelect('family_trees', contains: {'collaboratorEmails': [email]}, timeout: kNgmyCloudLoadTimeout),
+        'collaborator',
+      ),
+      optional(ngmyDbRelaySelect('family_trees', eq: {'isPrivate': false}, timeout: kNgmyCloudLoadTimeout), 'public'),
+    ]);
+    final ownedRows = results[0];
+    final collabRows = results[1];
+    final publicRows = results[2];
     final byId = <String, Map<String, dynamic>>{};
     for (final row in [...ownedRows, ...collabRows, ...publicRows]) {
       final id = (row['id'] ?? '').toString();

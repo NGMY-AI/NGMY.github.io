@@ -248,11 +248,16 @@ Future<_BookFonts> _loadBookFonts() async {
 }
 
 /// How many pages and sheets a book takes, for the print screen.
-Future<({int pages, int sheets})> ngmyBookletCount(NgmyBookDoc doc, NgmyBookPaper paper) async {
+/// [filled] = pages up to the last written one (the rest are blanks that fill the sheet).
+Future<({int pages, int sheets, int filled})> ngmyBookletCount(NgmyBookDoc doc, NgmyBookPaper paper) async {
   final fonts = await _loadBookFonts();
   final size = ngmyBookPageSize(paper);
   final pages = ngmyPaginateBook(doc, pageWidth: size.width, pageHeight: size.height, measure: fonts.measure);
-  return (pages: pages.length, sheets: pages.length ~/ 4);
+  var filled = pages.length;
+  while (filled > 1 && pages[filled - 1].isBlank) {
+    filled--;
+  }
+  return (pages: pages.length, sheets: pages.length ~/ 4, filled: filled);
 }
 
 /// The PDF to print. [booklet] = sideways sheets, two pages per side with the fold line;
@@ -298,11 +303,25 @@ Future<Uint8List> ngmyBuildBookletPdf(NgmyBookDoc doc, {NgmyBookPaper paper = Ng
   final pdf = pw.Document(title: doc.title, author: doc.author);
   if (booklet) {
     final format = PdfPageFormat(size.width * 2, size.height, marginAll: 0);
-    for (final (left, right) in ngmyBookletSides(pages.length)) {
+    final sides = ngmyBookletSides(pages.length);
+    final sheets = sides.length ~/ 2;
+    for (var k = 0; k < sides.length; k++) {
+      final (left, right) = sides[k];
+      final sheetNo = k ~/ 2 + 1;
+      final face = k.isEven ? 'front' : 'back';
       pdf.addPage(pw.Page(
         pageFormat: format,
         build: (_) => pw.Stack(children: [
           pw.Row(children: [half(pages[left]), half(pages[right])]),
+          // Tiny stacking label: sheet 1 is the outside sheet, the last one is the middle.
+          pw.Positioned(
+            left: 14,
+            bottom: 10,
+            child: pw.Text(
+              'Sheet $sheetNo of $sheets · $face${sheetNo == 1 ? ' (outside)' : sheetNo == sheets ? ' (middle)' : ''}',
+              style: pw.TextStyle(font: fonts.regular, fontSize: 6.5, color: PdfColor.fromInt(0xFFB0B5BD)),
+            ),
+          ),
           // The fold / staple line down the middle of the sheet.
           pw.Positioned.fill(
             child: pw.CustomPaint(

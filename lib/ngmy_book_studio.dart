@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_ai_client.dart';
 import 'ngmy_invoice_print.dart';
 import 'ngmy_print_booklet.dart';
+import 'ngmy_slides_storage_idb_stub.dart' if (dart.library.html) 'ngmy_slides_storage_idb_web.dart';
 
 // ─── Storage (this device) ────────────────────────────────────────────────
 
@@ -25,23 +28,75 @@ class NgmySavedBook {
 
 String _booksKey(String email) => 'ngmy_books_v1_${email.toLowerCase().trim()}';
 
-Future<List<NgmySavedBook>> loadNgmyBooks(String email) async {
+List<NgmySavedBook> _decodeBooks(String? raw) {
+  if (raw == null || raw.isEmpty) return [];
   try {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_booksKey(email));
-    if (raw == null || raw.isEmpty) return [];
     final list = jsonDecode(raw);
     if (list is! List) return [];
-    return list.whereType<Map>().map((e) => NgmySavedBook.fromJson(Map<String, dynamic>.from(e))).where((b) => b.id.isNotEmpty).toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return list.whereType<Map>().map((e) => NgmySavedBook.fromJson(Map<String, dynamic>.from(e))).where((b) => b.id.isNotEmpty).toList();
   } catch (_) {
     return [];
   }
 }
 
-Future<void> saveNgmyBooks(String email, List<NgmySavedBook> books) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_booksKey(email), jsonEncode(books.map((b) => b.toJson()).toList()));
+/// Books live in the phone's IndexedDB (big room) with a copy in local storage. Local
+/// storage alone is small and was already full from other app data on the web, so saves
+/// failed quietly and books vanished. Both copies are merged; the newest edit of a book wins.
+Future<List<NgmySavedBook>> loadNgmyBooks(String email) async {
+  final byId = <String, NgmySavedBook>{};
+  void take(List<NgmySavedBook> list) {
+    for (final b in list) {
+      final have = byId[b.id];
+      if (have == null || b.updatedAt.isAfter(have.updatedAt)) byId[b.id] = b;
+    }
+  }
+
+  try {
+    take(_decodeBooks(await ngmySlidesIdbGet(_booksKey(email))));
+  } catch (_) {}
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    take(_decodeBooks(prefs.getString(_booksKey(email))));
+  } catch (_) {}
+  final deleted = await _deletedBookIds(email);
+  return byId.values.where((b) => !deleted.contains(b.id)).toList()..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+}
+
+Future<bool> saveNgmyBooks(String email, List<NgmySavedBook> books) async {
+  final json = jsonEncode(books.map((b) => b.toJson()).toList());
+  var ok = false;
+  try {
+    ok = await ngmySlidesIdbPut(_booksKey(email), json);
+  } catch (_) {}
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    ok = await prefs.setString(_booksKey(email), json) || ok;
+  } catch (_) {
+    // Local storage full — IndexedDB still has it.
+  }
+  return ok;
+}
+
+String _deletedKey(String email) => 'ngmy_books_deleted_v1_${email.toLowerCase().trim()}';
+
+Future<Set<String>> _deletedBookIds(String email) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    return (prefs.getStringList(_deletedKey(email)) ?? const <String>[]).toSet();
+  } catch (_) {
+    return {};
+  }
+}
+
+Future<void> deleteNgmyBook(String email, String id) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final ids = {...?prefs.getStringList(_deletedKey(email)), id};
+    await prefs.setStringList(_deletedKey(email), ids.toList());
+  } catch (_) {}
+  final list = await loadNgmyBooks(email)
+    ..removeWhere((b) => b.id == id);
+  await saveNgmyBooks(email, list);
 }
 
 // ─── AI writer ────────────────────────────────────────────────────────────
@@ -114,18 +169,38 @@ class _BookPrintSheet extends StatefulWidget {
 class _BookPrintSheetState extends State<_BookPrintSheet> {
   NgmyBookPaper _paper = NgmyBookPaper.letter;
   bool _booklet = true;
-  bool _busy = false;
-  ({int pages, int sheets})? _count;
+  ({int pages, int sheets, int filled})? _count;
+  Uint8List? _bytes;
+  int _job = 0;
 
   @override
   void initState() {
     super.initState();
-    _recount();
+    _prepare();
   }
 
-  Future<void> _recount() async {
-    final c = await ngmyBookletCount(widget.doc, _paper);
-    if (mounted) setState(() => _count = c);
+  /// The PDF is made as soon as the sheet opens (and again when an option changes), so the
+  /// Print tap opens printing straight away. Phones only allow the print / share window
+  /// right inside a tap; building the PDF first (as before) made Print do nothing.
+  Future<void> _prepare() async {
+    final job = ++_job;
+    setState(() {
+      _bytes = null;
+      _count = null;
+    });
+    try {
+      final c = await ngmyBookletCount(widget.doc, _paper);
+      final bytes = await ngmyBuildBookletPdf(widget.doc, paper: _paper, booklet: _booklet);
+      if (!mounted || job != _job) return;
+      setState(() {
+        _count = c;
+        _bytes = bytes;
+      });
+    } catch (e) {
+      if (mounted && job == _job) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('Could not make the book: $e')));
+      }
+    }
   }
 
   String get _fileName {
@@ -133,27 +208,24 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
     return '${t.replaceAll(RegExp(r'[^\w\- ]+'), '').replaceAll(' ', '_')}${_booklet ? '_booklet' : ''}.pdf';
   }
 
-  Future<void> _go({required bool download}) async {
-    if (_busy) return;
-    setState(() => _busy = true);
+  void _print() {
+    final bytes = _bytes;
+    if (bytes == null) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      final bytes = await ngmyBuildBookletPdf(widget.doc, paper: _paper, booklet: _booklet);
-      if (download) {
-        await downloadNgmyPdfBytes(bytes, _fileName);
-        messenger?.showSnackBar(const SnackBar(content: Text('Book PDF saved.')));
-      } else {
-        final ok = await ngmyInvoicePrintPdfDirect(bytes, _fileName, preferPrintDialog: true);
-        if (!ok) {
-          await downloadNgmyPdfBytes(bytes, _fileName);
-          messenger?.showSnackBar(const SnackBar(content: Text('Could not open printing here — the PDF was saved instead.')));
-        }
-      }
-    } catch (e) {
-      messenger?.showSnackBar(SnackBar(content: Text('Could not make the book: $e')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    // Called inside the tap: share sheet (with Print) on iPhone, print window elsewhere.
+    ngmyInvoicePrintPdfDirect(bytes, _fileName).then((ok) async {
+      if (ok) return;
+      if (await ngmyInvoiceOpenPdfInBrowser(bytes)) return;
+      await downloadNgmyPdfBytes(bytes, _fileName);
+      messenger?.showSnackBar(const SnackBar(content: Text('Printing could not open here — the PDF was saved. Open it and print.')));
+    });
+  }
+
+  void _save() {
+    final bytes = _bytes;
+    if (bytes == null) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    downloadNgmyPdfBytes(bytes, _fileName).then((msg) => messenger?.showSnackBar(SnackBar(content: Text(msg))));
   }
 
   Widget _choice(String label, bool selected, VoidCallback onTap, IconData icon) {
@@ -181,96 +253,160 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
     );
   }
 
+  void _setOption(VoidCallback change) {
+    setState(change);
+    _prepare();
+  }
+
+  String _pageName(int i, int filled) {
+    if (i == 0) return 'Cover';
+    if (i >= filled) return 'blank';
+    return 'p.$i';
+  }
+
+  /// Which pages land on each sheet — the folding math, shown so you can check your stack.
+  Widget _sheetMap(({int pages, int sheets, int filled}) c) {
+    final sides = ngmyBookletSides(c.pages);
+    Widget side(String face, (int, int) s) => Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            child: Column(children: [
+              Text(face, style: TextStyle(fontSize: 10, color: _kInk.withValues(alpha: 0.55), fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Row(children: [
+                Expanded(
+                  child: Text(_pageName(s.$1, c.filled),
+                      textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, color: _kInk, fontSize: 12)),
+                ),
+                Container(width: 1, height: 16, color: const Color(0xFF9CA3AF)),
+                Expanded(
+                  child: Text(_pageName(s.$2, c.filled),
+                      textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900, color: _kInk, fontSize: 12)),
+                ),
+              ]),
+            ]),
+          ),
+        );
+    return Column(children: [
+      for (var i = 0; i < c.sheets; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(children: [
+            SizedBox(
+              width: 66,
+              child: Text(
+                'Sheet ${i + 1}${i == 0 ? '\noutside' : i == c.sheets - 1 ? '\nmiddle' : ''}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _kAccent, height: 1.2),
+              ),
+            ),
+            side('front', sides[i * 2]),
+            side('back', sides[i * 2 + 1]),
+          ]),
+        ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _count;
+    final ready = _bytes != null;
     return SafeArea(
       top: false,
       child: Container(
         margin: const EdgeInsets.all(10),
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.88),
         decoration: BoxDecoration(color: const Color(0xFFFAF3E8), borderRadius: BorderRadius.circular(22)),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Center(
-            child: Container(
-                width: 40, height: 4, decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(9))),
-          ),
-          const SizedBox(height: 12),
-          const Row(children: [
-            Icon(Icons.menu_book_rounded, color: _kAccent),
-            SizedBox(width: 8),
-            Expanded(child: Text('Print as a book', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _kInk))),
-          ]),
-          const SizedBox(height: 12),
-          const _SheetDiagram(),
-          const SizedBox(height: 12),
-          Row(children: [
-            _choice('Fold & staple', _booklet, () => setState(() => _booklet = true), Icons.auto_stories_rounded),
-            const SizedBox(width: 8),
-            _choice('Single pages', !_booklet, () => setState(() => _booklet = false), Icons.description_outlined),
-          ]),
-          const SizedBox(height: 8),
-          Row(children: [
-            for (final p in NgmyBookPaper.values) ...[
-              _choice(ngmyBookPaperLabel(p), _paper == p, () {
-                setState(() {
-                  _paper = p;
-                  _count = null;
-                });
-                _recount();
-              }, Icons.crop_portrait_rounded),
-              if (p != NgmyBookPaper.values.last) const SizedBox(width: 8),
-            ],
-          ]),
-          const SizedBox(height: 12),
-          Text(
-            c == null
-                ? 'Counting pages…'
-                : _booklet
-                    ? '${c.pages} book pages → ${c.sheets} sheet${c.sheets == 1 ? '' : 's'} of paper.'
-                    : '${c.pages} pages.',
-            style: const TextStyle(fontWeight: FontWeight.w800, color: _kInk),
-          ),
-          if (_booklet) ...[
-            const SizedBox(height: 6),
-            Text(
-              '1. Print on both sides — choose "flip on short edge".\n'
-              '2. Keep the sheets in order and stack them.\n'
-              '3. Fold along the dashed middle line and staple on it.',
-              style: TextStyle(color: _kInk.withValues(alpha: 0.8), height: 1.45, fontSize: 13),
-            ),
-          ],
-          const SizedBox(height: 14),
-          Row(children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _busy ? null : () => _go(download: true),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kAccent,
-                  side: const BorderSide(color: _kAccent),
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 8),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(
+                  child: Container(
+                      width: 40, height: 4, decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(9))),
                 ),
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('Save PDF', style: TextStyle(fontWeight: FontWeight.w800)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: _busy ? null : () => _go(download: false),
-                style: FilledButton.styleFrom(
-                  backgroundColor: _kAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                const SizedBox(height: 12),
+                const Row(children: [
+                  Icon(Icons.menu_book_rounded, color: _kAccent),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Print as a book', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: _kInk))),
+                ]),
+                const SizedBox(height: 12),
+                const _SheetDiagram(),
+                const SizedBox(height: 12),
+                Row(children: [
+                  _choice('Fold & staple', _booklet, () => _setOption(() => _booklet = true), Icons.auto_stories_rounded),
+                  const SizedBox(width: 8),
+                  _choice('Single pages', !_booklet, () => _setOption(() => _booklet = false), Icons.description_outlined),
+                ]),
+                const SizedBox(height: 8),
+                Row(children: [
+                  for (final p in NgmyBookPaper.values) ...[
+                    _choice(ngmyBookPaperLabel(p), _paper == p, () => _setOption(() => _paper = p), Icons.crop_portrait_rounded),
+                    if (p != NgmyBookPaper.values.last) const SizedBox(width: 8),
+                  ],
+                ]),
+                const SizedBox(height: 12),
+                Text(
+                  c == null
+                      ? 'Getting your book ready…'
+                      : _booklet
+                          ? '${c.filled} book pages → ${c.sheets} sheet${c.sheets == 1 ? '' : 's'} of paper (4 pages per sheet).'
+                          : '${c.filled} pages.',
+                  style: const TextStyle(fontWeight: FontWeight.w800, color: _kInk),
                 ),
-                icon: _busy
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.print_rounded, size: 18),
-                label: const Text('Print', style: TextStyle(fontWeight: FontWeight.w800)),
-              ),
+                if (_booklet) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '1. Print on both sides — choose "flip on short edge" and "actual size" (100%).\n'
+                    '2. Every sheet has a tiny label in the corner: Sheet 1, Sheet 2…\n'
+                    '3. Put them inside each other: Sheet 1 on the outside, Sheet 2 inside it, and so on — the last sheet is the middle.\n'
+                    '4. Fold on the dashed middle line and staple right on the line.',
+                    style: TextStyle(color: _kInk.withValues(alpha: 0.8), height: 1.45, fontSize: 13),
+                  ),
+                  if (c != null) ...[
+                    const SizedBox(height: 10),
+                    _sheetMap(c),
+                  ],
+                ],
+              ]),
             ),
-          ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+            child: Row(children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: ready ? _save : null,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kAccent,
+                    side: const BorderSide(color: _kAccent),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: const Text('Save PDF', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: ready ? _print : null,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _kAccent,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: ready
+                      ? const Icon(Icons.print_rounded, size: 18)
+                      : const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                  label: const Text('Print', style: TextStyle(fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ]),
+          ),
         ]),
       ),
     );
@@ -362,32 +498,54 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
     });
   }
 
-  Future<void> _open(NgmySavedBook book) async {
+  Future<void> _saveChain = Future<void>.value();
+
+  /// Saves one book: updates the list on screen at once, then writes it (writes run one
+  /// after another, so a slow save can never overwrite a newer one).
+  Future<void> _store(NgmySavedBook b) {
+    b.updatedAt = DateTime.now();
+    final i = _books.indexWhere((x) => x.id == b.id);
+    if (i < 0) {
+      _books.insert(0, b);
+    } else {
+      _books[i] = b;
+    }
+    // May be called while the editor is closing, so redraw on the next turn.
+    Future.microtask(() {
+      if (mounted) setState(() {});
+    });
+    _saveChain = _saveChain.then((_) async {
+      final list = await loadNgmyBooks(widget.userEmail);
+      final j = list.indexWhere((x) => x.id == b.id);
+      if (j < 0) {
+        list.insert(0, b);
+      } else {
+        list[j] = b;
+      }
+      await saveNgmyBooks(widget.userEmail, list);
+    }).catchError((_) {});
+    return _saveChain;
+  }
+
+  Future<void> _open(NgmySavedBook book, {bool isNew = false}) async {
+    if (isNew) await _store(book);
+    if (!mounted) return;
     await Navigator.of(context).push<void>(MaterialPageRoute(
-      builder: (_) => _BookEditorScreen(
-        book: book,
-        onSave: (b) async {
-          b.updatedAt = DateTime.now();
-          final list = await loadNgmyBooks(widget.userEmail);
-          final i = list.indexWhere((x) => x.id == b.id);
-          if (i < 0) {
-            list.insert(0, b);
-          } else {
-            list[i] = b;
-          }
-          await saveNgmyBooks(widget.userEmail, list);
-        },
-      ),
+      builder: (_) => _BookEditorScreen(book: book, onSave: _store),
     ));
+    await _saveChain;
     await _reload();
   }
 
   void _newBook({NgmyBookDoc? doc}) {
-    _open(NgmySavedBook(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
-      doc: doc ?? const NgmyBookDoc(title: 'My Book', chapters: [NgmyBookChapter(title: 'Chapter 1', body: '')]),
-      updatedAt: DateTime.now(),
-    ));
+    _open(
+      NgmySavedBook(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        doc: doc ?? const NgmyBookDoc(title: 'My Book', chapters: [NgmyBookChapter(title: 'Chapter 1', body: '')]),
+        updatedAt: DateTime.now(),
+      ),
+      isNew: true,
+    );
   }
 
   Future<void> _writeWithAi() async {
@@ -413,9 +571,9 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
       ),
     );
     if (ok != true) return;
-    final list = await loadNgmyBooks(widget.userEmail)
-      ..removeWhere((x) => x.id == b.id);
-    await saveNgmyBooks(widget.userEmail, list);
+    setState(() => _books.removeWhere((x) => x.id == b.id));
+    await _saveChain;
+    await deleteNgmyBook(widget.userEmail, b.id);
     await _reload();
   }
 
@@ -632,22 +790,42 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
   late final TextEditingController _subtitle;
   late final TextEditingController _author;
   final List<(TextEditingController, TextEditingController)> _pages = [];
+  Timer? _autosave;
+  bool _dirty = false;
+
+  TextEditingController _watch(TextEditingController c) => c..addListener(_changed);
+
+  /// Every change is saved on the phone a moment after you stop typing.
+  void _changed() {
+    _dirty = true;
+    _autosave?.cancel();
+    _autosave = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) _save();
+    });
+  }
 
   @override
   void initState() {
     super.initState();
     final d = widget.book.doc;
-    _title = TextEditingController(text: d.title);
-    _subtitle = TextEditingController(text: d.subtitle);
-    _author = TextEditingController(text: d.author);
+    _title = _watch(TextEditingController(text: d.title));
+    _subtitle = _watch(TextEditingController(text: d.subtitle));
+    _author = _watch(TextEditingController(text: d.author));
     for (final c in d.chapters) {
-      _pages.add((TextEditingController(text: c.title), TextEditingController(text: c.body)));
+      _pages.add((_watch(TextEditingController(text: c.title)), _watch(TextEditingController(text: c.body))));
     }
-    if (_pages.isEmpty) _addPage();
+    if (_pages.isEmpty) {
+      _pages.add((_watch(TextEditingController(text: 'Page 1')), _watch(TextEditingController())));
+    }
   }
 
   @override
   void dispose() {
+    _autosave?.cancel();
+    if (_dirty) {
+      widget.book.doc = _doc;
+      widget.onSave(widget.book);
+    }
     _title.dispose();
     _subtitle.dispose();
     _author.dispose();
@@ -666,12 +844,15 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
       );
 
   Future<void> _save() async {
+    _autosave?.cancel();
+    _dirty = false;
     widget.book.doc = _doc;
     await widget.onSave(widget.book);
   }
 
   void _addPage() {
-    setState(() => _pages.add((TextEditingController(text: 'Page ${_pages.length + 1}'), TextEditingController())));
+    setState(() => _pages.add((_watch(TextEditingController(text: 'Page ${_pages.length + 1}')), _watch(TextEditingController()))));
+    _changed();
   }
 
   void _move(int i, int dir) {
@@ -682,11 +863,13 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
       _pages[i] = _pages[j];
       _pages[j] = t;
     });
+    _changed();
   }
 
   void _remove(int i) {
     final p = _pages.removeAt(i);
     setState(() {});
+    _changed();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       p.$1.dispose();
       p.$2.dispose();
