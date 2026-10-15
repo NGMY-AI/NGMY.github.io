@@ -1236,23 +1236,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
               children: [
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)))),
                 const SizedBox(height: 14),
-                // Centered header: glowing badge, title, one short line.
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
-                      boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 16)],
-                    ),
-                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 15),
-                      SizedBox(width: 6),
-                      Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.5)),
-                    ]),
-                  ),
-                ),
-                const SizedBox(height: 10),
+                // Centered header: title and one short line.
                 const Text(
                   'Create with AI',
                   textAlign: TextAlign.center,

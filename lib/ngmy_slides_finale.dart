@@ -57,6 +57,8 @@ const kNgmyFinales = <NgmyFinaleStyle>[
   NgmyFinaleStyle('flowers', 'Blooming Garden', 'Growing together', [Color(0xFF2A0E2E), Color(0xFF0A030C)], _rose),
   NgmyFinaleStyle('music', 'Music Party', 'Celebrate with us', [Color(0xFF13072E), Color(0xFF020108)], _silver),
   NgmyFinaleStyle('mandala', 'Royal Mandala', 'Harmony and unity', [Color(0xFF2A0A3A), Color(0xFF07020C)], _gold),
+  NgmyFinaleStyle('sparklers', 'Golden Sparklers', 'Light up the night', [Color(0xFF1A1206), Color(0xFF050302)], _gold),
+  NgmyFinaleStyle('city', 'City Lights', 'The whole city celebrates', [Color(0xFF0B1230), Color(0xFF020617)], _gold),
 ];
 
 NgmyFinaleStyle? ngmyFinaleStyle(String? id) {
@@ -334,6 +336,10 @@ class _FinalePainter extends CustomPainter {
         _music(canvas, size, t);
       case 'mandala':
         _mandala(canvas, size, t);
+      case 'sparklers':
+        _sparklers(canvas, size, t);
+      case 'city':
+        _city(canvas, size, t);
     }
   }
 
@@ -1477,6 +1483,79 @@ class _FinalePainter extends CustomPainter {
       ..shader = RadialGradient(colors: [const Color(0xFFF5C451).withValues(alpha: 0.25), const Color(0x00F5C451)])
           .createShader(Rect.fromCircle(center: center, radius: m * 0.17)));
     _twinkles(c, s, t, 30, const Color(0xFFFDE68A), seed: 300);
+  }
+
+  // 31. Golden Sparklers ----------------------------------------------------
+
+  void _sparklers(Canvas c, Size s, double t) {
+    final m = math.min(s.width, s.height);
+    for (final side in [-1.0, 1.0]) {
+      final base = Offset(s.width / 2 + side * s.width * 0.34, s.height * 0.95);
+      final sway = math.sin(t * 1.3 + side) * 0.12;
+      final tipOff = Offset(math.sin(sway) * m * 0.45 - side * m * 0.08, -math.cos(sway) * m * 0.45);
+      final tip = base + tipOff;
+      c.drawLine(base, tip, Paint()
+        ..color = const Color(0xFF6B7280)
+        ..strokeWidth = m * 0.008
+        ..strokeCap = StrokeCap.round);
+      c.drawCircle(tip, m * 0.06, Paint()
+        ..shader = RadialGradient(colors: [const Color(0xFFFFFBEB), const Color(0xFFF5C451).withValues(alpha: 0.6), const Color(0x00F5C451)])
+            .createShader(Rect.fromCircle(center: tip, radius: m * 0.06)));
+      // Sparks spitting out in every direction, with little forks.
+      for (var i = 0; i < n(70); i++) {
+        final period = 0.5 + 0.4 * _r(i, 1);
+        final v = ((t + _r(i, 2) * period) % period) / period;
+        final cyc = ((t + _r(i, 2) * period) / period).floor();
+        final a = _r(i * 31 + cyc, 3) * math.pi * 2;
+        final len = m * (0.06 + 0.16 * _r(i * 17 + cyc, 4));
+        final p0 = tip + Offset(math.cos(a), math.sin(a)) * len * v * 0.6;
+        final p1 = tip + Offset(math.cos(a), math.sin(a)) * len * v;
+        final paint = Paint()
+          ..color = Color.lerp(const Color(0xFFFFFBEB), const Color(0xFFF59E0B), v)!.withValues(alpha: 1 - v)
+          ..strokeWidth = math.max(0.8, m * 0.003)
+          ..strokeCap = StrokeCap.round
+          ..blendMode = BlendMode.plus;
+        c.drawLine(p0, p1, paint);
+        if (v > 0.6) {
+          c.drawLine(p1, p1 + Offset(math.cos(a + 0.7), math.sin(a + 0.7)) * len * 0.15, paint);
+          c.drawLine(p1, p1 + Offset(math.cos(a - 0.7), math.sin(a - 0.7)) * len * 0.15, paint);
+        }
+      }
+    }
+    _twinkles(c, s, t, 35, const Color(0xFFFDE68A), seed: 310);
+  }
+
+  // 32. City Lights ---------------------------------------------------------
+
+  void _city(Canvas c, Size s, double t) {
+    _fireworks(c, Size(s.width, s.height * 0.75), t * 0.9);
+    final m = math.min(s.width, s.height);
+    // Skyline.
+    var x = 0.0;
+    var i = 0;
+    while (x < s.width) {
+      final w = m * (0.08 + 0.1 * _r(i, 1));
+      final h = s.height * (0.14 + 0.24 * _r(i, 2));
+      final rect = Rect.fromLTWH(x, s.height - h, w, h);
+      c.drawRect(rect, Paint()
+        ..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E1B4B), Color(0xFF020617)])
+            .createShader(rect));
+      // Windows lighting up and going off.
+      final cols = (w / (m * 0.025)).floor();
+      final rows = (h / (m * 0.035)).floor();
+      for (var cx = 0; cx < cols; cx++) {
+        for (var cy = 0; cy < rows; cy++) {
+          final on = math.sin(t * (0.3 + _r(i * 50 + cx, cy)) + cx * 1.7 + cy * 2.3 + i) > 0.2;
+          if (!on) continue;
+          c.drawRect(
+            Rect.fromLTWH(x + m * 0.008 + cx * m * 0.025, s.height - h + m * 0.012 + cy * m * 0.035, m * 0.012, m * 0.016),
+            Paint()..color = const Color(0xFFFDE68A).withValues(alpha: 0.85),
+          );
+        }
+      }
+      x += w + m * 0.01;
+      i++;
+    }
   }
 
   @override
