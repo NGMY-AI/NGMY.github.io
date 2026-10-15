@@ -2350,7 +2350,8 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
       if (same) return;
     }
     _bytes = bytes;
-    _memoryProvider = MemoryImage(bytes);
+    // Decoded at about the size it's shown (not the photo's full size) — faster and lighter.
+    _memoryProvider = ResizeImage(MemoryImage(bytes), width: (widget.size * 3).round().clamp(96, 600), policy: ResizeImagePolicy.fit);
     if (rebuild && mounted) setState(() {});
   }
 
@@ -2471,6 +2472,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
       child: Image.asset(
         path,
         key: ValueKey<String>('asset_$path'),
+        cacheWidth: (widget.size * 3).round().clamp(96, 600),
         width: widget.size,
         height: widget.size,
         fit: BoxFit.cover,
@@ -2980,6 +2982,7 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
   final _searchCtrl = TextEditingController();
   late final AnimationController _bgCtrl;
   late final AnimationController _floatCtrl;
+  final ValueNotifier<bool> _hubScrolling = ValueNotifier<bool>(false);
 
   @override
   void initState() {
@@ -3102,8 +3105,23 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
       backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          _LoveWorldBackground(ctrl: _bgCtrl, floatCtrl: _floatCtrl, isDark: isDark),
-          Positioned.fill(child: _companionGrid(context, topPad: topPad, bottomPad: bottomPad)),
+          RepaintBoundary(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _hubScrolling,
+              builder: (context, scrolling, _) =>
+                  _LoveWorldBackground(ctrl: _bgCtrl, floatCtrl: _floatCtrl, isDark: isDark, still: scrolling),
+            ),
+          ),
+          Positioned.fill(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n is ScrollStartNotification) _hubScrolling.value = true;
+                if (n is ScrollEndNotification) _hubScrolling.value = false;
+                return false;
+              },
+              child: RepaintBoundary(child: _companionGrid(context, topPad: topPad, bottomPad: bottomPad)),
+            ),
+          ),
           SafeArea(
             bottom: false,
             child: _worldTopFrame(context),
@@ -3356,7 +3374,9 @@ class _Companion3DCard extends StatelessWidget {
       const Color(0xFFEC4899),
     ];
     return AnimatedBuilder(
-      animation: floatCtrl,
+      // Not tied to the float clock (it never used it) — the HUD motion above already redraws
+      // the card a few times a second; this rebuilt every card 60 times a second for nothing.
+      animation: kAlwaysCompleteAnimation,
       child: Center(
         child: RepaintBoundary(
           child: NgmyCommunicateAvatar(

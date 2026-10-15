@@ -62,20 +62,56 @@ class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateM
 
   @override
   void dispose() {
+    _tick.removeListener(_onTick);
     _pulse.dispose();
     _scan.dispose();
     _orbit.dispose();
     super.dispose();
   }
 
+  /// Redraws ~20 times a second (not 60) and holds still while the list scrolls — the whole
+  /// grid of cards was being rebuilt every frame, which made Advisors slow to open and scroll.
+  int _lastTick = 0;
+  bool _scrolling = false;
+  late final Listenable _tick = Listenable.merge([_pulse, _scan, _orbit]);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tick.removeListener(_onTick);
+    _tick.addListener(_onTick);
+  }
+
+  void _onTick() {
+    if (_scrolling || !mounted) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastTick < 50) return;
+    _lastTick = now;
+    setState(() {});
+  }
+
+  void _setScrolling(bool v) {
+    if (_scrolling == v) return;
+    _scrolling = v;
+    for (final c in [_pulse, _scan, _orbit]) {
+      if (v) {
+        c.stop(canceled: false);
+      } else if (!c.isAnimating) {
+        c == _pulse ? c.repeat(reverse: true) : c.repeat();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_pulse, _scan, _orbit]),
-      builder: (context, _) {
-        final pulse = Curves.easeInOut.transform(_pulse.value);
-        return widget.builder(context, pulse, _scan.value, _orbit.value);
+    final pulse = Curves.easeInOut.transform(_pulse.value);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n is ScrollStartNotification) _setScrolling(true);
+        if (n is ScrollEndNotification) _setScrolling(false);
+        return false;
       },
+      child: widget.builder(context, pulse, _scan.value, _orbit.value),
     );
   }
 }

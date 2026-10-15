@@ -4693,196 +4693,329 @@ class _NgmyHomeCloudCardsSheetState extends State<_NgmyHomeCloudCardsSheet> {
     final saved = _savedCards;
     final local = _localOnly;
     final name = (widget.displayName ?? '').trim();
+    final full = saved.length >= kNgmyHomeCloudCardSlots;
+    final ink = dark ? Colors.white : const Color(0xFF0F172A);
+    final muted = dark ? Colors.white60 : const Color(0xFF64748B);
+    const accent = Color(0xFF60A5FA);
+    const accent2 = Color(0xFF8B5CF6);
+
+    Widget section(IconData icon, String title, String trailing) => Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                gradient: const LinearGradient(colors: [accent, accent2]),
+              ),
+              child: Icon(icon, color: Colors.white, size: 16),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: ink))),
+            Text(trailing, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: muted)),
+          ],
+        );
 
     return DraggableScrollableSheet(
-      initialChildSize: 0.88,
+      initialChildSize: 0.9,
       minChildSize: 0.5,
       maxChildSize: 0.96,
       expand: false,
       builder: (ctx, scroll) {
         return Container(
           decoration: BoxDecoration(
-            color: dark ? const Color(0xFF0B1220) : const Color(0xFFF8FAFC),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: dark ? const [Color(0xFF111A33), Color(0xFF070B16)] : const [Color(0xFFEFF4FF), Color(0xFFF8FAFC)],
+            ),
+            border: Border(top: BorderSide(color: accent.withValues(alpha: 0.35))),
           ),
-          child: ListView(
-            controller: scroll,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          child: Stack(
             children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: dark ? Colors.white24 : Colors.black26,
-                    borderRadius: BorderRadius.circular(99),
+              ListView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(color: dark ? Colors.white24 : Colors.black26, borderRadius: BorderRadius.circular(99)),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Saved cards',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: dark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${saved.length}/$kNgmyHomeCloudCardSlots saved · same account on every phone. '
-                'Swipe the stack, remove one to free a slot, then Save another. '
-                'Deleting with X on Home does not auto-save the next card.',
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.35,
-                  color: dark ? Colors.white70 : const Color(0xFF475569),
-                ),
-              ),
-              if (_status != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _status!,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: dark ? const Color(0xFF86EFAC) : const Color(0xFF166534),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Text(
-                'On your account',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: dark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (saved.isEmpty)
-                Container(
-                  height: 120,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: dark ? Colors.white12 : const Color(0xFFCBD5E1)),
-                  ),
-                  child: Text(
-                    'No cards saved yet. Save up to $kNgmyHomeCloudCardSlots below.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
-                  ),
-                )
-              else
-                NgmyGlassCardStack<NgmySpendingEntry>(
-                  height: ngmyHomeCardHeightFor(MediaQuery.sizeOf(context).width - 40),
-                  items: saved,
-                  itemId: (e) => e.id,
-                  autoPlay: false,
-                  slideStyle: NgmyHomeCardSlideStyle.slideLeft,
-                  emptyBuilder: (_) => const SizedBox.shrink(),
-                  cardBuilder: (c, entry, {required isFront, required revealDates}) {
-                    return NgmyFrostedCard(
-                      dateLabel: ngmyHomeDateTabLabel(entry.date),
-                      isFront: isFront,
-                      showDateTab: revealDates,
-                      welcomeName: isFront && !entry.hasCivicId ? (name.isEmpty ? null : name) : null,
-                      onDelete: isFront ? () => unawaited(_removeSaved(entry.id)) : null,
-                      fillBleed: entry.hasCivicId ||
-                          entry.hasBusinessCard ||
-                          entry.hasImage ||
-                          entry.showsCreditFace ||
-                          (entry.hasPinnedEssentials && entry.amount <= 0),
-                      accent: entry.hasCivicId
-                          ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
-                          : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
-                      child: _SpendingCardContent(
-                        entry: entry,
-                        totalSpent: 0,
-                        userEmail: widget.userEmail,
-                        liveCivicRecord: widget.civicIdRecord,
-                        profilePicturePath: widget.profilePicturePath,
+                  const SizedBox(height: 18),
+                  // Header.
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [accent, accent2]),
+                          boxShadow: [BoxShadow(color: accent2.withValues(alpha: 0.4), blurRadius: 18, offset: const Offset(0, 6))],
+                        ),
+                        child: const Icon(Icons.cloud_done_rounded, color: Colors.white, size: 28),
                       ),
-                    );
-                  },
-                ),
-              if (saved.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Swipe to browse · tap X to remove from account (keeps card on this phone)',
-                  style: TextStyle(fontSize: 12, color: dark ? Colors.white54 : const Color(0xFF64748B)),
-                ),
-              ],
-              const SizedBox(height: 22),
-              Text(
-                'On this phone only',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: dark ? Colors.white : const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (local.isEmpty)
-                Text(
-                  saved.length >= kNgmyHomeCloudCardSlots
-                      ? 'All local cards are already saved, or remove one above to Save another.'
-                      : 'No other local cards.',
-                  style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
-                )
-              else
-                ...local.map((e) {
-                  final full = saved.length >= kNgmyHomeCloudCardSlots;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Material(
-                      color: dark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        title: Text(
-                          _labelFor(e),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: dark ? Colors.white : const Color(0xFF0F172A),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Cloud Cards', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: ink, letterSpacing: -0.3)),
+                            const SizedBox(height: 2),
+                            Text('Saved to your account — on every phone you sign in to',
+                                style: TextStyle(fontSize: 12.5, color: muted, height: 1.3)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // Slots.
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      color: dark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                      border: Border.all(color: dark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text('${saved.length} of $kNgmyHomeCloudCardSlots slots used',
+                                style: TextStyle(fontWeight: FontWeight.w900, color: ink, fontSize: 14)),
+                            const Spacer(),
+                            if (full)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                                child: const Text('FULL', style: TextStyle(color: Color(0xFFF59E0B), fontWeight: FontWeight.w900, fontSize: 10.5)),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            for (var i = 0; i < kNgmyHomeCloudCardSlots; i++) ...[
+                              Expanded(
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 250),
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(99),
+                                    gradient: i < saved.length ? const LinearGradient(colors: [accent, accent2]) : null,
+                                    color: i < saved.length ? null : (dark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                                  ),
+                                ),
+                              ),
+                              if (i < kNgmyHomeCloudCardSlots - 1) const SizedBox(width: 6),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text('Remove one to free a slot. Deleting a card on Home doesn\'t save the next one for you.',
+                            style: TextStyle(fontSize: 11.5, color: muted, height: 1.35)),
+                      ],
+                    ),
+                  ),
+                  if (_status != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.14),
+                        border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.45)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF22C55E), size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_status!,
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: dark ? const Color(0xFF86EFAC) : const Color(0xFF166534))),
                           ),
-                        ),
-                        subtitle: Text(
-                          e.hasCivicId ? 'Civic Registry ID' : e.category,
-                          style: TextStyle(color: dark ? Colors.white54 : const Color(0xFF64748B)),
-                        ),
-                        trailing: TextButton(
-                          onPressed: _busy || full ? null : () => unawaited(_save(e)),
-                          child: Text(
-                            'Save',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              color: full
-                                  ? (dark ? Colors.white38 : Colors.black38)
-                                  : (dark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                  );
-                }),
-              if (_busy) ...[
-                const SizedBox(height: 12),
-                const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-              ],
+                  ],
+                  const SizedBox(height: 22),
+                  section(Icons.cloud_rounded, 'On your account', saved.isEmpty ? '' : 'Swipe to browse'),
+                  const SizedBox(height: 12),
+                  if (saved.isEmpty)
+                    Container(
+                      height: 130,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        color: dark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
+                        border: Border.all(color: accent.withValues(alpha: 0.35), width: 1.2),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.cloud_upload_rounded, color: accent.withValues(alpha: 0.8), size: 34),
+                          const SizedBox(height: 6),
+                          Text('No cards saved yet', style: TextStyle(fontWeight: FontWeight.w800, color: ink)),
+                          Text('Save up to $kNgmyHomeCloudCardSlots from the list below', style: TextStyle(fontSize: 12, color: muted)),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    NgmyGlassCardStack<NgmySpendingEntry>(
+                      height: ngmyHomeCardHeightFor(MediaQuery.sizeOf(context).width - 40),
+                      items: saved,
+                      itemId: (e) => e.id,
+                      autoPlay: false,
+                      slideStyle: NgmyHomeCardSlideStyle.slideLeft,
+                      emptyBuilder: (_) => const SizedBox.shrink(),
+                      cardBuilder: (c, entry, {required isFront, required revealDates}) {
+                        return NgmyFrostedCard(
+                          dateLabel: ngmyHomeDateTabLabel(entry.date),
+                          isFront: isFront,
+                          showDateTab: revealDates,
+                          welcomeName: isFront && !entry.hasCivicId ? (name.isEmpty ? null : name) : null,
+                          onDelete: isFront ? () => unawaited(_removeSaved(entry.id)) : null,
+                          fillBleed: entry.hasCivicId ||
+                              entry.hasBusinessCard ||
+                              entry.hasImage ||
+                              entry.showsCreditFace ||
+                              (entry.hasPinnedEssentials && entry.amount <= 0),
+                          accent: entry.hasCivicId
+                              ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
+                              : const [Color(0xFF60A5FA), Color(0xFF8B5CF6)],
+                          child: _SpendingCardContent(
+                            entry: entry,
+                            totalSpent: 0,
+                            userEmail: widget.userEmail,
+                            liveCivicRecord: widget.civicIdRecord,
+                            profilePicturePath: widget.profilePicturePath,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded, size: 14, color: muted),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text('Tap X to take it off your account — it stays on this phone',
+                              style: TextStyle(fontSize: 11.5, color: muted)),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  section(Icons.phone_iphone_rounded, 'On this phone only', local.isEmpty ? '' : '${local.length}'),
+                  const SizedBox(height: 12),
+                  if (local.isEmpty)
+                    Text(
+                      full ? 'Everything is saved, or remove a card above to save another.' : 'No other cards on this phone.',
+                      style: TextStyle(color: muted),
+                    )
+                  else
+                    ...local.map((e) {
+                      final (icon, color) = _iconFor(e);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(18),
+                            color: dark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
+                            border: Border.all(color: dark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(14),
+                                  color: color.withValues(alpha: 0.16),
+                                  border: Border.all(color: color.withValues(alpha: 0.5)),
+                                ),
+                                child: Icon(icon, color: color, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_labelFor(e),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, color: ink, fontSize: 14.5)),
+                                    const SizedBox(height: 2),
+                                    Text(e.hasCivicId ? 'Civic Registry ID' : (e.category.isEmpty ? 'Card' : e.category),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: muted, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Opacity(
+                                opacity: _busy || full ? 0.45 : 1,
+                                child: GestureDetector(
+                                  onTap: _busy || full ? null : () => unawaited(_save(e)),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(99),
+                                      gradient: const LinearGradient(colors: [accent, accent2]),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.cloud_upload_rounded, color: Colors.white, size: 16),
+                                        SizedBox(width: 5),
+                                        Text('Save', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+              if (_busy)
+                const Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    child: LinearProgressIndicator(minHeight: 3),
+                  ),
+                ),
             ],
           ),
         );
       },
     );
   }
+
+  /// A small icon and colour for each kind of card.
+  (IconData, Color) _iconFor(NgmySpendingEntry e) {
+    if (e.hasCivicId) return (Icons.verified_user_rounded, const Color(0xFF38BDF8));
+    if (e.hasBusinessCard) return (Icons.badge_rounded, const Color(0xFFA78BFA));
+    if (e.isPassword) return (Icons.lock_rounded, const Color(0xFFF59E0B));
+    if (e.hasPinnedEssentials) return (Icons.medical_services_rounded, const Color(0xFF34D399));
+    if (e.hasImage) return (Icons.image_rounded, const Color(0xFFF472B6));
+    return (Icons.credit_card_rounded, const Color(0xFF60A5FA));
+  }
 }
 
-// ?? Add sheets ???????????????????????????????????????????????????????????
 
 class _NgmyAddSpendingSheet extends StatefulWidget {
   const _NgmyAddSpendingSheet({

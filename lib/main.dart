@@ -32614,20 +32614,30 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       // membership for a few seconds even after they already verified.
       await _restoreLocalUnlockImmediately();
       if (!mounted) return;
-      unawaited(_checkRegistryUnlock());
-      if (!mounted) return;
-      unawaited(_refreshCivicMembersFromCloud());
-      unawaited(_hydrateStateSwitchLock());
-      unawaited(_maybePromptCivicIdPhoto());
-      unawaited(_ensureUniqueRegistryIdsDeferred());
-      unawaited(_refreshCivicHelpModeAndContributions());
-      unawaited(_maybeShowHelperGiftsInbox());
-      unawaited(() async {
-        await _mergeCivicRegistryPinsIntoConfig(widget.config);
-        if (mounted) setState(() {});
-      }());
-      unawaited(_refreshCivicStateAccess());
-      unawaited(_promptCivicCloudSignInIfNeeded());
+      // Let the page finish opening first, then refresh in the background one job at a time.
+      // Starting ~10 refreshes at once (each redrawing this big page) during the opening
+      // animation is what made Civic Registry take 5-6 seconds / several taps to open.
+      final jobs = <Future<void> Function()>[
+        _checkRegistryUnlock,
+        _refreshCivicMembersFromCloud,
+        _hydrateStateSwitchLock,
+        _refreshCivicHelpModeAndContributions,
+        () async {
+          await _mergeCivicRegistryPinsIntoConfig(widget.config);
+          if (mounted) setState(() {});
+        },
+        _refreshCivicStateAccess,
+        _ensureUniqueRegistryIdsDeferred,
+        _maybePromptCivicIdPhoto,
+        _maybeShowHelperGiftsInbox,
+        _promptCivicCloudSignInIfNeeded,
+      ];
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      for (final job in jobs) {
+        if (!mounted) return;
+        unawaited(job());
+        await Future<void>.delayed(const Duration(milliseconds: 180));
+      }
     });
     // Live changes arrive through the help-mode broadcast channel; this poll
     // only catches a missed broadcast, so it stays slow and skips hidden tabs.
