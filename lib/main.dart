@@ -8228,7 +8228,8 @@ Widget _ngmyGlassGreenShell({
       ),
     );
     if (!useBlur || ngmyPreferLightGraphics) return inner;
-    return ngmyClipBackdrop(borderRadius: borderRadius, sigma: 12, child: inner);
+    return ngmyClipBackdrop(
+                  borderRadius: borderRadius, sigma: 12, child: inner);
   }
 
   return Container(
@@ -44817,6 +44818,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
                 child: ngmyClipBackdrop(
+                  solid: true,
                   borderRadius: BorderRadius.circular(35),
                   sigma: 22,
                   child: Container(
@@ -55553,6 +55555,7 @@ class _NgmyJobMarketplaceMediaScreenState extends State<NgmyJobMarketplaceMediaS
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(15, 8, 15, 0),
                 child: ngmyClipBackdrop(
+                  solid: true,
                   borderRadius: BorderRadius.circular(35),
                   child: Container(
                     height: 64,

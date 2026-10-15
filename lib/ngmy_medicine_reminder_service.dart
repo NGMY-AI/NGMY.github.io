@@ -285,6 +285,7 @@ class _MedicineReminderOverlayState extends State<_MedicineReminderOverlay> {
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 22),
                       child: ngmyClipBackdrop(
+                  solid: true,
                         borderRadius: BorderRadius.circular(32),
                         child: Container(
                             padding: const EdgeInsets.fromLTRB(24, 16, 24, 22),

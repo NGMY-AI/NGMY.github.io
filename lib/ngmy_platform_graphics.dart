@@ -58,9 +58,22 @@ Widget ngmyClipBackdrop({
   required BorderRadius borderRadius,
   required Widget child,
   double sigma = 14,
+  /// For bars that float over scrolling content (page headers): blur is off on phones, so a
+  /// see-through glass bar let the text scrolling underneath show through and the page looked
+  /// hazy / blurry. Solid puts the page's own background under the glass so it reads clean.
+  bool solid = false,
 }) {
   if (ngmyPreferLightGraphics) {
-    return ClipRRect(borderRadius: borderRadius, child: child);
+    if (!solid) return ClipRRect(borderRadius: borderRadius, child: child);
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: Builder(
+        builder: (context) => ColoredBox(
+          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF15171C) : const Color(0xFFF8FAFC),
+          child: child,
+        ),
+      ),
+    );
   }
   return ClipRRect(
     borderRadius: borderRadius,
