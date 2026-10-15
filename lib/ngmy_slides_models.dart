@@ -132,7 +132,7 @@ class NgmySlideElement {
   String loopFx;
   /// Picture shape: circle, rounded, triangle, hexagon, diamond, arch ('' = as is).
   String frame;
-  /// Ring around a picture: gold, platinum, glow, rainbow, double, neon, framed.
+  /// Ring around a picture: gold, platinum, glow, rainbow, double, neon, framed, rosegold, jewels, aurora.
   String ring;
 
   NgmySlideElement copy() => NgmySlideElement(
@@ -362,6 +362,10 @@ class NgmySlideDeck {
     this.aiOutlineJson,
     this.aiSlideIds,
     this.aiExtras,
+    this.finaleStyle,
+    this.finaleTitle,
+    this.finaleSubtitle,
+    this.finaleLogo,
     DateTime? updatedAt,
     List<NgmySlide>? slides,
   })  : updatedAt = updatedAt ?? DateTime.now(),
@@ -402,6 +406,12 @@ class NgmySlideDeck {
   List<String>? aiSlideIds;
   /// Extras the AI used (emojis, pictures, 3D icons, animations, video motion).
   List<String>? aiExtras;
+  /// Ending celebration played after the last slide (see ngmy_slides_finale.dart); null = none.
+  String? finaleStyle;
+  String? finaleTitle;
+  String? finaleSubtitle;
+  /// Logo shown in the ending celebration (data URI).
+  String? finaleLogo;
   bool get aiMade => (aiOutlineJson ?? '').isNotEmpty;
 
   bool get isMarriageAgreement => deckKind == 'marriage_agreement';
@@ -452,6 +462,10 @@ class NgmySlideDeck {
         aiOutlineJson: aiOutlineJson,
         aiSlideIds: aiSlideIds == null ? null : List.of(aiSlideIds!),
         aiExtras: aiExtras == null ? null : List.of(aiExtras!),
+        finaleStyle: finaleStyle,
+        finaleTitle: finaleTitle,
+        finaleSubtitle: finaleSubtitle,
+        finaleLogo: finaleLogo,
         slides: slides.map((s) => s.copy()).toList(),
       );
 
@@ -477,6 +491,10 @@ class NgmySlideDeck {
         if (aiMade) 'aiOutlineJson': aiOutlineJson,
         if (aiSlideIds != null) 'aiSlideIds': aiSlideIds,
         if (aiExtras != null) 'aiExtras': aiExtras,
+        if ((finaleStyle ?? '').isNotEmpty) 'finaleStyle': finaleStyle,
+        if (finaleTitle != null) 'finaleTitle': finaleTitle,
+        if (finaleSubtitle != null) 'finaleSubtitle': finaleSubtitle,
+        if ((finaleLogo ?? '').isNotEmpty) 'finaleLogo': finaleLogo,
         'slides': slides.map((s) => s.toJson()).toList(),
       };
 
@@ -500,6 +518,10 @@ class NgmySlideDeck {
         aiOutlineJson: json['aiOutlineJson']?.toString(),
         aiSlideIds: (json['aiSlideIds'] as List?)?.map((e) => '$e').toList(),
         aiExtras: (json['aiExtras'] as List?)?.map((e) => '$e').toList(),
+        finaleStyle: json['finaleStyle']?.toString(),
+        finaleTitle: json['finaleTitle']?.toString(),
+        finaleSubtitle: json['finaleSubtitle']?.toString(),
+        finaleLogo: json['finaleLogo']?.toString(),
         slides: (json['slides'] as List?)
                 ?.whereType<Map>()
                 .map((s) => NgmySlide.fromJson(Map<String, dynamic>.from(s)))

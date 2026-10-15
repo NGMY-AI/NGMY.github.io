@@ -14,6 +14,7 @@ import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_book_studio.dart';
+import 'ngmy_slides_finale.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -941,6 +942,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         ..aiExtras = made.aiExtras
         ..cinematic = deck.cinematic || made.cinematic
         ..loop = deck.loop || made.loop;
+      if ((made.finaleStyle ?? '').isNotEmpty) {
+        deck
+          ..finaleStyle = made.finaleStyle
+          ..finaleTitle = made.finaleTitle
+          ..finaleSubtitle = made.finaleSubtitle
+          ..finaleLogo = made.finaleLogo;
+      }
       _selectedElementId = null;
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3858,6 +3866,22 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   if (d == null) return;
                   _mutate(() => d.loop = !d.loop);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(d.loop ? 'Non-stop on — the show starts over after the last slide.' : 'Non-stop off — the show stops on the last slide.')));
+                case 'finale':
+                  final d = _activeDeck;
+                  if (d == null) return;
+                  final picked = await showNgmyFinaleGallery(
+                    context,
+                    NgmyFinaleChoice(style: d.finaleStyle ?? '', title: d.finaleTitle ?? 'NGMY', subtitle: d.finaleSubtitle ?? '', logo: d.finaleLogo ?? ''),
+                  );
+                  if (picked == null || !mounted) return;
+                  _mutate(() {
+                    d.finaleStyle = picked.none ? null : picked.style;
+                    d.finaleTitle = picked.title;
+                    d.finaleSubtitle = picked.subtitle;
+                    d.finaleLogo = picked.logo.isEmpty ? null : picked.logo;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(picked.none ? 'No ending celebration.' : '${ngmyFinaleStyle(picked.style)?.name} will play after your last slide.')));
               }
             },
             itemBuilder: (_) => [
@@ -3865,6 +3889,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
               PopupMenuItem(value: 'timer', child: Text('Timer: ${_activeDeck?.autoAdvanceSeconds ?? 5}s')),
               PopupMenuItem(value: 'motion', child: Text('Video motion: ${(_activeDeck?.cinematic ?? false) ? 'On' : 'Off'}')),
               PopupMenuItem(value: 'loop', child: Text('Non-stop loop: ${(_activeDeck?.loop ?? false) ? 'On' : 'Off'}')),
+              PopupMenuItem(value: 'finale', child: Text('Ending celebration: ${ngmyFinaleStyle(_activeDeck?.finaleStyle)?.name ?? 'None'}')),
             ],
           ),
           const SizedBox(width: 4),
@@ -6053,6 +6078,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
   void dispose() {
     _autoTimer?.cancel();
     _morph.dispose();
+    _finaleTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     ngmyExitFullscreen();
     super.dispose();
@@ -6079,7 +6105,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
     _autoTimer = Timer(Duration(seconds: seconds), () {
       if (!mounted || !_autoPlaying) return;
       // Non-stop decks go back to the first slide after the last one.
-      if (_index < widget.deck.slides.length - 1 || widget.deck.loop) {
+      if (_index < widget.deck.slides.length - 1 || widget.deck.loop || _hasFinale) {
         _next();
       }
     });
@@ -6094,8 +6120,41 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
     }
   }
 
+  /// Ending celebration after the last slide (when the deck has one).
+  bool _finale = false;
+  Timer? _finaleTimer;
+  bool get _hasFinale => (widget.deck.finaleStyle ?? '').isNotEmpty;
+
+  void _showFinale() {
+    _autoTimer?.cancel();
+    setState(() => _finale = true);
+    // Non-stop shows celebrate for a while, then start again from the first slide.
+    _finaleTimer?.cancel();
+    if (widget.deck.loop && _autoPlaying) {
+      _finaleTimer = Timer(const Duration(seconds: 9), () {
+        if (mounted && _finale) _next();
+      });
+    }
+  }
+
   void _next() {
     final n = widget.deck.slides.length;
+    if (_finale) {
+      _finaleTimer?.cancel();
+      if (widget.deck.loop) {
+        setState(() {
+          _finale = false;
+          _lastTransition = widget.deck.slides.first.transition;
+          _index = 0;
+        });
+        _scheduleAutoAdvance();
+      }
+      return;
+    }
+    if (_index == n - 1 && _hasFinale) {
+      _showFinale();
+      return;
+    }
     if (_index < n - 1 || (widget.deck.loop && n > 1)) {
       final to = (_index + 1) % n;
       final was = _index;
@@ -6110,6 +6169,12 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
 
   void _prev() {
     final n = widget.deck.slides.length;
+    if (_finale) {
+      _finaleTimer?.cancel();
+      setState(() => _finale = false);
+      _scheduleAutoAdvance();
+      return;
+    }
     if (_index > 0 || (widget.deck.loop && n > 1)) {
       final from = _index;
       setState(() {
@@ -6316,15 +6381,28 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // The slide as big as the screen allows, keeping its shape.
-            Center(
-              child: AspectRatio(
-                aspectRatio: widget.deck.aspectValue,
-                child: ClipRect(
-                  child: InteractiveViewer(minScale: 1, maxScale: 4, child: body),
+            // The slide as big as the screen allows, keeping its shape —
+            // or the ending celebration over the whole screen.
+            if (_finale)
+              Positioned.fill(
+                child: NgmyFinaleView(
+                  choice: NgmyFinaleChoice(
+                    style: widget.deck.finaleStyle ?? '',
+                    title: widget.deck.finaleTitle ?? 'NGMY',
+                    subtitle: widget.deck.finaleSubtitle ?? '',
+                    logo: widget.deck.finaleLogo ?? '',
+                  ),
+                ),
+              )
+            else
+              Center(
+                child: AspectRatio(
+                  aspectRatio: widget.deck.aspectValue,
+                  child: ClipRect(
+                    child: InteractiveViewer(minScale: 1, maxScale: 4, child: body),
+                  ),
                 ),
               ),
-            ),
             if (!_locked) ...[
               Positioned(
                 top: 12,

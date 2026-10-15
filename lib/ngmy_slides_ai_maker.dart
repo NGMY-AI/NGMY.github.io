@@ -15,6 +15,7 @@ import 'ngmy_slides_render.dart';
 
 import 'ngmy_bio_models.dart';
 import 'ngmy_slides_bio_phone.dart';
+import 'ngmy_slides_finale.dart';
 
 part 'ngmy_slides_luxe_recipe.dart';
 
@@ -270,7 +271,7 @@ class NgmySlidesAiOutline {
   final String photoRing;
 }
 
-const _kFrameRule = '- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: circle, rounded, triangle, hexagon, diamond, arch, or "" (as is). "logo_ring" and "photo_ring" are one of: gold, platinum, glow, rainbow, double, neon, framed, or "" (none). Follow what the request says (e.g. "my picture in a circle with a gold ring"); if it says nothing, choose what suits the look (luxury → gold, neon/night → neon, clean → rounded with no ring).';
+const _kFrameRule = '- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: circle, rounded, triangle, hexagon, diamond, arch, or "" (as is). "logo_ring" and "photo_ring" are one of: gold, platinum, glow, rainbow, double, neon, framed, rosegold, jewels, aurora, or "" (none). Follow what the request says (e.g. "my picture in a circle with a gold ring"); if it says nothing, choose what suits the look (luxury → gold, neon/night → neon, clean → rounded with no ring).';
 
 const _kBioRule = '- BIO LINK: if they ask to put their bio link / link page / socials / "my links" in the presentation, add ONE slide with kind "bio" (title like "Connect with me", a one-line inviting subtitle) — usually just before the closing slide, or where they say. Their real Bio page (with clickable links) is shown on a phone on that slide.';
 
@@ -863,6 +864,8 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _descFocus = FocusNode();
   /// Non-stop: the show starts over after the last slide.
   bool _loop = false;
+  /// Ending celebration after the last slide (style "" = none).
+  NgmyFinaleChoice _finale = const NgmyFinaleChoice(style: '');
   /// Your own logo and pictures (data URIs), used instead of made-up art.
   String? _logo;
   List<String> _pictures = [];
@@ -1118,6 +1121,13 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
         },
       );
       deck.loop = _loop;
+      if (!_finale.none) {
+        deck
+          ..finaleStyle = _finale.style
+          ..finaleTitle = _finale.title
+          ..finaleSubtitle = _finale.subtitle
+          ..finaleLogo = _finale.logo.isNotEmpty ? _finale.logo : _logo;
+      }
       if (mounted) Navigator.of(context).pop(deck);
     } catch (e) {
       if (mounted) {
@@ -1202,7 +1212,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                   maxLines: 6,
                   style: const TextStyle(color: Colors.white, height: 1.35),
                   decoration: InputDecoration(
-                    hintText: 'e.g. A presentation about NGMY for next Saturday — what the app does, Civic Registry, how to join. Make it feel like a celebration.',
+                    hintText: 'e.g. A presentation about my business for a meeting on Friday — who we are, what we offer and why people love us. Warm and professional.',
                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.05),
@@ -1265,6 +1275,17 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                   'Your logo goes on every slide; your pictures replace stock photos. Pick a shape and ring under each, or just describe it (e.g. "my logo in a circle with a gold ring").',
                   style: TextStyle(color: Colors.white38, fontSize: 11.5),
                 ),
+                const SizedBox(height: 18),
+                const Row(children: [
+                  Icon(Icons.celebration_rounded, color: Color(0xFFFDE68A), size: 18),
+                  SizedBox(width: 6),
+                  Text('Ending celebration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ]),
+                const SizedBox(height: 4),
+                const Text('A big celebration after your last slide. Tap one to watch it and change the words or add your logo.',
+                    style: TextStyle(color: Colors.white38, fontSize: 11.5)),
+                const SizedBox(height: 10),
+                NgmyFinalePicker(choice: _finale, onChanged: (c) => setState(() => _finale = c)),
                 const SizedBox(height: 18),
                 const Text('How many slides?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),

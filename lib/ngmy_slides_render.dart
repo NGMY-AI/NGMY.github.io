@@ -1038,6 +1038,9 @@ const kNgmySlideRings = <(String, String)>[
   ('double', 'Double line'),
   ('neon', 'Neon'),
   ('framed', 'Gallery frame'),
+  ('rosegold', 'Rose gold'),
+  ('jewels', 'Jeweled'),
+  ('aurora', 'Aurora'),
 ];
 
 /// The outline of a picture shape inside [r].
@@ -1129,6 +1132,32 @@ class _RingPainter extends CustomPainter {
           ..color = const Color(0xFF22D3EE).withValues(alpha: 0.7)
           ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.035));
         canvas.drawPath(path, stroke(w * 0.016)..color = const Color(0xFFA5F3FC));
+      case 'rosegold':
+        canvas.drawPath(path, stroke(w * 0.05)
+          ..shader = const SweepGradient(colors: [Color(0xFFFBCFE8), Color(0xFFB76E79), Color(0xFFF9D5D3), Color(0xFF9D4E5C), Color(0xFFFBCFE8)]).createShader(r));
+        canvas.drawPath(ngmySlideFramePath(frame, r.deflate(w * 0.032)), stroke(w * 0.006)..color = const Color(0xCCFFF1F2));
+        canvas.drawPath(ngmySlideFramePath(frame, r.inflate(w * 0.03)), stroke(w * 0.004)..color = const Color(0x99E8B4B8));
+      case 'jewels':
+        // Gold band set with sparkling gems all the way round.
+        canvas.drawPath(path, stroke(w * 0.055)
+          ..shader = const SweepGradient(colors: [Color(0xFFFDE68A), Color(0xFFB8860B), Color(0xFFF5C451), Color(0xFF8A6417), Color(0xFFFDE68A)]).createShader(r));
+        const gems = [Color(0xFFFFFFFF), Color(0xFFE11D48), Color(0xFF38BDF8), Color(0xFF10B981)];
+        for (final metric in path.computeMetrics()) {
+          final count = (metric.length / (w * 0.09)).floor().clamp(8, 40);
+          for (var i = 0; i < count; i++) {
+            final pos = metric.getTangentForOffset(metric.length * i / count)?.position;
+            if (pos == null) continue;
+            final col = gems[i % gems.length];
+            canvas.drawCircle(pos, w * 0.018, Paint()..color = col);
+            canvas.drawCircle(pos.translate(-w * 0.006, -w * 0.006), w * 0.006, Paint()..color = Colors.white.withValues(alpha: 0.9));
+          }
+        }
+      case 'aurora':
+        canvas.drawPath(path, stroke(w * 0.08)
+          ..shader = const SweepGradient(colors: [Color(0xFF34D399), Color(0xFF22D3EE), Color(0xFFA78BFA), Color(0xFFF472B6), Color(0xFF34D399)]).createShader(r)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, w * 0.03));
+        canvas.drawPath(path, stroke(w * 0.018)
+          ..shader = const SweepGradient(colors: [Color(0xFFA7F3D0), Color(0xFFA5F3FC), Color(0xFFDDD6FE), Color(0xFFFBCFE8), Color(0xFFA7F3D0)]).createShader(r));
       case 'framed':
         canvas.drawPath(path, stroke(w * 0.07)..color = Colors.white);
         canvas.drawPath(ngmySlideFramePath(frame, r.deflate(w * 0.035)), stroke(w * 0.004)..color = const Color(0x33000000));
