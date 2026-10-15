@@ -44444,7 +44444,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FB),
       body: Stack(
         children: [
-          SelectionContainer.disabled(
+          // Tells the Voting card to hold still while you scroll (smooth scrolling).
+          NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (n is ScrollStartNotification) ngmyCivicPageScrolling.value = true;
+              if (n is ScrollEndNotification) ngmyCivicPageScrolling.value = false;
+              return false;
+            },
+            child: SelectionContainer.disabled(
             child: SingleChildScrollView(
               padding: EdgeInsets.fromLTRB(
                 20,
@@ -44755,7 +44762,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                 ],
               ),
             ),
-          ),
+          )),
           Positioned(
             top: 0,
             left: 0,

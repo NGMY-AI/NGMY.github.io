@@ -4,6 +4,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'ngmy_platform_graphics.dart';
 
 import 'ngmy_civic_member_report_print_stub.dart'
     if (dart.library.html) 'ngmy_civic_member_report_print_web.dart';
@@ -14,6 +15,9 @@ import 'ngmy_coming_soon.dart';
 import 'ngmy_nav.dart';
 
 /// Animated voting entry card for Civic Registry Search tab (home-card size).
+/// True while the Civic Registry page is being scrolled.
+final ValueNotifier<bool> ngmyCivicPageScrolling = ValueNotifier<bool>(false);
+
 class NgmyCivicVotingEntryCard extends StatefulWidget {
   const NgmyCivicVotingEntryCard({
     super.key,
@@ -47,7 +51,22 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
     _spin = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1600))..repeat(reverse: true);
     _spark = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
+    ngmyCivicPageScrolling.addListener(_onPageScroll);
     unawaited(_load());
+  }
+
+  /// Hold the card still while the Civic page scrolls — scrolling stays smooth.
+  void _onPageScroll() {
+    if (!mounted) return;
+    if (ngmyCivicPageScrolling.value) {
+      _spin.stop();
+      _pulse.stop();
+      _spark.stop();
+    } else {
+      _spin.repeat();
+      _pulse.repeat(reverse: true);
+      _spark.repeat();
+    }
   }
 
   Future<void> _load() async {
@@ -119,7 +138,7 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
                       padding: const EdgeInsets.all(3),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(26),
-                        child: BackdropFilter(
+                        child: NgmyNoBackdrop(
                           filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
@@ -305,6 +324,7 @@ class _NgmyCivicVotingEntryCardState extends State<NgmyCivicVotingEntryCard>
 
   @override
   void dispose() {
+    ngmyCivicPageScrolling.removeListener(_onPageScroll);
     _spin.dispose();
     _pulse.dispose();
     _spark.dispose();

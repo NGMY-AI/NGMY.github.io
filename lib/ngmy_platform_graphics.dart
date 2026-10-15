@@ -27,7 +27,8 @@ Color ngmyCrispBorderColor(BuildContext context) {
 void ngmyInitCrispRendering() {
   if (!kIsWeb) return;
   PaintingBinding.instance.imageCache
-    ..maximumSizeBytes = 96 << 20
+    // Kept modest: iPhone Safari closes the page when the app holds too much picture memory.
+    ..maximumSizeBytes = 64 << 20
     ..maximumSize = 300;
 }
 
@@ -68,4 +69,16 @@ Widget ngmyClipBackdrop({
       child: child,
     ),
   );
+}
+
+/// Stand-in for [BackdropFilter] on cards that animate or sit in long scrolling pages: draws
+/// the child only. A live backdrop blur re-renders every frame on iPhone web — it made the
+/// Civic Registry stutter while scrolling and, left running, crash.
+class NgmyNoBackdrop extends StatelessWidget {
+  const NgmyNoBackdrop({super.key, this.filter, required this.child});
+  final ImageFilter? filter;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
 }
