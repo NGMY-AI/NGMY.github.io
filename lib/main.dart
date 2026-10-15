@@ -32657,13 +32657,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     // Live changes arrive through the help-mode broadcast channel; this poll
     // only catches a missed broadcast, so it stays slow and skips hidden tabs.
     var helpPollTicks = 0;
-    _helpModePoll = Timer.periodic(const Duration(seconds: 30), (_) {
+    // Every 15 s while this page is open, always asking the server (never a saved copy): a
+    // member just watching the page counted as "idle", got the old answer, and only saw the
+    // registrar turn help mode on/off after reopening the app.
+    _helpModePoll = Timer.periodic(const Duration(seconds: 15), (_) {
       if (!mounted) return;
       if (ngmyAppInBackground()) return;
-      unawaited(_refreshCivicHelpModeSettingsOnly());
+      unawaited(_refreshCivicHelpModeSettingsOnly(fresh: true));
       // Every 2 minutes also pull contributions, for a missed broadcast.
       helpPollTicks++;
-      if (helpPollTicks % 4 == 0) _refreshCivicMoneySoon();
+      if (helpPollTicks % 8 == 0) _refreshCivicMoneySoon();
     });
     _membersCloudPoll = Timer.periodic(const Duration(minutes: 2), (_) {
       if (!mounted || _activeTab != 2) return;
@@ -32762,6 +32765,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final refreshCompleter = Completer<void>();
     _helpSettingsRefreshCompleter = refreshCompleter;
     try {
+      String helpSig() => '${widget.config.helpModeActive}|${jsonEncode(widget.config.helpModeByState)}';
+      final beforeHelp = helpSig();
       await ngmyHydrateCivicHelpModeFromAllBackups(widget.config, fresh: fresh);
       final mirrored = await ngmyHydrateCivicContributionsLocal(
         deletedIds: widget.config.civicDeletedContributionIds,
@@ -32771,18 +32776,22 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty)
           .toSet();
-      setState(() {
-        if (mirrored.isNotEmpty) {
-          _communityContributions = _mergeCivicCloudTransactions(
-            mirrored,
-            prior: _communityContributions,
-            local: widget.allTransactions.where(
-              (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
-            ),
-            deleted: deleted,
-          );
-        }
-      });
+      var merged = _communityContributions;
+      if (mirrored.isNotEmpty) {
+        merged = _mergeCivicCloudTransactions(
+          mirrored,
+          prior: _communityContributions,
+          local: widget.allTransactions.where(
+            (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
+          ),
+          deleted: deleted,
+        );
+      }
+      // Redraw this big page only when help mode or the contributions really changed.
+      String txSig(List<AppTransaction> l) => '${l.length}|${l.fold<double>(0, (s, t) => s + t.amount)}';
+      if (helpSig() != beforeHelp || txSig(merged) != txSig(_communityContributions)) {
+        setState(() => _communityContributions = merged);
+      }
       _queueHelpModeLifecycleMaintenance();
     } finally {
       _helpSettingsRefreshInFlight = false;
@@ -32834,20 +32843,33 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     });
   }
 
+  /// Tells every phone on the Civic page that help mode changed. Sent three times over a few
+  /// seconds: a phone whose live connection was reconnecting at that moment still hears it.
   Future<void> _broadcastCivicHelpModeChanged(String state) async {
-    final channel = _civicHelpBroadcastChannel;
-    if (channel == null) return;
-    try {
-      await channel.sendBroadcastMessage(
-        event: 'changed',
-        payload: {
-          'state': state.trim().toLowerCase(),
-          'at': DateTime.now().toUtc().toIso8601String(),
-        },
-      );
-    } catch (e) {
-      debugPrint('[help mode] broadcast: $e');
+    Future<void> send() async {
+      final channel = _civicHelpBroadcastChannel;
+      if (channel == null) return;
+      try {
+        await channel.sendBroadcastMessage(
+          event: 'changed',
+          payload: {
+            'state': state.trim().toLowerCase(),
+            'at': DateTime.now().toUtc().toIso8601String(),
+          },
+        );
+      } catch (e) {
+        debugPrint('[help mode] broadcast: $e');
+      }
     }
+
+    await send();
+    // The repeats run in the background — the registrar's button never waits for them.
+    unawaited(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      await send();
+      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      await send();
+    }());
   }
 
   /// Green bar on success. On failure the orange bar names the cause and
