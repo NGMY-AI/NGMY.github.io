@@ -12559,8 +12559,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           txns((t) => t.type == TransactionType.contribution && t.timestamp.isAfter(recent))),
       if (isAdmin) ...[
         NgmyAdminAlertCategory('members', 'New member joined', 'new members joined', [
+          // Real sign-ups only: Civic Registry guests get a stand-in "civic.…@guest.ngmy"
+          // address on the phone (not an account), and they kept being announced as new.
           for (final x in _allUsers)
-            if (x.email.trim().isNotEmpty && ngmyNormalizeEmail(x.email) != me)
+            if (x.email.trim().isNotEmpty &&
+                ngmyNormalizeEmail(x.email) != me &&
+                !ngmyNormalizeEmail(x.email).endsWith('@guest.ngmy') &&
+                !ngmyNormalizeEmail(x.email).contains('+local.ngmy') &&
+                !ngmyNormalizeEmail(x.email).startsWith('civic.'))
               NgmyAdminAlertItem('email:${ngmyNormalizeEmail(x.email)}', who(x.email)),
         ]),
         NgmyAdminAlertCategory('deposits', 'New deposit request', 'new deposit requests',

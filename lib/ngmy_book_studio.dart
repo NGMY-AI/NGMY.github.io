@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_ai_client.dart';
+import 'ngmy_ai_community_knowledge.dart';
 import 'ngmy_ai_language.dart';
 import 'ngmy_book_cover.dart';
 import 'ngmy_invoice_print.dart';
@@ -119,6 +120,7 @@ Rules:
 - Split the body into 3-5 paragraphs separated by a blank line. Plain words, no markdown, no emojis, no lists.
 - LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write the WHOLE book in it. Otherwise write in the language the request is written in.
 ${ngmyLanguageDirective(description)}
+${ngmyCommunityKnowledgeFor(description)}
 - Give every page an "image_query": 2-3 simple ENGLISH words for a real photo that fits it (e.g. "family dinner", "african village").
 - Design the cover: "cover_template" is the best fit from: $templates (story = children's books, starry = bedtime/faith, vintage = history/family memories, royal = formal/gifts, photo/portrait/split = people and places, sunset/band/geo = modern and bold). "cover_query": 2-3 English words for a cover photo, or "" for none.
 Reply with JSON only:
@@ -201,7 +203,7 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
     fail();
   }
 
-  final lang = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write in it; otherwise use the language the request is written in.\n${ngmyLanguageDirective(description)}';
+  final lang = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write in it; otherwise use the language the request is written in.\n${ngmyLanguageDirective(description)}\n${ngmyCommunityKnowledgeFor(description)}';
   final templates = kNgmyCoverTemplates.map((t) => t.id).join(', ');
 
   // 1. Plan: title, cover and the parts (about 50 pages each).
