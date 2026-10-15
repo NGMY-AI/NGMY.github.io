@@ -50,6 +50,7 @@ import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_admin_alerts.dart';
+import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup;
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_arcade_host.dart';
@@ -14652,6 +14653,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         theme: ThemeData(
           useMaterial3: true,
           fontFamily: 'Roboto',
+          // Emoji and symbols (▶️ ⭐ ⚜️ …) from the bundled font — they draw offline too.
+          fontFamilyFallback: kIsWeb ? const ['Noto Color Emoji'] : null,
           colorSchemeSeed: const Color(0xFF00B25A),
           brightness: Brightness.light,
           scaffoldBackgroundColor: Colors.white,
@@ -14683,6 +14686,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         darkTheme: ThemeData(
           useMaterial3: true,
           fontFamily: 'Roboto',
+          // Emoji and symbols (▶️ ⭐ ⚜️ …) from the bundled font — they draw offline too.
+          fontFamilyFallback: kIsWeb ? const ['Noto Color Emoji'] : null,
           colorSchemeSeed: const Color(0xFFBB86FC),
           brightness: Brightness.dark,
           scaffoldBackgroundColor: const Color(0xFF121212),
@@ -14726,7 +14731,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                   ),
                 ),
               );
-          return ngmyCrispAppWrapper(context, body);
+          return NgmyOfflineGlyphWarmup(child: ngmyCrispAppWrapper(context, body));
         },
         home: !_sessionBootstrapComplete
             ? Scaffold(

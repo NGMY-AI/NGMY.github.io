@@ -11,7 +11,13 @@ import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 
+import 'ngmy_bio_models.dart';
+import 'ngmy_slides_bio_phone.dart';
+
 part 'ngmy_slides_luxe_recipe.dart';
+
+/// Set by Slides: your Bio link page (published one first) for "bio" slides.
+Future<NgmyBioDocument?> Function()? ngmySlidesLoadBio;
 
 /// "Describe it and the AI makes it": speak (or type) what the presentation is
 /// about, pick how many slides and a look, and get a finished, colourful deck.
@@ -264,6 +270,8 @@ class NgmySlidesAiOutline {
 
 const _kFrameRule = '- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: circle, rounded, triangle, hexagon, diamond, arch, or "" (as is). "logo_ring" and "photo_ring" are one of: gold, platinum, glow, rainbow, double, neon, framed, or "" (none). Follow what the request says (e.g. "my picture in a circle with a gold ring"); if it says nothing, choose what suits the look (luxury → gold, neon/night → neon, clean → rounded with no ring).';
 
+const _kBioRule = '- BIO LINK: if they ask to put their bio link / link page / socials / "my links" in the presentation, add ONE slide with kind "bio" (title like "Connect with me", a one-line inviting subtitle) — usually just before the closing slide, or where they say. Their real Bio page (with clickable links) is shown on a phone on that slide.';
+
 const _kLanguageRule = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "en français", "en español", "in Arabic"), write EVERY title, subtitle, bullet and note in that language, with correct spelling and accents. If no language is named, write in the language the request itself is written in. Keep the JSON keys and the "kind", "style", "icon3d" and "image_query" values in English.';
 
 extension NgmySlidesAiOutlineJson on NgmySlidesAiOutline {
@@ -316,6 +324,7 @@ Rules:
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
 - Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
 $_kFrameRule
+$_kBioRule
 ${_pictureRule(pictureCount)}
 ${extras.contains(NgmySlidesAiExtra.emojis) ? '- New slides get an "emoji".\n' : ''}${extras.contains(NgmySlidesAiExtra.icons3d) ? '- New slides get an "icon3d" from: ${kNgmySlides3dIcons.join(', ')}.\n' : ''}${extras.contains(NgmySlidesAiExtra.pictures) ? '- New content slides get an "image_query" (2-3 English words).\n' : ''}- Reply with the WHOLE presentation as JSON only, no markdown, same shape:
 {"title":"...","style":"...","logo_frame":"","logo_ring":"","photo_frame":"","photo_ring":"","slides":[{"kind":"...","title":"...","subtitle":"...","bullets":[],"notes":"...","emoji":"","icon3d":"","image_query":""}]}
@@ -354,6 +363,7 @@ Rules:
 - "notes": 1-2 sentences the presenter can say.
 $_kLanguageRule
 $_kFrameRule
+$_kBioRule
 ${_pictureRule(pictureCount)}
 - "style": ${styleId == 'auto' ? 'pick the best of: $styles (match the mood they describe: nature, vibe, celebration, colorful, professional...)' : 'use "$styleId"'}.
 $extraRules- Reply with JSON only, no markdown, in this shape:
@@ -422,6 +432,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
   String? logoRing,
   String? photoFrame,
   String? photoRing,
+  /// Your Bio page (as JSON) for a "bio" slide.
+  String? bioJson,
 }) {
   final luxe = extras.contains(NgmySlidesAiExtra.luxe);
   // Luxury FX: every deck gets its own royal theme and its own ornaments and moving light,
@@ -521,7 +533,7 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
     final chosen = o.picture > 0 && o.picture <= userPictures.length;
     if (chosen) {
       picture = userPictures[o.picture - 1];
-    } else if (userPictures.isNotEmpty && !placedByAi && !const {'title', 'quote', 'closing'}.contains(o.kind)) {
+    } else if (userPictures.isNotEmpty && !placedByAi && !const {'title', 'quote', 'closing', 'bio'}.contains(o.kind)) {
       picture = userPictures[picIndex++ % userPictures.length];
     }
     final emoji = useEmoji ? o.emoji : '';
@@ -573,6 +585,25 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
           ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center, anim: tIn, key: 'title'))
           ..add(text(o.subtitle.isEmpty ? '' : '— ${o.subtitle}', 0.12, 0.68, 0.76, 0.12, 22, color: st.muted, align: TextAlign.center, delay: 300, key: 'sub'));
         if (emoji.isNotEmpty) els.add(text(emoji, 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
+      case 'bio' when (bioJson ?? '').isNotEmpty:
+        // Your Bio page on a phone (links tappable), with the invite beside it.
+        els
+          ..add(shape(NgmySlideShapeKind.circle, 0.58, 0.04, 0.44, 0.80, _withAlpha(a1, 0x2A), key: 'orb1', fx: 'drift'))
+          ..add(shape(NgmySlideShapeKind.rectangle, 0.08, 0.62, 0.14, 0.014, a1, key: 'bar', fx: 'pulse'))
+          ..add(text(emoji.isEmpty ? o.title : '$emoji  ${o.title}', 0.07, 0.30, 0.52, 0.28, 46, weight: FontWeight.w900, anim: tIn, key: 'title'))
+          ..add(text(o.subtitle, 0.07, 0.66, 0.50, 0.16, 22, color: st.muted, delay: 250, key: 'sub'))
+          ..add(NgmySlideElement(
+            id: id(),
+            type: NgmySlideElementType.bio,
+            x: 0.64,
+            y: 0.05,
+            w: 0.27,
+            h: 0.90,
+            text: bioJson!,
+            textTransition: animate ? NgmySlideTransition.slideUp : NgmySlideTransition.none,
+            textAnimDelayMs: animate ? 350 : 0,
+            morphKey: 'bio',
+          ));
       case 'closing':
         layout = NgmySlideLayout.title;
         els
@@ -775,8 +806,14 @@ Future<NgmySlideDeck> _finishAiDeck(NgmySlidesAiOutline outline, Set<NgmySlidesA
     // Your own pictures replace stock photos; 3D icons are still fetched.
     assets = await ngmyFetchSlidesAiAssets(outline, pictures.isEmpty ? extras : ({...extras}..remove(NgmySlidesAiExtra.pictures)));
   }
+  // A "bio" slide shows your own Bio page on a phone.
+  String? bioJson;
+  if (outline.slides.any((s) => s.kind == 'bio')) {
+    final bio = await ngmySlidesLoadBio?.call();
+    if (bio != null) bioJson = ngmyBioToSlideText(bio);
+  }
   final deck = ngmyBuildSlidesAiDeck(outline, extras: extras, assets: assets, logo: logo, userPictures: pictures,
-      logoFrame: look.logoFrame, logoRing: look.logoRing, photoFrame: look.photoFrame, photoRing: look.photoRing);
+      logoFrame: look.logoFrame, logoRing: look.logoRing, photoFrame: look.photoFrame, photoRing: look.photoRing, bioJson: bioJson);
   deck
     ..aiOutlineJson = NgmySlidesAiOutline(
       title: outline.title,

@@ -23,7 +23,8 @@ TextDecoration _ngmySlideDecorationFromKey(Object? raw) {
   }
 }
 
-enum NgmySlideElementType { text, image, shape, pdf, signature }
+/// `bio`: a Bio link page shown on a phone screen (its `text` is the Bio as JSON).
+enum NgmySlideElementType { text, image, shape, pdf, signature, bio }
 
 enum NgmySlideAspectRatio {
   landscape169,

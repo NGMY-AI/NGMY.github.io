@@ -571,6 +571,71 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// ── Runtime caches for other sites (kept across deploys; trimmed to a size) ──
+const RT_FONTS = 'ngmy-rt-fonts-v1';
+const RT_MEDIA = 'ngmy-rt-media-v1';
+
+function ngmyIsRuntimeFont(url) {
+  return url.hostname === 'fonts.gstatic.com' || url.hostname === 'fonts.googleapis.com';
+}
+
+function ngmyIsRuntimeImage(url, request) {
+  if (request.destination === 'image') return true;
+  if (/\.(png|jpe?g|webp|gif|svg|avif|ico|bmp)(\?|$)/i.test(url.pathname)) return true;
+  // Supabase storage pictures (avatars, posts, slides) and twemoji/CDN art.
+  if (/\/storage\/v1\/object\/(public|sign)\//.test(url.pathname)) return true;
+  return /(^|\.)(twemoji\.maxcdn\.com|cdn\.jsdelivr\.net|images\.unsplash\.com|api\.openverse\.org|live\.staticflickr\.com|upload\.wikimedia\.org)$/i.test(url.hostname);
+}
+
+async function ngmyTrim(cacheName, max) {
+  try {
+    const c = await caches.open(cacheName);
+    const keys = await c.keys();
+    for (let i = 0; i < keys.length - max; i++) await c.delete(keys[i]);
+  } catch (_) {}
+}
+
+function ngmyCacheable(res) {
+  return res && (res.ok || res.type === 'opaque');
+}
+
+async function ngmyCacheFirst(cacheName, request, max) {
+  const c = await caches.open(cacheName);
+  const hit = await c.match(request);
+  if (hit) return hit;
+  try {
+    const res = await fetch(request);
+    if (ngmyCacheable(res)) {
+      await c.put(request, res.clone());
+      ngmyTrim(cacheName, max);
+    }
+    return res;
+  } catch (e) {
+    const any = await c.match(request, { ignoreSearch: true });
+    if (any) return any;
+    throw e;
+  }
+}
+
+async function ngmyStaleWhileRevalidate(cacheName, request, max) {
+  const c = await caches.open(cacheName);
+  const hit = await c.match(request);
+  const net = fetch(request)
+    .then(async (res) => {
+      if (ngmyCacheable(res)) {
+        await c.put(request, res.clone());
+        ngmyTrim(cacheName, max);
+      }
+      return res;
+    })
+    .catch(() => null);
+  if (hit) return hit;
+  const res = await net;
+  if (res) return res;
+  const any = await c.match(request, { ignoreSearch: true });
+  return any || new Response('', { status: 504, statusText: 'Offline' });
+}
+
 self.addEventListener('fetch', (event) => {
   var url = new URL(event.request.url);
 
@@ -588,7 +653,16 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.method !== 'GET') return;
 
-  if (url.origin !== self.location.origin) return;
+  // Other sites: the fonts the engine fetches for symbols (▶ ★ ⚜ ♛ …) and pictures shown in
+  // the app. Kept on the phone once seen, so offline they still draw instead of a box with an X.
+  if (url.origin !== self.location.origin) {
+    if (ngmyIsRuntimeFont(url)) {
+      event.respondWith(ngmyCacheFirst(RT_FONTS, event.request, 400));
+    } else if (ngmyIsRuntimeImage(url, event.request)) {
+      event.respondWith(ngmyStaleWhileRevalidate(RT_MEDIA, event.request, 900));
+    }
+    return;
+  }
   if (!isInScope(url)) return;
 
   event.respondWith(

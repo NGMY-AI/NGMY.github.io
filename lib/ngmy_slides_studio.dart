@@ -25,6 +25,9 @@ import 'ngmy_slides_render.dart';
 import 'ngmy_fullscreen_stub.dart' if (dart.library.html) 'ngmy_fullscreen_web.dart';
 import 'ngmy_slides_motion.dart';
 import 'ngmy_slides_toolkit.dart';
+import 'ngmy_bio_models.dart';
+import 'ngmy_bio_storage.dart';
+import 'ngmy_slides_bio_phone.dart';
 import 'ngmy_slides_transfer.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_transfer_payments.dart';
@@ -98,6 +101,12 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // The AI can put your Bio link on a slide — your published Bio first.
+    ngmySlidesLoadBio = () async {
+      final bios = await loadNgmyBios(userEmail: widget.userEmail);
+      if (bios.isEmpty) return null;
+      return bios.firstWhere((b) => b.isPublished, orElse: () => bios.first);
+    };
     _framePulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2800))..repeat(reverse: true);
     unawaited(_loadDecks());
   }
@@ -1329,6 +1338,58 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         w: 0.6,
         h: 0.55,
         imageRef: ref,
+      );
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
+    });
+  }
+
+  /// One of your Bio link pages on this slide, on a phone screen — its links open when tapped.
+  Future<void> _addBioLink() async {
+    if (_currentSlide == null) return;
+    final bios = await loadNgmyBios(userEmail: widget.userEmail);
+    if (!mounted) return;
+    if (bios.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You don\'t have a Bio link yet — create one in Bio first.')),
+      );
+      return;
+    }
+    final doc = bios.length == 1
+        ? bios.first
+        : await showModalBottomSheet<NgmyBioDocument>(
+            context: context,
+            builder: (ctx) => SafeArea(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  const ListTile(title: Text('Which Bio link?', style: TextStyle(fontWeight: FontWeight.w900))),
+                  for (final b in bios)
+                    ListTile(
+                      leading: const Icon(Icons.phone_iphone_rounded),
+                      title: Text(b.displayName.trim().isEmpty ? 'My Bio' : b.displayName.trim()),
+                      subtitle: Text('${b.activeLinks.length} links${b.isPublished ? ' · ${b.publicUrl}' : ''}',
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => Navigator.pop(ctx, b),
+                    ),
+                ],
+              ),
+            ),
+          );
+    if (doc == null || !mounted || _currentSlide == null) return;
+    _mutate(() {
+      // Phone-shaped box, as tall as most of the slide.
+      const h = 0.86;
+      final w = (h * kNgmyBioPhoneAspect * 9 / 16).clamp(0.12, 0.5);
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.bio,
+        x: 0.5 - w / 2,
+        y: 0.07,
+        w: w,
+        h: h,
+        text: ngmyBioToSlideText(doc),
+        fileName: doc.displayName,
       );
       _currentSlide!.elements.add(el);
       _selectedElementId = el.id;
@@ -4018,6 +4079,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           children: [
             _ribbonBtn(Icons.title_rounded, 'Text Box', _addTextBox, isDark),
             _ribbonBtn(Icons.image_rounded, 'Picture', () => unawaited(_addImage()), isDark),
+            _ribbonBtn(Icons.phone_iphone_rounded, 'Bio link', () => unawaited(_addBioLink()), isDark),
             _ribbonBtn(Icons.table_chart_rounded, 'Table', () => _applyDocTool('table'), isDark),
             _ribbonBtn(Icons.sticky_note_2_rounded, 'Sticky', () => _applyDocTool('sticky'), isDark),
             _ribbonBtn(Icons.horizontal_rule_rounded, 'Divider', () => _applyDocTool('divider'), isDark),

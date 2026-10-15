@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_slides_luxe_fx.dart';
+import 'ngmy_slides_bio_phone.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_pdf_embed_stub.dart'
     if (dart.library.html) 'ngmy_slides_pdf_embed_web.dart';
@@ -67,6 +68,9 @@ class NgmySlideElementView extends StatelessWidget {
         return _pdfView();
       case NgmySlideElementType.shape:
         return CustomPaint(painter: NgmyShapePainter(element), size: Size.infinite);
+      case NgmySlideElementType.bio:
+        // Links are tappable when shown (not while it's being moved around in the editor).
+        return NgmySlideBioPhone(bioJson: element.text, interactive: !editing && onTap == null);
     }
   }
 

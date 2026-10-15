@@ -163,3 +163,30 @@ class _NgmyTwemojiImageState extends State<_NgmyTwemojiImage> {
     );
   }
 }
+
+/// Every symbol the app shows (▶ ★ ✦ ♛ ⚜ ✓ arrows, dice, chess…). Laid out once, out of sight,
+/// when the app opens: the web engine then fetches the fonts for them while online, and the
+/// offline cache keeps those fonts — so offline they draw instead of a box with an X.
+const kNgmyAppSymbols =
+    '➕⏸⚽⚾−‑–—〰⟦⟧﹡’“”›€⏭⏰⏱∑√≈≡⋮⌨⌫⟲⟳⬅⬆⬇□▪▶►◆◈●◦↑↗→↳⇒➡↓←↔↺─━═▌…☀☁☂☄☆★☐☑☠♂♔♕♛♜♞♟♠♣♥♦'
+    '✂✈✉✓✕✖✗✚✦✧✶✿❂❄❈❓❖❚❤❦✅✨❌☔☕⚠⚡†•⚓⚔⚕⚖⚙⚜⚪⚫⛄⛏⛪⛳⛵⛷⭐⭕⚀⚁⚂⁴⚃⚄⚅∞ℹ✔✘✰✪✫✬✭✮✯❀❁❃❅❆❇❉❊❋♡♢♤♧⚐⚑⚒⚛⚝⚬⛔⛺⛽';
+
+class NgmyOfflineGlyphWarmup extends StatelessWidget {
+  const NgmyOfflineGlyphWarmup({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb) return child;
+    return Stack(
+      textDirection: TextDirection.ltr,
+      children: [
+        child,
+        // Laid out, never painted.
+        const Offstage(
+          child: Text(kNgmyAppSymbols, textDirection: TextDirection.ltr, style: TextStyle(fontSize: 12)),
+        ),
+      ],
+    );
+  }
+}

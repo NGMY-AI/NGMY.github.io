@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_bio_phone.dart';
 
 PdfColor _pdfColor(int argb) {
   final a = ((argb >> 24) & 0xFF) / 255.0;
@@ -171,6 +172,8 @@ pw.Widget _pdfElement(NgmySlideElement e, double pageW, double pageH) {
       );
     case NgmySlideElementType.shape:
       child = _pdfShape(e, pageW);
+    case NgmySlideElementType.bio:
+      child = _pdfBio(e);
   }
 
   // The editor/live view rotates elements via Flutter's Transform.rotate.
@@ -339,4 +342,50 @@ Future<Uint8List> ngmySlidesExportPdfBytes(NgmySlideDeck deck) async {
 String ngmySlidesExportPdfFilename(NgmySlideDeck deck) {
   final safe = deck.name.trim().replaceAll(RegExp(r'[^\w\-. ]+'), '_').trim();
   return safe.isEmpty ? 'presentation' : safe;
+}
+
+/// A Bio link on a printed / PDF slide: a phone-shaped card with the name and every link,
+/// each one clickable in the PDF.
+pw.Widget _pdfBio(NgmySlideElement e) {
+  final doc = ngmyBioFromSlideText(e.text);
+  final name = (doc?.displayName ?? '').trim();
+  final links = doc?.activeLinks ?? const [];
+  return pw.Container(
+    decoration: pw.BoxDecoration(
+      color: PdfColor.fromInt(0xFF111114),
+      borderRadius: pw.BorderRadius.circular(18),
+      border: pw.Border.all(color: PdfColor.fromInt(0xFF8E8A85), width: 3),
+    ),
+    padding: const pw.EdgeInsets.fromLTRB(10, 16, 10, 10),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Center(
+          child: pw.Text(name.isEmpty ? 'My links' : name,
+              style: pw.TextStyle(color: PdfColors.white, fontSize: 12, fontWeight: pw.FontWeight.bold)),
+        ),
+        if ((doc?.tagline ?? '').trim().isNotEmpty)
+          pw.Center(child: pw.Text(doc!.tagline.trim(), style: const pw.TextStyle(color: PdfColors.grey400, fontSize: 8))),
+        pw.SizedBox(height: 8),
+        for (final l in links.take(8))
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 5),
+            child: pw.UrlLink(
+              destination: l.url.trim(),
+              child: pw.Container(
+                padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 6),
+                decoration: pw.BoxDecoration(color: PdfColor.fromInt(0xFF26262C), borderRadius: pw.BorderRadius.circular(8)),
+                child: pw.Text(l.title.trim().isEmpty ? l.url.trim() : l.title.trim(),
+                    textAlign: pw.TextAlign.center, style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+              ),
+            ),
+          ),
+        if ((doc?.publicUrl ?? '').trim().isNotEmpty)
+          pw.UrlLink(
+            destination: doc!.publicUrl.trim(),
+            child: pw.Center(child: pw.Text(doc.publicUrl.trim(), style: const pw.TextStyle(color: PdfColors.amber, fontSize: 7))),
+          ),
+      ],
+    ),
+  );
 }

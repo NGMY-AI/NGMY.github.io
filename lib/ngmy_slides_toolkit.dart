@@ -11,6 +11,7 @@ import 'ngmy_invoice_signature.dart';
 import 'ngmy_slides_download.dart';
 import 'ngmy_slides_export.dart';
 import 'ngmy_slides_models.dart';
+import 'ngmy_slides_bio_phone.dart';
 import 'ngmy_slides_pdf_ios.dart';
 import 'ngmy_slides_print_stub.dart' if (dart.library.html) 'ngmy_slides_print_web.dart';
 import 'ngmy_worksheet_helpers.dart';
@@ -260,6 +261,16 @@ String ngmySlidesPrintHtml(NgmySlideDeck deck) {
           buf.write('<div class="pdf"><div>📄 ${_escapeHtml(e.fileName.isEmpty ? 'PDF document' : e.fileName)}</div></div>');
         case NgmySlideElementType.shape:
           buf.write('<div style="width:100%;height:100%;background:${_cssColor(e.fillColor)};border:2px solid ${_cssColor(e.strokeColor)}"></div>');
+        case NgmySlideElementType.bio:
+          // A phone with the Bio's name and its links (clickable).
+          final doc = ngmyBioFromSlideText(e.text);
+          buf.write('<div style="width:100%;height:100%;box-sizing:border-box;background:#111114;border:4px solid #8E8A85;border-radius:18px;padding:18px 8px 8px;color:#fff;font-family:sans-serif;text-align:center;overflow:hidden">');
+          buf.write('<div style="font-weight:700;font-size:13px">${_escapeHtml((doc?.displayName ?? '').trim().isEmpty ? 'My links' : doc!.displayName.trim())}</div>');
+          for (final l in (doc?.activeLinks ?? const []).take(8)) {
+            final label = l.title.trim().isEmpty ? l.url.trim() : l.title.trim();
+            buf.write('<a href="${_escapeHtml(l.url.trim())}" target="_blank" rel="noopener" style="display:block;margin-top:6px;padding:6px;border-radius:8px;background:#26262C;color:#fff;text-decoration:none;font-size:11px">${_escapeHtml(label)}</a>');
+          }
+          buf.write('</div>');
       }
       buf.writeln('</div>');
     }
