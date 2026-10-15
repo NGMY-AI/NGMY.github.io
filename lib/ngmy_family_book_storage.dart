@@ -58,7 +58,12 @@ Future<List<FamilyBookEntry>> loadFamilyBookEntries(String userEmail, String tre
         .map((e) => FamilyBookEntry.fromJson(Map<String, dynamic>.from(e)))
         .where((e) => e.id.isNotEmpty)
         .toList()
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      // Book order: pages in the order they were written (ids are creation timestamps).
+      ..sort((a, b) {
+        final x = int.tryParse(a.id), y = int.tryParse(b.id);
+        if (x != null && y != null) return x.compareTo(y);
+        return a.updatedAt.compareTo(b.updatedAt);
+      });
   } catch (_) {
     return [];
   }

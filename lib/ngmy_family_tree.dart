@@ -843,6 +843,8 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
       userEmail: widget.userEmail,
       treeId: _tree.id,
       canEdit: _canEdit,
+      bookTitle: _tree.name,
+      membersPage: familyTreeMembersBookText(_tree),
     ));
   }
 
@@ -1216,6 +1218,55 @@ class _FamilyTreeCanvas extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The "Our Family" page of a printed Family Book: everyone by generation, with their
+/// spouse and parent.
+String familyTreeMembersBookText(FamilyTree tree) {
+  final vis = visibleMembers(tree);
+  if (vis.isEmpty) return '';
+  final byId = {for (final m in vis) m.id: m};
+  String? partnerOf(FamilyMember m) {
+    if (byId.containsKey(m.spouseId)) return m.spouseId;
+    return vis.where((o) => o.spouseId == m.id).map((o) => o.id).firstOrNull;
+  }
+
+  int? chainDepth(FamilyMember m) {
+    var d = 0;
+    var cur = m;
+    final seen = <String>{m.id};
+    while (cur.parentId != null && byId.containsKey(cur.parentId) && seen.add(cur.parentId!)) {
+      cur = byId[cur.parentId]!;
+      d++;
+    }
+    return d;
+  }
+
+  final depth = <String, int>{};
+  for (final m in vis) {
+    depth[m.id] = chainDepth(m)!;
+  }
+  // A married-in spouse (no parent here) belongs to their partner's generation.
+  for (final m in vis) {
+    if (m.parentId != null && byId.containsKey(m.parentId)) continue;
+    final p = partnerOf(m);
+    if (p != null && (depth[p] ?? 0) > 0) depth[m.id] = depth[p]!;
+  }
+  final gens = depth.values.toSet().toList()..sort();
+  final out = StringBuffer();
+  for (final g in gens) {
+    out.writeln('Generation ${g + 1}');
+    for (final m in vis.where((m) => depth[m.id] == g)) {
+      final bits = <String>[];
+      final sp = partnerOf(m);
+      if (sp != null) bits.add('married to ${byId[sp]!.name}');
+      final par = m.parentId;
+      if (par != null && byId.containsKey(par) && sp != par) bits.add('child of ${byId[par]!.name}');
+      out.writeln('• ${m.name}${bits.isEmpty ? '' : ' — ${bits.join(', ')}'}');
+    }
+    out.writeln();
+  }
+  return out.toString().trim();
 }
 
 /// Laid-out top-center of each visible member (tests check the tree never overlaps).

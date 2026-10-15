@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'ngmy_book_studio.dart';
 import 'ngmy_family_book_storage.dart';
+import 'ngmy_print_booklet.dart';
 import 'ngmy_worksheet_helpers.dart';
 
 Future<void> showFamilyBookSheet(
@@ -8,6 +10,8 @@ Future<void> showFamilyBookSheet(
   required String userEmail,
   required String treeId,
   required bool canEdit,
+  String bookTitle = '',
+  String membersPage = '',
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
@@ -16,6 +20,8 @@ Future<void> showFamilyBookSheet(
         userEmail: userEmail,
         treeId: treeId,
         canEdit: canEdit,
+        bookTitle: bookTitle,
+        membersPage: membersPage,
       ),
     ),
   );
@@ -26,11 +32,17 @@ class _FamilyBookScreen extends StatefulWidget {
     required this.userEmail,
     required this.treeId,
     required this.canEdit,
+    this.bookTitle = '',
+    this.membersPage = '',
   });
 
   final String userEmail;
   final String treeId;
   final bool canEdit;
+  final String bookTitle;
+
+  /// "Our family" page text (members by generation) printed after the cover.
+  final String membersPage;
 
   @override
   State<_FamilyBookScreen> createState() => _FamilyBookScreenState();
@@ -167,6 +179,23 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await _reload();
   }
 
+  /// Fold-and-staple book: cover with the family name, the family members page, then
+  /// every Family Book page in order.
+  Future<void> _printBook() async {
+    if (_editing) await _saveCurrentPage();
+    if (!mounted) return;
+    final name = widget.bookTitle.trim();
+    final doc = NgmyBookDoc(
+      title: name.isEmpty ? 'Our Family Book' : name,
+      subtitle: 'Family Book',
+      chapters: [
+        if (widget.membersPage.trim().isNotEmpty) NgmyBookChapter(title: 'Our Family', body: widget.membersPage),
+        for (final e in _entries) NgmyBookChapter(title: e.title, body: e.body),
+      ],
+    );
+    await showNgmyBookPrintSheet(context, doc);
+  }
+
   String _formatDate(DateTime dt) {
     final local = dt.toLocal();
     final m = local.month.toString().padLeft(2, '0');
@@ -197,6 +226,12 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty)
+            IconButton(
+              tooltip: 'Print as a book',
+              onPressed: _printBook,
+              icon: Icon(Icons.print_rounded, color: paper, size: 20),
+            ),
           if (widget.canEdit && _entries.isNotEmpty)
             IconButton(
               tooltip: _editing ? 'Save page' : 'Edit page',

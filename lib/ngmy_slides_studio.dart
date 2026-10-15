@@ -13,6 +13,7 @@ import 'ngmy_hati_document_transfer.dart';
 import 'ngmy_hati_kiapo_uongozi.dart';
 import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_agreement_templates.dart';
+import 'ngmy_book_studio.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -4028,6 +4029,32 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                       ),
                     );
                   }),
+                  ),
+                )
+                // Book: write (yourself or with AI) and print a fold-and-staple book.
+                ..add(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: Tooltip(
+                      message: 'Books — write and print a fold & staple book',
+                      child: GestureDetector(
+                        onTap: () => showNgmyBookStudio(context, userEmail: widget.userEmail),
+                        child: Container(
+                          height: 34,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(999),
+                            gradient: const LinearGradient(colors: [Color(0xFF8B4513), Color(0xFFB45309)]),
+                            boxShadow: [BoxShadow(color: const Color(0xFF8B4513).withValues(alpha: 0.4), blurRadius: 10)],
+                          ),
+                          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.menu_book_rounded, color: Colors.white, size: 16),
+                            SizedBox(width: 5),
+                            Text('Book', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12)),
+                          ]),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
             ),
