@@ -32461,6 +32461,19 @@ class CivicRegistryScreen extends StatefulWidget {
 
 class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsBindingObserver {
   int _activeTab = 0; // 0: Search, 1: Enroll, 2: Members, 3: Rankings
+  /// Long lists (Members, Rankings) show this many rows and grow as you near the bottom —
+  /// building every member at once made those tabs lag while scrolling.
+  int _civicListLimit = 30;
+  int _civicListLimitTab = -1;
+  int _civicListTotal = 0;
+  final ScrollController _civicScroll = ScrollController();
+
+  void _onCivicScroll() {
+    if (!_civicScroll.hasClients || _civicListLimit >= _civicListTotal) return;
+    if (_civicScroll.position.extentAfter < 900) {
+      setState(() => _civicListLimit += 30);
+    }
+  }
   String _searchQuery = '';
   late String _selectedState;
   bool _registryUnlocked = false;
@@ -32545,6 +32558,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     super.initState();
     NgmyFeatureSyncSession.enterCivicRegistry();
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
+    _civicScroll.addListener(_onCivicScroll);
     _selectedState = widget.user.state;
     final bypass = _canBypassCivicGate();
     final requiresUnlock = _stateRequiresMemberUnlock();
@@ -33116,6 +33130,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       unawaited(Supabase.instance.client.removeChannel(civicHelpChannel));
     }
     NgmyAdminLiveRefresh.removeListener(_onCivicLiveRefresh);
+    _civicScroll.dispose();
     _searchController.dispose();
     _enrollSearchC.dispose();
     _fullNameC.dispose();
@@ -38149,7 +38164,17 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       _effectiveHelpsForRanking(u, state) > 0;
 
   /// Earliest contribution time for rankings — active help campaign when on, else any in state.
+  /// Worked out once per redraw — the Rankings sort asked for it thousands of times, each
+  /// time decoding the member's whole contribution history.
+  final Map<String, DateTime?> _rankTimeCache = {};
+
   DateTime? _rankingContributionTime(UserData u, String state) {
+    final cacheKey = '${u.email.toLowerCase().trim()}|${state.trim()}';
+    if (_rankTimeCache.containsKey(cacheKey)) return _rankTimeCache[cacheKey];
+    return _rankTimeCache[cacheKey] = _rankingContributionTimeUncached(u, state);
+  }
+
+  DateTime? _rankingContributionTimeUncached(UserData u, String state) {
     final st = state.trim();
     final campaignId = widget.config.helpActiveFor(st) ? _activeHelpCampaignId(st).trim() : '';
     final startedRaw = widget.config.helpCampaignStartedAtFor(st).trim();
@@ -44463,6 +44488,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             },
             child: SelectionContainer.disabled(
             child: SingleChildScrollView(
+              controller: _civicScroll,
               padding: EdgeInsets.fromLTRB(
                 20,
                 MediaQuery.paddingOf(context).top + 8 + 64 + 14,
@@ -46418,9 +46444,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             Expanded(
               child: Builder(
                 builder: (context) {
+                  // One pass over the registry (it used to search the whole registry once per member).
+                  final byEmail = <String, Map<String, dynamic>>{
+                    for (final r in NgmyCivicRegistryMembers.listFrom(widget.config))
+                      NgmyCivicRegistryMembers.emailKey((r['email'] ?? '').toString()): r,
+                  };
                   var people = 0;
                   for (final u in members) {
-                    final raw = NgmyCivicRegistryMembers.findByEmail(widget.config, u.email);
+                    final raw = byEmail[NgmyCivicRegistryMembers.emailKey(u.email)];
                     people += raw == null ? 1 : NgmyCivicRegistryMembers.familySizeOf(raw);
                   }
                   final ink = isDark ? Colors.white70 : Colors.grey;
@@ -46480,10 +46511,38 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
 
         const SizedBox(height: 15),
         if (members.isEmpty) const Center(child: Padding(padding: EdgeInsets.all(40), child: Text('No members match your filters.', style: TextStyle(color: Colors.grey))))
-        else ...members.map((m) => _memberCard(m, isDark, manageActions: _canUseRegistrarToolsHere())),
+        else ...[
+          ...members.take(_civicListShown(members.length)).map((m) => _memberCard(m, isDark, manageActions: _canUseRegistrarToolsHere())),
+          if (members.length > _civicListLimit) _civicMoreHint(isDark, members.length),
+        ],
       ],
     );
   }
+
+  /// How many rows of a long list to show now (grows as you scroll; resets per tab).
+  int _civicListShown(int total) {
+    if (_civicListLimitTab != _activeTab) {
+      _civicListLimitTab = _activeTab;
+      _civicListLimit = 30;
+    }
+    _civicListTotal = total;
+    return _civicListLimit;
+  }
+
+  Widget _civicMoreHint(bool isDark, int total) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 10),
+            Text(
+              'Showing ${_civicListLimit.clamp(0, total)} of $total — keep scrolling for more',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white54 : Colors.black54),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _openMoneyForMember(UserData u) async {
     // Open right away from what this phone already has. Waiting for the
@@ -47192,6 +47251,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   }
 
   Widget _rankingsSection(bool isDark) {
+    _rankTimeCache.clear(); // fresh each redraw
     final st = _selectedState.trim();
     final enrolled = _rankingsEnrolled();
     final hasContributions = enrolled.any((u) => _memberCountsAsTopHelper(u, st));
@@ -47226,6 +47286,12 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final muted = isDark ? Colors.white54 : Colors.black54;
     final waitingOnDirectory = _sharedDirectoryLoading && enrolled.isEmpty;
+    // Show the lists a page at a time (they grow as you scroll) — all three share one budget.
+    final rankTotal = topHelpers.length + leastHelpers.length + nonHelpers.length;
+    final rankBudget = _civicListShown(rankTotal);
+    final topShown = topHelpers.length.clamp(0, rankBudget);
+    final leastShown = leastHelpers.length.clamp(0, rankBudget - topShown);
+    final nonShown = nonHelpers.length.clamp(0, rankBudget - topShown - leastShown);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -47433,7 +47499,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             isDark,
           )
         else
-          ...topHelpers.asMap().entries.map(
+          ...topHelpers.asMap().entries.take(topShown).map(
                 (e) => _civicRankCard(
                   e.key + 1,
                   e.value,
@@ -47466,7 +47532,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             isDark,
           )
         else
-          ...leastHelpers.asMap().entries.map(
+          ...leastHelpers.asMap().entries.take(leastShown).map(
                 (e) => _civicRankCard(
                   e.key + 1,
                   e.value,
@@ -47498,7 +47564,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             isDark,
           )
         else
-          ...nonHelpers.asMap().entries.map(
+          ...nonHelpers.asMap().entries.take(nonShown).map(
                 (e) => _civicRankCard(
                   e.key + 1,
                   e.value,
@@ -47508,6 +47574,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   helps: e.value.helps,
                 ),
               ),
+        if (rankTotal > rankBudget) _civicMoreHint(isDark, rankTotal),
 
         const SizedBox(height: 20),
         if (_canChangeCivicState()) ...[
