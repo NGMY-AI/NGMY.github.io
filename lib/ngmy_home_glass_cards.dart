@@ -2771,7 +2771,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
 
   Widget _installGuideEmptyCard({required bool isDark, required String name}) {
     return SizedBox(
-      height: 252,
+      height: ngmyHomeCardHeightFor(MediaQuery.sizeOf(context).width - 32),
       width: double.infinity,
       child: NgmyFrostedCard(
         dateLabel: ngmyHomeDateTabLabel(DateTime.now()),
@@ -2793,6 +2793,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     if (!_loaded) return const SizedBox(height: 300);
     final name = _welcomeName;
 
+    // Same card shape on every phone (wide 1.55 : 1, like the photo crop) — a card made on one
+    // phone is never cut off at the ends on another.
+    return LayoutBuilder(builder: (context, box) {
+    final deckH = ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2802,7 +2806,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
           children: [
             NgmyGlassCardStack<NgmySpendingEntry>(
               key: const ValueKey('home-spending-stack'),
-              height: 252,
+              height: deckH,
               items: _spending,
               itemId: (e) => e.id,
               autoPlay: _autoPlay,
@@ -2927,6 +2931,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
         ),
       ],
     );
+    });
   }
 }
 
@@ -2946,7 +2951,9 @@ class _SpendingCardContent extends StatelessWidget {
   final String? profilePicturePath;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => NgmyHomeCardCanvas(child: _face(context));
+
+  Widget _face(BuildContext context) {
     if (entry.hasImage) {
       return _ImageCardBody(imageBase64: entry.imageBase64);
     }
@@ -4769,7 +4776,7 @@ class _NgmyHomeCloudCardsSheetState extends State<_NgmyHomeCloudCardsSheet> {
                 )
               else
                 NgmyGlassCardStack<NgmySpendingEntry>(
-                  height: 252,
+                  height: ngmyHomeCardHeightFor(MediaQuery.sizeOf(context).width - 40),
                   items: saved,
                   itemId: (e) => e.id,
                   autoPlay: false,
@@ -6336,5 +6343,33 @@ class _DottedRule extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Home card height for a given width: always the same 1.55 : 1 shape (the shape the card
+/// photo crop uses), so cards look the same on a small iPhone, an iPhone 14 Plus or a tablet.
+double ngmyHomeCardHeightFor(double width) {
+  if (!width.isFinite || width <= 0) return 252;
+  return (width / 1.55).clamp(190.0, 320.0);
+}
+
+/// Lays a card's face out at one fixed design size and scales it to the card, so text, photos
+/// and badges sit exactly where they were designed on every screen (nothing pushed off the ends).
+class NgmyHomeCardCanvas extends StatelessWidget {
+  const NgmyHomeCardCanvas({super.key, required this.child});
+  final Widget child;
+
+  static const double designWidth = 390;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      if (!box.hasBoundedWidth || !box.hasBoundedHeight || box.maxWidth <= 0 || box.maxHeight <= 0) return child;
+      final h = designWidth * box.maxHeight / box.maxWidth;
+      return FittedBox(
+        fit: BoxFit.fill,
+        child: SizedBox(width: designWidth, height: h, child: child),
+      );
+    });
   }
 }

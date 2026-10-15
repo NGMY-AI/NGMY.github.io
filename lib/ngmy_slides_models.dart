@@ -1031,6 +1031,7 @@ class NgmySlidesTemplates {
 
 class NgmySlidesStorage {
   static final Map<String, String> _memoryJson = {};
+  static final Map<String, List<NgmySlideDeck>> _lastSaved = {};
 
   static String _emailKey(String email) => email.toLowerCase().trim();
 
@@ -1109,9 +1110,47 @@ class NgmySlidesStorage {
     return merged;
   }
 
+  static String _deletedKey(String email) => 'ngmy_slides_deleted_${_emailKey(email)}';
+
+  /// Presentations you deleted — the only way one leaves storage.
+  static Future<Set<String>> _deletedIds(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return (prefs.getStringList(_deletedKey(email)) ?? const []).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Call when a presentation is really deleted.
+  static Future<void> markDeleted(String email, String deckId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = (prefs.getStringList(_deletedKey(email)) ?? <String>[])..add(deckId);
+      await prefs.setStringList(_deletedKey(email), ids.length > 500 ? ids.sublist(ids.length - 500) : ids);
+    } catch (_) {}
+  }
+
+  /// Saves the presentations. Never shrinks what's stored: anything already saved that is
+  /// missing from [decks] (e.g. a save that ran before the list finished loading) is kept,
+  /// newer copies win, and only presentations you deleted are left out.
   static Future<void> saveDecks(String email, List<NgmySlideDeck> decks) async {
     final key = _emailKey(email);
-    final raw = jsonEncode(decks.map((d) => d.toJson()).toList());
+    if (key.isEmpty) return;
+    // What's saved already (kept in memory after the first save, so autosave stays quick).
+    final stored = _lastSaved[key] ?? await loadDecks(email);
+    final deleted = await _deletedIds(email);
+    final byId = <String, NgmySlideDeck>{for (final d in stored) if (d.id.trim().isNotEmpty) d.id: d};
+    for (final d in decks) {
+      if (d.id.trim().isEmpty) continue;
+      final have = byId[d.id];
+      // The copy being saved wins unless the stored one is strictly newer.
+      if (have == null || !have.updatedAt.isAfter(d.updatedAt)) byId[d.id] = d;
+    }
+    final merged = byId.values.where((d) => !deleted.contains(d.id)).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    _lastSaved[key] = merged;
+    final raw = jsonEncode(merged.map((d) => d.toJson()).toList());
     _memoryJson[key] = raw;
     try {
       await ngmySlidesIdbPut(key, raw);

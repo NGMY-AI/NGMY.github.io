@@ -294,6 +294,9 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   Future<void> _persistDecks() => _flushPersistedDecks();
 
   Future<void> _flushPersistedDecks({String? email}) async {
+    // Still loading: the list on screen isn't the real one yet — saving it now is what made
+    // presentations disappear (the app going to the background right after opening Slides).
+    if (_loading && email == null) return;
     final personal = _personalDecksSnapshot();
     await NgmySlidesStorage.saveDecks(email ?? widget.userEmail, personal);
     final active = _activeDeck;
@@ -1180,6 +1183,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       _hiddenKiapoStates.add(state.toLowerCase());
     }
     unawaited(NgmySlidesTransferQrStash.releaseBundle(deck.id));
+    // Saving never drops a presentation by itself — only this does.
+    await NgmySlidesStorage.markDeleted(widget.userEmail, deck.id);
     if (!mounted) return;
     setState(() {
       _decks.removeWhere((d) => d.id == deck.id);

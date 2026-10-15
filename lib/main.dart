@@ -44857,13 +44857,14 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final isVoteAdmin = widget.user.isAdmin ||
         widget.user.isCivicRegistryKing ||
         widget.user.isCivicRegistryAdmin;
-    return NgmyCivicVotingEntryCard(
+    // Its own layer: the card's animations no longer redraw the whole Civic page (scroll lag).
+    return RepaintBoundary(child: NgmyCivicVotingEntryCard(
       config: widget.config,
       userEmail: widget.user.email,
       userPhone: widget.user.phone,
       memberState: memberState,
       isAdmin: isVoteAdmin,
-    );
+    ));
   }
 
   List<UserData> _dedupeRankingUsers(List<UserData> users) {

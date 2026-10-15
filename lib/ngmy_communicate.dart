@@ -3648,6 +3648,8 @@ class _LoveWorldChat extends StatefulWidget {
 }
 
 class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObserver {
+  /// True while the chat list is being scrolled (the background holds still meanwhile).
+  final ValueNotifier<bool> _chatScrolling = ValueNotifier<bool>(false);
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final _photoPicker = ImagePicker();
@@ -6278,9 +6280,28 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
       backgroundColor: scaffoldBg,
       body: Stack(
         children: [
-          _LoveWorldBackground(ctrl: widget.bgCtrl, floatCtrl: widget.floatCtrl, isDark: isDark, still: _agentRun.visible && _agentRun.liveUrl.isNotEmpty),
+          // Own layers: the moving background never makes the message list redraw, and it
+          // holds still while you scroll so scrolling stays smooth.
+          RepaintBoundary(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _chatScrolling,
+              builder: (context, scrolling, _) => _LoveWorldBackground(
+                ctrl: widget.bgCtrl,
+                floatCtrl: widget.floatCtrl,
+                isDark: isDark,
+                still: scrolling || (_agentRun.visible && _agentRun.liveUrl.isNotEmpty),
+              ),
+            ),
+          ),
           Positioned.fill(
-            child: ListView.builder(
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (n) {
+                if (n is ScrollStartNotification) _chatScrolling.value = true;
+                if (n is ScrollEndNotification) _chatScrolling.value = false;
+                return false;
+              },
+              child: RepaintBoundary(
+                child: ListView.builder(
               controller: _scroll,
               reverse: true,
               padding: EdgeInsets.fromLTRB(16, topPad, 16, 8),
@@ -6492,6 +6513,8 @@ class _LoveWorldChatState extends State<_LoveWorldChat> with WidgetsBindingObser
                   ),
                 );
               },
+            ),
+              ),
             ),
           ),
           Positioned(
