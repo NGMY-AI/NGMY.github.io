@@ -33010,6 +33010,41 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     } catch (_) {}
   }
 
+  bool _uploadingMissingContributions = false;
+
+  /// Uploads approved contributions this phone has but the database doesn't (last 90 days,
+  /// never ones deleted). One batch write; safe to repeat (same ids are simply updated).
+  Future<void> _uploadMissingContributions({
+    required List<AppTransaction> cloud,
+    required List<AppTransaction> local,
+    required Set<String> deleted,
+  }) async {
+    if (_uploadingMissingContributions) return;
+    _uploadingMissingContributions = true;
+    try {
+      final inCloud = {for (final t in cloud) t.id};
+      final cutoff = DateTime.now().subtract(const Duration(days: 90));
+      final missing = <String, AppTransaction>{};
+      for (final t in local) {
+        if (t.id.isEmpty || inCloud.contains(t.id) || deleted.contains(t.id)) continue;
+        if (t.type != TransactionType.contribution || t.status != TransactionStatus.approved) continue;
+        if (t.timestamp.isBefore(cutoff) || t.amount <= 0) continue;
+        missing[t.id] = t;
+      }
+      if (missing.isEmpty) return;
+      debugPrint('[civic] uploading ${missing.length} contribution(s) missing from the database');
+      await ngmyEnsurePrivilegedCloudSession();
+      final rows = missing.values.map(_transactionRowForCloud).toList();
+      for (var i = 0; i < rows.length; i += 40) {
+        await _safeUpsertTransactionRows(rows.sublist(i, math.min(i + 40, rows.length)), requireStatus: true);
+      }
+    } catch (e) {
+      debugPrint('[civic] upload missing contributions: $e');
+    } finally {
+      _uploadingMissingContributions = false;
+    }
+  }
+
   Future<void> _refreshCivicHelpModeAndContributions({String? state}) async {
     if (_helpRefreshInFlight) {
       final pending = _helpRefreshCompleter;
@@ -33068,6 +33103,16 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     final localContributions = widget.allTransactions.where(
       (t) => t.type == TransactionType.contribution && t.status == TransactionStatus.approved,
     );
+    // Contributions recorded on this phone that never reached the database (an upload that
+    // failed — e.g. several entered within seconds) are sent again now. Without this the
+    // recording phone showed $40 while every other phone showed $30 for the same collection.
+    if (results[0].isNotEmpty && (_canUseRegistrarToolsHere() || widget.user.isAdmin)) {
+      unawaited(_uploadMissingContributions(
+        cloud: results[0],
+        local: [...priorContributions, ...localContributions],
+        deleted: deleted,
+      ));
+    }
     final localClaims = widget.allTransactions.where((t) => t.type == TransactionType.claim);
     setState(() {
       if (nationwideStats != null) {

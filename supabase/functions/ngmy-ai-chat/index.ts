@@ -2667,13 +2667,15 @@ async function enforceRateLimit(
   key: string,
   max: number,
   windowSeconds: number,
+  /** What the blocked request was for (logged only when blocked — finds noisy writers). */
+  note = "",
 ): Promise<Response | null> {
   const admin = adminClient();
   const ok = await consumeRateLimit(admin, bucket, key, max, windowSeconds);
   if (ok) return null;
   const ip = clientIp(req);
   console.error("[rate-limit]", bucket, key.slice(0, 80), ip);
-  await logSecurityEvent(admin, "rate_limit", `${bucket}:${key}`, ip);
+  await logSecurityEvent(admin, "rate_limit", `${bucket}:${key}${note ? " " + note : ""}`.slice(0, 300), ip);
   return rateLimitedResponse();
 }
 
@@ -3898,7 +3900,8 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
   const DB_RELAY_MAX_ROWS = 50;
 
   if (op === "s") {
-    const readLimited = await enforceRateLimit(req, "db_read", clientIp(req), 120, 60);
+    const readLimited = await enforceRateLimit(req, "db_read", clientIp(req), 120, 60,
+      `${table}${settingsRealKey ? ":" + settingsRealKey : ""}`);
     if (readLimited) return readLimited;
     let q = client.from(table).select(String(body.cols ?? "*"));
     for (const [k, v] of Object.entries(eq)) q = q.eq(k, v as never);
@@ -3941,7 +3944,10 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     return jsonOk({ ok: true, data });
   }
 
-  const writeLimited = await enforceRateLimit(req, "db_write", clientIp(req), 60, 60);
+  // 240/min: a registrar entering several contributions within seconds used to hit 60 and the
+  // last one silently never reached the database (one phone showed $40, the rest $30).
+  const writeLimited = await enforceRateLimit(req, "db_write", clientIp(req), 240, 60,
+    `${table}${settingsRealKey ? ":" + settingsRealKey : ""} ${op}`);
   if (writeLimited) return writeLimited;
 
   if (op === "up" || op === "i") {
