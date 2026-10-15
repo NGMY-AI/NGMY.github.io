@@ -12420,7 +12420,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
     _inAppNoticeEntry = OverlayEntry(
-      builder: (_) => IgnorePointer(
+      // Material gives the banner its real text style (without it the text showed huge with yellow underlines).
+      builder: (_) => Material(
+        type: MaterialType.transparency,
+        child: IgnorePointer(
         child: SafeArea(
           child: Align(
             alignment: Alignment.topCenter,
@@ -12453,7 +12456,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           ),
         ),
       ),
-    );
+    ));
     overlay.insert(_inAppNoticeEntry!);
     Future.delayed(const Duration(seconds: 4), () {
       if (!mounted) {
@@ -12598,11 +12601,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (id.isEmpty || prevIds.contains(id)) continue;
       final name = (app['fullName'] ?? app['username'] ?? 'Someone').toString();
       final state = (app['state'] ?? '').toString();
-      unawaited(_notifyAdminPendingRequest(
-        title: 'Registrar application',
-        body: '$name applied${state.isNotEmpty ? ' ($state)' : ''}. Open Admin → Civic Registry.',
-        tag: 'admin_registrar_$id',
-      ));
+      // Told once per application, ever (a reload of old data no longer repeats it).
+      unawaited(NgmyAdminAlerts.firstTime('registrar_apps', id).then((first) async {
+        if (!first) return;
+        await _notifyAdminPendingRequest(
+          title: 'Registrar application',
+          body: '$name applied${state.isNotEmpty ? ' ($state)' : ''}. Open Admin → Civic Registry.',
+          tag: 'admin_registrar_$id',
+        );
+      }));
     }
   }
 

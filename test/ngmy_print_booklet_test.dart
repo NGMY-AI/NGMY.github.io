@@ -85,6 +85,14 @@ void main() {
     expect(ngmyRequestedLanguage('A presentation about solar energy for my class'), isNull);
   });
 
+  test('no ruled Notes lines unless asked for', () {
+    final doc = NgmyBookDoc(title: 'N', chapters: [NgmyBookChapter(title: 'A', body: 'short ' * 30)]);
+    final off = ngmyPaginateBook(doc, pageWidth: 396, pageHeight: 612, measure: _w);
+    expect(off.every((p) => p.notesFrom == null), isTrue);
+    final on = ngmyPaginateBook(doc, pageWidth: 396, pageHeight: 612, measure: _w, notes: true);
+    expect(on.any((p) => p.notesFrom != null), isTrue);
+  });
+
   testWidgets('PDF builds in both layouts', (tester) async {
     await tester.runAsync(() async {
       final doc = NgmyBookDoc(title: 'T', chapters: [NgmyBookChapter(title: 'A', body: 'hello ' * 400)]);
@@ -95,3 +103,4 @@ void main() {
     });
   });
 }
+

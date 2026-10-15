@@ -266,8 +266,8 @@ List<String> ngmyWrapBookText(String paragraph, double maxWidth, double size, bo
 
 /// Flows the book onto pages: the cover, then the pages one after another with no big gaps
 /// (a new page only starts a page when the old one is nearly full), pictures under their
-/// titles, and ruled "Notes" lines in leftover space. Extra pages needed to fill the last
-/// sheet become Notes pages, and the back cover is always the very last page.
+/// titles; with [notes] on, ruled "Notes" lines fill leftover space. Extra pages needed to fill the last
+/// sheet are blank (Notes pages when [notes] is on), and the back cover is always last.
 List<NgmyBookPage> ngmyPaginateBook(
   NgmyBookDoc doc, {
   required double pageWidth,
@@ -276,6 +276,7 @@ List<NgmyBookPage> ngmyPaginateBook(
   double bodySize = kNgmyBookBodySize,
   bool Function(int chapter)? hasPicture,
   bool backCover = true,
+  bool notes = false,
 }) {
   final contentW = pageWidth - kNgmyBookSideMargin * 2;
   final contentH = pageHeight - kNgmyBookTopMargin - kNgmyBookBottomMargin;
@@ -345,14 +346,16 @@ List<NgmyBookPage> ngmyPaginateBook(
     }
   }
   if (!pageEmpty()) {
-    // Leftover space on the last written page becomes ruled lines for notes.
-    final notesFrom = y + 30 < contentH - 90 ? y + 30 : null;
+    // Leftover space on the last written page: ruled lines only when notes were asked for.
+    final notesFrom = notes && y + 30 < contentH - 90 ? y + 30 : null;
     pages.add(NgmyBookPage(lines: lines, pictures: pics, number: pages.length, notesFrom: notesFrom));
   }
 
   final reserved = backCover ? 1 : 0;
   while ((pages.length + reserved) % 4 != 0) {
-    pages.add(NgmyBookPage(kind: NgmyBookPageKind.notes, number: pages.length, notesFrom: 0));
+    pages.add(notes
+        ? NgmyBookPage(kind: NgmyBookPageKind.notes, number: pages.length, notesFrom: 0)
+        : const NgmyBookPage(kind: NgmyBookPageKind.notes));
   }
   if (backCover) pages.add(const NgmyBookPage(kind: NgmyBookPageKind.back));
   return pages;
@@ -414,17 +417,37 @@ Map<int, pw.MemoryImage> _chapterImages(NgmyBookDoc doc) {
   return out;
 }
 
-List<NgmyBookPage> _layout(NgmyBookDoc doc, NgmyBookPaper paper, _BookFonts fonts, Map<int, pw.MemoryImage> images) {
+/// Lays the book out. When the last sheet would end with blank pages, it quietly tries a
+/// slightly smaller or larger text size (11-12.5 pt) that fills the sheets better, so the
+/// book doesn't end in empty paper.
+List<NgmyBookPage> _layout(NgmyBookDoc doc, NgmyBookPaper paper, _BookFonts fonts, Map<int, pw.MemoryImage> images, {bool notes = false}) {
   final size = ngmyBookPageSize(paper);
-  return ngmyPaginateBook(doc,
-      pageWidth: size.width, pageHeight: size.height, measure: fonts.measure, hasPicture: images.containsKey);
+  List<NgmyBookPage> run(double body) => ngmyPaginateBook(doc,
+      pageWidth: size.width,
+      pageHeight: size.height,
+      measure: fonts.measure,
+      hasPicture: images.containsKey,
+      bodySize: body,
+      notes: notes);
+  int blanks(List<NgmyBookPage> p) => p.where((x) => x.kind == NgmyBookPageKind.notes).length;
+  var best = run(kNgmyBookBodySize);
+  if (notes || blanks(best) == 0) return best;
+  // Long books: one extra blank page or two is nothing; skip the extra work.
+  final words = doc.chapters.fold<int>(0, (n, c) => n + c.body.length ~/ 6);
+  if (words > 40000) return best;
+  for (final body in const [12.0, 11.0, 12.5]) {
+    final p = run(body);
+    if (blanks(p) < blanks(best)) best = p;
+    if (blanks(best) == 0) break;
+  }
+  return best;
 }
 
 /// How many pages and sheets a book takes, for the print screen.
 /// [filled] = pages up to the last written one (the rest are Notes pages and the back cover).
-Future<({int pages, int sheets, int filled})> ngmyBookletCount(NgmyBookDoc doc, NgmyBookPaper paper) async {
+Future<({int pages, int sheets, int filled})> ngmyBookletCount(NgmyBookDoc doc, NgmyBookPaper paper, {bool notes = false}) async {
   final fonts = await _loadBookFonts();
-  final pages = _layout(doc, paper, fonts, _chapterImages(doc));
+  final pages = _layout(doc, paper, fonts, _chapterImages(doc), notes: notes);
   var filled = pages.length;
   while (filled > 1 && (pages[filled - 1].isBlank || pages[filled - 1].isBack)) {
     filled--;
@@ -443,11 +466,12 @@ Future<Uint8List> ngmyBuildBookletPdf(
   Uint8List? coverPng,
   int? backColor,
   int? accentColor,
+  bool notes = false,
 }) async {
   final fonts = await _loadBookFonts();
   final size = ngmyBookPageSize(paper);
   final images = _chapterImages(doc);
-  final pages = _layout(doc, paper, fonts, images);
+  final pages = _layout(doc, paper, fonts, images, notes: notes);
   final ink = PdfColor.fromInt(0xFF1F2937);
   final soft = PdfColor.fromInt(0xFF6B7280);
   final rule = PdfColor.fromInt(0xFFD7DCE3);
@@ -461,7 +485,7 @@ Future<Uint8List> ngmyBuildBookletPdf(
     } catch (_) {}
   }
 
-  pw.Widget notes(double from, {bool heading = false}) {
+  pw.Widget ruled(double from, {bool heading = false}) {
     final top = kNgmyBookTopMargin + from;
     final widgets = <pw.Widget>[];
     var y = top + (heading ? 34 : 0);
@@ -526,7 +550,7 @@ Future<Uint8List> ngmyBuildBookletPdf(
       width: size.width,
       height: size.height,
       child: pw.Stack(children: [
-        if (page.notesFrom != null) notes(page.notesFrom!, heading: page.kind == NgmyBookPageKind.notes),
+        if (page.notesFrom != null) ruled(page.notesFrom!, heading: page.kind == NgmyBookPageKind.notes),
         for (final p in page.pictures)
           if (images[p.chapter] != null)
             pw.Positioned(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -154,36 +155,190 @@ String _coverQueryOf(String text) {
   return m?.group(1)?.trim() ?? '';
 }
 
+/// Most pages the AI can write in one book.
+const int kNgmyBookAiMaxPages = 1000;
+
+/// Writes the book. Up to 12 pages is one AI request; longer books (up to
+/// [kNgmyBookAiMaxPages]) are planned first, outlined in parts and then written a few pages
+/// at a time in parallel, so even a 500-page book comes out whole and in order.
+/// [onStatus] gets a message and how far along it is (0-1).
 Future<NgmyBookDoc> ngmyWriteBookWithAi({
   required String description,
   required int pages,
   String author = '',
-  void Function(String status)? onStatus,
+  void Function(String status, double progress)? onStatus,
 }) async {
+  pages = pages.clamp(1, kNgmyBookAiMaxPages);
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
   final creds = ngmyParseAiCredentials(key);
   String? lastError;
-  for (var attempt = 0; attempt < 2; attempt++) {
-    onStatus?.call('Writing your $pages pages…');
-    final r = await ngmyAiGenerateWithCredentials(creds, ngmyBookAiPrompt(description: description, pages: pages));
-    if (r.text != null) {
-      final doc = ngmyParseBookAi(r.text!, author: author);
-      if (doc != null) {
-        onStatus?.call('Adding pictures…');
-        return _withPictures(doc, _coverQueryOf(r.text!));
-      }
-    } else {
+
+  Future<String?> ask(String prompt) async {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final r = await ngmyAiGenerateWithCredentials(creds, prompt);
+      if (r.text != null && r.text!.trim().isNotEmpty) return r.text;
       lastError = r.error;
     }
+    return null;
   }
-  throw lastError != null && ngmyIsOfflineOrNetworkError(lastError)
+
+  Never fail() => throw lastError != null && ngmyIsOfflineOrNetworkError(lastError!)
       ? 'No internet connection — try again when you are online.'
       : 'The AI could not write the book. Try describing it again.';
+
+  if (pages <= 12) {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      onStatus?.call('Writing your $pages pages…', 0.15);
+      final text = await ask(ngmyBookAiPrompt(description: description, pages: pages));
+      if (text == null) continue;
+      final doc = ngmyParseBookAi(text, author: author);
+      if (doc != null) {
+        onStatus?.call('Adding pictures…', 0.85);
+        return _withPictures(doc, _coverQueryOf(text));
+      }
+    }
+    fail();
+  }
+
+  final lang = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "kwa Kiswahili", "in English"), write in it; otherwise use the language the request is written in.\n${ngmyLanguageDirective(description)}';
+  final templates = kNgmyCoverTemplates.map((t) => t.id).join(', ');
+
+  // 1. Plan: title, cover and the parts (about 50 pages each).
+  final partCount = (pages / 50).ceil();
+  onStatus?.call('Planning your $pages-page book…', 0.02);
+  final planText = await ask('''
+You plan a long printable book of $pages pages from this request:
+"""$description"""
+$lang
+Split it into exactly $partCount parts that tell the whole book in order.
+"cover_template": best fit from $templates. "cover_query": 2-3 English words for a cover photo.
+Reply with JSON only:
+{"title":"...","subtitle":"...","cover_template":"...","cover_query":"...","parts":[{"title":"...","summary":"2-3 sentences"}]}
+''');
+  final plan = planText == null ? null : _jsonObject(planText);
+  if (plan == null) fail();
+  final title = '${plan['title'] ?? ''}'.trim();
+  final subtitle = '${plan['subtitle'] ?? ''}'.trim();
+  final template = '${plan['cover_template'] ?? ''}'.trim();
+  final parts = (plan['parts'] is List ? plan['parts'] as List : const []).whereType<Map>().toList();
+  while (parts.length < partCount) {
+    parts.add({'title': 'Part ${parts.length + 1}', 'summary': description});
+  }
+
+  // 2. Outline every page of every part.
+  final outline = List<Map<String, String>?>.filled(pages, null);
+  var outlined = 0;
+  final outlineJobs = <Future<void> Function()>[];
+  for (var p = 0; p < partCount; p++) {
+    final from = p * 50;
+    final count = math.min(50, pages - from);
+    final part = parts[p];
+    outlineJobs.add(() async {
+      final text = await ask('''
+Book: "$title" — $subtitle. Request: """$description"""
+$lang
+Outline part ${p + 1} of $partCount: "${part['title']}" — ${part['summary']}
+This part is pages ${from + 1} to ${from + count} of $pages. Give exactly $count pages, in order, each with a short title, a one-sentence summary of what happens or is explained, and "image_query" (2-3 English words for a photo).
+Reply with JSON only: {"pages":[{"title":"...","summary":"...","image_query":"..."}]}
+''');
+      final list = text == null ? const [] : (_jsonObject(text)?['pages'] is List ? _jsonObject(text)!['pages'] as List : const []);
+      for (var i = 0; i < count; i++) {
+        final m = i < list.length && list[i] is Map ? Map<String, dynamic>.from(list[i] as Map) : const <String, dynamic>{};
+        outline[from + i] = {
+          'title': '${m['title'] ?? ''}'.trim().isEmpty ? '${part['title']} ${i + 1}' : '${m['title']}'.trim(),
+          'summary': '${m['summary'] ?? part['summary'] ?? ''}'.trim(),
+          'image_query': '${m['image_query'] ?? ''}'.trim(),
+        };
+      }
+      outlined++;
+      onStatus?.call('Outlining part $outlined of $partCount…', 0.02 + 0.08 * outlined / partCount);
+    });
+  }
+  await _pool(outlineJobs, 3);
+
+  // 3. Write the pages, 6 at a time, 3 requests at once.
+  final bodies = List<String>.filled(pages, '');
+  var written = 0;
+  final writeJobs = <Future<void> Function()>[];
+  for (var from = 0; from < pages; from += 6) {
+    final count = math.min(6, pages - from);
+    writeJobs.add(() async {
+      final before = from > 0 ? 'The page before was "${outline[from - 1]!['title']}": ${outline[from - 1]!['summary']}' : 'This is the start of the book.';
+      final list = [
+        for (var i = 0; i < count; i++) '${from + i + 1}. "${outline[from + i]!['title']}" — ${outline[from + i]!['summary']}',
+      ].join('\n');
+      final text = await ask('''
+You are writing the printable book "$title" ($subtitle). Request: """$description"""
+$lang
+$before
+Write these $count pages now, in order. Each body is 230-300 words in 3-5 paragraphs separated by a blank line, plain words, no markdown, no emojis. Continue the book naturally; do not repeat earlier pages.
+$list
+Reply with JSON only: {"pages":[{"title":"...","body":"..."}]}
+''');
+      final got = text == null ? const [] : (_jsonObject(text)?['pages'] is List ? _jsonObject(text)!['pages'] as List : const []);
+      for (var i = 0; i < count; i++) {
+        final m = i < got.length && got[i] is Map ? Map<String, dynamic>.from(got[i] as Map) : const <String, dynamic>{};
+        final body = '${m['body'] ?? ''}'.trim();
+        bodies[from + i] = body.isNotEmpty ? body : outline[from + i]!['summary'] ?? '';
+      }
+      written += count;
+      onStatus?.call('Writing pages… $written of $pages', 0.1 + 0.8 * written / pages);
+    });
+  }
+  await _pool(writeJobs, 3);
+  if (bodies.every((b) => b.isEmpty)) fail();
+
+  // Pictures: every page in short books, about 40 spread through long ones.
+  final every = pages <= 40 ? 1 : (pages / 40).ceil();
+  final chapters = [
+    for (var i = 0; i < pages; i++)
+      NgmyBookChapter(
+        title: outline[i]!['title']!,
+        body: bodies[i],
+        imageQuery: i % every == 0 ? outline[i]!['image_query']! : '',
+      ),
+  ];
+  onStatus?.call('Adding pictures…', 0.92);
+  final doc = NgmyBookDoc(
+    title: title.isEmpty ? 'My Book' : title,
+    subtitle: subtitle,
+    author: author,
+    chapters: chapters,
+    cover: NgmyBookCover(template: kNgmyCoverTemplates.any((t) => t.id == template) ? template : 'royal'),
+  );
+  return _withPictures(doc, '${plan['cover_query'] ?? ''}');
 }
 
-/// Fetches a picture for each page (and the cover) in parallel; pages whose picture can't be
-/// found simply print without one.
+Map<String, dynamic>? _jsonObject(String text) {
+  final start = text.indexOf('{');
+  final end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    final j = jsonDecode(text.substring(start, end + 1));
+    return j is Map ? Map<String, dynamic>.from(j) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Runs [jobs] with at most [workers] at the same time.
+Future<void> _pool(List<Future<void> Function()> jobs, int workers) async {
+  var next = 0;
+  Future<void> worker() async {
+    while (next < jobs.length) {
+      final job = jobs[next++];
+      try {
+        await job();
+      } catch (_) {}
+    }
+  }
+
+  await Future.wait(List.generate(math.min(workers, jobs.length), (_) => worker()));
+}
+
+/// Fetches pictures for the pages that asked for one (and the cover), a few at a time;
+/// pages whose picture can't be found simply print without one.
 Future<NgmyBookDoc> _withPictures(NgmyBookDoc doc, String coverQuery) async {
   Future<String> pic(String q) async {
     if (q.trim().isEmpty) return '';
@@ -197,12 +352,14 @@ Future<NgmyBookDoc> _withPictures(NgmyBookDoc doc, String coverQuery) async {
     }
   }
 
-  final results = await Future.wait([
-    for (final c in doc.chapters) pic(c.imageQuery),
-    pic(coverQuery),
-  ]);
+  final results = List<String>.filled(doc.chapters.length, '');
+  var coverPhoto = '';
+  await _pool([
+    for (var i = 0; i < doc.chapters.length; i++)
+      if (doc.chapters[i].imageQuery.isNotEmpty) () async => results[i] = await pic(doc.chapters[i].imageQuery),
+    () async => coverPhoto = await pic(coverQuery),
+  ], 6);
   final chapters = [for (var i = 0; i < doc.chapters.length; i++) doc.chapters[i].copyWith(picture: results[i])];
-  final coverPhoto = results.last;
   return doc.copyWith(chapters: chapters, cover: doc.cover.copyWith(photo: coverPhoto));
 }
 
@@ -232,6 +389,7 @@ class _BookPrintSheet extends StatefulWidget {
 class _BookPrintSheetState extends State<_BookPrintSheet> {
   NgmyBookPaper _paper = NgmyBookPaper.letter;
   bool _booklet = true;
+  bool _notes = false;
   ({int pages, int sheets, int filled})? _count;
   Uint8List? _bytes;
   int _job = 0;
@@ -270,7 +428,7 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
       _count = null;
     });
     try {
-      final c = await ngmyBookletCount(_doc, _paper);
+      final c = await ngmyBookletCount(_doc, _paper, notes: _notes);
       final coverPng = await _captureCover();
       final colors = ngmyCoverColors(_doc.cover);
       // Page titles use the cover's accent unless it is too light to read on white paper.
@@ -284,6 +442,7 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
         coverPng: coverPng,
         backColor: colors.bg1.toARGB32(),
         accentColor: accent.toARGB32(),
+        notes: _notes,
       );
       if (!mounted || job != _job) return;
       setState(() {
@@ -495,6 +654,16 @@ class _BookPrintSheetState extends State<_BookPrintSheet> {
                     if (p != NgmyBookPaper.values.last) const SizedBox(width: 8),
                   ],
                 ]),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  activeThumbColor: _kAccent,
+                  value: _notes,
+                  onChanged: (v) => _setOption(() => _notes = v),
+                  title: const Text('Add Notes pages', style: TextStyle(fontWeight: FontWeight.w800, color: _kInk)),
+                  subtitle: Text('Lined pages to write on at the end. Off: no Notes pages.',
+                      style: TextStyle(color: _kInk.withValues(alpha: 0.65), fontSize: 12)),
+                ),
                 const SizedBox(height: 12),
                 Text(
                   c == null
@@ -696,7 +865,14 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
   }
 
   Future<void> _writeWithAi() async {
-    final doc = await showDialog<NgmyBookDoc>(context: context, builder: (_) => const _BookAiDialog());
+    final doc = await showModalBottomSheet<NgmyBookDoc>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _BookAiSheet(),
+    );
     if (doc == null || !mounted) return;
     _newBook(doc: doc);
   }
@@ -734,6 +910,28 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
         elevation: 0,
         title: const Text('Books', style: TextStyle(fontWeight: FontWeight.w900)),
         centerTitle: true,
+        actions: [
+          // Small AI icon in the corner: describe the book, the AI writes it.
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: Tooltip(
+              message: 'Write with AI',
+              child: GestureDetector(
+                onTap: _writeWithAi,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                    boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5), blurRadius: 12)],
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFFAF3E8)))
@@ -743,34 +941,31 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
                 const Text(
                   'Write a book with as many pages as you like, then print it to fold and staple — '
                   'two pages on each side of the paper, a line down the middle.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(color: Color(0xCCFAF3E8), height: 1.4),
                 ),
-                const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(
-                    child: _BigButton(
-                      icon: Icons.edit_note_rounded,
-                      label: 'Write it myself',
-                      colors: const [Color(0xFF8B4513), Color(0xFFB45309)],
-                      onTap: () => _newBook(),
+                SizedBox(height: _books.isEmpty ? 60 : 18),
+                Center(
+                  child: GestureDetector(
+                    onTap: () => _newBook(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 38, vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF8B4513), Color(0xFFD97706)]),
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: [BoxShadow(color: const Color(0xFFD97706).withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6))],
+                      ),
+                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.edit_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 10),
+                        Text('Write', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.5)),
+                      ]),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _BigButton(
-                      icon: Icons.auto_awesome_rounded,
-                      label: 'Write with AI',
-                      colors: const [Color(0xFF8B5CF6), Color(0xFFDB2777)],
-                      onTap: _writeWithAi,
-                    ),
-                  ),
-                ]),
-                const SizedBox(height: 18),
+                ),
+                const SizedBox(height: 22),
                 if (_books.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 30),
-                    child: Center(child: Text('No books yet.', style: TextStyle(color: Color(0x99FAF3E8)))),
-                  ),
+                  const Center(child: Text('No books yet.', style: TextStyle(color: Color(0x99FAF3E8)))),
                 for (final b in _books)
                   Card(
                     color: const Color(0xFFFAF3E8),
@@ -806,49 +1001,45 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
   }
 }
 
-class _BigButton extends StatelessWidget {
-  const _BigButton({required this.icon, required this.label, required this.colors, required this.onTap});
-  final IconData icon;
-  final String label;
-  final List<Color> colors;
-  final VoidCallback onTap;
-
+/// "Write a book with AI": describe it, pick how many pages (up to 1,000), and watch it write.
+class _BookAiSheet extends StatefulWidget {
+  const _BookAiSheet();
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(gradient: LinearGradient(colors: colors), borderRadius: BorderRadius.circular(16)),
-        child: Column(children: [
-          Icon(icon, color: Colors.white, size: 26),
-          const SizedBox(height: 6),
-          Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        ]),
-      ),
-    );
-  }
+  State<_BookAiSheet> createState() => _BookAiSheetState();
 }
 
-class _BookAiDialog extends StatefulWidget {
-  const _BookAiDialog();
-  @override
-  State<_BookAiDialog> createState() => _BookAiDialogState();
-}
-
-class _BookAiDialogState extends State<_BookAiDialog> {
+class _BookAiSheetState extends State<_BookAiSheet> {
   final _desc = TextEditingController();
   final _author = TextEditingController();
-  int _pages = 8;
+  final _pagesCtl = TextEditingController(text: '10');
   bool _busy = false;
   String? _error;
-  String _status = 'Writing…';
+  String _status = '';
+  double _progress = 0;
+
+  static const _quick = [10, 25, 50, 100, 250, 500, 1000];
+  static const _ideas = [
+    'A children\'s story about a brave little lion',
+    'Hadithi ya familia yetu kutoka Kigoma',
+    'Our family history for the grandchildren',
+    'A devotional: 30 days of hope',
+  ];
+
+  int get _pages => (int.tryParse(_pagesCtl.text.trim()) ?? 10).clamp(1, kNgmyBookAiMaxPages);
 
   @override
   void dispose() {
     _desc.dispose();
     _author.dispose();
+    _pagesCtl.dispose();
     super.dispose();
+  }
+
+  String get _estimate {
+    final p = _pages;
+    if (p <= 12) return 'About a minute.';
+    final minutes = (p / 18 * 0.4).ceil() + 1;
+    return 'Long book — about $minutes minute${minutes == 1 ? '' : 's'}. Keep this open while it writes.';
   }
 
   Future<void> _go() async {
@@ -857,17 +1048,25 @@ class _BookAiDialogState extends State<_BookAiDialog> {
       setState(() => _error = 'Say what the book is about.');
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() {
       _busy = true;
       _error = null;
+      _status = 'Starting…';
+      _progress = 0.01;
     });
     try {
       final doc = await ngmyWriteBookWithAi(
         description: d,
         pages: _pages,
         author: _author.text.trim(),
-        onStatus: (s) {
-          if (mounted) setState(() => _status = s);
+        onStatus: (s, p) {
+          if (mounted) {
+            setState(() {
+              _status = s;
+              _progress = p;
+            });
+          }
         },
       );
       if (mounted) Navigator.pop(context, doc);
@@ -878,59 +1077,176 @@ class _BookAiDialogState extends State<_BookAiDialog> {
     }
   }
 
+  InputDecoration _deco(String hint, {IconData? icon}) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Color(0x80FFFFFF)),
+        prefixIcon: icon == null ? null : Icon(icon, color: const Color(0xB3FFFFFF), size: 20),
+        filled: true,
+        fillColor: Colors.white.withValues(alpha: 0.07),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFFA78BFA), width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      );
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Row(children: [
-        Icon(Icons.auto_awesome_rounded, color: Color(0xFF8B5CF6)),
-        SizedBox(width: 8),
-        Text('Write a book with AI'),
-      ]),
-      content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(
-            controller: _desc,
-            minLines: 3,
-            maxLines: 6,
-            decoration: const InputDecoration(
-              labelText: 'What is the book about?',
-              hintText: 'e.g. A children\'s story about our grandmother in Kigoma — or in Kiswahili: Hadithi ya familia yetu',
-              border: OutlineInputBorder(),
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    return PopScope(
+      canPop: !_busy,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bottom),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.92),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFF1E1036), Color(0xFF120A22)]),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(9)))),
+                const SizedBox(height: 18),
+                Row(children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFFDB2777).withValues(alpha: 0.45), blurRadius: 16)],
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Write a book with AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                      SizedBox(height: 2),
+                      Text('Any language — just write in it or ask for it.', style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 12.5)),
+                    ]),
+                  ),
+                  if (!_busy)
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    ),
+                ]),
+                const SizedBox(height: 18),
+                if (_busy) ...[
+                  const SizedBox(height: 10),
+                  Center(
+                    child: SizedBox(
+                      width: 92,
+                      height: 92,
+                      child: Stack(alignment: Alignment.center, children: [
+                        SizedBox.expand(
+                          child: CircularProgressIndicator(
+                            value: _progress.clamp(0.02, 1.0),
+                            strokeWidth: 6,
+                            backgroundColor: Colors.white12,
+                            color: const Color(0xFFA78BFA),
+                          ),
+                        ),
+                        Text('${(_progress * 100).clamp(1, 100).round()}%',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(_status, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  Text(_estimate, textAlign: TextAlign.center, style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 12)),
+                  const SizedBox(height: 20),
+                ] else ...[
+                  TextField(
+                    controller: _desc,
+                    minLines: 3,
+                    maxLines: 6,
+                    style: const TextStyle(color: Colors.white, height: 1.4),
+                    decoration: _deco('What is the book about? Who is it for? Any names, places or style…'),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final idea in _ideas)
+                      GestureDetector(
+                        onTap: () => setState(() => _desc.text = idea),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: Text(idea, style: const TextStyle(color: Color(0xD9FFFFFF), fontSize: 12)),
+                        ),
+                      ),
+                  ]),
+                  const SizedBox(height: 14),
+                  TextField(controller: _author, style: const TextStyle(color: Colors.white), decoration: _deco('Author (optional)', icon: Icons.person_outline_rounded)),
+                  const SizedBox(height: 18),
+                  Row(children: [
+                    const Text('Pages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                    const Spacer(),
+                    SizedBox(
+                      width: 110,
+                      child: TextField(
+                        controller: _pagesCtl,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                        decoration: _deco('10').copyWith(contentPadding: const EdgeInsets.symmetric(vertical: 10)),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 10),
+                  Wrap(spacing: 8, runSpacing: 8, children: [
+                    for (final n in _quick)
+                      GestureDetector(
+                        onTap: () => setState(() => _pagesCtl.text = '$n'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: _pages == n ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(color: _pages == n ? const Color(0xFFC4B5FD) : Colors.white12),
+                          ),
+                          child: Text('$n', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text('Up to $kNgmyBookAiMaxPages pages. $_estimate', style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 12)),
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w600)),
+                  ],
+                  const SizedBox(height: 18),
+                  GestureDetector(
+                    onTap: _go,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6))],
+                      ),
+                      child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text('Write my book', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                      ]),
+                    ),
+                  ),
+                ],
+              ]),
             ),
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _author,
-            decoration: const InputDecoration(labelText: 'Author (optional)', border: OutlineInputBorder()),
-          ),
-          const SizedBox(height: 10),
-          Row(children: [
-            const Text('Pages', style: TextStyle(fontWeight: FontWeight.w700)),
-            Expanded(
-              child: Slider(
-                value: _pages.toDouble(),
-                min: 2,
-                max: 40,
-                divisions: 38,
-                label: '$_pages',
-                onChanged: _busy ? null : (v) => setState(() => _pages = v.round()),
-              ),
-            ),
-            Text('$_pages'),
-          ]),
-          if (_error != null) Text(_error!, style: TextStyle(color: Colors.red.shade700)),
-        ]),
-      ),
-      actions: [
-        TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-        FilledButton.icon(
-          onPressed: _busy ? null : _go,
-          icon: _busy
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.auto_awesome_rounded, size: 18),
-          label: Text(_busy ? _status : 'Write it'),
         ),
-      ],
+      ),
     );
   }
 }
