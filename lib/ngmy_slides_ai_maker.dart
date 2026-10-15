@@ -962,6 +962,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
           final picked = await showModalBottomSheet<String>(
+            isScrollControlled: rings,
             context: context,
             backgroundColor: const Color(0xFF111827),
             shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
@@ -982,35 +983,109 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 );
               }
 
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: GridView.count(
-                    shrinkWrap: true,
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    children: [
-                      // Auto: let the AI choose from what you describe.
-                      tile(
-                        '__auto',
-                        Container(
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)]),
-                          ),
-                          child: const Center(child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28)),
+              final grid = GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: [
+                  // Auto: let the AI choose from what you describe.
+                  tile(
+                    '__auto',
+                    Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)]),
+                      ),
+                      child: const Center(child: Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28)),
+                    ),
+                  ),
+                  for (final (id, _) in rings ? kNgmySlideRings : kNgmySlideFrames)
+                    tile(id, _lookPreview(thumb, frameFor(id), ringFor(id), 64)),
+                ],
+              );
+              if (!rings) {
+                return SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), child: grid));
+              }
+              // Rings sheet: the rings, then the ending celebrations under them.
+              Widget finaleTile(String id, String label) {
+                final on = _finale.style == id;
+                return GestureDetector(
+                  onTap: () => Navigator.pop(ctx, 'finale:$id'),
+                  child: Column(children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: on ? const Color(0xFFFDE68A) : Colors.white12, width: on ? 2.5 : 1),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: id.isEmpty
+                              ? Container(color: Colors.white.withValues(alpha: 0.05), child: const Icon(Icons.block_rounded, color: Colors.white38))
+                              : IgnorePointer(child: NgmyFinaleView(choice: _finale.copyWith(style: id), preview: true, animate: false)),
                         ),
                       ),
-                      for (final (id, _) in rings ? kNgmySlideRings : kNgmySlideFrames)
-                        tile(id, _lookPreview(thumb, frameFor(id), ringFor(id), 64)),
-                    ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: on ? const Color(0xFFFDE68A) : Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                  ]),
+                );
+              }
+
+              return SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.85),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Rings', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      const SizedBox(height: 10),
+                      grid,
+                      const SizedBox(height: 22),
+                      const Row(children: [
+                        Icon(Icons.celebration_rounded, color: Color(0xFFFDE68A), size: 18),
+                        SizedBox(width: 6),
+                        Text('Ending celebration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                      ]),
+                      const SizedBox(height: 4),
+                      const Text('Plays big after your last slide. Tap one to watch it, change the words or add your logo.',
+                          style: TextStyle(color: Colors.white54, fontSize: 12)),
+                      const SizedBox(height: 10),
+                      GridView.count(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 1.15,
+                        children: [
+                          finaleTile('', 'None'),
+                          for (final st in kNgmyFinales) finaleTile(st.id, st.name),
+                        ],
+                      ),
+                    ]),
                   ),
                 ),
               );
             },
           );
           if (picked == null) return;
+          if (picked.startsWith('finale:')) {
+            final id = picked.substring(7);
+            if (id.isEmpty) {
+              setState(() => _finale = _finale.copyWith(style: ''));
+              return;
+            }
+            if (!mounted) return;
+            final chosen = await showNgmyFinalePreview(context, _finale.copyWith(style: id, logo: _finale.logo.isEmpty ? (_logo ?? '') : _finale.logo));
+            if (chosen != null && mounted) setState(() => _finale = chosen);
+            return;
+          }
           onChanged(picked == '__auto' ? null : picked);
         },
         child: Container(
@@ -1161,17 +1236,33 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
               children: [
                 Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(99)))),
                 const SizedBox(height: 14),
-                const Row(
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, color: Color(0xFFC4B5FD)),
-                    SizedBox(width: 8),
-                    Expanded(child: Text('Create with AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20))),
-                  ],
+                // Centered header: glowing badge, title, one short line.
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(999),
+                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 16)],
+                    ),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 15),
+                      SizedBox(width: 6),
+                      Text('AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.5)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Create with AI',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: 0.3),
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Type what it\'s about, who it\'s for, the mood (nature, vibe, celebration…) and anything it must include. Want it in another language? Just say so — e.g. "in Swahili" or "en français".',
-                  style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.35),
+                  'Write your idea in any language — the AI makes the slides.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.35),
                 ),
                 const SizedBox(height: 18),
                 // Green mic (no recording — the AI works from typing). Tapping it
@@ -1212,7 +1303,7 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                   maxLines: 6,
                   style: const TextStyle(color: Colors.white, height: 1.35),
                   decoration: InputDecoration(
-                    hintText: 'e.g. A presentation about my business for a meeting on Friday — who we are, what we offer and why people love us. Warm and professional.',
+                    hintText: 'Type your idea here…',
                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.05),
@@ -1272,20 +1363,34 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Your logo goes on every slide; your pictures replace stock photos. Pick a shape and ring under each, or just describe it (e.g. "my logo in a circle with a gold ring").',
+                  'Your logo goes on every slide and your pictures replace stock photos. The ring button also has the ending celebrations.',
                   style: TextStyle(color: Colors.white38, fontSize: 11.5),
                 ),
-                const SizedBox(height: 18),
-                const Row(children: [
-                  Icon(Icons.celebration_rounded, color: Color(0xFFFDE68A), size: 18),
-                  SizedBox(width: 6),
-                  Text('Ending celebration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                ]),
-                const SizedBox(height: 4),
-                const Text('A big celebration after your last slide. Tap one to watch it and change the words or add your logo.',
-                    style: TextStyle(color: Colors.white38, fontSize: 11.5)),
-                const SizedBox(height: 10),
-                NgmyFinalePicker(choice: _finale, onChanged: (c) => setState(() => _finale = c)),
+                if (!_finale.none) ...[
+                  const SizedBox(height: 10),
+                  // The ending chosen in the ring button.
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0x22F5C451),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: const Color(0x66F5C451)),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.celebration_rounded, color: Color(0xFFFDE68A), size: 16),
+                        const SizedBox(width: 6),
+                        Text('Ending: ${ngmyFinaleStyle(_finale.style)?.name ?? ''}',
+                            style: const TextStyle(color: Color(0xFFFDE68A), fontWeight: FontWeight.w800, fontSize: 12)),
+                        InkWell(
+                          onTap: () => setState(() => _finale = _finale.copyWith(style: '')),
+                          child: const Padding(padding: EdgeInsets.all(4), child: Icon(Icons.close_rounded, color: Colors.white54, size: 16)),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 18),
                 const Text('How many slides?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
