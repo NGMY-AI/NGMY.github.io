@@ -598,6 +598,7 @@ class NgmyLocalGrowthIncomeStore {
       // added rows since this one last looked, and they must not be wiped.
       var history = transactions;
       var credited = creditedTxnIds;
+      if (!await ngmyCanReachCloud()) return false; // offline: saved on the phone, pushed later
       final cloud = await fetchCloudWallet(realEmail);
       if (cloud != null) {
         history = mergeTransactionHistories(transactions, cloud.transactions);
@@ -667,6 +668,18 @@ class NgmyLocalGrowthIncomeStore {
     required List<String> localCreditedIds,
     bool pushIfLocalWins = true,
   }) async {
+    // No connection: use the wallet saved on this phone right away (no waiting for a
+    // timeout); it syncs with the cloud the next time the app is online.
+    if (!await ngmyCanReachCloud()) {
+      return (
+        user: localUser,
+        transactions: localTransactions,
+        walletStateRevision: localRevision,
+        updatedAt: localUpdatedAt ?? DateTime.now().toUtc(),
+        creditedTxnIds: localCreditedIds,
+        adoptedCloud: false,
+      );
+    }
     final cloud = await fetchCloudWallet(realEmail);
     if (cloud == null) {
       final at = localUpdatedAt ?? DateTime.now().toUtc();

@@ -10394,6 +10394,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       // Game wins also create AppTransaction rows — _notifyTransactionEvent sends one alert per txn.
     };
     NgmyAdminLiveRefresh.addListener(_scheduleAdminAlertSweep);
+    unawaited(_loadTxnOutbox().then((_) => _flushTxnOutbox()));
     ngmyReceiptFiller = (email, items) => ngmyFillGameReceipts(email, items, _allTransactions);
     ngmyAppTransactionsForWallet = () => _allTransactions;
     ngmyInAppNotify = ({required String title, required String body, String? tag, Duration cooldown = const Duration(seconds: 50)}) =>
@@ -10548,6 +10549,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_checkIncomingGameInvites());
+      unawaited(_flushTxnOutbox());
       // Do not force a viewport resettle on every resume — returning from the
       // image picker was making Menu/Bio feel like the app was refreshing/crashing.
       unawaited(() async {
@@ -10853,7 +10855,84 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _markTransactionDirty(String? id) {
     final key = id?.trim() ?? '';
-    if (key.isNotEmpty) _dirtyTransactionIds.add(key);
+    if (key.isEmpty) return;
+    _dirtyTransactionIds.add(key);
+    _txnOutbox.add(key);
+    _saveTxnOutboxSoon();
+  }
+
+  // ── Outbox: money moves made on this phone that the database doesn't have yet ──
+  // (offline games in Growth Income, a failed upload…). Kept on the phone, so closing the app
+  // never loses them; sent when the app opens, comes back, or every minute while any wait.
+  static const _kTxnOutboxKey = 'ngmy_txn_outbox_v1';
+  final Set<String> _txnOutbox = {};
+  bool _txnOutboxLoaded = false;
+  Timer? _txnOutboxSaveTimer;
+  Timer? _txnOutboxFlushTimer;
+  bool _txnOutboxFlushing = false;
+
+  Future<void> _loadTxnOutbox() async {
+    if (_txnOutboxLoaded) return;
+    _txnOutboxLoaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final ids = prefs.getStringList(_kTxnOutboxKey) ?? const [];
+      _txnOutbox.addAll(ids);
+      // Reloading from the database keeps anything still waiting here.
+      _dirtyTransactionIds.addAll(ids);
+    } catch (_) {}
+    _txnOutboxFlushTimer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_txnOutbox.isNotEmpty) unawaited(_flushTxnOutbox());
+    });
+  }
+
+  void _saveTxnOutboxSoon() {
+    _txnOutboxSaveTimer?.cancel();
+    _txnOutboxSaveTimer = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(_kTxnOutboxKey, _txnOutbox.toList());
+      } catch (_) {}
+    });
+  }
+
+  /// The database has it now — nothing left to send for this one.
+  void _txnOutboxDone(String id) {
+    if (_txnOutbox.remove(id)) _saveTxnOutboxSoon();
+    _dirtyTransactionIds.remove(id);
+  }
+
+  /// Sends everything waiting in the outbox (in batches) and clears what got saved.
+  Future<void> _flushTxnOutbox() async {
+    if (_txnOutboxFlushing || _txnOutbox.isEmpty) return;
+    if (!await ngmyCanReachCloud()) return;
+    _txnOutboxFlushing = true;
+    try {
+      final waiting = _allTransactions.where((t) => _txnOutbox.contains(t.id)).toList();
+      // Ids no longer on this phone (deleted / replaced) have nothing to send.
+      _txnOutbox.removeWhere((id) => !waiting.any((t) => t.id == id));
+      if (waiting.any((t) => t.type == TransactionType.contribution)) {
+        await ngmyEnsurePrivilegedCloudSession();
+      }
+      for (var i = 0; i < waiting.length; i += 40) {
+        final part = waiting.sublist(i, math.min(i + 40, waiting.length));
+        final rows = <Map<String, dynamic>>[];
+        for (final t in part) {
+          rows.add(await _transactionRowForCloudPrepared(t));
+        }
+        if (await _safeUpsertTransactionRows(rows)) {
+          for (final t in part) {
+            _txnOutbox.remove(t.id);
+            _dirtyTransactionIds.remove(t.id);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[outbox] flush: $e');
+    } finally {
+      _txnOutboxFlushing = false;
+      _saveTxnOutboxSoon();
+    }
   }
 
   Future<void> _refreshWalletDecisionLedger() async {
@@ -14908,7 +14987,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(userKey);
                     }
                   });
-                  unawaited(_pushTransactionToCloudReliable(t));
+                  // Saved → out of the outbox; failed (e.g. offline) → stays there and is sent later.
+                  unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
                   unawaited(_pushTransactionToCloudFast(t));
                   _markTransactionDirty(t.id);
                   if (syncedUser != null) {
@@ -14944,7 +15024,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     // amount/note edits, etc.). Replace the list entry so final
                     // fields like amount/sourceDetails actually change.
                     _allTransactions[existingIdx] = t;
-                    unawaited(_pushTransactionToCloudReliable(t));
+                    unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
                     unawaited(_pushTransactionToCloudFast(t));
                     _markTransactionDirty(t.id);
                     if (t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
