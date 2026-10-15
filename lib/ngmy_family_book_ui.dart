@@ -12,6 +12,7 @@ Future<void> showFamilyBookSheet(
   required bool canEdit,
   String bookTitle = '',
   String membersPage = '',
+  String familyFacts = '',
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
@@ -22,6 +23,7 @@ Future<void> showFamilyBookSheet(
         canEdit: canEdit,
         bookTitle: bookTitle,
         membersPage: membersPage,
+        familyFacts: familyFacts,
       ),
     ),
   );
@@ -34,6 +36,7 @@ class _FamilyBookScreen extends StatefulWidget {
     required this.canEdit,
     this.bookTitle = '',
     this.membersPage = '',
+    this.familyFacts = '',
   });
 
   final String userEmail;
@@ -43,6 +46,9 @@ class _FamilyBookScreen extends StatefulWidget {
 
   /// "Our family" page text (members by generation) printed after the cover.
   final String membersPage;
+
+  /// Everyone in the tree, written out for the AI book writer.
+  final String familyFacts;
 
   @override
   State<_FamilyBookScreen> createState() => _FamilyBookScreenState();
@@ -179,6 +185,25 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
     await _reload();
   }
 
+  /// The AI writes the family book from everyone in the tree (plus anything the user adds);
+  /// each page it writes becomes a Family Book page, after the ones already here.
+  Future<void> _writeWithAi() async {
+    if (_editing) await _saveCurrentPage();
+    if (!mounted) return;
+    final doc = await showNgmyBookAiSheet(context, familyFacts: widget.familyFacts, familyName: widget.bookTitle);
+    if (doc == null || !mounted) return;
+    final base = DateTime.now().microsecondsSinceEpoch;
+    final list = await loadFamilyBookEntries(widget.userEmail, widget.treeId);
+    for (var i = 0; i < doc.chapters.length; i++) {
+      final c = doc.chapters[i];
+      list.add(FamilyBookEntry(id: '${base + i}', title: c.title.trim().isEmpty ? 'Page ${i + 1}' : c.title.trim(), body: c.body.trim(), updatedAt: DateTime.now()));
+    }
+    await saveFamilyBookEntries(widget.userEmail, widget.treeId, list);
+    await _reload();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('The AI wrote ${doc.chapters.length} pages for your family book.')));
+  }
+
   /// Fold-and-staple book: cover with the family name, the family members page, then
   /// every Family Book page in order.
   Future<void> _printBook() async {
@@ -227,6 +252,25 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (widget.canEdit && widget.familyFacts.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Tooltip(
+                message: 'Write the family book with AI',
+                child: GestureDetector(
+                  onTap: _writeWithAi,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+                  ),
+                ),
+              ),
+            ),
           if (_entries.isNotEmpty || widget.membersPage.trim().isNotEmpty)
             IconButton(
               tooltip: 'Print as a book',
@@ -333,6 +377,14 @@ class _FamilyBookScreenState extends State<_FamilyBookScreen> {
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Add first page'),
               ),
+              if (widget.familyFacts.trim().isNotEmpty) ...[
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: _writeWithAi,
+                  icon: const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFFC4B5FD)),
+                  label: const Text('Or let AI write it from your tree', style: TextStyle(color: Color(0xFFE9D5FF), fontWeight: FontWeight.w700)),
+                ),
+              ],
             ],
           ],
         ),

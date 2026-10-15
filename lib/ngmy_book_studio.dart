@@ -900,10 +900,176 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
     await _reload();
   }
 
+  Future<void> _bookMenu(NgmySavedBook b) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: const Color(0xFF241812), borderRadius: BorderRadius.circular(20)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 8),
+            for (final (id, icon, label, color) in const [
+              ('open', Icons.edit_rounded, 'Open & write', Color(0xFFFAF3E8)),
+              ('print', Icons.print_rounded, 'Print as a book', Color(0xFFFAF3E8)),
+              ('delete', Icons.delete_outline_rounded, 'Delete', Color(0xFFF87171)),
+            ])
+              ListTile(
+                leading: Icon(icon, color: color),
+                title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+                onTap: () => Navigator.pop(ctx, id),
+              ),
+            const SizedBox(height: 8),
+          ]),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'open':
+        await _open(b);
+      case 'print':
+        await showNgmyBookPrintSheet(context, b.doc);
+      case 'delete':
+        await _delete(b);
+    }
+  }
+
+  Widget _hero() {
+    final samples = [
+      const NgmyBookDoc(title: 'Our Story', cover: NgmyBookCover(template: 'vintage')),
+      const NgmyBookDoc(title: 'Dream Big', cover: NgmyBookCover(template: 'starry')),
+      const NgmyBookDoc(title: 'Little Lion', cover: NgmyBookCover(template: 'story')),
+    ];
+    Widget mini(NgmyBookDoc d, double angle, double dx) => Transform.translate(
+          offset: Offset(dx, 0),
+          child: Transform.rotate(
+            angle: angle,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), blurRadius: 12, offset: const Offset(2, 6))],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(width: 62, height: 62 * 612 / 396, child: FittedBox(child: NgmyBookCoverView(doc: d))),
+              ),
+            ),
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 12, 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF7C2D12), Color(0xFFB45309), Color(0xFFF59E0B)]),
+        boxShadow: [BoxShadow(color: const Color(0xFFB45309).withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 10))],
+      ),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Make a book', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 24, height: 1.1)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final t in const ['Write', 'Design', 'Print & fold'])
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(999)),
+                  child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+            ]),
+            const SizedBox(height: 16),
+            GestureDetector(
+              onTap: () => _newBook(),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.edit_rounded, color: Color(0xFF9A3412), size: 18),
+                  SizedBox(width: 8),
+                  Text('Write', style: TextStyle(color: Color(0xFF9A3412), fontWeight: FontWeight.w900, fontSize: 15)),
+                ]),
+              ),
+            ),
+          ]),
+        ),
+        SizedBox(
+          width: 130,
+          height: 110,
+          child: Stack(alignment: Alignment.center, children: [
+            mini(samples[0], -0.22, -30),
+            mini(samples[2], 0.22, 30),
+            mini(samples[1], 0, 0),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _bookCard(NgmySavedBook b) {
+    final pages = b.doc.chapters.length;
+    return GestureDetector(
+      onTap: () => _open(b),
+      onLongPress: () => _bookMenu(b),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        AspectRatio(
+          aspectRatio: 396 / 612,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 14, offset: const Offset(0, 6))],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Stack(fit: StackFit.expand, children: [
+                FittedBox(fit: BoxFit.cover, child: NgmyBookCoverView(doc: b.doc)),
+                // Book spine shading.
+                const Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(gradient: LinearGradient(colors: [Color(0x55000000), Color(0x00000000)])),
+                  ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: GestureDetector(
+                    onTap: () => _bookMenu(b),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      decoration: const BoxDecoration(color: Color(0x88000000), shape: BoxShape.circle),
+                      child: const Icon(Icons.more_horiz_rounded, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          b.doc.title.trim().isEmpty ? 'Untitled Book' : b.doc.title.trim(),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFFFAF3E8), fontWeight: FontWeight.w800, fontSize: 13),
+        ),
+        Text('$pages page${pages == 1 ? '' : 's'}', style: const TextStyle(color: Color(0x99FAF3E8), fontSize: 11.5)),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF2B1D14),
+      backgroundColor: const Color(0xFF1C130E),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: const Color(0xFFFAF3E8),
@@ -935,75 +1101,72 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFFAF3E8)))
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-              children: [
-                const Text(
-                  'Write a book with as many pages as you like, then print it to fold and staple — '
-                  'two pages on each side of the paper, a line down the middle.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xCCFAF3E8), height: 1.4),
-                ),
-                SizedBox(height: _books.isEmpty ? 60 : 18),
-                Center(
-                  child: GestureDetector(
-                    onTap: () => _newBook(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 38, vertical: 16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF8B4513), Color(0xFFD97706)]),
-                        borderRadius: BorderRadius.circular(999),
-                        boxShadow: [BoxShadow(color: const Color(0xFFD97706).withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6))],
+          : CustomScrollView(slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                sliver: SliverToBoxAdapter(child: _hero()),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 26, 18, 12),
+                sliver: SliverToBoxAdapter(
+                  child: Row(children: [
+                    const Text('Your library', style: TextStyle(color: Color(0xFFFAF3E8), fontWeight: FontWeight.w900, fontSize: 18)),
+                    const SizedBox(width: 8),
+                    if (_books.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: const Color(0x33F59E0B), borderRadius: BorderRadius.circular(999)),
+                        child: Text('${_books.length}', style: const TextStyle(color: Color(0xFFFCD34D), fontWeight: FontWeight.w800, fontSize: 12)),
                       ),
-                      child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.edit_rounded, color: Colors.white, size: 20),
-                        SizedBox(width: 10),
-                        Text('Write', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.5)),
-                      ]),
+                  ]),
+                ),
+              ),
+              if (_books.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(32, 30, 32, 40),
+                    child: Column(children: [
+                      Icon(Icons.auto_stories_rounded, color: Color(0x55FAF3E8), size: 56),
+                      SizedBox(height: 10),
+                      Text('Your books will live here.', textAlign: TextAlign.center, style: TextStyle(color: Color(0x99FAF3E8))),
+                    ]),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 30),
+                  sliver: SliverGrid(
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 170,
+                      mainAxisSpacing: 20,
+                      crossAxisSpacing: 16,
+                      childAspectRatio: 0.52,
                     ),
+                    delegate: SliverChildBuilderDelegate((_, i) => _bookCard(_books[i]), childCount: _books.length),
                   ),
                 ),
-                const SizedBox(height: 22),
-                if (_books.isEmpty)
-                  const Center(child: Text('No books yet.', style: TextStyle(color: Color(0x99FAF3E8)))),
-                for (final b in _books)
-                  Card(
-                    color: const Color(0xFFFAF3E8),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: ListTile(
-                      onTap: () => _open(b),
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(3),
-                        child: SizedBox(width: 34, height: 34 * 612 / 396, child: FittedBox(child: NgmyBookCoverView(doc: b.doc))),
-                      ),
-                      title: Text(b.doc.title.trim().isEmpty ? 'Untitled Book' : b.doc.title,
-                          style: const TextStyle(fontWeight: FontWeight.w900, color: _kInk)),
-                      subtitle: Text('${b.doc.chapters.length} page${b.doc.chapters.length == 1 ? '' : 's'} written',
-                          style: TextStyle(color: _kInk.withValues(alpha: 0.6))),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(
-                          tooltip: 'Print',
-                          icon: const Icon(Icons.print_rounded, color: _kAccent),
-                          onPressed: () => showNgmyBookPrintSheet(context, b.doc),
-                        ),
-                        IconButton(
-                          tooltip: 'Delete',
-                          icon: Icon(Icons.delete_outline_rounded, color: Colors.red.shade400),
-                          onPressed: () => _delete(b),
-                        ),
-                      ]),
-                    ),
-                  ),
-              ],
-            ),
+            ]),
     );
   }
 }
 
-/// "Write a book with AI": describe it, pick how many pages (up to 1,000), and watch it write.
+/// Opens "Write a book with AI". With [familyFacts] (everyone in a family tree), the AI uses
+/// those people — names, dates, places, notes, who is married to and child of whom.
+Future<NgmyBookDoc?> showNgmyBookAiSheet(BuildContext context, {String familyFacts = '', String familyName = ''}) {
+  return showModalBottomSheet<NgmyBookDoc>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: false,
+    enableDrag: false,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _BookAiSheet(familyFacts: familyFacts, familyName: familyName),
+  );
+}
+
 class _BookAiSheet extends StatefulWidget {
-  const _BookAiSheet();
+  const _BookAiSheet({this.familyFacts = '', this.familyName = ''});
+  final String familyFacts;
+  final String familyName;
   @override
   State<_BookAiSheet> createState() => _BookAiSheetState();
 }
@@ -1018,12 +1181,20 @@ class _BookAiSheetState extends State<_BookAiSheet> {
   double _progress = 0;
 
   static const _quick = [10, 25, 50, 100, 250, 500, 1000];
-  static const _ideas = [
-    'A children\'s story about a brave little lion',
-    'Hadithi ya familia yetu kutoka Kigoma',
-    'Our family history for the grandchildren',
-    'A devotional: 30 days of hope',
-  ];
+  bool get _family => widget.familyFacts.trim().isNotEmpty;
+  List<String> get _ideas => _family
+      ? const [
+          'The story of our family, from the oldest to the youngest',
+          'A tribute to our grandparents',
+          'Hadithi ya familia yetu',
+          'A children\'s book about our family',
+        ]
+      : const [
+          'A children\'s story about a brave little lion',
+          'Hadithi ya familia yetu kutoka Kigoma',
+          'Our family history for the grandchildren',
+          'A devotional: 30 days of hope',
+        ];
 
   int get _pages => (int.tryParse(_pagesCtl.text.trim()) ?? 10).clamp(1, kNgmyBookAiMaxPages);
 
@@ -1043,8 +1214,14 @@ class _BookAiSheetState extends State<_BookAiSheet> {
   }
 
   Future<void> _go() async {
-    final d = _desc.text.trim();
-    if (d.isEmpty) {
+    final typed = _desc.text.trim();
+    final d = _family
+        ? '${typed.isEmpty ? 'A warm book about our family.' : typed}\n\n'
+            'This book is about the ${widget.familyName.isEmpty ? 'family' : '${widget.familyName} family'} in my family tree. '
+            'Use these real people and facts; mention ages and dates only as given here, never invent birth dates, deaths or names:\n'
+            '${widget.familyFacts}'
+        : typed;
+    if (typed.isEmpty && !_family) {
       setState(() => _error = 'Say what the book is about.');
       return;
     }
@@ -1120,11 +1297,16 @@ class _BookAiSheetState extends State<_BookAiSheet> {
                     child: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Write a book with AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
-                      SizedBox(height: 2),
-                      Text('Any language — just write in it or ask for it.', style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 12.5)),
+                      Text(_family ? 'Write your family book' : 'Write a book with AI',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                      const SizedBox(height: 2),
+                      Text(
+                          _family
+                              ? 'The AI already knows everyone in your tree — names, dates, places and notes.'
+                              : 'Any language — just write in it or ask for it.',
+                          style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 12.5)),
                     ]),
                   ),
                   if (!_busy)
@@ -1165,7 +1347,9 @@ class _BookAiSheetState extends State<_BookAiSheet> {
                     minLines: 3,
                     maxLines: 6,
                     style: const TextStyle(color: Colors.white, height: 1.4),
-                    decoration: _deco('What is the book about? Who is it for? Any names, places or style…'),
+                    decoration: _deco(_family
+                        ? 'Anything to add? (optional) — e.g. focus on grandma, make it for the kids, write it in Swahili…'
+                        : 'What is the book about? Who is it for? Any names, places or style…'),
                   ),
                   const SizedBox(height: 10),
                   Wrap(spacing: 8, runSpacing: 8, children: [
@@ -1190,34 +1374,43 @@ class _BookAiSheetState extends State<_BookAiSheet> {
                     const Text('Pages', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
                     const Spacer(),
                     SizedBox(
-                      width: 110,
+                      width: 96,
                       child: TextField(
                         controller: _pagesCtl,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         onChanged: (_) => setState(() {}),
-                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
-                        decoration: _deco('10').copyWith(contentPadding: const EdgeInsets.symmetric(vertical: 10)),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17),
+                        decoration: _deco('10').copyWith(contentPadding: const EdgeInsets.symmetric(vertical: 9)),
                       ),
                     ),
                   ]),
                   const SizedBox(height: 10),
-                  Wrap(spacing: 8, runSpacing: 8, children: [
-                    for (final n in _quick)
-                      GestureDetector(
-                        onTap: () => setState(() => _pagesCtl.text = '$n'),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                          decoration: BoxDecoration(
-                            color: _pages == n ? const Color(0xFF8B5CF6) : Colors.white.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: _pages == n ? const Color(0xFFC4B5FD) : Colors.white12),
+                  // Quick picks, all on one straight line.
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14)),
+                    child: Row(children: [
+                      for (final n in _quick)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _pagesCtl.text = '$n'),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              height: 34,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: _pages == n ? const Color(0xFF8B5CF6) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text('$n',
+                                  style: TextStyle(
+                                      color: _pages == n ? Colors.white : const Color(0xB3FFFFFF), fontWeight: FontWeight.w800, fontSize: 12.5)),
+                            ),
                           ),
-                          child: Text('$n', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                         ),
-                      ),
-                  ]),
+                    ]),
+                  ),
                   const SizedBox(height: 8),
                   Text('Up to $kNgmyBookAiMaxPages pages. $_estimate', style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 12)),
                   if (_error != null) ...[

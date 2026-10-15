@@ -392,8 +392,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   final List<FamilyTree> _undoStack = [];
   bool _showHidden = false;
   final Set<String> _expandedChildGroups = {};
-  final ScrollController _hScroll = ScrollController();
-  final ScrollController _vScroll = ScrollController();
+  final TransformationController _zoom = TransformationController();
   bool _didCenterRoot = false;
   String? _centeredForTreeId;
 
@@ -414,8 +413,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
 
   @override
   void dispose() {
-    _hScroll.dispose();
-    _vScroll.dispose();
+    _zoom.dispose();
     super.dispose();
   }
 
@@ -456,20 +454,38 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     _toast(nextPrivate ? 'Family tree is now private.' : 'Family tree is now public for all users.');
   }
 
-  void _scheduleCenterRoot({
-    required double rootCenterX,
-  }) {
+  /// Fits the whole tree on screen once per tree (not smaller than a readable size),
+  /// with the root family in the middle.
+  void _scheduleFit({required Size viewport, required Size content, required double rootX}) {
     if (_centeredForTreeId == _tree.id && _didCenterRoot) return;
+    _didCenterRoot = true;
+    _centeredForTreeId = _tree.id;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_hScroll.hasClients) return;
-      final maxScroll = _hScroll.position.maxScrollExtent;
-      final target = rootCenterX.clamp(0.0, maxScroll);
-      if ((_hScroll.offset - target).abs() > 1) {
-        _hScroll.jumpTo(target);
-      }
-      _didCenterRoot = true;
-      _centeredForTreeId = _tree.id;
+      if (mounted) _fit(viewport, content, rootX);
     });
+  }
+
+  void _fit(Size viewport, Size content, double rootX) {
+    final s = math.min(1.0, math.max(0.45, math.min(viewport.width / content.width, viewport.height / content.height)));
+    final tx = content.width * s <= viewport.width ? (viewport.width - content.width * s) / 2 : viewport.width / 2 - rootX * s;
+    final ty = content.height * s <= viewport.height ? (viewport.height - content.height * s) / 2 : 8.0;
+    _zoom.value = Matrix4.identity()
+      ..translateByDouble(tx, ty, 0, 1)
+      ..scaleByDouble(s, s, 1, 1);
+  }
+
+  /// Zoom buttons: zoom around the middle of the screen.
+  void _zoomBy(double factor, Size viewport) {
+    final m = _zoom.value.clone();
+    final current = m.getMaxScaleOnAxis();
+    final target = (current * factor).clamp(0.2, 3.0);
+    final f = target / current;
+    final c = Offset(viewport.width / 2, viewport.height / 2);
+    _zoom.value = Matrix4.identity()
+      ..translateByDouble(c.dx, c.dy, 0, 1)
+      ..scaleByDouble(f, f, 1, 1)
+      ..translateByDouble(-c.dx, -c.dy, 0, 1)
+      ..multiply(m);
   }
 
   Future<void> _loadLocalTree() async {
@@ -720,6 +736,45 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
     NgmyNavigator.pop(context);
   }
 
+  /// Removes one person. Their children stay in the tree: they move under the other
+  /// parent (the spouse) when there is one, otherwise under the grandparent.
+  Future<void> _deleteMember(FamilyMember member) async {
+    if (!_canEdit) return;
+    final members = _tree.members;
+    String? partner = member.spouseId;
+    if (partner == null || !members.any((m) => m.id == partner)) {
+      partner = members.where((m) => m.spouseId == member.id).map((m) => m.id).firstOrNull;
+    }
+    final newParent = partner ?? member.parentId;
+    _pushUndo();
+    setState(() {
+      _tree = _tree.copyWith(
+        members: [
+          for (final m in members)
+            if (m.id != member.id)
+              FamilyMember(
+                id: m.id,
+                name: m.name,
+                gender: m.gender,
+                parentId: m.parentId == member.id ? newParent : m.parentId,
+                spouseId: m.spouseId == member.id ? null : m.spouseId,
+                photoPath: m.photoPath,
+                notes: m.notes,
+                birthDate: m.birthDate,
+                birthPlace: m.birthPlace,
+                deathDate: m.deathDate,
+                occupation: m.occupation,
+                birthOrder: m.birthOrder,
+                hidden: m.hidden,
+                visibleChildrenCap: m.visibleChildrenCap,
+              ),
+        ],
+      );
+    });
+    await _persist();
+    _toast('${member.name} was removed. Tap Undo to bring them back.');
+  }
+
   Future<void> _editMember(FamilyMember member) async {
     if (!_canEdit) {
       await _viewMember(member);
@@ -729,6 +784,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
       context: context,
       builder: (ctx) => _MemberEditorDialog(
         title: 'Member Profile',
+        onDelete: () => _deleteMember(member),
         member: member,
         parents: visibleMembers(_tree).where((m) => m.id != member.id).toList(),
         tree: _tree,
@@ -860,6 +916,7 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
       canEdit: _canEdit,
       bookTitle: _tree.name,
       membersPage: familyTreeMembersBookText(_tree),
+      familyFacts: familyTreeFactsForAi(_tree),
     ));
   }
 
@@ -990,37 +1047,74 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                           showHidden: _showHidden,
                           expandedChildGroups: _expandedChildGroups,
                         );
-                        final vpW = constraints.maxWidth;
-                        final rootX = layout.rootCenterX;
+                        final contentW = layout.width + 32;
+                        final contentH = layout.height + 32;
                         if (layout.nodes.isNotEmpty) {
-                          _scheduleCenterRoot(rootCenterX: rootX);
+                          _scheduleFit(
+                            viewport: constraints.biggest,
+                            content: Size(contentW, contentH),
+                            rootX: layout.rootCenterX,
+                          );
                         }
-                        return SingleChildScrollView(
-                          controller: _hScroll,
-                          scrollDirection: Axis.horizontal,
-                          child: SingleChildScrollView(
-                            controller: _vScroll,
-                            child: Padding(
-                              // Extra side padding so the root can sit in the middle of the screen.
-                              padding: EdgeInsets.symmetric(horizontal: vpW / 2),
-                              child: _FamilyTreeCanvas(
-                                tree: _tree,
-                                layout: layout,
-                                showHidden: _showHidden,
-                                expandedChildGroups: _expandedChildGroups,
-                                onToggleChildGroup: (parentId) {
-                                  setState(() {
-                                    if (_expandedChildGroups.contains(parentId)) {
-                                      _expandedChildGroups.remove(parentId);
-                                    } else {
-                                      _expandedChildGroups.add(parentId);
-                                    }
-                                  });
-                                },
-                                onMemberTap: _onMemberTap,
-                                isDark: p.isDark,
-                              ),
+                        return Container(
+                          margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: p.isDark
+                                  ? const [Color(0xFF0E1A17), Color(0xFF0B1220)]
+                                  : const [Color(0xFFFBF7EE), Color(0xFFEFF6EF)],
                             ),
+                            border: Border.all(color: p.isDark ? Colors.white10 : const Color(0xFFE5DCC8)),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: Stack(children: [
+                              Positioned.fill(child: CustomPaint(painter: _DotGridPainter(isDark: p.isDark))),
+                              // Pinch (or use the buttons) to zoom; drag to move around.
+                              Positioned.fill(
+                                child: InteractiveViewer(
+                                  transformationController: _zoom,
+                                  constrained: false,
+                                  minScale: 0.2,
+                                  maxScale: 3,
+                                  boundaryMargin: EdgeInsets.all(math.max(constraints.maxWidth, constraints.maxHeight)),
+                                  child: SizedBox(
+                                    width: contentW,
+                                    height: contentH,
+                                    child: _FamilyTreeCanvas(
+                                      tree: _tree,
+                                      layout: layout,
+                                      showHidden: _showHidden,
+                                      expandedChildGroups: _expandedChildGroups,
+                                      onToggleChildGroup: (parentId) {
+                                        setState(() {
+                                          if (_expandedChildGroups.contains(parentId)) {
+                                            _expandedChildGroups.remove(parentId);
+                                          } else {
+                                            _expandedChildGroups.add(parentId);
+                                          }
+                                        });
+                                      },
+                                      onMemberTap: _onMemberTap,
+                                      isDark: p.isDark,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 10,
+                                bottom: 10,
+                                child: _ZoomControls(
+                                  isDark: p.isDark,
+                                  onIn: () => _zoomBy(1.25, constraints.biggest),
+                                  onOut: () => _zoomBy(0.8, constraints.biggest),
+                                  onFit: () => _fit(constraints.biggest, Size(contentW, contentH), layout.rootCenterX),
+                                ),
+                              ),
+                            ]),
                           ),
                         );
                       },
@@ -1233,6 +1327,47 @@ class _FamilyTreeCanvas extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Everything in the tree, written out for the AI that writes the family book: each person
+/// with gender, dates and age, places, work, notes, spouse, parents and children.
+String familyTreeFactsForAi(FamilyTree tree) {
+  final vis = visibleMembers(tree);
+  if (vis.isEmpty) return '';
+  final byId = {for (final m in vis) m.id: m};
+  final year = DateTime.now().year;
+  String? partnerOf(FamilyMember m) {
+    if (byId.containsKey(m.spouseId)) return m.spouseId;
+    return vis.where((o) => o.spouseId == m.id).map((o) => o.id).firstOrNull;
+  }
+
+  final out = StringBuffer('Family tree "${tree.name}" (${vis.length} people):\n');
+  for (final m in vis) {
+    final bits = <String>[];
+    if (m.gender != FamilyGender.unknown) bits.add(m.gender == FamilyGender.male ? 'male' : 'female');
+    final born = _yearOf(m.birthDate);
+    final died = _yearOf(m.deathDate);
+    if (m.birthDate.trim().isNotEmpty) bits.add('born ${m.birthDate.trim()}${m.birthPlace.trim().isNotEmpty ? ' in ${m.birthPlace.trim()}' : ''}');
+    if (m.birthDate.trim().isEmpty && m.birthPlace.trim().isNotEmpty) bits.add('from ${m.birthPlace.trim()}');
+    if (m.deathDate.trim().isNotEmpty) bits.add('died ${m.deathDate.trim()}');
+    if (born != null && died == null) bits.add('about ${year - int.parse(born)} years old');
+    if (born != null && died != null) bits.add('lived about ${int.parse(died) - int.parse(born)} years');
+    if (m.occupation.trim().isNotEmpty) bits.add('work: ${m.occupation.trim()}');
+    final sp = partnerOf(m);
+    if (sp != null) bits.add('married to ${byId[sp]!.name}');
+    final par = m.parentId;
+    if (par != null && byId.containsKey(par) && par != sp) {
+      final other = partnerOf(byId[par]!);
+      bits.add('child of ${byId[par]!.name}${other != null && other != m.id ? ' and ${byId[other]!.name}' : ''}');
+    }
+    final kids = vis.where((k) => k.parentId == m.id && k.id != sp).map((k) => k.name).toList();
+    if (kids.isNotEmpty) bits.add('children: ${kids.join(', ')}');
+    out.write('- ${m.name}${bits.isEmpty ? '' : ' — ${bits.join('; ')}'}');
+    final notes = m.notes.trim();
+    if (notes.isNotEmpty) out.write('. Notes: ${notes.length > 600 ? '${notes.substring(0, 600)}…' : notes}');
+    out.writeln();
+  }
+  return out.toString().trim();
 }
 
 /// The "Our Family" page of a printed Family Book: everyone by generation, with their
@@ -1735,68 +1870,75 @@ class _FamilyTreeLinesPainter extends CustomPainter {
     final left = a.dx <= b.dx ? a : b;
     final right = a.dx <= b.dx ? b : a;
     const r = _FamilyTreeLayout.avatarSize / 2;
-    const pad = 4.0;
+    const pad = 3.0;
     final x1 = left.dx + r + pad;
     final x2 = right.dx - r - pad;
     if (x2 <= x1 + 2) return;
     final y = (left.dy + right.dy) / 2;
-    canvas.drawLine(Offset(x1, y), Offset(x2, y), paint);
+    final bar = Paint()
+      ..color = const Color(0xFFEC4899).withValues(alpha: 0.75)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(x1, y), Offset(x2, y), bar);
+    // A small heart on the marriage line.
+    final c = Offset((x1 + x2) / 2, y);
+    const h = 5.5;
+    final heart = Path()
+      ..moveTo(c.dx, c.dy + h)
+      ..cubicTo(c.dx - h * 1.8, c.dy - h * 0.2, c.dx - h * 0.9, c.dy - h * 1.6, c.dx, c.dy - h * 0.55)
+      ..cubicTo(c.dx + h * 0.9, c.dy - h * 1.6, c.dx + h * 1.8, c.dy - h * 0.2, c.dx, c.dy + h)
+      ..close();
+    canvas.drawCircle(c, h + 3.5, Paint()..color = Colors.white);
+    canvas.drawPath(heart, Paint()..color = const Color(0xFFEC4899));
   }
 
+  /// Parent to children with soft rounded corners.
   void _drawParentChildGroup(Canvas canvas, Paint paint, Offset parentBottom, List<Offset> childTops) {
     if (childTops.isEmpty) return;
     childTops.sort((a, b) => a.dx.compareTo(b.dx));
-
     final midY = parentBottom.dy + (childTops.first.dy - parentBottom.dy) / 2;
-    final barPaint = Paint()
-      ..color = paint.color
-      ..strokeWidth = paint.strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.butt
-      ..strokeJoin = StrokeJoin.round;
+    const r = 10.0;
 
-    if (childTops.length == 1) {
-      final childTop = childTops.first;
-      if ((childTop.dx - parentBottom.dx).abs() < 0.5) {
-        canvas.drawLine(parentBottom, childTop, paint);
-      } else {
-        canvas.drawLine(parentBottom, Offset(parentBottom.dx, midY), paint);
-        canvas.drawLine(Offset(parentBottom.dx, midY), Offset(childTop.dx, midY), barPaint);
-        canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
+    final centered = childTops.any((t) => (t.dx - parentBottom.dx).abs() < 0.5);
+    final nearest = childTops.map((t) => (t.dx - parentBottom.dx).abs()).where((d) => d >= 0.5).fold<double>(double.infinity, math.min);
+    canvas.drawLine(parentBottom, Offset(parentBottom.dx, centered ? midY : midY - math.min(r, nearest / 2)), paint);
+    for (final top in childTops) {
+      final dx = top.dx - parentBottom.dx;
+      if (dx.abs() < 0.5) {
+        canvas.drawLine(Offset(top.dx, midY), top, paint);
+        continue;
       }
-      return;
-    }
-
-    // Bar only spans THIS parent's children — never visually fuse with a neighbor family.
-    final leftX = childTops.first.dx;
-    final rightX = childTops.last.dx;
-    canvas.drawLine(parentBottom, Offset(parentBottom.dx, midY), paint);
-    canvas.drawLine(Offset(leftX, midY), Offset(rightX, midY), barPaint);
-
-    for (final childTop in childTops) {
-      canvas.drawLine(Offset(childTop.dx, midY), childTop, paint);
+      final dir = dx.sign;
+      final rr = math.min(r, dx.abs() / 2);
+      final path = Path()
+        ..moveTo(parentBottom.dx, midY - rr)
+        ..quadraticBezierTo(parentBottom.dx, midY, parentBottom.dx + dir * rr, midY)
+        ..lineTo(top.dx - dir * rr, midY)
+        ..quadraticBezierTo(top.dx, midY, top.dx, midY + rr)
+        ..lineTo(top.dx, top.dy);
+      canvas.drawPath(path, paint);
     }
   }
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = WorksheetPalette.teal
-      ..strokeWidth = 2
+      ..color = WorksheetPalette.teal.withValues(alpha: 0.75)
+      ..strokeWidth = 2.2
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     for (final edge in layout.edges) {
-      if (edge.isSpouse) {
-        _drawSpouseLink(canvas, paint, edge.from, edge.to);
-        continue;
-      }
       if (edge.childTops != null && edge.childTops!.isNotEmpty) {
         _drawParentChildGroup(canvas, paint, edge.from, edge.childTops!);
-      } else if (edge.to != Offset.zero) {
+      } else if (!edge.isSpouse && edge.to != Offset.zero) {
         canvas.drawLine(edge.from, edge.to, paint);
       }
+    }
+    // Marriage lines last so their hearts sit on top.
+    for (final edge in layout.edges) {
+      if (edge.isSpouse) _drawSpouseLink(canvas, paint, edge.from, edge.to);
     }
   }
 
@@ -1804,6 +1946,9 @@ class _FamilyTreeLinesPainter extends CustomPainter {
   bool shouldRepaint(covariant _FamilyTreeLinesPainter oldDelegate) =>
       oldDelegate.layout != layout;
 }
+
+/// First 4-digit year in a date the user typed ("12 May 1948" → "1948").
+String? _yearOf(String s) => RegExp(r'(1[5-9]\d\d|20\d\d)').firstMatch(s)?.group(1);
 
 class _MemberNode extends StatelessWidget {
   final FamilyMember member;
@@ -1816,19 +1961,33 @@ class _MemberNode extends StatelessWidget {
     required this.onTap,
   });
 
-  Color get _ringColor {
+  List<Color> get _ring {
+    if (member.deathDate.trim().isNotEmpty) return const [Color(0xFF94A3B8), Color(0xFF64748B)];
     switch (member.gender) {
       case FamilyGender.male:
-        return WorksheetPalette.teal;
+        return const [Color(0xFF14B8A6), Color(0xFF2563EB)];
       case FamilyGender.female:
-        return const Color(0xFFEC4899);
+        return const [Color(0xFFF472B6), Color(0xFFE11D48)];
       case FamilyGender.unknown:
-        return Colors.grey;
+        return const [Color(0xFFA3A3A3), Color(0xFF6B7280)];
     }
+  }
+
+  String get _years {
+    final b = _yearOf(member.birthDate);
+    final d = _yearOf(member.deathDate);
+    if (b != null && d != null) return '$b – $d';
+    if (b != null) return 'b. $b';
+    if (d != null) return '† $d';
+    return '';
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ring = _ring;
+    final photo = ngmyImageFromRef(member.photoPath);
+    final years = _years;
     return GestureDetector(
       onTap: onTap,
       child: SizedBox(
@@ -1842,52 +2001,140 @@ class _MemberNode extends StatelessWidget {
                 Container(
                   width: _FamilyTreeLayout.avatarSize,
                   height: _FamilyTreeLayout.avatarSize,
+                  padding: const EdgeInsets.all(2.5),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: _ringColor, width: 3),
-                    color: _ringColor.withValues(alpha: 0.12),
+                    gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: ring),
+                    boxShadow: [BoxShadow(color: ring.last.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
-                  child: ClipOval(
-                    child: ngmyImageFromRef(member.photoPath) != null
-                        ? Image(
-                            image: ngmyImageFromRef(member.photoPath)!,
-                            fit: BoxFit.cover,
-                            width: _FamilyTreeLayout.avatarSize,
-                            height: _FamilyTreeLayout.avatarSize,
-                          )
-                        : Icon(Icons.person, color: _ringColor, size: 30),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isDark ? const Color(0xFF111827) : Colors.white,
+                      border: Border.all(color: isDark ? const Color(0xFF111827) : Colors.white, width: 2),
+                    ),
+                    child: ClipOval(
+                      child: photo != null
+                          ? Image(image: photo, fit: BoxFit.cover)
+                          : Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: [ring.first.withValues(alpha: 0.18), ring.last.withValues(alpha: 0.28)]),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                member.name.trim().isEmpty ? '?' : member.name.trim()[0].toUpperCase(),
+                                style: TextStyle(color: ring.last, fontWeight: FontWeight.w900, fontSize: 20),
+                              ),
+                            ),
+                    ),
                   ),
                 ),
                 if (siblingOrder > 0)
                   Positioned(
-                    left: -4,
+                    right: -6,
                     top: -4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: const Color(0xFF6366F1),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(color: isDark ? const Color(0xFF111827) : Colors.white, width: 1.5),
                       ),
                       child: Text(
-                        '#$siblingOrder',
-                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
+                        '$siblingOrder',
+                        style: const TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w900),
                       ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              member.name.toUpperCase(),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, height: 1.1),
+            const SizedBox(height: 4),
+            Container(
+              constraints: const BoxConstraints(maxWidth: _FamilyTreeLayout.nodeWidth),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1F2937) : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: ring.first.withValues(alpha: 0.35)),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06), blurRadius: 6, offset: const Offset(0, 2))],
+              ),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Text(
+                  member.name.trim(),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.15,
+                    color: isDark ? Colors.white : const Color(0xFF1F2937),
+                  ),
+                ),
+                if (years.isNotEmpty)
+                  Text(
+                    years,
+                    maxLines: 1,
+                    style: TextStyle(fontSize: 7.5, height: 1.1, fontWeight: FontWeight.w600, color: isDark ? Colors.white60 : const Color(0xFF6B7280)),
+                  ),
+              ]),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Soft dotted paper behind the tree.
+class _DotGridPainter extends CustomPainter {
+  _DotGridPainter({required this.isDark});
+  final bool isDark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = (isDark ? Colors.white : const Color(0xFF7C6A46)).withValues(alpha: isDark ? 0.05 : 0.09);
+    for (var y = 10.0; y < size.height; y += 20) {
+      for (var x = 10.0; x < size.width; x += 20) {
+        canvas.drawCircle(Offset(x, y), 1, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotGridPainter old) => old.isDark != isDark;
+}
+
+/// + / − / fit buttons over the tree.
+class _ZoomControls extends StatelessWidget {
+  const _ZoomControls({required this.isDark, required this.onIn, required this.onOut, required this.onFit});
+  final bool isDark;
+  final VoidCallback onIn;
+  final VoidCallback onOut;
+  final VoidCallback onFit;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, String tip, VoidCallback onTap) => Tooltip(
+          message: tip,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(width: 38, height: 38, child: Icon(icon, size: 20, color: isDark ? Colors.white : const Color(0xFF1F2937))),
+          ),
+        );
+    return Material(
+      color: isDark ? const Color(0xFF1F2937) : Colors.white,
+      elevation: 4,
+      shadowColor: Colors.black26,
+      borderRadius: BorderRadius.circular(12),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        btn(Icons.add_rounded, 'Zoom in', onIn),
+        Container(width: 22, height: 1, color: isDark ? Colors.white12 : Colors.black12),
+        btn(Icons.remove_rounded, 'Zoom out', onOut),
+        Container(width: 22, height: 1, color: isDark ? Colors.white12 : Colors.black12),
+        btn(Icons.fit_screen_rounded, 'Fit the whole tree', onFit),
+      ]),
     );
   }
 }
@@ -1985,6 +2232,8 @@ class _MemberEditorDialog extends StatefulWidget {
   final dynamic config;
   final Future<bool> Function(double amount, String description) onChargeWallet;
   final VoidCallback onDataChanged;
+  /// Shown as a small trash icon in the corner when set (editing an existing member).
+  final VoidCallback? onDelete;
 
   const _MemberEditorDialog({
     required this.title,
@@ -1997,6 +2246,7 @@ class _MemberEditorDialog extends StatefulWidget {
     this.parents = const [],
     this.initialParentId,
     this.tree,
+    this.onDelete,
   });
 
   @override
@@ -2092,6 +2342,36 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
     );
   }
 
+  /// Small "are you sure?" before removing the member.
+  Future<void> _confirmDelete() async {
+    final name = widget.member?.name.trim() ?? '';
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 60),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        contentPadding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        content: Text(
+          'Delete ${name.isEmpty ? 'this member' : name}?',
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete', style: TextStyle(color: Colors.red.shade600, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    Navigator.pop(context);
+    widget.onDelete?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = WorksheetPalette.of(context);
@@ -2111,11 +2391,31 @@ class _MemberEditorDialogState extends State<_MemberEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                widget.title,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: p.primaryText, letterSpacing: 0.3),
-              ),
+              Stack(alignment: Alignment.center, children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 30),
+                  child: Text(
+                    widget.title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: p.primaryText, letterSpacing: 0.3),
+                  ),
+                ),
+                if (widget.onDelete != null && widget.member != null)
+                  Positioned(
+                    right: 0,
+                    child: Tooltip(
+                      message: 'Delete member',
+                      child: InkWell(
+                        onTap: _confirmDelete,
+                        customBorder: const CircleBorder(),
+                        child: Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Icon(Icons.delete_outline_rounded, size: 17, color: Colors.red.shade400),
+                        ),
+                      ),
+                    ),
+                  ),
+              ]),
               const SizedBox(height: 14),
               Center(
                 child: GestureDetector(
