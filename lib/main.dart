@@ -38586,15 +38586,24 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     return _memberMatchesHelpScope(widget.user, forState: st);
   }
 
+  /// Decoded once per record and reused — it was decoded from JSON in 33 places on every redraw.
+  static final Map<String, Map<String, dynamic>> _contributionMetaCache = {};
+
   Map<String, dynamic> _decodeContributionMeta(AppTransaction t) {
     final raw = t.sourceDetails?.trim() ?? '';
     if (raw.isEmpty) return {};
+    final hit = _contributionMetaCache[raw];
+    if (hit != null) return Map<String, dynamic>.from(hit); // a copy: callers may change it
+    Map<String, dynamic> out;
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    } catch (_) {}
-    return {'note': raw};
+      out = decoded is Map ? Map<String, dynamic>.from(decoded) : {'note': raw};
+    } catch (_) {
+      out = {'note': raw};
+    }
+    if (_contributionMetaCache.length > 5000) _contributionMetaCache.clear();
+    _contributionMetaCache[raw] = out;
+    return Map<String, dynamic>.from(out);
   }
 
   bool _audienceMatchForViewer(String scopeType, String scopeValue) {
@@ -45406,12 +45415,19 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   }
 
   Widget _enrollSection(bool isDark) {
-    final availableAppUsers = widget.allUsers.where((u) =>
-      ngmyLooksLikeAppLoginUser(u) &&
-      !NgmyCivicRegistryMembers.isEnrolled(widget.config, u.email) &&
-      (u.username.toLowerCase().contains(_enrollSearchC.text.toLowerCase()) ||
-       u.email.toLowerCase().contains(_enrollSearchC.text.toLowerCase()))
-    ).toList();
+    // Enrolled emails gathered once (it checked the whole registry again for every app user —
+    // that's what made the Enroll tab so slow to scroll). Only 5 suggestions are shown.
+    final enrolledEmails = <String>{
+      for (final m in (widget.config.civicRegistryMembers as List).whereType<Map>())
+        NgmyCivicRegistryMembers.emailKey((m['email'] ?? '').toString()),
+    };
+    final q = _enrollSearchC.text.toLowerCase();
+    final availableAppUsers = <UserData>[];
+    for (final u in widget.allUsers) {
+      if (availableAppUsers.length >= 5) break;
+      if (!ngmyLooksLikeAppLoginUser(u) || enrolledEmails.contains(NgmyCivicRegistryMembers.emailKey(u.email))) continue;
+      if (u.username.toLowerCase().contains(q) || u.email.toLowerCase().contains(q)) availableAppUsers.add(u);
+    }
     final isEditing = (_editingMemberOriginalEmail ?? '').isNotEmpty ||
         (_editingMemberRegistryId ?? '').isNotEmpty;
     final cityOptions = [

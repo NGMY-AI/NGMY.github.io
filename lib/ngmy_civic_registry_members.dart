@@ -1429,14 +1429,14 @@ class NgmyCivicRegistryMembers {
   }) {
     final userEmail = emailKey(email);
     final userPhone = _phoneMatchKey(phone);
-    for (final m in listFrom(config)) {
+    for (final m in _sortedRefs(config)) {
       if (!passportGranted(m)) continue;
       final linked = emailKey((m['linkedAppEmail'] ?? '').toString());
-      if (linked.isNotEmpty && linked == userEmail) return m;
+      if (linked.isNotEmpty && linked == userEmail) return Map<String, dynamic>.from(m);
       final memberEmail = emailKey((m['email'] ?? '').toString());
-      if (memberEmail.isNotEmpty && memberEmail == userEmail) return m;
+      if (memberEmail.isNotEmpty && memberEmail == userEmail) return Map<String, dynamic>.from(m);
       final memberPhone = _phoneMatchKey((m['phone'] ?? '').toString());
-      if (userPhone.length >= 7 && memberPhone.isNotEmpty && memberPhone == userPhone) return m;
+      if (userPhone.length >= 7 && memberPhone.isNotEmpty && memberPhone == userPhone) return Map<String, dynamic>.from(m);
     }
     return null;
   }
@@ -1476,19 +1476,52 @@ class NgmyCivicRegistryMembers {
   static void removeByRegistryId(dynamic config, String registryId) =>
       softDeleteByRegistryId(config, registryId);
 
+  static List<Map<String, dynamic>> _sortedRefsCache = const [];
+  static int _sortedRefsSig = -1;
+
+  /// The stored rows, newest enrollment first, without copying them — sorted once and reused
+  /// until the registry changes (a row added/removed/replaced or an enrollment date edited).
+  static List<Map<String, dynamic>> _sortedRefs(dynamic config) {
+    final rows = _rawRows(config);
+    var sig = rows.length;
+    for (final r in rows) {
+      sig = (sig * 31 + identityHashCode(r) + (r['enrolledAt']?.hashCode ?? 0) + (r['updatedAt']?.hashCode ?? 0)) & 0x3fffffff;
+    }
+    if (sig == _sortedRefsSig) return _sortedRefsCache;
+    final sorted = rows.map((r) => r is Map<String, dynamic> ? r : Map<String, dynamic>.from(r)).toList()
+      ..sort(compareEnrolledAtDesc);
+    _sortedRefsSig = sig;
+    return _sortedRefsCache = sorted;
+  }
+
+  /// The stored member rows as-is (no copy, no sort) — for quick lookups.
+  static List<Map> _rawRows(dynamic config) {
+    final raw = (config as dynamic).civicRegistryMembers;
+    return raw is List ? raw.whereType<Map>().toList(growable: false) : const [];
+  }
+
+  // These used to copy and date-sort the whole registry on EVERY call (listFrom) — called
+  // once per member/user they made Civic Registry screens crawl. Same answers, one scan.
   static bool isEnrolled(dynamic config, String email) {
     final key = emailKey(email);
     if (key.isEmpty) return false;
-    return listFrom(config).any((m) => emailKey((m['email'] ?? '').toString()) == key);
+    for (final m in _rawRows(config)) {
+      if (emailKey((m['email'] ?? '').toString()) == key) return true;
+    }
+    return false;
   }
 
   static Map<String, dynamic>? findByEmail(dynamic config, String email) {
     final key = emailKey(email);
     if (key.isEmpty) return null;
-    for (final m in listFrom(config)) {
-      if (emailKey((m['email'] ?? '').toString()) == key) return m;
+    Map<String, dynamic>? best;
+    for (final m in _rawRows(config)) {
+      if (emailKey((m['email'] ?? '').toString()) != key) continue;
+      final row = Map<String, dynamic>.from(m);
+      // Same pick as before when an email appears twice: the newest enrollment.
+      if (best == null || compareEnrolledAtDesc(row, best) < 0) best = row;
     }
-    return null;
+    return best;
   }
 
   /// Overwrite local helps/missed from the live server ranking list (by registry ID).
@@ -1542,8 +1575,8 @@ class NgmyCivicRegistryMembers {
 
   static Map<String, dynamic>? findByRegistryId(dynamic config, String registryId) {
     if (NgmyCivicWalletIdentity.normalizeId(registryId).isEmpty) return null;
-    for (final m in listFrom(config)) {
-      if (NgmyCivicWalletIdentity.idMatches(m, registryId)) return m;
+    for (final m in _sortedRefs(config)) {
+      if (NgmyCivicWalletIdentity.idMatches(m, registryId)) return Map<String, dynamic>.from(m);
     }
     return null;
   }
