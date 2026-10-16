@@ -221,47 +221,95 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
         ),
       );
 
+  static const _presets = [30, 45, 60, 90, 120];
+
   Widget _allCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: _card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _amber.withValues(alpha: 0.35)),
-      ),
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Same time for every game', style: TextStyle(color: _ink, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text('Pick a time, then apply it to all', style: TextStyle(color: _mute, fontSize: 11.5)),
-          ]),
-        ),
-        _roundBtn(Icons.remove_rounded, () => setState(() => _allSeconds = (_allSeconds - 5).clamp(ngmyMinGameSeconds, ngmyMaxGameSeconds))),
-        SizedBox(
-          width: 52,
-          child: Text('${_allSeconds}s', textAlign: TextAlign.center, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15)),
-        ),
-        _roundBtn(Icons.add_rounded, () => setState(() => _allSeconds = (_allSeconds + 5).clamp(ngmyMinGameSeconds, ngmyMaxGameSeconds)), color: _amber),
-        const SizedBox(width: 8),
-        FilledButton(
-          onPressed: _applyAll,
-          style: FilledButton.styleFrom(
-            backgroundColor: _amber,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+      decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Same time for every game', style: TextStyle(color: _ink, fontWeight: FontWeight.w800, fontSize: 13)),
+        const SizedBox(height: 8),
+        Row(children: [
+          for (final s in _presets)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: GestureDetector(
+                  onTap: () => setState(() => _allSeconds = s),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    height: 34,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: _allSeconds == s ? _amber : _card,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text('${s}s',
+                        style: TextStyle(color: _allSeconds == s ? Colors.black : _ink, fontWeight: FontWeight.w800, fontSize: 12.5)),
+                  ),
+                ),
+              ),
+            ),
+          SizedBox(
+            height: 34,
+            child: FilledButton(
+              onPressed: _applyAll,
+              style: FilledButton.styleFrom(
+                backgroundColor: _green,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5)),
+            ),
           ),
-          child: const Text('Apply', style: TextStyle(fontWeight: FontWeight.w900)),
-        ),
+        ]),
       ]),
     );
   }
 
+  bool _showAllArcade = false;
+
+  Widget _group(String title, IconData icon, List<_TimerGame> games, {int? limit}) {
+    final shown = limit == null ? games : games.take(limit).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+        child: Row(children: [
+          Icon(icon, size: 16, color: _amber),
+          const SizedBox(width: 6),
+          Text(title, style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 14)),
+          const SizedBox(width: 6),
+          Text('${games.length}', style: TextStyle(color: _mute, fontWeight: FontWeight.w700, fontSize: 12)),
+        ]),
+      ),
+      Container(
+        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(16)),
+        child: Column(children: [
+          for (var i = 0; i < shown.length; i++) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, indent: 56, color: _mute.withValues(alpha: 0.12)),
+            _timerRow(shown[i]),
+          ],
+        ]),
+      ),
+      if (limit != null && games.length > limit)
+        Center(
+          child: TextButton.icon(
+            onPressed: () => setState(() => _showAllArcade = true),
+            icon: const Icon(Icons.expand_more_rounded, color: _amber),
+            label: Text('Show all ${games.length}', style: const TextStyle(color: _amber, fontWeight: FontWeight.w800)),
+          ),
+        ),
+    ]);
+  }
+
   Widget _timersTab() {
     final q = _search.text.trim().toLowerCase();
-    final shown = _games.where((g) => q.isEmpty || g.title.toLowerCase().contains(q)).toList();
+    bool match(_TimerGame g) => q.isEmpty || g.title.toLowerCase().contains(q);
+    final arcadeIds = {for (final g in kNgmyArcadeGames) g.id};
+    final classic = _games.where((g) => !arcadeIds.contains(g.id) && match(g)).toList();
+    final arcade = _games.where((g) => arcadeIds.contains(g.id) && match(g)).toList();
+    final changed = _games.where((g) => _value(g) != g.defaultSeconds).length;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       children: [
@@ -274,23 +322,63 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
           searchCloudUsers: widget.searchCloudUsers,
         ),
         const SizedBox(height: 16),
-        TextField(
-          controller: _search,
-          onChanged: (_) => setState(() {}),
-          style: TextStyle(color: _ink),
-          decoration: InputDecoration(
-            hintText: 'Search a game',
-            hintStyle: TextStyle(color: _mute),
-            prefixIcon: Icon(Icons.search_rounded, color: _mute),
-            filled: true,
-            fillColor: _card,
-            isDense: true,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+        // Game timers section.
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _amber.withValues(alpha: 0.3)),
           ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFFD97706), _amber]),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.timer_rounded, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Game timers', style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 17)),
+                  Text(changed == 0 ? 'How long each game lasts' : 'How long each game lasts · $changed changed',
+                      style: TextStyle(color: _mute, fontSize: 12)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _search,
+              onChanged: (_) => setState(() {}),
+              style: TextStyle(color: _ink),
+              decoration: InputDecoration(
+                hintText: 'Search a game',
+                hintStyle: TextStyle(color: _mute),
+                prefixIcon: Icon(Icons.search_rounded, color: _mute),
+                filled: true,
+                fillColor: _bg,
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+              ),
+            ),
+            if (q.isEmpty) ...[
+              const SizedBox(height: 10),
+              _allCard(),
+            ],
+            if (classic.isNotEmpty) _group('Classic games', Icons.casino_rounded, classic),
+            if (arcade.isNotEmpty)
+              _group('Arcade games', Icons.sports_esports_rounded, arcade, limit: q.isEmpty && !_showAllArcade ? 8 : null),
+            if (classic.isEmpty && arcade.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Center(child: Text('No game called "${_search.text.trim()}"', style: TextStyle(color: _mute))),
+              ),
+          ]),
         ),
-        const SizedBox(height: 12),
-        if (q.isEmpty) _allCard(),
-        for (final g in shown) _timerRow(g),
       ],
     );
   }
@@ -298,55 +386,61 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
   Widget _timerRow(_TimerGame g) {
     final v = _value(g);
     final custom = v != g.defaultSeconds;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-      decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(16)),
+    Widget step(IconData icon, VoidCallback onTap) => InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 16, color: custom ? _amber : _ink)),
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
       child: Row(children: [
         Container(
-          width: 42,
-          height: 42,
+          width: 36,
+          height: 36,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: _amber.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-          child: Text(g.emoji, style: const TextStyle(fontSize: 21)),
+          decoration: BoxDecoration(color: _card, shape: BoxShape.circle),
+          child: Text(g.emoji, style: const TextStyle(fontSize: 18)),
         ),
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(g.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w800, fontSize: 14)),
-            const SizedBox(height: 2),
-            Row(children: [
-              if (custom) ...[
-                Container(width: 6, height: 6, decoration: const BoxDecoration(color: _amber, shape: BoxShape.circle)),
-                const SizedBox(width: 5),
-              ],
-              Flexible(
-                child: Text(custom ? 'Changed · normal ${g.defaultSeconds}s' : 'Normal time',
-                    maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _mute, fontSize: 11.5)),
-              ),
-            ]),
+            Text(g.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w800, fontSize: 13.5)),
+            Text(custom ? 'Changed · normal ${g.defaultSeconds}s' : 'Normal time',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: custom ? _amber : _mute, fontSize: 11)),
           ]),
         ),
-        _roundBtn(Icons.remove_rounded, () => _set(g, v - 5)),
-        GestureDetector(
-          onTap: () => _type(g),
-          child: Container(
-            width: 58,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: custom ? _amber.withValues(alpha: 0.16) : _bg, borderRadius: BorderRadius.circular(10)),
-            child: Text('${v}s', style: TextStyle(color: custom ? _amber : _ink, fontWeight: FontWeight.w900, fontSize: 15)),
+        // − time + in one pill.
+        Container(
+          decoration: BoxDecoration(
+            color: custom ? _amber.withValues(alpha: 0.14) : _card,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: custom ? _amber.withValues(alpha: 0.6) : Colors.transparent),
           ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            step(Icons.remove_rounded, () => _set(g, v - 5)),
+            GestureDetector(
+              onTap: () => _type(g),
+              child: SizedBox(
+                width: 44,
+                child: Text('${v}s',
+                    textAlign: TextAlign.center, style: TextStyle(color: custom ? _amber : _ink, fontWeight: FontWeight.w900, fontSize: 14)),
+              ),
+            ),
+            step(Icons.add_rounded, () => _set(g, v + 5)),
+          ]),
         ),
-        _roundBtn(Icons.add_rounded, () => _set(g, v + 5), color: _amber),
-        if (custom)
-          IconButton(
-            tooltip: 'Back to normal',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _set(g, g.defaultSeconds),
-            icon: Icon(Icons.restart_alt_rounded, color: _mute, size: 19),
-          ),
+        SizedBox(
+          width: 34,
+          child: custom
+              ? IconButton(
+                  tooltip: 'Back to normal',
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _set(g, g.defaultSeconds),
+                  icon: Icon(Icons.restart_alt_rounded, color: _mute, size: 18),
+                )
+              : null,
+        ),
       ]),
     );
   }
