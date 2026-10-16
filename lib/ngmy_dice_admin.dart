@@ -639,8 +639,6 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
 
   Widget _liveCard(Color card, Color ink, Color mute, Color fill) {
     final rows = <Widget>[];
-    final active = <Widget>[];
-    final done = <Widget>[];
     for (final rule in widget.settings.userOutcomeRules) {
       final email = (rule['email'] ?? '').toString();
       if (email.isEmpty) continue;
@@ -650,6 +648,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
       final losesSet = n('losesSet') > 0 || n('losesLeft') == 0 ? n('losesSet') : n('losesLeft');
       final plus3Set = n('plus3Set');
       if (winsSet + losesSet + plus3Set == 0) continue;
+      if (n('winsLeft') + n('losesLeft') + n('plus3Left') <= 0) continue;
       final row = _LiveRuleTile(
         key: ValueKey('live-$email'),
         title: name.isEmpty ? email : name,
@@ -662,11 +661,8 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
         fill: fill,
         onStop: _saving ? null : () => _stopUser(email, name.isEmpty ? email : name),
       );
-      (n('winsLeft') + n('losesLeft') + n('plus3Left') > 0 ? active : done).add(row);
+      rows.add(row);
     }
-    rows
-      ..addAll(active)
-      ..addAll(done);
     for (final rule in widget.settings.userFaceRules) {
       final email = (rule['email'] ?? '').toString();
       final next = (rule['nextLeft'] as num?)?.toInt() ?? 0;
@@ -731,7 +727,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
           ],
           const SizedBox(height: 12),
           if (rows.isEmpty)
-            Text('No player has a personal rule right now.', style: TextStyle(color: mute, fontSize: 12.5))
+            Text('Nothing left to count. Every player is back to normal play.', style: TextStyle(color: mute, fontSize: 12.5))
           else
             ...rows,
         ],

@@ -69,6 +69,56 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('a player disappears from the live count once every play is used', (tester) async {
+    tester.view.physicalSize = const Size(900, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final settings = NgmyDiceSettings();
+    ngmySetUserOutcomeRule(cfg: settings, email: 'a@example.com', name: 'Ann', wins: 1, loses: 1, plus3: 1);
+    ngmySetUserOutcomeRule(cfg: settings, email: 'b@example.com', name: 'Bob', wins: 3, loses: 0);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ListView(children: [
+          NgmyDiceControlPanel(settings: settings, livePoll: false, onChanged: () async => null, users: const []),
+        ]),
+      ),
+    ));
+    expect(find.text('Ann'), findsOneWidget);
+    expect(find.text('Bob'), findsOneWidget);
+
+    for (final r in settings.userOutcomeRules) {
+      if (r['email'] == 'b@example.com') r['winsLeft'] = 0;
+    }
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ListView(children: [
+          NgmyDiceControlPanel(settings: settings, livePoll: false, onChanged: () async => null, users: const []),
+        ]),
+      ),
+    ));
+    expect(find.text('Ann'), findsOneWidget);
+    expect(find.text('Bob'), findsNothing);
+
+    for (final r in settings.userOutcomeRules) {
+      r['winsLeft'] = 0;
+      r['losesLeft'] = 0;
+      r['plus3Left'] = 0;
+    }
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ListView(children: [
+          NgmyDiceControlPanel(settings: settings, livePoll: false, onChanged: () async => null, users: const []),
+        ]),
+      ),
+    ));
+    expect(find.text('Ann'), findsNothing);
+    expect(find.text('Nothing left to count. Every player is back to normal play.'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('admin saves a win and lose count for everyone', (tester) async {
     tester.view.physicalSize = const Size(900, 3000);
     tester.view.devicePixelRatio = 1;
