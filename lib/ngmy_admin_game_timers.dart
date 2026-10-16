@@ -60,6 +60,10 @@ class _Winner {
   int wins = 0, plays = 0;
   final games = <String, ({int wins, double won, int plays})>{};
   double get net => won - staked;
+
+  /// Games played (stakes) that paid nothing back.
+  int lossesIn(({int wins, double won, int plays}) g) => (g.plays - g.wins).clamp(0, 1 << 30);
+  int get losses => games.values.fold(0, (n, g) => n + lossesIn(g));
 }
 
 const _amber = Color(0xFFF59E0B);
@@ -471,8 +475,8 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
 
   void _showPlayer(_Winner w, int rank) {
     final name = widget.nameOf?.call(w.email) ?? w.email;
-    final games = w.games.entries.where((e) => e.value.wins > 0).toList()..sort((a, b) => b.value.wins.compareTo(a.value.wins));
-    final maxWins = games.isEmpty ? 1 : games.first.value.wins;
+    final games = w.games.entries.toList()..sort((a, b) => b.value.wins != a.value.wins ? b.value.wins.compareTo(a.value.wins) : b.value.plays.compareTo(a.value.plays));
+    final maxPlays = games.fold<int>(1, (m, e) => [m, e.value.wins + w.lossesIn(e.value)].reduce((a, b) => a > b ? a : b));
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -500,36 +504,69 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
               ]),
               const SizedBox(height: 14),
               Row(children: [
-                Expanded(child: _stat('Won', _money(w.won), _green)),
+                Expanded(child: _stat('Wins', '${w.wins}', _green)),
                 const SizedBox(width: 8),
-                Expanded(child: _stat('Wins', '${w.wins}', _amber)),
+                Expanded(child: _stat('Losses', '${w.losses}', const Color(0xFFEF4444))),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _stat('Won', _money(w.won), _amber)),
                 const SizedBox(width: 8),
                 Expanded(child: _stat('Net', '${w.net >= 0 ? '+' : '−'}${_money(w.net.abs())}', w.net >= 0 ? _green : const Color(0xFFEF4444))),
               ]),
               const SizedBox(height: 18),
-              Text('Games they win on most', style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15)),
+              Text('Wins and losses by game', style: TextStyle(color: _ink, fontWeight: FontWeight.w900, fontSize: 15)),
+              const SizedBox(height: 4),
+              Row(children: [
+                Container(width: 10, height: 10, decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(3))),
+                Text('  wins    ', style: TextStyle(color: _mute, fontSize: 11)),
+                Container(width: 10, height: 10, decoration: BoxDecoration(color: const Color(0xFFEF4444), borderRadius: BorderRadius.circular(3))),
+                Text('  losses', style: TextStyle(color: _mute, fontSize: 11)),
+              ]),
               const SizedBox(height: 10),
               for (var i = 0; i < games.length; i++)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      if (i == 0) const Text('⭐ ', style: TextStyle(fontSize: 14)),
-                      Expanded(child: Text(games[i].key, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w800))),
-                      Text('${games[i].value.wins} wins · ${_money(games[i].value.won)}', style: TextStyle(color: _mute, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ]),
-                    const SizedBox(height: 5),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(99),
-                      child: LinearProgressIndicator(
-                        value: games[i].value.wins / maxWins,
-                        minHeight: 8,
-                        backgroundColor: _mute.withValues(alpha: 0.15),
-                        color: i == 0 ? _amber : _green,
+                Builder(builder: (_) {
+                  final g = games[i].value;
+                  final lost = w.lossesIn(g);
+                  final total = g.wins + lost;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        if (i == 0 && g.wins > 0) const Text('⭐ ', style: TextStyle(fontSize: 14)),
+                        Expanded(child: Text(games[i].key, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w800))),
+                        Text('${g.wins} W', style: const TextStyle(color: _green, fontSize: 12, fontWeight: FontWeight.w900)),
+                        Text('  ·  ', style: TextStyle(color: _mute, fontSize: 12)),
+                        Text('$lost L', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.w900)),
+                        Text('  ·  ${_money(g.won)}', style: TextStyle(color: _mute, fontSize: 12, fontWeight: FontWeight.w700)),
+                      ]),
+                      const SizedBox(height: 5),
+                      // Wins (green) and losses (red) side by side, sized against the busiest game.
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: SizedBox(
+                          height: 9,
+                          child: LayoutBuilder(builder: (_, box) {
+                            final scale = box.maxWidth / maxPlays;
+                            return Stack(children: [
+                              Container(color: _mute.withValues(alpha: 0.15)),
+                              Row(children: [
+                                Container(width: g.wins * scale, color: _green),
+                                Container(width: lost * scale, color: const Color(0xFFEF4444)),
+                              ]),
+                            ]);
+                          }),
+                        ),
                       ),
-                    ),
-                  ]),
-                ),
+                      if (total > 0)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text('Wins ${(g.wins * 100 / total).round()}% of the time',
+                              style: TextStyle(color: _mute, fontSize: 10.5, fontWeight: FontWeight.w600)),
+                        ),
+                    ]),
+                  );
+                }),
             ],
           ),
         ),
@@ -627,7 +664,7 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _ink, fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
-              Text('Best: ${best.key} · ${w.wins} wins', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _mute, fontSize: 11.5)),
+              Text('${w.wins} wins · ${w.losses} losses · best: ${best.key}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _mute, fontSize: 11.5)),
             ]),
           ),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
