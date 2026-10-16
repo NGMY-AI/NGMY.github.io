@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_family_book_ui.dart';
@@ -1135,105 +1136,109 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
   }
 
   Widget _headerBanner(WorksheetPalette p) {
+    final owner = !_tree.isViewOnly;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: WorksheetPalette.green,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: WorksheetPalette.green.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 5))],
+        borderRadius: BorderRadius.circular(22),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF064E3B), Color(0xFF047857), Color(0xFF0D9488)],
+        ),
+        boxShadow: [BoxShadow(color: const Color(0xFF047857).withValues(alpha: 0.35), blurRadius: 18, offset: const Offset(0, 8))],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _openSync,
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 2.5),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 6, offset: const Offset(0, 2)),
-                  ],
-                ),
-                child: const Icon(Icons.park_outlined, color: Colors.white, size: 28),
-              ),
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(children: [
+          // Big soft tree in the corner.
+          Positioned(
+            right: -18,
+            bottom: -26,
+            child: Icon(Icons.park_rounded, size: 130, color: Colors.white.withValues(alpha: 0.08)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _tree.name,
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: _openSync,
+                    customBorder: const CircleBorder(),
+                    child: Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 1.5),
                       ),
+                      child: const Icon(Icons.park_rounded, color: Colors.white, size: 24),
                     ),
-                    IconButton(
-                      onPressed: _canEdit ? _renameTree : null,
-                      icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 18),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    _metaChip(Icons.people_outline, '${_tree.visibleMemberCount} members'),
-                    InkWell(
-                      onTap: _isAdmin ? _togglePrivacy : null,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                        child: _metaChip(
-                          _tree.isPrivate ? Icons.lock_outline : Icons.public,
-                          _tree.isPrivate
-                              ? (_isAdmin ? 'Private · tap to publish' : 'Private')
-                              : (_isAdmin ? 'Public · tap to privatize' : 'Public'),
-                        ),
-                      ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      _tree.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 0.3),
                     ),
-                    _metaChip(Icons.tag, 'Code: ${_tree.code}'),
-                    InkWell(
-                      onTap: _manageCollaborators,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                        child: _metaChip(Icons.group_outlined, 'Collaborators (${_tree.collaboratorEmails.length})'),
-                      ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${_tree.visibleMemberCount} ${_tree.visibleMemberCount == 1 ? 'member' : 'members'}',
+                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12.5, fontWeight: FontWeight.w600),
                     ),
-                    if (_tree.isViewOnly) _metaChip(Icons.visibility_outlined, 'View only'),
-                  ],
+                  ]),
                 ),
-              ],
-            ),
+                if (_canEdit)
+                  IconButton(
+                    tooltip: 'Rename',
+                    onPressed: _renameTree,
+                    icon: const Icon(Icons.edit_rounded, color: Colors.white, size: 18),
+                  ),
+              ]),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                _metaChip(
+                  _tree.isPrivate ? Icons.lock_rounded : Icons.public_rounded,
+                  _tree.isPrivate ? 'Private' : 'Public',
+                  onTap: _isAdmin ? _togglePrivacy : null,
+                ),
+                _metaChip(Icons.tag_rounded, _tree.code, onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: _tree.code));
+                  _toast('Tree code copied.');
+                }),
+                _metaChip(Icons.group_rounded, '${_tree.collaboratorEmails.length} collaborator${_tree.collaboratorEmails.length == 1 ? '' : 's'}',
+                    onTap: owner ? _manageCollaborators : null),
+                if (_tree.isViewOnly) _metaChip(Icons.visibility_rounded, 'View only'),
+              ]),
+            ]),
           ),
-        ],
+        ]),
       ),
     );
   }
 
-  Widget _metaChip(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.white70),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
-      ],
+  Widget _metaChip(IconData icon, String label, {VoidCallback? onTap}) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.15),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 14, color: Colors.white),
+            const SizedBox(width: 5),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -1275,23 +1280,6 @@ class _FamilyTreeCanvas extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  tree.name,
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: WorksheetPalette.teal.withValues(alpha: isDark ? 0.95 : 1),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-            ),
             CustomPaint(
               size: Size(layout.width, layout.height),
               painter: _FamilyTreeLinesPainter(layout: layout),
@@ -1464,7 +1452,7 @@ class _FamilyTreeLayout {
   static const rowGap = 44.0;
   static const verticalStep = nodeHeight + rowGap;
   static const horizontalGap = 22.0;
-  static const titleBlockHeight = 44.0;
+  static const titleBlockHeight = 16.0;
   static const canvasPad = 24.0;
 
   /// Edge-to-edge space between cousins (children of different parents) on one row.
