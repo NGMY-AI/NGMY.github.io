@@ -3682,6 +3682,95 @@ const RELAY_SETTINGS_STRIP_FIELDS: Record<string, string[]> = {
   home_vote_ad_campaign: ["publishedBy"],
 };
 
+const DICE_LIVE_KEY = "ngmy_dice_live_v1";
+
+function diceRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((r): r is Record<string, unknown> => !!r && typeof r === "object" && !Array.isArray(r))
+    : [];
+}
+
+function diceNum(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// A player sees the shared dice rules but only their own personal rows.
+function diceFilterForPlayer(value: Record<string, unknown>, email: string): Record<string, unknown> {
+  const mine = (r: Record<string, unknown>) => emailKey(String(r.email ?? "")) === email;
+  return {
+    ...value,
+    userGrants: diceRecords(value.userGrants).filter(mine),
+    userFaceRules: diceRecords(value.userFaceRules).filter(mine),
+    userOutcomeRules: diceRecords(value.userOutcomeRules).filter(mine),
+    playerState: diceRecords(value.playerState).filter(mine),
+  };
+}
+
+// A player's write may only count their own rules down and update their own play counters.
+function diceMergePlayerWrite(
+  current: Record<string, unknown>,
+  incomingRaw: unknown,
+  email: string,
+): Record<string, unknown> {
+  const incoming = incomingRaw && typeof incomingRaw === "object" && !Array.isArray(incomingRaw)
+    ? (incomingRaw as Record<string, unknown>)
+    : {};
+  const mine = (r: Record<string, unknown>) => emailKey(String(r.email ?? "")) === email;
+  const countDown = (
+    currentRows: unknown,
+    incomingRows: unknown,
+    sameRule: (a: Record<string, unknown>, b: Record<string, unknown>) => boolean,
+    downFields: string[],
+    upFields: string[],
+  ) =>
+    diceRecords(currentRows).map((row) => {
+      if (!mine(row)) return row;
+      const match = diceRecords(incomingRows).find((r) => mine(r) && sameRule(row, r));
+      if (!match || String(match.updatedAt ?? "") !== String(row.updatedAt ?? "")) return row;
+      const next = { ...row };
+      for (const f of downFields) next[f] = Math.min(diceNum(row[f]), diceNum(match[f]));
+      for (const f of upFields) next[f] = Math.max(diceNum(row[f]), diceNum(match[f]));
+      return next;
+    });
+
+  const playerState = diceRecords(current.playerState).filter((r) => !mine(r));
+  const ownState = diceRecords(incoming.playerState).find(mine);
+  if (ownState) {
+    const prev = diceRecords(current.playerState).find(mine);
+    const prevStamp = String(prev?.crowdStamp ?? "");
+    const nextStamp = String(ownState.crowdStamp ?? "");
+    const merged = { ...ownState };
+    if (prev && prevStamp === nextStamp) {
+      merged.crowdWinsUsed = Math.max(diceNum(prev.crowdWinsUsed), diceNum(ownState.crowdWinsUsed));
+      merged.crowdLosesUsed = Math.max(diceNum(prev.crowdLosesUsed), diceNum(ownState.crowdLosesUsed));
+    } else if (prev && prevStamp > nextStamp) {
+      Object.assign(merged, {
+        crowdStamp: prev.crowdStamp,
+        crowdWinsUsed: prev.crowdWinsUsed,
+        crowdLosesUsed: prev.crowdLosesUsed,
+      });
+    }
+    playerState.push(merged);
+  } else {
+    const prev = diceRecords(current.playerState).find(mine);
+    if (prev) playerState.push(prev);
+  }
+
+  return {
+    ...current,
+    userFaceRules: countDown(
+      current.userFaceRules,
+      incoming.userFaceRules,
+      (a, b) => diceNum(a.outcome) === diceNum(b.outcome),
+      ["nextLeft"],
+      ["dayUsed", "weekUsed"],
+    ),
+    userOutcomeRules: countDown(current.userOutcomeRules, incoming.userOutcomeRules, () => true, ["winsLeft", "losesLeft"], []),
+    playerState,
+  };
+}
+
 function redactSettingsRow(realKey: string | null, row: unknown): unknown {
   if (!realKey || !row || typeof row !== "object") return row;
   const strip = RELAY_SETTINGS_STRIP_FIELDS[realKey];
@@ -3871,6 +3960,30 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     }
   }
 
+  // Dice control: admins write everything; players read their own rows and only count down.
+  let diceViewerEmail: string | null = null;
+  if (table === "ngmy_settings" && settingsRealKey === DICE_LIVE_KEY) {
+    const admin = adminClient();
+    if (!admin) return jsonOk({ error: "Server misconfigured" }, 500);
+    const email = (await requireJwtEmail(req)).trim().toLowerCase();
+    const isAdmin = email ? (await resolveCivicRole(admin, email)).isAdmin : false;
+    if (op === "s") {
+      client = admin;
+      diceViewerEmail = isAdmin ? null : email;
+    } else if (op === "up" || op === "i") {
+      if (!email) return jsonOk({ error: "Authentication required" }, 401);
+      if (!isAdmin) {
+        const current = await loadSettingsObject(admin, DICE_LIVE_KEY);
+        const incomingRows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
+        for (const r of incomingRows) r["value"] = diceMergePlayerWrite(current, r["value"], email);
+      }
+      client = admin;
+    } else {
+      if (!isAdmin) return jsonOk({ error: "Admin only" }, 403);
+      client = admin;
+    }
+  }
+
   const helperGiftRelayKey =
     settingsRealKey === CIVIC_HELPER_GIFT_PENDING_KEY ||
     settingsRealKey === CIVIC_HELPER_GIFT_INBOX_KEY ||
@@ -3950,6 +4063,13 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
     const redact = (row: unknown) => {
+      if (settingsRealKey === DICE_LIVE_KEY && diceViewerEmail !== null && row && typeof row === "object") {
+        const r = row as Record<string, unknown>;
+        if (r.value && typeof r.value === "object" && !Array.isArray(r.value)) {
+          return { ...r, value: diceFilterForPlayer(r.value as Record<string, unknown>, diceViewerEmail) };
+        }
+        return row;
+      }
       const redacted = redactSettingsRow(settingsRealKey, row);
       if (settingsRealKey !== "civic_help_mode_settings") return redacted;
       return slimCivicHelpModeRow(redacted);

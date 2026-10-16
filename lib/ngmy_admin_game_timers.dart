@@ -13,12 +13,16 @@ class NgmyAdminGameTimersScreen extends StatefulWidget {
     required this.onSave,
     required this.diceSettings,
     required this.onDiceChanged,
+    this.diceUsers = const [],
+    this.searchCloudUsers,
     this.isDark = true,
   });
   final Map<String, int> limits;
   final Future<void> Function(Map<String, int> limits) onSave;
   final NgmyDiceSettings diceSettings;
   final Future<void> Function() onDiceChanged;
+  final List<NgmyDiceUserOption> diceUsers;
+  final Future<List<NgmyDiceUserOption>> Function(String query)? searchCloudUsers;
   final bool isDark;
 
   @override
@@ -159,6 +163,8 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
             settings: widget.diceSettings,
             isDark: dark,
             onChanged: widget.onDiceChanged,
+            users: widget.diceUsers,
+            searchCloudUsers: widget.searchCloudUsers,
           ),
           const SizedBox(height: 18),
           Text('Game times', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16)),

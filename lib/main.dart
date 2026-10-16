@@ -84,6 +84,7 @@ import 'ngmy_supabase_health.dart';
 import 'ngmy_income_sound.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
+import 'ngmy_dice_admin.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_fun_games_popups.dart';
@@ -2632,6 +2633,12 @@ Map<String, dynamic> _mergeDiceSettingsPreferCustom(Map<String, dynamic> localJs
     userGrants: local.userGrants.isNotEmpty ? local.userGrants : remote.userGrants,
     playerState: local.playerState.isNotEmpty ? local.playerState : remote.playerState,
   );
+  ngmyMergeDiceRules(merged, local);
+  ngmyMergeDiceRules(merged, remote);
+  bool anyQuota(NgmyDiceSettings s) => s.faceQuotas.values.any((q) => (q['perDay'] ?? 0) > 0 || (q['perWeek'] ?? 0) > 0);
+  merged.faceQuotas = merged.crowdRule.isNotEmpty
+      ? ngmyDefaultFaceQuotas()
+      : (anyQuota(local) ? local.faceQuotas : remote.faceQuotas);
   return merged.toJson();
 }
 
@@ -8473,7 +8480,7 @@ Future<Map<String, dynamic>> _configRowForSupabaseUpsert({
   final remoteTerms = (remoteLegal['terms'] ?? '').trim();
   final remotePrivacy = (remoteLegal['privacy'] ?? '').trim();
   row['gameTimeLimits'] = config.gameTimeLimits;
-  row['diceSettings'] = config.diceSettings;
+  row['diceSettings'] = ngmyDiceSettingsForPublicConfig(config.diceSettings);
   // PII / locked columns — Edge only (never write back onto public config).
   for (final k in NgmyCloudPolicy.lockedConfigColumns) {
     row.remove(k);
@@ -23439,7 +23446,28 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  /// Admin → Game Timers: game lengths, and dice face control, for every player.
+  Future<List<NgmyDiceUserOption>> _searchDiceUsersInCloud(String query) async {
+    final q = query.trim().replaceAll('%', '');
+    if (q.length < 2) return const [];
+    final rows = await ngmyDbRelaySelect(
+      'users',
+      cols: 'email,username',
+      ilike: {'email': '%$q%'},
+      orderBy: 'email',
+      limit: 8,
+      timeout: const Duration(seconds: 6),
+    );
+    return [
+      for (final r in rows)
+        if ((r['email'] ?? '').toString().trim().isNotEmpty)
+          NgmyDiceUserOption(
+            email: (r['email'] ?? '').toString().trim(),
+            name: (r['username'] ?? '').toString().trim(),
+          ),
+    ];
+  }
+
+  /// Admin → Game Timers: game lengths and dice control, for every player.
   Future<void> _openGameTimersAdmin(bool isDark) async {
     final dice = NgmyDiceSettings.fromJson(widget.config.diceSettings);
     await Navigator.of(context).push<void>(MaterialPageRoute(
@@ -23447,6 +23475,15 @@ class _AdminDashboardState extends State<AdminDashboard> {
         isDark: isDark,
         limits: widget.config.gameTimeLimits,
         diceSettings: dice,
+        diceUsers: [
+          for (final u in widget.allUsers)
+            if (u.email.trim().isNotEmpty)
+              NgmyDiceUserOption(
+                email: u.email.trim(),
+                name: (u.username.trim().isNotEmpty ? u.username : (u.fullName ?? '')).trim(),
+              ),
+        ],
+        searchCloudUsers: _searchDiceUsersInCloud,
         onDiceChanged: () async {
           widget.config.diceSettings = dice.toJson();
           await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
