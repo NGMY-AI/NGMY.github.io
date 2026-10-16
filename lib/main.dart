@@ -23409,7 +23409,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 animDelayMs: 200,
               ),
               _menuFrame(
-                'Game Timers',
+                'Game Center',
                 Icons.timer_rounded,
                 const Color(0xFFF59E0B),
                 () => unawaited(_openGameTimersAdmin(isDark)),
@@ -23467,11 +23467,57 @@ class _AdminDashboardState extends State<AdminDashboard> {
     ];
   }
 
-  /// Admin → Game Timers: game lengths and dice control, for every player.
+  /// Every approved Game Center stake and win, for Admin → Game Center → Top winners.
+  List<NgmyGamePlayRecord> _gamePlayRecords() {
+    String title(String d) {
+      final lower = d.toLowerCase();
+      for (final tag in ['game payout:', 'game partial:', 'game bet:', 'multiplayer payout:']) {
+        final i = lower.indexOf(tag);
+        if (i >= 0) {
+          var s = d.substring(i + tag.length).trim();
+          final paren = s.indexOf('(');
+          if (paren > 0) s = s.substring(0, paren).trim();
+          return s.isEmpty ? 'Game' : s;
+        }
+      }
+      return lower.contains('dice') ? 'Dice Roll' : 'Game';
+    }
+
+    final out = <NgmyGamePlayRecord>[];
+    for (final t in widget.allTransactions) {
+      if (t.status != TransactionStatus.approved || !ngmyIsGameLedgerTransaction(t)) continue;
+      final win = t.type == TransactionType.reimbursement;
+      final stake = t.type == TransactionType.adminRemove;
+      if (!win && !stake) continue;
+      out.add(NgmyGamePlayRecord(
+        email: _ngmyBaseGameEmail(t.userEmail),
+        game: title(t.sourceDetails ?? ''),
+        amount: t.amount.abs(),
+        win: win,
+        at: t.timestamp,
+      ));
+    }
+    return out;
+  }
+
+  String _gamePlayerName(String email) {
+    final key = ngmyNormalizeEmail(email);
+    for (final u in widget.allUsers) {
+      if (_ngmyBaseGameEmail(u.email) == key) {
+        final n = (u.fullName ?? '').trim().isNotEmpty ? u.fullName!.trim() : u.username.trim();
+        if (n.isNotEmpty && n != 'User') return n;
+      }
+    }
+    return email;
+  }
+
+  /// Admin → Game Center: game lengths, dice control and top winners.
   Future<void> _openGameTimersAdmin(bool isDark) async {
     final dice = NgmyDiceSettings.fromJson(widget.config.diceSettings);
     await Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (_) => NgmyAdminGameTimersScreen(
+        records: _gamePlayRecords(),
+        nameOf: _gamePlayerName,
         isDark: isDark,
         limits: widget.config.gameTimeLimits,
         diceSettings: dice,
