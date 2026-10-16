@@ -593,7 +593,29 @@ Future<bool> pushSavedHomeCardsToCloud(String userEmail, List<NgmySpendingEntry>
   }
 }
 
+/// Uploads the saved set in the background, trying again a few times if the connection is
+/// slow. Only the newest request runs, so quick Save/Remove taps never fight each other.
+int _homeCloudPushGen = 0;
+void _pushHomeCardsInBackground(String userEmail, List<NgmySpendingEntry> allLocal) {
+  final gen = ++_homeCloudPushGen;
+  unawaited(() async {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (gen != _homeCloudPushGen) return;
+      bool ok;
+      try {
+        ok = await pushSavedHomeCardsToCloud(userEmail, allLocal).timeout(const Duration(seconds: 20), onTimeout: () => false);
+      } catch (_) {
+        ok = false;
+      }
+      if (ok) return;
+      await Future<void>.delayed(Duration(seconds: 5 * (attempt + 1)));
+    }
+  }());
+}
+
 /// Explicitly Save one card to the account cloud set (max 5). Button label: "Save".
+/// Saved on this phone at once (no waiting on the network — before, the button could spin
+/// for a long time); the account copy for your other phones uploads in the background.
 Future<({bool ok, String message})> saveHomeCardToCloud({
   required String userEmail,
   required NgmySpendingEntry card,
@@ -604,8 +626,8 @@ Future<({bool ok, String message})> saveHomeCardToCloud({
   }
   final ids = await NgmyHomeLocalStore.loadCloudCardIds(userEmail);
   if (ids.contains(card.id)) {
-    final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
-    return (ok: ok, message: ok ? 'Saved.' : 'Could not reach the account. Try again.');
+    _pushHomeCardsInBackground(userEmail, allLocal);
+    return (ok: true, message: 'Saved.');
   }
   if (ids.length >= kNgmyHomeCloudCardSlots) {
     return (
@@ -613,14 +635,9 @@ Future<({bool ok, String message})> saveHomeCardToCloud({
       message: 'Only $kNgmyHomeCloudCardSlots cards can be saved. Remove one first, then Save.',
     );
   }
-  final next = [...ids, card.id];
-  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, next);
-  final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
-  if (!ok) {
-    await NgmyHomeLocalStore.saveCloudCardIds(userEmail, ids);
-    return (ok: false, message: 'Could not Save. Run home_cards SQL in Supabase if needed.');
-  }
-  return (ok: true, message: 'Saved — visible on your other phones.');
+  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, [...ids, card.id]);
+  _pushHomeCardsInBackground(userEmail, allLocal);
+  return (ok: true, message: 'Saved — it will show on your other phones.');
 }
 
 /// Remove a card from the account cloud set only (stays on this phone unless deleted).
@@ -633,13 +650,8 @@ Future<({bool ok, String message})> removeHomeCardFromCloud({
   if (!ids.contains(cardId)) {
     return (ok: true, message: 'Already removed.');
   }
-  final next = ids.where((id) => id != cardId).toList();
-  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, next);
-  final ok = await pushSavedHomeCardsToCloud(userEmail, allLocal);
-  if (!ok) {
-    await NgmyHomeLocalStore.saveCloudCardIds(userEmail, ids);
-    return (ok: false, message: 'Could not update account. Try again.');
-  }
+  await NgmyHomeLocalStore.saveCloudCardIds(userEmail, ids.where((id) => id != cardId).toList());
+  _pushHomeCardsInBackground(userEmail, allLocal);
   return (ok: true, message: 'Removed from account. Still on this phone.');
 }
 
