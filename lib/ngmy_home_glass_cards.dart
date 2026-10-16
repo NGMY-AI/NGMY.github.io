@@ -3051,7 +3051,7 @@ class _ImageCardBodyState extends State<_ImageCardBody> {
     return Image.memory(
       _bytes!,
       key: ValueKey(_src.hashCode),
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       width: double.infinity,
       height: double.infinity,
       gaplessPlayback: true,
@@ -3078,28 +3078,23 @@ class _BusinessCardBody extends StatelessWidget {
         child: Center(child: Text('Business card unavailable', style: TextStyle(color: Colors.white70))),
       );
     }
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final cardH = w / kNgmyBusinessCardAspect;
-        final scale = math.max(1.0, c.maxHeight / cardH);
-        final renderedWidth = w * scale;
-        return ColoredBox(
-          color: const Color(0xFF0B1220),
-          child: ClipRect(
-            child: OverflowBox(
-              maxWidth: renderedWidth,
-              maxHeight: cardH * scale,
-              alignment: Alignment.center,
-              child: NgmyBusinessCardPreview(
-                document: doc!,
-                width: renderedWidth,
-                interactive: false,
-              ),
-            ),
+    // Whole business card always visible: scaled to fit the box, never cropped.
+    const designW = 360.0;
+    const designH = designW / kNgmyBusinessCardAspect;
+    return ColoredBox(
+      color: const Color(0xFF0B1220),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: designW,
+          height: designH,
+          child: NgmyBusinessCardPreview(
+            document: doc!,
+            width: designW,
+            interactive: false,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -3143,35 +3138,26 @@ class _CivicIdCardBody extends StatelessWidget {
         ) ??
         '')
         .trim();
-    return LayoutBuilder(
-      builder: (context, c) {
-        const designW = 360.0;
-        final designH = designW / 1.586;
-        final renderScale = math.max(
-          c.maxWidth / designW,
-          c.maxHeight / designH,
-        );
-        // Cover the whole card face so left/right (and top/bottom) gutters disappear.
-        return ColoredBox(
-          color: const Color(0xFF0B1220),
-          child: ClipRect(
-            child: OverflowBox(
-              maxWidth: designW * renderScale,
-              maxHeight: designH * renderScale,
-              alignment: Alignment.center,
-              child: NgmyCivicRegistryIdCard(
-                record: record!,
-                photoPath: photo.isEmpty ? null : photo,
-                scale: renderScale,
-                onQrTap: () => showNgmyEnlargedCivicQrDialog(
-                  context,
-                  (record!['registryId'] ?? '').toString().trim(),
-                ),
-              ),
+    // The whole ID always shows: it is scaled to fit the box (never cropped), at any window size.
+    const designW = 360.0;
+    const designH = designW / 1.586;
+    return ColoredBox(
+      color: const Color(0xFF0B1220),
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: SizedBox(
+          width: designW,
+          height: designH,
+          child: NgmyCivicRegistryIdCard(
+            record: record!,
+            photoPath: photo.isEmpty ? null : photo,
+            onQrTap: () => showNgmyEnlargedCivicQrDialog(
+              context,
+              (record!['registryId'] ?? '').toString().trim(),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
