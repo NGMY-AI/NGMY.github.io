@@ -332,6 +332,9 @@ class NgmyGameNotifications {
     );
     items.insert(0, entry);
     await _saveMerged(key, items);
+    // Any box still empty (stake not passed, or a win copied from another phone) is worked
+    // out from the transaction history straight away.
+    if (entry.missingNumbers) unawaited(fillMissing(key).then((_) => ngmyGameNotificationsTick.value++).catchError((_) {}));
   }
 
   /// Fills in the stake and balance before/after on receipts that don't have them (older

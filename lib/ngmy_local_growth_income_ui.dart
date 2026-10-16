@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_clock_day.dart';
+
 import 'main.dart';
 import 'ngmy_account_snapshot_ui.dart';
 import 'ngmy_db_relay.dart';
@@ -755,6 +757,21 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     if (NgmyLocalGrowthIncomeStore.sameCalendarDay(user.lastClockInEarningsDate, now) &&
         user.todayClockInEarned > 0) {
       _toast('Today has already been completed. Come back tomorrow.');
+      return;
+    }
+    // Never two clock-ins in one day — not even after moving to another state / time zone.
+    if (!user.isClockedIn &&
+        (ngmySameClockDay(user.lastClockInEarningsDate, now) ||
+            ngmySameClockDay(user.lastClockInDate, now) ||
+            ngmyClockedInTodayFromRecords(
+              [
+                for (final t in _transactions)
+                  if (t.userEmail.toLowerCase().trim() == user.email.toLowerCase().trim())
+                    (id: t.id, details: t.sourceDetails ?? '', at: t.timestamp),
+              ],
+              now,
+            ))) {
+      _toast('You already clocked in today. Come back tomorrow.');
       return;
     }
     if (user.isClockedIn) {

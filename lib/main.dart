@@ -51,6 +51,7 @@ import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_admin_alerts.dart';
 import 'ngmy_admin_game_timers.dart';
+import 'ngmy_clock_day.dart';
 import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup;
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
@@ -1013,7 +1014,8 @@ Future<List<NgmyGameNotification>> ngmyFillGameReceipts(
             if (t.timestamp.isAfter(n.timestamp.add(const Duration(seconds: 5)))) continue;
             if (n.timestamp.difference(t.timestamp) > const Duration(minutes: 45)) break;
             final d = (t.sourceDetails ?? '').toLowerCase();
-            if (t.type == TransactionType.adminRemove && d.contains('game bet') && (title.isEmpty || d.contains(title))) {
+            final isBet = t.type == TransactionType.adminRemove && (d.contains('game bet') || (title.contains('dice') && d.contains('dice')));
+            if (isBet && (title.isEmpty || d.contains(title) || (title.contains('dice') && d.contains('dice')))) {
               bet = t;
               break;
             }
@@ -6861,7 +6863,7 @@ bool _ngmyHasClockInPayoutForDay(String email, List<AppTransaction> txs, DateTim
     if (t.status != TransactionStatus.approved) continue;
     if (t.type != TransactionType.reimbursement) continue;
     if (!(t.sourceDetails ?? '').toLowerCase().contains('clock-in daily earnings')) continue;
-    if (_ngmySameCalendarDay(t.timestamp, day)) return true;
+    if (_ngmySameCalendarDay(t.timestamp, day) || ngmySameClockDay(t.timestamp, day)) return true;
   }
   return false;
 }
@@ -8742,7 +8744,8 @@ class UserData {
   }
   bool get alreadyClockedInToday {
     final now = DateTime.now();
-    if (_ngmySameCalendarDay(lastClockInEarningsDate, now)) return true;
+    if (_ngmySameCalendarDay(lastClockInEarningsDate, now) || ngmySameClockDay(lastClockInEarningsDate, now)) return true;
+    if (!isClockedIn && ngmySameClockDay(lastClockInDate, now)) return true;
     if (_ngmySameCalendarDay(lastClockInDate, now) && !isClockedIn) return true;
     return false;
   }
@@ -17732,6 +17735,8 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (!onTrial && widget.user.activeInvestment == null) return;
     if (!onTrial && _ngmyIsWeekend(now)) return;
     if (_ngmySameCalendarDay(widget.user.lastClockInEarningsDate, now)) return;
+    // Never two clock-ins in one day — not even after moving to another state / time zone.
+    if (ngmySameClockDay(widget.user.lastClockInEarningsDate, now)) return;
     _ngmyReconcileClockInSession(widget.user, _userClockInTransactions());
     if (widget.user.isClockedIn) return;
         final activeElsewhere =
@@ -17746,12 +17751,21 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           return;
         }
     if (!onTrial && !_ngmyIsClockInWindowOpen(now)) return;
+    // A new session never starts if one already started (or was paid) on this clock-in day.
+    if (ngmySameClockDay(widget.user.lastClockInDate, now)) return;
+    if (ngmyClockedInTodayFromRecords(
+      [for (final t in _userClockInTransactions()) (id: t.id, details: t.sourceDetails ?? '', at: t.timestamp)],
+      now,
+    )) {
+      return;
+    }
         final penalty = onTrial ? 0.0 : _ngmyClockInLatePenaltyPercent(now);
         final sessionId = 'clockin_start_${widget.user.email.toLowerCase().trim()}_${now.millisecondsSinceEpoch}';
         setState(() {
           widget.user.isClockedIn = true;
           widget.user.clockInStartTime = now;
           widget.user.clockInPenaltyPercent = penalty;
+          widget.user.lastClockInDate = now;
         });
         widget.onAddTransaction(AppTransaction(
           id: sessionId,
@@ -20054,6 +20068,8 @@ class _NgmyDiceGameHost extends StatefulWidget {
 
 class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceListener {
   late NgmyDiceSettings _dice;
+  /// The stake of the roll in play, so its win receipt shows Stake / Before / After.
+  double _lastBet = 0;
 
   @override
   void initState() {
@@ -20094,6 +20110,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
         }
         final balance = ngmyLiveBalanceFor(widget.user.email, fallback: () => widget.user.accountBalance);
         if (balance < bet) return false;
+        _lastBet = bet;
         widget.user.points += 20;
         widget.onGameStarted();
         widget.onAddTransaction(
@@ -20136,6 +20153,7 @@ class _NgmyDiceGameHostState extends State<_NgmyDiceGameHost> with NgmyBalanceLi
           amount: payout,
           detail: detail,
           txnId: txnId,
+          stake: _lastBet > 0 ? _lastBet : null,
         ));
       },
     );

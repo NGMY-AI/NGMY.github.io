@@ -325,6 +325,7 @@ Rules:
 - Keep every slide they did not ask about exactly as it is.
 - Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
+- TRANSLATING OR REWORDING: change only the words. Keep "style", "kind", "emoji", "icon3d", "image_query", "picture" and the frame/ring values exactly as they are, with the same number of slides and bullets.
 ${ngmyLanguageDirective(request)}
 ${ngmyCommunityKnowledgeFor(request)}
 - Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
@@ -1891,3 +1892,61 @@ class _LuxeTileSparkles extends CustomPainter {
 /// A free, openly licensed photo for [query] as a data URI (used by printable books too).
 Future<String?> ngmySlidesFetchPicture(String query) =>
     _pictureCache.putIfAbsent(query.trim().toLowerCase(), () => _fetchPicture(query));
+
+/// When an AI change only rewrote the words — a translation, a reword, a fixed spelling —
+/// the new words go into the slides already there, so the design (colours, layout, Luxury FX,
+/// pictures, motion) stays exactly the same. Returns false when the change needs new or
+/// different slides (added/removed slides, a new style, new pictures or icons); then the
+/// caller rebuilds them as before.
+bool ngmySlidesApplyTextOnlyEdit(NgmySlideDeck deck, String newOutlineJson, {bool apply = true}) {
+  final oldJson = deck.aiOutlineJson ?? '';
+  final a = ngmyParseSlidesAiOutline(oldJson, fallbackStyle: 'colorful');
+  final b = ngmyParseSlidesAiOutline(newOutlineJson, fallbackStyle: 'colorful');
+  if (a == null || b == null) return false;
+  if (a.slides.length != b.slides.length || a.style != b.style) return false;
+  if (a.logoFrame != b.logoFrame || a.logoRing != b.logoRing || a.photoFrame != b.photoFrame || a.photoRing != b.photoRing) return false;
+  final ids = deck.aiSlideIds ?? const <String>[];
+  if (ids.length != a.slides.length) return false;
+  final slides = <NgmySlide>[];
+  for (final id in ids) {
+    final s = deck.slides.where((x) => x.id == id).firstOrNull;
+    if (s == null) return false;
+    slides.add(s);
+  }
+  for (var i = 0; i < a.slides.length; i++) {
+    final x = a.slides[i], y = b.slides[i];
+    if (x.kind != y.kind || x.emoji != y.emoji || x.icon3d != y.icon3d || x.imageQuery != y.imageQuery || x.picture != y.picture) return false;
+    if (x.bullets.length != y.bullets.length) return false;
+  }
+  if (!apply) return true;
+  for (var i = 0; i < a.slides.length; i++) {
+    final x = a.slides[i], y = b.slides[i];
+    final pairs = <(String, String)>[
+      (x.title, y.title),
+      (x.subtitle, y.subtitle),
+      for (var j = 0; j < x.bullets.length; j++) (x.bullets[j], y.bullets[j]),
+      (x.notes, y.notes),
+    ].where((p) => p.$1.trim().isNotEmpty && p.$1 != p.$2).toList()
+      // Longest first, so a short phrase never breaks a longer one that contains it.
+      ..sort((p, q) => q.$1.length.compareTo(p.$1.length));
+    if (pairs.isEmpty) continue;
+    String swap(String s) {
+      var out = s;
+      for (final (from, to) in pairs) {
+        out = out.replaceAll(from, to);
+        final up = from.toUpperCase();
+        if (up != from) out = out.replaceAll(up, to.toUpperCase());
+      }
+      return out;
+    }
+
+    final slide = slides[i];
+    for (final e in slide.elements) {
+      if (e.text.isNotEmpty) e.text = swap(e.text);
+    }
+    slide.notes = swap(slide.notes);
+  }
+  if (deck.name.trim() == a.title.trim() && b.title.trim().isNotEmpty) deck.name = b.title.trim();
+  deck.aiOutlineJson = newOutlineJson;
+  return true;
+}

@@ -967,6 +967,18 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     if (deck == null || !deck.aiMade || _guardTransferredEdit()) return;
     final made = await showNgmySlidesAiEditor(context, deck: deck, currentSlide: _slideIndex + 1);
     if (made == null || !mounted || _activeDeck != deck) return;
+    // Only the words changed (e.g. "translate to Swahili")? Keep the design — just swap the words.
+    if (ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '', apply: false)) {
+      _mutate(() {
+        ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '');
+        _selectedElementId = null;
+        _clearTextControllers();
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Done — the words are changed and the design is kept. Undo brings back the old version.')),
+      );
+      return;
+    }
     final ids = (deck.aiSlideIds ?? const <String>[]).toSet();
     var at = deck.slides.indexWhere((s) => ids.contains(s.id));
     final oldCount = deck.slides.length;
@@ -6100,7 +6112,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
 
   void _scheduleAutoAdvance() {
     _autoTimer?.cancel();
-    if (!_autoPlaying) return;
+    if (!_autoPlaying || _finale) return;
     final seconds = widget.deck.durationForSlide(_index).clamp(1, 120);
     _autoTimer = Timer(Duration(seconds: seconds), () {
       if (!mounted || !_autoPlaying) return;
@@ -6170,6 +6182,8 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
   void _prev() {
     final n = widget.deck.slides.length;
     if (_finale) {
+      // Without Non-stop the celebration is the end of the show: it keeps playing (close to leave).
+      if (!widget.deck.loop) return;
       _finaleTimer?.cancel();
       setState(() => _finale = false);
       _scheduleAutoAdvance();
@@ -6425,7 +6439,7 @@ class _NgmySlideshowPageState extends State<_NgmySlideshowPage> with SingleTicke
                   ),
                 ),
               ),
-              Positioned(
+              if (!_finale) Positioned(
                 bottom: 16,
                 right: 16,
                 child: SafeArea(
