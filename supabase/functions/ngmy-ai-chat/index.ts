@@ -3700,6 +3700,7 @@ function diceFilterForPlayer(value: Record<string, unknown>, email: string): Rec
   const mine = (r: Record<string, unknown>) => emailKey(String(r.email ?? "")) === email;
   return {
     ...value,
+    diceServer: 1,
     userGrants: diceRecords(value.userGrants).filter(mine),
     userFaceRules: diceRecords(value.userFaceRules).filter(mine),
     userOutcomeRules: diceRecords(value.userOutcomeRules).filter(mine),
@@ -3766,7 +3767,7 @@ function diceMergePlayerWrite(
       ["nextLeft"],
       ["dayUsed", "weekUsed"],
     ),
-    userOutcomeRules: countDown(current.userOutcomeRules, incoming.userOutcomeRules, () => true, ["winsLeft", "losesLeft"], []),
+    userOutcomeRules: countDown(current.userOutcomeRules, incoming.userOutcomeRules, () => true, ["winsLeft", "losesLeft", "plus3Left"], []),
     playerState,
   };
 }
@@ -4063,12 +4064,14 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
     const result = body.single ? await q.maybeSingle() : await q;
     if (result.error) return jsonOk({ error: result.error.message }, 400);
     const redact = (row: unknown) => {
-      if (settingsRealKey === DICE_LIVE_KEY && diceViewerEmail !== null && row && typeof row === "object") {
-        const r = row as Record<string, unknown>;
-        if (r.value && typeof r.value === "object" && !Array.isArray(r.value)) {
-          return { ...r, value: diceFilterForPlayer(r.value as Record<string, unknown>, diceViewerEmail) };
-        }
-        return row;
+      if (settingsRealKey === DICE_LIVE_KEY) {
+        // diceServer tells the app this server version applies the dice rules.
+        const r = row && typeof row === "object" ? (row as Record<string, unknown>) : { key: DICE_LIVE_KEY };
+        const value = r.value && typeof r.value === "object" && !Array.isArray(r.value)
+          ? (r.value as Record<string, unknown>)
+          : {};
+        const shown = diceViewerEmail !== null ? diceFilterForPlayer(value, diceViewerEmail) : { ...value, diceServer: 1 };
+        return { ...r, value: shown };
       }
       const redacted = redactSettingsRow(settingsRealKey, row);
       if (settingsRealKey !== "civic_help_mode_settings") return redacted;

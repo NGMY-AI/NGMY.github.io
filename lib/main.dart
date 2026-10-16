@@ -23486,9 +23486,10 @@ class _AdminDashboardState extends State<AdminDashboard> {
         searchCloudUsers: _searchDiceUsersInCloud,
         onDiceChanged: () async {
           widget.config.diceSettings = dice.toJson();
-          await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
+          final liveError = await NgmyDiceLive.push(dice);
           await ngmyPersistGameCenterConfigNow(widget.config);
-          await NgmyDiceLive.push(dice);
+          unawaited(ngmyFlushCriticalConfigLocalAndCloud(widget.config));
+          return liveError;
         },
         onSave: (limits) async {
           widget.config.gameTimeLimits = limits;

@@ -19,7 +19,10 @@ void main() {
             NgmyDiceControlPanel(
               settings: settings,
               livePoll: false,
-              onChanged: () async => saves++,
+              onChanged: () async {
+                saves++;
+                return null;
+              },
               users: const [
                 NgmyDiceUserOption(email: 'maria@example.com', name: 'Maria Lopez'),
                 NgmyDiceUserOption(email: 'mark@example.com', name: 'Mark'),
@@ -41,6 +44,16 @@ void main() {
     await tester.pump();
     expect(find.text('Set dice for Maria Lopez'), findsOneWidget);
 
+    final winTop = tester.getTopLeft(find.text('WIN').last).dy;
+    expect(tester.getTopLeft(find.text('LOSE').last).dy, winTop);
+    expect(tester.getTopLeft(find.text('+3').first).dy, winTop);
+
+    final plus = find.byIcon(Icons.add_rounded);
+    await tester.tap(plus.at(4));
+    await tester.pump();
+    await tester.tap(plus.at(4));
+    await tester.pump();
+
     await tester.ensureVisible(find.text('Set dice for Maria Lopez'));
     await tester.tap(find.text('Set dice for Maria Lopez'));
     await tester.pump();
@@ -50,6 +63,8 @@ void main() {
     expect(rule['email'], 'maria@example.com');
     expect(rule['winsLeft'], 1);
     expect(rule['losesLeft'], 0);
+    expect(rule['plus3Left'], 2);
+    expect(find.text('3 of 3 left'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });
@@ -69,7 +84,10 @@ void main() {
             NgmyDiceControlPanel(
               settings: settings,
               livePoll: false,
-              onChanged: () async => saves++,
+              onChanged: () async {
+                saves++;
+                return null;
+              },
               users: const [],
             ),
           ],
@@ -77,7 +95,7 @@ void main() {
       ),
     ));
 
-    final plusButtons = find.byIcon(Icons.add_circle_rounded);
+    final plusButtons = find.byIcon(Icons.add_rounded);
     await tester.tap(plusButtons.at(0));
     await tester.pump();
     await tester.tap(plusButtons.at(0));

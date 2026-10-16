@@ -327,25 +327,30 @@ void ngmySetCrowdRule({
   cfg.faceQuotas = ngmyDefaultFaceQuotas();
 }
 
-/// Sets how many of one user's next plays win and lose. Zero for both clears it.
+/// Sets how many of one user's next plays win (+1/+2), lose (-1/-2) and land exactly on +3.
+/// All zero clears it.
 void ngmySetUserOutcomeRule({
   required NgmyDiceSettings cfg,
   required String email,
   String name = '',
   required int wins,
   required int loses,
+  int plus3 = 0,
 }) {
   final key = _emailKey(email);
   cfg.userOutcomeRules.removeWhere((g) => _emailKey((g['email'] ?? '').toString()) == key);
   final w = wins.clamp(0, 999);
   final l = loses.clamp(0, 999);
+  final p = plus3.clamp(0, 999);
   cfg.userOutcomeRules.insert(0, {
     'email': key,
     'name': name.trim(),
     'winsSet': w,
     'losesSet': l,
+    'plus3Set': p,
     'winsLeft': w,
     'losesLeft': l,
+    'plus3Left': p,
     'updatedAt': DateTime.now().toUtc().toIso8601String(),
   });
 }
@@ -358,6 +363,7 @@ void ngmyClearUserDiceRules(NgmyDiceSettings cfg, String email) {
     if (_emailKey((g['email'] ?? '').toString()) != key) continue;
     g['winsLeft'] = 0;
     g['losesLeft'] = 0;
+    g['plus3Left'] = 0;
     g['updatedAt'] = stamp;
   }
   for (final g in cfg.userFaceRules) {
@@ -396,28 +402,40 @@ int _pickLoseFace(NgmyDiceSettings cfg, math.Random rng) {
   return pool.isEmpty ? -1 : pool[rng.nextInt(pool.length)];
 }
 
-/// Win or lose for this user's next play, from their personal rule. Null when none is left.
-bool? _takeUserSide(NgmyDiceSettings cfg, String email, math.Random rng) {
+/// The face for this user's next play from their personal rule (win +1/+2, lose, or +3).
+/// Null when nothing is left.
+int? _takeUserOutcome(NgmyDiceSettings cfg, String email, math.Random rng) {
   final key = _emailKey(email);
   Map<String, dynamic>? row;
+  int left(Map<String, dynamic> g, String f) => (g[f] as num?)?.toInt() ?? 0;
   for (final g in cfg.userOutcomeRules) {
     if (_emailKey((g['email'] ?? '').toString()) != key) continue;
-    final left = ((g['winsLeft'] as num?)?.toInt() ?? 0) + ((g['losesLeft'] as num?)?.toInt() ?? 0);
-    if (left <= 0) continue;
+    if (left(g, 'winsLeft') + left(g, 'losesLeft') + left(g, 'plus3Left') <= 0) continue;
     if (row == null || (g['updatedAt'] ?? '').toString().compareTo((row['updatedAt'] ?? '').toString()) >= 0) {
       row = g;
     }
   }
   if (row == null) return null;
-  final w = (row['winsLeft'] as num?)?.toInt() ?? 0;
-  final l = (row['losesLeft'] as num?)?.toInt() ?? 0;
-  final win = rng.nextInt(w + l) < w;
-  if (win) {
+  final w = left(row, 'winsLeft');
+  final l = left(row, 'losesLeft');
+  final p = left(row, 'plus3Left');
+  final r = rng.nextInt(w + l + p);
+  if (r < w) {
     row['winsLeft'] = w - 1;
-  } else {
-    row['losesLeft'] = l - 1;
+    return _pickSmallWinFace(cfg, rng);
   }
-  return win;
+  if (r < w + l) {
+    row['losesLeft'] = l - 1;
+    return _pickLoseFace(cfg, rng);
+  }
+  row['plus3Left'] = p - 1;
+  return 3;
+}
+
+int _pickSmallWinFace(NgmyDiceSettings cfg, math.Random rng) {
+  final w1 = math.max(1, cfg.weights['1'] ?? 10);
+  final w2 = math.max(1, cfg.weights['2'] ?? 10);
+  return rng.nextInt(w1 + w2) < w1 ? 1 : 2;
 }
 
 /// Win or lose from the "everyone" rule, counted per player for the current day or week.
@@ -478,8 +496,12 @@ int ngmyPickDiceOutcome(NgmyDiceSettings cfg, String userEmail, math.Random rng)
     return o;
   }
 
-  final userSide = _takeUserSide(cfg, userEmail, rng);
-  if (userSide != null) return finishForced(userSide);
+  final userFace = _takeUserOutcome(cfg, userEmail, rng);
+  if (userFace != null) {
+    if (userFace == 3) cfg.plus3UsedToday++;
+    _recordOutcome(cfg, userEmail, userFace);
+    return userFace;
+  }
 
   final forced = _takeForcedFace(cfg, userEmail);
   if (forced != null) {
@@ -647,7 +669,7 @@ void ngmyMergeDiceRules(NgmyDiceSettings into, NgmyDiceSettings other) {
     into.userOutcomeRules,
     other.userOutcomeRules,
     idOf: _outcomeRuleId,
-    countdownFields: const ['winsLeft', 'losesLeft'],
+    countdownFields: const ['winsLeft', 'losesLeft', 'plus3Left'],
     usedFields: const [],
   );
   into.crowdRule = Map<String, dynamic>.from(_newerRule(into.crowdRule, other.crowdRule));
@@ -660,25 +682,49 @@ void _mergeLive(NgmyDiceSettings local, NgmyDiceSettings remote) {
 }
 
 class NgmyDiceLive {
-  static Future<void> pull(NgmyDiceSettings cfg) async {
+  /// True once the server answered with the dice rules in place (the Edge function is updated).
+  static bool serverReady = false;
+  static String lastError = '';
+  static DateTime? lastPullAt;
+  static Future<bool>? _inflight;
+
+  /// Pulls the newest shared rules and counts into [cfg]. Always asks the server (never the
+  /// 5-second read cache), so counts move as players play.
+  static Future<bool> pull(NgmyDiceSettings cfg) {
+    return _inflight ??= _pull(cfg).whenComplete(() => _inflight = null);
+  }
+
+  static Future<bool> _pull(NgmyDiceSettings cfg) async {
     try {
       final remote = await ngmyDbRelaySettingsFetch(
         kNgmyDiceLiveSettingsKey,
         timeout: const Duration(seconds: 4),
+        fresh: true,
       );
-      if (remote == null || remote.isEmpty) return;
+      lastError = '';
+      lastPullAt = DateTime.now();
+      serverReady = remote != null && remote['diceServer'] == 1;
+      if (remote == null || remote.isEmpty) return true;
       _mergeLive(cfg, NgmyDiceSettings.fromJson(remote));
-    } catch (_) {}
+      return true;
+    } catch (e) {
+      lastError = e.toString();
+      return false;
+    }
   }
 
-  static Future<void> push(NgmyDiceSettings cfg) async {
+  /// Sends [cfg] to the shared row. Returns null on success, or the reason it failed.
+  static Future<String?> push(NgmyDiceSettings cfg) async {
     try {
       await ngmyDbRelaySettingsUpsert(
         kNgmyDiceLiveSettingsKey,
         cfg.toJson(),
         timeout: const Duration(seconds: 6),
       );
-    } catch (_) {}
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
   }
 }
 

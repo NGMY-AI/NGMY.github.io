@@ -137,4 +137,36 @@ void main() {
     ngmyMergeDiceRules(a, b);
     expect(ngmyCrowdRemaining(a, 'p@example.com').wins, 1);
   });
+
+  test('one user: +3 plays land exactly on +3, mixed with wins and loses', () {
+    final cfg = NgmyDiceSettings();
+    ngmySetUserOutcomeRule(cfg: cfg, email: 'q@example.com', wins: 2, loses: 1, plus3: 3);
+
+    final outcomes = _play(cfg, 'q@example.com', 6);
+    expect(outcomes.where((o) => o == 3).length, 3);
+    expect(outcomes.where((o) => o == 1 || o == 2).length, 2);
+    expect(outcomes.where((o) => o < 0).length, 1);
+    final rule = cfg.userOutcomeRules.single;
+    expect(rule['plus3Left'], 0);
+    expect(rule['winsLeft'], 0);
+  });
+
+  test('one user: only +3 set gives +3 every time, counting down', () {
+    final cfg = NgmyDiceSettings();
+    ngmySetUserOutcomeRule(cfg: cfg, email: 'q@example.com', wins: 0, loses: 0, plus3: 2);
+    final rng = math.Random(9);
+    expect(ngmyPickDiceOutcome(cfg, 'q@example.com', rng), 3);
+    expect(cfg.userOutcomeRules.single['plus3Left'], 1);
+    expect(ngmyPickDiceOutcome(cfg, 'q@example.com', rng), 3);
+    expect(cfg.userOutcomeRules.single['plus3Left'], 0);
+  });
+
+  test('merge: +3 count from a player never goes back up', () {
+    final admin = NgmyDiceSettings();
+    ngmySetUserOutcomeRule(cfg: admin, email: 'q@example.com', wins: 0, loses: 0, plus3: 3);
+    final player = NgmyDiceSettings.fromJson(admin.toJson());
+    _play(player, 'q@example.com', 2);
+    ngmyMergeDiceRules(admin, player);
+    expect(admin.userOutcomeRules.single['plus3Left'], 1);
+  });
 }

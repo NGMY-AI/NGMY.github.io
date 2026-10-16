@@ -20,7 +20,7 @@ class NgmyAdminGameTimersScreen extends StatefulWidget {
   final Map<String, int> limits;
   final Future<void> Function(Map<String, int> limits) onSave;
   final NgmyDiceSettings diceSettings;
-  final Future<void> Function() onDiceChanged;
+  final Future<String?> Function() onDiceChanged;
   final List<NgmyDiceUserOption> diceUsers;
   final Future<List<NgmyDiceUserOption>> Function(String query)? searchCloudUsers;
   final bool isDark;
