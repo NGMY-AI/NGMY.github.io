@@ -472,7 +472,10 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       _creditedTxnIds = List<String>.from(loaded.creditedTxnIds);
     });
     _mirrorWalletOntoLiveUser();
-    _publishAppBalance(loaded.user.accountBalance, allowDecrease: true);
+    // Opening the screen is not a money change. This phone's saved copy can be stale, so
+    // show the app's balance (already aligned in initState) instead of publishing the copy's
+    // difference, which made the balance jump to a wrong figure and then snap back.
+    _adoptAppBalance();
     final synced = await NgmyLocalGrowthIncomeStore.reconcileWithCloud(
       realEmail: widget.liveUser.email,
       localUser: loaded.user,

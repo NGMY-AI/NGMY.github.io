@@ -275,7 +275,9 @@ const _kFrameRule = '- PICTURE LOOK: "logo_frame" and "photo_frame" are one of: 
 
 const _kBioRule = '- BIO LINK: if they ask to put their bio link / link page / socials / "my links" in the presentation, add ONE slide with kind "bio" (title like "Connect with me", a one-line inviting subtitle) — usually just before the closing slide, or where they say. Their real Bio page (with clickable links) is shown on a phone on that slide.';
 
-const _kLanguageRule = '- LANGUAGE: if the request names a language (e.g. "in Swahili", "en français", "en español", "in Arabic"), write EVERY title, subtitle, bullet and note in that language, with correct spelling and accents. If no language is named, write in the language the request itself is written in. Keep the JSON keys and the "kind", "style", "icon3d" and "image_query" values in English.';
+const _kVoiceRule = '- VOICE: write the way a real, friendly person talks and writes to someone they respect. Short plain sentences. Everyday words that people really use today. No corporate or robotic phrasing ("leverage", "synergy", "empower the ecosystem", "in today\'s dynamic landscape"), no made-up or rare words, no stacked jargon, no lecture tone. Explain the Civic registry, the AI, and any other topic the way you would explain it to a neighbour. If the language is Swahili, use the Swahili people speak and write every day in Kenya and Tanzania: real common words, natural word order, and never an English word forced into Swahili grammar or an invented Swahili word. Check that each word is one an ordinary speaker would understand.';
+
+const _kLanguageRule ='- LANGUAGE: if the request names a language (e.g. "in Swahili", "en français", "en español", "in Arabic"), write EVERY title, subtitle, bullet and note in that language, with correct spelling and accents. If no language is named, write in the language the request itself is written in. Keep the JSON keys and the "kind", "style", "icon3d" and "image_query" values in English.';
 
 extension NgmySlidesAiOutlineJson on NgmySlidesAiOutline {
   String toJsonString() => jsonEncode({
@@ -326,6 +328,7 @@ Rules:
 - Same limits as before: titles max 7 words, 3 to 5 bullets of max 12 words, never invent prices, dates or statistics.
 - LANGUAGE: keep the presentation's current language unless they ask for another one; if they do, translate EVERY slide. JSON keys and the "kind", "style", "icon3d" and "image_query" values stay in English.
 - TRANSLATING OR REWORDING: change only the words. Keep "style", "kind", "emoji", "icon3d", "image_query", "picture" and the frame/ring values exactly as they are, with the same number of slides and bullets.
+$_kVoiceRule
 ${ngmyLanguageDirective(request)}
 ${ngmyCommunityKnowledgeFor(request)}
 - Keep "logo_frame", "logo_ring", "photo_frame" and "photo_ring" unless they ask to change how the logo or pictures look.
@@ -368,6 +371,7 @@ Rules:
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
 - "notes": 1-2 sentences the presenter can say.
 $_kLanguageRule
+$_kVoiceRule
 ${ngmyLanguageDirective(description)}
 ${ngmyCommunityKnowledgeFor(description)}
 $_kFrameRule

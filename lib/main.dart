@@ -79,6 +79,7 @@ import 'ngmy_supabase_sync_throttle.dart';
 import 'ngmy_supabase_columns.dart';
 import 'ngmy_password_reset_otp.dart';
 import 'ngmy_db_relay.dart';
+import 'ngmy_wallet_server.dart';
 import 'ngmy_supabase_config.dart';
 import 'ngmy_supabase_auth.dart';
 import 'ngmy_supabase_health.dart';
@@ -794,6 +795,13 @@ String formatCurrency(double amount) {
 
 String ngmyNormalizeEmail(String email) => email.toLowerCase().trim();
 
+/// How the assistant should sound: a real person, not a robot or a corporate brochure.
+const String _ngmyHumanVoiceLine =
+    'Write like a real, warm person talking to a friend: short plain sentences, everyday words, '
+    'no robotic or corporate phrasing and no made-up or rare words. Explain the civic registry and any other '
+    'NGMY topic the way a neighbour would. In Swahili, use the everyday Swahili people speak in Kenya and Tanzania, '
+    'with natural word order and no English words forced into Swahili grammar.\n';
+
 /// Strip leading `$` so the field can use a visual prefix without fighting the controller.
 String ngmyCashAppTagInputText(String raw) {
   var t = raw.trim();
@@ -927,6 +935,9 @@ double ngmyResolveAccountBalance(
 ) {
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
+  // Once the server has settled a game for this account, its balance is the one truth.
+  final serverBalance = ngmyServerBalances[key];
+  if (serverBalance != null) return serverBalance.clamp(0.0, double.infinity);
   final stored = storedBalance.clamp(0.0, double.infinity);
   // Until the account's full history has downloaded, the phone only holds
   // part of it — adding that part up gave $0 or too little, and replaced the
@@ -8610,6 +8621,7 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
           'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n'
+          '$_ngmyHumanVoiceLine'
       : 'You are the helpful assistant for the NGMY platform (New Global Movement for Youth). '
           '$founderFacts'
           'NGMY offers investment plans, daily clock-in earnings, loans, NGMY Store, job marketplace, and civic registry. '
@@ -8621,7 +8633,8 @@ String _ngmyHelperSystemContext({required UserData user}) {
           'If live data is unavailable, say briefly you cannot fetch live stats right now and still help with general NGMY questions.\n'
           'Community News may be closed for posting — that never disables you. Always answer NGMY Helper AI questions normally.\n'
           'Each chat message includes a LIVE NGMY APP DATABASE block — treat it as real-time truth for menus, wallet pending counts, and app state.\n'
-          'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n';
+          'Admins can ask you to send direct emails to users through NGMY (send_email). Regular users cannot.\n'
+          '$_ngmyHumanVoiceLine';
 }
 
 Future<String?> _geminiGenerateReply(
@@ -10935,6 +10948,44 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         await prefs.setStringList(_kTxnOutboxKey, _txnOutbox.toList());
       } catch (_) {}
     });
+  }
+
+  /// Game bets and payouts settle on the server: one step stores the receipt and
+  /// changes the account balance, and the balance it returns is what every phone
+  /// shows. Falls back to the outbox when the server cannot be reached.
+  Future<void> _settleGameTxnOnServer(AppTransaction t) async {
+    final email = ngmyNormalizeEmail(t.userEmail);
+    final result = await ngmySettleGameTxnOnServer({
+      'id': t.id,
+      'userEmail': email,
+      'amount': t.amount,
+      'type': t.type.index,
+      'method': t.method.index,
+      'sourceDetails': t.sourceDetails,
+      'status': t.status.index,
+      'timestamp': t.timestamp.toUtc().toIso8601String(),
+    });
+    if (result == null) {
+      // Offline: the receipt waits in the outbox; the balance is corrected by the next sync.
+      if (await _pushTransactionToCloudReliable(t)) _txnOutboxDone(t.id);
+      return;
+    }
+    final serverBalance = result.balance;
+    if (serverBalance != null) {
+      ngmySeedLiveBalance(email, serverBalance, allowIncrease: true);
+      final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
+      if (idx != -1) _allUsers[idx].accountBalance = serverBalance;
+      if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == email) {
+        _currentUser!.accountBalance = serverBalance;
+      }
+      ngmyNotifyBalanceChanged();
+      if (mounted) setState(() {});
+    }
+    if (result.applied || result.reason == 'duplicate') {
+      _txnOutboxDone(t.id);
+    } else {
+      debugPrint('[wallet server] game txn not applied: ${result.reason}');
+    }
   }
 
   /// The database has it now — nothing left to send for this one.
@@ -15041,21 +15092,30 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       _lastWalletLedgerSignature = _walletLedgerSignatureForEmail(userKey);
                     }
                   });
-                  // Saved → out of the outbox; failed (e.g. offline) → stays there and is sent later.
-                  unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
-                  unawaited(_pushTransactionToCloudFast(t));
+                  // Game bets/payouts go through the server balance step; everything else
+                  // saves as before. Saved → out of the outbox; failed → stays there and is sent later.
+                  final isGameTxn = ngmyIsGameLedgerTransaction(t);
+                  if (isGameTxn) {
+                    unawaited(_settleGameTxnOnServer(t));
+                  } else {
+                    unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
+                    unawaited(_pushTransactionToCloudFast(t));
+                  }
                   _markTransactionDirty(t.id);
                   if (syncedUser != null) {
                     _markUserDirty(syncedUser!.email);
                     unawaited(_pushUserToCloudFast(syncedUser!, includeFreeTrial: true).then((ok) {
                       if (ok) _dirtyUserEmails.remove(ngmyNormalizeEmail(syncedUser!.email));
                     }));
-                    unawaited(_pushUserBalanceToCloud(
-                      syncedUser!,
-                      allowDecrease: ngmyIsGameLedgerTransaction(t) ||
-                          t.type == TransactionType.adminRemove ||
-                          t.type == TransactionType.withdrawal,
-                    ));
+                    // A game's balance is owned by the server; pushing this phone's number here
+                    // is what let two phones overwrite each other.
+                    if (!isGameTxn) {
+                      unawaited(_pushUserBalanceToCloud(
+                        syncedUser!,
+                        allowDecrease: t.type == TransactionType.adminRemove ||
+                            t.type == TransactionType.withdrawal,
+                      ));
+                    }
                     ngmyNotifyBalanceChanged(
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
@@ -19888,6 +19948,8 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
               ),
               child: Column(
                 children: [
+                  NgmyGameLiveStats(email: widget.user.email),
+                  const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),

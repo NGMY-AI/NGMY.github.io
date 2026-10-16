@@ -5199,6 +5199,38 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           Row(children: [const Text('X', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.x.clamp(0.0, maxX), min: 0, max: maxX, onChanged: (v) => apply(() => el.x = v)))]),
           Row(children: [const Text('Y', style: TextStyle(fontSize: 10)), Expanded(child: Slider(value: el.y.clamp(0.0, maxY), min: 0, max: maxY, onChanged: (v) => apply(() => el.y = v)))]),
         ],
+        if (el.type == NgmySlideElementType.image) ...[
+          const SizedBox(height: 8),
+          Text('Shape (frame)', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (id, label) in kNgmySlideFrames)
+                ChoiceChip(
+                  label: Text(label, style: const TextStyle(fontSize: 11)),
+                  selected: el.frame == id,
+                  onSelected: (_) => apply(() => el.frame = id),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('Ring', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final (id, label) in kNgmySlideRings)
+                ChoiceChip(
+                  label: Text(label, style: const TextStyle(fontSize: 11)),
+                  selected: el.ring == id,
+                  onSelected: (_) => apply(() => el.ring = id),
+                ),
+            ],
+          ),
+        ],
         const SizedBox(height: 8),
         if (el.type == NgmySlideElementType.text) ...[
           Text('Text color', style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : const Color(0xFF64748B))),
