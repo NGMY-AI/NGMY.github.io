@@ -17,6 +17,23 @@ class NgmyLocalGrowthIncomeStore {
   static const int walletSchemaVersion = 2;
   static const String cloudKeyPrefix = 'ngmy_gi_account_wallet_v1_';
 
+  static final Map<String, ({
+    UserData user,
+    List<AppTransaction> transactions,
+    int walletStateRevision,
+    DateTime? updatedAt,
+    List<String> creditedTxnIds,
+  })> _memory = {};
+
+  static ({
+    UserData user,
+    List<AppTransaction> transactions,
+    int walletStateRevision,
+    DateTime? updatedAt,
+    List<String> creditedTxnIds,
+  })? memoryFor(String realEmail) =>
+      _memory[_normalize(realEmail)];
+
   static String _normalize(String email) => email.toLowerCase().trim();
 
   static String _key(String realEmail) => 'ngmy_local_growth_income_${_normalize(realEmail)}';
@@ -74,13 +91,15 @@ class NgmyLocalGrowthIncomeStore {
       }
       ngmySeedLiveBalance(user.email, user.accountBalance);
       final credited = _creditedFromMap(map);
-      return (
+      final loaded = (
         user: user,
         transactions: transactions,
         walletStateRevision: revision,
         updatedAt: _updatedAtFromMap(map),
         creditedTxnIds: credited.isNotEmpty ? credited : await loadCreditedIds(realEmail),
       );
+      _memory[_normalize(realEmail)] = loaded;
+      return loaded;
     } catch (_) {
       final seeded = _freshUser(realEmail, liveUserSeed);
       await save(realEmail, seeded, const [], walletStateRevision: 0);
@@ -149,6 +168,13 @@ class NgmyLocalGrowthIncomeStore {
     } catch (e) {
       debugPrint('[growth income] local save: $e');
     }
+    _memory[_normalize(realEmail)] = (
+      user: user,
+      transactions: List<AppTransaction>.from(transactions),
+      walletStateRevision: revision,
+      updatedAt: at,
+      creditedTxnIds: List<String>.from(credited),
+    );
     unawaited(ngmySyncLocalLiveSnapshotIfRegistered(
       ownerEmail: realEmail,
       user: user,

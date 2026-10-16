@@ -147,7 +147,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
     }
     WidgetsBinding.instance.addObserver(this);
     NgmyFeatureSyncSession.enterGrowthIncomeUser();
-    _user = NgmyLocalGrowthIncomeStore.previewUser(widget.liveUser);
+    final remembered = NgmyLocalGrowthIncomeStore.memoryFor(widget.liveUser.email);
+    if (remembered != null) {
+      _user = remembered.user;
+      _transactions = List<AppTransaction>.from(remembered.transactions);
+      _walletStateRevision = remembered.walletStateRevision;
+      _walletUpdatedAt = remembered.updatedAt;
+      _creditedTxnIds = List<String>.from(remembered.creditedTxnIds);
+    } else {
+      _user = NgmyLocalGrowthIncomeStore.previewUser(widget.liveUser);
+    }
     _mirrorWalletOntoLiveUser();
     _adoptAppBalance();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -452,6 +461,16 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
 
   Future<void> _load() async {
     final loaded = await NgmyLocalGrowthIncomeStore.load(widget.liveUser.email, widget.liveUser);
+    if (!mounted) return;
+    setState(() {
+      _user = loaded.user;
+      _transactions = List<AppTransaction>.from(loaded.transactions);
+      _walletStateRevision = loaded.walletStateRevision;
+      _walletUpdatedAt = loaded.updatedAt;
+      _creditedTxnIds = List<String>.from(loaded.creditedTxnIds);
+    });
+    _mirrorWalletOntoLiveUser();
+    _publishAppBalance(loaded.user.accountBalance, allowDecrease: true);
     final synced = await NgmyLocalGrowthIncomeStore.reconcileWithCloud(
       realEmail: widget.liveUser.email,
       localUser: loaded.user,

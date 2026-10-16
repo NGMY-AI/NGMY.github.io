@@ -3636,6 +3636,7 @@ const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
   k53: "civic_helper_gift_pending_v1",
   k54: "civic_helper_gift_inbox_v1",
   k55: "game_center_timers",
+  k56: "ngmy_dice_live_v1",
 };
 
 // Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
