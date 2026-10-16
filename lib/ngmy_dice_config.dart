@@ -419,16 +419,26 @@ int? _takeUserOutcome(NgmyDiceSettings cfg, String email, math.Random rng) {
   final w = left(row, 'winsLeft');
   final l = left(row, 'losesLeft');
   final p = left(row, 'plus3Left');
-  final r = rng.nextInt(w + l + p);
-  if (r < w) {
+  // Repeating the previous kind is made unlikely (not impossible) so the order keeps changing.
+  final last = (row['last'] ?? '').toString();
+  final others = (w > 0 ? 1 : 0) + (l > 0 ? 1 : 0) + (p > 0 ? 1 : 0) > 1;
+  int weight(int count, String kind) => count * (others && last == kind ? 1 : 4);
+  final ww = weight(w, 'w');
+  final lw = weight(l, 'l');
+  final pw = weight(p, 'p');
+  final r = rng.nextInt(ww + lw + pw);
+  if (r < ww) {
     row['winsLeft'] = w - 1;
+    row['last'] = 'w';
     return _pickSmallWinFace(cfg, rng);
   }
-  if (r < w + l) {
+  if (r < ww + lw) {
     row['losesLeft'] = l - 1;
+    row['last'] = 'l';
     return _pickLoseFace(cfg, rng);
   }
   row['plus3Left'] = p - 1;
+  row['last'] = 'p';
   return 3;
 }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -23,6 +24,7 @@ class NgmyDiceControlPanel extends StatefulWidget {
     required this.users,
     this.searchCloudUsers,
     this.livePoll = true,
+    this.localSource,
     this.isDark = true,
   });
 
@@ -31,6 +33,10 @@ class NgmyDiceControlPanel extends StatefulWidget {
   final List<NgmyDiceUserOption> users;
   final Future<List<NgmyDiceUserOption>> Function(String query)? searchCloudUsers;
   final bool livePoll;
+
+  /// Newest dice settings kept on this phone (the Dice Roll screen writes here as soon as a
+  /// roll is picked). Merged into the panel twice a second so counts react at once.
+  final Map<String, dynamic> Function()? localSource;
   final bool isDark;
 
   @override
@@ -46,6 +52,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
   final _search = TextEditingController();
   final _searchFocus = FocusNode();
   Timer? _poll;
+  Timer? _localTick;
   Timer? _debounce;
   bool _saving = false;
   bool _searching = false;
@@ -67,12 +74,28 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
     super.initState();
     _loadCrowdFields();
     if (widget.livePoll) unawaited(_refresh());
+    if (widget.localSource != null) {
+      _localTick = Timer.periodic(const Duration(milliseconds: 500), (_) => _mergeLocal());
+    }
+  }
+
+  void _mergeLocal() {
+    final source = widget.localSource;
+    if (source == null || _disposed || _saving || !mounted) return;
+    final before = jsonEncode(widget.settings.userOutcomeRules);
+    try {
+      ngmyMergeDiceRules(widget.settings, NgmyDiceSettings.fromJson(source()));
+    } catch (_) {
+      return;
+    }
+    if (jsonEncode(widget.settings.userOutcomeRules) != before) setState(() {});
   }
 
   @override
   void dispose() {
     _disposed = true;
     _poll?.cancel();
+    _localTick?.cancel();
     _debounce?.cancel();
     _search.dispose();
     _searchFocus.dispose();
@@ -708,7 +731,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _sectionTitle('📊', 'Live count', 'Watch each player\'s plays go down as they play.', ink, mute)),
+              Expanded(child: _sectionTitle('📊', 'Live count', 'Each play shows up here the moment a player rolls. Bars drain as plays are used.', ink, mute)),
               if (widget.livePoll) _LiveDot(ok: ready && _syncError.isEmpty),
             ],
           ),
@@ -868,7 +891,7 @@ class _LiveRuleTile extends StatelessWidget {
               Text(label, style: TextStyle(color: off ? mute : c, fontWeight: FontWeight.w900, fontSize: 11)),
               const SizedBox(height: 2),
               Text(
-                off ? '—' : '${t.left}/${t.total}',
+                off ? '—' : '${t.total - t.left}/${t.total}',
                 style: TextStyle(color: off ? mute : ink, fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 6),
@@ -915,7 +938,7 @@ class _LiveRuleTile extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(color: accent.withValues(alpha: 0.16), borderRadius: BorderRadius.circular(20)),
                 child: Text(
-                  finished ? 'DONE' : '$left of $total left',
+                  finished ? 'DONE' : '${total - left} of $total played',
                   style: TextStyle(color: accent, fontWeight: FontWeight.w900, fontSize: 11.5),
                 ),
               ),

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_dice_admin.dart';
@@ -64,7 +66,7 @@ void main() {
     expect(rule['winsLeft'], 1);
     expect(rule['losesLeft'], 0);
     expect(rule['plus3Left'], 2);
-    expect(find.text('3 of 3 left'), findsOneWidget);
+    expect(find.text('0 of 3 played'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });
@@ -115,6 +117,43 @@ void main() {
     ));
     expect(find.text('Ann'), findsNothing);
     expect(find.text('Nothing left to count. Every player is back to normal play.'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('live count reacts within a moment when a roll is stored on this phone', (tester) async {
+    tester.view.physicalSize = const Size(900, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final settings = NgmyDiceSettings();
+    ngmySetUserOutcomeRule(cfg: settings, email: 'a@example.com', name: 'Ann', wins: 3, loses: 2, plus3: 1);
+    var stored = settings.toJson();
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ListView(children: [
+          NgmyDiceControlPanel(
+            settings: settings,
+            livePoll: false,
+            localSource: () => stored,
+            onChanged: () async => null,
+            users: const [],
+          ),
+        ]),
+      ),
+    ));
+    expect(find.text('0 of 6 played'), findsOneWidget);
+    expect(find.text('0/3'), findsOneWidget);
+
+    final player = NgmyDiceSettings.fromJson(stored);
+    final rng = Random(4);
+    ngmyPickDiceOutcome(player, 'a@example.com', rng);
+    stored = player.toJson();
+
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('1 of 6 played'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
   });

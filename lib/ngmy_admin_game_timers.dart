@@ -25,6 +25,7 @@ class NgmyAdminGameTimersScreen extends StatefulWidget {
     required this.onSave,
     required this.diceSettings,
     required this.onDiceChanged,
+    this.diceLocalSource,
     this.diceUsers = const [],
     this.searchCloudUsers,
     this.isDark = true,
@@ -35,6 +36,7 @@ class NgmyAdminGameTimersScreen extends StatefulWidget {
   final Future<void> Function(Map<String, int> limits) onSave;
   final NgmyDiceSettings diceSettings;
   final Future<String?> Function() onDiceChanged;
+  final Map<String, dynamic> Function()? diceLocalSource;
   final List<NgmyDiceUserOption> diceUsers;
   final Future<List<NgmyDiceUserOption>> Function(String query)? searchCloudUsers;
   final bool isDark;
@@ -322,6 +324,7 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
           settings: widget.diceSettings,
           isDark: _dark,
           onChanged: widget.onDiceChanged,
+          localSource: widget.diceLocalSource,
           users: widget.diceUsers,
           searchCloudUsers: widget.searchCloudUsers,
         ),

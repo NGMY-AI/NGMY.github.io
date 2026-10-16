@@ -22,6 +22,32 @@ void main() {
     expect(rule['losesLeft'], 0);
   });
 
+  test('one user: the order of wins, loses and +3 changes from set to set and rarely repeats', () {
+    final orders = <String>{};
+    var sameKindInARow = 0;
+    var picks = 0;
+    for (var seed = 0; seed < 200; seed++) {
+      final cfg = NgmyDiceSettings();
+      ngmySetUserOutcomeRule(cfg: cfg, email: 'zoe@example.com', wins: 3, loses: 2, plus3: 1);
+      final rng = math.Random(seed);
+      final kinds = <String>[];
+      for (var i = 0; i < 6; i++) {
+        final o = ngmyPickDiceOutcome(cfg, 'zoe@example.com', rng);
+        kinds.add(o == 3 ? 'p' : (o > 0 ? 'w' : 'l'));
+      }
+      expect(kinds.where((k) => k == 'w').length, 3);
+      expect(kinds.where((k) => k == 'l').length, 2);
+      expect(kinds.where((k) => k == 'p').length, 1);
+      orders.add(kinds.join());
+      for (var i = 1; i < kinds.length; i++) {
+        picks++;
+        if (kinds[i] == kinds[i - 1]) sameKindInARow++;
+      }
+    }
+    expect(orders.length, greaterThan(10));
+    expect(sameKindInARow / picks, lessThan(0.3));
+  });
+
   test('one user: remaining counts drop one play at a time', () {
     final cfg = NgmyDiceSettings();
     ngmySetUserOutcomeRule(cfg: cfg, email: 'ben@example.com', wins: 3, loses: 0);

@@ -23548,6 +23548,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
               ),
         ],
         searchCloudUsers: _searchDiceUsersInCloud,
+        diceLocalSource: () => widget.config.diceSettings,
         onDiceChanged: () async {
           widget.config.diceSettings = dice.toJson();
           final liveError = await NgmyDiceLive.push(dice);
