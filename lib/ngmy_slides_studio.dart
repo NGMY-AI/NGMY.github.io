@@ -1341,27 +1341,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   }
 
   Future<void> _addImage() async {
-    final refs = await ngmyPickImagesBase64();
-    if (refs.isEmpty || _currentSlide == null) return;
+    final ref = await ngmyPickImageBase64();
+    if (ref == null || _currentSlide == null) return;
     _mutate(() {
-      final n = refs.length;
-      final cols = n <= 1 ? 1 : (n <= 4 ? 2 : (n <= 9 ? 3 : 4));
-      final rows = (n / cols).ceil();
-      for (var i = 0; i < n; i++) {
-        final col = i % cols;
-        final row = i ~/ cols;
-        final el = NgmySlideElement(
-          id: NgmySlidesTemplates.newId(),
-          type: NgmySlideElementType.image,
-          x: 0.04 + col * (0.92 / cols),
-          y: 0.08 + row * (0.84 / rows),
-          w: (0.92 / cols) - 0.02,
-          h: (0.84 / rows) - 0.02,
-          imageRef: refs[i],
-        );
-        _currentSlide!.elements.add(el);
-        _selectedElementId = el.id;
-      }
+      final el = NgmySlideElement(
+        id: NgmySlidesTemplates.newId(),
+        type: NgmySlideElementType.image,
+        x: 0.2,
+        y: 0.18,
+        w: 0.6,
+        h: 0.55,
+        imageRef: ref,
+      );
+      _currentSlide!.elements.add(el);
+      _selectedElementId = el.id;
     });
   }
 

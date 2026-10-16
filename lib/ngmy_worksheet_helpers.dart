@@ -63,27 +63,6 @@ Future<String?> ngmyPickImageBase64({
   return 'data:image/jpeg;base64,${base64Encode(bytes)}';
 }
 
-/// Gallery photos for a slide. Extra picks past [maxCount] are ignored.
-Future<List<String>> ngmyPickImagesBase64({
-  int imageQuality = 78,
-  int maxWidth = 1600,
-  int maxCount = 20,
-}) async {
-  final files = await ImagePicker().pickMultiImage(
-    imageQuality: imageQuality,
-    maxWidth: maxWidth.toDouble(),
-  );
-  if (files.isEmpty) return const [];
-  final take = files.length > maxCount ? files.sublist(0, maxCount) : files;
-  final out = <String>[];
-  for (final img in take) {
-    final bytes = await img.readAsBytes();
-    if (bytes.isEmpty) continue;
-    out.add('data:image/jpeg;base64,${base64Encode(bytes)}');
-  }
-  return out;
-}
-
 /// Pick a gallery photo and save it locally (IndexedDB / device files).
 Future<String?> ngmyPickWorksheetPhotoRef() async {
   final picked = await ImagePicker().pickImage(
