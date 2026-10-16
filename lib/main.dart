@@ -40911,6 +40911,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       )
                     else
                       ...contributions.map((t) => _civicContributionRecordCard(ctx, t)),
+                      ..._civicGiftRecordCards(ctx, u),
                     const SizedBox(height: 16),
                     const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
@@ -41077,6 +41078,87 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
         subtitle: _txReadableDetails(t),
         date: t.timestamp,
       );
+
+  /// Helper gifts this member received (for 3 contributions in a row) — shown with their
+  /// contribution records, but styled as money RECEIVED, not money given.
+  List<Widget> _civicGiftRecordCards(BuildContext ctx, UserData u) {
+    final gifts = NgmyCivicHelperGifts.giftsForEmail(widget.config, u.email);
+    if (gifts.isEmpty) return const [];
+    final isDark = Theme.of(ctx).brightness == Brightness.dark;
+    return [
+      for (final g in gifts)
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? const [Color(0xFF3B2A06), Color(0xFF4A1D3A)]
+                  : const [Color(0xFFFFF7E0), Color(0xFFFCE7F3)],
+            ),
+            border: Border.all(color: const Color(0xFFF5C451), width: 1.4),
+            boxShadow: [BoxShadow(color: const Color(0xFFF5C451).withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 4))],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+            child: Row(children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [Color(0xFFF5C451), Color(0xFFEC4899)]),
+                ),
+                child: const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Text('+\$${formatCurrency(g.amount)}',
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: Color(0xFFB45309))),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(color: const Color(0xFFEC4899), borderRadius: BorderRadius.circular(999)),
+                      child: const Text('GIFT RECEIVED', style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
+                    ),
+                  ]),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${g.giftName}${g.forStreak > 0 ? ' · for ${g.forStreak} contributions in a row' : ' · helper reward'}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : const Color(0xFF6B4E16)),
+                  ),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Text(
+                  () {
+                    final d = DateTime.tryParse(g.createdAt)?.toLocal();
+                    return d == null ? '' : '${d.month}/${d.day}/${d.year}';
+                  }(),
+                  style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : const Color(0xFF8A6A2A)),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  g.redeemed ? 'Used' : (g.isExpired ? 'Expired' : 'Ready'),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: g.redeemed ? const Color(0xFF059669) : (g.isExpired ? Colors.grey : const Color(0xFFDB2777)),
+                  ),
+                ),
+              ]),
+            ]),
+          ),
+        ),
+    ];
+  }
 
   Widget _civicClaimRecordCard(BuildContext ctx, AppTransaction t) {
     final open = t.status == TransactionStatus.pending;
@@ -41247,6 +41329,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       Text('No contribution records yet.', style: TextStyle(color: mute))
                     else
                       ...contributions.take(12).map((t) => _civicContributionRecordCard(ctx, t)),
+                      ..._civicGiftRecordCards(ctx, u),
                     const SizedBox(height: 16),
                     Text('Claim records', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: ink)),
                     const SizedBox(height: 8),
@@ -41496,6 +41579,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                     )
                   else
                     ...contributions.take(8).map((t) => _civicContributionRecordCard(ctx, t)),
+                    ..._civicGiftRecordCards(ctx, u),
                   const SizedBox(height: 16),
                   const Text('Claim Records', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 8),

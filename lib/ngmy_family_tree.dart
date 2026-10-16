@@ -1202,23 +1202,61 @@ class _NgmyFamilyTreeDetailScreenState extends State<NgmyFamilyTreeDetailScreen>
                   ),
               ]),
               const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                _metaChip(
-                  _tree.isPrivate ? Icons.lock_rounded : Icons.public_rounded,
-                  _tree.isPrivate ? 'Private' : 'Public',
-                  onTap: _isAdmin ? _togglePrivacy : null,
+              // Three equal tiles in one straight line.
+              Row(children: [
+                Expanded(
+                  child: _infoTile(
+                    _tree.isPrivate ? Icons.lock_rounded : Icons.public_rounded,
+                    'Privacy',
+                    _tree.isPrivate ? 'Private' : 'Public',
+                    onTap: _isAdmin ? _togglePrivacy : null,
+                  ),
                 ),
-                _metaChip(Icons.tag_rounded, _tree.code, onTap: () async {
-                  await Clipboard.setData(ClipboardData(text: _tree.code));
-                  _toast('Tree code copied.');
-                }),
-                _metaChip(Icons.group_rounded, '${_tree.collaboratorEmails.length} collaborator${_tree.collaboratorEmails.length == 1 ? '' : 's'}',
-                    onTap: owner ? _manageCollaborators : null),
-                if (_tree.isViewOnly) _metaChip(Icons.visibility_rounded, 'View only'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _infoTile(Icons.tag_rounded, 'Tree code', _tree.code, onTap: () async {
+                    await Clipboard.setData(ClipboardData(text: _tree.code));
+                    _toast('Tree code copied.');
+                  }),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _infoTile(
+                    Icons.group_add_rounded,
+                    'Collaborators',
+                    _tree.collaboratorEmails.isEmpty ? 'Invite' : '${_tree.collaboratorEmails.length} · Manage',
+                    onTap: _manageCollaborators,
+                  ),
+                ),
               ]),
+              if (_tree.isViewOnly) ...[
+                const SizedBox(height: 8),
+                _metaChip(Icons.visibility_rounded, 'View only'),
+              ],
             ]),
           ),
         ]),
+      ),
+    );
+  }
+
+  Widget _infoTile(IconData icon, String label, String value, {VoidCallback? onTap}) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          child: Column(children: [
+            Icon(icon, size: 18, color: Colors.white),
+            const SizedBox(height: 4),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 10.5, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 1),
+            Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w900)),
+          ]),
+        ),
       ),
     );
   }
