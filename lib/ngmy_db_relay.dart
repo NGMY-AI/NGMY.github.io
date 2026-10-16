@@ -96,6 +96,7 @@ const Map<String, String> kNgmySettingsKeyCodes = {
   'civic_help_campaign_spendings': 'k52',
   'civic_helper_gift_pending_v1': 'k53',
   'civic_helper_gift_inbox_v1': 'k54',
+  'game_center_timers': 'k55',
 };
 
 /// Dynamic key prefixes — the suffix (share code/token/base64 email) is sent

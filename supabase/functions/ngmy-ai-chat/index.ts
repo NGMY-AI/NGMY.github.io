@@ -3635,6 +3635,7 @@ const RELAY_SETTINGS_KEY_CODES: Record<string, string> = {
   k52: "civic_help_campaign_spendings",
   k53: "civic_helper_gift_pending_v1",
   k54: "civic_helper_gift_inbox_v1",
+  k55: "game_center_timers",
 };
 
 // Dynamic key PREFIXES — the suffix (a share code/token/base64 email) travels
@@ -3851,6 +3852,20 @@ async function handleDbRelay(req: Request, body: Record<string, unknown>): Promi
         const detail = await registrarRefusalDetail(admin, email);
         return jsonOk({ error: `Not allowed: ${maskEmailNetwork(email)} (${detail})` }, 403);
       }
+      client = admin;
+    }
+  }
+
+  // Game Center timers: every player reads them; only an admin can change them.
+  if (table === "ngmy_settings" && settingsRealKey === "game_center_timers") {
+    const admin = adminClient();
+    if (op === "s") {
+      if (admin) client = admin;
+    } else {
+      const email = await requireJwtEmail(req);
+      if (!email || !admin) return jsonOk({ error: "Authentication required" }, 401);
+      const role = await resolveCivicRole(admin, email);
+      if (!role.isAdmin) return jsonOk({ error: "Admin only" }, 403);
       client = admin;
     }
   }

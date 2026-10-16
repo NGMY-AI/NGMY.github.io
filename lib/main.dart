@@ -50,6 +50,7 @@ import 'ngmy_civic_family.dart';
 import 'ngmy_civic_gives.dart';
 import 'ngmy_admin_ui_kit.dart';
 import 'ngmy_admin_alerts.dart';
+import 'ngmy_admin_game_timers.dart';
 import 'ngmy_offline_icons.dart' show NgmyOfflineGlyphWarmup;
 import 'ngmy_modern_chat_icon.dart';
 import 'ngmy_arcade_games.dart';
@@ -2593,6 +2594,12 @@ Map<String, int> _mergeGameTimeLimitsPreferCustom(Map<String, int> local, Map<St
     } else {
       out[id] = def;
     }
+  }
+  // Arcade game timers (no fixed default here): the cloud value wins, else this phone's.
+  for (final id in {...local.keys, ...remote.keys}) {
+    if (defaults.containsKey(id)) continue;
+    final v = remote[id] ?? local[id];
+    if (v != null) out[id] = v;
   }
   return out;
 }
@@ -10511,6 +10518,30 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     );
   }
 
+  /// Admin's Game Center timers (Admin → Game Timers), shared with every player.
+  /// Read at most every 10 minutes; they win over this phone's copy.
+  static DateTime? _lastTimersFetch;
+  Future<void> _refreshAdminGameTimers() async {
+    final last = _lastTimersFetch;
+    if (last != null && DateTime.now().difference(last) < const Duration(minutes: 10)) return;
+    _lastTimersFetch = DateTime.now();
+    try {
+      final v = await ngmyDbRelaySettingsFetch('game_center_timers');
+      final raw = v?['limits'];
+      if (raw is! Map || !mounted) return;
+      final next = Map<String, int>.from(_config.gameTimeLimits);
+      raw.forEach((k, val) {
+        final n = val is int ? val : int.tryParse('$val');
+        if (n != null && n >= ngmyMinGameSeconds && n <= ngmyMaxGameSeconds) next['$k'] = n;
+      });
+      if (jsonEncode(next) == jsonEncode(_config.gameTimeLimits)) return;
+      setState(() => _config.gameTimeLimits = next);
+      unawaited(_persistLocalOnly());
+    } catch (e) {
+      debugPrint('[game timers] $e');
+    }
+  }
+
   @override
   Future<void> _refreshGameCenterSettingsFromCloud() async {
     if (!mounted || !await ngmyCanReachCloud()) return;
@@ -10567,7 +10598,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        unawaited(_refreshGameCenterSettingsFromCloud());
+        unawaited(_refreshGameCenterSettingsFromCloud().then((_) => _refreshAdminGameTimers()));
         unawaited(_refreshSessionFromCloudOnResume());
         unawaited(_catchUpCloudDataAfterConnect());
       });
@@ -11447,10 +11478,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   void _startGameSettingsRefreshLoop() {
     _gameSettingsRefreshTimer?.cancel();
-    unawaited(_refreshGameCenterSettingsFromCloud());
+    unawaited(_refreshGameCenterSettingsFromCloud().then((_) => _refreshAdminGameTimers()));
     _gameSettingsRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (!mounted || _backgroundSyncPaused) return;
-      unawaited(_refreshGameCenterSettingsFromCloud());
+      unawaited(_refreshGameCenterSettingsFromCloud().then((_) => _refreshAdminGameTimers()));
     });
   }
 
@@ -23370,6 +23401,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 isDark,
                 animDelayMs: 200,
               ),
+              _menuFrame(
+                'Game Timers',
+                Icons.timer_rounded,
+                const Color(0xFFF59E0B),
+                () => unawaited(_openGameTimersAdmin(isDark)),
+                isDark,
+                animDelayMs: 200,
+              ),
             ],
           ),
           const SizedBox(height: 28),
@@ -23398,6 +23437,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
         await NgmyLoanPaymentsCloud.fetchAndApply(widget.config.loanApplications);
       },
     );
+  }
+
+  /// Admin → Game Timers: how long each Game Center game lasts, for every player.
+  Future<void> _openGameTimersAdmin(bool isDark) async {
+    await Navigator.of(context).push<void>(MaterialPageRoute(
+      builder: (_) => NgmyAdminGameTimersScreen(
+        isDark: isDark,
+        limits: widget.config.gameTimeLimits,
+        onSave: (limits) async {
+          widget.config.gameTimeLimits = limits;
+          // Saved on this phone and to the shared settings, so every player's games use it.
+          await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
+          await ngmyPersistGameCenterConfigNow(widget.config);
+          await ngmyDbRelaySettingsUpsert('game_center_timers', {'limits': limits});
+        },
+      ),
+    ));
+    if (mounted) setState(() {});
   }
 
   Future<void> _openPopupsAdmin(bool isDark) async {

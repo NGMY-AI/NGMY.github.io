@@ -16,7 +16,7 @@ export 'ngmy_game_result_popup.dart' show showNgmyGameResultPopup;
 
 /// Min/max round timer (seconds) for admin Game Center settings.
 const int ngmyMinGameSeconds = 1;
-const int ngmyMaxGameSeconds = 120;
+const int ngmyMaxGameSeconds = 600;
 
 /// All Game Center game ids (admin time limits use these keys). Dice is separate screen.
 const List<String> kNgmyGameIds = [
@@ -62,7 +62,8 @@ Map<String, int> ngmyParseGameTimeLimits(dynamic raw) {
   if (raw is Map) {
     for (final e in raw.entries) {
       final id = e.key.toString();
-      if (!out.containsKey(id)) continue;
+      if (id.isEmpty) continue;
+      // Skill games and the arcade games (their ids are kept too, set from Admin → Game Timers).
       final v = e.value is int ? e.value as int : int.tryParse('${e.value}') ?? 0;
       if (v >= ngmyMinGameSeconds && v <= ngmyMaxGameSeconds) out[id] = v;
     }
