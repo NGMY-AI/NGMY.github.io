@@ -1,13 +1,24 @@
 import 'package:flutter/material.dart';
 
 import 'ngmy_arcade_games.dart';
+import 'ngmy_dice_admin.dart';
+import 'ngmy_dice_config.dart';
 import 'ngmy_games.dart';
 
-/// Admin: how long every Game Center game lasts (seconds). Saved for every player.
+/// Admin: Game Center times, plus dice face control for every player.
 class NgmyAdminGameTimersScreen extends StatefulWidget {
-  const NgmyAdminGameTimersScreen({super.key, required this.limits, required this.onSave, this.isDark = true});
+  const NgmyAdminGameTimersScreen({
+    super.key,
+    required this.limits,
+    required this.onSave,
+    required this.diceSettings,
+    required this.onDiceChanged,
+    this.isDark = true,
+  });
   final Map<String, int> limits;
   final Future<void> Function(Map<String, int> limits) onSave;
+  final NgmyDiceSettings diceSettings;
+  final Future<void> Function() onDiceChanged;
   final bool isDark;
 
   @override
@@ -141,10 +152,18 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
           ),
         ),
       ),
-      body: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: TextField(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        children: [
+          NgmyDiceControlPanel(
+            settings: widget.diceSettings,
+            isDark: dark,
+            onChanged: widget.onDiceChanged,
+          ),
+          const SizedBox(height: 18),
+          Text('Game times', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 16)),
+          const SizedBox(height: 8),
+          TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
             style: TextStyle(color: ink),
@@ -157,14 +176,9 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),
           ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            itemCount: shown.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) {
-              final g = shown[i];
+          const SizedBox(height: 10),
+          for (final g in shown) ...[
+            Builder(builder: (_) {
               final v = _value(g);
               final custom = v != g.defaultSeconds;
               return Container(
@@ -203,10 +217,11 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
                     ),
                 ]),
               );
-            },
-          ),
-        ),
-      ]),
+            }),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
     );
   }
 }

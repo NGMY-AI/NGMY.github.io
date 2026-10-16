@@ -84,7 +84,6 @@ import 'ngmy_supabase_health.dart';
 import 'ngmy_income_sound.dart';
 import 'ngmy_pro_games.dart';
 import 'ngmy_typing_game.dart';
-import 'ngmy_dice_admin.dart';
 import 'ngmy_dice_config.dart';
 import 'ngmy_fun_games.dart';
 import 'ngmy_fun_games_popups.dart';
@@ -19802,22 +19801,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
                 ),
               ),
             ),
-            if (g.id == 'dice' && widget.user.isAdmin)
-              IconButton(
-                tooltip: 'Dice faces',
-                onPressed: () {
-                  final dice = NgmyDiceSettings.fromJson(widget.config.diceSettings);
-                  unawaited(showNgmyDiceAdminSheet(
-                    context: context,
-                    settings: dice,
-                    onChanged: () {
-                      widget.config.diceSettings = dice.toJson();
-                      widget.onDataChanged();
-                    },
-                  ));
-                },
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
-              ),
             if (mp)
               IconButton(
                 icon: const Icon(Icons.person_add_rounded, color: Color(0xFFFBBF24)),
@@ -23456,12 +23439,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  /// Admin → Game Timers: how long each Game Center game lasts, for every player.
+  /// Admin → Game Timers: game lengths, and dice face control, for every player.
   Future<void> _openGameTimersAdmin(bool isDark) async {
+    final dice = NgmyDiceSettings.fromJson(widget.config.diceSettings);
     await Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (_) => NgmyAdminGameTimersScreen(
         isDark: isDark,
         limits: widget.config.gameTimeLimits,
+        diceSettings: dice,
+        onDiceChanged: () async {
+          widget.config.diceSettings = dice.toJson();
+          await ngmyFlushCriticalConfigLocalAndCloud(widget.config);
+          await ngmyPersistGameCenterConfigNow(widget.config);
+          await NgmyDiceLive.push(dice);
+        },
         onSave: (limits) async {
           widget.config.gameTimeLimits = limits;
           // Saved on this phone and to the shared settings, so every player's games use it.
