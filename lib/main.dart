@@ -19948,8 +19948,6 @@ class _GameCenterScreenState extends State<GameCenterScreen> with NgmyBalanceLis
               ),
               child: Column(
                 children: [
-                  NgmyGameLiveStats(email: widget.user.email),
-                  const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),

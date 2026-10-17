@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'ngmy_admin_game_live.dart';
 import 'ngmy_arcade_games.dart';
 import 'ngmy_dice_admin.dart';
 import 'ngmy_dice_config.dart';
@@ -175,11 +174,7 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
             const Text('Game Center', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
             const SizedBox(height: 3),
             Text(
-              _tab == 0
-                  ? '${_games.length} games · $custom with your own time'
-                  : _tab == 1
-                      ? 'Who wins the most, and on which games'
-                      : 'Plays, wins, losses and +3 as they happen',
+              _tab == 0 ? '${_games.length} games · $custom with your own time' : 'Who wins the most, and on which games',
               style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, fontWeight: FontWeight.w600),
             ),
           ]),
@@ -216,11 +211,7 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(color: _card, borderRadius: BorderRadius.circular(15)),
-      child: Row(children: [
-        tab(0, Icons.timer_rounded, 'Timers'),
-        tab(1, Icons.emoji_events_rounded, 'Top winners'),
-        tab(2, Icons.bolt_rounded, 'Live'),
-      ]),
+      child: Row(children: [tab(0, Icons.timer_rounded, 'Timers'), tab(1, Icons.emoji_events_rounded, 'Top winners')]),
     );
   }
 
@@ -716,17 +707,7 @@ class _NgmyAdminGameTimersScreenState extends State<NgmyAdminGameTimersScreen> {
       body: Column(children: [
         _header(),
         _tabs(),
-        Expanded(
-          child: _tab == 0
-              ? _timersTab()
-              : _tab == 1
-                  ? _winnersTab()
-                  : NgmyAdminGameLiveBoard(
-                      emails: [for (final u in widget.diceUsers) u.email],
-                      nameOf: widget.nameOf,
-                      isDark: _dark,
-                    ),
-        ),
+        Expanded(child: _tab == 0 ? _timersTab() : _winnersTab()),
       ]),
     );
   }
