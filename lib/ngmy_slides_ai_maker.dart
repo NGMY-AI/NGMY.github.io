@@ -12,6 +12,7 @@ import 'ngmy_ai_language.dart';
 import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
+import 'ngmy_slides_source_document.dart';
 
 import 'ngmy_bio_models.dart';
 import 'ngmy_slides_bio_phone.dart';
@@ -346,7 +347,11 @@ String ngmySlidesAiPrompt({
   required String styleId,
   Set<NgmySlidesAiExtra> extras = const {},
   int pictureCount = 0,
+  bool hasSource = false,
 }) {
+  final sourceRule = hasSource
+      ? '- A document is attached (read it all). Rewrite its content as the slides in the same language: keep its facts, names, numbers, dates and the order of its sections, and never invent facts it does not contain.\n'
+      : '';
   final styles = kNgmySlidesAiStyles.map((s) => s.id).join(', ');
   final extraRules = StringBuffer();
   if (extras.contains(NgmySlidesAiExtra.emojis)) {
@@ -365,7 +370,7 @@ USER REQUEST (spoken, may be informal):
 """$description"""
 
 Rules:
-- Exactly $slideCount slides.
+$sourceRule- Exactly $slideCount slides.
 - Slide 1 has kind "title". The last slide has kind "closing" (thank-you / call to action).
 - Middle slides mostly kind "bullets" (3 to 5 short bullets, max 12 words each). You may use one "section" divider and one "quote" slide when it fits.
 - Titles are short and punchy (max 7 words). Use the user's own names, facts and details; never invent prices, dates or statistics they did not give.
@@ -759,13 +764,15 @@ Future<NgmySlideDeck> ngmyCreateSlidesWithAi({
   void Function(String status)? onStatus,
   String? logo,
   List<String> pictures = const [],
+  List<NgmyAiImagePart> sources = const [],
   NgmySlidesAiLook look = const NgmySlidesAiLook(),
 }) async {
   onStatus?.call('Writing your $slideCount slides…');
   final outline = await _askForOutline(
-    ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras, pictureCount: pictures.length),
+    ngmySlidesAiPrompt(description: description, slideCount: slideCount, styleId: styleId, extras: extras, pictureCount: pictures.length, hasSource: sources.isNotEmpty),
     fallbackStyle: styleId == 'auto' ? 'colorful' : styleId,
     failMessage: 'The AI could not write the slides. Try describing it again.',
+    sources: sources,
   );
   return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures, look: look);
 }
@@ -792,13 +799,13 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
   return _finishAiDeck(outline, extras, onStatus, logo: logo, pictures: pictures, look: look);
 }
 
-Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallbackStyle, required String failMessage}) async {
+Future<NgmySlidesAiOutline> _askForOutline(String prompt, {required String fallbackStyle, required String failMessage, List<NgmyAiImagePart> sources = const []}) async {
   final key = await ngmyResolveGeminiApiKey();
   if (key.trim().isEmpty) throw 'AI is not set up yet. AI is not available right now. Please try again later.';
   final creds = ngmyParseAiCredentials(key);
   String? lastError;
   for (var attempt = 0; attempt < 2; attempt++) {
-    final r = await ngmyAiGenerateWithCredentials(creds, prompt);
+    final r = await ngmyAiGenerateWithCredentials(creds, prompt, images: sources);
     if (r.text != null) {
       final outline = ngmyParseSlidesAiOutline(r.text!, fallbackStyle: fallbackStyle);
       if (outline != null) return outline;
@@ -866,6 +873,7 @@ class _SlidesAiMakerSheet extends StatefulWidget {
 
 class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
   final _desc = TextEditingController();
+  NgmySlidesSourceDocument? _source;
   final _descFocus = FocusNode();
   /// Non-stop: the show starts over after the last slide.
   bool _loop = false;
@@ -1171,10 +1179,23 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
     );
   }
 
+  Future<void> _attachSource() async {
+    try {
+      final doc = await ngmyPickSlidesSourceDocument();
+      if (doc == null || !mounted) return;
+      setState(() {
+        _source = doc;
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
   Future<void> _create() async {
     final d = _desc.text.trim();
-    if (d.length < 6) {
-      setState(() => _error = 'Type a little about the presentation first.');
+    if (d.length < 6 && _source == null) {
+      setState(() => _error = 'Type a little about the presentation first, or attach a document.');
       return;
     }
     // They asked for their logo but have not given it yet: ask for it.
@@ -1182,6 +1203,8 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
       setState(() => _error = 'You mentioned your logo — tap "Add your logo" below to upload it, so the AI puts the real one in.');
       return;
     }
+    final sourceText = _source?.text ?? '';
+    final description = sourceText.isEmpty ? d : '$d\n\nSOURCE DOCUMENT (${_source!.name}):\n$sourceText';
     setState(() {
       _busy = true;
       _error = null;
@@ -1189,12 +1212,13 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
     });
     try {
       final deck = await ngmyCreateSlidesWithAi(
-        description: d,
+        description: description,
         slideCount: _count,
         styleId: _style,
         extras: _extras,
         logo: _logo,
         pictures: _pictures,
+        sources: [if (_source?.part != null) _source!.part!],
         look: NgmySlidesAiLook(logoFrame: _logoFrame, logoRing: _logoRing, photoFrame: _photoFrame, photoRing: _photoRing),
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
@@ -1300,6 +1324,19 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accent)),
                   ),
                 ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _attachSource,
+                    icon: const Icon(Icons.attach_file_rounded, size: 18),
+                    label: Text(_source == null ? 'Attach a PDF, Word or text file' : _source!.name, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (_source != null)
+                    IconButton(
+                      onPressed: () => setState(() => _source = null),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                    ),
+                ]),
                 const SizedBox(height: 18),
                 // Your logo and your own pictures (optional).
                 Row(
