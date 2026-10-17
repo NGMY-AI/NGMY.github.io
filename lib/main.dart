@@ -3208,6 +3208,12 @@ void _openCivicRegistryPinSheet(
     'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
   ];
   final scope = _reviewerCivicStateScope(reviewer, config);
+  if (!reviewer.isAdmin && scope.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Your registrar account has no state yet, so there is no state PIN for you to set.')),
+    );
+    return;
+  }
   showNgmyCivicRegistryPinSheet(
     context,
     isDark: isDark,
@@ -3216,7 +3222,8 @@ void _openCivicRegistryPinSheet(
     pinsByState: config.civicRegistryPinsByState,
     initialState: initialState ?? (scope.isNotEmpty ? scope : reviewer.state),
     canEditAnyState: reviewer.isAdmin,
-    reviewerAssignedState: reviewer.isAdmin ? '' : (_isCivicRegistryKing(reviewer) ? scope : ''),
+    // Every authorized registrar sets only their own state's PIN; only the admin sees all states.
+    reviewerAssignedState: reviewer.isAdmin ? '' : scope,
     onSave: (state, pin, globalPin) => _persistCivicRegistryPins(
       config,
       state: state,
