@@ -6481,7 +6481,8 @@ class _DottedRule extends StatelessWidget {
 /// photo crop uses), so cards look the same on a small iPhone, an iPhone 14 Plus or a tablet.
 double ngmyHomeCardHeightFor(double width) {
   if (!width.isFinite || width <= 0) return 252;
-  return (width / 1.55).clamp(190.0, 320.0);
+  // Tall enough on a wide window that the ID card shows whole and big (fit, never cropped).
+  return (width / 1.55).clamp(190.0, 420.0);
 }
 
 /// Lays a card's face out at one fixed design size and scales it to the card, so text, photos
