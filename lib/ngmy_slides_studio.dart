@@ -960,6 +960,116 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
+  Widget _ribbonIconButton(IconData icon, String tip, VoidCallback onTap, bool isDark) => Tooltip(
+        message: tip,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDark ? Colors.white10 : const Color(0xFFF1F5F9),
+              border: Border.all(color: isDark ? Colors.white24 : const Color(0xFFCBD5E1)),
+            ),
+            child: Icon(icon, size: 18, color: isDark ? Colors.white : const Color(0xFF334155)),
+          ),
+        ),
+      );
+
+  /// The logo (or the picture you tapped) on this slide: its shape and its ring.
+  /// Changes show on the slide at once and Undo brings them back.
+  Future<void> _openLogoLookSheet() async {
+    final deck = _activeDeck;
+    if (deck == null || _guardTransferredEdit()) return;
+    final sel = _selectedElement();
+    final onSlide = deck.slides.isEmpty || _slideIndex >= deck.slides.length
+        ? <NgmySlideElement>[]
+        : deck.slides[_slideIndex].elements.where((e) => e.type == NgmySlideElementType.image).toList();
+    final targets = sel != null && sel.type == NgmySlideElementType.image ? [sel] : onSlide;
+    if (targets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tap the logo or a picture on this slide first.')));
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111827),
+      builder: (ctx) {
+        var frame = targets.first.frame;
+        var ring = targets.first.ring;
+        return StatefulBuilder(builder: (ctx, setSheet) {
+          void choose({String? f, String? r}) {
+            setSheet(() {
+              if (f != null) frame = f;
+              if (r != null) ring = r;
+            });
+            _mutate(() {
+              for (final t in targets) {
+                if (f != null) t.frame = f;
+                if (r != null) t.ring = r;
+              }
+            });
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Logo shape', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final (id, label) in kNgmySlideFrames)
+                          ChoiceChip(label: Text(label), selected: frame == id, onSelected: (_) => choose(f: id)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Ring', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final (id, label) in kNgmySlideRings)
+                          ChoiceChip(label: Text(label), selected: ring == id, onSelected: (_) => choose(r: id)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        });
+      },
+    );
+  }
+
+  /// The ending celebration after the last slide (same choice as ⋯ → Ending celebration).
+  Future<void> _openEndingPicker() async {
+    final d = _activeDeck;
+    if (d == null || _guardTransferredEdit()) return;
+    final picked = await showNgmyFinaleGallery(
+      context,
+      NgmyFinaleChoice(style: d.finaleStyle ?? '', title: d.finaleTitle ?? 'NGMY', subtitle: d.finaleSubtitle ?? '', logo: d.finaleLogo ?? ''),
+    );
+    if (picked == null || !mounted) return;
+    _mutate(() {
+      d.finaleStyle = picked.none ? null : picked.style;
+      d.finaleTitle = picked.title;
+      d.finaleSubtitle = picked.subtitle;
+      d.finaleLogo = picked.logo.isEmpty ? null : picked.logo;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(picked.none ? 'No ending celebration.' : '${ngmyFinaleStyle(picked.style)?.name} will play after your last slide.')));
+  }
+
   /// Green mic: the AI changes the slides it wrote (add, rewrite, translate…).
   /// Its slides are swapped for the new set in the same place. Undo works.
   Future<void> _editWithAi() async {
@@ -3697,6 +3807,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         children: [
           if (isText)
             _selChip(Icons.edit_rounded, 'Edit', () => _startTextEditing(el.id), isDark, accent: true),
+          if (el.type == NgmySlideElementType.image)
+            _selChip(Icons.radio_button_checked_rounded, 'Shape & ring', () => unawaited(_openLogoLookSheet()), isDark, accent: true),
           _selChip(Icons.tune_rounded, 'Format', () {
             if (_isCompactLayout(context)) {
               unawaited(_openMobileFormatSheet());
@@ -4068,6 +4180,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   }),
                   ),
                 )
+                // Logo: its shape (frame) and ring, next to the mic.
+                ..add(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _ribbonIconButton(Icons.image_rounded, 'Logo shape & ring', _openLogoLookSheet, isDark),
+                  ),
+                )
                 // Book: write (yourself or with AI) and print a fold-and-staple book.
                 ..add(
                   Padding(
@@ -4092,6 +4211,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         ),
                       ),
                     ),
+                  ),
+                )
+                // Right side: ending celebration, and logo ring & frame.
+                ..add(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12),
+                    child: _ribbonIconButton(Icons.celebration_rounded, 'Ending celebration', _openEndingPicker, isDark),
+                  ),
+                )
+                ..add(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
                   ),
                 ),
             ),

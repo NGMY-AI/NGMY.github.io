@@ -2812,7 +2812,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
     // Capped to most of the screen height, so the whole ID fits on one screen without scrolling.
     final deckH = hasCivicInDeck
-        ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.62)
+        ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.72)
         : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
