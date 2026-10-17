@@ -2810,7 +2810,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     return LayoutBuilder(builder: (context, box) {
     // A civic ID is as wide as the card row and as tall as its shape needs (no cropping).
     final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
-    final deckH = hasCivicInDeck ? box.maxWidth / 1.586 : ngmyHomeCardHeightFor(box.maxWidth);
+    // Capped to most of the screen height, so the whole ID fits on one screen without scrolling.
+    final deckH = hasCivicInDeck
+        ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.62)
+        : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
