@@ -1317,6 +1317,45 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                   style: const TextStyle(color: Colors.white, height: 1.35),
                   decoration: InputDecoration(
                     hintText: 'Type your idea here…',
+                    suffixIcon: Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_source != null)
+                            IconButton(
+                              tooltip: 'Remove document',
+                              onPressed: _busy ? null : () => setState(() => _source = null),
+                              icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
+                            ),
+                          Tooltip(
+                            message: _source == null ? 'Attach a PDF, Word or text file' : _source!.name,
+                            child: Material(
+                              color: Colors.transparent,
+                              shape: const CircleBorder(),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: _busy ? null : _attachSource,
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                                    boxShadow: [BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 10)],
+                                  ),
+                                  child: Icon(
+                                    _source == null ? Icons.description_rounded : Icons.check_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.05),
@@ -1324,19 +1363,6 @@ class _SlidesAiMakerSheetState extends State<_SlidesAiMakerSheet> {
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: accent)),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Row(children: [
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : _attachSource,
-                    icon: const Icon(Icons.attach_file_rounded, size: 18),
-                    label: Text(_source == null ? 'Attach a PDF, Word or text file' : _source!.name, overflow: TextOverflow.ellipsis),
-                  ),
-                  if (_source != null)
-                    IconButton(
-                      onPressed: () => setState(() => _source = null),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
-                    ),
-                ]),
                 const SizedBox(height: 18),
                 // Your logo and your own pictures (optional).
                 Row(
