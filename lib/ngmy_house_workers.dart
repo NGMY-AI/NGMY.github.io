@@ -29,6 +29,7 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> me() => _call('hwMe');
   static Future<Map<String, dynamic>> apply(Map<String, dynamic> form) => _call('hwApply', form);
   static Future<Map<String, dynamic>> request(Map<String, dynamic> form) => _call('hwRequest', form);
+  static Future<Map<String, dynamic>> busy(String workerId, DateTime day) => _call('hwBusy', {'workerId': workerId, 'date': _isoDay(day)});
   static Future<Map<String, dynamic>> respond(String id, bool accept) =>
       _call('hwRespond', {'requestId': id, 'decision': accept ? 'accept' : 'decline'});
   static Future<Map<String, dynamic>> done(String id) => _call('hwDone', {'requestId': id});
@@ -47,6 +48,25 @@ class NgmyHouseWorkersApi {
 
 const Color _kHwAccent = Color(0xFF0EA5E9);
 const Color _kHwGreen = Color(0xFF10B981);
+
+/// Work slots a client can book (24-hour, one per hour).
+const List<String> _kHwSlots = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+String _isoDay(DateTime d) =>
+    '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+String _prettyDay(DateTime d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}, ${d.year}';
+}
+
+/// "09:00" → "9:00 AM".
+String _slotLabel(String slot) {
+  final h = int.parse(slot.substring(0, 2));
+  final hour12 = h % 12 == 0 ? 12 : h % 12;
+  return '$hour12:${slot.substring(3)} ${h < 12 ? 'AM' : 'PM'}';
+}
 
 List<Map<String, dynamic>> _maps(dynamic raw) =>
     raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
@@ -799,6 +819,9 @@ Future<bool> showNgmySubmitWorkSheet(
   final detailsC = TextEditingController();
   final timeC = TextEditingController();
   String category = '';
+  DateTime? bookingDay;
+  String bookingSlot = '';
+  var busyTimes = <String>[];
   var busy = false;
   final sent = await showModalBottomSheet<bool>(
     context: context,
@@ -808,9 +831,15 @@ Future<bool> showNgmySubmitWorkSheet(
       builder: (ctx, setSheet) {
         final c = _HwColors(ctx);
         Future<void> submit() async {
+          if (bookingDay == null || bookingSlot.isEmpty) {
+            _snack(ctx, 'Choose the day and the time for the work.', error: true);
+            return;
+          }
           setSheet(() => busy = true);
           final res = await NgmyHouseWorkersApi.request({
             'workerId': worker['id'],
+            'bookingDate': _isoDay(bookingDay!),
+            'bookingTime': bookingSlot,
             'clientName': nameC.text.trim(),
             'clientPhone': phoneC.text.trim(),
             'address': addressC.text.trim(),
@@ -867,7 +896,81 @@ Future<bool> showNgmySubmitWorkSheet(
                 const SizedBox(height: 10),
                 TextField(controller: cityC, decoration: _field(ctx, 'City', icon: Icons.location_city_rounded)),
                 const SizedBox(height: 10),
-                TextField(controller: timeC, decoration: _field(ctx, 'Best time (optional)', hint: 'e.g. Saturday morning', icon: Icons.schedule_rounded)),
+                Text('Day and time', style: TextStyle(fontWeight: FontWeight.w800, color: c.ink)),
+                const SizedBox(height: 6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final picked = await showDatePicker(
+                      context: ctx,
+                      initialDate: bookingDay ?? now,
+                      firstDate: DateTime(now.year, now.month, now.day),
+                      lastDate: now.add(const Duration(days: 120)),
+                    );
+                    if (picked == null) return;
+                    setSheet(() {
+                      bookingDay = picked;
+                      bookingSlot = '';
+                      busyTimes = [];
+                    });
+                    final res = await NgmyHouseWorkersApi.busy((worker['id'] ?? '').toString(), picked);
+                    if (!ctx.mounted) return;
+                    setSheet(() => busyTimes = [for (final t in (res['busyTimes'] as List? ?? const [])) t.toString()]);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _kHwAccent.withOpacity(0.5)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.event_rounded, color: _kHwAccent, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            bookingDay == null ? 'Choose a day' : _prettyDay(bookingDay!),
+                            style: TextStyle(fontWeight: FontWeight.w700, color: c.ink),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: c.muted),
+                      ],
+                    ),
+                  ),
+                ),
+                if (bookingDay != null) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final slot in _kHwSlots)
+                        ChoiceChip(
+                          label: Text(
+                            busyTimes.contains(slot) ? '${_slotLabel(slot)} · Busy' : _slotLabel(slot),
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              decoration: busyTimes.contains(slot) ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
+                          selected: bookingSlot == slot,
+                          onSelected: busyTimes.contains(slot) ? null : (_) => setSheet(() => bookingSlot = slot),
+                          selectedColor: _kHwAccent.withOpacity(0.25),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  if (busyTimes.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '${worker['name']} is already booked at the times marked Busy. Pick another time.',
+                      style: TextStyle(fontSize: 11.5, color: c.muted, height: 1.3),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 10),
+                                TextField(controller: timeC, decoration: _field(ctx, 'Best time (optional)', hint: 'e.g. Saturday morning', icon: Icons.schedule_rounded)),
                 const SizedBox(height: 10),
                 TextField(controller: nameC, decoration: _field(ctx, 'Your name *', icon: Icons.person_rounded)),
                 const SizedBox(height: 10),

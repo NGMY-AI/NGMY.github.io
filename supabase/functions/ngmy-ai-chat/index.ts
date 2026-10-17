@@ -1585,9 +1585,19 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 // client's phone only to the worker they sent the job to.
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
-  "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp",
+  "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
+
+// A booking is one worker, one day, one time slot. A day is YYYY-MM-DD; a slot is HH:MM.
+function hwDate(v: unknown): string {
+  const s = String(v ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : "";
+}
+function hwSlot(v: unknown): string {
+  const s = String(v ?? "").trim();
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(s) ? s : "";
+}
 
 function hwText(v: unknown, max: number): string {
   return String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
@@ -2073,6 +2083,19 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     return jsonOk({ ok: true, plans: await hwPlans(db, email) });
   }
 
+  if (action === "hwBusy") {
+    // The times a worker is already booked on a day, so the app can show them as busy.
+    const workerId = hwText(body?.workerId, 60);
+    const day = hwDate(body?.date);
+    if (!workerId || !day) return jsonOk({ ok: false, error: "Choose a day first." }, 400);
+    const { data: w } = await db.from("house_workers").select("email").eq("id", workerId).maybeSingle();
+    if (!w) return jsonOk({ ok: false, error: "This worker is not available." }, 404);
+    const { data: rows } = await db.from("house_work_requests").select("booking_time")
+      .eq("worker_email", w.email).eq("booking_date", day).in("status", ["pending", "accepted"]);
+    const busyTimes = (rows ?? []).map((r: any) => String(r.booking_time ?? "")).filter((t: string) => t);
+    return jsonOk({ ok: true, busyTimes });
+  }
+
   if (action === "hwPostJob") {
     const limited = await enforceRateLimit(req, "hw_post", email, 10, 3600);
     if (limited) return limited;
@@ -2204,6 +2227,18 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: false, error: "This worker is not available." }, 404);
     }
     if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
+    // A booking is a worker, a day, and a time. Only one open booking per slot.
+    const bookingDate = hwDate(body?.bookingDate);
+    const bookingTime = hwSlot(body?.bookingTime);
+    if (!bookingDate || !bookingTime) {
+      return jsonOk({ ok: false, error: "Choose the day and the time for the work." }, 400);
+    }
+    const { data: clash } = await db.from("house_work_requests").select("id")
+      .eq("worker_email", w.email).eq("booking_date", bookingDate).eq("booking_time", bookingTime)
+      .in("status", ["pending", "accepted"]).limit(1);
+    if (clash && clash.length > 0) {
+      return jsonOk({ ok: false, error: "This worker is already booked at that time. Please pick another time." }, 409);
+    }
     const { count } = await db.from("house_work_requests").select("id", { count: "exact", head: true })
       .eq("client_email", email).eq("status", "pending");
     if ((count ?? 0) >= 5) {
@@ -2214,7 +2249,12 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       worker_email: w.email, state: w.state, city: hwText(body?.city, 60),
       address: hwText(body?.address, 200), category: hwText(body?.category, 60),
       details, best_time: hwText(body?.bestTime, 80),
+      booking_date: bookingDate, booking_time: bookingTime,
     }).select("id").single();
+    // The unique slot rule catches two bookings that land at the same moment.
+    if (error && /duplicate|unique/i.test(error.message ?? "")) {
+      return jsonOk({ ok: false, error: "This worker is already booked at that time. Please pick another time." }, 409);
+    }
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     return jsonOk({ ok: true, id: data?.id });
   }
