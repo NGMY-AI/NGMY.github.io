@@ -2812,7 +2812,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
     // Capped to most of the screen height, so the whole ID fits on one screen without scrolling.
     final deckH = hasCivicInDeck
-        ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.72)
+        ? math.min(box.maxWidth / 1.586 + kNgmyCivicIdTopInset + 15, MediaQuery.sizeOf(context).height * 0.72)
         : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3104,6 +3104,9 @@ class _BusinessCardBody extends StatelessWidget {
   }
 }
 
+/// Room left at the top of the civic ID for the date tab, so the tab never covers the ID header.
+const double kNgmyCivicIdTopInset = 30;
+
 class _CivicIdCardBody extends StatelessWidget {
   const _CivicIdCardBody({
     required this.json,
@@ -3148,17 +3151,20 @@ class _CivicIdCardBody extends StatelessWidget {
     const designH = designW / 1.586;
     return ColoredBox(
       color: const Color(0xFF0B1220),
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: SizedBox(
-          width: designW,
-          height: designH,
-          child: NgmyCivicRegistryIdCard(
-            record: record!,
-            photoPath: photo.isEmpty ? null : photo,
-            onQrTap: () => showNgmyEnlargedCivicQrDialog(
-              context,
-              (record!['registryId'] ?? '').toString().trim(),
+      child: Padding(
+        padding: const EdgeInsets.only(top: kNgmyCivicIdTopInset),
+        child: FittedBox(
+          fit: BoxFit.contain,
+          child: SizedBox(
+            width: designW,
+            height: designH,
+            child: NgmyCivicRegistryIdCard(
+              record: record!,
+              photoPath: photo.isEmpty ? null : photo,
+              onQrTap: () => showNgmyEnlargedCivicQrDialog(
+                context,
+                (record!['registryId'] ?? '').toString().trim(),
+              ),
             ),
           ),
         ),
