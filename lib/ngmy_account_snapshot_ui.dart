@@ -355,7 +355,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       return true;
     }
     if (peek.notConfigured) {
-      _toast('This deposit is not assigned to an account. Ask admin to recreate it with your email and verification code.');
+      _toast('This deposit is not available right now. Please try again later.');
       return true;
     }
     if (peek.wrongAccount) {
@@ -389,7 +389,7 @@ class _NgmyAccountSnapshotPageState extends State<NgmyAccountSnapshotPage> {
       return;
     }
     if (peek.notConfigured) {
-      _toast('This deposit is not assigned to an account. Ask admin to recreate it with your email and verification code.');
+      _toast('This deposit is not available right now. Please try again later.');
       return;
     }
     if (peek.wrongAccount) {

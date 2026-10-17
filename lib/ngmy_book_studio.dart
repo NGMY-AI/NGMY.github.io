@@ -172,7 +172,7 @@ Future<NgmyBookDoc> ngmyWriteBookWithAi({
 }) async {
   pages = pages.clamp(1, kNgmyBookAiMaxPages);
   final key = await ngmyResolveGeminiApiKey();
-  if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
+  if (key.trim().isEmpty) throw 'AI is not set up yet. AI is not available right now. Please try again later.';
   final creds = ngmyParseAiCredentials(key);
   String? lastError;
 

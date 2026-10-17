@@ -67,7 +67,7 @@ class NgmyElevenLabsTts {
 
     final cleanedKey = sanitizeKey(apiKey);
     if (cleanedKey.isEmpty) {
-      return (ok: false, error: 'ElevenLabs key missing. Admin → NGMY AI → paste key → Save AI Settings.');
+      return (ok: false, error: 'Voice is not available right now. Please try again later.');
     }
 
     if (isSpeaking(key)) {

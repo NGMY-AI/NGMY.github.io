@@ -48,7 +48,7 @@ Future<NgmyAppBuilderCopilotResult> ngmyAppBuilderAiCopilot({
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppBuilderCopilotResult(
-      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
+      message: 'AI is not available right now. Please try again later.',
     );
   }
 
@@ -304,7 +304,7 @@ Future<String> ngmyAppBuilderAiChat({
   }
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
-    return 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.';
+    return 'AI is not available right now. Please try again later.';
   }
 
   final projectBlock = project == null
@@ -355,7 +355,7 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditScreen({
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppScreenAiResult(
-      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
+      message: 'AI is not available right now. Please try again later.',
     );
   }
 
@@ -454,7 +454,7 @@ Future<NgmyAppScreenAiResult> ngmyAppBuilderAiEditWidget({
   final creds = ngmyParseAiCredentials(apiKey);
   if (creds.apiKey.isEmpty) {
     return const NgmyAppScreenAiResult(
-      message: 'Add an AI API key in Admin → Management Menus → NGMY AI, then try again.',
+      message: 'AI is not available right now. Please try again later.',
     );
   }
 

@@ -211,7 +211,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'AI is not connected. Ask admin to save an API key.';
+        _error = 'AI is not available right now. Please try again later.';
       });
       return;
     }
@@ -332,7 +332,7 @@ class _NgmyDocumentTranslatePageState extends State<_NgmyDocumentTranslatePage> 
       if (!mounted) return;
       setState(() {
         _wordBusy = false;
-        _wordLesson = 'AI is not connected. Ask admin to save an API key.';
+        _wordLesson = 'AI is not available right now. Please try again later.';
       });
       return;
     }

@@ -282,7 +282,7 @@ extension _NgmyAiAppPlaces on _MainScreenState {
         rows: const [],
         error: registrarState.isNotEmpty
             ? 'That member is outside the state you serve, so I can\'t show their record.'
-            : 'Only Civic Registry admins and registrars can look up other members.',
+            : 'Only registrars can look up other members.',
       );
     }
     return (rows: [for (final e in scored.take(5)) e.$2], error: null);

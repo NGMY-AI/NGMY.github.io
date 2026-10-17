@@ -97,7 +97,7 @@ class _NgmyOutfitStudioPageState extends State<NgmyOutfitStudioPage> {
       if (apiKey.trim().isEmpty) {
         setState(() {
           _busy = false;
-          _error = 'NGMY AI key not loaded. Ask admin to save Gemini key in Management Menus → NGMY AI, then reload.';
+          _error = 'AI is not available right now. Please reload and try again later.';
         });
         return;
       }

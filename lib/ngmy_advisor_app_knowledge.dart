@@ -104,7 +104,7 @@ SLIDES: Slides tab. Free blank + some class templates/designs. Slides Pro unlock
 
 ADVISORS: 30 free minutes, then Advisors subscription for unlimited chat (admins unlimited).
 
-CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), Civic King/Admin roles. Guest enroll can use ?civic=enroll. Georgia stays free. Every other state gets a 2-month free Civic Registry trial for Authorized Registrars, then \$50/mo State Registrar sponsorship starting month 3.
+CIVIC REGISTRY (NGMY Hub): community ID, PIN gate, enrollment, registrars (AR), civic registrar roles. Guest enroll can use ?civic=enroll. Georgia stays free. Every other state gets a 2-month free Civic Registry trial for Authorized Registrars, then \$50/mo State Registrar sponsorship starting month 3.
 
 VAULT GAMES (Home → Vault Channel): arcade games. Need an active Growth Income investment for full access; otherwise one free play total. Free trial does not unlock games.
 
@@ -171,7 +171,7 @@ INVESTMENT PLANS:
 ROLES:
 - App Admin (Boss): hardcoded admin emails; isAdmin; full bypass + management.
 - Crowns: king/queen cosmetic + rewards.
-- Civic: Authorized Registrar (max 5/state), Civic King, Civic Registry Admin (any state, does not count toward AR cap), App Admin over civic PIN.
+- Civic: Authorized Registrar (max 5/state), Authorized Registrars set their own state's PIN.
 - Store sell grant: canSellOnStore. Workers/helpers: approval flags.
 
 HUBS RECAP FOR DEEP ANSWERS:

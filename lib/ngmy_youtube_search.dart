@@ -130,8 +130,7 @@ Future<List<NgmyYouTubeSearchResult>> ngmySearchYouTube(
 
   if (apiKey.trim().isEmpty) {
     throw Exception(
-      'Song search needs a YouTube API key. Ask the admin to add one in NGMY AI settings, '
-      'or paste a YouTube link instead.',
+      'Song search is not available right now. You can paste a YouTube link instead.',
     );
   }
   throw Exception(

@@ -1003,7 +1003,7 @@ class NgmyCivicHelperGifts {
     if (locked.isEmpty) {
       return (
         ok: false,
-        message: 'This gift is not locked to a store. Ask the admin to choose an NGMY store.',
+        message: 'This gift is not available right now. Please try again later.',
         gift: gift,
       );
     }

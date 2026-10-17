@@ -34327,7 +34327,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
           content: Text(
             'Your Authorized Registrar approval was only saved on a phone, not on the server, so your saves '
             'were refused. A new registrar request for ${widget.user.state.trim().isEmpty ? 'your state' : widget.user.state} '
-            'was just sent to the King/Admin — once they tap Approve, Help Mode and contributions save for everyone.',
+            'was just sent for review — once it is approved, Help Mode and contributions save for everyone.',
           ),
         ));
     }
@@ -34655,7 +34655,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    'The King/Admin reviews every request. You will see the result here in Civic Registry.',
+                                    'Every request is reviewed. You will see the result here in Civic Registry.',
                                     style: TextStyle(fontSize: 11.5, height: 1.3, color: muted, fontWeight: FontWeight.w600),
                                   ),
                                 ),
@@ -38325,7 +38325,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                 Navigator.pop(ctx);
                                 if (!canPin) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Only registry kings or admins can set the PIN.')),
+                                    const SnackBar(content: Text('You cannot set this PIN from your account.')),
                                   );
                                   return;
                                 }
@@ -53256,7 +53256,7 @@ class _NgmyStoreScreenState extends State<NgmyStoreScreen> with SingleTickerProv
 
   Future<void> _showPostListingDialog() async {
     if (!_canSell) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not authorized to sell on NGMY Store. Ask admin to enable Store Sell.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not able to sell on NGMY Store yet.')));
       return;
     }
     // Each store may have at most 4 items up at a time (admin has no limit).

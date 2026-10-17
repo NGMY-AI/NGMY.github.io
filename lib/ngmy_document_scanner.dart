@@ -313,7 +313,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
   String? _mapScanError(String? errRaw) {
     final err = (errRaw ?? '').trim();
     if (err.contains('proxy not deployed') || err.contains('404')) {
-      return 'Document Scanner needs the Supabase AI proxy function (same as NGMY Helper). Ask admin to deploy it, then reload.';
+      return 'Document Scanner is not available right now. Please reload and try again later.';
     }
     if (err.contains('Network') || err.contains('Failed to fetch') || err.contains('CORS')) {
       return 'Network blocked the scan. Reload the page or try again on the NGMY app.';
@@ -357,7 +357,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       final apiKey = await _resolveApiKey();
       if (apiKey == null) {
         setState(() {
-          _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Menus → NGMY AI.';
+          _error = 'AI is not available right now. Please try again later.';
           _analyzing = false;
         });
         return;
@@ -426,7 +426,7 @@ class _NgmyDocumentScannerPageState extends State<_NgmyDocumentScannerPage> with
       final apiKey = await _resolveApiKey();
       if (apiKey == null) {
         setState(() {
-          _error = 'AI is not connected. Ask an admin to save an AI API key in Admin → Management Menus → NGMY AI.';
+          _error = 'AI is not available right now. Please try again later.';
           _analyzing = false;
         });
         return;

@@ -582,7 +582,7 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
         state: widget.state,
       );
       if (expected.isEmpty) {
-        setState(() => _error = 'No state PIN is set yet. Ask a registry king or admin.');
+        setState(() => _error = 'Incorrect state PIN. Try again.');
         return;
       }
       if (value != expected) {

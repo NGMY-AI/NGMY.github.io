@@ -115,7 +115,7 @@ String _extractApiErrorMessage(Object? err, {String? body}) {
   }
   final text = err?.toString() ?? '';
   if (text.contains('XMLHttpRequest') || text.contains('Failed to fetch')) {
-    return 'Network or browser security blocked the AI request. Save the API key in Admin → Management Menus → NGMY AI, then reload. On web, ensure the Supabase AI proxy function is deployed.';
+    return 'Network or browser security blocked the AI request. AI is not available right now. Please reload and try again later.';
   }
   if (text.length > 200) return '${text.substring(0, 200)}…';
   return text.isEmpty ? 'Unknown AI error' : text;

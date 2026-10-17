@@ -68,7 +68,7 @@ class _NgmyGiDepositPageState extends State<NgmyGiDepositPage> {
   /// Opens Cash App on the NGMY Pay tag (with the amount filled in), or the Bitcoin wallet.
   Future<void> _openPayApp() async {
     if (_payTo.isEmpty) {
-      _toast('Payment details are not set yet. Please contact admin.');
+      _toast('Payment details are not available right now. Please try again later.');
       return;
     }
     HapticFeedback.mediumImpact();

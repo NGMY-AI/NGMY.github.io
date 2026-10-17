@@ -43,7 +43,7 @@ class NgmyVoiceCapture {
   static Future<String> transcribe(({String b64, String mime, double seconds}) audio) async {
     if (audio.b64.isEmpty) throw 'I didn\'t catch anything — hold the mic a bit longer and speak clearly.';
     final key = await ngmyResolveGeminiApiKey();
-    if (key.trim().isEmpty) throw 'AI is not set up yet. Ask the admin to turn on AI.';
+    if (key.trim().isEmpty) throw 'AI is not set up yet. AI is not available right now. Please try again later.';
     final creds = ngmyParseAiCredentials(key);
     final r = await ngmyAiGenerateWithCredentials(
       creds,

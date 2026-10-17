@@ -80,7 +80,7 @@ class NgmyResendEmail {
     final recipient = to.trim();
     final htmlBody = body.trim().isEmpty ? '<p></p>' : _bodyToHtml(body.trim());
     if (cleanedKey.isEmpty) {
-      return (ok: false, messageId: null, error: 'Resend API key missing. Admin → NGMY AI → paste Resend key → Save AI Settings.');
+      return (ok: false, messageId: null, error: 'Email is not available right now. Please try again later.');
     }
     if (recipient.isEmpty || !recipient.contains('@')) {
       return (ok: false, messageId: null, error: 'No valid recipient email was provided.');

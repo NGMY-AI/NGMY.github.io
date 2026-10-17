@@ -541,8 +541,7 @@ class NgmyCivicRegistrarApplication {
     if (!fetched) {
       return (
         summary: 'Server view: could not be fetched (no answer from the server).',
-        advice: 'Tap Retry in Details. If the server keeps refusing, ask the King/Admin to approve your '
-            'registrar request again in Civic Registry → Registrar Requests.',
+        advice: 'Tap Retry. If it keeps failing, try again later.',
       );
     }
     if (isAdmin) {
@@ -565,8 +564,7 @@ class NgmyCivicRegistrarApplication {
       return (
         summary: 'Server view: no registrar application exists for this account on the server, '
             'so the server treats it as a regular member.',
-        advice: 'Open Civic Registry again — a new registrar request is sent to the King/Admin automatically — '
-            'then ask the King/Admin to tap Approve in Registrar Requests. Help Mode saves as soon as it is approved.',
+        advice: 'Your registrar request is being checked. Help Mode saves as soon as it is approved.',
       );
     }
     final status = _statusOf(row);
@@ -576,8 +574,7 @@ class NgmyCivicRegistrarApplication {
         return (
           summary: 'Server view: your$stateLabel registrar request is PENDING'
               '${sent.isEmpty ? '' : ' (sent $sent)'}; it was never approved on the server.',
-          advice: 'Ask the King/Admin to tap Approve in Civic Registry → Registrar Requests. '
-              'Help Mode saves as soon as it is approved.',
+          advice: 'Your registrar request is being checked. Help Mode saves as soon as it is approved.',
         );
       case 'revoked':
       case 'rejected':
@@ -585,7 +582,7 @@ class NgmyCivicRegistrarApplication {
         return (
           summary: 'Server view: your$stateLabel registrar access is ${status.toUpperCase()}'
               '${when.isEmpty ? '' : ' (since $when)'}.',
-          advice: 'Ask the King/Admin to tap Restore Access in Civic Registry → Registrar Requests.',
+          advice: 'Please try again later.',
         );
       default:
         return (

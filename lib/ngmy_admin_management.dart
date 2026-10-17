@@ -2002,7 +2002,7 @@ NgmyCivicHelpModeSyncFailure ngmyClassifyCivicHelpModeSyncError(String error) {
       return (
         reason: 'the server does not list $account as an Authorized Registrar or admin',
         advice: 'Your registrar approval must exist on the server, not only on this phone. '
-            'Ask the King/Admin to approve your registrar request in Civic Registry → Registrar Requests, '
+            'Your registrar request is still waiting for approval. '
             'or sign in with the approved account.',
       );
     case NgmyCivicHelpModeSyncFailure.rateLimited:
