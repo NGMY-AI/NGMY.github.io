@@ -1532,14 +1532,23 @@ class _NgmyCivicStateWalletScreenState extends State<NgmyCivicStateWalletScreen>
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a valid deposit amount.')));
       return;
     }
-    await widget.onAddTrustDeposit(
+    // Money moves from the Contribution Case into State Trust: it leaves one ledger and
+    // lands in the other, so the total tracked never changes (no new money is created).
+    if (amount > _snap.available + 0.001) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Only ${_money(_snap.available)} is in the Contribution Case.')),
+      );
+      return;
+    }
+    await widget.onTransferFunds(
       amount: amount,
-      description: note.isEmpty ? 'State Trust deposit' : note,
+      description: note.isEmpty ? 'Transfer to State Trust' : note,
+      direction: 'to_trust',
     );
     if (!mounted) return;
     _reload();
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Deposited ${_money(amount)} into State Trust.')),
+      SnackBar(content: Text('Moved ${_money(amount)} from Contribution Case to State Trust.')),
     );
   }
 
