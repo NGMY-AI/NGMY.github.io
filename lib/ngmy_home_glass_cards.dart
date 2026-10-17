@@ -2809,11 +2809,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     // phone is never cut off at the ends on another.
     return LayoutBuilder(builder: (context, box) {
     // A civic ID is as wide as the card row and as tall as its shape needs (no cropping).
-    final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
-    // Capped to most of the screen height, so the whole ID fits on one screen without scrolling.
-    final deckH = hasCivicInDeck
-        ? math.min(box.maxWidth / 1.586 + kNgmyCivicIdTopInset + 15, MediaQuery.sizeOf(context).height * 0.72)
-        : ngmyHomeCardHeightFor(box.maxWidth);
+    final deckH = ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3056,7 +3052,7 @@ class _ImageCardBodyState extends State<_ImageCardBody> {
     return Image.memory(
       _bytes!,
       key: ValueKey(_src.hashCode),
-      fit: BoxFit.contain,
+      fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
       gaplessPlayback: true,
@@ -3083,29 +3079,34 @@ class _BusinessCardBody extends StatelessWidget {
         child: Center(child: Text('Business card unavailable', style: TextStyle(color: Colors.white70))),
       );
     }
-    // Whole business card always visible: scaled to fit the box, never cropped.
-    const designW = 360.0;
-    const designH = designW / kNgmyBusinessCardAspect;
-    return ColoredBox(
-      color: const Color(0xFF0B1220),
-      child: FittedBox(
-        fit: BoxFit.contain,
-        child: SizedBox(
-          width: designW,
-          height: designH,
-          child: NgmyBusinessCardPreview(
-            document: doc!,
-            width: designW,
-            interactive: false,
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final cardH = w / kNgmyBusinessCardAspect;
+        final scale = math.max(1.0, c.maxHeight / cardH);
+        final renderedWidth = w * scale;
+        return ColoredBox(
+          color: const Color(0xFF0B1220),
+          child: ClipRect(
+            child: OverflowBox(
+              maxWidth: renderedWidth,
+              maxHeight: cardH * scale,
+              alignment: Alignment.center,
+              child: NgmyBusinessCardPreview(
+                document: doc!,
+                width: renderedWidth,
+                interactive: false,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
 
 /// Room left at the top of the civic ID for the date tab, so the tab never covers the ID header.
-const double kNgmyCivicIdTopInset = 30;
+const double kNgmyCivicIdTopInset = 0;
 
 class _CivicIdCardBody extends StatelessWidget {
   const _CivicIdCardBody({
@@ -3154,7 +3155,7 @@ class _CivicIdCardBody extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(top: kNgmyCivicIdTopInset),
         child: FittedBox(
-          fit: BoxFit.contain,
+          fit: BoxFit.fill,
           child: SizedBox(
             width: designW,
             height: designH,
