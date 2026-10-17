@@ -3155,7 +3155,7 @@ class _CivicIdCardBody extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(top: kNgmyCivicIdTopInset),
         child: FittedBox(
-          fit: BoxFit.fill,
+          fit: BoxFit.contain,
           child: SizedBox(
             width: designW,
             height: designH,
