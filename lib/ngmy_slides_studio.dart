@@ -16,6 +16,7 @@ import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_book_studio.dart';
 import 'ngmy_slides_finale.dart';
 import 'ngmy_slides_ai_history.dart';
+import 'ngmy_slides_icon_picker.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -1231,6 +1232,22 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                               filled: true,
                               fillColor: fill,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              suffixIcon: IconButton(
+                                tooltip: 'Add an icon',
+                                icon: const Icon(Icons.emoji_emotions_rounded, color: Color(0xFF7C3AED)),
+                                onPressed: () async {
+                                  final picked = await showNgmySlideIconPicker(context);
+                                  if (picked == null || !mounted) return;
+                                  final c = controllers[e.id]!;
+                                  final sel = c.selection;
+                                  final start = sel.isValid ? sel.start : c.text.length;
+                                  final end = sel.isValid ? sel.end : c.text.length;
+                                  final next = c.text.replaceRange(start, end, picked);
+                                  c.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: start + picked.length));
+                                  _updateElementText(e.id, next);
+                                  _scheduleAutosave();
+                                },
+                              ),
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),

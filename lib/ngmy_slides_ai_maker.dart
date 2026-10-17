@@ -602,7 +602,8 @@ NgmySlideDeck ngmyBuildSlidesAiDeck(
           ..add(text('“', 0.06, 0.02, 0.2, 0.36, 140, weight: FontWeight.w900, color: _withAlpha(a1, 0xCC), anim: NgmySlideTransition.zoom, key: 'quote', fx: 'pulse'))
           ..add(text(o.title, 0.12, 0.30, 0.76, 0.34, 36, weight: FontWeight.w700, style: FontStyle.italic, align: TextAlign.center, anim: tIn, key: 'title'))
           ..add(text(o.subtitle.isEmpty ? '' : '— ${o.subtitle}', 0.12, 0.68, 0.76, 0.12, 22, color: st.muted, align: TextAlign.center, delay: 300, key: 'sub'));
-        if (emoji.isNotEmpty) els.add(text(emoji, 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
+        // The logo sits in the top-right corner: keep the icon beside it, never on it.
+        if (emoji.isNotEmpty) els.add(text(emoji, hasLogo ? 0.72 : 0.82, 0.06, 0.12, 0.2, 52, align: TextAlign.center, anim: NgmySlideTransition.bounce, delay: 500, key: 'hero', fx: 'float3d'));
       case 'bio' when (bioJson ?? '').isNotEmpty:
         // Your Bio page on a phone (links tappable), with the invite beside it.
         els
