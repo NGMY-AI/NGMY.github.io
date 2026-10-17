@@ -1,4 +1,5 @@
 ﻿import 'dart:math' as math;
+import 'dart:async' show unawaited;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'ngmy_platform_graphics.dart';
 import 'package:flutter/services.dart';
 
 import 'ngmy_civic_identity.dart';
+import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_gate.dart';
 import 'ngmy_civic_registry_members.dart';
 import 'ngmy_civic_state_wallet_ui.dart';
@@ -567,6 +569,20 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
 
   bool get _obscure => _step == 0;
 
+
+  Future<void> _checkStatePin(String value, String expected) async {
+    if (expected.isNotEmpty && value == expected) {
+      if (mounted) setState(() => _step = 1);
+      return;
+    }
+    final verified = await ngmyCivicVerifyStatePin(email: '', state: widget.state, pin: value);
+    if (!mounted) return;
+    if (verified.ok) {
+      setState(() => _step = 1);
+    } else {
+      setState(() => _error = 'Incorrect state PIN. Try again.');
+    }
+  }
   void _submit() {
     setState(() => _error = null);
     final value = _activeController.text.trim();
@@ -581,15 +597,8 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
         pinsByState: widget.pinsByState,
         state: widget.state,
       );
-      if (expected.isEmpty) {
-        setState(() => _error = 'Incorrect state PIN. Try again.');
-        return;
-      }
-      if (value != expected) {
-        setState(() => _error = 'Incorrect state PIN. Try again.');
-        return;
-      }
-      setState(() => _step = 1);
+      // Check the PIN on the server so every member can pass, not only the ones whose phone has it.
+      unawaited(_checkStatePin(value, expected));
       return;
     }
 

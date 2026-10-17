@@ -3139,6 +3139,8 @@ Future<String?> _persistCivicRegistryPins(
   if (st.isEmpty) return 'Choose a state first.';
   final email = ngmyCurrentAuthEmail();
   if (email.isEmpty) return 'Sign in again to save the PIN.';
+  // Saving needs a real signed-in session; make sure this phone has one before the save.
+  await ngmyEnsurePrivilegedCloudSession();
   final batch = <String, String>{};
   if (allStates) {
     for (final s in kNgmyUsStateNames) {

@@ -6301,8 +6301,8 @@ async function handleCivicVerifyStatePin(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = await requireJwtEmail(req);
-  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  // The PIN itself is the secret (rate-limited above). No login is needed to check it, so
+  // members without a Supabase session can still pass the state gate.
   const state = String(body.state ?? "").trim();
   const pin = String(body.pin ?? "").trim();
   if (!state || !pin) return jsonOk({ error: "state and pin required" }, 400);
