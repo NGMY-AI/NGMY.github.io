@@ -15,6 +15,7 @@ import 'ngmy_hati_kuhowa_templates.dart';
 import 'ngmy_marriage_agreement_templates.dart';
 import 'ngmy_book_studio.dart';
 import 'ngmy_slides_finale.dart';
+import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -103,6 +104,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // The AI's recent versions (for "undo" / "bring it back") are kept on this device.
+    unawaited(ngmySlidesAiLoadHistory());
     // The AI can put your Bio link on a slide — your published Bio first.
     ngmySlidesLoadBio = () async {
       final bios = await loadNgmyBios(userEmail: widget.userEmail);
@@ -1281,9 +1284,11 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final deck = _activeDeck;
     if (deck == null || !deck.aiMade || _guardTransferredEdit()) return;
     final made = await showNgmySlidesAiEditor(context, deck: deck, currentSlide: _slideIndex + 1);
+    final restored = ngmySlidesAiTakeRestoreFlag();
     if (made == null || !mounted || _activeDeck != deck) return;
     // Only the words changed (e.g. "translate to Swahili")? Keep the design — just swap the words.
-    if (ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '', apply: false)) {
+    // A brought-back version always swaps in whole, so the earlier look comes back too.
+    if (!restored && ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '', apply: false)) {
       _mutate(() {
         ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '');
         _selectedElementId = null;

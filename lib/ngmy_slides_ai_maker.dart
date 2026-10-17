@@ -13,6 +13,7 @@ import 'ngmy_slides_luxe_fx.dart';
 import 'ngmy_slides_models.dart';
 import 'ngmy_slides_render.dart';
 import 'ngmy_slides_source_document.dart';
+import 'ngmy_slides_ai_history.dart';
 
 import 'ngmy_bio_models.dart';
 import 'ngmy_slides_bio_phone.dart';
@@ -788,7 +789,14 @@ Future<NgmySlideDeck> ngmyEditSlidesWithAi({
   String? logo,
   List<String> pictures = const [],
   NgmySlidesAiLook look = const NgmySlidesAiLook(),
+  /// The presentation being changed: its previous version is kept for 20 minutes, so the
+  /// user can ask to bring it back.
+  String deckId = '',
 }) async {
+  // Save the version being replaced first, so it can be brought back at once.
+  if (deckId.isNotEmpty) {
+    ngmySlidesAiRemember(deckId: deckId, outlineJson: outlineJson, extras: {for (final e in extras) e.name}, request: request);
+  }
   onStatus?.call('Making your changes…');
   final current = ngmyParseSlidesAiOutline(outlineJson, fallbackStyle: 'colorful');
   final outline = await _askForOutline(
@@ -1657,6 +1665,22 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
       _status = 'Making your changes…';
     });
     try {
+      // "Undo" / "bring it back": restore the saved version with no AI call.
+      if (ngmySlidesAiIsUndoRequest(request)) {
+        final snap = ngmySlidesAiLatest(widget.deck.id);
+        if (snap == null) {
+          setState(() {
+            _busy = false;
+            _error = 'Nothing to bring back. Changes are kept for 20 minutes.';
+          });
+          return;
+        }
+        final restored = ngmySlidesAiRestoreDeck(snap, widget.deck);
+        ngmySlidesAiDropLatest(widget.deck.id);
+        ngmySlidesAiMarkRestore();
+        if (mounted) Navigator.of(context).pop(restored);
+        return;
+      }
       final made = await ngmyEditSlidesWithAi(
         outlineJson: widget.deck.aiOutlineJson ?? '',
         request: request,
@@ -1664,6 +1688,7 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
         extras: ngmySlidesAiExtrasOf(widget.deck),
         logo: ngmySlidesAiLogoOf(widget.deck),
         pictures: ngmySlidesAiPhotosOf(widget.deck),
+        deckId: widget.deck.id,
         onStatus: (s) {
           if (mounted) setState(() => _status = s);
         },
@@ -2018,6 +2043,34 @@ bool ngmySlidesApplyTextOnlyEdit(NgmySlideDeck deck, String newOutlineJson, {boo
   return true;
 }
 
+/// Builds the deck from a saved version (its words, style, effects and frames), using the
+/// current logo and pictures. The caller swaps it in, the same way as any AI change.
+NgmySlideDeck ngmySlidesAiRestoreDeck(NgmySlidesAiSnapshot snap, NgmySlideDeck deck) {
+  final outline = ngmyParseSlidesAiOutline(snap.outlineJson, fallbackStyle: 'colorful');
+  if (outline == null) throw 'That earlier version could not be read.';
+  final extras = {
+    for (final n in snap.extras)
+      for (final e in NgmySlidesAiExtra.values)
+        if (e.name == n) e,
+  };
+  final built = ngmyBuildSlidesAiDeck(
+    outline,
+    extras: extras,
+    logo: ngmySlidesAiLogoOf(deck),
+    userPictures: ngmySlidesAiPhotosOf(deck),
+    logoFrame: outline.logoFrame,
+    logoRing: outline.logoRing,
+    photoFrame: outline.photoFrame,
+    photoRing: outline.photoRing,
+  );
+  built
+    ..aiOutlineJson = snap.outlineJson
+    ..aiSlideIds = built.slides.map((s) => s.id).toList()
+    ..aiExtras = extras.map((e) => e.name).toList()
+    ..cinematic = extras.contains(NgmySlidesAiExtra.videoMotion);
+  return built;
+}
+
 /// Look and feel for a presentation the AI wrote: pick a style and Luxury FX. Returns the
 /// rebuilt AI slides (the caller swaps them in), or null when nothing was changed.
 Future<NgmySlideDeck?> showNgmyLookAndFeelSheet(BuildContext context, {required NgmySlideDeck deck, required int currentSlide}) {
@@ -2060,6 +2113,7 @@ class _LookAndFeelSheetState extends State<_LookAndFeelSheet> {
         extras: extras,
         logo: ngmySlidesAiLogoOf(widget.deck),
         pictures: ngmySlidesAiPhotosOf(widget.deck),
+        deckId: widget.deck.id,
       );
       final newStyle = ngmyParseSlidesAiOutline(made.aiOutlineJson ?? '', fallbackStyle: _style)?.style ?? _style;
       if (newStyle != style.id && !_luxe) {
