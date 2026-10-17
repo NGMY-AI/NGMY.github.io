@@ -3592,9 +3592,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           margin: const EdgeInsets.only(bottom: 10),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: ngmyClipBackdrop(
-              borderRadius: BorderRadius.zero,
-              sigma: 12,
+            child: NgmyNoBackdrop(
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
