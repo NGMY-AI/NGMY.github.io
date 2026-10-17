@@ -1286,6 +1286,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final made = await showNgmySlidesAiEditor(context, deck: deck, currentSlide: _slideIndex + 1);
     final restored = ngmySlidesAiTakeRestoreFlag();
     if (made == null || !mounted || _activeDeck != deck) return;
+    // A text-size request changed the deck in place: keep it, and make it undoable.
+    if (identical(made, deck)) {
+      _mutate(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Done — only the text size was changed. Undo brings back the old size.')),
+      );
+      return;
+    }
     // Only the words changed (e.g. "translate to Swahili")? Keep the design — just swap the words.
     // A brought-back version always swaps in whole, so the earlier look comes back too.
     if (!restored && ngmySlidesApplyTextOnlyEdit(deck, made.aiOutlineJson ?? '', apply: false)) {

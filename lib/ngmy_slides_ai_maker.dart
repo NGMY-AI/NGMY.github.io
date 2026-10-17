@@ -1665,6 +1665,27 @@ class _SlidesAiEditSheetState extends State<_SlidesAiEditSheet> {
       _status = 'Making your changes…';
     });
     try {
+      // Text size / fit: changed right here, only the text boxes, no AI call.
+      final textCmd = ngmySlidesTextCommandOf(request);
+      if (textCmd != null) {
+        final changed = ngmySlidesApplyTextCommand(
+          widget.deck,
+          widget.currentSlide - 1,
+          textCmd,
+          allSlides: ngmySlidesTextCommandIsAllSlides(request),
+        );
+        if (!changed) {
+          setState(() {
+            _busy = false;
+            _error = textCmd == NgmyTextCommand.fit
+                ? 'The text already fits inside its frame.'
+                : 'The text is already at its limit.';
+          });
+          return;
+        }
+        if (mounted) Navigator.of(context).pop(widget.deck);
+        return;
+      }
       // "Undo" / "bring it back": restore the saved version with no AI call.
       if (ngmySlidesAiIsUndoRequest(request)) {
         final snap = ngmySlidesAiLatest(widget.deck.id);
@@ -2041,6 +2062,73 @@ bool ngmySlidesApplyTextOnlyEdit(NgmySlideDeck deck, String newOutlineJson, {boo
   if (deck.name.trim() == a.title.trim() && b.title.trim().isNotEmpty) deck.name = b.title.trim();
   deck.aiOutlineJson = newOutlineJson;
   return true;
+}
+
+/// Text-size requests the app does itself, without the AI: they only change text boxes, keep
+/// every word, and leave the look, colours and layout alone.
+enum NgmyTextCommand { smaller, bigger, fit }
+
+NgmyTextCommand? ngmySlidesTextCommandOf(String request) {
+  final t = request.toLowerCase();
+  if (RegExp(r'\b(fit|fits|fitting|overflow|overflowing|reframe|inside|too big|out of the|going under|under the slide|below the slide)\b').hasMatch(t)) {
+    return NgmyTextCommand.fit;
+  }
+  if (RegExp(r'\b(smaller|shrink|reduce|decrease|make .{0,20}small|less big)\b').hasMatch(t)) return NgmyTextCommand.smaller;
+  if (RegExp(r'\b(bigger|larger|increase|enlarge|grow|make .{0,20}big)\b').hasMatch(t)) return NgmyTextCommand.bigger;
+  return null;
+}
+
+/// True when the request means every slide, not only the one on screen.
+bool ngmySlidesTextCommandIsAllSlides(String request) =>
+    RegExp(r'\b(all|every|whole|entire)\b.{0,30}\b(slides?|presentation|deck|pages?)\b|\b(slides?|presentation|deck)\b.{0,20}\b(all|every|whole|entire)\b')
+        .hasMatch(request.toLowerCase());
+
+/// Would this text, at [size], fit inside its own frame on the slide?
+bool _ngmyTextFits(NgmySlideElement e, double size, double slideW, double slideH) {
+  final boxW = e.w * slideW;
+  final boxH = e.h * slideH;
+  final charW = size * 0.55;
+  final perLine = math.max(1, (boxW / charW).floor());
+  var lines = 0;
+  for (final para in e.text.split('\n')) {
+    lines += math.max(1, (para.length / perLine).ceil());
+  }
+  return lines * size * 1.3 <= boxH + 0.5 && e.y + e.h <= 1.001;
+}
+
+/// Applies a text-size request in place. Returns true if any text box changed.
+bool ngmySlidesApplyTextCommand(NgmySlideDeck deck, int slideIndex, NgmyTextCommand cmd, {required bool allSlides}) {
+  if (deck.slides.isEmpty) return false;
+  final slides = allSlides ? deck.slides : [deck.slides[slideIndex.clamp(0, deck.slides.length - 1)]];
+  final portrait = deck.aspectRatio == NgmySlideAspectRatio.portrait916;
+  final slideW = portrait ? 540.0 : 960.0;
+  final slideH = portrait ? 960.0 : 540.0;
+  var changed = false;
+  for (final s in slides) {
+    for (final e in s.elements) {
+      if (e.type != NgmySlideElementType.text) continue;
+      final startSize = e.fontSize;
+      final startX = e.x;
+      final startY = e.y;
+      switch (cmd) {
+        case NgmyTextCommand.smaller:
+          e.fontSize = (e.fontSize * 0.85).clamp(10.0, 120.0).toDouble();
+        case NgmyTextCommand.bigger:
+          final next = (e.fontSize * 1.15).clamp(10.0, 120.0).toDouble();
+          if (_ngmyTextFits(e, next, slideW, slideH)) e.fontSize = next;
+        case NgmyTextCommand.fit:
+          var guard = 0;
+          while (!_ngmyTextFits(e, e.fontSize, slideW, slideH) && e.fontSize > 10 && guard++ < 200) {
+            e.fontSize = math.max(10.0, e.fontSize - 1);
+          }
+          // Keep the frame on the slide, without moving it more than it must.
+          if (e.y + e.h > 1) e.y = math.max(0.0, 1 - e.h);
+          if (e.x + e.w > 1) e.x = math.max(0.0, 1 - e.w);
+      }
+      if (e.fontSize != startSize || e.x != startX || e.y != startY) changed = true;
+    }
+  }
+  return changed;
 }
 
 /// Builds the deck from a saved version (its words, style, effects and frames), using the
