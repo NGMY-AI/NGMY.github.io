@@ -2808,7 +2808,9 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     // Same card shape on every phone (wide 1.55 : 1, like the photo crop) — a card made on one
     // phone is never cut off at the ends on another.
     return LayoutBuilder(builder: (context, box) {
-    final deckH = ngmyHomeCardHeightFor(box.maxWidth);
+    // A civic ID is as wide as the card row and as tall as its shape needs (no cropping).
+    final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
+    final deckH = hasCivicInDeck ? box.maxWidth / 1.586 : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
