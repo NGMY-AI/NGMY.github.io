@@ -2808,8 +2808,13 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     // Same card shape on every phone (wide 1.55 : 1, like the photo crop) — a card made on one
     // phone is never cut off at the ends on another.
     return LayoutBuilder(builder: (context, box) {
-    // A civic ID is as wide as the card row and as tall as its shape needs (no cropping).
-    final deckH = ngmyHomeCardHeightFor(box.maxWidth);
+    // Computer windows only: a civic ID shows at its full shape, capped to 72% of the screen
+    // height so it fits without scrolling. Phones keep the usual card height.
+    final isWideWindow = box.maxWidth >= 700;
+    final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
+    final deckH = (isWideWindow && hasCivicInDeck)
+        ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.72)
+        : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
