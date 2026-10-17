@@ -2081,73 +2081,161 @@ class _LookAndFeelSheetState extends State<_LookAndFeelSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
     final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final surface = isDark ? const Color(0xFF0F172A) : Colors.white;
     return SafeArea(
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111827) : Colors.white,
-          borderRadius: BorderRadius.circular(24),
+          color: surface,
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
-                  child: const Icon(Icons.palette_rounded, color: Colors.white, size: 20),
-                ),
-                const SizedBox(width: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 12, 4),
+              child: Row(children: [
                 Expanded(
-                  child: Text('Look and feel', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Look and feel', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                      const SizedBox(height: 2),
+                      Text('Your words, pictures and logo stay the same.', style: TextStyle(color: muted, fontSize: 12.5)),
+                    ],
+                  ),
                 ),
+                IconButton(onPressed: _busy ? null : () => Navigator.pop(context), icon: Icon(Icons.close_rounded, color: muted)),
               ]),
-              const SizedBox(height: 6),
-              Text('Pick a new look. Your words, pictures and logo stay the same.', style: TextStyle(color: muted, fontSize: 12.5)),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final s in kNgmySlidesAiStyles)
-                    ChoiceChip(
-                      label: Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                      selected: _style == s.id,
-                      onSelected: _busy ? null : (_) => setState(() => _style = s.id),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1.25,
+                      children: [
+                        for (final s in kNgmySlidesAiStyles)
+                          _StyleTile(
+                            style: s,
+                            selected: _style == s.id,
+                            onTap: _busy ? null : () => setState(() => _style = s.id),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('Luxury FX', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
-                subtitle: Text('Moving light and ornaments, a new royal look each time', style: TextStyle(color: muted, fontSize: 12)),
-                value: _luxe,
-                onChanged: _busy ? null : (v) => setState(() => _luxe = v),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 6),
-                Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.w700)),
-              ],
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: _busy ? null : _apply,
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF7C3AED),
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    const SizedBox(height: 14),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: _luxe
+                            ? const LinearGradient(colors: [Color(0xFF854D0E), Color(0xFFCA8A04)])
+                            : null,
+                        color: _luxe ? null : (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9)),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.auto_awesome_rounded, color: _luxe ? Colors.white : muted),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Luxury FX', style: TextStyle(color: _luxe ? Colors.white : ink, fontWeight: FontWeight.w800)),
+                              Text('Moving light and ornaments, a new royal look each time',
+                                  style: TextStyle(color: _luxe ? Colors.white70 : muted, fontSize: 11.5)),
+                            ],
+                          ),
+                        ),
+                        Switch(
+                          value: _luxe,
+                          activeThumbColor: Colors.white,
+                          activeTrackColor: const Color(0xFFFDE68A),
+                          onChanged: _busy ? null : (v) => setState(() => _luxe = v),
+                        ),
+                      ]),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 10),
+                      Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.w700)),
+                    ],
+                  ],
                 ),
-                child: _busy
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Apply look', style: TextStyle(fontWeight: FontWeight.w900)),
               ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: FilledButton(
+                  onPressed: _busy ? null : _apply,
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      gradient: const LinearGradient(colors: [Color(0xFF7C3AED), Color(0xFFDB2777)]),
+                    ),
+                    child: Center(
+                      child: _busy
+                          ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Apply look', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One style as a colour tile: its own gradient, its name, and a tick when chosen.
+class _StyleTile extends StatelessWidget {
+  const _StyleTile({required this.style, required this.selected, required this.onTap});
+  final NgmySlidesAiStyle style;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final pair = style.backgrounds.first;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(pair.$1), Color(pair.$2)]),
+          border: Border.all(color: selected ? Colors.white : Colors.transparent, width: 2.5),
+          boxShadow: selected ? [BoxShadow(color: Color(pair.$1).withValues(alpha: 0.5), blurRadius: 12)] : null,
+        ),
+        child: Stack(
+          children: [
+            Align(alignment: Alignment.topRight, child: Icon(style.icon, color: Colors.white70, size: 18)),
+            Align(
+              alignment: Alignment.bottomLeft,
+              child: Text(
+                style.label,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13, shadows: [Shadow(blurRadius: 6, color: Colors.black38)]),
+              ),
+            ),
+            if (selected) const Align(alignment: Alignment.topLeft, child: Icon(Icons.check_circle_rounded, color: Colors.white, size: 18)),
+          ],
         ),
       ),
     );

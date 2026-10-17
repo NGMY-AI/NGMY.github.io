@@ -798,6 +798,9 @@ class _BookStudioScreen extends StatefulWidget {
 }
 
 class _BookStudioScreenState extends State<_BookStudioScreen> {
+  static bool _isBlankBook(NgmySavedBook b) =>
+      b.doc.title.trim() == 'My Book' && b.doc.chapters.every((c) => c.body.trim().isEmpty);
+
   List<NgmySavedBook> _books = [];
   bool _loading = true;
 
@@ -823,6 +826,8 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
   Future<void> _store(NgmySavedBook b) {
     b.updatedAt = DateTime.now();
     final i = _books.indexWhere((x) => x.id == b.id);
+    // A new book that has nothing typed in yet is not created.
+    if (i < 0 && _isBlankBook(b)) return _saveChain;
     if (i < 0) {
       _books.insert(0, b);
     } else {
@@ -846,7 +851,6 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
   }
 
   Future<void> _open(NgmySavedBook book, {bool isNew = false}) async {
-    if (isNew) await _store(book);
     if (!mounted) return;
     await Navigator.of(context).push<void>(MaterialPageRoute(
       builder: (_) => _BookEditorScreen(book: book, onSave: _store),
@@ -882,17 +886,81 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
   Future<void> _delete(NgmySavedBook b) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete this book?'),
-        content: Text('“${b.doc.title}” will be removed from this device.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+      builder: (ctx) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            constraints: const BoxConstraints(maxWidth: 340),
+            decoration: BoxDecoration(
+              color: const Color(0xFF241812),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF4A2C1B)),
+              boxShadow: const [BoxShadow(color: Color(0x99000000), blurRadius: 30, offset: Offset(0, 16))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 24, 22, 4),
+                  child: Column(children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.14),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFF87171), size: 28),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Delete this book?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Color(0xFFFAF3E8), fontWeight: FontWeight.w900, fontSize: 19),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '“${b.doc.title}” is removed from this device. This cannot be undone.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Color(0xFFD6B99A), fontSize: 14, height: 1.45),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 22),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFAF3E8),
+                          side: const BorderSide(color: Color(0xFF6B4A33)),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Keep it', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFFDC2626),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w900)),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
     if (ok != true) return;
@@ -908,21 +976,55 @@ class _BookStudioScreenState extends State<_BookStudioScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => SafeArea(
         child: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: const Color(0xFF241812), borderRadius: BorderRadius.circular(20)),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const SizedBox(height: 8),
-            for (final (id, icon, label, color) in const [
-              ('open', Icons.edit_rounded, 'Open & write', Color(0xFFFAF3E8)),
-              ('print', Icons.print_rounded, 'Print as a book', Color(0xFFFAF3E8)),
-              ('delete', Icons.delete_outline_rounded, 'Delete', Color(0xFFF87171)),
+          margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF241812),
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(color: const Color(0xFF4A2C1B)),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(colors: [Color(0xFF8B4513), Color(0xFFB45309)]),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.menu_book_rounded, color: Color(0xFFFAF3E8), size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(b.doc.title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Color(0xFFFAF3E8), fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 2),
+                  const Text('What would you like to do?', style: TextStyle(color: Color(0xFFD6B99A), fontSize: 12)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            for (final (id, icon, label, sub) in const [
+              ('open', Icons.edit_rounded, 'Open & write', 'Keep writing this book'),
+              ('print', Icons.print_rounded, 'Print as a book', 'Fold and staple it'),
             ])
-              ListTile(
-                leading: Icon(icon, color: color),
-                title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+              _BookMenuRow(
+                icon: icon,
+                label: label,
+                sub: sub,
                 onTap: () => Navigator.pop(ctx, id),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            const Divider(color: Color(0xFF4A2C1B), height: 1),
+            const SizedBox(height: 6),
+            _BookMenuRow(
+              icon: Icons.delete_outline_rounded,
+              label: 'Delete book',
+              sub: 'Remove it from this device',
+              danger: true,
+              onTap: () => Navigator.pop(ctx, 'delete'),
+            ),
           ]),
         ),
       ),
@@ -1752,6 +1854,58 @@ class _BookEditorScreenState extends State<_BookEditorScreen> {
                 ]),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One row in the book menu: an icon in a warm square, a title and a short line under it.
+class _BookMenuRow extends StatelessWidget {
+  const _BookMenuRow({required this.icon, required this.label, required this.sub, required this.onTap, this.danger = false});
+  final IconData icon;
+  final String label;
+  final String sub;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = danger ? const Color(0xFFF87171) : const Color(0xFFFAF3E8);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              color: danger ? const Color(0xFFEF4444).withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.04),
+            ),
+            child: Row(children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: danger ? const Color(0xFFEF4444).withValues(alpha: 0.16) : const Color(0xFFB45309).withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: TextStyle(color: accent, fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 2),
+                  Text(sub, style: const TextStyle(color: Color(0xFFD6B99A), fontSize: 12)),
+                ]),
+              ),
+              Icon(Icons.chevron_right_rounded, color: accent.withValues(alpha: 0.6)),
+            ]),
+          ),
         ),
       ),
     );

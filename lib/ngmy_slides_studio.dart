@@ -977,8 +977,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
         ),
       );
 
-  /// The logo (or the picture you tapped) on this slide: its shape and its ring.
-  /// Changes show on the slide at once and Undo brings them back.
+  /// The logo (or the picture you tapped) on this slide: its shape and its ring, shown as
+  /// pictures to tap. The upload button puts a different logo into the same place.
   Future<void> _openLogoLookSheet() async {
     final deck = _activeDeck;
     if (deck == null || _guardTransferredEdit()) return;
@@ -994,73 +994,122 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF111827),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         var frame = targets.first.frame;
         var ring = targets.first.ring;
-        return StatefulBuilder(builder: (ctx, setSheet) {
-          void choose({String? f, String? r}) {
-            setSheet(() {
-              if (f != null) frame = f;
-              if (r != null) ring = r;
-            });
-            _mutate(() {
-              for (final t in targets) {
-                if (f != null) t.frame = f;
-                if (r != null) t.ring = r;
-              }
-            });
-          }
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            void choose({String? f, String? r}) {
+              setSheet(() {
+                if (f != null) frame = f;
+                if (r != null) ring = r;
+              });
+              _mutate(() {
+                for (final t in targets) {
+                  if (f != null) t.frame = f;
+                  if (r != null) t.ring = r;
+                }
+              });
+            }
 
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Logo shape', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final (id, label) in kNgmySlideFrames)
-                          ChoiceChip(label: Text(label), selected: frame == id, onSelected: (_) => choose(f: id)),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    const Text('Ring', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final (id, label) in kNgmySlideRings)
-                          ChoiceChip(label: Text(label), selected: ring == id, onSelected: (_) => choose(r: id)),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        final ref = await ngmyPickImageBase64();
-                        if (ref == null) return;
-                        _mutate(() {
-                          for (final t in targets) {
-                            t.imageRef = ref;
-                          }
-                        });
-                      },
-                      icon: const Icon(Icons.upload_rounded),
-                      label: const Text('Change logo — upload another picture'),
-                    ),
-                  ],
+            final isDark = Theme.of(ctx).brightness == Brightness.dark;
+            final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+            final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+            final tileBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+            return SafeArea(
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                padding: const EdgeInsets.fromLTRB(18, 16, 14, 18),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Logo and pictures', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 20)),
+                              const SizedBox(height: 2),
+                              Text('Tap a shape or a ring to change it.', style: TextStyle(color: muted, fontSize: 12.5)),
+                            ],
+                          ),
+                        ),
+                        IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: muted)),
+                      ]),
+                      const SizedBox(height: 16),
+                      Text('SHAPE', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          for (final (id, label) in kNgmySlideFrames)
+                            _LogoShapeTile(
+                              id: id,
+                              label: label,
+                              selected: frame == id,
+                              background: tileBg,
+                              ink: ink,
+                              onTap: () => choose(f: id),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text('RING', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          for (final (id, label) in kNgmySlideRings)
+                            _LogoRingTile(
+                              id: id,
+                              label: label,
+                              selected: ring == id,
+                              ink: ink,
+                              muted: muted,
+                              onTap: () => choose(r: id),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF7C3AED),
+                            side: const BorderSide(color: Color(0xFF7C3AED), width: 1.4),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          onPressed: () async {
+                            final ref = await ngmyPickImageBase64();
+                            if (ref == null) return;
+                            _mutate(() {
+                              for (final t in targets) {
+                                t.imageRef = ref;
+                              }
+                            });
+                          },
+                          icon: const Icon(Icons.upload_rounded),
+                          label: const Text('Upload a different logo', style: TextStyle(fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        });
+            );
+          },
+        );
       },
     );
   }
@@ -1105,54 +1154,101 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This slide has no text boxes.')));
       return;
     }
+    // The biggest words on the slide are its title.
+    final biggest = texts.map((e) => e.fontSize).reduce((a, b) => a > b ? a : b);
     final controllers = {for (final e in texts) e.id: TextEditingController(text: e.text)};
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF111827),
-      builder: (ctx) => SafeArea(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.8),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+        final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+        final fill = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+            padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F172A) : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+            ),
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.8),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Edit this slide\'s text', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
-                const SizedBox(height: 4),
-                const Text('Changes save as you type.', style: TextStyle(color: Colors.white60, fontSize: 12)),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      for (final e in texts) ...[
-                        TextField(
-                          controller: controllers[e.id],
-                          maxLines: null,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.06),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            isDense: true,
-                          ),
-                          onChanged: (v) {
-                            _updateElementText(e.id, v);
-                            _scheduleAutosave();
-                          },
-                        ),
-                        const SizedBox(height: 10),
+                Row(children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF2563EB), Color(0xFF7C3AED)])),
+                    child: const Icon(Icons.edit_note_rounded, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Edit this slide', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 19)),
+                        Text('Slide ${_slideIndex + 1} · changes save as you type', style: TextStyle(color: muted, fontSize: 12)),
                       ],
-                    ],
+                    ),
+                  ),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: Icon(Icons.close_rounded, color: muted)),
+                ]),
+                const SizedBox(height: 14),
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.only(right: 6),
+                    itemCount: texts.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) {
+                      final e = texts[i];
+                      final isTitle = e.fontSize == biggest;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, bottom: 6),
+                            child: Text(
+                              isTitle ? 'TITLE' : 'TEXT ${i + 1}',
+                              style: TextStyle(color: isTitle ? const Color(0xFF7C3AED) : muted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1),
+                            ),
+                          ),
+                          TextField(
+                            controller: controllers[e.id],
+                            maxLines: null,
+                            minLines: isTitle ? 1 : 2,
+                            style: TextStyle(color: ink, fontWeight: isTitle ? FontWeight.w800 : FontWeight.w500, fontSize: 15),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: fill,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(color: Color(0xFF7C3AED), width: 1.5),
+                              ),
+                            ),
+                            onChanged: (v) {
+                              _updateElementText(e.id, v);
+                              _scheduleAutosave();
+                            },
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
     for (final c in controllers.values) {
       c.dispose();
@@ -4312,6 +4408,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         ),
                       ]
                     : const <Widget>[])
+                // Between Book and the text editor (AI decks only): look and feel, then edit this slide's text.
+                ..addAll(aiMade
+                    ? <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.palette_rounded, 'Look and feel', _openLookAndFeel, isDark),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.edit_note_rounded, 'Edit this slide\'s text', _openSlideTextSheet, isDark),
+                        ),
+                      ]
+                    : const <Widget>[])
                 // Book: write (yourself or with AI) and print a fold-and-staple book.
                 ..add(
                   Padding(
@@ -4338,19 +4447,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                     ),
                   ),
                 )
-                // Between Book and the text editor (AI decks only): look and feel, then edit this slide's text.
-                ..addAll(aiMade
-                    ? <Widget>[
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: _ribbonIconButton(Icons.palette_rounded, 'Look and feel', _openLookAndFeel, isDark),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: _ribbonIconButton(Icons.edit_note_rounded, 'Edit this slide\'s text', _openSlideTextSheet, isDark),
-                        ),
-                      ]
-                    : const <Widget>[]),
             ),
           ),
           SingleChildScrollView(
@@ -6802,4 +6898,127 @@ class _SlideWipeClipper extends CustomClipper<Rect> {
 
   @override
   bool shouldReclip(covariant _SlideWipeClipper oldClipper) => oldClipper.progress != progress;
+}
+
+/// A picture shape as a tile: the shape itself is drawn, with its name under it.
+class _LogoShapeTile extends StatelessWidget {
+  const _LogoShapeTile({required this.id, required this.label, required this.selected, required this.background, required this.ink, required this.onTap});
+  final String id;
+  final String label;
+  final bool selected;
+  final Color background;
+  final Color ink;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = switch (id) {
+      'circle' => BorderRadius.circular(999),
+      'rounded' => BorderRadius.circular(18),
+      'arch' => const BorderRadius.vertical(top: Radius.circular(30), bottom: Radius.circular(8)),
+      _ => BorderRadius.circular(6),
+    };
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 78,
+        child: Column(
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: radius,
+                border: Border.all(color: selected ? const Color(0xFF7C3AED) : Colors.transparent, width: 2.5),
+              ),
+              child: Center(
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)]),
+                    borderRadius: id == 'circle' ? BorderRadius.circular(999) : BorderRadius.circular(id == 'rounded' ? 9 : 3),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: selected ? const Color(0xFF7C3AED) : ink, fontSize: 11.5, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A ring as a round swatch with its own colours; the chosen one has a tick.
+class _LogoRingTile extends StatelessWidget {
+  const _LogoRingTile({required this.id, required this.label, required this.selected, required this.ink, required this.muted, required this.onTap});
+  final String id;
+  final String label;
+  final bool selected;
+  final Color ink;
+  final Color muted;
+  final VoidCallback onTap;
+
+  static const Map<String, List<Color>> _colours = {
+    'gold': [Color(0xFFFDE68A), Color(0xFFD4A017)],
+    'platinum': [Color(0xFFF1F5F9), Color(0xFF94A3B8)],
+    'glow': [Color(0xFF67E8F9), Color(0xFF2563EB)],
+    'rainbow': [Color(0xFFF472B6), Color(0xFF38BDF8), Color(0xFFFACC15)],
+    'double': [Color(0xFFCBD5E1), Color(0xFF475569)],
+    'neon': [Color(0xFF22D3EE), Color(0xFFA855F7)],
+    'framed': [Color(0xFF8B5CF6), Color(0xFF312E81)],
+    'rosegold': [Color(0xFFF3C6B5), Color(0xFFB76E79)],
+    'jewels': [Color(0xFFF43F5E), Color(0xFF7E22CE)],
+    'aurora': [Color(0xFF34D399), Color(0xFF6366F1)],
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final colours = _colours[id] ?? const [Color(0xFFCBD5E1), Color(0xFF64748B)];
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 66,
+        child: Column(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: id == 'none' ? null : LinearGradient(colors: colours),
+                color: id == 'none' ? Colors.grey.withValues(alpha: 0.25) : null,
+                border: selected ? Border.all(color: const Color(0xFF7C3AED), width: 2.5) : null,
+              ),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: muted.withValues(alpha: 0.15),
+                ),
+                child: selected ? const Icon(Icons.check_rounded, color: Colors.white, size: 20) : null,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: selected ? const Color(0xFF7C3AED) : ink, fontSize: 10.5, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
