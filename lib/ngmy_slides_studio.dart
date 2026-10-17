@@ -1065,6 +1065,73 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
+  /// Edit the words on the slide you are on: every text box on it is a field here.
+  /// Each change is saved as you type (autosave), so you see it on the slide straight away.
+  Future<void> _openSlideTextSheet() async {
+    final deck = _activeDeck;
+    if (deck == null || _guardTransferredEdit() || !_canEditKiapoDeck()) return;
+    final slide = _currentSlide;
+    if (slide == null) return;
+    final texts = slide.elements.where((e) => e.type == NgmySlideElementType.text).toList();
+    if (texts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('This slide has no text boxes.')));
+      return;
+    }
+    final controllers = {for (final e in texts) e.id: TextEditingController(text: e.text)};
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF111827),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.8),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Edit this slide\'s text', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                const SizedBox(height: 4),
+                const Text('Changes save as you type.', style: TextStyle(color: Colors.white60, fontSize: 12)),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final e in texts) ...[
+                        TextField(
+                          controller: controllers[e.id],
+                          maxLines: null,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white.withValues(alpha: 0.06),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            isDense: true,
+                          ),
+                          onChanged: (v) {
+                            _updateElementText(e.id, v);
+                            _scheduleAutosave();
+                          },
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    for (final c in controllers.values) {
+      c.dispose();
+    }
+    if (mounted) setState(() {});
+  }
+
   /// The ending celebration after the last slide (same choice as ⋯ → Ending celebration).
   Future<void> _openEndingPicker() async {
     final d = _activeDeck;
@@ -4134,6 +4201,8 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
 
   Widget _modernRibbon(bool isDark, {required bool compact}) {
     final tabs = ['Home', 'Insert', 'School', 'Tools', 'Design', 'Transitions', 'View'];
+    // The AI-only buttons (green mic, ending, ring & frame, text edit) show only for a presentation the AI wrote.
+    final aiMade = _activeDeck?.aiMade ?? false;
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
       decoration: BoxDecoration(
@@ -4148,7 +4217,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
             child: Row(
-              children: tabs.map((t) {
+              children: tabs.map<Widget>((t) {
                 final sel = _ribbonTab == t;
                 return Padding(
                   padding: const EdgeInsets.only(right: 6),
@@ -4204,19 +4273,23 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   }),
                   ),
                 )
-                // Right after the mic: the ending celebration, and the logo ring & frame.
-                ..add(
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: _ribbonIconButton(Icons.celebration_rounded, 'Ending celebration', _openEndingPicker, isDark),
-                  ),
-                )
-                ..add(
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
-                  ),
-                )
+                // AI decks only, right after the mic: ending celebration, logo ring & frame, edit this slide's text.
+                ..addAll(aiMade
+                    ? <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.celebration_rounded, 'Ending celebration', _openEndingPicker, isDark),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.edit_note_rounded, 'Edit this slide\'s text', _openSlideTextSheet, isDark),
+                        ),
+                      ]
+                    : const <Widget>[])
                 // Book: write (yourself or with AI) and print a fold-and-staple book.
                 ..add(
                   Padding(

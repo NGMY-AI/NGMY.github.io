@@ -1567,9 +1567,12 @@ class _FinalePainter extends CustomPainter {
 /// A row of live mini previews to choose from ("None" first). Tap one to see it full screen
 /// and change its words or logo.
 class NgmyFinalePicker extends StatelessWidget {
-  const NgmyFinalePicker({super.key, required this.choice, required this.onChanged});
+  const NgmyFinalePicker({super.key, required this.choice, required this.onChanged, this.wrap = false});
   final NgmyFinaleChoice choice;
   final ValueChanged<NgmyFinaleChoice> onChanged;
+  /// true = every celebration shows, in rows you scroll down (the gallery sheet);
+  /// false = one strip you scroll sideways.
+  final bool wrap;
 
   @override
   Widget build(BuildContext context) {
@@ -1597,28 +1600,38 @@ class NgmyFinalePicker extends StatelessWidget {
           ),
         );
 
+    final noneCard = card(
+      selected: choice.none,
+      label: 'None',
+      onTap: () => onChanged(choice.copyWith(style: '')),
+      child: Container(color: Colors.white.withValues(alpha: 0.05), child: const Icon(Icons.block_rounded, color: Colors.white38)),
+    );
+    Widget styleCard(NgmyFinaleStyle st) => card(
+          selected: choice.style == st.id,
+          label: st.name,
+          onTap: () async {
+            final picked = await showNgmyFinalePreview(context, choice.copyWith(style: st.id));
+            if (picked != null) onChanged(picked);
+          },
+          child: IgnorePointer(child: NgmyFinaleView(choice: choice.copyWith(style: st.id), preview: true, animate: false)),
+        );
+
+    if (wrap) {
+      return Wrap(
+        spacing: 10,
+        runSpacing: 12,
+        children: [noneCard, for (final st in kNgmyFinales) styleCard(st)],
+      );
+    }
     return SizedBox(
       height: 100,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: [
-          card(
-            selected: choice.none,
-            label: 'None',
-            onTap: () => onChanged(choice.copyWith(style: '')),
-            child: Container(color: Colors.white.withValues(alpha: 0.05), child: const Icon(Icons.block_rounded, color: Colors.white38)),
-          ),
+          noneCard,
           for (final st in kNgmyFinales) ...[
             const SizedBox(width: 10),
-            card(
-              selected: choice.style == st.id,
-              label: st.name,
-              onTap: () async {
-                final picked = await showNgmyFinalePreview(context, choice.copyWith(style: st.id));
-                if (picked != null) onChanged(picked);
-              },
-              child: IgnorePointer(child: NgmyFinaleView(choice: choice.copyWith(style: st.id), preview: true, animate: false)),
-            ),
+            styleCard(st),
           ],
         ],
       ),
@@ -1787,22 +1800,28 @@ Future<NgmyFinaleChoice?> showNgmyFinaleGallery(BuildContext context, NgmyFinale
           decoration: const BoxDecoration(color: Color(0xFF0F0F14), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
           child: SafeArea(
             top: false,
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(9)))),
-              const SizedBox(height: 14),
-              const Text('Ending celebration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
-              const SizedBox(height: 4),
-              const Text('Plays after your last slide. Tap one to watch it and change its words or logo.',
-                  style: TextStyle(color: Colors.white60, fontSize: 12.5)),
-              const SizedBox(height: 14),
-              NgmyFinalePicker(
-                choice: choice,
-                onChanged: (c) {
-                  setLocal(() => choice = c);
-                  Navigator.pop(ctx, c);
-                },
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.85),
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(9)))),
+                  const SizedBox(height: 14),
+                  const Text('Ending celebration', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18)),
+                  const SizedBox(height: 4),
+                  const Text('Plays after your last slide. Tap one to watch it and change its words or logo.',
+                      style: TextStyle(color: Colors.white60, fontSize: 12.5)),
+                  const SizedBox(height: 14),
+                  NgmyFinalePicker(
+                    wrap: true,
+                    choice: choice,
+                    onChanged: (c) {
+                      setLocal(() => choice = c);
+                      Navigator.pop(ctx, c);
+                    },
+                  ),
+                ]),
               ),
-            ]),
+            ),
           ),
         ),
       );
