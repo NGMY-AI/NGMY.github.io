@@ -2017,3 +2017,139 @@ bool ngmySlidesApplyTextOnlyEdit(NgmySlideDeck deck, String newOutlineJson, {boo
   deck.aiOutlineJson = newOutlineJson;
   return true;
 }
+
+/// Look and feel for a presentation the AI wrote: pick a style and Luxury FX. Returns the
+/// rebuilt AI slides (the caller swaps them in), or null when nothing was changed.
+Future<NgmySlideDeck?> showNgmyLookAndFeelSheet(BuildContext context, {required NgmySlideDeck deck, required int currentSlide}) {
+  return showModalBottomSheet<NgmySlideDeck>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) => _LookAndFeelSheet(deck: deck, currentSlide: currentSlide),
+  );
+}
+
+class _LookAndFeelSheet extends StatefulWidget {
+  const _LookAndFeelSheet({required this.deck, required this.currentSlide});
+  final NgmySlideDeck deck;
+  final int currentSlide;
+  @override
+  State<_LookAndFeelSheet> createState() => _LookAndFeelSheetState();
+}
+
+class _LookAndFeelSheetState extends State<_LookAndFeelSheet> {
+  late String _style = ngmyParseSlidesAiOutline(widget.deck.aiOutlineJson ?? '', fallbackStyle: 'colorful')?.style ?? 'colorful';
+  late bool _luxe = ngmySlidesAiExtrasOf(widget.deck).contains(NgmySlidesAiExtra.luxe);
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _apply() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final style = kNgmySlidesAiStyles.firstWhere((s) => s.id == _style);
+      final extras = {...ngmySlidesAiExtrasOf(widget.deck)}..remove(NgmySlidesAiExtra.luxe);
+      if (_luxe) extras.add(NgmySlidesAiExtra.luxe);
+      final made = await ngmyEditSlidesWithAi(
+        outlineJson: widget.deck.aiOutlineJson ?? '',
+        request: 'Change the look: use the style "${style.id}"${_luxe ? ' with Luxury FX' : ''}. '
+            'Keep every word, slide, bullet, picture and the logo exactly as they are.',
+        currentSlide: widget.currentSlide,
+        extras: extras,
+        logo: ngmySlidesAiLogoOf(widget.deck),
+        pictures: ngmySlidesAiPhotosOf(widget.deck),
+      );
+      final newStyle = ngmyParseSlidesAiOutline(made.aiOutlineJson ?? '', fallbackStyle: _style)?.style ?? _style;
+      if (newStyle != style.id && !_luxe) {
+        throw 'The AI did not change the look. Try again.';
+      }
+      if (mounted) Navigator.of(context).pop(made);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink = isDark ? Colors.white : const Color(0xFF0F172A);
+    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF111827) : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFFDB2777)])),
+                  child: const Icon(Icons.palette_rounded, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text('Look and feel', style: TextStyle(color: ink, fontWeight: FontWeight.w900, fontSize: 18)),
+                ),
+              ]),
+              const SizedBox(height: 6),
+              Text('Pick a new look. Your words, pictures and logo stay the same.', style: TextStyle(color: muted, fontSize: 12.5)),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final s in kNgmySlidesAiStyles)
+                    ChoiceChip(
+                      label: Text(s.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                      selected: _style == s.id,
+                      onSelected: _busy ? null : (_) => setState(() => _style = s.id),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('Luxury FX', style: TextStyle(color: ink, fontWeight: FontWeight.w800)),
+                subtitle: Text('Moving light and ornaments, a new royal look each time', style: TextStyle(color: muted, fontSize: 12)),
+                value: _luxe,
+                onChanged: _busy ? null : (v) => setState(() => _luxe = v),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 6),
+                Text(_error!, style: const TextStyle(color: Color(0xFFF87171), fontWeight: FontWeight.w700)),
+              ],
+              const SizedBox(height: 14),
+              FilledButton(
+                onPressed: _busy ? null : _apply,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF7C3AED),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _busy
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Apply look', style: TextStyle(fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

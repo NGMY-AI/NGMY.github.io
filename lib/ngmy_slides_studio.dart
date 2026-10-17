@@ -1065,6 +1065,34 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     );
   }
 
+  /// Look and feel: change the style and Luxury FX of the presentation the AI wrote.
+  /// The new look replaces the AI slides in the same place; Undo brings the old one back.
+  Future<void> _openLookAndFeel() async {
+    final deck = _activeDeck;
+    if (deck == null || !deck.aiMade || _guardTransferredEdit()) return;
+    final made = await showNgmyLookAndFeelSheet(context, deck: deck, currentSlide: _slideIndex + 1);
+    if (made == null || !mounted || _activeDeck != deck) return;
+    final ids = (deck.aiSlideIds ?? const <String>[]).toSet();
+    var at = deck.slides.indexWhere((s) => ids.contains(s.id));
+    _mutate(() {
+      if (at < 0) at = deck.slides.length;
+      deck.slides.removeWhere((s) => ids.contains(s.id));
+      at = at.clamp(0, deck.slides.length);
+      deck.slides.insertAll(at, made.slides);
+      deck
+        ..aiOutlineJson = made.aiOutlineJson
+        ..aiSlideIds = made.aiSlideIds
+        ..aiExtras = made.aiExtras
+        ..cinematic = made.cinematic;
+      _slideIndex = _slideIndex.clamp(0, deck.slides.length - 1);
+      _selectedElementId = null;
+      _clearTextControllers();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Done — the look is changed. Undo brings back the old one.')),
+    );
+  }
+
   /// Edit the words on the slide you are on: every text box on it is a field here.
   /// Each change is saved as you type (autosave), so you see it on the slide straight away.
   Future<void> _openSlideTextSheet() async {
@@ -4282,10 +4310,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                           padding: const EdgeInsets.only(left: 6),
                           child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 6),
-                          child: _ribbonIconButton(Icons.edit_note_rounded, 'Edit this slide\'s text', _openSlideTextSheet, isDark),
-                        ),
                       ]
                     : const <Widget>[])
                 // Book: write (yourself or with AI) and print a fold-and-staple book.
@@ -4313,7 +4337,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                       ),
                     ),
                   ),
-                ),
+                )
+                // Between Book and the text editor (AI decks only): look and feel, then edit this slide's text.
+                ..addAll(aiMade
+                    ? <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.palette_rounded, 'Look and feel', _openLookAndFeel, isDark),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 6),
+                          child: _ribbonIconButton(Icons.edit_note_rounded, 'Edit this slide\'s text', _openSlideTextSheet, isDark),
+                        ),
+                      ]
+                    : const <Widget>[]),
             ),
           ),
           SingleChildScrollView(
