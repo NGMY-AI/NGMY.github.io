@@ -6,6 +6,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'ngmy_civic_registry_stats.dart';
 
 /// Per-state + optional global Civic Registry PIN helpers.
+/// Choice in the state list that sets the same PIN for every state (admin only).
+const String kNgmyPinAllStates = 'All states';
+
+/// Every state, in the order the PIN list shows them.
+const List<String> kNgmyUsStateNames = [ 'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming', ];
+
+
 class NgmyCivicRegistryPins {
   static const _localKey = 'ngmy_civic_registry_pins_backup';
 
@@ -89,7 +96,7 @@ void showNgmyCivicRegistryPinSheet(
   required String initialState,
   required bool canEditAnyState,
   required String reviewerAssignedState,
-  required Future<void> Function(String state, String pin, String globalPin) onSave,
+  required Future<String?> Function(String state, String pin, String globalPin) onSave,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -116,7 +123,7 @@ class _CivicRegistryPinSheet extends StatefulWidget {
   final String initialState;
   final bool canEditAnyState;
   final String reviewerAssignedState;
-  final Future<void> Function(String state, String pin, String globalPin) onSave;
+  final Future<String?> Function(String state, String pin, String globalPin) onSave;
 
   const _CivicRegistryPinSheet({
     required this.isDark,
@@ -138,6 +145,8 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
   late final TextEditingController _pinC;
   late final TextEditingController _globalC;
   bool _busy = false;
+  bool _showPin = false;
+  bool _showGlobal = false;
 
   @override
   void initState() {
@@ -145,13 +154,13 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
     final allowed = _allowedStates;
     _state = allowed.contains(widget.initialState)
         ? widget.initialState
-        : (allowed.isNotEmpty ? allowed.first : widget.usStates.first);
+        : (allowed.firstWhere((s) => s != kNgmyPinAllStates, orElse: () => widget.usStates.first));
     _pinC = TextEditingController(text: widget.pinsByState[_state] ?? '');
     _globalC = TextEditingController(text: widget.globalPin);
   }
 
   List<String> get _allowedStates {
-    if (widget.canEditAnyState) return widget.usStates;
+    if (widget.canEditAnyState) return [kNgmyPinAllStates, ...widget.usStates];
     final assigned = widget.reviewerAssignedState.trim();
     if (assigned.isEmpty) return widget.usStates;
     return widget.usStates.where((s) => s.trim().toLowerCase() == assigned.toLowerCase()).toList();
@@ -168,6 +177,7 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final allowed = _allowedStates;
+    final pinLabel = _state == kNgmyPinAllStates ? 'PIN for all states' : 'PIN for $_state';
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Align(
@@ -231,9 +241,10 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
               TextField(
                 controller: _pinC,
                 keyboardType: TextInputType.number,
-                obscureText: true,
+                obscureText: !_showPin,
                 decoration: InputDecoration(
-                  labelText: 'PIN for $_state',
+                  labelText: pinLabel,
+                  suffixIcon: IconButton(onPressed: () => setState(() => _showPin = !_showPin), icon: Icon(_showPin ? Icons.visibility_off_rounded : Icons.visibility_rounded)),
                   filled: true,
                   fillColor: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -244,9 +255,10 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
                 TextField(
                   controller: _globalC,
                   keyboardType: TextInputType.number,
-                  obscureText: true,
+                  obscureText: !_showGlobal,
                   decoration: InputDecoration(
                     labelText: 'Fallback PIN (all states without their own PIN)',
+                    suffixIcon: IconButton(onPressed: () => setState(() => _showGlobal = !_showGlobal), icon: Icon(_showGlobal ? Icons.visibility_off_rounded : Icons.visibility_rounded)),
                     filled: true,
                     fillColor: isDark ? const Color(0xFF1C1F2E) : const Color(0xFFF8FAFC),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -267,11 +279,15 @@ class _CivicRegistryPinSheetState extends State<_CivicRegistryPinSheet> {
                         }
                         setState(() => _busy = true);
                         try {
-                          await widget.onSave(_state, pin, _globalC.text.trim());
+                          final error = await widget.onSave(_state, pin, _globalC.text.trim());
                           if (!context.mounted) return;
+                          if (error != null) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+                            return;
+                          }
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Registry PIN saved for $_state.')),
+                            SnackBar(content: Text(_state == kNgmyPinAllStates ? 'Registry PIN saved for all states.' : 'Registry PIN saved for $_state.')),
                           );
                         } finally {
                           if (mounted) setState(() => _busy = false);

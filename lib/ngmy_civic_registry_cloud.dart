@@ -492,6 +492,7 @@ Future<bool> ngmyCivicSaveRegistryPins({
   String state = '',
   String pin = '',
   String? globalPin,
+  Map<String, String>? byState,
 }) async {
   final data = await ngmyCivicInvoke({
     'action': 'civicSaveRegistryPins',
@@ -499,6 +500,7 @@ Future<bool> ngmyCivicSaveRegistryPins({
     if (state.trim().isNotEmpty) 'state': state.trim(),
     if (pin.trim().isNotEmpty) 'pin': pin.trim(),
     if (globalPin != null) 'globalPin': globalPin.trim(),
+    if (byState != null && byState.isNotEmpty) 'byState': byState,
   });
   return data != null && data['ok'] == true;
 }

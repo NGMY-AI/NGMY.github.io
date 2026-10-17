@@ -3124,7 +3124,9 @@ Future<void> _persistCivicCitiesAndRoomsNow(AppConfig config) async {
   }
 }
 
-Future<void> _persistCivicRegistryPins(
+/// Saves a PIN for one state, or — for the admin's "All states" choice — for every state.
+/// Returns null when it is saved on the server, or the message to show the user.
+Future<String?> _persistCivicRegistryPins(
   AppConfig config, {
   required String state,
   required String pin,
@@ -3132,12 +3134,31 @@ Future<void> _persistCivicRegistryPins(
 }) async {
   final st = state.trim();
   final p = pin.trim();
-  if (st.isNotEmpty && p.isNotEmpty) {
-    config.civicRegistryPinsByState = Map<String, String>.from(config.civicRegistryPinsByState)..[st] = p;
+  if (p.isEmpty) return 'Enter a PIN first.';
+  final allStates = st == kNgmyPinAllStates;
+  if (st.isEmpty) return 'Choose a state first.';
+  final email = ngmyCurrentAuthEmail();
+  if (email.isEmpty) return 'Sign in again to save the PIN.';
+  final batch = <String, String>{};
+  if (allStates) {
+    for (final s in kNgmyUsStateNames) {
+      batch[s] = p;
+    }
+  } else {
+    batch[st] = p;
   }
-  if (globalPin != null && globalPin.trim().isNotEmpty) {
-    config.civicRegistryPin = globalPin.trim();
-  }
+  final typedGlobal = globalPin?.trim() ?? '';
+  final nextGlobal = typedGlobal.isNotEmpty ? typedGlobal : (allStates ? p : '');
+  final saved = await ngmyCivicSaveRegistryPins(
+    email: email,
+    state: allStates ? '' : st,
+    pin: allStates ? '' : p,
+    globalPin: nextGlobal.isEmpty ? null : nextGlobal,
+    byState: allStates ? batch : null,
+  );
+  if (!saved) return 'The PIN could not be saved. Check your connection and try again.';
+  config.civicRegistryPinsByState = Map<String, String>.from(config.civicRegistryPinsByState)..addAll(batch);
+  if (nextGlobal.isNotEmpty) config.civicRegistryPin = nextGlobal;
   await NgmyCivicRegistryPins.saveLocalBackup(
     globalPin: config.civicRegistryPin,
     pinsByState: config.civicRegistryPinsByState,
@@ -3148,17 +3169,8 @@ Future<void> _persistCivicRegistryPins(
   } catch (e) {
     debugPrint('[config] local civic pins save: $e');
   }
-  final email = ngmyCurrentAuthEmail();
-  if (email.isEmpty || !await ngmyCanReachCloud()) return;
-  final ok = await ngmyCivicSaveRegistryPins(
-    email: email,
-    state: st,
-    pin: p,
-    globalPin: globalPin,
-  );
-  if (!ok) debugPrint('[config] civic pins Edge save failed');
-  // Refresh from server (role-filtered) so local matches what Edge stored.
   await _mergeCivicRegistryPinsIntoConfig(config);
+  return null;
 }
 
 /// Civic Registry King — crowned by admin; may approve registrars and change states in their state.
@@ -3224,12 +3236,16 @@ void _openCivicRegistryPinSheet(
     canEditAnyState: reviewer.isAdmin,
     // Every authorized registrar sets only their own state's PIN; only the admin sees all states.
     reviewerAssignedState: reviewer.isAdmin ? '' : scope,
-    onSave: (state, pin, globalPin) => _persistCivicRegistryPins(
-      config,
-      state: state,
-      pin: pin,
-      globalPin: reviewer.isAdmin ? globalPin : null,
-    ).then((_) => onDataChanged()),
+    onSave: (state, pin, globalPin) async {
+      final error = await _persistCivicRegistryPins(
+        config,
+        state: state,
+        pin: pin,
+        globalPin: reviewer.isAdmin ? globalPin : null,
+      );
+      if (error == null) onDataChanged();
+      return error;
+    },
   );
 }
 
@@ -38100,7 +38116,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
       return;
     }
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canPin = _isCivicRegistryKing(widget.user) || widget.user.isAdmin;
+    final canPin = _hasCivicRegistrarReviewAccess(widget.user, widget.config);
     final bg = isDark ? const Color(0xFF121212) : const Color(0xFFF7F8FA);
     final card = isDark ? const Color(0xFF151C2C) : Colors.white;
     final ink = isDark ? Colors.white : const Color(0xFF0F172A);
