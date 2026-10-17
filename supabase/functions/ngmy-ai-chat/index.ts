@@ -6320,8 +6320,8 @@ async function handleCivicGateMatchName(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = await requireJwtEmail(req);
-  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  // The state PIN proof (pinSig) is the gate here; no login is needed.
+  const email = emailKey(String(body.email ?? ""));
   const state = String(body.state ?? "").trim();
   const fullName = String(body.fullName ?? "").trim();
   const pinSig = String(body.pinSig ?? "").trim();
@@ -6385,8 +6385,8 @@ async function handleCivicGateVerifyIdentity(
   req: Request,
   body: Record<string, unknown>,
 ): Promise<Response> {
-  const email = await requireJwtEmail(req);
-  if (!email) return jsonOk({ error: "Authentication required" }, 401);
+  // The state PIN proof (pinSig) is the gate here; no login is needed.
+  const email = emailKey(String(body.email ?? ""));
   const state = String(body.state ?? "").trim();
   const pinSig = String(body.pinSig ?? "").trim();
   const memberEmail = emailKey(String(body.memberEmail ?? ""));

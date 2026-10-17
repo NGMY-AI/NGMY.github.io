@@ -570,19 +570,9 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
   bool get _obscure => _step == 0;
 
 
-  Future<void> _checkStatePin(String value, String expected) async {
-    if (expected.isNotEmpty && value == expected) {
-      if (mounted) setState(() => _step = 1);
-      return;
-    }
-    final verified = await ngmyCivicVerifyStatePin(email: '', state: widget.state, pin: value);
-    if (!mounted) return;
-    if (verified.ok) {
-      setState(() => _step = 1);
-    } else {
-      setState(() => _error = 'Incorrect state PIN. Try again.');
-    }
-  }
+  String? _pinSig;
+  String? _memberEmail;
+
   void _submit() {
     setState(() => _error = null);
     final value = _activeController.text.trim();
@@ -590,77 +580,76 @@ class _NgmyCivicStateWalletVerifyScreenState extends State<NgmyCivicStateWalletV
       setState(() => _error = 'This field is required.');
       return;
     }
+    unawaited(_checkStep(value));
+  }
 
+  void _fail(String message) {
+    if (mounted) setState(() => _error = message);
+  }
+
+  /// Each of the four steps is checked on the server, so a registered member passes no matter
+  /// which records this phone holds. The state PIN proof from step 1 is carried into steps 2-4.
+  Future<void> _checkStep(String value) async {
     if (_step == 0) {
-      final expected = civicRegistryEffectivePin(
-        globalPin: widget.globalPin,
-        pinsByState: widget.pinsByState,
-        state: widget.state,
-      );
-      // Check the PIN on the server so every member can pass, not only the ones whose phone has it.
-      unawaited(_checkStatePin(value, expected));
-      return;
-    }
-
-    if (_step == 1) {
-      final member = NgmyCivicWalletIdentity.findByName(
-        members: widget.members,
-        state: widget.state,
-        fullName: value,
-      );
-      if (member == null) {
-        setState(() => _error = 'That name is not registered in ${widget.state}.');
+      final verified = await ngmyCivicVerifyStatePin(email: '', state: widget.state, pin: value);
+      if (!mounted) return;
+      final sig = verified.pinSig ?? '';
+      if (!verified.ok || sig.isEmpty) {
+        _fail('Incorrect state PIN. Try again.');
         return;
       }
       setState(() {
-        _matchedMember = member;
-        _step = 2;
-      });
-      return;
-    }
-
-    if (_step == 2) {
-      final member = _matchedMember;
-      if (member == null) {
-        setState(() {
-          _error = 'Start over â€” name step was lost.';
-          _step = 1;
-        });
-        return;
-      }
-      final storedDob = (member['dob'] ?? '').toString().trim();
-      if (storedDob.isNotEmpty && !NgmyCivicWalletIdentity.dobMatches(member, value)) {
-        setState(() => _error = 'Date of birth does not match that registered name.');
-        return;
-      }
-      setState(() => _step = 3);
-      return;
-    }
-
-    final member = _matchedMember;
-    if (member == null) {
-      setState(() {
-        _error = 'Start over â€” verification incomplete.';
+        _pinSig = sig;
         _step = 1;
       });
       return;
     }
-    final byId = NgmyCivicWalletIdentity.findById(
-      members: widget.members,
-      state: widget.state,
-      registryId: value,
-    );
-    final dob = _dobC.text.trim();
-    final storedDob = (byId?['dob'] ?? '').toString().trim();
-    final resolved = (byId != null &&
-            (storedDob.isEmpty || dob.isEmpty || NgmyCivicWalletIdentity.dobMatches(byId, dob)))
-        ? byId
-        : (NgmyCivicWalletIdentity.idMatches(member, value) ? member : null);
-    if (resolved == null) {
-      setState(() => _error = 'Registry ID does not match that member.');
+    final pinSig = _pinSig ?? '';
+    if (_step == 1) {
+      final matched = await ngmyCivicGateMatchName(email: '', state: widget.state, pinSig: pinSig, fullName: value);
+      if (!mounted) return;
+      final who = matched.memberEmail ?? '';
+      if (matched.ok && who.isNotEmpty) {
+        setState(() {
+          _memberEmail = who;
+          _step = 2;
+        });
+        return;
+      }
+      _fail(matched.error ?? 'That name is not registered in ${widget.state}.');
       return;
     }
-    NgmyNavigator.pop(context, true);
+    if (_step == 2) {
+      final checked = await ngmyCivicGateVerifyIdentity(
+        email: '',
+        state: widget.state,
+        pinSig: pinSig,
+        memberEmail: _memberEmail ?? '',
+        dob: value,
+        step: 'dob',
+      );
+      if (!mounted) return;
+      if (checked.ok) {
+        setState(() => _step = 3);
+        return;
+      }
+      _fail(checked.error ?? 'Date of birth does not match that registered name.');
+      return;
+    }
+    final checked = await ngmyCivicGateVerifyIdentity(
+      email: '',
+      state: widget.state,
+      pinSig: pinSig,
+      memberEmail: _memberEmail ?? '',
+      registryId: value,
+      step: 'id',
+    );
+    if (!mounted) return;
+    if (checked.ok) {
+      NgmyNavigator.pop(context, true);
+      return;
+    }
+    _fail(checked.error ?? 'Registry ID does not match that member.');
   }
 
   @override
