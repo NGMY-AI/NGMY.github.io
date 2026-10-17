@@ -2987,6 +2987,14 @@ Future<void> ngmyHydrateCivicHelpCampaignSpendings(AppConfig config) async {
       config.helpCampaignSpendings,
       remote,
     );
+    // Write the merged list back to the shared copy, so rows only this phone has reach every
+    // device and every member sees the same wallet.
+    if (config.helpCampaignSpendings.length != remote.length) {
+      await ngmyDbRelaySettingsUpsert(
+        _kNgmyCivicHelpCampaignSpendingsSettingsKey,
+        {'items': config.helpCampaignSpendings},
+      );
+    }
     await _persistCivicHelpCampaignSpendingsLocal(config);
   } catch (e) {
     debugPrint('[civic help spendings] shared cloud hydrate: $e');
