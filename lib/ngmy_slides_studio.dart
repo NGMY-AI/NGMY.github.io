@@ -1041,6 +1041,20 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                           ChoiceChip(label: Text(label), selected: ring == id, onSelected: (_) => choose(r: id)),
                       ],
                     ),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        final ref = await ngmyPickImageBase64();
+                        if (ref == null) return;
+                        _mutate(() {
+                          for (final t in targets) {
+                            t.imageRef = ref;
+                          }
+                        });
+                      },
+                      icon: const Icon(Icons.upload_rounded),
+                      label: const Text('Change logo — upload another picture'),
+                    ),
                   ],
                 ),
               ),
@@ -1393,6 +1407,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
       final c = _controllerFor(el);
       c.selection = TextSelection.collapsed(offset: c.text.length);
     });
+  }
+
+  /// One tap on a text box starts editing it right away (type over the AI's words);
+  /// a tap on a picture or logo selects it.
+  void _tapElement(NgmySlideElement e) {
+    if (e.type == NgmySlideElementType.text && !_isTransferredReadOnly() && _canEditKiapoDeck()) {
+      _startTextEditing(e.id);
+      return;
+    }
+    _selectElement(e.id);
   }
 
   void _selectElement(String? id) {
@@ -4180,11 +4204,17 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   }),
                   ),
                 )
-                // Logo: its shape (frame) and ring, next to the mic.
+                // Right after the mic: the ending celebration, and the logo ring & frame.
                 ..add(
                   Padding(
                     padding: const EdgeInsets.only(left: 6),
-                    child: _ribbonIconButton(Icons.image_rounded, 'Logo shape & ring', _openLogoLookSheet, isDark),
+                    child: _ribbonIconButton(Icons.celebration_rounded, 'Ending celebration', _openEndingPicker, isDark),
+                  ),
+                )
+                ..add(
+                  Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
                   ),
                 )
                 // Book: write (yourself or with AI) and print a fold-and-staple book.
@@ -4211,19 +4241,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                         ),
                       ),
                     ),
-                  ),
-                )
-                // Right side: ending celebration, and logo ring & frame.
-                ..add(
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12),
-                    child: _ribbonIconButton(Icons.celebration_rounded, 'Ending celebration', _openEndingPicker, isDark),
-                  ),
-                )
-                ..add(
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
-                    child: _ribbonIconButton(Icons.radio_button_checked_rounded, 'Logo ring & frame', _openLogoLookSheet, isDark),
                   ),
                 ),
             ),
@@ -4987,7 +5004,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
           unawaited(_redoMarriageSignature(e));
           return;
         }
-        if (selectable) _selectElement(e.id);
+        if (selectable) _tapElement(e);
       };
     }
     return Positioned(
@@ -5069,7 +5086,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                           }
                           if (!selectable) return;
                           if (_editingTextId == e.id) return;
-                          _selectElement(e.id);
+                          _tapElement(e);
                         },
                         onDoubleTap: selectable && e.type == NgmySlideElementType.text
                             ? () => _startTextEditing(e.id)
