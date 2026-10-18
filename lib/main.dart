@@ -23572,7 +23572,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
     return [
       for (final r in rows)
-        if ((r['email'] ?? '').toString().trim().isNotEmpty)
+        if ((r['email'] ?? '').toString().trim().isNotEmpty &&
+            !(r['email'] ?? '').toString().toLowerCase().contains('+local.ngmy'))
           NgmyDiceUserOption(
             email: (r['email'] ?? '').toString().trim(),
             name: (r['username'] ?? '').toString().trim(),
@@ -23636,7 +23637,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         diceSettings: dice,
         diceUsers: [
           for (final u in widget.allUsers)
-            if (u.email.trim().isNotEmpty)
+            if (u.email.trim().isNotEmpty && !u.email.toLowerCase().contains('+local.ngmy'))
               NgmyDiceUserOption(
                 email: u.email.trim(),
                 name: (u.username.trim().isNotEmpty ? u.username : (u.fullName ?? '')).trim(),

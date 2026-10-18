@@ -3730,6 +3730,12 @@ function diceRecords(value: unknown): Record<string, unknown>[] {
     : [];
 }
 
+// Growth Income plays as "you@x.com+local.ngmy": the same person as "you@x.com".
+function diceEmailKey(raw: string): string {
+  const k = emailKey(raw);
+  return k.endsWith("+local.ngmy") ? k.slice(0, -"+local.ngmy".length) : k;
+}
+
 function diceNum(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -3737,7 +3743,7 @@ function diceNum(value: unknown): number {
 
 // A player sees the shared dice rules but only their own personal rows.
 function diceFilterForPlayer(value: Record<string, unknown>, email: string): Record<string, unknown> {
-  const mine = (r: Record<string, unknown>) => emailKey(String(r.email ?? "")) === email;
+  const mine = (r: Record<string, unknown>) => diceEmailKey(String(r.email ?? "")) === diceEmailKey(email);
   return {
     ...value,
     diceServer: 1,
@@ -3757,7 +3763,7 @@ function diceMergePlayerWrite(
   const incoming = incomingRaw && typeof incomingRaw === "object" && !Array.isArray(incomingRaw)
     ? (incomingRaw as Record<string, unknown>)
     : {};
-  const mine = (r: Record<string, unknown>) => emailKey(String(r.email ?? "")) === email;
+  const mine = (r: Record<string, unknown>) => diceEmailKey(String(r.email ?? "")) === diceEmailKey(email);
   const countDown = (
     currentRows: unknown,
     incomingRows: unknown,

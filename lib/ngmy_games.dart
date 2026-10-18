@@ -390,7 +390,7 @@ class _NgmyDiceGameScreenState extends State<NgmyDiceGameScreen> {
       setState(() => _betLocked = true);
     }
 
-    await NgmyDiceLive.pull(widget.diceSettings);
+    await NgmyDiceLive.pullForRoll(widget.diceSettings);
     final outcome = ngmyPickDiceOutcome(widget.diceSettings, widget.userEmail, _rng);
     widget.onDiceSettingsChanged();
     unawaited(NgmyDiceLive.push(widget.diceSettings));

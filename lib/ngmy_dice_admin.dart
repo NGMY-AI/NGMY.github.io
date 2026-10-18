@@ -133,7 +133,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
     _poll = Timer(Duration(milliseconds: _anyCounting ? 1000 : 4000), () => unawaited(_refresh()));
   }
 
-  Future<void> _save(String message, void Function() apply) async {
+  Future<void> _save(String message, void Function() apply, {String? verifyEmail}) async {
     if (_saving) return;
     _poll?.cancel();
     setState(() => _saving = true);
@@ -142,13 +142,21 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
       if (widget.livePoll) await NgmyDiceLive.pull(widget.settings);
       apply();
       error = await widget.onChanged();
+      if (error == null && verifyEmail != null && widget.livePoll) {
+        final key = verifyEmail.toLowerCase().trim();
+        String stamp = '';
+        for (final g in widget.settings.userOutcomeRules) {
+          if ((g['email'] ?? '').toString().toLowerCase().trim() == key) stamp = (g['updatedAt'] ?? '').toString();
+        }
+        if (stamp.isNotEmpty) error = await NgmyDiceLive.verifyPlayerRule(verifyEmail, stamp);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         backgroundColor: error == null ? null : const Color(0xFFB91C1C),
-        duration: Duration(seconds: error == null ? 3 : 6),
+        duration: Duration(seconds: error == null ? 3 : 8),
         content: Text(error == null
             ? message
-            : 'Saved on this phone, but the server did not take it yet, so players will not see it. ($error)'),
+            : 'Saved on this phone, but the server did not take it, so players will not see it. ($error)'),
       ));
     } finally {
       if (mounted) {
@@ -272,6 +280,7 @@ class _NgmyDiceControlPanelState extends State<NgmyDiceControlPanel> {
         loses: _userLoses,
         plus3: _userPlus3,
       ),
+      verifyEmail: picked.email,
     );
   }
 

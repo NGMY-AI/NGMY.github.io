@@ -150,7 +150,11 @@ Map<String, int> ngmyDefaultDiceWeights() => {
       '-2': 20,
     };
 
-String _emailKey(String email) => email.toLowerCase().trim();
+/// One person, one key: Growth Income plays as "you@x.com+local.ngmy", which is the same player.
+String _emailKey(String email) {
+  final k = email.toLowerCase().trim();
+  return k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+}
 
 Map<String, dynamic> _findPlayer(NgmyDiceSettings cfg, String email) {
   final key = _emailKey(email);
@@ -697,20 +701,46 @@ class NgmyDiceLive {
   static String lastError = '';
   static DateTime? lastPullAt;
   static Future<bool>? _inflight;
+  static NgmyDiceSettings? _inflightFor;
+
+  /// Test hooks: replace the network calls.
+  static Future<Map<String, dynamic>?> Function()? fetchOverride;
+  static Future<void> Function(Map<String, dynamic> value)? upsertOverride;
 
   /// Pulls the newest shared rules and counts into [cfg]. Always asks the server (never the
-  /// 5-second read cache), so counts move as players play.
+  /// 5-second read cache), so counts move as players play. One read serves one settings object;
+  /// another object (the roll screen while the admin panel is polling) gets its own read.
   static Future<bool> pull(NgmyDiceSettings cfg) {
-    return _inflight ??= _pull(cfg).whenComplete(() => _inflight = null);
+    final running = _inflight;
+    if (running != null && identical(_inflightFor, cfg)) return running;
+    late Future<bool> mine;
+    mine = _pull(cfg).whenComplete(() {
+      if (identical(_inflight, mine)) {
+        _inflight = null;
+        _inflightFor = null;
+      }
+    });
+    _inflight = mine;
+    _inflightFor = cfg;
+    return mine;
+  }
+
+  /// Like [pull], with one more try when the first read fails, so a brief network hiccup does not
+  /// make a roll skip the player's rule.
+  static Future<bool> pullForRoll(NgmyDiceSettings cfg) async {
+    if (await pull(cfg)) return true;
+    return pull(cfg);
   }
 
   static Future<bool> _pull(NgmyDiceSettings cfg) async {
     try {
-      final remote = await ngmyDbRelaySettingsFetch(
-        kNgmyDiceLiveSettingsKey,
-        timeout: const Duration(seconds: 4),
-        fresh: true,
-      );
+      final remote = fetchOverride != null
+          ? await fetchOverride!()
+          : await ngmyDbRelaySettingsFetch(
+              kNgmyDiceLiveSettingsKey,
+              timeout: const Duration(seconds: 5),
+              fresh: true,
+            );
       lastError = '';
       lastPullAt = DateTime.now();
       serverReady = remote != null && remote['diceServer'] == 1;
@@ -726,12 +756,40 @@ class NgmyDiceLive {
   /// Sends [cfg] to the shared row. Returns null on success, or the reason it failed.
   static Future<String?> push(NgmyDiceSettings cfg) async {
     try {
-      await ngmyDbRelaySettingsUpsert(
-        kNgmyDiceLiveSettingsKey,
-        cfg.toJson(),
-        timeout: const Duration(seconds: 6),
-      );
+      if (upsertOverride != null) {
+        await upsertOverride!(cfg.toJson());
+      } else {
+        await ngmyDbRelaySettingsUpsert(
+          kNgmyDiceLiveSettingsKey,
+          cfg.toJson(),
+          timeout: const Duration(seconds: 8),
+        );
+      }
       return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  /// Reads the server's copy of one player's rule and says whether it holds exactly what the
+  /// admin saved (same save time, counts not above what was set). Null means it is there.
+  static Future<String?> verifyPlayerRule(String email, String updatedAt) async {
+    try {
+      final remote = fetchOverride != null
+          ? await fetchOverride!()
+          : await ngmyDbRelaySettingsFetch(
+              kNgmyDiceLiveSettingsKey,
+              timeout: const Duration(seconds: 6),
+              fresh: true,
+            );
+      if (remote == null) return 'The server has no dice rules saved yet.';
+      final key = _emailKey(email);
+      for (final g in NgmyDiceSettings.fromJson(remote).userOutcomeRules) {
+        if (_emailKey((g['email'] ?? '').toString()) != key) continue;
+        if ((g['updatedAt'] ?? '').toString() == updatedAt) return null;
+        if ((g['updatedAt'] ?? '').toString().compareTo(updatedAt) > 0) return null;
+      }
+      return 'The server did not keep this rule for $email.';
     } catch (e) {
       return e.toString();
     }
