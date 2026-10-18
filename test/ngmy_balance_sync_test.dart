@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_game_session.dart';
 import 'package:ngmy/ngmy_wallet_server.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('a phone with an old higher balance never brings spent money back', () {
     // Phone B still shows 352; phone A already lost a 2 bet, so the server holds 350.
     final target = ngmyBalanceToSave(local: 352, known: 352, cloud: 350);
@@ -37,5 +39,39 @@ void main() {
     ngmyEndGameSettle();
     await f;
     expect(waited, isTrue);
+  });
+
+  test('the balance drops the moment a bet is placed and a late older number cannot raise it', () async {
+    const email = 'live@x.com';
+    ngmySeedLiveBalance(email, 350, authoritative: true);
+    ngmyBeginGameSettle();
+    ngmyNotifyBalanceChanged(email: email, balance: 348, authoritative: true);
+    expect(ngmyLiveBalanceFor(email), 348);
+    // A database echo or an older read that still says 350 arrives mid-settle.
+    ngmyNotifyBalanceChanged(email: email, balance: 350);
+    ngmySeedLiveBalance(email, 350);
+    expect(ngmyLiveBalanceFor(email), 348);
+    // The server's answer is authoritative.
+    ngmySeedLiveBalance(email, 348, authoritative: true);
+    ngmyEndGameSettle();
+    ngmyNotifyBalanceChanged(email: email, balance: 350);
+    expect(ngmyLiveBalanceFor(email), 348);
+  });
+
+  test('a win shows instantly and a stale lower number never hides it', () {
+    const email = 'win@x.com';
+    ngmySeedLiveBalance(email, 348, authoritative: true);
+    ngmyBeginGameSettle();
+    ngmyNotifyBalanceChanged(email: email, balance: 352, authoritative: true);
+    expect(ngmyLiveBalanceFor(email), 352);
+    ngmyEndGameSettle();
+  });
+
+  test('raises are accepted again once the settle window has passed', () async {
+    const email = 'later@x.com';
+    ngmySeedLiveBalance(email, 100, authoritative: true);
+    await Future<void>.delayed(const Duration(milliseconds: 2700));
+    ngmyNotifyBalanceChanged(email: email, balance: 150);
+    expect(ngmyLiveBalanceFor(email), 150);
   });
 }

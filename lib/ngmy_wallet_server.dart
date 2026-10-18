@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'ngmy_game_session.dart';
 import 'ngmy_network_resilience.dart';
 
 /// Outcome of settling one game bet or payout on the server.
@@ -36,9 +37,14 @@ int _gameSettlesInFlight = 0;
 
 /// Marks a game bet or payout as on its way to the server. Balance saves wait for it, so a save
 /// made from this phone's figure can never land between the bet and the server's answer.
-void ngmyBeginGameSettle() => _gameSettlesInFlight++;
+void ngmyBeginGameSettle() {
+  _gameSettlesInFlight++;
+  ngmyGameSettleStarted();
+}
+
 void ngmyEndGameSettle() {
   if (_gameSettlesInFlight > 0) _gameSettlesInFlight--;
+  ngmyGameSettleFinished();
 }
 
 Future<void> ngmyWaitForGameSettles({Duration max = const Duration(seconds: 8)}) async {

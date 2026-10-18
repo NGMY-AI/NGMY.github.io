@@ -931,6 +931,12 @@ double ngmyResolveAccountBalance(
 ) {
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
+  // While a bet or payout is on its way to the server, the on-screen balance already holds it;
+  // an older figure arriving now must not paint over it.
+  if (ngmyGameSettleActive) {
+    final live = ngmyCachedLiveBalance(key);
+    if (live != null) return live.clamp(0.0, double.infinity).toDouble();
+  }
   // Once the server has settled a game for this account, its balance is the one truth.
   final serverBalance = ngmyFreshServerBalance(key);
   if (serverBalance != null) return serverBalance.clamp(0.0, double.infinity).toDouble();
@@ -11017,19 +11023,19 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       ));
     }
     if (result == null) {
-      // Offline: the receipt waits in the outbox; the balance is corrected by the next sync.
-      if (await _pushTransactionToCloudReliable(t)) _txnOutboxDone(t.id);
+      // Offline: the receipt waits in the outbox and goes through the same one-step server
+      // settle again later. A plain row upload would make the server skip the balance change.
       return;
     }
     final serverBalance = result.balance;
     if (serverBalance != null) {
-      ngmySeedLiveBalance(email, serverBalance, allowIncrease: true);
+      ngmySeedLiveBalance(email, serverBalance, allowIncrease: true, authoritative: true);
       final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
       if (idx != -1) _allUsers[idx].accountBalance = serverBalance;
       if (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == email) {
         _currentUser!.accountBalance = serverBalance;
       }
-      ngmyNotifyBalanceChanged();
+      ngmyNotifyBalanceChanged(email: email, balance: serverBalance, authoritative: true);
       if (mounted) setState(() {});
     }
     if (result.applied || result.reason == 'duplicate') {
@@ -11051,9 +11057,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (!await ngmyCanReachCloud()) return;
     _txnOutboxFlushing = true;
     try {
-      final waiting = _allTransactions.where((t) => _txnOutbox.contains(t.id)).toList();
+      final queued = _allTransactions.where((t) => _txnOutbox.contains(t.id)).toList();
+      final waiting = queued.where((t) => !ngmyIsGameLedgerTransaction(t)).toList();
+      final waitingGames = queued.where(ngmyIsGameLedgerTransaction).toList();
       // Ids no longer on this phone (deleted / replaced) have nothing to send.
-      _txnOutbox.removeWhere((id) => !waiting.any((t) => t.id == id));
+      _txnOutbox.removeWhere((id) => !queued.any((t) => t.id == id));
+      for (final g in waitingGames) {
+        await _settleGameTxnOnServer(g);
+      }
       if (waiting.any((t) => t.type == TransactionType.contribution)) {
         await ngmyEnsurePrivilegedCloudSession();
       }
@@ -11335,6 +11346,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       final pending = t.status == TransactionStatus.pending;
       final recent = t.timestamp.isAfter(cutoff);
       final dirty = _dirtyTransactionIds.contains(t.id);
+      if (ngmyIsGameLedgerTransaction(t) && (dirty || _txnOutbox.contains(t.id))) continue;
       if (pending || recent || dirty) {
         rows.add(Map<String, dynamic>.from(t.toJson()));
       }
@@ -14811,7 +14823,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           final mine = _allTransactions
               .where((t) =>
                   t.userEmail.toLowerCase().trim() == userEmail &&
-                  _dirtyTransactionIds.contains(t.id))
+                  _dirtyTransactionIds.contains(t.id) &&
+                  !ngmyIsGameLedgerTransaction(t))
               .map((e) => Map<String, dynamic>.from(e.toJson()))
               .toList();
           if (mine.isNotEmpty) {
@@ -15184,6 +15197,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                       email: syncedUser!.email,
                       balance: syncedUser!.accountBalance,
                       allowIncrease: true,
+                      authoritative: isGameTxn,
                     );
                   } else {
                     ngmyNotifyBalanceChanged();
@@ -15202,9 +15216,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
                     // amount/note edits, etc.). Replace the list entry so final
                     // fields like amount/sourceDetails actually change.
                     _allTransactions[existingIdx] = t;
-                    unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
-                    unawaited(_pushTransactionToCloudFast(t));
-                    _markTransactionDirty(t.id);
+                    if (!ngmyIsGameLedgerTransaction(t)) {
+                      unawaited(_pushTransactionToCloudReliable(t).then((ok) => ok ? _txnOutboxDone(t.id) : null));
+                      unawaited(_pushTransactionToCloudFast(t));
+                      _markTransactionDirty(t.id);
+                    }
                     if (t.type == TransactionType.contribution && t.status == TransactionStatus.approved) {
                       unawaited(ngmyPersistAllCivicContributionsFromTransactions(
                         _allTransactions,

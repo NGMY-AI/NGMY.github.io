@@ -19,7 +19,29 @@ final ValueNotifier<Map<String, double>> ngmyLiveBalanceCache = ValueNotifier<Ma
 /// True after the signed-in user's full transaction ledger has synced from cloud.
 bool ngmyUserWalletLedgerSettled = false;
 
-void _ngmyWriteLiveBalance(String email, double balance, {required bool allowIncrease}) {
+int _ngmyGameSettlesPending = 0;
+DateTime? _ngmyLastGameSettleEnd;
+
+/// A game bet or payout is on its way to the server (or just got its answer). During this window
+/// the server's answer and the phone's own bet/payout decide the balance; older numbers that
+/// arrive late (a database echo, a read that started before the bet) must not repaint it.
+bool get ngmyGameSettleActive {
+  if (_ngmyGameSettlesPending > 0) return true;
+  final end = _ngmyLastGameSettleEnd;
+  return end != null && DateTime.now().difference(end) < const Duration(milliseconds: 2500);
+}
+
+void ngmyGameSettleStarted() => _ngmyGameSettlesPending++;
+
+void ngmyGameSettleFinished() {
+  if (_ngmyGameSettlesPending > 0) _ngmyGameSettlesPending--;
+  _ngmyLastGameSettleEnd = DateTime.now();
+}
+
+double? ngmyCachedLiveBalance(String email) => ngmyLiveBalanceCache.value[_ngmyEmailKey(email)];
+
+void _ngmyWriteLiveBalance(String email, double balance,
+    {required bool allowIncrease, bool authoritative = false}) {
   // Growth Income's own running figure can lag behind (it showed $962.51 when the account had
   // $952.51) — only the account itself sets the balance; Growth Income just reads it.
   if (_ngmyIsGrowthIncomeCopy(email)) return;
@@ -28,20 +50,27 @@ void _ngmyWriteLiveBalance(String email, double balance, {required bool allowInc
   if (!allowIncrease) {
     final prev = ngmyLiveBalanceCache.value[key];
     if (prev != null && balance > prev + 0.001) balance = prev;
-  }  final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
+  }
+  if (!authoritative && ngmyGameSettleActive) {
+    final prev = ngmyLiveBalanceCache.value[key];
+    if (prev != null && balance > prev + 0.001) return;
+  }
+  final next = Map<String, double>.from(ngmyLiveBalanceCache.value);
   next[key] = balance;
   ngmyLiveBalanceCache.value = next;
   // Kept on the phone so the next launch shows this money instantly.
   NgmyWalletMemory.rememberBalance(key, balance);
 }
 
-void ngmySeedLiveBalance(String email, double balance, {bool allowIncrease = true}) {
-  _ngmyWriteLiveBalance(email, balance, allowIncrease: allowIncrease);
+void ngmySeedLiveBalance(String email, double balance,
+    {bool allowIncrease = true, bool authoritative = false}) {
+  _ngmyWriteLiveBalance(email, balance, allowIncrease: allowIncrease, authoritative: authoritative);
 }
 
-void ngmyNotifyBalanceChanged({String? email, double? balance, bool allowIncrease = true}) {
+void ngmyNotifyBalanceChanged(
+    {String? email, double? balance, bool allowIncrease = true, bool authoritative = false}) {
   if (email != null && balance != null) {
-    ngmySeedLiveBalance(email, balance, allowIncrease: allowIncrease);
+    ngmySeedLiveBalance(email, balance, allowIncrease: allowIncrease, authoritative: authoritative);
   }
   ngmyBalanceTick.value++;
 }
