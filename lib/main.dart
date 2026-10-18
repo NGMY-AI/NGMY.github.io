@@ -10970,7 +10970,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// shows. Falls back to the outbox when the server cannot be reached.
   Future<void> _settleGameTxnOnServer(AppTransaction t) async {
     final email = ngmyNormalizeEmail(t.userEmail);
-    final result = await ngmySettleGameTxnOnServer({
+    final payload = {
       'id': t.id,
       'userEmail': email,
       'amount': t.amount,
@@ -10979,7 +10979,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       'sourceDetails': t.sourceDetails,
       'status': t.status.index,
       'timestamp': t.timestamp.toUtc().toIso8601String(),
-    });
+    };
+    // Try a few times: a game result that never reaches the server is what made the other phones
+    // show the old balance.
+    NgmyServerWalletResult? result;
+    for (var attempt = 0; attempt < 3 && result == null; attempt++) {
+      result = await ngmySettleGameTxnOnServer(payload);
+      if (result == null && attempt < 2) await Future.delayed(Duration(milliseconds: 800 * (attempt + 1)));
+    }
+    if (result == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        backgroundColor: Color(0xFFB91C1C),
+        content: Text('This game could not be saved to the server, so other phones will not show it yet. It will be sent again when you are online.'),
+      ));
+    }
     if (result == null) {
       // Offline: the receipt waits in the outbox; the balance is corrected by the next sync.
       if (await _pushTransactionToCloudReliable(t)) _txnOutboxDone(t.id);
