@@ -11389,9 +11389,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
-    if (_currentUser != null) {
-      unawaited(_pushUserBalanceToCloud(_currentUser!, allowDecrease: true, ledgerTransactions: _allTransactions));
-    }
+    // No balance is written here: this runs on every refresh, and a phone still showing an
+    // older, higher balance would push that number back up. Each real money change saves its own balance.
     _dataChangedUiDebounce?.cancel();
     _dataChangedUiDebounce = Timer(const Duration(milliseconds: 150), () {
     if (mounted) setState(() {});
