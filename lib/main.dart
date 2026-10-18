@@ -932,7 +932,7 @@ double ngmyResolveAccountBalance(
   final key = ngmyNormalizeEmail(email);
   if (key.isEmpty) return 0.0;
   // Once the server has settled a game for this account, its balance is the one truth.
-  final serverBalance = ngmyServerBalances[key];
+  final serverBalance = ngmyFreshServerBalance(key);
   if (serverBalance != null) return serverBalance.clamp(0.0, double.infinity).toDouble();
   final stored = storedBalance.clamp(0.0, double.infinity).toDouble();
   return ngmyBalanceOrRemembered(key, stored);
@@ -5648,53 +5648,52 @@ Future<bool> _pushUserBalanceToCloud(
   if (!await ngmyCanReachCloud()) return false;
   final email = u.email.trim();
   if (email.isEmpty) return false;
-  final local = u.accountBalance.clamp(0.0, double.infinity);
+  // A game still on its way to the server owns the balance until it answers.
+  await ngmyWaitForGameSettles();
+  final key = ngmyNormalizeEmail(email);
+  final local = u.accountBalance.clamp(0.0, double.infinity).toDouble();
   // A $0 from an account that hasn't finished loading must never be saved over real money.
   if (ngmyBalanceOrRemembered(email, local) > local + 0.009) return false;
   try {
-    // A caller with ledger history for this person already knows `local`
-    // is authoritative (it's what ngmyResolveAccountBalance/
-    // ngmyReconcileUserAccountBalance just computed from their own
-    // AppTransaction rows — e.g. right after a bet was deducted or a win
-    // credited). Checking cloud and adopting it whenever it happens to
-    // still show the pre-bet/pre-payout number — because this push raced
-    // ahead of that number actually landing in Supabase — silently
-    // reverted the spend/credit and skipped writing the correct value.
-    // Only fall back to "trust cloud when it's higher" when the caller
-    // has no ledger to vouch for `local` at all.
-    final hasLedgerHistory = ledgerTransactions != null &&
-        ledgerTransactions.any((t) => ngmyNormalizeEmail(t.userEmail) == ngmyNormalizeEmail(email));
-    if (!allowDecrease && !hasLedgerHistory) {
-      final rows = await ngmyDbRelaySelect(
-        'users',
-        cols: 'accountBalance',
-        eq: {'email': email},
-        single: true,
-        timeout: kNgmyCloudLoadTimeout,
-      );
-      if (rows.isNotEmpty) {
-        final row = rows.first;
-        final cloud = (row['accountBalance'] ?? 0.0).toDouble();
-        if (cloud > local + 0.01) {
-          u.accountBalance = cloud;
-        }
-      }
+    // The server holds the real balance, and another phone may have changed it since this one
+    // last looked. So only the CHANGE made here since then (local minus the last server figure
+    // this phone saw) is applied on top of what the server has now. Saving this phone's whole
+    // number instead is what brought an old, higher balance back after a game was lost.
+    double? cloud;
+    final rows = await ngmyDbRelaySelect(
+      'users',
+      cols: 'accountBalance',
+      eq: {'email': email},
+      single: true,
+      timeout: kNgmyCloudLoadTimeout,
+    );
+    if (rows.isNotEmpty) cloud = ((rows.first['accountBalance'] ?? 0.0) as num).toDouble();
+    final known = ngmyLastServerBalance[key];
+    final target = ngmyBalanceToSave(local: local, known: known, cloud: cloud);
+    final adoptedOnly = cloud != null && (target - cloud).abs() < 0.005;
+    u.accountBalance = target;
+    ngmyLastServerBalance[key] = target;
+    if (!adoptedOnly || rows.isEmpty) {
+      await _safeUpsertUserRow({
+        'email': email,
+        'accountBalance': target,
+        'totalProfit': u.totalProfit,
+        'activeInvestment': u.activeInvestment?.toJson(),
+        'isClockedIn': u.isClockedIn,
+        'clockInStartTime': u.clockInStartTime?.toUtc().toIso8601String(),
+        'clockInPenaltyPercent': u.clockInPenaltyPercent,
+        'lastClockInDate': u.lastClockInDate?.toUtc().toIso8601String(),
+        'lastClockInEarningsDate': u.lastClockInEarningsDate?.toUtc().toIso8601String(),
+        'todayClockInEarned': u.todayClockInEarned,
+        'pendingInvestmentName': u.pendingInvestmentName,
+        'pendingInvestmentAmount': u.pendingInvestmentAmount,
+        'pendingInvestmentRoi': u.pendingInvestmentRoi,
+      });
     }
-    await _safeUpsertUserRow({
-      'email': email,
-      'accountBalance': u.accountBalance.clamp(0.0, double.infinity),
-      'totalProfit': u.totalProfit,
-      'activeInvestment': u.activeInvestment?.toJson(),
-      'isClockedIn': u.isClockedIn,
-      'clockInStartTime': u.clockInStartTime?.toUtc().toIso8601String(),
-      'clockInPenaltyPercent': u.clockInPenaltyPercent,
-      'lastClockInDate': u.lastClockInDate?.toUtc().toIso8601String(),
-      'lastClockInEarningsDate': u.lastClockInEarningsDate?.toUtc().toIso8601String(),
-      'todayClockInEarned': u.todayClockInEarned,
-      'pendingInvestmentName': u.pendingInvestmentName,
-      'pendingInvestmentAmount': u.pendingInvestmentAmount,
-      'pendingInvestmentRoi': u.pendingInvestmentRoi,
-    });
+    if ((target - local).abs() >= 0.005) {
+      ngmySeedLiveBalance(email, target, allowIncrease: true);
+      ngmyNotifyBalanceChanged(email: email, balance: target, allowIncrease: true);
+    }
     return true;
   } catch (e) {
     debugPrint('[user] balance upsert: $e');
@@ -10672,7 +10671,20 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     unawaited(_persistLocalOnly());
   }
 
-  Future<void> _pullGrowthIncomeWalletFromCloud() async {
+  Timer? _serverBalanceReadTimer;
+
+  /// Reads the account's balance from the server shortly after another phone played a game, so
+  /// every phone on the account moves together.
+  void _scheduleServerBalanceRead() {
+    _serverBalanceReadTimer?.cancel();
+    _serverBalanceReadTimer = Timer(const Duration(milliseconds: 700), () async {
+      if (!mounted || _currentUser == null) return;
+      await ngmyWaitForGameSettles();
+      await _pullGrowthIncomeWalletFromCloud(force: true);
+    });
+  }
+
+  Future<void> _pullGrowthIncomeWalletFromCloud({bool force = false}) async {
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
     final email = _currentUser!.email.trim();
     if (email.isEmpty) return;
@@ -10689,7 +10701,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       // This phone just saved a money / clock-in / plan change; the server may
       // still hold the older figures. Applying them now made money vanish and
       // come back, and plans drop. The next pull picks up the saved values.
-      if (ngmyWalletChangedLocallyRecently(email)) return;
+      if (!force && ngmyWalletChangedLocallyRecently(email)) return;
       final remote = UserData.fromJson({
         ..._currentUser!.toJson(),
         ...rows.first,
@@ -10715,7 +10727,9 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         }
       });
       // Show the saved money now — don't wait for the whole history to download.
+      ngmyLastServerBalance[ngmyNormalizeEmail(email)] = remote.accountBalance;
       ngmySeedLiveBalance(email, _currentUser!.accountBalance, allowIncrease: true);
+      ngmyNotifyBalanceChanged(email: email, balance: _currentUser!.accountBalance, allowIncrease: true);
       _rememberCurrentWallet();
     } catch (e) {
       debugPrint('[user] growth income pull: $e');
@@ -10969,6 +10983,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// changes the account balance, and the balance it returns is what every phone
   /// shows. Falls back to the outbox when the server cannot be reached.
   Future<void> _settleGameTxnOnServer(AppTransaction t) async {
+    ngmyBeginGameSettle();
+    try {
+      await _settleGameTxnOnServerInner(t);
+    } finally {
+      ngmyEndGameSettle();
+    }
+  }
+
+  Future<void> _settleGameTxnOnServerInner(AppTransaction t) async {
     final email = ngmyNormalizeEmail(t.userEmail);
     final payload = {
       'id': t.id,
@@ -13627,7 +13650,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
           if (userIdx >= 0 &&
               (previous == null || statusChanged || becameApproved) &&
               ngmyNormalizeEmail(tx.userEmail) == ngmyNormalizeEmail(_currentUser!.email)) {
-            unawaited(_pushUserBalanceToCloud(_allUsers[userIdx], ledgerTransactions: _allTransactions));
+            if (ngmyIsGameLedgerTransaction(tx)) {
+              // The server already applied this game. A game another phone played only needs this
+              // phone to read the new balance, never to save its own figure back.
+              if (previous == null) _scheduleServerBalanceRead();
+            } else {
+              unawaited(_pushUserBalanceToCloud(_allUsers[userIdx], ledgerTransactions: _allTransactions));
+            }
           }
         }
         if (tx.status == TransactionStatus.pending &&
