@@ -920,14 +920,10 @@ double ngmyPendingWithdrawalTotal(String email, List<AppTransaction> transaction
   return total;
 }
 
-/// Authoritative balance from the transaction ledger once this device has
-/// any history for the person — a bet/win/purchase lands as a local
-/// AppTransaction row immediately, and it must win over a stale cloud
-/// echo of the pre-bet balance so a spend visibly drops (and a payout
-/// visibly lands) right away instead of getting silently reverted by the
-/// next sync. Only falls back to the stored/cloud balance when this
-/// device has no transaction history at all for the person (e.g. a
-/// just-arrived realtime row for someone not loaded locally yet).
+/// The account's balance is the server's balance. A phone's own transaction history is only a
+/// slice of the account (each phone has a different one), so adding it up gave different
+/// numbers on different phones, and a phone with a short history could show $0 and push that.
+/// So this keeps the balance the server (or this device's last confirmed copy) holds.
 double ngmyResolveAccountBalance(
   String email,
   double storedBalance,
@@ -937,15 +933,9 @@ double ngmyResolveAccountBalance(
   if (key.isEmpty) return 0.0;
   // Once the server has settled a game for this account, its balance is the one truth.
   final serverBalance = ngmyServerBalances[key];
-  if (serverBalance != null) return serverBalance.clamp(0.0, double.infinity);
-  final stored = storedBalance.clamp(0.0, double.infinity);
-  // Until the account's full history has downloaded, the phone only holds
-  // part of it — adding that part up gave $0 or too little, and replaced the
-  // real (saved / cloud) balance. Keep the saved balance until then.
-  if (!ngmyUserWalletLedgerSettled) return ngmyBalanceOrRemembered(key, stored);
-  final txnCount = transactions.where((t) => ngmyNormalizeEmail(t.userEmail) == key).length;
-  if (txnCount == 0) return stored;
-  return ngmyBalanceFromApprovedTransactions(email, transactions);
+  if (serverBalance != null) return serverBalance.clamp(0.0, double.infinity).toDouble();
+  final stored = storedBalance.clamp(0.0, double.infinity).toDouble();
+  return ngmyBalanceOrRemembered(key, stored);
 }
 
 void ngmyReconcileUserAccountBalance(UserData user, List<AppTransaction> transactions) {

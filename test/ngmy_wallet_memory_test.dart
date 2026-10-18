@@ -5,14 +5,14 @@ import 'package:ngmy/ngmy_wallet_memory.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('a partial history on the phone never replaces the real balance', () {
+  test("a phone's partial history never replaces the server balance", () {
     final partial = [
       AppTransaction(id: 'a', userEmail: 'me@x.com', amount: 5, type: TransactionType.adminAdd, method: PaymentMethod.system, status: TransactionStatus.approved, timestamp: DateTime.now()),
     ];
     ngmyUserWalletLedgerSettled = false;
     expect(ngmyResolveAccountBalance('me@x.com', 420, partial), 420);
     ngmyUserWalletLedgerSettled = true;
-    expect(ngmyResolveAccountBalance('me@x.com', 420, partial), 5);
+    expect(ngmyResolveAccountBalance("me@x.com", 420, partial), 420);
     ngmyUserWalletLedgerSettled = false;
   });
 
