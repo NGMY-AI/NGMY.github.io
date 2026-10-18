@@ -11402,8 +11402,15 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   void _onDataChanged({String? dirtyUserEmail, String? dirtyTransactionId}) {
     _markUserDirty(dirtyUserEmail ?? _currentUser?.email);
     _markTransactionDirty(dirtyTransactionId);
-    // No balance is written here: this runs on every refresh, and a phone still showing an
-    // older, higher balance would push that number back up. Each real money change saves its own balance.
+    // A balance only goes to the server on its own when it has gone DOWN from the last figure the
+    // server confirmed (a withdrawal or a lost game). A stale, higher figure is never pushed up.
+    final me = _currentUser;
+    if (me != null) {
+      final known = ngmyLastServerBalance[ngmyNormalizeEmail(me.email)];
+      if (known != null && me.accountBalance < known - 0.009) {
+        unawaited(_pushUserBalanceToCloud(me, allowDecrease: true, ledgerTransactions: _allTransactions));
+      }
+    }
     _dataChangedUiDebounce?.cancel();
     _dataChangedUiDebounce = Timer(const Duration(milliseconds: 150), () {
     if (mounted) setState(() {});
@@ -13684,6 +13691,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     // transaction history for the person, the ledger is authoritative —
     // same rule ngmyResolveAccountBalance already applies elsewhere.
     remote.accountBalance = ngmyResolveAccountBalance(remote.email, remote.accountBalance, _allTransactions);
+    ngmyLastServerBalance[ngmyNormalizeEmail(remote.email)] = remote.accountBalance;
     _mergeCloudProfileIdentityFields(local, remote);
     _mergeUserMediaProfileFields(local, remote);
     if (local.savedCashAppTag.trim().isNotEmpty && remote.savedCashAppTag.trim().isEmpty) {

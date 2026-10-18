@@ -34,6 +34,7 @@ Future<NgmyServerWalletResult?> ngmySettleGameTxnOnServer(Map<String, dynamic> t
     final balance = (map['balance'] as num?)?.toDouble();
     final email = (txn['userEmail'] ?? '').toString().toLowerCase().trim();
     if (balance != null && email.isNotEmpty) ngmyServerBalances[email] = balance;
+    if (balance != null && email.isNotEmpty) ngmyLastServerBalance[email] = balance;
     return NgmyServerWalletResult(
       applied: map['applied'] == true,
       balance: balance,
@@ -44,3 +45,8 @@ Future<NgmyServerWalletResult?> ngmySettleGameTxnOnServer(Map<String, dynamic> t
     return null;
   }
 }
+
+/// The balance the server last confirmed for each account (lowercase email). A phone saves its
+/// balance on its own only when it has gone DOWN from this figure, so a stale phone cannot push
+/// an old, higher number back up.
+final Map<String, double> ngmyLastServerBalance = {};
