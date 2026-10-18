@@ -11042,6 +11042,12 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _txnOutboxDone(t.id);
     } else {
       debugPrint('[wallet server] game txn not applied: ${result.reason}');
+      if (mounted) {
+        final why = result.reason == 'insufficient'
+            ? 'Not enough money on the server for this game.'
+            : 'The server did not accept this game (${result.reason ?? 'unknown'}), so it is not saved. Pull to refresh or contact support.';
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(backgroundColor: const Color(0xFFB91C1C), content: Text(why)));
+      }
     }
   }
 

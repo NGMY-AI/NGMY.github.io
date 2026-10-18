@@ -97,6 +97,19 @@
       // newer build only actually takes over the next time this device
       // does a real fresh load with no live session to disrupt (new tab,
       // reinstall, or once a service-worker update naturally rolls in).
+      function showUpdateBar(serverBuild) {
+        if (document.getElementById('ngmy-update-bar')) return;
+        var go = function () {
+          if (!document.body) { document.addEventListener('DOMContentLoaded', go); return; }
+          var bar = document.createElement('div');
+          bar.id = 'ngmy-update-bar';
+          bar.textContent = 'A new version with balance fixes is ready. Tap here to update.';
+          bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;padding:12px 16px;background:#00B25A;color:#fff;font:700 14px sans-serif;text-align:center;cursor:pointer';
+          bar.onclick = function () { sessionStorage.removeItem('ngmy_force_reload_' + serverBuild); forceRefreshForBuild(serverBuild, { deferIfVisible: false }); };
+          document.body.appendChild(bar);
+        };
+        go();
+      }
       function checkForUpdate(opts) {
         var silent = opts && opts.silent;
         fetch(base + 'version.json?_=' + Date.now(), { cache: 'no-store' })
@@ -105,6 +118,17 @@
             if (!v || !v.build_number) return;
             if (v.build_number === embedded) {
               try { localStorage.removeItem('ngmy_pending_deploy'); } catch (e) {}
+              return;
+            }
+            // A build with a money fix: a plain page refresh must land on it, and a tab left open
+            // gets a tap-to-update bar, because an older build can bring spent money back.
+            var critical = v.critical_since && /^\d+$/.test(embedded) && embedded < v.critical_since;
+            if (critical) {
+              if (opts && opts.onLoad) {
+                forceRefreshForBuild(v.build_number, { deferIfVisible: false });
+              } else {
+                showUpdateBar(v.build_number);
+              }
               return;
             }
             if (silent) {
@@ -149,7 +173,7 @@
       if (isNewContext && pendingDeploy && pendingDeploy !== embedded) {
         forceRefreshForBuild(pendingDeploy, { deferIfVisible: false });
       } else {
-        checkForUpdate({ silent: true });
+        checkForUpdate({ silent: true, onLoad: true });
       }
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'visible') checkForUpdate({ silent: true });

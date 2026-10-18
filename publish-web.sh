@@ -38,8 +38,10 @@ printf '%s' 'ngmy.org' > docs/CNAME
 echo ""
 echo "[4/6] Stamp deploy id (cache bust for phones) ..."
 DEPLOYED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# Builds older than this must update on the next page load (they can bring old balances back).
+CRITICAL_SINCE="20261018180000"
 cat > docs/version.json <<EOF
-{"app_name":"ngmy","version":"1.0.0","build_number":"$DEPLOY_ID","package_name":"ngmy","deployed_at":"$DEPLOYED_AT"}
+{"app_name":"ngmy","version":"1.0.0","build_number":"$DEPLOY_ID","package_name":"ngmy","deployed_at":"$DEPLOYED_AT","critical_since":"$CRITICAL_SINCE"}
 EOF
 
 sed -i "s/__NGMY_DEPLOY_ID__/$DEPLOY_ID/g" docs/index.html
