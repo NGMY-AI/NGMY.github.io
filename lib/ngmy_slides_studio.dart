@@ -18,6 +18,7 @@ import 'ngmy_slides_finale.dart';
 import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_icon_picker.dart';
 import 'ngmy_quote_maker.dart';
+import 'ngmy_quote_templates.dart' show kNgmyQuoteLogoFile;
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -1782,6 +1783,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
   void _deleteSelected() {
     final id = _selectedElementId;
     if (id == null || _currentSlide == null) return;
+    // The NGMY logo on a quote can be moved and reframed, but never removed.
+    if (_currentSlide!.elements.any((e) => e.id == id && e.fileName == kNgmyQuoteLogoFile)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The NGMY logo stays on every quote. You can move it or change its frame.')),
+      );
+      return;
+    }
     if (_editingTextId == id) _stopTextEditing(unfocus: true);
     _mutate(() {
       _currentSlide!.elements.removeWhere((e) => e.id == id);
@@ -3419,13 +3427,6 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            _actionCard(
-              icon: Icons.format_quote_rounded,
-              label: 'NGMY Quotes',
-              color: const Color(0xFF7C3AED),
-              onTap: () => unawaited(_openQuoteMaker()),
             ),
             const SizedBox(height: 24),
             Text(

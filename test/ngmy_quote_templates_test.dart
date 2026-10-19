@@ -30,6 +30,29 @@ void main() {
     expect(ngmyQuoteFontSize('x' * 300), lessThan(ngmyQuoteFontSize('Short')));
   });
 
+  const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+  test('the NGMY logo is round with a ring by default, marked so it cannot be deleted, and follows the options', () {
+    final t = kNgmyQuoteTemplates.first;
+    final slide = ngmyBuildQuoteSlide(t, quote: 'Hi', author: 'A', logoData: tinyPng);
+    final logo = slide.elements.singleWhere((e) => e.fileName == kNgmyQuoteLogoFile);
+    expect(logo.type, NgmySlideElementType.image);
+    expect(logo.frame, 'circle');
+    expect(logo.ring, 'gold');
+    final moved = ngmyBuildQuoteSlide(t, quote: 'Hi', author: 'A', logoData: tinyPng, logoX: 0.1, logoY: 0.2, logoSize: 0.3, logoFrame: 'hexagon', logoRing: 'neon');
+    final m = moved.elements.singleWhere((e) => e.fileName == kNgmyQuoteLogoFile);
+    expect([m.x, m.y, m.w], [0.1, 0.2, 0.3]);
+    expect([m.frame, m.ring], ['hexagon', 'neon']);
+  });
+
+  test('elements keep the same ids each time a quote is rebuilt, so the logo is not decoded again', () {
+    final t = kNgmyQuoteTemplates[3];
+    final a = ngmyBuildQuoteSlide(t, quote: 'One', author: 'A', logoData: tinyPng, idSeed: 'seed1');
+    final b = ngmyBuildQuoteSlide(t, quote: 'Two', author: 'A', logoData: tinyPng, idSeed: 'seed1');
+    expect(a.elements.map((e) => e.id).toList(), b.elements.map((e) => e.id).toList());
+    expect(a.elements.map((e) => e.id).toSet().length, a.elements.length);
+  });
+
   testWidgets('every design draws without errors at story size', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;

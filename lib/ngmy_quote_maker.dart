@@ -32,6 +32,13 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
   String _group = 'All';
   String? _logo;
   bool _busy = false;
+  // The NGMY logo: round with a ring by default. It can be moved, reframed and resized, never removed.
+  final String _seed = 'quote${DateTime.now().microsecondsSinceEpoch}';
+  double _logoX = 0.39;
+  double _logoY = 0.80;
+  double _logoSize = 0.22;
+  String _logoFrame = 'circle';
+  String _logoRing = 'gold';
 
   static const _groups = ['All', 'Robotic', 'Nature', 'Warm', 'Bold', 'Clean'];
 
@@ -51,14 +58,28 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
   Future<void> _loadLogo() async {
     try {
       final data = await rootBundle.load('assets/images/ngmy_logo.png');
+      final bytes = data.buffer.asUint8List();
+      // Decoded ahead of time, so the logo is already drawn the first time it shows.
+      if (mounted) await precacheImage(MemoryImage(bytes), context);
       if (!mounted) return;
-      setState(() => _logo = 'data:image/png;base64,${base64Encode(data.buffer.asUint8List())}');
+      setState(() => _logo = 'data:image/png;base64,${base64Encode(bytes)}');
     } catch (_) {
       // The quote still has the NGMY name watermark without the logo picture.
     }
   }
 
-  NgmySlide _slide() => ngmyBuildQuoteSlide(_template, quote: _quote.text, author: _author.text, logoData: _logo);
+  NgmySlide _slide() => ngmyBuildQuoteSlide(
+        _template,
+        quote: _quote.text,
+        author: _author.text,
+        logoData: _logo,
+        idSeed: _seed,
+        logoX: _logoX,
+        logoY: _logoY,
+        logoSize: _logoSize,
+        logoFrame: _logoFrame,
+        logoRing: _logoRing,
+      );
 
   void _editAsSlide() {
     final deck = NgmySlideDeck(
@@ -75,6 +96,9 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
+      // Let the logo and every picture finish drawing before the picture is taken.
+      await WidgetsBinding.instance.endOfFrame;
+      await Future<void>.delayed(const Duration(milliseconds: 400));
       await WidgetsBinding.instance.endOfFrame;
       final ro = _previewKey.currentContext?.findRenderObject();
       if (ro is! RenderRepaintBoundary) throw 'The picture is not ready yet.';
@@ -114,12 +138,44 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
                 constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.5),
                 child: AspectRatio(
                   aspectRatio: 9 / 16,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(18),
-                    child: RepaintBoundary(
-                      key: _previewKey,
-                      child: NgmySlideAnimatedRender(slide: _slide(), animate: false),
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, box) {
+                      final pw = box.maxWidth;
+                      final ph = box.maxHeight;
+                      return Stack(
+                        children: [
+                          Positioned.fill(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: RepaintBoundary(
+                                key: _previewKey,
+                                child: NgmySlideAnimatedRender(slide: _slide(), animate: false),
+                              ),
+                            ),
+                          ),
+                          // Drag the logo anywhere on the quote. This handle is not part of the picture.
+                          Positioned(
+                            left: _logoX * pw,
+                            top: _logoY * ph,
+                            width: _logoSize * pw,
+                            height: _logoSize * pw,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onPanUpdate: (d) => setState(() {
+                                _logoX = (_logoX + d.delta.dx / pw).clamp(0.0, 1 - _logoSize);
+                                _logoY = (_logoY + d.delta.dy / ph).clamp(0.0, 1 - _logoSize * pw / ph);
+                              }),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 1),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
@@ -142,17 +198,20 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
               decoration: _field('Who said it', 'NGMY'),
             ),
             const SizedBox(height: 14),
-            Row(children: [
-              for (final g in _groups)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: ChoiceChip(
-                    label: Text(g, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    selected: _group == g,
-                    onSelected: (_) => setState(() => _group = g),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final g in _groups)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(g, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                      selected: _group == g,
+                      onSelected: (_) => setState(() => _group = g),
+                    ),
                   ),
-                ),
-            ]),
+              ]),
+            ),
             const SizedBox(height: 10),
             SizedBox(
               height: 116,
@@ -195,7 +254,66 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
+            Row(children: [
+              const Icon(Icons.verified_rounded, color: Color(0xFFFACC15), size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('NGMY logo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+              ),
+              TextButton(
+                onPressed: () => setState(() {
+                  _logoX = 0.39;
+                  _logoY = 0.80;
+                  _logoSize = 0.22;
+                  _logoFrame = 'circle';
+                  _logoRing = 'gold';
+                }),
+                child: const Text('Reset'),
+              ),
+            ]),
+            const Text('Drag it on the quote to move it. It stays on every quote.',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
+            const SizedBox(height: 10),
+            const Text('SHAPE', style: TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final (id, label) in kNgmySlideFrames)
+                if (id.isNotEmpty)
+                  ChoiceChip(
+                    label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    selected: _logoFrame == id,
+                    onSelected: (_) => setState(() => _logoFrame = id),
+                  ),
+            ]),
+            const SizedBox(height: 10),
+            const Text('RING', style: TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final (id, label) in kNgmySlideRings)
+                ChoiceChip(
+                  label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  selected: _logoRing == id,
+                  onSelected: (_) => setState(() => _logoRing = id),
+                ),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              const Text('Size', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Slider(
+                  value: _logoSize,
+                  min: 0.12,
+                  max: 0.4,
+                  onChanged: (v) => setState(() {
+                    _logoSize = v;
+                    _logoX = _logoX.clamp(0.0, 1 - v);
+                    _logoY = _logoY.clamp(0.0, 0.95);
+                  }),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 10),
             Row(children: [
               Expanded(
                 child: OutlinedButton.icon(

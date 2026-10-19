@@ -72,9 +72,18 @@ double ngmyQuoteFontSize(String quote) {
   return 30;
 }
 
+/// The file name that marks the NGMY logo on a quote, so the editor knows not to delete it.
+const String kNgmyQuoteLogoFile = 'ngmy_quote_logo';
+
+// Element ids are the same every time a quote is rebuilt, so the logo picture is not decoded
+// again (and left blank for a moment) each time something in the maker changes.
+String _idSeed = 'q';
+int _idCount = 0;
+String _qid() => '${_idSeed}_${_idCount++}';
+
 NgmySlideElement _shape(NgmySlideShapeKind kind, double x, double y, double w, double h, int color, {double rotation = 0}) =>
     NgmySlideElement(
-      id: NgmySlidesTemplates.newId(),
+      id: _qid(),
       type: NgmySlideElementType.shape,
       x: x,
       y: y,
@@ -223,13 +232,21 @@ NgmySlide ngmyBuildQuoteSlide(
   required String quote,
   required String author,
   String? logoData,
+  String idSeed = 'q',
+  double logoX = 0.39,
+  double logoY = 0.80,
+  double logoSize = 0.22,
+  String logoFrame = 'circle',
+  String logoRing = 'gold',
 }) {
+  _idSeed = idSeed;
+  _idCount = 0;
   final words = quote.trim().isEmpty ? t.sample : quote.trim();
   final who = author.trim();
   NgmySlideElement text(String s, double x, double y, double w, double h, double size, int color,
           {FontWeight weight = FontWeight.w700, FontStyle style = FontStyle.normal, TextAlign align = TextAlign.center}) =>
       NgmySlideElement(
-        id: NgmySlidesTemplates.newId(),
+        id: _qid(),
         type: NgmySlideElementType.text,
         x: x,
         y: y,
@@ -243,7 +260,7 @@ NgmySlide ngmyBuildQuoteSlide(
         align: align,
       );
   return NgmySlide(
-    id: NgmySlidesTemplates.newId(),
+    id: '${idSeed}_slide',
     layout: NgmySlideLayout.blank,
     background: t.top,
     backgroundEnd: t.bottom,
@@ -252,19 +269,23 @@ NgmySlide ngmyBuildQuoteSlide(
       text('“', 0.08, 0.17, 0.84, 0.1, 200, t.accent, weight: FontWeight.w900),
       text(words, 0.09, 0.30, 0.82, 0.36, ngmyQuoteFontSize(words), t.text, weight: FontWeight.w800),
       if (who.isNotEmpty) text('— $who', 0.09, 0.69, 0.82, 0.05, 30, _alpha(t.text, 0xDD), style: FontStyle.italic, weight: FontWeight.w600),
-      // The NGMY watermark: the logo, and the name under it.
+      text('NGMY', 0.3, 0.925, 0.4, 0.028, 22, _alpha(t.text, 0xB3), weight: FontWeight.w900),
+      text('New Global Movement for Youth', 0.1, 0.96, 0.8, 0.025, 14, _alpha(t.text, 0x99), weight: FontWeight.w600),
+      // The NGMY logo: a round profile-picture style by default, with a ring. It can be moved and
+      // reframed, but it is always there.
       if (logoData != null && logoData.isNotEmpty)
         NgmySlideElement(
-          id: NgmySlidesTemplates.newId(),
+          id: _qid(),
           type: NgmySlideElementType.image,
-          x: 0.4,
-          y: 0.82,
-          w: 0.2,
-          h: 0.2 * 9 / 16,
+          x: logoX,
+          y: logoY,
+          w: logoSize,
+          h: logoSize * 9 / 16,
           imageRef: logoData,
+          fileName: kNgmyQuoteLogoFile,
+          frame: logoFrame,
+          ring: logoRing,
         ),
-      text('NGMY', 0.3, 0.915, 0.4, 0.03, 26, _alpha(t.text, 0xB3), weight: FontWeight.w900),
-      text('New Global Movement for Youth', 0.1, 0.95, 0.8, 0.025, 15, _alpha(t.text, 0x99), weight: FontWeight.w600),
     ],
   );
 }
