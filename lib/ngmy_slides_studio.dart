@@ -17,6 +17,7 @@ import 'ngmy_book_studio.dart';
 import 'ngmy_slides_finale.dart';
 import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_icon_picker.dart';
+import 'ngmy_quote_maker.dart';
 import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
@@ -1894,6 +1895,16 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     _mutate(() => NgmySlidesTemplates.applyLayout(slide, layout, _theme));
   }
 
+  /// NGMY Quotes: pick a design and type a quote. Editing it opens it as a new presentation.
+  Future<void> _openQuoteMaker() async {
+    final deck = await showNgmyQuoteMaker(context);
+    if (deck == null || !mounted) return;
+    _syncDeckIntoList();
+    setState(() => _decks.insert(0, deck));
+    await _persistDecks();
+    if (mounted) _openDeck(deck);
+  }
+
   /// Downloads the slides as a video: each slide stays on screen for the seconds set on it.
   Future<void> _downloadVideo() async {
     final deck = _activeDeck;
@@ -3409,6 +3420,13 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 ),
               ],
             ),
+            const SizedBox(height: 10),
+            _actionCard(
+              icon: Icons.format_quote_rounded,
+              label: 'NGMY Quotes',
+              color: const Color(0xFF7C3AED),
+              onTap: () => unawaited(_openQuoteMaker()),
+            ),
             const SizedBox(height: 24),
             Text(
               'YOUR PRESENTATIONS',
@@ -4576,6 +4594,14 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
                 children: [
                   _aspectChip('Wide 16:9', NgmySlideAspectRatio.landscape169, isDark),
                   _aspectChip('Short 9:16', NgmySlideAspectRatio.portrait916, isDark),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.format_quote_rounded, size: 14),
+                      label: const Text('Quotes', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700)),
+                      onPressed: () => unawaited(_openQuoteMaker()),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
