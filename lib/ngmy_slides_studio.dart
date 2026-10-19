@@ -17,6 +17,7 @@ import 'ngmy_book_studio.dart';
 import 'ngmy_slides_finale.dart';
 import 'ngmy_slides_ai_history.dart';
 import 'ngmy_slides_icon_picker.dart';
+import 'ngmy_slides_video_export.dart';
 import 'ngmy_slides_ai_maker.dart';
 import 'ngmy_slides_class_templates.dart';
 import 'ngmy_slides_designs.dart';
@@ -1891,6 +1892,19 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
     final slide = _currentSlide;
     if (slide == null) return;
     _mutate(() => NgmySlidesTemplates.applyLayout(slide, layout, _theme));
+  }
+
+  /// Downloads the slides as a video: each slide stays on screen for the seconds set on it.
+  Future<void> _downloadVideo() async {
+    final deck = _activeDeck;
+    if (deck == null) return;
+    _stopTextEditing(unfocus: true);
+    _syncDeckIntoList();
+    final problem = await ngmyExportSlidesVideo(context, deck);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(problem ?? 'Your video is ready. Check your downloads.')),
+    );
   }
 
   Future<void> _downloadPdf() async {
@@ -4192,6 +4206,7 @@ class _NgmySlidesStudioScreenState extends State<NgmySlidesStudioScreen>
             _topIconBtn(Icons.redo_rounded, 'Redo', _redo.isEmpty ? null : _redoAction, isDark),
           ],
           _topIconBtn(Icons.picture_as_pdf_outlined, 'PDF', () => unawaited(_downloadPdf()), isDark),
+          _topIconBtn(Icons.download_rounded, 'Download as video', () => unawaited(_downloadVideo()), isDark),
           if (!_isTransferredReadOnly())
           PopupMenuButton<String>(
             tooltip: 'More',
