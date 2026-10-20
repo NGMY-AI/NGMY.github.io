@@ -53,6 +53,26 @@ void main() {
     expect(a.elements.map((e) => e.id).toSet().length, a.elements.length);
   });
 
+  testWidgets('every word design draws, and starred words are bigger without showing the stars', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    for (final fx in ['', 'caps', 'elegant', 'shadow', 'neon', 'outline', 'marker', 'stamp']) {
+      final slide = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Lead with *courage* today', author: 'A', textFx: fx, sizeScale: 1.2);
+      final q = slide.elements.firstWhere((e) => e.text.contains('courage'));
+      expect(q.textFx, fx);
+      expect(q.rich, isTrue);
+      await tester.pumpWidget(MaterialApp(
+        home: SizedBox(width: 360, height: 640, child: NgmySlideAnimatedRender(slide: slide, animate: false)),
+      ));
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: fx);
+      expect(find.textContaining('*', findRichText: true), findsNothing, reason: fx);
+    }
+    final copy = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'a *b* c', author: '', textFx: 'neon').elements.firstWhere((e) => e.rich).copy();
+    expect([copy.textFx, copy.rich], ['neon', true]);
+  });
+
   testWidgets('every design draws without errors at story size', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;

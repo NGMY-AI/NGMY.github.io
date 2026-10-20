@@ -40,7 +40,101 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
   String _logoFrame = 'circle';
   String _logoRing = 'gold';
 
-  static const _groups = ['All', 'Robotic', 'Nature', 'Warm', 'Bold', 'Clean'];
+  // How the words look: a design, an overall size, and bigger words marked with *stars*.
+  String _fx = '';
+  double _textScale = 1.0;
+
+  static const _fxList = [
+    ('', 'Classic'),
+    ('caps', 'Bold caps'),
+    ('elegant', 'Elegant'),
+    ('shadow', 'Shadow'),
+    ('neon', 'Neon glow'),
+    ('outline', 'Outline'),
+    ('marker', 'Highlighter'),
+    ('stamp', 'Stamp'),
+  ];
+
+  /// Makes the selected words (or the word the cursor is in) bigger by putting stars around them.
+  void _bigger() {
+    final text = _quote.text;
+    var sel = _quote.selection;
+    if (!sel.isValid) sel = TextSelection.collapsed(offset: text.length);
+    var a = sel.start;
+    var b = sel.end;
+    if (a == b) {
+      while (a > 0 && !RegExp(r'\s').hasMatch(text[a - 1])) {
+        a--;
+      }
+      while (b < text.length && !RegExp(r'\s').hasMatch(text[b])) {
+        b++;
+      }
+    }
+    if (a == b) return;
+    final piece = text.substring(a, b).replaceAll('*', '');
+    final next = '${text.substring(0, a)}*$piece*${text.substring(b)}';
+    _quote.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: a + piece.length + 2));
+    setState(() {});
+  }
+
+  void _normalWords() {
+    final text = _quote.text;
+    final sel = _quote.selection;
+    if (sel.isValid && !sel.isCollapsed) {
+      final next = text.replaceRange(sel.start, sel.end, text.substring(sel.start, sel.end).replaceAll('*', ''));
+      _quote.value = TextEditingValue(text: next, selection: TextSelection.collapsed(offset: sel.start));
+    } else {
+      _quote.value = TextEditingValue(text: text.replaceAll('*', ''), selection: const TextSelection.collapsed(offset: 0));
+    }
+    setState(() {});
+  }
+
+  List<Widget> _wordsControls() => [
+        Row(children: [
+          const Icon(Icons.text_fields_rounded, color: Color(0xFFFACC15), size: 18),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text('Words', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+          ),
+        ]),
+        const SizedBox(height: 4),
+        const Text('Select words or a whole sentence in your quote, then tap Bigger. Or put *stars* around them.',
+            style: TextStyle(color: Colors.white54, fontSize: 12)),
+        const SizedBox(height: 8),
+        Row(children: [
+          FilledButton.icon(
+            onPressed: _bigger,
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF7C3AED)),
+            icon: const Icon(Icons.format_size_rounded, size: 18),
+            label: const Text('Bigger', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: _normalWords,
+            style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white38)),
+            child: const Text('Normal', style: TextStyle(fontWeight: FontWeight.w800)),
+          ),
+        ]),
+        Row(children: [
+          const Text('Size', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
+          Expanded(
+            child: Slider(value: _textScale, min: 0.6, max: 1.5, onChanged: (v) => setState(() => _textScale = v)),
+          ),
+        ]),
+        const Text('DESIGN', style: TextStyle(color: Colors.white54, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          for (final (id, label) in _fxList)
+            ChoiceChip(
+              label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              selected: _fx == id,
+              onSelected: (_) => setState(() => _fx = id),
+            ),
+        ]),
+        const SizedBox(height: 14),
+      ];
+
+  static const _groups =['All', 'Robotic', 'Nature', 'Warm', 'Bold', 'Clean'];
 
   @override
   void initState() {
@@ -79,6 +173,8 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
         logoSize: _logoSize,
         logoFrame: _logoFrame,
         logoRing: _logoRing,
+        textFx: _fx,
+        sizeScale: _textScale,
       );
 
   void _editAsSlide() {
@@ -198,6 +294,7 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
               decoration: _field('Who said it', 'NGMY'),
             ),
             const SizedBox(height: 14),
+            ..._wordsControls(),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(children: [

@@ -74,14 +74,97 @@ class NgmySlideElementView extends StatelessWidget {
     }
   }
 
-  TextStyle _textStyle() => TextStyle(
-        fontSize: element.fontSize * scale,
-        fontWeight: element.fontWeight,
-        fontStyle: element.fontStyle,
-        decoration: element.decoration,
-        color: Color(element.color),
-        height: 1.25,
+  TextStyle _textStyle() {
+    final fx = element.textFx;
+    final c = Color(element.color);
+    var weight = element.fontWeight;
+    var fstyle = element.fontStyle;
+    var deco = element.decoration;
+    double? spacing;
+    Color? bg;
+    var color = c;
+    List<Shadow>? shadows;
+    switch (fx) {
+      case 'caps':
+        weight = FontWeight.w900;
+        spacing = 3 * scale;
+      case 'elegant':
+        weight = FontWeight.w300;
+        fstyle = FontStyle.italic;
+        spacing = 1.2 * scale;
+      case 'shadow':
+        shadows = [Shadow(color: const Color(0x99000000), offset: Offset(0, 4 * scale), blurRadius: 8 * scale)];
+      case 'neon':
+        shadows = [
+          Shadow(color: c, blurRadius: 6 * scale),
+          Shadow(color: c, blurRadius: 16 * scale),
+          Shadow(color: c.withValues(alpha: 0.8), blurRadius: 30 * scale),
+        ];
+      case 'marker':
+        bg = const Color(0xFFFACC15);
+        color = const Color(0xFF111827);
+        weight = FontWeight.w900;
+      case 'stamp':
+        weight = FontWeight.w900;
+        spacing = 6 * scale;
+        deco = TextDecoration.underline;
+    }
+    return TextStyle(
+      fontSize: element.fontSize * scale,
+      fontWeight: weight,
+      fontStyle: fstyle,
+      decoration: deco,
+      color: color,
+      backgroundColor: bg,
+      letterSpacing: spacing,
+      shadows: shadows,
+      height: 1.25,
+    );
+  }
+
+  bool get _upper => element.textFx == 'caps' || element.textFx == 'stamp';
+
+  /// The words, with *starred* parts drawn bigger and heavier when [NgmySlideElement.rich] is on.
+  Widget _richOrPlain(String s, TextStyle style, StrutStyle strut, {bool clipSingleLine = false, Paint? stroke}) {
+    final shown = _upper ? s.toUpperCase() : s;
+    TextStyle st(TextStyle b) => stroke == null
+        ? b
+        : TextStyle(
+            fontSize: b.fontSize,
+            fontWeight: b.fontWeight,
+            fontStyle: b.fontStyle,
+            letterSpacing: b.letterSpacing,
+            height: b.height,
+            foreground: stroke,
+          );
+    final parts = element.rich ? shown.split('*') : <String>[shown];
+    if (parts.length < 3) {
+      return Text(
+        parts.join(),
+        style: st(style),
+        strutStyle: strut,
+        textAlign: element.align,
+        softWrap: !clipSingleLine,
+        maxLines: clipSingleLine ? 1 : null,
+        overflow: clipSingleLine ? TextOverflow.clip : TextOverflow.visible,
       );
+    }
+    return Text.rich(
+      TextSpan(children: [
+        for (var i = 0; i < parts.length; i++)
+          if (parts[i].isNotEmpty)
+            TextSpan(
+              text: parts[i],
+              // Parts between a pair of stars are the big ones; a lone last star stays plain.
+              style: (i.isOdd && i < parts.length - 1)
+                  ? st(style.copyWith(fontSize: (style.fontSize ?? 24) * 1.7, fontWeight: FontWeight.w900))
+                  : st(style),
+            ),
+      ]),
+      style: st(style),
+      textAlign: element.align,
+    );
+  }
 
   Widget _textView() {
     // Padding must scale with the canvas — otherwise this fixed pixel
@@ -134,18 +217,37 @@ class NgmySlideElementView extends StatelessWidget {
         onTap: onTap,
         onDoubleTap: onDoubleTap,
         behavior: HitTestBehavior.opaque,
-        child: Text(
-          showHint ? 'Tap to select · Edit to type' : (empty ? '' : element.text),
-          key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
-          style: showHint
-              ? style.copyWith(color: Color(element.color).withValues(alpha: 0.45), fontStyle: FontStyle.italic)
-              : style,
-          strutStyle: strut,
-          textAlign: element.align,
-          softWrap: !clipSingleLine,
-          maxLines: clipSingleLine ? 1 : null,
-          overflow: clipSingleLine ? TextOverflow.clip : TextOverflow.visible,
-        ),
+        child: (showHint || (element.textFx.isEmpty && !element.rich))
+            ? Text(
+                showHint ? 'Tap to select · Edit to type' : (empty ? '' : element.text),
+                key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}'),
+                style: showHint
+                    ? style.copyWith(color: Color(element.color).withValues(alpha: 0.45), fontStyle: FontStyle.italic)
+                    : style,
+                strutStyle: strut,
+                textAlign: element.align,
+                softWrap: !clipSingleLine,
+                maxLines: clipSingleLine ? 1 : null,
+                overflow: clipSingleLine ? TextOverflow.clip : TextOverflow.visible,
+              )
+            : KeyedSubtree(
+                key: ValueKey('slide_txt_${element.id}_${element.text.hashCode}_${element.textFx}'),
+                child: element.textFx == 'outline'
+                    ? Stack(children: [
+                        _richOrPlain(
+                          element.text,
+                          style,
+                          element.rich ? const StrutStyle() : strut,
+                          stroke: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 3 * scale
+                            ..strokeJoin = StrokeJoin.round
+                            ..color = const Color(0xFF111827),
+                        ),
+                        _richOrPlain(element.text, style, element.rich ? const StrutStyle() : strut),
+                      ])
+                    : _richOrPlain(element.text, style, element.rich ? const StrutStyle() : strut, clipSingleLine: clipSingleLine),
+              ),
       );
     }
 

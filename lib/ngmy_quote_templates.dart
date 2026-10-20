@@ -238,6 +238,8 @@ NgmySlide ngmyBuildQuoteSlide(
   double logoSize = 0.22,
   String logoFrame = 'circle',
   String logoRing = 'gold',
+  String textFx = '',
+  double sizeScale = 1.0,
 }) {
   _idSeed = idSeed;
   _idCount = 0;
@@ -259,6 +261,22 @@ NgmySlide ngmyBuildQuoteSlide(
         color: color,
         align: align,
       );
+  // The quote itself: words in *stars* are drawn bigger, and [textFx] is the chosen word design.
+  NgmySlideElement quoteText(String s, double size, int color) => NgmySlideElement(
+        id: _qid(),
+        type: NgmySlideElementType.text,
+        x: 0.09,
+        y: 0.30,
+        w: 0.82,
+        h: 0.36,
+        text: s,
+        fontSize: size,
+        fontWeight: FontWeight.w800,
+        color: color,
+        align: TextAlign.center,
+        textFx: textFx,
+        rich: true,
+      );
   return NgmySlide(
     id: '${idSeed}_slide',
     layout: NgmySlideLayout.blank,
@@ -267,7 +285,7 @@ NgmySlide ngmyBuildQuoteSlide(
     elements: [
       ..._decoration(t.deco, t.accent, t.accent2),
       text('“', 0.08, 0.17, 0.84, 0.1, 200, t.accent, weight: FontWeight.w900),
-      text(words, 0.09, 0.30, 0.82, 0.36, ngmyQuoteFontSize(words), t.text, weight: FontWeight.w800),
+      quoteText(words, ngmyQuoteFontSize(words.replaceAll('*', '')) * sizeScale * (words.contains('*') ? 0.8 : 1.0), t.text),
       if (who.isNotEmpty) text('— $who', 0.09, 0.69, 0.82, 0.05, 30, _alpha(t.text, 0xDD), style: FontStyle.italic, weight: FontWeight.w600),
       text('NGMY', 0.3, 0.925, 0.4, 0.028, 22, _alpha(t.text, 0xB3), weight: FontWeight.w900),
       text('New Global Movement for Youth', 0.1, 0.96, 0.8, 0.025, 14, _alpha(t.text, 0x99), weight: FontWeight.w600),

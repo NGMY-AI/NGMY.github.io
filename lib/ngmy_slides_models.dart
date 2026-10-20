@@ -100,6 +100,8 @@ class NgmySlideElement {
     this.loopFx = '',
     this.frame = '',
     this.ring = '',
+    this.textFx = '',
+    this.rich = false,
   });
 
   final String id;
@@ -134,6 +136,10 @@ class NgmySlideElement {
   String frame;
   /// Ring around a picture: gold, platinum, glow, rainbow, double, neon, framed, rosegold, jewels, aurora.
   String ring;
+  /// Word design: '', caps, elegant, shadow, neon, outline, marker, stamp.
+  String textFx;
+  /// When true, words wrapped in *stars* are drawn bigger.
+  bool rich;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -164,6 +170,8 @@ class NgmySlideElement {
         loopFx: loopFx,
         frame: frame,
         ring: ring,
+        textFx: textFx,
+        rich: rich,
       );
 
   Map<String, dynamic> toJson() => {
@@ -195,6 +203,8 @@ class NgmySlideElement {
         if (loopFx.isNotEmpty) 'loopFx': loopFx,
         if (frame.isNotEmpty) 'frame': frame,
         if (ring.isNotEmpty) 'ring': ring,
+        if (textFx.isNotEmpty) 'textFx': textFx,
+        if (rich) 'rich': true,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -230,6 +240,8 @@ class NgmySlideElement {
       loopFx: (json['loopFx'] ?? '').toString(),
       frame: (json['frame'] ?? '').toString(),
       ring: (json['ring'] ?? '').toString(),
+      textFx: (json['textFx'] ?? '').toString(),
+      rich: json['rich'] == true,
     );
   }
 }
