@@ -83,6 +83,7 @@ class NgmySlideElementView extends StatelessWidget {
     double? spacing;
     Color? bg;
     var color = c;
+    Paint? fg;
     List<Shadow>? shadows;
     switch (fx) {
       case 'caps':
@@ -108,13 +109,85 @@ class NgmySlideElementView extends StatelessWidget {
         weight = FontWeight.w900;
         spacing = 6 * scale;
         deco = TextDecoration.underline;
+      case 'retro':
+        weight = FontWeight.w900;
+        spacing = 2 * scale;
+        shadows = [Shadow(color: const Color(0xFFEC4899), offset: Offset(4 * scale, 4 * scale))];
+      case 'threed':
+        weight = FontWeight.w900;
+        final dark = Color.lerp(c, Colors.black, 0.65)!;
+        shadows = [for (var i = 1; i <= 6; i++) Shadow(color: dark, offset: Offset(i * scale, i * scale))];
+      case 'glitch':
+        weight = FontWeight.w900;
+        spacing = 2 * scale;
+        shadows = [
+          Shadow(color: const Color(0xFF22D3EE), offset: Offset(-3 * scale, 0)),
+          Shadow(color: const Color(0xFFEF4444), offset: Offset(3 * scale, 0)),
+        ];
+      case 'fire':
+        weight = FontWeight.w900;
+        color = const Color(0xFFFFE08A);
+        shadows = [
+          Shadow(color: const Color(0xFFFB923C), blurRadius: 8 * scale),
+          Shadow(color: const Color(0xFFEF4444), blurRadius: 18 * scale, offset: Offset(0, -3 * scale)),
+        ];
+      case 'ice':
+        weight = FontWeight.w700;
+        color = const Color(0xFFE0F2FE);
+        shadows = [Shadow(color: const Color(0xFF38BDF8), blurRadius: 10 * scale), Shadow(color: const Color(0xFF0EA5E9), blurRadius: 22 * scale)];
+      case 'chalk':
+        weight = FontWeight.w300;
+        spacing = 1 * scale;
+        shadows = [Shadow(color: c.withValues(alpha: 0.45), blurRadius: 3 * scale)];
+      case 'comic':
+        weight = FontWeight.w900;
+        final ink = Color.lerp(c, Colors.black, 0.85)!;
+        shadows = [
+          for (final o in const [Offset(-2, -2), Offset(2, -2), Offset(-2, 2), Offset(2, 2), Offset(0, -2.5), Offset(0, 2.5), Offset(-2.5, 0), Offset(2.5, 0)])
+            Shadow(color: ink, offset: Offset(o.dx * scale, o.dy * scale)),
+          Shadow(color: ink, offset: Offset(5 * scale, 6 * scale)),
+        ];
+      case 'gold':
+        weight = FontWeight.w900;
+        fg = Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFDE68A), Color(0xFFF59E0B), Color(0xFFB45309)],
+            tileMode: TileMode.mirror,
+          ).createShader(Rect.fromLTWH(0, 0, 900 * scale, element.fontSize * scale * 1.6));
+        shadows = [Shadow(color: const Color(0x66000000), offset: Offset(0, 3 * scale), blurRadius: 5 * scale)];
+      case 'sunset':
+        weight = FontWeight.w900;
+        fg = Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFB923C), Color(0xFFEC4899), Color(0xFF8B5CF6)],
+            tileMode: TileMode.mirror,
+          ).createShader(Rect.fromLTWH(0, 0, 900 * scale, element.fontSize * scale * 1.6));
+      case 'softglow':
+        weight = FontWeight.w600;
+        shadows = [Shadow(color: c, blurRadius: 14 * scale)];
+      case 'lowercase':
+        weight = FontWeight.w500;
+        spacing = 2 * scale;
+      case 'double':
+        shadows = [
+          Shadow(color: c.withValues(alpha: 0.45), offset: Offset(5 * scale, 5 * scale)),
+          Shadow(color: c.withValues(alpha: 0.2), offset: Offset(10 * scale, 10 * scale)),
+        ];
+      case 'whisper':
+        weight = FontWeight.w300;
+        spacing = 6 * scale;
     }
     return TextStyle(
       fontSize: element.fontSize * scale,
       fontWeight: weight,
       fontStyle: fstyle,
       decoration: deco,
-      color: color,
+      color: fg == null ? color : null,
+      foreground: fg,
       backgroundColor: bg,
       letterSpacing: spacing,
       shadows: shadows,
@@ -122,11 +195,12 @@ class NgmySlideElementView extends StatelessWidget {
     );
   }
 
-  bool get _upper => element.textFx == 'caps' || element.textFx == 'stamp';
+  bool get _upper => const {'caps', 'stamp', 'retro', 'glitch', 'whisper'}.contains(element.textFx);
+  bool get _lower => element.textFx == 'lowercase';
 
   /// The words, with *starred* parts drawn bigger and heavier when [NgmySlideElement.rich] is on.
   Widget _richOrPlain(String s, TextStyle style, StrutStyle strut, {bool clipSingleLine = false, Paint? stroke}) {
-    final shown = _upper ? s.toUpperCase() : s;
+    final shown = _upper ? s.toUpperCase() : (_lower ? s.toLowerCase() : s);
     TextStyle st(TextStyle b) => stroke == null
         ? b
         : TextStyle(
