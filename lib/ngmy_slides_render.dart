@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -363,15 +364,25 @@ class NgmySlideElementView extends StatelessWidget {
 
   Widget _buildImageMemory(String ref, {bool cover = false}) {
     try {
-      final bytes = base64Decode(ref.split(',').last);
+      // The same bytes every rebuild (not a fresh decode each time), and a picture is decoded
+      // no bigger than the space it is drawn in. Full-size decodes on every rebuild are what
+      // used up an iPhone's memory and made the page reload.
+      final bytes = ngmySlideImageBytes(ref);
       final coverBg = element.fileName == 'marriage_locked_bg' || element.fileName.endsWith('_bg');
-      return Image.memory(
-        bytes,
-        key: ValueKey('img_${element.id}_${bytes.length}'),
-        fit: coverBg || cover ? BoxFit.cover : BoxFit.contain,
-        gaplessPlayback: true,
-        errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)),
-      );
+      return LayoutBuilder(builder: (context, c) {
+        final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
+        final w = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+        // Sharp enough for a downloaded picture or video too, which are drawn bigger than the screen.
+        final target = w <= 0 ? null : (w * math.max(dpr, 5.0)).clamp(96.0, 1500.0).round();
+        return Image.memory(
+          bytes,
+          key: ValueKey('img_${element.id}_${bytes.length}'),
+          cacheWidth: target,
+          fit: coverBg || cover ? BoxFit.cover : BoxFit.contain,
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54)),
+        );
+      });
     } catch (_) {
       return const Center(child: Icon(Icons.broken_image_outlined, color: Colors.white54));
     }
@@ -1177,6 +1188,29 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
       },
     );
   }
+}
+
+// Pictures in slides are stored as base64 text. Decoding it on every rebuild made a new copy of the
+// whole picture each time, so the decoded bytes are kept (newest last, capped) and reused.
+final Map<String, Uint8List> _slideImageBytes = <String, Uint8List>{};
+int _slideImageBytesTotal = 0;
+const int _kSlideImageBytesCap = 40 * 1024 * 1024;
+
+/// The picture bytes of a `data:image/...;base64,` reference, decoded once and reused.
+Uint8List ngmySlideImageBytes(String ref) {
+  final hit = _slideImageBytes.remove(ref);
+  if (hit != null) {
+    _slideImageBytes[ref] = hit;
+    return hit;
+  }
+  final bytes = base64Decode(ref.substring(ref.indexOf(',') + 1));
+  _slideImageBytes[ref] = bytes;
+  _slideImageBytesTotal += bytes.length;
+  while (_slideImageBytesTotal > _kSlideImageBytesCap && _slideImageBytes.length > 1) {
+    final oldest = _slideImageBytes.keys.first;
+    _slideImageBytesTotal -= _slideImageBytes.remove(oldest)!.length;
+  }
+  return bytes;
 }
 
 /// Splits words marked *big*, ^huge^ and ~small~ into styled pieces. Null when nothing is marked.

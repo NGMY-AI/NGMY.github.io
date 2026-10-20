@@ -2814,7 +2814,11 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
     final deckH = (isWideWindow && hasCivicInDeck)
         ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.72)
-        : ngmyHomeCardHeightFor(box.maxWidth);
+        : (hasCivicInDeck
+            // Phones: tall enough (plus the 16px above the card) that the ID fills the card's whole
+            // width. A shorter card made the ID shrink to fit and left dark bands at both ends.
+            ? math.max(ngmyHomeCardHeightFor(box.maxWidth), box.maxWidth / 1.586 + 16)
+            : ngmyHomeCardHeightFor(box.maxWidth));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

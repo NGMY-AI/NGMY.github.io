@@ -1570,6 +1570,8 @@ class NgmyBrandedQrWidget extends StatelessWidget {
   final Color? borderColor;
   /// Larger, bolder QR modules for easy phone scanning (short payloads only).
   final bool coarseScan;
+  /// The tile behind the code. White by default; a soft tint keeps the dark code easy to scan.
+  final Color tileColor;
 
   const NgmyBrandedQrWidget({
     super.key,
@@ -1583,6 +1585,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
     this.tightFrame = false,
     this.borderColor,
     this.coarseScan = false,
+    this.tileColor = Colors.white,
   });
 
   static Future<Uint8List?> capturePng(GlobalKey key, {double pixelRatio = 4}) async {
@@ -1632,7 +1635,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
             height: size,
             padding: EdgeInsets.all(qrPad),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: tileColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [BoxShadow(color: _accent.withOpacity(0.18), blurRadius: 16, spreadRadius: 1)],
             ),
@@ -1644,7 +1647,7 @@ class NgmyBrandedQrWidget extends StatelessWidget {
                   version: QrVersions.auto,
                   size: size - qrPad * 2,
                   padding: EdgeInsets.zero,
-                  backgroundColor: Colors.white,
+                  backgroundColor: tileColor,
                   errorCorrectionLevel: errorCorrectionLevel ?? (coarseScan ? QrErrorCorrectLevel.L : QrErrorCorrectLevel.H),
                   errorStateBuilder: (context, error) => Container(
                     alignment: Alignment.center,
