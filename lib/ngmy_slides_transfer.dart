@@ -473,7 +473,8 @@ NgmySlideDeck ngmySlidesDeckCopyForImport(
   final deck = NgmySlideDeck.fromJson(Map<String, dynamic>.from(json));
   // A document that came from an admin can be edited for 4 hours, the same
   // window as a fresh marriage payment. That applies to this copy only.
-  if (sharedByAdmin) {
+  // Only for the locked legal documents; ordinary and AI-made slides never get a timer.
+  if (sharedByAdmin && deck.isLockedTemplateDoc) {
     deck.adminShareEditUntil = DateTime.now()
         .toUtc()
         .add(const Duration(hours: 4))

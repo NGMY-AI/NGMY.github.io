@@ -436,6 +436,7 @@ class NgmySlideDeck {
 
   /// Admin transfer grants a timed edit window on this document only.
   bool get adminShareEditOpen {
+    if (!isLockedTemplateDoc) return false;
     final until = adminShareEditUntilAt;
     if (until == null) return false;
     return DateTime.now().isBefore(until.toLocal());
@@ -445,12 +446,7 @@ class NgmySlideDeck {
   /// and future document categories) — these share the tap-to-fill-only
   /// editing behavior: everything except the blank fields and sign zones
   /// is locked in place.
-  bool get isLockedTemplateDoc =>
-      deckKind == 'marriage_agreement' ||
-      deckKind == 'hati_kuhowa' ||
-      deckKind == 'hati_kuhoweya' ||
-      deckKind == 'hati_malipo_awamu' ||
-      deckKind == 'hati_kiapo_uongozi';
+  bool get isLockedTemplateDoc => _isLockedDeckKind(deckKind);
 
   double get aspectValue => aspectRatio == NgmySlideAspectRatio.portrait916 ? 9 / 16 : 16 / 9;
 
@@ -520,8 +516,10 @@ class NgmySlideDeck {
         deckKind: json['deckKind']?.toString(),
         marriageState: json['marriageState']?.toString(),
         transferClaimCode: json['transferClaimCode']?.toString(),
-        transferReceived: json['transferReceived'] == true,
-        adminShareEditUntil: json['adminShareEditUntil']?.toString(),
+        // Only the locked legal documents stay "received copies". Ordinary and AI-made slides that
+        // arrive by QR or code are normal slides: no lock, no timer.
+        transferReceived: json['transferReceived'] == true && _isLockedDeckKind(json['deckKind']?.toString()),
+        adminShareEditUntil: _isLockedDeckKind(json['deckKind']?.toString()) ? json['adminShareEditUntil']?.toString() : null,
         signatureStrokeWidth: (json['signatureStrokeWidth'] as num?)?.toDouble(),
         signatureInkColor: (json['signatureInkColor'] as num?)?.toInt(),
         kiapoSignedAt: json['kiapoSignedAt']?.toString(),
@@ -541,6 +539,13 @@ class NgmySlideDeck {
             [NgmySlidesTemplates.blankSlide()],
       );
 }
+
+bool _isLockedDeckKind(String? kind) =>
+    kind == 'marriage_agreement' ||
+    kind == 'hati_kuhowa' ||
+    kind == 'hati_kuhoweya' ||
+    kind == 'hati_malipo_awamu' ||
+    kind == 'hati_kiapo_uongozi';
 
 NgmySlideAspectRatio _aspectFromJson(Object? raw) {
   final name = (raw ?? 'landscape169').toString();

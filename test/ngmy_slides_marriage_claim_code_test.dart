@@ -125,7 +125,9 @@ void main() {
       ),
       sharedByAdmin: true,
     );
-    expect(slides.adminShareEditOpen, isTrue);
+    // Ordinary slides never get a timer, even from an admin.
+    expect(slides.adminShareEditOpen, isFalse);
+    expect(slides.transferReceived, isFalse);
 
     final fromAdminEmail = ngmySlidesDecksFromShareRaw(jsonEncode({
       'type': kNgmySlidesDeckBundleType,
