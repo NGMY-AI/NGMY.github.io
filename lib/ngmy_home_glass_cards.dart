@@ -2814,11 +2814,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
     final hasCivicInDeck = _spending.any((e) => e.hasCivicId);
     final deckH = (isWideWindow && hasCivicInDeck)
         ? math.min(box.maxWidth / 1.586, MediaQuery.sizeOf(context).height * 0.72)
-        : (hasCivicInDeck
-            // Phones: tall enough (plus the 16px above the card) that the ID fills the card's whole
-            // width. A shorter card made the ID shrink to fit and left dark bands at both ends.
-            ? math.max(ngmyHomeCardHeightFor(box.maxWidth), box.maxWidth / 1.586 + 16)
-            : ngmyHomeCardHeightFor(box.maxWidth));
+        : ngmyHomeCardHeightFor(box.maxWidth);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3163,21 +3159,27 @@ class _CivicIdCardBody extends StatelessWidget {
       color: const Color(0xFF0B1220),
       child: Padding(
         padding: const EdgeInsets.only(top: kNgmyCivicIdTopInset),
-        child: FittedBox(
-          fit: BoxFit.contain,
-          child: SizedBox(
-            width: designW,
-            height: designH,
-            child: NgmyCivicRegistryIdCard(
-              record: record!,
-              photoPath: photo.isEmpty ? null : photo,
-              onQrTap: () => showNgmyEnlargedCivicQrDialog(
-                context,
-                (record!['registryId'] ?? '').toString().trim(),
+        // On a phone the card is a hair shorter than an ID, so the ID is eased into the card's exact
+        // size (a few percent) and fills it edge to edge, with no dark bands at the ends. The card
+        // itself stays business-card size. A computer window keeps the true shape.
+        child: LayoutBuilder(builder: (context, c) {
+          final phone = c.maxWidth < 700;
+          return FittedBox(
+            fit: phone ? BoxFit.fill : BoxFit.contain,
+            child: SizedBox(
+              width: designW,
+              height: designH,
+              child: NgmyCivicRegistryIdCard(
+                record: record!,
+                photoPath: photo.isEmpty ? null : photo,
+                onQrTap: () => showNgmyEnlargedCivicQrDialog(
+                  context,
+                  (record!['registryId'] ?? '').toString().trim(),
+                ),
               ),
             ),
-          ),
-        ),
+          );
+        }),
       ),
     );
   }

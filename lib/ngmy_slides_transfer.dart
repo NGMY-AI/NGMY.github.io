@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import 'ngmy_admin_slides_vault.dart';
+import 'ngmy_admin_slides_vault_sheet.dart';
 import 'ngmy_backup_file_picker_stub.dart' if (dart.library.html) 'ngmy_backup_file_picker_web.dart';
 import 'ngmy_civic_registry_stats.dart';
 import 'ngmy_communicate_sync_download_io.dart'
@@ -930,6 +930,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   Widget _heroHeader(bool isDark) {
     return Container(
       width: double.infinity,
+      clipBehavior: Clip.antiAlias,
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(24),
@@ -943,6 +944,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
         ],
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned(
             right: -12,
@@ -997,23 +999,20 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
             ],
           ),
           // Admin only: a small icon to keep presentations in the database.
+          // Just the icon, sitting in the very corner of the blue frame (no little frame of its own).
           if (widget.isAdmin)
             Positioned(
-              top: -12,
-              right: -12,
+              top: -19,
+              right: -17,
               child: Tooltip(
                 message: 'Save presentations to the database',
                 child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: _openVault,
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.2),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-                    ),
-                    child: const Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 18),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(Icons.cloud_sync_rounded, color: Colors.white, size: 22),
                   ),
                 ),
               ),
@@ -1024,13 +1023,7 @@ class _NgmySlidesTransferPageState extends State<NgmySlidesTransferPage> {
   }
 
   Future<void> _openVault() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF0F172A),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (ctx) => _AdminSlidesVaultSheet(decks: widget.decks, onRestore: widget.onImported),
-    );
+    await showNgmyAdminSlidesVault(context, decks: widget.decks, onRestore: widget.onImported);
   }
 
   Widget _sectionTitle(bool isDark, String text) {
@@ -1792,169 +1785,3 @@ class _NgmySlidesTransferScanPageState extends State<NgmySlidesTransferScanPage>
   }
 }
 
-/// Admin only: pick any presentations and save them to the database, or bring saved ones back.
-class _AdminSlidesVaultSheet extends StatefulWidget {
-  const _AdminSlidesVaultSheet({required this.decks, required this.onRestore});
-
-  final List<NgmySlideDeck> decks;
-  final Future<void> Function(List<NgmySlideDeck> imported) onRestore;
-
-  @override
-  State<_AdminSlidesVaultSheet> createState() => _AdminSlidesVaultSheetState();
-}
-
-class _AdminSlidesVaultSheetState extends State<_AdminSlidesVaultSheet> {
-  final Set<String> _picked = {};
-  List<Map<String, dynamic>>? _saved;
-  bool _loading = true;
-  bool _busy = false;
-  String? _note;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_refresh());
-  }
-
-  Future<void> _refresh() async {
-    final list = await NgmyAdminSlidesVault.list();
-    if (!mounted) return;
-    setState(() {
-      _saved = list;
-      _loading = false;
-    });
-  }
-
-  Future<void> _save() async {
-    final decks = widget.decks.where((d) => _picked.contains(d.id)).toList();
-    if (decks.isEmpty || _busy) return;
-    setState(() {
-      _busy = true;
-      _note = null;
-    });
-    final n = await NgmyAdminSlidesVault.save(decks);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _note = n == decks.length
-          ? 'Saved $n presentation${n == 1 ? '' : 's'} to the database.'
-          : (n == 0 ? 'Could not save. Check the connection and try again.' : 'Saved $n of ${decks.length}. Try the rest again.');
-      if (n == decks.length) _picked.clear();
-    });
-    await _refresh();
-  }
-
-  Future<void> _restore(Map<String, dynamic> item) async {
-    if (_busy) return;
-    setState(() {
-      _busy = true;
-      _note = null;
-    });
-    final deck = await NgmyAdminSlidesVault.load((item['id'] ?? '').toString());
-    if (deck == null) {
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _note = 'Could not open that saved presentation.';
-      });
-      return;
-    }
-    final copy = ngmySlidesDeckCopyForImport(deck);
-    copy.transferReceived = false;
-    await widget.onRestore([copy]);
-    if (!mounted) return;
-    setState(() {
-      _busy = false;
-      _note = 'Brought "${deck.name}" back to your presentations.';
-    });
-  }
-
-  Future<void> _delete(Map<String, dynamic> item) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    await NgmyAdminSlidesVault.remove((item['id'] ?? '').toString());
-    if (!mounted) return;
-    setState(() => _busy = false);
-    await _refresh();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final saved = _saved ?? const <Map<String, dynamic>>[];
-    return SafeArea(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.88),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-          shrinkWrap: true,
-          children: [
-            Row(children: [
-              const Icon(Icons.cloud_sync_rounded, color: Color(0xFF7DD3FC), size: 20),
-              const SizedBox(width: 8),
-              const Expanded(child: Text('Database (admin)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17))),
-              if (_busy) const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4)),
-            ]),
-            const SizedBox(height: 4),
-            const Text('Pick as many presentations as you like and save them. Saved ones can be brought back any time.',
-                style: TextStyle(color: Colors.white54, fontSize: 12.5, height: 1.35)),
-            const SizedBox(height: 14),
-            Row(children: [
-              const Expanded(child: Text('YOUR PRESENTATIONS', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.1))),
-              TextButton(
-                onPressed: () => setState(() {
-                  if (_picked.length == widget.decks.length) {
-                    _picked.clear();
-                  } else {
-                    _picked.addAll(widget.decks.map((d) => d.id));
-                  }
-                }),
-                child: Text(_picked.length == widget.decks.length ? 'Clear' : 'Select all'),
-              ),
-            ]),
-            if (widget.decks.isEmpty) const Text('No presentations yet.', style: TextStyle(color: Colors.white38)),
-            for (final d in widget.decks)
-              CheckboxListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                controlAffinity: ListTileControlAffinity.trailing,
-                value: _picked.contains(d.id),
-                onChanged: (v) => setState(() => v == true ? _picked.add(d.id) : _picked.remove(d.id)),
-                title: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                subtitle: Text('${d.slides.length} slides', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-              ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: _picked.isEmpty || _busy ? null : _save,
-              icon: const Icon(Icons.cloud_upload_rounded),
-              label: Text(_picked.isEmpty ? 'Save to database' : 'Save ${_picked.length} to database'),
-            ),
-            if (_note != null) ...[
-              const SizedBox(height: 10),
-              Text(_note!, style: const TextStyle(color: Color(0xFF7DD3FC), fontSize: 12.5, fontWeight: FontWeight.w700)),
-            ],
-            const SizedBox(height: 18),
-            const Text('SAVED IN THE DATABASE', style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.1)),
-            const SizedBox(height: 6),
-            if (_loading)
-              const Padding(padding: EdgeInsets.all(12), child: Center(child: CircularProgressIndicator()))
-            else if (_saved == null)
-              const Text('Could not reach the database.', style: TextStyle(color: Colors.white38))
-            else if (saved.isEmpty)
-              const Text('Nothing saved yet.', style: TextStyle(color: Colors.white38)),
-            for (final item in saved)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                title: Text((item['name'] ?? 'Presentation').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                subtitle: Text('${item['slides'] ?? '?'} slides', style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  IconButton(tooltip: 'Bring it back', onPressed: _busy ? null : () => _restore(item), icon: const Icon(Icons.download_rounded, color: Color(0xFF34D399))),
-                  IconButton(tooltip: 'Delete from the database', onPressed: _busy ? null : () => _delete(item), icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent)),
-                ]),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
