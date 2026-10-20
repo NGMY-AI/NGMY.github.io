@@ -137,10 +137,10 @@ class NgmySlideElementView extends StatelessWidget {
             height: b.height,
             foreground: stroke,
           );
-    final parts = element.rich ? shown.split('*') : <String>[shown];
-    if (parts.length < 3) {
+    final spans = element.rich ? ngmyRichSpans(shown, style, st) : null;
+    if (spans == null) {
       return Text(
-        parts.join(),
+        shown,
         style: st(style),
         strutStyle: strut,
         textAlign: element.align,
@@ -149,21 +149,7 @@ class NgmySlideElementView extends StatelessWidget {
         overflow: clipSingleLine ? TextOverflow.clip : TextOverflow.visible,
       );
     }
-    return Text.rich(
-      TextSpan(children: [
-        for (var i = 0; i < parts.length; i++)
-          if (parts[i].isNotEmpty)
-            TextSpan(
-              text: parts[i],
-              // Parts between a pair of stars are the big ones; a lone last star stays plain.
-              style: (i.isOdd && i < parts.length - 1)
-                  ? st(style.copyWith(fontSize: (style.fontSize ?? 24) * 1.7, fontWeight: FontWeight.w900))
-                  : st(style),
-            ),
-      ]),
-      style: st(style),
-      textAlign: element.align,
-    );
+    return Text.rich(TextSpan(children: spans), style: st(style), textAlign: element.align);
   }
 
   Widget _textView() {
@@ -1116,6 +1102,45 @@ class _NgmyLoopFxState extends State<NgmyLoopFx> with SingleTickerProviderStateM
         }
       },
     );
+  }
+}
+
+/// Splits words marked *big*, ^huge^ and ~small~ into styled pieces. Null when nothing is marked.
+List<InlineSpan>? ngmyRichSpans(String s, TextStyle base, TextStyle Function(TextStyle) apply) {
+  final re = RegExp(r'\*([^*]+)\*|\^([^^]+)\^|~([^~]+)~');
+  final found = re.allMatches(s).toList();
+  if (found.isEmpty) return null;
+  final size = base.fontSize ?? 24;
+  final out = <InlineSpan>[];
+  var pos = 0;
+  for (final m in found) {
+    if (m.start > pos) out.add(TextSpan(text: s.substring(pos, m.start), style: apply(base)));
+    if (m.group(1) != null) {
+      out.add(TextSpan(text: m.group(1), style: apply(base.copyWith(fontSize: size * 1.6, fontWeight: FontWeight.w900))));
+    } else if (m.group(2) != null) {
+      out.add(TextSpan(text: m.group(2), style: apply(base.copyWith(fontSize: size * 2.4, fontWeight: FontWeight.w900))));
+    } else {
+      out.add(TextSpan(text: m.group(3), style: apply(base.copyWith(fontSize: size * 0.62, fontWeight: FontWeight.w500))));
+    }
+    pos = m.end;
+  }
+  if (pos < s.length) out.add(TextSpan(text: s.substring(pos), style: apply(base)));
+  return out;
+}
+
+/// Shows "Aa"-style sample words in one of the word designs (used by the design pickers).
+class NgmyFxSample extends StatelessWidget {
+  const NgmyFxSample({super.key, required this.fx, this.text = 'Aa', this.color = Colors.white, this.size = 28});
+
+  final String fx;
+  final String text;
+  final Color color;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = NgmySlideElement(id: 'fx', type: NgmySlideElementType.text, text: text, fontSize: size, color: color.toARGB32(), textFx: fx, align: TextAlign.center);
+    return Center(child: NgmySlideElementView(element: e, scale: 1, compactText: true));
   }
 }
 

@@ -75,6 +75,38 @@ double ngmyQuoteFontSize(String quote) {
 /// The file name that marks the NGMY logo on a quote, so the editor knows not to delete it.
 const String kNgmyQuoteLogoFile = 'ngmy_quote_logo';
 
+/// Marks the background picture of a quote.
+const String kNgmyQuoteBackgroundFile = 'ngmy_quote_background';
+
+/// The quote with the size marks taken out.
+String ngmyQuotePlain(String s) => s.replaceAll(RegExp(r'[*~^]'), '');
+
+/// Writes size marks around words: [levels] holds one number per word — -1 small, 0 normal,
+/// 1 big, 2 huge. Words next to each other with the same size share one mark.
+/// The renderer reads *big*, ^huge^ and ~small~.
+String ngmyQuoteMarkup(String text, List<int> levels) {
+  final matches = RegExp(r'\S+').allMatches(text).toList();
+  if (matches.isEmpty) return text;
+  final out = StringBuffer();
+  var pos = 0;
+  var i = 0;
+  while (i < matches.length) {
+    final lvl = i < levels.length ? levels[i] : 0;
+    var j = i;
+    while (j + 1 < matches.length && (j + 1 < levels.length ? levels[j + 1] : 0) == lvl) {
+      j++;
+    }
+    out.write(text.substring(pos, matches[i].start));
+    final run = ngmyQuotePlain(text.substring(matches[i].start, matches[j].end));
+    final mark = switch (lvl) { 1 => '*', 2 => '^', -1 => '~', _ => '' };
+    out..write(mark)..write(run)..write(mark);
+    pos = matches[j].end;
+    i = j + 1;
+  }
+  out.write(text.substring(pos));
+  return out.toString();
+}
+
 // Element ids are the same every time a quote is rebuilt, so the logo picture is not decoded
 // again (and left blank for a moment) each time something in the maker changes.
 String _idSeed = 'q';
@@ -240,11 +272,21 @@ NgmySlide ngmyBuildQuoteSlide(
   String logoRing = 'gold',
   String textFx = '',
   double sizeScale = 1.0,
+  String? bgImage,
+  bool transparent = false,
+  int? textColor,
+  TextAlign align = TextAlign.center,
+  bool bold = true,
+  bool italic = false,
+  double quoteY = 0.30,
+  bool quoteMarks = true,
+  bool shapes = true,
 }) {
   _idSeed = idSeed;
   _idCount = 0;
   final words = quote.trim().isEmpty ? t.sample : quote.trim();
   final who = author.trim();
+  final ink = textColor ?? t.text;
   NgmySlideElement text(String s, double x, double y, double w, double h, double size, int color,
           {FontWeight weight = FontWeight.w700, FontStyle style = FontStyle.normal, TextAlign align = TextAlign.center}) =>
       NgmySlideElement(
@@ -266,29 +308,43 @@ NgmySlide ngmyBuildQuoteSlide(
         id: _qid(),
         type: NgmySlideElementType.text,
         x: 0.09,
-        y: 0.30,
+        y: quoteY,
         w: 0.82,
         h: 0.36,
         text: s,
         fontSize: size,
-        fontWeight: FontWeight.w800,
+        fontWeight: bold ? FontWeight.w800 : FontWeight.w500,
+        fontStyle: italic ? FontStyle.italic : FontStyle.normal,
         color: color,
-        align: TextAlign.center,
+        align: align,
         textFx: textFx,
         rich: true,
       );
   return NgmySlide(
     id: '${idSeed}_slide',
     layout: NgmySlideLayout.blank,
-    background: t.top,
-    backgroundEnd: t.bottom,
+    background: transparent ? 0x00000000 : t.top,
+    backgroundEnd: transparent ? 0x00000000 : t.bottom,
     elements: [
-      ..._decoration(t.deco, t.accent, t.accent2),
-      text('“', 0.08, 0.17, 0.84, 0.1, 200, t.accent, weight: FontWeight.w900),
-      quoteText(words, ngmyQuoteFontSize(words.replaceAll('*', '')) * sizeScale * (words.contains('*') ? 0.8 : 1.0), t.text),
-      if (who.isNotEmpty) text('— $who', 0.09, 0.69, 0.82, 0.05, 30, _alpha(t.text, 0xDD), style: FontStyle.italic, weight: FontWeight.w600),
-      text('NGMY', 0.3, 0.925, 0.4, 0.028, 22, _alpha(t.text, 0xB3), weight: FontWeight.w900),
-      text('New Global Movement for Youth', 0.1, 0.96, 0.8, 0.025, 14, _alpha(t.text, 0x99), weight: FontWeight.w600),
+      // A picture behind everything, when the quote has its own background picture.
+      if (bgImage != null && bgImage.isNotEmpty)
+        NgmySlideElement(
+          id: _qid(),
+          type: NgmySlideElementType.image,
+          x: 0,
+          y: 0,
+          w: 1,
+          h: 1,
+          imageRef: bgImage,
+          fileName: kNgmyQuoteBackgroundFile,
+        ),
+      if (shapes) ..._decoration(t.deco, t.accent, t.accent2),
+      if (quoteMarks) text('“', 0.08, (quoteY - 0.13).clamp(0.0, 1.0), 0.84, 0.1, 200, t.accent, weight: FontWeight.w900, align: align),
+      quoteText(words, ngmyQuoteFontSize(ngmyQuotePlain(words)) * sizeScale * (words.contains(RegExp(r'[*^]')) ? 0.85 : 1.0), ink),
+      if (who.isNotEmpty)
+        text('— $who', 0.09, (quoteY + 0.39).clamp(0.0, 0.9), 0.82, 0.05, 30, _alpha(ink, 0xDD), style: FontStyle.italic, weight: FontWeight.w600, align: align),
+      text('NGMY', 0.3, 0.925, 0.4, 0.028, 22, _alpha(ink, 0xB3), weight: FontWeight.w900),
+      text('New Global Movement for Youth', 0.1, 0.96, 0.8, 0.025, 14, _alpha(ink, 0x99), weight: FontWeight.w600),
       // The NGMY logo: a round profile-picture style by default, with a ring. It can be moved and
       // reframed, but it is always there.
       if (logoData != null && logoData.isNotEmpty)

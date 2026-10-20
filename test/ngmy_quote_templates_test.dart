@@ -58,7 +58,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     for (final fx in ['', 'caps', 'elegant', 'shadow', 'neon', 'outline', 'marker', 'stamp']) {
-      final slide = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Lead with *courage* today', author: 'A', textFx: fx, sizeScale: 1.2);
+      final slide = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Lead with *courage* ~today~ ^now^', author: 'A', textFx: fx, sizeScale: 1.2);
       final q = slide.elements.firstWhere((e) => e.text.contains('courage'));
       expect(q.textFx, fx);
       expect(q.rich, isTrue);
@@ -67,10 +67,32 @@ void main() {
       ));
       await tester.pump();
       expect(tester.takeException(), isNull, reason: fx);
-      expect(find.textContaining('*', findRichText: true), findsNothing, reason: fx);
+      for (final mark in ['*', '~', '^']) {
+        expect(find.textContaining(mark, findRichText: true), findsNothing, reason: '$fx $mark');
+      }
     }
     final copy = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'a *b* c', author: '', textFx: 'neon').elements.firstWhere((e) => e.rich).copy();
     expect([copy.textFx, copy.rich], ['neon', true]);
+  });
+
+  test('word sizes become marks, sharing one mark between neighbours of the same size', () {
+    expect(ngmyQuoteMarkup('Lead with courage today', [0, 0, 1, -1]), 'Lead with *courage* ~today~');
+    expect(ngmyQuoteMarkup('Be bold and kind', [1, 1, 0, 2]), '*Be bold* and ^kind^');
+    expect(ngmyQuoteMarkup('plain words', []), 'plain words');
+    expect(ngmyQuoteMarkup('stars *in* text', [0, 1, 0]), 'stars *in* text');
+    expect(ngmyQuotePlain('*a* ~b~ ^c^'), 'a b c');
+  });
+
+  test('a background picture goes behind everything and the logo stays', () {
+    final s = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Hi', author: 'A', logoData: tinyPng, bgImage: tinyPng, textColor: 0xFFFF0000, align: TextAlign.left, quoteY: 0.4, shapes: false, quoteMarks: false);
+    expect(s.elements.first.fileName, kNgmyQuoteBackgroundFile);
+    expect([s.elements.first.x, s.elements.first.y, s.elements.first.w, s.elements.first.h], [0, 0, 1, 1]);
+    expect(s.elements.any((e) => e.fileName == kNgmyQuoteLogoFile), isTrue);
+    final q = s.elements.firstWhere((e) => e.text == 'Hi');
+    expect([q.color, q.align, q.y], [0xFFFF0000, TextAlign.left, 0.4]);
+    expect(s.elements.length, 6, reason: 'picture, quote, author, NGMY, tagline and logo only');
+    final clear = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Hi', author: 'A', transparent: true);
+    expect(clear.background, 0x00000000);
   });
 
   testWidgets('every design draws without errors at story size', (tester) async {
