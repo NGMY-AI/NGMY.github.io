@@ -189,7 +189,7 @@ class NgmySlideElementView extends StatelessWidget {
       decoration: deco,
       color: fg == null ? color : null,
       foreground: fg,
-      backgroundColor: bg,
+      backgroundColor: element.textBg != 0 ? Color(element.textBg) : bg,
       letterSpacing: spacing,
       shadows: shadows,
       height: 1.25,

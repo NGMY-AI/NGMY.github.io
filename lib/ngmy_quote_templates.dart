@@ -281,6 +281,7 @@ NgmySlide ngmyBuildQuoteSlide(
   double quoteY = 0.30,
   bool quoteMarks = true,
   bool shapes = true,
+  int highlight = 0,
 }) {
   _idSeed = idSeed;
   _idCount = 0;
@@ -319,6 +320,7 @@ NgmySlide ngmyBuildQuoteSlide(
         align: align,
         textFx: textFx,
         rich: true,
+        textBg: highlight,
       );
   return NgmySlide(
     id: '${idSeed}_slide',

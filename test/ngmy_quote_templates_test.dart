@@ -95,6 +95,32 @@ void main() {
     expect(clear.background, 0x00000000);
   });
 
+  testWidgets('a highlight colour sits behind the words with any word design, and survives saving', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    for (final fx in ['', 'neon', 'caps', 'marker']) {
+      final slide = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Lead with *courage*', author: 'A', textFx: fx, highlight: 0xCC22D3EE);
+      final q = slide.elements.firstWhere((e) => e.text.contains('courage'));
+      expect(q.textBg, 0xCC22D3EE);
+      final back = NgmySlideElement.fromJson(q.toJson());
+      expect(back.textBg, 0xCC22D3EE);
+      await tester.pumpWidget(MaterialApp(home: SizedBox(width: 360, height: 640, child: NgmySlideAnimatedRender(slide: slide, animate: false))));
+      await tester.pump();
+      final withBg = tester.widgetList<RichText>(find.byType(RichText)).where((r) {
+        var found = false;
+        r.text.visitChildren((s) {
+          if (s is TextSpan && s.style?.backgroundColor == const Color(0xCC22D3EE)) found = true;
+          return true;
+        });
+        return found;
+      });
+      expect(withBg, isNotEmpty, reason: 'highlight shows with design "$fx"');
+    }
+    final none = ngmyBuildQuoteSlide(kNgmyQuoteTemplates.first, quote: 'Hi', author: 'A');
+    expect(none.elements.firstWhere((e) => e.text == 'Hi').textBg, 0);
+  });
+
   testWidgets('every design draws without errors at story size', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1.0;

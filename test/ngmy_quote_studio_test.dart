@@ -91,6 +91,17 @@ void main() {
       expect(tester.takeException(), isNull, reason: name);
     }
 
+    // Highlight behind the words: pick a custom colour, then change its colour, shade and strength.
+    expect(find.text('Strength'), findsNothing);
+    await tester.tap(find.byIcon(Icons.colorize_rounded));
+    await tester.pump();
+    expect(find.text('Strength'), findsOneWidget);
+    await tester.drag(_sliderFor('Colour'), const Offset(80, 0));
+    await tester.drag(_sliderFor('Shade'), const Offset(-40, 0));
+    await tester.drag(_sliderFor('Strength'), const Offset(-60, 0));
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+
     // Photo studio: the controls change the picture that gets downloaded.
     await tester.tap(find.text('Photo'));
     await tester.pump();

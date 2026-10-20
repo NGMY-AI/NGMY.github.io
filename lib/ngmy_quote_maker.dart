@@ -143,6 +143,21 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
   double _quoteY = 0.30;
   bool _quoteMarks = true;
   bool _shapes = true;
+  // The highlight behind the words: a colour (null = none), how strong, or a custom colour.
+  int? _hlColor;
+  double _hlAmt = 1.0;
+  bool _hlCustom = false;
+  double _hlHue = 50;
+  double _hlLight = 0.6;
+
+  /// The highlight as ARGB, 0 when there is none.
+  int get _highlight {
+    final rgb = _hlCustom ? HSLColor.fromAHSL(1, _hlHue, 0.9, _hlLight).toColor().toARGB32() & 0x00FFFFFF : (_hlColor == null ? null : _hlColor! & 0x00FFFFFF);
+    if (rgb == null) return 0;
+    return (((_hlAmt * 255).round().clamp(0, 255)) << 24) | rgb;
+  }
+
+  static const _hlColors = <int?>[null, 0xFFFACC15, 0xFFFDE047, 0xFF4ADE80, 0xFF22D3EE, 0xFFF472B6, 0xFFFB923C, 0xFFEF4444, 0xFF8B5CF6, 0xFF3B82F6, 0xFFFFFFFF, 0xFF111827];
 
   // The picture behind the quote and the photo studio.
   Uint8List? _bg;
@@ -355,6 +370,7 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
         quoteY: _quoteY,
         quoteMarks: _quoteMarks,
         shapes: _shapes,
+        highlight: _highlight,
       );
 
   /// The picture behind the quote with every photo setting applied, as 1080-wide PNG bytes.
@@ -828,6 +844,41 @@ class _QuoteMakerScreenState extends State<_QuoteMakerScreen> {
             ),
         ]);
       }),
+      _label('HIGHLIGHT BEHIND THE WORDS', icon: Icons.highlight_rounded),
+      Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        _swatches(_hlCustom ? -1 : _hlColor, (c) {
+          _hlCustom = false;
+          _hlColor = c;
+        }, _hlColors),
+        // A colour of your own: tap, then slide the colour and the shade.
+        GestureDetector(
+          onTap: () => setState(() => _hlCustom = true),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const SweepGradient(colors: [Color(0xFFFF0000), Color(0xFFFFFF00), Color(0xFF00FF00), Color(0xFF00FFFF), Color(0xFF0000FF), Color(0xFFFF00FF), Color(0xFFFF0000)]),
+              border: Border.all(color: _hlCustom ? Colors.white : Colors.white24, width: _hlCustom ? 3 : 1),
+            ),
+            child: const Icon(Icons.colorize_rounded, size: 15, color: Colors.white),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 6),
+      _hint('Add a coloured band behind the words, with any word design. The first circle turns it off.'),
+      if (_highlight != 0) ...[
+        const SizedBox(height: 10),
+        _card(
+          child: Column(children: [
+            if (_hlCustom) ...[
+              _slider('Colour', _hlHue, 0, 360, (v) => _hlHue = v, shown: '${_hlHue.round()}°'),
+              _slider('Shade', _hlLight, 0.15, 0.9, (v) => _hlLight = v, shown: '${(_hlLight * 100).round()}'),
+            ],
+            _slider('Strength', _hlAmt, 0.15, 1.0, (v) => _hlAmt = v, shown: '${(_hlAmt * 100).round()}%', neutral: 1.0),
+          ]),
+        ),
+      ],
       _label('LOOK', icon: Icons.title_rounded),
       Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
         _pill('Bold', on: _bold, icon: Icons.format_bold_rounded, onTap: () => setState(() => _bold = !_bold)),

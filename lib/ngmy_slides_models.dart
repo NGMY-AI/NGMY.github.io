@@ -102,6 +102,7 @@ class NgmySlideElement {
     this.ring = '',
     this.textFx = '',
     this.rich = false,
+    this.textBg = 0,
   });
 
   final String id;
@@ -140,6 +141,8 @@ class NgmySlideElement {
   String textFx;
   /// When true, words wrapped in *stars* are drawn bigger.
   bool rich;
+  /// Highlight behind the words, as ARGB (0 = none). Works with every word design.
+  int textBg;
 
   NgmySlideElement copy() => NgmySlideElement(
         id: id,
@@ -172,6 +175,7 @@ class NgmySlideElement {
         ring: ring,
         textFx: textFx,
         rich: rich,
+        textBg: textBg,
       );
 
   Map<String, dynamic> toJson() => {
@@ -205,6 +209,7 @@ class NgmySlideElement {
         if (ring.isNotEmpty) 'ring': ring,
         if (textFx.isNotEmpty) 'textFx': textFx,
         if (rich) 'rich': true,
+        if (textBg != 0) 'textBg': textBg,
       };
 
   factory NgmySlideElement.fromJson(Map<String, dynamic> json) {
@@ -242,6 +247,7 @@ class NgmySlideElement {
       ring: (json['ring'] ?? '').toString(),
       textFx: (json['textFx'] ?? '').toString(),
       rich: json['rich'] == true,
+      textBg: (json['textBg'] as num?)?.toInt() ?? 0,
     );
   }
 }
