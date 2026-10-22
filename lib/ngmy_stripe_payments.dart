@@ -74,9 +74,9 @@ class NgmyStripePayments {
       'https://buy.stripe.com/test_ngmy_civic_user_group_extra';
   static const String civicUserGroupMembersUrl =
       'https://buy.stripe.com/test_ngmy_civic_user_group_members';
-  /// Live Payment Link for House Insurance (\$50 / 30 days). Empty until the
+  /// Live Payment Link for House Insurance ($125 / 30 days). Empty until the
   /// Stripe Dashboard link is pasted here — Cash App still collects the fee.
-  static const String houseInsuranceUrl = 'https://buy.stripe.com/eVqbJ1eo1fcdcArgcRb7y0l';
+  static const String houseInsuranceUrl = 'https://buy.stripe.com/cNi3cveo13tv2ZR1hXb7y0m';
 
   /// Invoices a free user may create before the paywall. Counted per invoice,
   /// not per day, so someone who only invoices occasionally still gets all three.
@@ -348,7 +348,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.civicUserGroupMembers:
         return 299;
       case NgmyStripeProduct.houseInsurance:
-        return 5000;
+        return 12500;
     }
   }
 
@@ -618,7 +618,7 @@ class NgmyStripePayments {
       case NgmyStripeProduct.civicUserGroupMembers:
         return 'Unlock more than 100 members in your lightning Civic Group (30 days).';
       case NgmyStripeProduct.houseInsurance:
-        return '\$50 for 30 days of the home-fix coverages you choose.';
+        return '\$125 for 30 days of the home-fix coverages you choose.';
     }
   }
 

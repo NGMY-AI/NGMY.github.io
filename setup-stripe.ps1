@@ -179,7 +179,7 @@ $productLinks = [ordered]@{
     "slides_studio"  = "https://buy.stripe.com/3cIaEX1Bf4xzeIzd0Fb7y0i"
     "device_transfer" = "https://buy.stripe.com/8x2fZh2Fjc01cAr7Glb7y0j"
     "state_registrar" = "https://buy.stripe.com/cNi9AT93H2prbwn7Glb7y0k"
-    "house_insurance" = "https://buy.stripe.com/eVqbJ1eo1fcdcArgcRb7y0l"
+    "house_insurance" = "https://buy.stripe.com/cNi3cveo13tv2ZR1hXb7y0m"
 }
 
 $allLinks = Invoke-Stripe -Method GET -Path "payment_links?limit=100"

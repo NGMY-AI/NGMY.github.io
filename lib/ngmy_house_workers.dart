@@ -424,6 +424,71 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
 
   /// An action tile: a colored icon square, the label, and a count when something is waiting.
   /// The main action ([primary]) is filled with the color.
+  /// A fixed-height action tile. With a [label] it shows icon + words; without one it is just the icon.
+  Widget _tile(IconData icon, Color color, VoidCallback onTap, {String? label, String? tip, String? caption, int badge = 0, bool primary = false, bool dot = false}) {
+    final c = _HwColors(context);
+    final ink = primary ? Colors.white : c.ink;
+    final iconWidget = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, size: 21, color: primary ? Colors.white : color),
+        if (dot)
+          Positioned(right: -3, top: -3, child: Container(width: 9, height: 9, decoration: BoxDecoration(color: _kHwGreen, shape: BoxShape.circle, border: Border.all(color: c.tile, width: 1.5)))),
+        if (badge > 0 && label == null)
+          Positioned(
+            right: -9,
+            top: -7,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
+              child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w900)),
+            ),
+          ),
+      ],
+    );
+    final tile = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Ink(
+          height: caption == null ? 46 : 58,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: primary
+                ? LinearGradient(colors: [color, Color.lerp(color, Colors.black, 0.25)!])
+                : LinearGradient(colors: [color.withOpacity(c.isDark ? 0.22 : 0.14), color.withOpacity(c.isDark ? 0.07 : 0.05)]),
+            border: Border.all(color: primary ? Colors.transparent : color.withOpacity(0.45)),
+            boxShadow: primary ? [BoxShadow(color: color.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 4))] : null,
+          ),
+          child: Center(
+            child: label == null && caption != null
+                ? Column(mainAxisSize: MainAxisSize.min, children: [iconWidget, const SizedBox(height: 4), Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: c.ink))])
+                : label == null
+                ? iconWidget
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      iconWidget,
+                      const SizedBox(width: 7),
+                      Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: ink))),
+                      if (badge > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(color: primary ? Colors.white : color, borderRadius: BorderRadius.circular(999)),
+                          child: Text('$badge', style: TextStyle(color: primary ? color : Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                        ),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ),
+    );
+    return tip == null ? tile : Tooltip(message: tip, child: tile);
+  }
+
   Widget _pill(String label, IconData icon, Color color, VoidCallback onTap, {int badge = 0, bool primary = false}) {
     final c = _HwColors(context);
     final ink = primary ? Colors.white : c.ink;
@@ -571,37 +636,54 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
                       )),
           ),
           const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          // One line: Post work and My requests have words, House Care is an icon so all three fit.
+          Row(
             children: [
-              _pill('Post work', Icons.add_task_rounded, const Color(0xFFF97316), _openPostWork, primary: true),
-              _pill(
-                _care['active'] == true ? 'House Care: member' : (_care['signed'] == true ? 'House Care: pay to start' : 'Join House Care'),
-                Icons.verified_user_rounded,
-                const Color(0xFF14B8A6),
-                _openCare,
-              ),
-              _pill('My requests', Icons.assignment_rounded, _kHwAccent, _openMyRequests, badge: _openRequests),
-              if (workerApproved)
-                _pill('Work inbox', Icons.inbox_rounded, _kHwGreen, _openInbox, badge: _newJobs),
-              if (widget.isAdmin)
-                _pill('House Care members', Icons.fact_check_rounded, const Color(0xFF14B8A6), _openAdminCare),
-              if (widget.isAdmin)
-                _pill('Pay workers', Icons.payments_rounded, const Color(0xFFF59E0B), _openAdminPay),
-              if (myWorker != null && !workerApproved)
-                _pill(
-                  myWorker['status'] == 'pending'
-                      ? 'Worker application: waiting'
-                      : (myWorker['status'] == 'deactivated' ? 'Worker: paused' : 'Worker application: ${myWorker['status']}'),
-                  Icons.hourglass_top_rounded,
-                  const Color(0xFFF59E0B),
-                  () => showNgmyWorkerApplySheet(context, state: _registryState, clientName: _displayName, clientPhone: widget.clientPhone).then((_) => _load()),
+              Expanded(flex: 5, child: _tile(Icons.add_task_rounded, const Color(0xFFF97316), _openPostWork, label: 'Post work', primary: true)),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 54,
+                child: _tile(
+                  Icons.verified_user_rounded,
+                  const Color(0xFF14B8A6),
+                  _openCare,
+                  tip: _care['active'] == true ? 'House Care: member' : (_care['signed'] == true ? 'House Care: pay to start' : 'Join House Care'),
+                  dot: _care['active'] == true,
                 ),
-              if (widget.isAdmin)
-                _pill('Worker applications', Icons.admin_panel_settings_rounded, const Color(0xFF8B5CF6), _openAdmin),
+              ),
+              const SizedBox(width: 8),
+              Expanded(flex: 5, child: _tile(Icons.assignment_rounded, _kHwAccent, _openMyRequests, label: 'My requests', badge: _openRequests)),
             ],
           ),
+          if (workerApproved || widget.isAdmin) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (workerApproved) ...[
+                  Expanded(child: _tile(Icons.inbox_rounded, _kHwGreen, _openInbox, tip: 'Work inbox', caption: 'Inbox', badge: _newJobs)),
+                  const SizedBox(width: 8),
+                ],
+                if (widget.isAdmin) ...[
+                  Expanded(child: _tile(Icons.fact_check_rounded, const Color(0xFF14B8A6), _openAdminCare, tip: 'House Care members', caption: 'Members')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _tile(Icons.payments_rounded, const Color(0xFFF59E0B), _openAdminPay, tip: 'Pay workers', caption: 'Pay')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _tile(Icons.admin_panel_settings_rounded, const Color(0xFF8B5CF6), _openAdmin, tip: 'Worker applications', caption: 'Workers')),
+                ],
+              ],
+            ),
+          ],
+          if (myWorker != null && !workerApproved) ...[
+            const SizedBox(height: 8),
+            _pill(
+              myWorker['status'] == 'pending'
+                  ? 'Worker application: waiting'
+                  : (myWorker['status'] == 'deactivated' ? 'Worker: paused' : 'Worker application: ${myWorker['status']}'),
+              Icons.hourglass_top_rounded,
+              const Color(0xFFF59E0B),
+              () => showNgmyWorkerApplySheet(context, state: _registryState, clientName: _displayName, clientPhone: widget.clientPhone).then((_) => _load()),
+            ),
+          ],
         ],
       ),
     );
