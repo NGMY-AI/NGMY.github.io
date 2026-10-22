@@ -411,28 +411,46 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
     _load();
   }
 
-  Widget _pill(String label, IconData icon, Color color, VoidCallback onTap, {int badge = 0}) {
+  /// An action tile: a colored icon square, the label, and a count when something is waiting.
+  /// The main action ([primary]) is filled with the color.
+  Widget _pill(String label, IconData icon, Color color, VoidCallback onTap, {int badge = 0, bool primary = false}) {
     final c = _HwColors(context);
+    final ink = primary ? Colors.white : c.ink;
     return Material(
-      color: color.withOpacity(c.isDark ? 0.18 : 0.1),
-      borderRadius: BorderRadius.circular(999),
+      color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(6, 6, 12, 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            gradient: primary
+                ? LinearGradient(colors: [color, Color.lerp(color, Colors.black, 0.25)!])
+                : LinearGradient(colors: [color.withOpacity(c.isDark ? 0.22 : 0.14), color.withOpacity(c.isDark ? 0.07 : 0.05)]),
+            border: Border.all(color: primary ? Colors.transparent : color.withOpacity(0.45)),
+            boxShadow: primary ? [BoxShadow(color: color.withOpacity(0.35), blurRadius: 12, offset: const Offset(0, 4))] : null,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: color)),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: primary ? Colors.white.withOpacity(0.2) : color.withOpacity(0.2),
+                ),
+                child: Icon(icon, size: 17, color: primary ? Colors.white : color),
+              ),
+              const SizedBox(width: 8),
+              Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: ink)),
               if (badge > 0) ...[
-                const SizedBox(width: 5),
+                const SizedBox(width: 7),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(999)),
-                  child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(color: primary ? Colors.white : color, borderRadius: BorderRadius.circular(999)),
+                  child: Text('$badge', style: TextStyle(color: primary ? color : Colors.white, fontSize: 10.5, fontWeight: FontWeight.w900)),
                 ),
               ],
             ],
@@ -546,7 +564,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
             spacing: 6,
             runSpacing: 6,
             children: [
-              _pill('Post work', Icons.add_task_rounded, const Color(0xFFF97316), _openPostWork),
+              _pill('Post work', Icons.add_task_rounded, const Color(0xFFF97316), _openPostWork, primary: true),
               _pill(
                 _care['active'] == true ? 'House Care: member' : (_care['signed'] == true ? 'House Care: pay to start' : 'Join House Care'),
                 Icons.verified_user_rounded,

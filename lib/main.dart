@@ -12645,44 +12645,79 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       return;
     }
     final accent = isError ? const Color(0xFFEF4444) : const Color(0xFF22D3EE);
+    final blob = '${title.toLowerCase()} ${body.toLowerCase()}';
+    final IconData noticeIcon = isError
+        ? Icons.error_outline_rounded
+        : blob.contains('civic')
+            ? Icons.how_to_reg_rounded
+            : blob.contains('member')
+                ? Icons.person_add_alt_1_rounded
+                : (blob.contains('deposit') || blob.contains('withdraw') || blob.contains('\$'))
+                    ? Icons.payments_rounded
+                    : blob.contains('game')
+                        ? Icons.sports_esports_rounded
+                        : Icons.notifications_rounded;
+    // A small, compact card: it is only as big as its words, slides in from the top and leaves by itself.
     _inAppNoticeEntry = OverlayEntry(
-      // Material gives the banner its real text style (without it the text showed huge with yellow underlines).
       builder: (_) => Material(
         type: MaterialType.transparency,
         child: IgnorePointer(
-        child: SafeArea(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B1020).withOpacity(0.92),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: accent.withOpacity(0.55)),
-                boxShadow: [BoxShadow(color: accent.withOpacity(0.28), blurRadius: 16, offset: const Offset(0, 6))],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.notifications_active_rounded, color: accent),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          child: SafeArea(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+                builder: (context, t, child) => Opacity(
+                  opacity: t,
+                  child: Transform.translate(offset: Offset(0, (1 - t) * -18), child: child),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 340),
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    padding: const EdgeInsets.fromLTRB(8, 8, 14, 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111827).withOpacity(0.96),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withOpacity(0.10)),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.35), blurRadius: 14, offset: const Offset(0, 5))],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 2),
-                        Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(colors: [accent, accent.withOpacity(0.6)]),
+                          ),
+                          child: Icon(noticeIcon, color: Colors.white, size: 17),
+                        ),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.2)),
+                              if (body.trim().isNotEmpty)
+                                Text(body, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.62), fontSize: 11, height: 1.25)),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ));
+    );
     overlay.insert(_inAppNoticeEntry!);
     Future.delayed(const Duration(seconds: 4), () {
       if (!mounted) {
@@ -12780,10 +12815,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ];
     final recent = DateTime.now().subtract(const Duration(days: 7));
     final cats = <NgmyAdminAlertCategory>[
-      NgmyAdminAlertCategory('civic_members', 'New civic registry member', 'new civic registry members', rows(_config.civicRegistryMembers)),
-      NgmyAdminAlertCategory('civic_contributions', 'New civic contribution', 'new civic contributions',
-          txns((t) => t.type == TransactionType.contribution && t.timestamp.isAfter(recent))),
       if (isAdmin) ...[
+        NgmyAdminAlertCategory('civic_members', 'New civic registry member', 'new civic registry members', rows(_config.civicRegistryMembers)),
+        NgmyAdminAlertCategory('civic_contributions', 'New civic contribution', 'new civic contributions',
+            txns((t) => t.type == TransactionType.contribution && t.timestamp.isAfter(recent))),
         NgmyAdminAlertCategory('members', 'New member joined', 'new members joined', [
           // Real sign-ups only: Civic Registry guests get a stand-in "civic.…@guest.ngmy"
           // address on the phone (not an account), and they kept being announced as new.
