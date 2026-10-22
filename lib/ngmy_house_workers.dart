@@ -62,6 +62,7 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> adminCarePayments() => _call('hwAdminCarePayments');
   static Future<Map<String, dynamic>> adminCarePaymentDecide(String id, bool approve) =>
       _call('hwAdminCarePaymentDecide', {'paymentId': id, 'decision': approve ? 'approve' : 'reject'});
+  static Future<Map<String, dynamic>> adminWorkerStats(String email) => _call('hwAdminWorkerStats', {'workerEmail': email});
   static Future<Map<String, dynamic>> adminCareRevoke(String email) => _call('hwAdminCareRevoke', {'memberEmail': email});
   static Future<Map<String, dynamic>> adminCareRestore(String email) => _call('hwAdminCareRestore', {'memberEmail': email});
   static Future<Map<String, dynamic>> adminList() => _call('hwAdminList');
@@ -297,6 +298,17 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
   bool _needsRegistry = false;
 
   /// The state on the person's Civic Registry record. Workers and work are always for this state.
+  /// A worker report for the NGMY WhatsApp: the details written for the user, plus who is reporting.
+  String _report(String text) {
+    final buf = StringBuffer(text.trimRight())
+      ..writeln()
+      ..writeln()
+      ..writeln('Reported by: $_displayName');
+    if (widget.clientPhone.trim().isNotEmpty) buf.writeln('Phone: ${widget.clientPhone.trim()}');
+    if (widget.clientEmail.trim().isNotEmpty) buf.writeln('Email: ${widget.clientEmail.trim()}');
+    return widget.reportUrl(buf.toString().trimRight());
+  }
+
   /// The name on the user's Civic Registry membership; the app username only if there is none.
   String get _displayName {
     final r = (_me?['registryName'] ?? '').toString().trim();
@@ -369,6 +381,12 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
   int get _newJobs => _maps(_me?['inbox']).where((r) => r['status'] == 'pending').length;
 
   void _openWorker(Map<String, dynamic> w) {
+    // An admin who taps a worker's picture sees that worker's whole record.
+    final adminEmail = (w['email'] ?? '').toString();
+    if (widget.isAdmin && adminEmail.isNotEmpty) {
+      showNgmyAdminWorkerStats(context, email: adminEmail, name: (w['name'] ?? '').toString(), photoUrl: (w['photoUrl'] ?? '').toString());
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -386,9 +404,8 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
           );
           if (sent) _load();
         },
-        onReport: () => _openUrl(widget.reportUrl(
-          'NGMY House & Insurance — report about worker ${w['name']} (${w['city']}, ${w['state']}).\n'
-          'What happened: ',
+        onReport: () => _openUrl(_report(
+          'WORKER REPORT\nWorker: ${w['name']}\nPhone: ${(w['phone'] ?? '').toString().isEmpty ? 'not shown' : w['phone']}\nLocation: ${w['city']}, ${w['state']}\nIssue: ',
         )),
       ),
     );
@@ -399,7 +416,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _MyRequestsSheet(reportUrl: widget.reportUrl),
+      builder: (_) => _MyRequestsSheet(reportUrl: _report),
     );
     _load();
   }
@@ -1498,36 +1515,9 @@ class _MyRequestsSheetState extends State<_MyRequestsSheet> {
   }
 
   Future<void> _rate(Map<String, dynamic> r) async {
-    var stars = 5;
-    final reviewC = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setD) => AlertDialog(
-          title: Text('Rate ${(r['worker'] as Map?)?['name'] ?? 'the worker'}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  return IconButton(
-                    onPressed: () => setD(() => stars = i + 1),
-                    icon: Icon(i < stars ? Icons.star_rounded : Icons.star_border_rounded, color: const Color(0xFFF59E0B), size: 32),
-                  );
-                }),
-              ),
-              TextField(controller: reviewC, maxLines: 3, decoration: const InputDecoration(hintText: 'How was the work? (optional)')),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Send rating')),
-          ],
-        ),
-      ),
-    );
-    if (ok == true) await _act(NgmyHouseWorkersApi.rate(r['id'].toString(), stars, reviewC.text.trim()), 'Thanks for rating.');
+    final w = Map<String, dynamic>.from((r['worker'] as Map?) ?? const {});
+    final out = await showNgmyRateWorkerDialog(context, workerName: (w['name'] ?? 'the worker').toString(), photoUrl: (w['photoUrl'] ?? '').toString());
+    if (out != null) await _act(NgmyHouseWorkersApi.rate(r['id'].toString(), out.stars, out.review), 'Thanks for rating.');
   }
 
   @override
@@ -1620,8 +1610,7 @@ class _MyRequestsSheetState extends State<_MyRequestsSheet> {
                                 ),
                               TextButton.icon(
                                 onPressed: () => _openUrl(widget.reportUrl(
-                                  'NGMY House & Insurance — report about worker ${w['name']} (${w['state']}).\n'
-                                  'Request: ${r['details']}\nWhat happened: ',
+                                  'WORKER REPORT\nWorker: ${w['name']}\nPhone: ${phone.isEmpty ? 'not shown' : phone}\nLocation: ${[w['city'], w['state']].where((e) => (e ?? '').toString().isNotEmpty).join(', ')}\nIssue with this work: ${r['details']}\nStatus: $status',
                                 )),
                                 icon: const Icon(Icons.flag_rounded, size: 15),
                                 label: const Text('Report'),
@@ -1864,7 +1853,10 @@ class _AdminWorkersSheetState extends State<_AdminWorkersSheet> {
                         children: [
                           Row(
                             children: [
-                              NgmyRingAvatar(url: (w['photoUrl'] ?? '').toString(), name: (w['name'] ?? '').toString(), size: 46, spin: widget.spin),
+                              GestureDetector(
+                                onTap: () => showNgmyAdminWorkerStats(context, email: (w['email'] ?? '').toString(), name: (w['name'] ?? '').toString(), photoUrl: (w['photoUrl'] ?? '').toString()),
+                                child: NgmyRingAvatar(url: (w['photoUrl'] ?? '').toString(), name: (w['name'] ?? '').toString(), size: 46, spin: widget.spin),
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(

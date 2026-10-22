@@ -21,6 +21,7 @@ Future<void> _settle(WidgetTester tester) async {
 void main() {
   setUp(() {});
   _payDialogTest();
+  _rateDialogTest();
 
   testWidgets('House Care: pick the years, agree, sign; the button waits for the selfie', (tester) async {
     tester.view.physicalSize = const Size(430, 2600);
@@ -151,5 +152,21 @@ void _payDialogTest() {
     expect(tester.takeException(), isNull);
     final card = tester.getRect(find.byType(SingleChildScrollView).first);
     expect((card.center.dx - 215).abs() < 20, isTrue);
+  });
+}
+
+void _rateDialogTest() {
+  testWidgets('Rating pop-up: stars, quick tags, a note and Submit rating, centered', (tester) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host((c) => showNgmyRateWorkerDialog(c, workerName: 'Kb Pablo')));
+    await tester.tap(find.text('open'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('How was Kb Pablo?'), findsOneWidget);
+    expect(find.text('Submit rating'), findsOneWidget);
+    expect(find.text('On time'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

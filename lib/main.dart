@@ -10645,8 +10645,14 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         state == AppLifecycleState.detached) {
       unawaited(_persistSessionImmediately());
       _pauseBackgroundSync();
+      _awaySince ??= DateTime.now();
     }
     if (state == AppLifecycleState.resumed) {
+      // A quick trip to another app: keep what is on screen. The heavy reload of cloud data below
+      // only runs after a real absence, so the app does not flash and redraw every time.
+      final away = _awaySince == null ? const Duration(days: 1) : DateTime.now().difference(_awaySince!);
+      _awaySince = null;
+      final longAway = away > const Duration(minutes: 2);
       unawaited(_checkIncomingGameInvites());
       unawaited(_checkHouseCareExpiry());
       unawaited(_checkNewHouseJobs());
@@ -10666,13 +10672,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (_currentUser != null) {
         _ngmyReconcileClockInSession(_currentUser!, _allTransactions);
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (longAway) WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         unawaited(_refreshGameCenterSettingsFromCloud().then((_) => _refreshAdminGameTimers()));
         unawaited(_refreshSessionFromCloudOnResume());
         unawaited(_catchUpCloudDataAfterConnect());
       });
-      if (_ngmySessionIsAdmin(_currentUser)) {
+      if (longAway && _ngmySessionIsAdmin(_currentUser)) {
         if (NgmyFeatureSyncSession.growthIncomeAdminActive) {
           unawaited(_refreshPendingTransactionsFromCloud());
           unawaited(_archiveAndPurgeOldApprovedWalletRequests(online: true));
@@ -12801,6 +12807,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  DateTime? _awaySince;
   DateTime? _lastCareExpiryCheck;
 
   /// A House Care member whose paid time ends in 3 days or less sees a top notification every time

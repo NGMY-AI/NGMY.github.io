@@ -1586,7 +1586,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
-  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore", "hwAdminCarePayments", "hwAdminCarePaymentDecide",
+  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore", "hwAdminCarePayments", "hwAdminCarePaymentDecide", "hwAdminWorkerStats",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -2184,7 +2184,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     const data = (rows ?? []).filter((w: any) => statesMatch(String(w.state ?? ""), state));
     const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
-    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)), w.email)).map(hwPublicWorker)
+    const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)), w.email)).map((w: any) => isAdmin ? { ...hwPublicWorker(w), email: w.email, phone: w.phone } : hwPublicWorker(w))
       .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
     return jsonOk({ ok: true, workers });
   }
@@ -2662,6 +2662,62 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     if (!data || data.length === 0) return jsonOk({ ok: false, error: "That job is not finished." }, 409);
     return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminWorkerStats") {
+    // Everything an admin needs to know about one worker: profile, work done by week / month / ever, ratings and reviews.
+    const target = emailKey(String(body?.workerEmail ?? ""));
+    if (!target) return jsonOk({ ok: false, error: "Pick a worker." }, 400);
+    const { data: w } = await db.from("house_workers").select("*").eq("email", target).maybeSingle();
+    if (!w) return jsonOk({ ok: false, error: "That worker was not found." }, 404);
+    const { data: rows } = await db.from("house_work_requests").select("*")
+      .eq("worker_email", target).order("created_at", { ascending: false }).limit(1000);
+    const nowMs = Date.now();
+    const monthKey = new Date().toISOString().slice(0, 7);
+    let done = 0, week = 0, month = 0, last30 = 0, inProgress = 0, cancelled = 0;
+    let earned = 0, earnedMonth = 0, hoursSum = 0, hoursCount = 0, lastDone = "";
+    const dist: Record<string, number> = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+    const reviews: any[] = [];
+    let ratingSum = 0, ratingCount = 0;
+    for (const r of rows ?? []) {
+      if (r.status === "accepted") inProgress++;
+      if (r.status === "cancelled") cancelled++;
+      if (r.status === "done") {
+        done++;
+        const dMs = Date.parse(String(r.done_at ?? "")) || 0;
+        if (dMs > nowMs - 7 * 86400000) week++;
+        if (dMs > nowMs - 30 * 86400000) last30++;
+        const pay = (Number(r.labor_cost ?? 0) || 0) + (Number(r.worker_pay ?? 0) || 0);
+        earned += pay;
+        if (String(r.done_at ?? "").slice(0, 7) === monthKey) { month++; earnedMonth += pay; }
+        if (!lastDone || String(r.done_at) > lastDone) lastDone = String(r.done_at ?? "");
+        const aMs = Date.parse(String(r.accepted_at ?? "")) || 0;
+        if (aMs && dMs > aMs) { hoursSum += (dMs - aMs) / 3600000; hoursCount++; }
+      }
+      const rating = Number(r.rating ?? 0);
+      if (rating >= 1 && rating <= 5) {
+        ratingSum += rating; ratingCount++; dist[String(rating)]++;
+        if (reviews.length < 20) {
+          reviews.push({
+            rating, review: String(r.review ?? ""), at: r.rated_at, category: r.category ?? "",
+            client: hwText(r.client_name, 80).split(" ")[0],
+          });
+        }
+      }
+    }
+    return jsonOk({
+      ok: true,
+      worker: {
+        name: w.name, email: w.email, phone: w.phone, state: w.state, city: w.city, status: w.status,
+        bio: w.bio, photoUrl: w.photo_url, skills: Array.isArray(w.skills) ? w.skills : [], createdAt: w.created_at,
+      },
+      stats: {
+        done, week, month, last30, inProgress, cancelled, earned, earnedMonth, lastDone,
+        avgHours: hoursCount > 0 ? Math.round((hoursSum / hoursCount) * 10) / 10 : 0,
+        rating: ratingCount > 0 ? Math.round((ratingSum / ratingCount) * 10) / 10 : 0,
+        ratingCount, distribution: dist,
+      },
+      reviews,
+    });
   }
   if (action === "hwAdminCareRevoke" || action === "hwAdminCareRestore") {
     // The admin ends (or brings back) a member's House Care. Ending it stops the free labor and
@@ -10214,6 +10270,7 @@ serve(async (req) => {
       hm: "hwAdminCareRestore",
       hn: "hwAdminCarePayments",
       ho: "hwAdminCarePaymentDecide",
+      hp: "hwAdminWorkerStats",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

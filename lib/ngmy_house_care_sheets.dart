@@ -1982,3 +1982,381 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerP
     );
   }
 }
+
+// ── Rate a worker ───────────────────────────────────────────────────────────
+
+/// A centered, animated rating pop-up: tap the stars, pick what went well, add a note.
+Future<({int stars, String review})?> showNgmyRateWorkerDialog(BuildContext context, {required String workerName, String photoUrl = ''}) {
+  return showGeneralDialog<({int stars, String review})>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black.withOpacity(0.62),
+    transitionDuration: const Duration(milliseconds: 360),
+    pageBuilder: (_, __, ___) => _RateWorkerDialog(workerName: workerName, photoUrl: photoUrl),
+    transitionBuilder: (_, anim, __, child) {
+      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: ScaleTransition(scale: Tween<double>(begin: 0.86, end: 1).animate(curved), child: child),
+      );
+    },
+  );
+}
+
+class _RateWorkerDialog extends StatefulWidget {
+  const _RateWorkerDialog({required this.workerName, required this.photoUrl});
+  final String workerName;
+  final String photoUrl;
+
+  @override
+  State<_RateWorkerDialog> createState() => _RateWorkerDialogState();
+}
+
+class _RateWorkerDialogState extends State<_RateWorkerDialog> {
+  static const _gold = Color(0xFFFBBF24);
+  static const _labels = ['Poor', 'Could be better', 'Good', 'Great', 'Excellent'];
+  static const _tags = ['On time', 'Polite', 'Clean work', 'Fair price', 'Fast', 'Professional'];
+  int _stars = 5;
+  final Set<String> _picked = {};
+  final TextEditingController _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  void _send() {
+    final extra = _picked.isEmpty ? '' : '${_picked.join(' · ')}. ';
+    Navigator.pop(context, (stars: _stars, review: '$extra${_note.text.trim()}'.trim()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final keyboard = MediaQuery.of(context).viewInsets.bottom;
+    return SafeArea(
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 380, maxHeight: size.height * 0.92 - keyboard),
+            margin: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF2B1B05), Color(0xFF0F0A04), Color(0xFF170F1F)]),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              boxShadow: [BoxShadow(color: _gold.withOpacity(0.22), blurRadius: 46, spreadRadius: -8)],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 14),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Center(
+                    child: Container(
+                      width: 74,
+                      height: 74,
+                      padding: const EdgeInsets.all(3),
+                      decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF97316)])),
+                      child: ClipOval(
+                        child: widget.photoUrl.isEmpty
+                            ? Container(color: const Color(0xFF1F2937), child: const Icon(Icons.person_rounded, color: Colors.white70, size: 36))
+                            : Image.network(widget.photoUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: const Color(0xFF1F2937), child: const Icon(Icons.person_rounded, color: Colors.white70, size: 36))),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text('How was ${widget.workerName}?', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 20)),
+                  const SizedBox(height: 4),
+                  Text('Your rating helps other people choose.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.55), fontSize: 12.5)),
+                  const SizedBox(height: 16),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    for (var i = 0; i < 5; i++)
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _stars = i + 1);
+                        },
+                        child: AnimatedScale(
+                          scale: i < _stars ? 1.12 : 0.94,
+                          duration: Duration(milliseconds: 220 + i * 40),
+                          curve: Curves.easeOutBack,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(
+                              i < _stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                              size: 42,
+                              color: i < _stars ? _gold : Colors.white.withOpacity(0.25),
+                              shadows: i < _stars ? [Shadow(color: _gold.withOpacity(0.6), blurRadius: 14)] : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ]),
+                  const SizedBox(height: 6),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: Text(_labels[_stars - 1], key: ValueKey(_stars), textAlign: TextAlign.center, style: const TextStyle(color: _gold, fontWeight: FontWeight.w900, fontSize: 14)),
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: [
+                      for (final t in _tags)
+                        GestureDetector(
+                          onTap: () => setState(() => _picked.contains(t) ? _picked.remove(t) : _picked.add(t)),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(999),
+                              color: _picked.contains(t) ? _gold.withOpacity(0.2) : Colors.white.withOpacity(0.06),
+                              border: Border.all(color: _picked.contains(t) ? _gold : Colors.white.withOpacity(0.14)),
+                            ),
+                            child: Text(t, style: TextStyle(color: _picked.contains(t) ? _gold : Colors.white70, fontWeight: FontWeight.w800, fontSize: 12)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _note,
+                    maxLines: 3,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Tell us more (optional)',
+                      hintStyle: TextStyle(color: Colors.white.withOpacity(0.35)),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.06),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: _gold, width: 1.4)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(colors: [Color(0xFFFBBF24), Color(0xFFF97316)]),
+                      boxShadow: [BoxShadow(color: const Color(0xFFF97316).withOpacity(0.4), blurRadius: 18, offset: const Offset(0, 7))],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: _send,
+                        child: const Center(child: Text('Submit rating', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15.5))),
+                      ),
+                    ),
+                  ),
+                  TextButton(onPressed: () => Navigator.pop(context), child: Text('Not now', style: TextStyle(color: Colors.white.withOpacity(0.55), fontWeight: FontWeight.w800))),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Admin: one worker's record ──────────────────────────────────────────────
+
+/// Everything an admin needs about one worker: contact, work done this week / month / ever,
+/// money, speed, ratings and what clients wrote.
+Future<void> showNgmyAdminWorkerStats(BuildContext context, {required String email, String name = '', String photoUrl = ''}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _AdminWorkerStatsSheet(email: email, name: name, photoUrl: photoUrl),
+  );
+}
+
+class _AdminWorkerStatsSheet extends StatefulWidget {
+  const _AdminWorkerStatsSheet({required this.email, required this.name, required this.photoUrl});
+  final String email;
+  final String name;
+  final String photoUrl;
+
+  @override
+  State<_AdminWorkerStatsSheet> createState() => _AdminWorkerStatsSheetState();
+}
+
+class _AdminWorkerStatsSheetState extends State<_AdminWorkerStatsSheet> {
+  Map<String, dynamic>? _data;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final res = await NgmyHouseWorkersApi.adminWorkerStats(widget.email);
+    if (!mounted) return;
+    setState(() {
+      if (res['ok'] == true) {
+        _data = res;
+      } else {
+        _error = (res['error'] ?? 'Could not load this worker.').toString();
+      }
+    });
+  }
+
+  Widget _tile(_HwColors c, String value, String label, Color color) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withOpacity(0.35)),
+          ),
+          child: Column(children: [
+            FittedBox(fit: BoxFit.scaleDown, child: Text(value, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: c.ink))),
+            const SizedBox(height: 2),
+            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: c.muted)),
+          ]),
+        ),
+      );
+
+  Widget _row(_HwColors c, String k, String v) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          Expanded(child: Text(k, style: TextStyle(color: c.muted, fontSize: 12.5))),
+          Flexible(child: Text(v, textAlign: TextAlign.right, style: TextStyle(color: c.ink, fontWeight: FontWeight.w800, fontSize: 13))),
+        ]),
+      );
+
+  Widget _heading(_HwColors c, String t) => Padding(
+        padding: const EdgeInsets.only(top: 14, bottom: 8),
+        child: Text(t.toUpperCase(), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.3, color: c.muted)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    final d = _data;
+    final w = d?['worker'] is Map ? Map<String, dynamic>.from(d!['worker'] as Map) : const <String, dynamic>{};
+    final s = d?['stats'] is Map ? Map<String, dynamic>.from(d!['stats'] as Map) : const <String, dynamic>{};
+    final dist = s['distribution'] is Map ? Map<String, dynamic>.from(s['distribution'] as Map) : const <String, dynamic>{};
+    final ratingCount = (s['ratingCount'] as num?)?.toInt() ?? 0;
+    final rating = (s['rating'] as num?)?.toDouble() ?? 0;
+    final reviews = _maps(d?['reviews']);
+    final phone = (w['phone'] ?? '').toString();
+    return _sheetFrame(
+      context,
+      title: 'Worker record',
+      icon: Icons.badge_rounded,
+      child: d == null
+          ? Padding(
+              padding: const EdgeInsets.all(40),
+              child: Center(child: _error != null ? Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)) : const CircularProgressIndicator()),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  NgmyRingAvatar(url: (w['photoUrl'] ?? widget.photoUrl).toString(), name: (w['name'] ?? widget.name).toString(), size: 64),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text((w['name'] ?? widget.name).toString(), style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17, color: c.ink)),
+                      Text([w['city'], w['state']].where((e) => (e ?? '').toString().isNotEmpty).join(', '), style: TextStyle(fontSize: 12, color: c.muted)),
+                      const SizedBox(height: 3),
+                      Row(children: [
+                        NgmyStars(rating: rating, size: 15),
+                        const SizedBox(width: 6),
+                        Text(ratingCount == 0 ? 'No ratings yet' : '${rating.toStringAsFixed(1)} (${ratingCount})', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: c.ink)),
+                      ]),
+                    ]),
+                  ),
+                ]),
+                _heading(c, 'Work done'),
+                Row(children: [
+                  _tile(c, '${s['week'] ?? 0}', 'This week', _kHwAccent),
+                  const SizedBox(width: 8),
+                  _tile(c, '${s['month'] ?? 0}', 'This month', _kHwGreen),
+                  const SizedBox(width: 8),
+                  _tile(c, '${s['last30'] ?? 0}', 'Last 30 days', _kCareTeal),
+                  const SizedBox(width: 8),
+                  _tile(c, '${s['done'] ?? 0}', 'All time', _kJobOrange),
+                ]),
+                const SizedBox(height: 8),
+                _row(c, 'Working on now', '${s['inProgress'] ?? 0}'),
+                _row(c, 'Cancelled', '${s['cancelled'] ?? 0}'),
+                _row(c, 'Last job finished', (s['lastDone'] ?? '').toString().isEmpty ? 'None yet' : _careDate(s['lastDone'])),
+                _row(c, 'Average time to finish', (s['avgHours'] as num? ?? 0) == 0 ? '—' : '${s['avgHours']} hours'),
+                _heading(c, 'Money'),
+                _row(c, 'Earned this month', _money(s['earnedMonth'])),
+                _row(c, 'Earned all time', _money(s['earned'])),
+                _heading(c, 'Contact'),
+                _row(c, 'Phone', phone.isEmpty ? '—' : phone),
+                _row(c, 'Email', (w['email'] ?? '').toString()),
+                _row(c, 'Status', (w['status'] ?? '').toString()),
+                _row(c, 'Joined', _careDate(w['createdAt'])),
+                if (phone.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => ngmyOpenWhatsApp(context, phone, 'Hi ${w['name']}, this is NGMY House & Insurance.'),
+                    icon: const Icon(Icons.chat_rounded, size: 18),
+                    label: const Text('WhatsApp the worker'),
+                  ),
+                ],
+                _heading(c, 'Ratings'),
+                if (ratingCount == 0)
+                  Text('Nobody has rated this worker yet.', style: TextStyle(color: c.muted, fontSize: 12.5))
+                else
+                  for (var star = 5; star >= 1; star--)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 3),
+                      child: Row(children: [
+                        SizedBox(width: 16, child: Text('$star', style: TextStyle(fontWeight: FontWeight.w800, color: c.ink, fontSize: 12))),
+                        const Icon(Icons.star_rounded, size: 13, color: Color(0xFFF59E0B)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              minHeight: 8,
+                              value: ratingCount == 0 ? 0 : ((dist['$star'] as num?) ?? 0) / ratingCount,
+                              backgroundColor: c.line,
+                              color: const Color(0xFFF59E0B),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        SizedBox(width: 24, child: Text('${dist['$star'] ?? 0}', textAlign: TextAlign.right, style: TextStyle(color: c.muted, fontSize: 12))),
+                      ]),
+                    ),
+                if (reviews.isNotEmpty) ...[
+                  _heading(c, 'What clients wrote'),
+                  for (final r in reviews)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.line)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          NgmyStars(rating: ((r['rating'] as num?) ?? 0).toDouble(), size: 13),
+                          const Spacer(),
+                          Text('${r['client'] ?? ''} · ${_careDate(r['at'])}', style: TextStyle(fontSize: 11, color: c.muted)),
+                        ]),
+                        if ((r['review'] ?? '').toString().isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text((r['review'] ?? '').toString(), style: TextStyle(fontSize: 12.5, color: c.ink, height: 1.35)),
+                        ],
+                      ]),
+                    ),
+                ],
+              ]),
+            ),
+    );
+  }
+}
