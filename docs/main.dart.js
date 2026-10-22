@@ -97093,7 +97093,7 @@ return A.b(A.ih(A.cb(B.a.c9(o,"/")?o+p:o+"/"+p,0,null),B.eV,null),$async$akd)
 case 3:if(!k||e.e==null){q=!1
 s=1
 break}s=4
-return A.b(A.fCn(e,p,b),$async$akd)
+return A.b(A.fCn(e,p,b,!1),$async$akd)
 case 4:if(k!==!0){q=!1
 s=1
 break}s=5
@@ -97103,19 +97103,22 @@ s=1
 break
 case 1:return A.h(q,r)}})
 return A.i($async$akd,r)},
-fCn(a,b,c){return A.hL(B.x.j(0.55),!0,"Close",a,new A.eZG(b,c),new A.eZH(),B.iH,!0,t.y)},
+fCn(a,b,c,d){return A.hL(B.x.j(0.55),!0,"Close",a,new A.eZG(b,c,d),new A.eZH(),B.iH,!0,t.y)},
 bXZ:function bXZ(){},
 bY_:function bY_(){},
 bY1:function bY1(){},
 bY2:function bY2(){},
 bY3:function bY3(){},
 bY4:function bY4(){},
-eZG:function eZG(a,b){this.a=a
-this.b=b},
+eZG:function eZG(a,b,c){this.a=a
+this.b=b
+this.c=c},
 eZH:function eZH(){},
-a7Y:function a7Y(a,b,c){this.c=a
-this.d=b
-this.a=c},
+a7Y:function a7Y(a,b,c,d){var _=this
+_.c=a
+_.d=b
+_.e=c
+_.a=d},
 dkq:function dkq(a){this.a=a},
 dkr:function dkr(a){this.a=a},
 aSH:function aSH(a,b,c,d,e,f,g,h,i,j){var _=this
@@ -345479,7 +345482,7 @@ A.bY4.prototype={
 $1(a){return a.length!==0},
 $S:3}
 A.eZG.prototype={
-$3(a,b,c){return new A.a7Y(this.a,this.b,null)},
+$3(a,b,c){return new A.a7Y(this.a,this.b,this.c,null)},
 $C:"$3",
 $R:3,
 $S:1861}
@@ -345488,22 +345491,25 @@ $4(a,b,c,d){var s=A.cx(B.cj,b,null),r=t.Y
 return new A.cU(s,!1,A.iE(B.E,d,null,new A.ba(s,new A.bt(0.94,1,r),r.k("ba<by.T>"))),null)},
 $S:32}
 A.a7Y.prototype={
-B(a){var s,r,q,p,o,n,m,l,k,j,i=null,h=A.I(a).ax.a===B.F,g=h?B.pd:B.c,f=h?B.c:B.M,e=h?B.am:B.bw,d=B.a.i(this.d)
-if(d.length===0)d="$NGMYpay"
+B(a){var s,r,q,p,o,n,m,l,k,j,i,h=null,g=A.I(a).ax.a===B.F,f=g?B.pd:B.c,e=g?B.c:B.M,d=g?B.am:B.bw,c=B.a.i(this.d)
+if(c.length===0)c="$NGMYpay"
 s=B.nj.j(0.25)
 r=A.m(28)
-q=A.o(i,B.bsN,B.i,i,i,B.aMU,i,56,i,i,i,i,i,56)
-p=A.d("CASH APP",i,i,i,i,i,i,A.l(i,i,h?B.eR:B.fb,i,i,i,i,i,i,i,i,11,i,i,B.v,i,i,!0,i,2.2,i,i,i,i,i,i),i,i,i)
-o=A.d("Did you send it on Cash App?",i,i,i,i,i,i,A.l(i,i,f,i,i,i,i,i,i,i,i,20,i,i,B.v,i,1.15,!0,i,i,i,i,i,i,i,i),B.K,i,i)
-n=B.nj.j(h?0.12:0.08)
+q=A.o(h,B.bsN,B.i,h,h,B.aMU,h,56,h,h,h,h,h,56)
+p=A.d("CASH APP",h,h,h,h,h,h,A.l(h,h,g?B.eR:B.fb,h,h,h,h,h,h,h,h,11,h,h,B.v,h,h,!0,h,2.2,h,h,h,h,h,h),h,h,h)
+o=A.d("Did you send it on Cash App?",h,h,h,h,h,h,A.l(h,h,e,h,h,h,h,h,h,h,h,20,h,h,B.v,h,1.15,!0,h,h,h,h,h,h,h,h),B.K,h,h)
+n=B.nj.j(g?0.12:0.08)
 m=A.m(18)
 l=A.G(B.nj.j(0.35),B.r,1)
 k=this.c
 j=t.p
-m=A.o(i,A.u(A.a([A.d("$"+k,i,i,i,i,i,i,A.l(i,i,f,i,i,i,i,i,i,i,i,32,i,i,B.v,i,1,!0,i,i,i,i,i,i,i,i),i,i,i),B.ax,A.d("to "+d,i,i,i,i,i,i,A.l(i,i,e,i,i,i,i,i,i,i,i,14,i,i,B.I,i,i,!0,i,i,i,i,i,i,i,i),B.K,i,i)],j),B.n,i,B.h,B.j,0,B.p),B.i,i,i,new A.n(n,i,l,m,i,i,B.m),i,i,i,i,B.eN,i,i,1/0)
-l=A.d("Cash App should be open. Come back here and confirm after the payment goes through.",i,i,i,i,i,i,A.l(i,i,e,i,i,i,i,i,i,i,i,13,i,i,B.Y,i,1.3,!0,i,i,i,i,i,i,i,i),B.K,i,i)
-n=A.bj(B.nj,i,i,i,B.jP,i,i,i,new A.b5(A.m(16),B.V),i,i,i)
-return A.bu(!0,A.as(A.cm(new A.da(B.xJ,A.az(!1,B.X,!0,r,new A.D(B.baR,A.u(A.a([q,B.S,p,B.ax,o,B.a8,m,B.S,l,B.aF,new A.a5(1/0,46,A.bF(A.d("I sent $"+k,i,i,i,i,i,i,B.mY,i,i,i),new A.dkq(a),n),i),new A.a5(1/0,40,A.bG(!1,B.efO,i,i,!0,i,i,new A.dkr(a),i,A.f5(i,i,i,i,i,i,i,i,i,i,i,e,i,i,i,i,i,i,i,new A.b5(A.m(16),B.V),i,i,i,i,i,i)),i)],j),B.n,i,B.h,B.U,0,B.p),i),B.i,g,18,i,s,i,i,i,B.a5),i),B.q,i,B.D,i,B.aa8,i,i,B.aj),i,i,i),!0,!1,B.ah,!0,!0)}}
+m=A.o(h,A.u(A.a([A.d("$"+k,h,h,h,h,h,h,A.l(h,h,e,h,h,h,h,h,h,h,h,32,h,h,B.v,h,1,!0,h,h,h,h,h,h,h,h),h,h,h),B.ax,A.d("to "+c,h,h,h,h,h,h,A.l(h,h,d,h,h,h,h,h,h,h,h,14,h,h,B.I,h,h,!0,h,h,h,h,h,h,h,h),B.K,h,h)],j),B.n,h,B.h,B.j,0,B.p),B.i,h,h,new A.n(n,h,l,m,h,h,B.m),h,h,h,h,B.eN,h,h,1/0)
+n=this.e
+l=n?"Send the money on Cash App, then tap below. An admin checks the payment and approves it, and your House Care starts once it is approved.":"Cash App should be open. Come back here and confirm after the payment goes through."
+l=A.d(l,h,h,h,h,h,h,A.l(h,h,d,h,h,h,h,h,h,h,h,13,h,h,B.Y,h,1.3,!0,h,h,h,h,h,h,h,h),B.K,h,h)
+i=A.bj(B.nj,h,h,h,B.jP,h,h,h,new A.b5(A.m(16),B.V),h,h,h)
+k="I sent $"+k
+return A.bu(!0,A.as(A.cm(new A.da(B.xJ,A.az(!1,B.X,!0,r,new A.D(B.baR,A.u(A.a([q,B.S,p,B.ax,o,B.a8,m,B.S,l,B.aF,new A.a5(1/0,46,A.bF(A.d(n?k+" \xb7 ask for approval":k,h,h,h,h,h,h,B.mY,h,h,h),new A.dkq(a),i),h),new A.a5(1/0,40,A.bG(!1,B.efO,h,h,!0,h,h,new A.dkr(a),h,A.f5(h,h,h,h,h,h,h,h,h,h,h,d,h,h,h,h,h,h,h,new A.b5(A.m(16),B.V),h,h,h,h,h,h)),h)],j),B.n,h,B.h,B.U,0,B.p),h),B.i,f,18,h,s,h,h,h,B.a5),h),B.q,h,B.D,h,B.aa8,h,h,B.aj),h,h,h),!0,!1,B.ah,!0,!0)}}
 A.dkq.prototype={
 $0(){A.a4(this.a,!1).K(!0)
 return null},
@@ -346184,7 +346190,7 @@ case 3:if(!c||p.c==null){s=1
 break}o=p.c
 o.toString
 s=4
-return A.b(A.fCn(o,n,p.a.x),$async$Cx)
+return A.b(A.fCn(o,n,p.a.x,!0),$async$Cx)
 case 4:if(c!==!0||p.c==null){s=1
 break}p.n(new A.cv_(p))
 s=5
