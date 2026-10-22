@@ -11023,6 +11023,29 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _legacyGameSettleChain = Future<void>.value();
+
+  /// The server's one-step game save returned an error (nothing was changed there). Save the
+  /// receipt and this phone's change on top of the server balance instead, one game at a time, so
+  /// a win or a bet is never lost between refreshes.
+  Future<void> _settleGameTxnWithoutServerStep(AppTransaction t, String email) {
+    final run = _legacyGameSettleChain.then((_) async {
+      ngmyUnsettledGameTxns.remove(t.id);
+      if (t.type == TransactionType.adminRemove) ngmyNoteLocalDebit(email, t.amount);
+      final rowOk = await _pushTransactionToCloudReliable(t);
+      final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
+      final user = idx != -1
+          ? _allUsers[idx]
+          : (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == email ? _currentUser : null);
+      var balanceOk = false;
+      if (user != null) balanceOk = await _pushUserBalanceToCloud(user, allowDecrease: true);
+      if (rowOk && balanceOk) _txnOutboxDone(t.id);
+      if (mounted) setState(() {});
+    });
+    _legacyGameSettleChain = run.catchError((Object _) {});
+    return run;
+  }
+
   Future<void> _settleGameTxnOnServerInner(AppTransaction t) async {
     final email = ngmyNormalizeEmail(t.userEmail);
     final payload = {
@@ -11040,6 +11063,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     NgmyServerWalletResult? result;
     for (var attempt = 0; attempt < 3 && result == null; attempt++) {
       result = await ngmySettleGameTxnOnServer(payload);
+      if (result != null && result.serverError) {
+        await _settleGameTxnWithoutServerStep(t, email);
+        return;
+      }
       if (result == null && attempt < 2) await Future.delayed(Duration(milliseconds: 800 * (attempt + 1)));
     }
     if (result == null && mounted) {

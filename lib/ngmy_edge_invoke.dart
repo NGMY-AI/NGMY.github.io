@@ -307,8 +307,11 @@ Future<Map<String, dynamic>?> ngmyEdgeInvoke(
         }
       }
     } else if (isWrite) {
-      writeKey = _relayWriteKey(body);
-      final last = _relayWriteCache[writeKey];
+      // A balance is never "the same write as before": another save may have changed it since.
+      final rows = body['rows'];
+      final carriesBalance = rows is List && rows.any((r) => r is Map && r.containsKey('accountBalance'));
+      writeKey = carriesBalance ? null : _relayWriteKey(body);
+      final last = writeKey == null ? null : _relayWriteCache[writeKey];
       if (last != null && DateTime.now().difference(last) < const Duration(minutes: 5)) {
         return {'ok': true, 'deduped': true};
       }

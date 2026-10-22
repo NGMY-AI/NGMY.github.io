@@ -48,13 +48,17 @@ begin
   end if;
 
   if v_change < -4.99 and v_via <> 'game_rpc' then
-    v_suspect := not exists (
-      select 1 from public.transactions t
-       where lower(t."userEmail") = lower(new.email)
-         and t.timestamp::text >= to_char((now() - interval '10 minutes') at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS')
-         and t.type in (1, 3, 5)
-         and t.amount >= (-v_change) - 0.01
-    );
+    begin
+      v_suspect := not exists (
+        select 1 from public.transactions t
+         where lower(t."userEmail") = lower(new.email)
+           and nullif(t.timestamp::text, '')::timestamptz >= now() - interval '10 minutes'
+           and t.type in (1, 3, 5)
+           and t.amount >= (-v_change) - 0.01
+      );
+    exception when others then
+      v_suspect := true;
+    end;
   end if;
 
   begin

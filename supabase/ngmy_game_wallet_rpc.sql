@@ -58,7 +58,8 @@ begin
   end if;
 
   insert into public.transactions (id, "userEmail", amount, type, method, "sourceDetails", status, timestamp)
-  values (v_id, v_email, v_amount, v_type, v_method, v_note, v_status, coalesce(p_txn->>'timestamp', ''));
+  values (v_id, v_email, v_amount, v_type, v_method, v_note, v_status,
+          coalesce(nullif(p_txn->>'timestamp', '')::timestamptz, now()));
 
   perform set_config('ngmy.via', 'game_rpc', true);
   update public.users

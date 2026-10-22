@@ -6,7 +6,11 @@ import 'ngmy_network_resilience.dart';
 
 /// Outcome of settling one game bet or payout on the server.
 class NgmyServerWalletResult {
-  const NgmyServerWalletResult({required this.applied, this.balance, this.reason});
+  const NgmyServerWalletResult({required this.applied, this.balance, this.reason, this.serverError = false});
+
+  /// The server step itself failed (an error inside it, not a lost connection). Nothing was
+  /// changed, so the caller can safely save the game another way.
+  final bool serverError;
 
   /// True when this call changed the balance.
   final bool applied;
@@ -75,6 +79,9 @@ Future<NgmyServerWalletResult?> ngmySettleGameTxnOnServer(Map<String, dynamic> t
       balance: balance,
       reason: map['reason']?.toString(),
     );
+  } on PostgrestException catch (e) {
+    debugPrint('[wallet server] game txn rejected: ${e.code} ${e.message}');
+    return NgmyServerWalletResult(applied: false, reason: 'server_error:${e.code}', serverError: true);
   } catch (e) {
     debugPrint('[wallet server] game txn: $e');
     return null;
