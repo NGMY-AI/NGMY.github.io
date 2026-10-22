@@ -20,6 +20,7 @@ Future<void> _settle(WidgetTester tester) async {
 
 void main() {
   setUp(() {});
+  _payDialogTest();
 
   testWidgets('House Care: pick the years, agree, sign; the button waits for the selfie', (tester) async {
     tester.view.physicalSize = const Size(430, 2600);
@@ -131,5 +132,24 @@ void main() {
     expect(find.textContaining('3 jobs done'), findsOneWidget);
     expect(find.textContaining('\$150.00 earned'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+}
+
+void _payDialogTest() {
+  testWidgets('Cash App payment is a centered pop-up with a code, no admin wording and a Submit button', (tester) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(_host((c) => showNgmyCareCashAppSheet(c, amount: 125, label: 'House Care · 30 days', cashAppUrl: 'https://cash.app/\$ngmy', cashAppTag: '\$ngmy', fullTerm: false)));
+    await tester.tap(find.text('open'));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 1500));
+    expect(find.text('Submit payment'), findsOneWidget);
+    expect(find.text('Open Cash App'), findsOneWidget);
+    expect(find.textContaining('admin', findRichText: true), findsNothing);
+    expect(find.textContaining('approval', findRichText: true), findsNothing);
+    expect(tester.takeException(), isNull);
+    final card = tester.getRect(find.byType(SingleChildScrollView).first);
+    expect((card.center.dx - 215).abs() < 20, isTrue);
   });
 }

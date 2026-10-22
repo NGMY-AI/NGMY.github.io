@@ -10648,6 +10648,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (state == AppLifecycleState.resumed) {
       unawaited(_checkIncomingGameInvites());
+      unawaited(_checkHouseCareExpiry());
       unawaited(_flushTxnOutbox());
       // Do not force a viewport resettle on every resume — returning from the
       // image picker was making Menu/Bio feel like the app was refreshing/crashing.
@@ -12755,6 +12756,34 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   DateTime? _lastInviteCheck;
   final Set<String> _notifiedInviteIds = {};
 
+  DateTime? _lastCareExpiryCheck;
+
+  /// A House Care member whose paid time ends in 3 days or less sees a top notification every time
+  /// they open the app (checked at most once a minute).
+  Future<void> _checkHouseCareExpiry() async {
+    final u = _currentUser;
+    if (u == null) return;
+    final last = _lastCareExpiryCheck;
+    if (last != null && DateTime.now().difference(last) < const Duration(minutes: 1)) return;
+    _lastCareExpiryCheck = DateTime.now();
+    try {
+      final res = await NgmyHouseWorkersApi.care();
+      if (res['ok'] != true || res['care'] is! Map) return;
+      final care = Map<String, dynamic>.from(res['care'] as Map);
+      final days = (care['daysLeft'] as num?)?.toInt() ?? 0;
+      if (care['active'] != true || days < 1 || days > 3) return;
+      await _pushInAppNotification(
+        title: 'House Care ends soon',
+        body: days == 1 ? 'Your House Care ends tomorrow. Pay again to keep it going.' : 'Your House Care ends in $days days. Pay again to keep it going.',
+        tag: 'house_care_expiry',
+        cooldown: const Duration(seconds: 20),
+        important: true,
+      );
+    } catch (e) {
+      debugPrint('[house care] expiry check: $e');
+    }
+  }
+
   /// Someone invited this player to a game — top notification (when the app opens or comes back).
   Future<void> _checkIncomingGameInvites() async {
     final u = _currentUser;
@@ -14751,6 +14780,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _allowConfigDiffNotifications = true;
       _scheduleAdminAlertSweep();
       unawaited(_checkIncomingGameInvites());
+      unawaited(_checkHouseCareExpiry());
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
   }

@@ -320,7 +320,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       state: _registryState,
       clientName: _displayName,
       clientPhone: widget.clientPhone,
-      care: _care,
+      care: widget.isAdmin ? {..._care, 'subscribed': true} : _care,
       hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
       onJoinCare: _openCare,
     );

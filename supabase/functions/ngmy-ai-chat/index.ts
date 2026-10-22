@@ -1964,6 +1964,8 @@ async function handleStoreAccess(req: Request, action: string, body: any): Promi
 const HW_BASIC_PRICE = 125;
 const HW_PREMIUM_PRICE = 65;
 const HW_PLAN_DAYS = 30;
+// A paid member can pay again only in the last days of the time they paid for.
+const HW_RENEW_WINDOW_DAYS = 3;
 // Off until the job board and plan screens ship in the app: until then a
 // client can still send work straight to a worker without Premium.
 const HW_PLANS_ENFORCED = false;
@@ -2002,8 +2004,8 @@ async function hwPlanUntil(db: any, email: string, plan: string, term: boolean):
   const base = Math.max(Date.now(), prevMs);
   const price = plan === "premium" ? HW_PREMIUM_PRICE : HW_BASIC_PRICE;
   // Paid ahead (a whole term, or many months): nothing more to pay until that time is nearly over.
-  if (plan === "basic" && prevMs > Date.now() + 40 * 86400000) {
-    return { error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. No payment is needed before then.`, status: 409 };
+  if (plan === "basic" && prevMs > Date.now() + HW_RENEW_WINDOW_DAYS * 86400000) {
+    return { error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. You can pay again in the last 3 days before it ends.`, status: 409 };
   }
   if (term && plan === "basic") {
     // The whole agreement at once: the monthly price for every month of the term the member signed.
@@ -2020,6 +2022,19 @@ async function hwPlanUntil(db: any, email: string, plan: string, term: boolean):
     return { until: d.toISOString(), amount: price * 12 * years };
   }
   return { until: new Date(base + HW_PLAN_DAYS * 86400000).toISOString(), amount: price };
+}
+
+const HW_NEEDS_SUB = "Join House Care and pay for it before you send work.";
+
+/** Work can only be sent by a member whose House Care is paid (Cash App or card) and not ended. */
+async function hwSubscribed(db: any, email: string): Promise<boolean> {
+  const plans = await hwPlans(db, email);
+  if (!plans.canPost) return false;
+  try {
+    const { data } = await db.from("house_subscriptions").select("status").eq("email", email).maybeSingle();
+    if (data?.status === "cancelled") return false;
+  } catch (_) { /* no agreement row: the paid plan still counts */ }
+  return true;
 }
 
 // ── House Care membership ───────────────────────────────────────────────────
@@ -2068,7 +2083,7 @@ async function hwCare(db: any, email: string) {
     row = data;
   } catch (_) { /* table not created yet: no membership */ }
   if (!row) {
-    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE, pendingPayment };
+    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE, pendingPayment, subscribed: plans.canPost, daysLeft: 0 };
   }
   const paidUntil: string | null = plans.basicUntil;
   const paidMs = paidUntil ? Date.parse(paidUntil) : 0;
@@ -2090,7 +2105,9 @@ async function hwCare(db: any, email: string) {
     signed: true, active, status, termYears: Number(row.term_years ?? 1), fullName: row.full_name ?? "",
     agreedAt: row.agreed_at, startedAt, termEnds, nextDue: paidUntil, price: HW_BASIC_PRICE,
     // Paid ahead for a long time (the whole term): no payment is due until it runs down.
-    prepaid: active && paidMs > Date.now() + 40 * 86400000,
+    prepaid: active && paidMs > Date.now() + HW_RENEW_WINDOW_DAYS * 86400000,
+    subscribed: status !== "cancelled" && plans.canPost,
+    daysLeft: paidMs > Date.now() ? Math.ceil((paidMs - Date.now()) / 86400000) : 0,
     termPrice: HW_BASIC_PRICE * 12 * Number(row.term_years ?? 1),
     pendingPayment,
   };
@@ -2305,7 +2322,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     }
     const { data: waiting } = await db.from("house_care_payments").select("id").eq("email", email).eq("plan", plan).eq("status", "pending").limit(1);
     if (waiting && waiting.length > 0) {
-      return jsonOk({ ok: false, error: "Your last payment is still waiting for approval." }, 409);
+      return jsonOk({ ok: false, error: "Your last payment is still being confirmed." }, 409);
     }
     // Like a Growth Income deposit: the payment carries its code and the screenshot of the Cash App payment.
     const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
@@ -2352,6 +2369,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (!isAdmin && !postElig?.hasRegistryId) {
       return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to submit work." }, 403);
     }
+    if (!isAdmin && !(await hwSubscribed(db, email))) return jsonOk({ ok: false, needsSubscription: true, error: HW_NEEDS_SUB }, 402);
     // The work goes to the state on their Civic Registry record, nowhere else.
     const state = isAdmin ? (postElig?.state || hwText(body?.state, 60)) : (postElig?.state ?? "");
     if (!state) {
@@ -2481,6 +2499,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   if (action === "hwRequest") {
     const limited = await enforceRateLimit(req, "hw_request", email, 20, 3600);
     if (limited) return limited;
+    if (!isAdmin && !(await hwSubscribed(db, email))) return jsonOk({ ok: false, needsSubscription: true, error: HW_NEEDS_SUB }, 402);
     // Choosing a specific worker is a Premium feature; posting to the job board is not.
     if (HW_PLANS_ENFORCED && !isAdmin && !(await hwPlans(db, email)).premium) {
       return jsonOk({

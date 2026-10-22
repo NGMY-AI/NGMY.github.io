@@ -148,6 +148,7 @@ Future<bool> showNgmyPostWorkSheet(
   String category = '';
   var busy = false;
   final member = care['active'] == true;
+  final canSend = member || care['subscribed'] == true;
   final posted = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -191,7 +192,7 @@ Future<bool> showNgmyPostWorkSheet(
                 ),
                 const SizedBox(height: 10),
                 Align(alignment: Alignment.centerLeft, child: _laborBadge(member)),
-                if (!member) ...[
+                if (!canSend) ...[
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -199,7 +200,7 @@ Future<bool> showNgmyPostWorkSheet(
                     child: Row(children: [
                       Expanded(
                         child: Text(
-                          'Members of House Care do not pay for labor, only materials.',
+                          'Join House Care and pay for it to send work. Members do not pay for labor, only materials.',
                           style: TextStyle(fontSize: 11.5, color: c.ink, fontWeight: FontWeight.w700, height: 1.3),
                         ),
                       ),
@@ -256,7 +257,7 @@ Future<bool> showNgmyPostWorkSheet(
                 const SizedBox(height: 10),
                 TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: _field(ctx, 'Your WhatsApp number *', icon: Icons.phone_rounded)),
                 const SizedBox(height: 16),
-                _primaryButton('Post work', Icons.send_rounded, hasRegistryId ? submit : null, color: _kJobOrange, busy: busy),
+                _primaryButton('Post work', Icons.send_rounded, hasRegistryId && canSend ? submit : null, color: _kJobOrange, busy: busy),
               ],
             ),
           ),
@@ -999,7 +1000,7 @@ class _CareSheetState extends State<_CareSheet> {
     );
     if (res == null || !mounted) return;
     await _reload();
-    if (mounted) _snack(context, 'Sent. An admin will check your payment and approve it.');
+    if (mounted) _snack(context, 'Payment submitted. Thank you.');
   }
 
   // ── Views ─────────────────────────────────────────────────────────────────
@@ -1028,7 +1029,7 @@ class _CareSheetState extends State<_CareSheet> {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: const Color(0xFF34D399).withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF34D399).withOpacity(0.5))),
-        child: Text('Paid in full until ${_careDate(_care['nextDue'])}. No payment is needed until then.', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+        child: Text('Paid until ${_careDate(_care['nextDue'])}. You can pay again in the last 3 days.', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
       );
     }
     final waiting = _care['pendingPayment'];
@@ -1041,7 +1042,7 @@ class _CareSheetState extends State<_CareSheet> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Your \$${((waiting['amount'] as num?) ?? 0).toStringAsFixed(0)} Cash App payment is waiting for approval. House Care starts as soon as an admin confirms it.',
+              'Your \$${((waiting['amount'] as num?) ?? 0).toStringAsFixed(0)} Cash App payment was received. We are confirming it now.',
               style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.3),
             ),
           ),
@@ -1615,11 +1616,11 @@ Widget ngmyOfferSheetForTest(Map<String, dynamic> job) => _OfferSheet(job: job);
 @visibleForTesting
 Widget ngmyWorkRecordCardForTest(Map<String, dynamic> stats) => _WorkRecordCard(stats: stats);
 
-// ── Cash App payment: code, send, screenshot, ask for approval ─────────────
+// ── Cash App payment: code, send, screenshot, submit ───────────────────────
 
-/// The Cash App payment sheet for House Care. It works like a Growth Income deposit: the member
-/// writes the code in the Cash App note, sends the money, then attaches the screenshot so an admin
-/// can check it and approve. Returns the server's answer once the request is sent, or null if closed.
+/// The Cash App payment card for House Care, a pop-up in the middle of the screen. Like a Growth
+/// Income deposit: the member writes the code in the Cash App note, sends the money, then attaches
+/// the screenshot of the payment and submits. Returns the server's answer once sent, or null.
 Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
   BuildContext context, {
   required double amount,
@@ -1628,11 +1629,20 @@ Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
   required String cashAppTag,
   required bool fullTerm,
 }) {
-  return showModalBottomSheet<Map<String, dynamic>>(
+  return showGeneralDialog<Map<String, dynamic>>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => _CareCashAppSheet(amount: amount, label: label, cashAppUrl: cashAppUrl, cashAppTag: cashAppTag, fullTerm: fullTerm),
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black.withOpacity(0.62),
+    transitionDuration: const Duration(milliseconds: 380),
+    pageBuilder: (_, __, ___) => _CareCashAppSheet(amount: amount, label: label, cashAppUrl: cashAppUrl, cashAppTag: cashAppTag, fullTerm: fullTerm),
+    transitionBuilder: (_, anim, __, child) {
+      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: ScaleTransition(scale: Tween<double>(begin: 0.86, end: 1).animate(curved), child: child),
+      );
+    },
   );
 }
 
@@ -1649,19 +1659,29 @@ class _CareCashAppSheet extends StatefulWidget {
   State<_CareCashAppSheet> createState() => _CareCashAppSheetState();
 }
 
-class _CareCashAppSheetState extends State<_CareCashAppSheet> {
-  static const _green = Color(0xFF00B84A);
+class _CareCashAppSheetState extends State<_CareCashAppSheet> with SingleTickerProviderStateMixin {
+  static const _green = Color(0xFF22E07A);
+  static const _deep = Color(0xFF04120C);
   final String _code = (10000 + math.Random().nextInt(89999)).toString();
+  late final AnimationController _glow = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat(reverse: true);
   bool _opened = false;
   bool _busy = false;
+  bool _copied = false;
   Uint8List? _shot;
   String _shotMime = 'image/jpeg';
 
   String get _amountText => widget.amount.toStringAsFixed(0);
 
+  @override
+  void dispose() {
+    _glow.dispose();
+    super.dispose();
+  }
+
   Future<void> _copyCode() async {
     await Clipboard.setData(ClipboardData(text: _code));
-    if (mounted) _snack(context, 'Code copied. Paste it in the Cash App note.');
+    HapticFeedback.selectionClick();
+    if (mounted) setState(() => _copied = true);
   }
 
   Future<void> _openCashApp() async {
@@ -1673,7 +1693,10 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> {
     await Clipboard.setData(ClipboardData(text: _code));
     final url = base.endsWith('/') ? '$base$_amountText' : '$base/$_amountText';
     final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    if (mounted) setState(() => _opened = ok);
+    if (mounted) setState(() {
+      _opened = ok;
+      _copied = true;
+    });
   }
 
   Future<void> _pickShot() async {
@@ -1706,126 +1729,228 @@ class _CareCashAppSheetState extends State<_CareCashAppSheet> {
     if (res['ok'] == true) {
       Navigator.pop(context, res);
     } else {
-      _snack(context, (res['error'] ?? 'Could not send the request.').toString(), error: true);
+      _snack(context, (res['error'] ?? 'Could not send the payment.').toString(), error: true);
     }
   }
 
-  Widget _step(_HwColors c, int n, String title, String body, {Widget? extra, bool done = false}) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: c.tile,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: done ? _green : c.line, width: done ? 1.6 : 1),
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: 26,
-          height: 26,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? _green : _green.withOpacity(0.15)),
+  /// Each block rises into place one after the other.
+  Widget _rise(int i, Widget child) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Duration(milliseconds: 420 + i * 110),
+        curve: Curves.easeOutCubic,
+        builder: (_, t, c) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, (1 - t) * 22), child: c)),
+        child: child,
+      );
+
+  Widget _badge(int n, bool done) => AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 30,
+        height: 30,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: done ? const LinearGradient(colors: [Color(0xFF22E07A), Color(0xFF0FA958)]) : null,
+          color: done ? null : Colors.white.withOpacity(0.08),
+          border: Border.all(color: done ? Colors.transparent : Colors.white.withOpacity(0.22)),
+          boxShadow: done ? [BoxShadow(color: _green.withOpacity(0.5), blurRadius: 12)] : null,
+        ),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
           child: done
-              ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-              : Text('$n', style: const TextStyle(fontWeight: FontWeight.w900, color: _green, fontSize: 13)),
+              ? const Icon(Icons.check_rounded, key: ValueKey('ok'), size: 18, color: Colors.white)
+              : Text('$n', key: ValueKey('n$n'), style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white70, fontSize: 13)),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 13.5)),
-            const SizedBox(height: 2),
-            Text(body, style: TextStyle(color: c.muted, fontSize: 12, height: 1.3)),
-            if (extra != null) ...[const SizedBox(height: 8), extra],
-          ]),
-        ),
+      );
+
+  Widget _stepCard({required int n, required String title, required String body, required bool done, Widget? child}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        color: Colors.white.withOpacity(done ? 0.07 : 0.045),
+        border: Border.all(color: done ? _green.withOpacity(0.55) : Colors.white.withOpacity(0.09)),
+      ),
+      child: Column(children: [
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          _badge(n, done),
+          const SizedBox(width: 10),
+          Flexible(child: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15))),
+        ]),
+        const SizedBox(height: 6),
+        Text(body, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.62), fontSize: 12.5, height: 1.35)),
+        if (child != null) ...[const SizedBox(height: 12), child],
       ]),
+    );
+  }
+
+  Widget _gradientButton(String text, IconData icon, VoidCallback? onTap, {bool busy = false, List<Color> colors = const [Color(0xFF22E07A), Color(0xFF0FA958)]}) {
+    final enabled = onTap != null && !busy;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 250),
+      opacity: onTap == null ? 0.42 : 1,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: LinearGradient(colors: colors),
+          boxShadow: onTap == null ? null : [BoxShadow(color: colors.last.withOpacity(0.45), blurRadius: 18, offset: const Offset(0, 7))],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: enabled ? onTap : null,
+            child: Center(
+              child: busy
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(icon, size: 20, color: Colors.white),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15.5))),
+                    ]),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final c = _HwColors(context);
     final tag = widget.cashAppTag.trim();
-    return _sheetFrame(
-      context,
-      title: 'Pay with Cash App',
-      icon: Icons.attach_money_rounded,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+    final size = MediaQuery.of(context).size;
+    return SafeArea(
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 400, maxHeight: size.height * 0.92),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF00B84A), Color(0xFF047857)]),
+              borderRadius: BorderRadius.circular(32),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0A2A1C), _deep, Color(0xFF071B2B)]),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              boxShadow: [BoxShadow(color: _green.withOpacity(0.28), blurRadius: 50, spreadRadius: -8)],
             ),
-            child: Column(children: [
-              Text(widget.label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 10.5, letterSpacing: 1.4)),
-              const SizedBox(height: 2),
-              Text('\$$_amountText', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38, height: 1.1)),
-              if (tag.isNotEmpty) Text('to $tag', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-            ]),
-          ),
-          const SizedBox(height: 12),
-          _step(
-            c,
-            1,
-            'Your code',
-            'Write this code in the Cash App note (memo) so we can find your payment.',
-            extra: Row(children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: _green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: _green.withOpacity(0.5))),
-                  child: Text(_code, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: _green, letterSpacing: 4)),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: Stack(children: [
+                Positioned(top: -70, right: -50, child: Container(width: 190, height: 190, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [_green.withOpacity(0.22), Colors.transparent])))),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    _rise(
+                      0,
+                      Column(children: [
+                        Container(
+                          width: 58,
+                          height: 58,
+                          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF22E07A), Color(0xFF0FA958)])),
+                          child: const Icon(Icons.attach_money_rounded, color: Colors.white, size: 32),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(widget.label.toUpperCase(), textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.w800, fontSize: 10.5, letterSpacing: 2)),
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: widget.amount),
+                          duration: const Duration(milliseconds: 1100),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, v, __) => Text('\$${v.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 46, height: 1.15)),
+                        ),
+                        if (tag.isNotEmpty) Text('to $tag', style: const TextStyle(color: _green, fontWeight: FontWeight.w800, fontSize: 14)),
+                      ]),
+                    ),
+                    const SizedBox(height: 16),
+                    _rise(
+                      1,
+                      _stepCard(
+                        n: 1,
+                        title: 'Your code',
+                        body: 'Write this code in the Cash App note.',
+                        done: _copied,
+                        child: AnimatedBuilder(
+                          animation: _glow,
+                          builder: (_, __) => GestureDetector(
+                            onTap: _copyCode,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(16),
+                                color: _green.withOpacity(0.1),
+                                border: Border.all(color: _green.withOpacity(0.4 + 0.3 * _glow.value)),
+                                boxShadow: [BoxShadow(color: _green.withOpacity(0.12 + 0.2 * _glow.value), blurRadius: 18)],
+                              ),
+                              child: Column(children: [
+                                Text(_code, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: _green, letterSpacing: 7)),
+                                const SizedBox(height: 2),
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(_copied ? Icons.check_rounded : Icons.copy_rounded, size: 13, color: Colors.white54),
+                                  const SizedBox(width: 5),
+                                  Text(_copied ? 'Copied' : 'Tap to copy', style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700)),
+                                ]),
+                              ]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _rise(
+                      2,
+                      _stepCard(
+                        n: 2,
+                        title: 'Send the money',
+                        body: 'Open Cash App and send \$$_amountText with the code in the note.',
+                        done: _opened,
+                        child: _gradientButton('Open Cash App', Icons.open_in_new_rounded, _openCashApp),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _rise(
+                      3,
+                      _stepCard(
+                        n: 3,
+                        title: 'Screenshot your payment',
+                        body: 'Take a screenshot that shows the amount and the code, then add it here.',
+                        done: _shot != null,
+                        child: Column(children: [
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                            child: _shot == null
+                                ? const SizedBox(width: double.infinity)
+                                : Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 170), child: Image.memory(_shot!, fit: BoxFit.contain)),
+                                    ),
+                                  ),
+                          ),
+                          _gradientButton(
+                            _shot == null ? 'Add screenshot' : 'Change screenshot',
+                            _shot == null ? Icons.add_photo_alternate_rounded : Icons.swap_horiz_rounded,
+                            _pickShot,
+                            colors: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+                          ),
+                        ]),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _rise(4, _gradientButton('Submit payment', Icons.arrow_forward_rounded, _shot == null ? null : _submit, busy: _busy)),
+                    const SizedBox(height: 4),
+                    TextButton(
+                      onPressed: _busy ? null : () => Navigator.pop(context),
+                      child: Text('Cancel', style: TextStyle(color: Colors.white.withOpacity(0.55), fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(onPressed: _copyCode, icon: const Icon(Icons.copy_rounded, size: 18), tooltip: 'Copy code'),
-            ]),
+              ]),
+            ),
           ),
-          _step(
-            c,
-            2,
-            'Send the money',
-            'Tap the button, send \$$_amountText on Cash App with the code in the note.',
-            done: _opened,
-            extra: _primaryButton('Open Cash App · send \$$_amountText', Icons.open_in_new_rounded, _openCashApp, color: _green),
-          ),
-          _step(
-            c,
-            3,
-            'Take a screenshot',
-            'After you pay, take a screenshot of the payment that shows the amount and the code.',
-          ),
-          _step(
-            c,
-            4,
-            'Attach it',
-            'Add the screenshot so an admin can check it and approve.',
-            done: _shot != null,
-            extra: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              if (_shot != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 170), child: Image.memory(_shot!, fit: BoxFit.contain)),
-                  ),
-                ),
-              OutlinedButton.icon(
-                onPressed: _pickShot,
-                icon: Icon(_shot == null ? Icons.add_photo_alternate_rounded : Icons.swap_horiz_rounded, size: 18),
-                label: Text(_shot == null ? 'Choose screenshot' : 'Change screenshot'),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 4),
-          _primaryButton('Send for approval', Icons.send_rounded, _shot == null ? null : _submit, color: _green, busy: _busy),
-          const SizedBox(height: 6),
-          Text('Your House Care starts as soon as an admin approves the payment.', textAlign: TextAlign.center, style: TextStyle(color: c.muted, fontSize: 11.5)),
-        ]),
+        ),
       ),
     );
   }
