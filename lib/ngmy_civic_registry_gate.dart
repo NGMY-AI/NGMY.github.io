@@ -9,6 +9,7 @@ import 'ngmy_civic_identity.dart';
 import 'ngmy_civic_registry_access.dart';
 import 'ngmy_civic_registry_cloud.dart';
 import 'ngmy_civic_registry_stats.dart';
+import 'ngmy_ui_lang.dart';
 
 const String _kUnlockPrefsKey = 'civic_registry_unlock_v2';
 
@@ -396,23 +397,49 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
   static const _redTop = Color(0xFFE53935);
   static const _redBottom = Color(0xFFB71C1C);
 
-  static const _stepTitles = [
-    'Enter PIN',
-    'Member name',
-    'Date of birth',
-    'Registry ID',
-  ];
+  List<String> get _stepTitles => [
+        ngmyT('Enter PIN', 'Weka PIN'),
+        ngmyT('Member name', 'Jina la mwanachama'),
+        ngmyT('Date of birth', 'Tarehe ya kuzaliwa'),
+        ngmyT('Registry ID', 'Namba ya usajili'),
+      ];
 
-  static const _stepHints = [
-    'Enter the PIN from your state registrar.',
-    'Enter your full name exactly as registered.',
-    'Enter the date of birth that matches that name (MM/DD/YYYY).',
-    'Enter your Civic Registry ID number.',
-  ];
+  List<String> get _stepHints => [
+        ngmyT('Enter the PIN from your state registrar.', 'Weka PIN uliyopewa na msajili wa jimbo lako.'),
+        ngmyT('Enter your full name exactly as registered.', 'Weka jina lako kamili kama lilivyosajiliwa.'),
+        ngmyT('Enter the date of birth that matches that name (MM/DD/YYYY).', 'Weka tarehe ya kuzaliwa inayolingana na jina hilo (MM/DD/YYYY).'),
+        ngmyT('Enter your Civic Registry ID number.', 'Weka namba yako ya usajili wa Civic Registry.'),
+      ];
+
+  /// Messages come from the server and from this screen in English; show them in the chosen language.
+  String _trErr(String e) {
+    if (!NgmyUiLang.isSw) return e;
+    const map = {
+      'Choose your state.': 'Chagua jimbo lako.',
+      'This field is required.': 'Sehemu hii inahitajika.',
+      'Could not verify PIN. Check your connection and try again.': 'Imeshindikana kuthibitisha PIN. Angalia mtandao wako kisha ujaribu tena.',
+      'Could not verify PIN. Check connection and try again.': 'Imeshindikana kuthibitisha PIN. Angalia mtandao kisha ujaribu tena.',
+      'Could not verify name. Check your connection and try again.': 'Imeshindikana kuthibitisha jina. Angalia mtandao wako kisha ujaribu tena.',
+      'Enter your state PIN again, then your name.': 'Weka PIN ya jimbo lako tena, kisha jina lako.',
+      'Start over — name step was lost.': 'Anza upya — hatua ya jina imepotea.',
+      'Start over — verification incomplete.': 'Anza upya — uthibitisho haujakamilika.',
+      'Date of birth does not match that registered name.': 'Tarehe ya kuzaliwa hailingani na jina hilo lililosajiliwa.',
+      'Registry ID does not match that member.': 'Namba ya usajili hailingani na mwanachama huyo.',
+    };
+    final hit = map[e];
+    if (hit != null) return hit;
+    final pin = RegExp(r'^Incorrect PIN for (.+)\.$').firstMatch(e);
+    if (pin != null) return 'PIN si sahihi kwa ${pin.group(1)}.';
+    final nm = RegExp(r'^That name is not registered in (.+)\.$').firstMatch(e);
+    if (nm != null) return 'Jina hilo halijasajiliwa katika ${nm.group(1)}.';
+    return e;
+  }
 
   @override
   void initState() {
     super.initState();
+    NgmyUiLang.code.addListener(_langChanged);
+    unawaited(NgmyUiLang.load());
     _state = widget.usStates.contains(widget.initialState) ? widget.initialState : widget.usStates.first;
     _error = (widget.initialMessage ?? '').trim().isEmpty ? null : widget.initialMessage!.trim();
     // Authorized Registrar returning home (or any state that does not require
@@ -422,6 +449,10 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
       final requires = widget.stateRequiresUnlock?.call(_state) ?? true;
       if (!requires) widget.onUnlocked(_state);
     });
+  }
+
+  void _langChanged() {
+    if (mounted) setState(() {});
   }
 
   NgmyCivicAccessStatus _accessFor(Map<String, dynamic>? member, {String name = ''}) {
@@ -442,6 +473,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
 
   @override
   void dispose() {
+    NgmyUiLang.code.removeListener(_langChanged);
     _pinC.dispose();
     _nameC.dispose();
     _dobC.dispose();
@@ -958,7 +990,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    'Select your state',
+                                    ngmyT('Select your state', 'Chagua jimbo lako'),
                                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: text),
                                   ),
                                 ),
@@ -986,7 +1018,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                                       controller: q,
                                       style: TextStyle(color: text, fontSize: 14),
                                       decoration: InputDecoration(
-                                        hintText: 'Search state…',
+                                        hintText: ngmyT('Search state…', 'Tafuta jimbo…'),
                                         hintStyle: TextStyle(color: muted),
                                         border: InputBorder.none,
                                       ),
@@ -1007,7 +1039,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                                 builder: (_, states, __) {
                                   if (states.isEmpty) {
                                     return Center(
-                                      child: Text('No results', style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
+                                      child: Text(ngmyT('No results', 'Hakuna matokeo'), style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
                                     );
                                   }
                                   return ListView.separated(
@@ -1080,6 +1112,17 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: backIconColor),
           onPressed: _busy ? null : _goBackStep,
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: Center(
+              child: Container(
+                decoration: BoxDecoration(color: _redTop, borderRadius: BorderRadius.circular(14)),
+                child: const NgmyLangFlag(),
+              ),
+            ),
+          ),
+        ],
       ),
       body: Align(
         alignment: const Alignment(0, -0.14),
@@ -1126,7 +1169,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Verify your membership',
+                  ngmyT('Verify your membership', 'Thibitisha uanachama wako'),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.92),
                     fontSize: 15,
@@ -1145,7 +1188,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Step ${_step + 1} of 4',
+                  ngmyT('Step ${_step + 1} of 4', 'Hatua ${_step + 1} kati ya 4'),
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 22),
@@ -1153,7 +1196,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Select Your State',
+                      ngmyT('Select Your State', 'Chagua Jimbo Lako'),
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.95),
                         fontSize: 13,
@@ -1187,7 +1230,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'You will only see data from the state you select',
+                    ngmyT('You will only see data from the state you select', 'Utaona taarifa za jimbo ulilochagua tu'),
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 11),
                   ),
                   const SizedBox(height: 20),
@@ -1230,7 +1273,7 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                 if (_error != null) ...[
                   const SizedBox(height: 10),
                   Text(
-                    _error!,
+                    _trErr(_error!),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Color(0xFFFFCDD2), fontSize: 12, fontWeight: FontWeight.w600),
                   ),
@@ -1253,14 +1296,14 @@ class _CivicRegistryGateScreenState extends State<CivicRegistryGateScreen> {
                             height: 22,
                             child: CircularProgressIndicator(strokeWidth: 2, color: _redTop),
                           )
-                        : Text(_step == 3 ? 'Unlock Registry' : 'Continue'),
+                        : Text(_step == 3 ? ngmyT('Unlock Registry', 'Fungua Usajili') : ngmyT('Continue', 'Endelea')),
                   ),
                 ),
                 const SizedBox(height: 22),
                 Divider(color: Colors.white.withValues(alpha: 0.35), height: 1),
                 const SizedBox(height: 14),
                 Text(
-                  'Name, date of birth, and registry ID must match Civic Registry records',
+                  ngmyT('Name, date of birth, and registry ID must match Civic Registry records', 'Jina, tarehe ya kuzaliwa, na namba ya usajili lazima vilingane na rekodi za Civic Registry'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12),
                 ),

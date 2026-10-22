@@ -52,7 +52,9 @@ Widget _laborBadge(bool laborFree) {
       const SizedBox(width: 5),
       Flexible(
         child: Text(
-          laborFree ? 'House Care member: materials only, no labor charge' : 'Standard work: labor + materials',
+          laborFree
+              ? ngmyT('House Care member: materials only, no labor charge', 'Mwanachama wa House Care: vifaa tu, hakuna malipo ya kazi')
+              : ngmyT('Standard work: labor + materials', 'Kazi ya kawaida: kazi + vifaa'),
           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: color),
         ),
       ),
@@ -130,6 +132,20 @@ Future<({double materials, double labor})?> _askWorkCosts(BuildContext context, 
 
 // ── Post work ───────────────────────────────────────────────────────────────
 
+/// Short names for the nine work categories (English / Swahili), by category id.
+const Map<String, (String, String)> _kWorkLabels = {
+  'faucet': ('Faucet & sink', 'Bomba na sinki'),
+  'toilet': ('Toilet', 'Choo'),
+  'outlet': ('Outlet & switch', 'Soketi na swichi'),
+  'door': ('Door & lock', 'Mlango na kufuli'),
+  'cabinet': ('Cabinet & hinge', 'Kabati na bawaba'),
+  'drywall': ('Drywall patch', 'Kuziba ukuta'),
+  'caulk': ('Caulk & seal', 'Kuziba mapengo'),
+  'shelf': ('Shelf & mount', 'Rafu na kuning\'iniza'),
+  'paint': ('Paint touch-up', 'Kupaka rangi'),
+};
+
+/// The post-work pop-up, in the middle of the screen. Returns true when the work was posted.
 Future<bool> showNgmyPostWorkSheet(
   BuildContext context, {
   required String state,
@@ -139,136 +155,422 @@ Future<bool> showNgmyPostWorkSheet(
   required bool hasRegistryId,
   required Future<void> Function() onJoinCare,
 }) async {
-  final nameC = TextEditingController(text: clientName);
-  final phoneC = TextEditingController(text: clientPhone);
-  final addressC = TextEditingController();
-  final cityC = TextEditingController();
-  final detailsC = TextEditingController();
-  final timeC = TextEditingController();
-  String category = '';
-  var busy = false;
-  final member = care['active'] == true;
-  final canSend = member || care['subscribed'] == true;
-  final posted = await showModalBottomSheet<bool>(
+  final posted = await showGeneralDialog<bool>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setSheet) {
-        final c = _HwColors(ctx);
-        Future<void> submit() async {
-          setSheet(() => busy = true);
-          final res = await NgmyHouseWorkersApi.postJob({
-            'state': state,
-            'clientName': nameC.text.trim(),
-            'clientPhone': phoneC.text.trim(),
-            'address': addressC.text.trim(),
-            'city': cityC.text.trim(),
-            'category': category,
-            'details': detailsC.text.trim(),
-            'bestTime': timeC.text.trim(),
-          });
-          if (!ctx.mounted) return;
-          setSheet(() => busy = false);
-          if (res['ok'] == true) {
-            Navigator.pop(ctx, true);
-          } else {
-            _snack(ctx, (res['error'] ?? 'Could not post. Try again.').toString(), error: true);
-          }
-        }
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black.withOpacity(0.64),
+    transitionDuration: const Duration(milliseconds: 380),
+    pageBuilder: (_, __, ___) => _PostWorkDialog(
+      state: state,
+      clientName: clientName,
+      clientPhone: clientPhone,
+      care: care,
+      hasRegistryId: hasRegistryId,
+      onJoinCare: onJoinCare,
+    ),
+    transitionBuilder: (_, anim, __, child) {
+      final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeInCubic);
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: anim, curve: Curves.easeOut),
+        child: ScaleTransition(scale: Tween<double>(begin: 0.88, end: 1).animate(curved), child: child),
+      );
+    },
+  );
+  if (posted == true && context.mounted) {
+    _snack(context, ngmyT('Your work is posted. The first worker to pick it up will show in My requests.', 'Kazi yako imetumwa. Fundi wa kwanza atakayeipokea ataonekana kwenye Maombi yangu.'));
+  }
+  return posted == true;
+}
 
-        return _sheetFrame(
-          ctx,
-          title: 'Post work',
-          icon: Icons.add_task_rounded,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Write the work you want done. It shows up for the workers in your state right away, and the first worker to pick it up gets it.',
-                  style: TextStyle(fontSize: 12, color: c.muted, height: 1.35),
-                ),
-                const SizedBox(height: 10),
-                Align(alignment: Alignment.centerLeft, child: _laborBadge(member)),
-                if (!canSend) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: _kCareTeal.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: _kCareTeal.withOpacity(0.4))),
-                    child: Row(children: [
-                      Expanded(
-                        child: Text(
-                          'Join House Care and pay for it to send work. Members do not pay for labor, only materials.',
-                          style: TextStyle(fontSize: 11.5, color: c.ink, fontWeight: FontWeight.w700, height: 1.3),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () async {
-                          Navigator.pop(ctx, false);
-                          await onJoinCare();
-                        },
-                        child: const Text('Join'),
-                      ),
-                    ]),
-                  ),
-                ],
-                if (!hasRegistryId) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: const Color(0xFFEF4444).withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.45))),
-                    child: Text(
-                      'To submit work you need to be registered in Civic Registry. Your work goes to the workers in the state you are registered in.',
-                      style: TextStyle(fontSize: 11.5, color: c.ink, fontWeight: FontWeight.w700, height: 1.3),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final cat in NgmyHouseInsurance.coveredCategories)
-                      ChoiceChip(
-                        label: Text(cat.title, style: const TextStyle(fontSize: 11.5)),
-                        selected: category == cat.title,
-                        onSelected: (_) => setSheet(() => category = category == cat.title ? '' : cat.title),
-                        selectedColor: _kJobOrange.withOpacity(0.25),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: detailsC,
-                  maxLines: 4,
-                  decoration: _field(ctx, 'What work do you want done? *', hint: 'Describe it: what is broken, leaking, or not working…'),
-                ),
-                const SizedBox(height: 10),
-                TextField(controller: addressC, decoration: _field(ctx, 'Address of the work', icon: Icons.home_rounded)),
-                const SizedBox(height: 10),
-                TextField(controller: cityC, decoration: _field(ctx, 'City', icon: Icons.location_city_rounded)),
-                const SizedBox(height: 10),
-                TextField(controller: timeC, decoration: _field(ctx, 'Best time (optional)', hint: 'e.g. Saturday morning', icon: Icons.schedule_rounded)),
-                const SizedBox(height: 10),
-                TextField(controller: nameC, decoration: _field(ctx, 'Your name *', icon: Icons.person_rounded)),
-                const SizedBox(height: 10),
-                TextField(controller: phoneC, keyboardType: TextInputType.phone, decoration: _field(ctx, 'Your WhatsApp number *', icon: Icons.phone_rounded)),
-                const SizedBox(height: 16),
-                _primaryButton('Post work', Icons.send_rounded, hasRegistryId && canSend ? submit : null, color: _kJobOrange, busy: busy),
-              ],
+class _PostWorkDialog extends StatefulWidget {
+  const _PostWorkDialog({
+    required this.state,
+    required this.clientName,
+    required this.clientPhone,
+    required this.care,
+    required this.hasRegistryId,
+    required this.onJoinCare,
+  });
+
+  final String state;
+  final String clientName;
+  final String clientPhone;
+  final Map<String, dynamic> care;
+  final bool hasRegistryId;
+  final Future<void> Function() onJoinCare;
+
+  @override
+  State<_PostWorkDialog> createState() => _PostWorkDialogState();
+}
+
+class _PostWorkDialogState extends State<_PostWorkDialog> {
+  static const _orange = Color(0xFFFF8A1F);
+  late final TextEditingController _name = TextEditingController(text: widget.clientName);
+  late final TextEditingController _phone = TextEditingController(text: ngmyPhoneDashed(widget.clientPhone));
+  final TextEditingController _address = TextEditingController();
+  final TextEditingController _city = TextEditingController();
+  final TextEditingController _details = TextEditingController();
+  String _category = '';
+  DateTime? _when;
+  bool _busy = false;
+  String? _error;
+
+  bool get _member => widget.care['active'] == true;
+  bool get _canSend => _member || widget.care['subscribed'] == true;
+  bool get _valid =>
+      widget.hasRegistryId &&
+      _canSend &&
+      _details.text.trim().length >= 5 &&
+      _name.text.trim().isNotEmpty &&
+      ngmyPhoneDigits(_phone.text).length >= 10;
+
+  @override
+  void initState() {
+    super.initState();
+    NgmyUiLang.code.addListener(_langChanged);
+    unawaited(NgmyUiLang.load());
+    for (final c in [_name, _phone, _address, _city, _details]) {
+      c.addListener(() {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    NgmyUiLang.code.removeListener(_langChanged);
+    for (final c in [_name, _phone, _address, _city, _details]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _langChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String get _whenText {
+    final d = _when;
+    if (d == null) return '';
+    final days = NgmyUiLang.isSw
+        ? ['Jumatatu', 'Jumanne', 'Jumatano', 'Alhamisi', 'Ijumaa', 'Jumamosi', 'Jumapili']
+        : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final months = NgmyUiLang.isSw
+        ? ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ago', 'Sep', 'Okt', 'Nov', 'Des']
+        : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final m = d.minute.toString().padLeft(2, '0');
+    return '${days[d.weekday - 1]}, ${months[d.month - 1]} ${d.day} · $h:$m ${d.hour < 12 ? 'AM' : 'PM'}';
+  }
+
+  Future<void> _pickTime() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _when ?? now,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: now.add(const Duration(days: 180)),
+      helpText: ngmyT('Pick the day', 'Chagua siku'),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_when ?? now.add(const Duration(hours: 1))),
+      helpText: ngmyT('Pick the time', 'Chagua saa'),
+    );
+    if (time == null || !mounted) return;
+    setState(() => _when = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+  }
+
+  Future<void> _submit() async {
+    if (!_valid || _busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final res = await NgmyHouseWorkersApi.postJob({
+      'state': widget.state,
+      'clientName': _name.text.trim(),
+      'clientPhone': _phone.text.trim(),
+      'address': _address.text.trim(),
+      'city': _city.text.trim(),
+      'category': _category,
+      'details': _details.text.trim(),
+      'bestTime': _whenText,
+    });
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      Navigator.pop(context, true);
+    } else {
+      setState(() {
+        _busy = false;
+        _error = (res['error'] ?? ngmyT('Could not post. Try again.', 'Imeshindikana kutuma. Jaribu tena.')).toString();
+      });
+    }
+  }
+
+  Widget _rise(int i, Widget child) => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: Duration(milliseconds: 380 + i * 90),
+        curve: Curves.easeOutCubic,
+        builder: (_, t, c) => Opacity(opacity: t, child: Transform.translate(offset: Offset(0, (1 - t) * 18), child: c)),
+        child: child,
+      );
+
+  InputDecoration _dark(String label, {String? hint, IconData? icon}) => InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6), fontWeight: FontWeight.w700, fontSize: 13),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+        prefixIcon: icon == null ? null : Icon(icon, size: 19, color: _orange),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.06),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: _orange, width: 1.5)),
+      );
+
+  Widget _label(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 8, top: 2),
+        child: Text(t.toUpperCase(), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.3, color: Colors.white.withOpacity(0.5))),
+      );
+
+  Widget _categoryGrid() {
+    final cats = NgmyHouseInsurance.coveredCategories;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: cats.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 8, crossAxisSpacing: 8, mainAxisExtent: 86),
+      itemBuilder: (_, i) {
+        final cat = cats[i];
+        final on = _category == cat.title;
+        final label = _kWorkLabels[cat.id];
+        final text = label == null ? cat.title : ngmyT(label.$1, label.$2);
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            setState(() => _category = on ? '' : cat.title);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: on ? const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFFFF8A1F), Color(0xFFE5560B)]) : null,
+              color: on ? null : Colors.white.withOpacity(0.06),
+              border: Border.all(color: on ? Colors.transparent : Colors.white.withOpacity(0.1)),
+              boxShadow: on ? [BoxShadow(color: _orange.withOpacity(0.45), blurRadius: 16, offset: const Offset(0, 6))] : null,
             ),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              AnimatedScale(scale: on ? 1.15 : 1, duration: const Duration(milliseconds: 220), child: Icon(cat.icon, size: 26, color: on ? Colors.white : _orange)),
+              const SizedBox(height: 6),
+              Text(text, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: on ? Colors.white : Colors.white70, fontWeight: FontWeight.w800, fontSize: 11.5, height: 1.15)),
+            ]),
           ),
         );
       },
-    ),
-  );
-  if (posted == true && context.mounted) {
-    _snack(context, 'Your work is posted. The first worker to pick it up will show in My requests.');
+    );
   }
-  return posted == true;
+
+  Widget _notice(Color color, String text, {Widget? action}) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: color.withOpacity(0.45))),
+        child: Row(children: [
+          Expanded(child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.3))),
+          if (action != null) action,
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final keyboard = MediaQuery.of(context).viewInsets.bottom;
+    final enabled = _valid && !_busy;
+    return SafeArea(
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 420, maxHeight: size.height * 0.94 - keyboard),
+            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(32),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF2A1606), Color(0xFF0E0B10), Color(0xFF0A1420)]),
+              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              boxShadow: [BoxShadow(color: _orange.withOpacity(0.25), blurRadius: 50, spreadRadius: -10)],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 8, 4),
+                  child: Row(children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), gradient: const LinearGradient(colors: [Color(0xFFFF8A1F), Color(0xFFE5560B)])),
+                      child: const Icon(Icons.add_task_rounded, color: Colors.white, size: 21),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(ngmyT('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19))),
+                    const NgmyLangFlag(),
+                    IconButton(onPressed: () => Navigator.pop(context, false), icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.6))),
+                  ]),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                      _rise(
+                        0,
+                        Text(
+                          ngmyT(
+                            'Write the work you want done. It shows up for the workers in your state right away, and the first worker to pick it up gets it.',
+                            'Andika kazi unayotaka ifanyike. Inaonekana mara moja kwa mafundi wa jimbo lako, na fundi wa kwanza kuipokea ataipata.',
+                          ),
+                          style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.6), height: 1.4),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (!_canSend)
+                        _notice(
+                          _orange,
+                          ngmyT('Join House Care and pay for it to send work. Members do not pay for labor, only materials.', 'Jiunge na House Care na ulipe ili kutuma kazi. Wanachama hawalipi kazi, vifaa tu.'),
+                          action: TextButton(
+                            onPressed: () async {
+                              Navigator.pop(context, false);
+                              await widget.onJoinCare();
+                            },
+                            child: Text(ngmyT('Join', 'Jiunge'), style: const TextStyle(color: _orange, fontWeight: FontWeight.w900)),
+                          ),
+                        ),
+                      if (!widget.hasRegistryId)
+                        _notice(
+                          const Color(0xFFEF4444),
+                          ngmyT(
+                            'To submit work you need to be registered in Civic Registry. Your work goes to the workers in the state you are registered in.',
+                            'Ili kutuma kazi lazima uwe umesajiliwa kwenye Civic Registry. Kazi yako huenda kwa mafundi wa jimbo ulilosajiliwa.',
+                          ),
+                        ),
+                      _rise(1, Align(alignment: Alignment.centerLeft, child: _laborBadge(_member))),
+                      const SizedBox(height: 14),
+                      _rise(2, _label(ngmyT('What kind of work?', 'Kazi ya aina gani?'))),
+                      _rise(2, _categoryGrid()),
+                      const SizedBox(height: 16),
+                      _rise(3, _label(ngmyT('What needs to be fixed', 'Kinachohitaji kutengenezwa'))),
+                      _rise(
+                        3,
+                        TextField(
+                          controller: _details,
+                          maxLines: 4,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dark(ngmyT('Describe the work *', 'Eleza kazi *'), hint: ngmyT('What is broken, leaking, or not working…', 'Nini kimeharibika, kinavuja, au hakifanyi kazi…')),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _rise(4, _label(ngmyT('Where', 'Mahali'))),
+                      _rise(4, TextField(controller: _address, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('Address', 'Anwani'), icon: Icons.home_rounded))),
+                      const SizedBox(height: 10),
+                      _rise(4, TextField(controller: _city, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('City', 'Jiji'), icon: Icons.location_city_rounded))),
+                      const SizedBox(height: 16),
+                      _rise(5, _label(ngmyT('Best time', 'Muda mzuri'))),
+                      _rise(
+                        5,
+                        GestureDetector(
+                          onTap: _pickTime,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              color: _when == null ? Colors.white.withOpacity(0.06) : _orange.withOpacity(0.14),
+                              border: Border.all(color: _when == null ? Colors.white.withOpacity(0.1) : _orange.withOpacity(0.7)),
+                            ),
+                            child: Row(children: [
+                              const Icon(Icons.schedule_rounded, size: 20, color: _orange),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _when == null ? ngmyT('Tap to choose a day and time', 'Gusa kuchagua siku na saa') : _whenText,
+                                  style: TextStyle(color: _when == null ? Colors.white54 : Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
+                                ),
+                              ),
+                              if (_when != null)
+                                GestureDetector(
+                                  onTap: () => setState(() => _when = null),
+                                  child: Icon(Icons.close_rounded, size: 18, color: Colors.white.withOpacity(0.6)),
+                                )
+                              else
+                                Icon(Icons.chevron_right_rounded, color: Colors.white.withOpacity(0.4)),
+                            ]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _rise(6, _label(ngmyT('You', 'Wewe'))),
+                      _rise(6, TextField(controller: _name, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('Your name *', 'Jina lako *'), icon: Icons.person_rounded))),
+                      const SizedBox(height: 10),
+                      _rise(
+                        6,
+                        TextField(
+                          controller: _phone,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: const [NgmyPhoneDashFormatter()],
+                          style: const TextStyle(color: Colors.white),
+                          decoration: _dark(ngmyT('Phone number (WhatsApp) *', 'Namba ya simu (WhatsApp) *'), hint: '123-456-7890', icon: Icons.phone_rounded),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFFCA5A5), fontWeight: FontWeight.w700, fontSize: 12.5)),
+                      ],
+                      const SizedBox(height: 18),
+                      _rise(
+                        7,
+                        AnimatedOpacity(
+                          duration: const Duration(milliseconds: 250),
+                          opacity: enabled || _busy ? 1 : 0.45,
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: const LinearGradient(colors: [Color(0xFFFF9A3C), Color(0xFFE5560B)]),
+                              boxShadow: enabled ? [BoxShadow(color: _orange.withOpacity(0.5), blurRadius: 22, offset: const Offset(0, 9))] : null,
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: enabled ? _submit : null,
+                                child: Center(
+                                  child: _busy
+                                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.6, color: Colors.white))
+                                      : Row(mainAxisSize: MainAxisSize.min, children: [
+                                          const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                                          const SizedBox(width: 10),
+                                          Text(ngmyT('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.3)),
+                                        ]),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ── Live work feed (workers) ────────────────────────────────────────────────

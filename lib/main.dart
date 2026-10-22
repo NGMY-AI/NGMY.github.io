@@ -65,6 +65,7 @@ import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
+import 'ngmy_ui_lang.dart';
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -33169,6 +33170,8 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   void initState() {
     super.initState();
     NgmyFeatureSyncSession.enterCivicRegistry();
+    NgmyUiLang.code.addListener(_civicLangChanged);
+    unawaited(NgmyUiLang.load());
     NgmyAdminLiveRefresh.addListener(_onCivicLiveRefresh);
     _civicScroll.addListener(_onCivicScroll);
     _selectedState = widget.user.state;
@@ -33781,6 +33784,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
     }
   }
 
+  void _civicLangChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _onCivicLiveRefresh() {
     if (!mounted) return;
     if (_lastRosterMutationAt != null &&
@@ -33798,6 +33805,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    NgmyUiLang.code.removeListener(_civicLangChanged);
     NgmyFeatureSyncSession.leaveCivicRegistry();
     _helpModePoll?.cancel();
     _civicMoneyRefreshDebounce?.cancel();
@@ -45279,7 +45287,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
               ),
               child: LayoutBuilder(
                 builder: (context, headerBox) {
-                  final nameMaxWidth = (headerBox.maxWidth * 0.52).clamp(96.0, 188.0);
+                  final nameMaxWidth = (headerBox.maxWidth * 0.40).clamp(80.0, 170.0);
                   return Stack(
                     children: [
                       Padding(
@@ -45311,9 +45319,9 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Civic Registry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
-                        Text('Community Identity & Trust System', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      children: [
+                        const Text('Civic Registry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+                        Text(ngmyT('Community Identity & Trust System', 'Mfumo wa Utambulisho na Uaminifu wa Jamii'), style: const TextStyle(color: Colors.white70, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -45349,10 +45357,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                       ],
                     ),
                       ),
+                      const Positioned(top: 8, right: 8, child: NgmyLangFlag()),
                       if (openedAsName.isNotEmpty)
                         Positioned(
                           top: 10,
-                          right: 12,
+                          right: 76,
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxWidth: nameMaxWidth),
                             child: FittedBox(
@@ -45422,7 +45431,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Send Contributions To:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
+                              Text(ngmyT('Send Contributions To:', 'Tuma Michango Kwa:'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.black87)),
                               Text(_helpScopeLabel(), style: const TextStyle(fontSize: 11, color: Colors.black54)),
                             ],
                           ),
@@ -45434,7 +45443,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                               value: widget.config.helpCashAppFor(helpModeStateName),
                               color: Colors.green,
                               onTap: _openCashApp,
-                              tapHint: 'Tap row to open Cash App',
+                              tapHint: ngmyT('Tap row to open Cash App', 'Gusa safu kufungua Cash App'),
                               onCopyTap: () => _copyText(widget.config.helpCashAppFor(helpModeStateName), 'Cash App'),
                             ),
                           if (widget.config.helpZelleFor(helpModeStateName).trim().isNotEmpty)
@@ -45447,11 +45456,11 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             ),
                           _helpRow(
                             icon: Icons.call_outlined,
-                            title: 'Call for Help',
+                            title: ngmyT('Call for Help', 'Piga Simu Kuomba Msaada'),
                             value: ngmyFormatPhoneDisplay(widget.config.helpPhoneFor(helpModeStateName)),
                             color: Colors.blue,
                             onTap: _callHelpPhone,
-                            tapHint: 'Tap row to call now',
+                            tapHint: ngmyT('Tap row to call now', 'Gusa safu kupiga simu sasa'),
                             onCopyTap: () => _copyText(
                               ngmyFormatPhoneDisplay(widget.config.helpPhoneFor(helpModeStateName)),
                               'Phone number',
@@ -45462,10 +45471,10 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
                             decoration: BoxDecoration(color: Colors.amber.shade400, borderRadius: BorderRadius.circular(8)),
-                            child: const Text(
-                              'Include your NAME & PHONE in payment memo.',
+                            child: Text(
+                              ngmyT('Include your NAME & PHONE in payment memo.', 'Andika JINA na SIMU yako kwenye maelezo ya malipo.'),
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black87),
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -45478,7 +45487,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                     campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                   ),
                                   icon: const Icon(Icons.receipt_long_rounded, size: 16),
-                                  label: const Text('View Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                  label: Text(ngmyT('View Spending', 'Tazama Matumizi'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFF1E293B),
                                     side: const BorderSide(color: Color(0xFF334155)),
@@ -45496,7 +45505,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
                                       campaignTitle: widget.config.helpPurposeFor(helpModeStateName),
                                     ),
                                     icon: const Icon(Icons.folder_open_rounded, size: 16),
-                                    label: const Text('Record Spending', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+                                    label: Text(ngmyT('Record Spending', 'Rekodi Matumizi'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: Colors.white,
                                       foregroundColor: const Color(0xFF4F2FD6),
@@ -45524,25 +45533,25 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             if (_canUseRegistrarToolsHere()) ...[
               Row(
                 children: [
-                  Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
+                  Expanded(child: _tabItem(0, ngmyT('Search', 'Tafuta'), Icons.search_rounded)),
                   const SizedBox(width: 15),
-                  Expanded(child: _tabItem(1, 'Enroll', Icons.add_rounded)),
+                  Expanded(child: _tabItem(1, ngmyT('Enroll', 'Sajili'), Icons.add_rounded)),
                 ],
               ),
               const SizedBox(height: 15),
               Row(
                 children: [
-                  Expanded(child: _tabItem(2, 'Members', Icons.people_outline_rounded)),
+                  Expanded(child: _tabItem(2, ngmyT('Members', 'Wanachama'), Icons.people_outline_rounded)),
                   const SizedBox(width: 15),
-                  Expanded(child: _tabItem(3, 'Rankings', Icons.bookmark_border_rounded)),
+                  Expanded(child: _tabItem(3, ngmyT('Rankings', 'Viwango'), Icons.bookmark_border_rounded)),
                 ],
               ),
             ] else
               Row(
                 children: [
-                  Expanded(child: _tabItem(0, 'Search', Icons.search_rounded)),
+                  Expanded(child: _tabItem(0, ngmyT('Search', 'Tafuta'), Icons.search_rounded)),
                   const SizedBox(width: 15),
-                  Expanded(child: _tabItem(1, 'Rankings', Icons.bookmark_border_rounded)),
+                  Expanded(child: _tabItem(1, ngmyT('Rankings', 'Viwango'), Icons.bookmark_border_rounded)),
                 ],
               ),
             const SizedBox(height: 30),
@@ -46008,7 +46017,7 @@ class _CivicRegistryScreenState extends State<CivicRegistryScreen> with WidgetsB
             // below update on every keystroke via onChanged.
             onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             decoration: InputDecoration(
-              hintText: 'Search by name, ID, city...',
+              hintText: ngmyT('Search by name, ID, city...', 'Tafuta kwa jina, namba ya usajili, jiji...'),
               hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
               prefixIcon: const Icon(Icons.search, size: 22),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),

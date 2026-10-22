@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_house_workers.dart';
@@ -19,7 +20,9 @@ Future<void> _settle(WidgetTester tester) async {
 }
 
 void main() {
-  setUp(() {});
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   _payDialogTest();
   _rateDialogTest();
 
@@ -74,7 +77,9 @@ void main() {
     await _open(tester);
     expect(find.textContaining('materials only, no labor charge'), findsWidgets);
     expect(find.text('Join'), findsNothing);
-    expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Post work')).onPressed, isNotNull);
+    expect(find.text('Post work'), findsWidgets);
+    expect(find.text('Door & lock'), findsOneWidget);
+    expect(find.text('Paint touch-up'), findsOneWidget);
     Navigator.of(tester.element(find.text('Post work').first)).pop();
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -91,7 +96,17 @@ void main() {
     expect(find.textContaining('Standard work'), findsWidgets);
     expect(find.text('Join'), findsOneWidget);
     expect(find.textContaining('registered in Civic Registry'), findsWidgets);
-    expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Post work')).onPressed, isNull);
+    await tester.tap(find.text('EN'));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Tuma kazi'), findsWidgets);
+    expect(find.text('Mlango na kufuli'), findsOneWidget);
+    await tester.tap(find.text('SW'));
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text('Post work'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
 

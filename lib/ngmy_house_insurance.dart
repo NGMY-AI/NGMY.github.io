@@ -18,6 +18,7 @@ class NgmyHouseInsurance {
     (id: 'drywall', title: 'Small drywall patch', detail: 'Nail pops and fist-sized holes', icon: Icons.wallpaper_rounded),
     (id: 'caulk', title: 'Caulk & seal', detail: 'Tub, sink, and window weatherseal touch-ups', icon: Icons.handyman_rounded),
     (id: 'shelf', title: 'Shelf & mount', detail: 'Hang shelves, TV mounts under 55\", mirrors', icon: Icons.view_agenda_rounded),
+    (id: 'paint', title: 'Paint touch-up', detail: 'Scuffs, patched walls, small rooms and trim', icon: Icons.format_paint_rounded),
   ];
 
   static double monthlyFeeFromConfig(dynamic config) {
@@ -384,13 +385,13 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          active ? 'CHOOSE A SERVICE' : 'SUBSCRIBE FIRST',
+          active ? 'COVERED' : 'SUBSCRIBE FIRST',
           style: TextStyle(fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w900, color: muted),
         ),
         const SizedBox(height: 4),
         Text(
           active
-              ? 'Pick the service you need. Then tap Send on WhatsApp.'
+              ? 'Your House Insurance is active. Use Post work above, or tap Send on WhatsApp.'
               : 'Pay $feeLabel with Stripe or Cash App. Services and Send on WhatsApp stay off until you pay.',
           style: TextStyle(fontSize: 12, height: 1.35, fontWeight: FontWeight.w600, color: titleColor),
         ),
@@ -399,73 +400,6 @@ class NgmyHouseInsuranceCard extends StatelessWidget {
           Text(untilLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: const Color(0xFF0F766E))),
         ],
         const SizedBox(height: 10),
-        if (active)
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: NgmyHouseInsurance.coveredCategories.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            mainAxisExtent: 78,
-          ),
-          itemBuilder: (_, i) {
-            final c = NgmyHouseInsurance.coveredCategories[i];
-            final on = selectedIds.contains(c.id);
-            return Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => onToggleCoverage(c.id),
-                borderRadius: BorderRadius.circular(14),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white,
-                    border: Border.all(
-                      color: on ? const Color(0xFF0EA5E9) : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
-                      width: 1,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-                    child: Row(
-                      children: [
-                        Icon(
-                          on ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                          size: 20,
-                          color: on ? const Color(0xFF0EA5E9) : muted,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                c.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, height: 1.15, fontWeight: FontWeight.w800, color: titleColor),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                c.detail,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 10, color: muted),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
         if (!active) ...[
           const SizedBox(height: 10),
           SizedBox(
