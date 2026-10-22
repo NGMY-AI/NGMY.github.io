@@ -13,3 +13,8 @@ create table if not exists public.house_care_payments (
 create index if not exists house_care_payments_email_idx on public.house_care_payments (email, status);
 alter table public.house_care_payments enable row level security;
 notify pgrst, 'reload schema';
+
+-- The payment code (written in the Cash App note) and the screenshot of the payment.
+alter table public.house_care_payments add column if not exists code text not null default '';
+alter table public.house_care_payments add column if not exists proof_url text not null default '';
+notify pgrst, 'reload schema';

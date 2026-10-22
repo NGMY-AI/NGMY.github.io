@@ -2307,11 +2307,24 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (waiting && waiting.length > 0) {
       return jsonOk({ ok: false, error: "Your last payment is still waiting for approval." }, 409);
     }
+    // Like a Growth Income deposit: the payment carries its code and the screenshot of the Cash App payment.
+    const code = String(body?.code ?? "").replace(/\D/g, "").slice(0, 8);
+    const proofB64 = String(body?.proofBase64 ?? "");
+    if (code.length < 4) return jsonOk({ ok: false, error: "Your payment code is missing. Open the payment again." }, 400);
+    if (!proofB64) return jsonOk({ ok: false, error: "Attach the screenshot of your Cash App payment." }, 400);
+    let proofUrl = "";
+    try {
+      proofUrl = await hwUploadCareImage(db, email, "pay", proofB64, String(body?.proofMime ?? ""));
+    } catch (e) {
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
     const { error } = await db.from("house_care_payments").insert({
       email, plan, term: body?.term === true && plan === "basic", amount: unpaid.amount, status: "pending",
+      code, proof_url: proofUrl,
     });
     if (error) {
-      const missing = /house_care_payments/i.test(error.message);
+      await hwRemoveCareImage(db, proofUrl);
+      const missing = /house_care_payments|proof_url|code/i.test(error.message);
       return jsonOk({ ok: false, error: missing ? "Payments are not switched on yet. Please tell the admin to finish the House Care setup." : error.message }, 500);
     }
     return jsonOk({ ok: true, pending: true, care: await hwCare(db, email), plans: await hwPlans(db, email) });
@@ -2664,6 +2677,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const payments = (data ?? []).map((r: any) => ({
       id: r.id, email: r.email, name: names[String(r.email)] || String(r.email), plan: r.plan, term: r.term === true,
       amount: Number(r.amount ?? 0), status: r.status, createdAt: r.created_at, decidedAt: r.decided_at,
+      code: r.code ?? "", proofUrl: r.proof_url ?? "",
     }));
     return jsonOk({ ok: true, payments, pending: payments.filter((p: any) => p.status === "pending").length });
   }

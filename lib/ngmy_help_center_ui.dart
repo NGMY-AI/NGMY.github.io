@@ -386,8 +386,6 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
     if (!mounted) return;
     if (ok) {
-      // Also record it on the server: the job board checks the plan there.
-      unawaited(NgmyHouseWorkersApi.planCashApp('basic'));
       setState(() {});
       _snack('You\'re subscribed. Choose a service, then Send on WhatsApp.');
     } else {

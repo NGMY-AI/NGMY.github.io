@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -56,7 +57,8 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> postJob(Map<String, dynamic> form) => _call('hwPostJob', form);
   static Future<Map<String, dynamic>> jobs() => _call('hwJobs');
   static Future<Map<String, dynamic>> pickJob(String id) => _call('hwPickJob', {'requestId': id});
-  static Future<Map<String, dynamic>> planCashApp(String plan, {bool term = false}) => _call('hwPlanCashApp', {'plan': plan, if (term) 'term': true});
+  static Future<Map<String, dynamic>> planCashApp(String plan, {bool term = false, String? code, String? proofBase64, String? proofMime}) =>
+      _call('hwPlanCashApp', {'plan': plan, if (term) 'term': true, if (code != null) 'code': code, if (proofBase64 != null) 'proofBase64': proofBase64, if (proofMime != null) 'proofMime': proofMime});
   static Future<Map<String, dynamic>> adminCarePayments() => _call('hwAdminCarePayments');
   static Future<Map<String, dynamic>> adminCarePaymentDecide(String id, bool approve) =>
       _call('hwAdminCarePaymentDecide', {'paymentId': id, 'decision': approve ? 'approve' : 'reject'});

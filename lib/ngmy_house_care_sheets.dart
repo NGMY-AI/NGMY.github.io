@@ -985,27 +985,21 @@ class _CareSheetState extends State<_CareSheet> {
   double get _termPrice => (_care['termPrice'] as num?)?.toDouble() ?? _price * 12 * _years;
 
   Future<void> _payCashApp({bool fullTerm = false}) async {
-    final base = widget.cashAppUrl.trim();
-    if (base.isEmpty) {
+    if (widget.cashAppUrl.trim().isEmpty) {
       _snack(context, 'Cash App is not set up yet.', error: true);
       return;
     }
-    final amount = (fullTerm ? _termPrice : _price).toStringAsFixed(0);
-    final payUrl = base.endsWith('/') ? '$base$amount' : '$base/$amount';
-    final opened = await launchUrl(Uri.parse(payUrl), mode: LaunchMode.externalApplication);
-    if (!opened || !mounted) return;
-    final sent = await showNgmyCashAppPaymentConfirm(context, amountText: amount, cashAppTag: widget.cashAppTag, needsApproval: true);
-    if (sent != true || !mounted) return;
-    setState(() => _busy = true);
-    final res = await NgmyHouseWorkersApi.planCashApp('basic', term: fullTerm);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (res['ok'] == true) {
-      await _reload();
-      if (mounted) _snack(context, res['pending'] == true ? 'Payment sent. It starts once an admin confirms it.' : 'Thank you. Your House Care is active.');
-    } else {
-      _snack(context, (res['error'] ?? 'Could not record the payment.').toString(), error: true);
-    }
+    final res = await showNgmyCareCashAppSheet(
+      context,
+      amount: fullTerm ? _termPrice : _price,
+      label: fullTerm ? 'Full $_years-year agreement' : 'House Care · 30 days',
+      cashAppUrl: widget.cashAppUrl,
+      cashAppTag: widget.cashAppTag,
+      fullTerm: fullTerm,
+    );
+    if (res == null || !mounted) return;
+    await _reload();
+    if (mounted) _snack(context, 'Sent. An admin will check your payment and approve it.');
   }
 
   // ── Views ─────────────────────────────────────────────────────────────────
@@ -1438,6 +1432,31 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
             ),
           ]),
         ]),
+        if ((p['code'] ?? '').toString().isNotEmpty || (p['proofUrl'] ?? '').toString().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            if ((p['proofUrl'] ?? '').toString().isNotEmpty)
+              GestureDetector(
+                onTap: () => _zoom((p['proofUrl'] ?? '').toString(), '${p['name']} · payment screenshot'),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: SizedBox(
+                    width: 64,
+                    height: 84,
+                    child: Image.network((p['proofUrl'] ?? '').toString(), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded)),
+                  ),
+                ),
+              ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('CODE IN THE CASH APP NOTE', style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, letterSpacing: 1, color: c.muted)),
+                Text((p['code'] ?? '').toString().isEmpty ? '—' : (p['code'] ?? '').toString(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 3, color: _kHwGreen)),
+                Text('Tap the picture to enlarge it', style: TextStyle(fontSize: 11, color: c.muted)),
+              ]),
+            ),
+          ]),
+        ],
         if (status == 'pending') ...[
           const SizedBox(height: 10),
           Row(children: [
@@ -1595,3 +1614,219 @@ Widget ngmyOfferSheetForTest(Map<String, dynamic> job) => _OfferSheet(job: job);
 
 @visibleForTesting
 Widget ngmyWorkRecordCardForTest(Map<String, dynamic> stats) => _WorkRecordCard(stats: stats);
+
+// ── Cash App payment: code, send, screenshot, ask for approval ─────────────
+
+/// The Cash App payment sheet for House Care. It works like a Growth Income deposit: the member
+/// writes the code in the Cash App note, sends the money, then attaches the screenshot so an admin
+/// can check it and approve. Returns the server's answer once the request is sent, or null if closed.
+Future<Map<String, dynamic>?> showNgmyCareCashAppSheet(
+  BuildContext context, {
+  required double amount,
+  required String label,
+  required String cashAppUrl,
+  required String cashAppTag,
+  required bool fullTerm,
+}) {
+  return showModalBottomSheet<Map<String, dynamic>>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _CareCashAppSheet(amount: amount, label: label, cashAppUrl: cashAppUrl, cashAppTag: cashAppTag, fullTerm: fullTerm),
+  );
+}
+
+class _CareCashAppSheet extends StatefulWidget {
+  const _CareCashAppSheet({required this.amount, required this.label, required this.cashAppUrl, required this.cashAppTag, required this.fullTerm});
+
+  final double amount;
+  final String label;
+  final String cashAppUrl;
+  final String cashAppTag;
+  final bool fullTerm;
+
+  @override
+  State<_CareCashAppSheet> createState() => _CareCashAppSheetState();
+}
+
+class _CareCashAppSheetState extends State<_CareCashAppSheet> {
+  static const _green = Color(0xFF00B84A);
+  final String _code = (10000 + math.Random().nextInt(89999)).toString();
+  bool _opened = false;
+  bool _busy = false;
+  Uint8List? _shot;
+  String _shotMime = 'image/jpeg';
+
+  String get _amountText => widget.amount.toStringAsFixed(0);
+
+  Future<void> _copyCode() async {
+    await Clipboard.setData(ClipboardData(text: _code));
+    if (mounted) _snack(context, 'Code copied. Paste it in the Cash App note.');
+  }
+
+  Future<void> _openCashApp() async {
+    final base = widget.cashAppUrl.trim();
+    if (base.isEmpty) {
+      _snack(context, 'Cash App is not set up yet.', error: true);
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: _code));
+    final url = base.endsWith('/') ? '$base$_amountText' : '$base/$_amountText';
+    final ok = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (mounted) setState(() => _opened = ok);
+  }
+
+  Future<void> _pickShot() async {
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 70);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _shot = bytes;
+        _shotMime = file.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+      });
+    } catch (_) {
+      if (mounted) _snack(context, 'Could not open your photos. Try again.', error: true);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_shot == null || _busy) return;
+    setState(() => _busy = true);
+    final res = await NgmyHouseWorkersApi.planCashApp(
+      'basic',
+      term: widget.fullTerm,
+      code: _code,
+      proofBase64: base64Encode(_shot!),
+      proofMime: _shotMime,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (res['ok'] == true) {
+      Navigator.pop(context, res);
+    } else {
+      _snack(context, (res['error'] ?? 'Could not send the request.').toString(), error: true);
+    }
+  }
+
+  Widget _step(_HwColors c, int n, String title, String body, {Widget? extra, bool done = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: c.tile,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: done ? _green : c.line, width: done ? 1.6 : 1),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: done ? _green : _green.withOpacity(0.15)),
+          child: done
+              ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+              : Text('$n', style: const TextStyle(fontWeight: FontWeight.w900, color: _green, fontSize: 13)),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 13.5)),
+            const SizedBox(height: 2),
+            Text(body, style: TextStyle(color: c.muted, fontSize: 12, height: 1.3)),
+            if (extra != null) ...[const SizedBox(height: 8), extra],
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    final tag = widget.cashAppTag.trim();
+    return _sheetFrame(
+      context,
+      title: 'Pay with Cash App',
+      icon: Icons.attach_money_rounded,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF00B84A), Color(0xFF047857)]),
+            ),
+            child: Column(children: [
+              Text(widget.label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 10.5, letterSpacing: 1.4)),
+              const SizedBox(height: 2),
+              Text('\$$_amountText', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 38, height: 1.1)),
+              if (tag.isNotEmpty) Text('to $tag', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          _step(
+            c,
+            1,
+            'Your code',
+            'Write this code in the Cash App note (memo) so we can find your payment.',
+            extra: Row(children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: _green.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: _green.withOpacity(0.5))),
+                  child: Text(_code, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: _green, letterSpacing: 4)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(onPressed: _copyCode, icon: const Icon(Icons.copy_rounded, size: 18), tooltip: 'Copy code'),
+            ]),
+          ),
+          _step(
+            c,
+            2,
+            'Send the money',
+            'Tap the button, send \$$_amountText on Cash App with the code in the note.',
+            done: _opened,
+            extra: _primaryButton('Open Cash App · send \$$_amountText', Icons.open_in_new_rounded, _openCashApp, color: _green),
+          ),
+          _step(
+            c,
+            3,
+            'Take a screenshot',
+            'After you pay, take a screenshot of the payment that shows the amount and the code.',
+          ),
+          _step(
+            c,
+            4,
+            'Attach it',
+            'Add the screenshot so an admin can check it and approve.',
+            done: _shot != null,
+            extra: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (_shot != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ConstrainedBox(constraints: const BoxConstraints(maxHeight: 170), child: Image.memory(_shot!, fit: BoxFit.contain)),
+                  ),
+                ),
+              OutlinedButton.icon(
+                onPressed: _pickShot,
+                icon: Icon(_shot == null ? Icons.add_photo_alternate_rounded : Icons.swap_horiz_rounded, size: 18),
+                label: Text(_shot == null ? 'Choose screenshot' : 'Change screenshot'),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          _primaryButton('Send for approval', Icons.send_rounded, _shot == null ? null : _submit, color: _green, busy: _busy),
+          const SizedBox(height: 6),
+          Text('Your House Care starts as soon as an admin approves the payment.', textAlign: TextAlign.center, style: TextStyle(color: c.muted, fontSize: 11.5)),
+        ]),
+      ),
+    );
+  }
+}
