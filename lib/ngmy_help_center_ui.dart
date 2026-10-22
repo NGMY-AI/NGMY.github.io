@@ -372,24 +372,49 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
       _snack('Cash App is not configured yet.');
       return;
     }
-    final fee = NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig);
-    final ok = await NgmyHouseInsurance.payWithCashApp(
-      context: context,
-      cashAppUrl: url,
-      cashAppTag: _cfg.cashAppDisplayTag(),
-      amount: fee,
-      email: widget.clientEmail,
-      coverageIds: _selectedCoverage,
-      config: widget.appConfig,
-      onDataChanged: widget.onDataChanged ?? () {},
-      onPersistConfig: widget.onPersistConfig ?? () async => true,
-    );
+    final res = await NgmyHouseWorkersApi.care();
     if (!mounted) return;
-    if (ok) {
+    if (res['ok'] != true) {
+      _snack((res['error'] ?? 'Could not open payment. Try again.').toString());
+      return;
+    }
+    final care = res['care'] is Map ? Map<String, dynamic>.from(res['care'] as Map) : <String, dynamic>{};
+    final elig = res['eligibility'] is Map ? Map<String, dynamic>.from(res['eligibility'] as Map) : <String, dynamic>{};
+    final tag = _cfg.cashAppDisplayTag();
+    // No signed agreement yet: sign it first. The same sheet then goes on to the payment.
+    if (care['signed'] != true) {
+      await showNgmyHouseCareSheet(
+        context,
+        care: care,
+        hasRegistryId: elig['hasRegistryId'] == true,
+        state: (elig['state'] ?? '').toString(),
+        clientName: (elig['name'] ?? '').toString().trim().isNotEmpty ? elig['name'].toString() : widget.clientName,
+        clientEmail: widget.clientEmail,
+        cashAppUrl: url,
+        cashAppTag: tag,
+      );
+      if (mounted) setState(() {});
+      return;
+    }
+    if (care['pendingPayment'] is Map) {
+      _snack('Your last payment was received. We are confirming it now.');
+      return;
+    }
+    if (care['prepaid'] == true) {
+      _snack('You are paid up. You can pay again in the last 3 days.');
+      return;
+    }
+    final paid = await showNgmyCareCashAppSheet(
+      context,
+      amount: (care['price'] as num?)?.toDouble() ?? 125,
+      label: 'House Care · 30 days',
+      cashAppUrl: url,
+      cashAppTag: tag,
+      fullTerm: false,
+    );
+    if (paid != null && mounted) {
       setState(() {});
-      _snack('You\'re subscribed. Choose a service, then Send on WhatsApp.');
-    } else {
-      _snack('Payment was not confirmed. House Insurance stays off until Cash App is sent.');
+      _snack('Payment submitted. Thank you.');
     }
   }
 
