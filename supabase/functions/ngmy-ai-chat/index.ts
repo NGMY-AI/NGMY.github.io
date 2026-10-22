@@ -1586,6 +1586,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
+  "hwCare", "hwCareSign", "hwAdminCare",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -1649,6 +1650,8 @@ async function hwUploadPhoto(db: any, email: string, b64: string, mime: string):
 const HW_MAX_MISSED = 5;
 const HW_MAX_CLAIMS = 3;
 type HwElig = {
+  /** The state on the person's Civic Registry record ("" when it has none). */
+  state: string;
   hasRegistryId: boolean;
   hasBio: boolean;
   missed: number;
@@ -1721,6 +1724,7 @@ async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwE
     const hasBio = bioOwners.has(e);
     const deactivated = missed > HW_MAX_MISSED || c > HW_MAX_CLAIMS;
     out.set(e, {
+      state: hwText(m?.state ?? m?.stateName ?? "", 60),
       hasRegistryId,
       hasBio,
       missed,
@@ -1985,6 +1989,70 @@ async function hwPlans(db: any, email: string) {
   };
 }
 
+// ── House Care membership ───────────────────────────────────────────────────
+// A member signs the NGMY agreement (a chosen term, a signature and a selfie) and pays the monthly
+// plan. While the plan is paid, their posted work carries no labor charge: they only pay for
+// materials. Everyone else can still post work, and is charged like normal work.
+const HW_CARE_TERMS = [1, 2, 3, 4];
+const HW_CARE_VERSION = "v1";
+
+async function hwUploadCareImage(db: any, email: string, kind: string, b64: string, mime: string): Promise<string> {
+  const clean = b64.includes(",") ? b64.slice(b64.indexOf(",") + 1) : b64;
+  const bytes = Uint8Array.from(atob(clean), (ch) => ch.charCodeAt(0));
+  if (bytes.length === 0 || bytes.length > HW_MAX_PHOTO_BYTES) throw new Error(`The ${kind} is too big. Try again.`);
+  const type = /png/i.test(mime) ? "image/png" : "image/jpeg";
+  const ext = type === "image/png" ? "png" : "jpg";
+  const key = await sha256Hex(`hwcare:${email}`);
+  const path = `house-care/${key.slice(0, 24)}-${kind}-${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("media").upload(path, bytes, { contentType: type, upsert: true });
+  if (error) throw new Error(`The ${kind} upload failed. Try again.`);
+  const base = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  return `${base}/storage/v1/object/public/media/${path}`;
+}
+
+async function hwRemoveCareImage(db: any, url: string): Promise<void> {
+  const marker = "/storage/v1/object/public/media/";
+  const at = url.indexOf(marker);
+  if (at < 0) return;
+  const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+  if (!path.startsWith("house-care/")) return;
+  try {
+    await db.storage.from("media").remove([path]);
+  } catch (_) { /* a leftover file is harmless */ }
+}
+
+async function hwCare(db: any, email: string) {
+  const plans = await hwPlans(db, email);
+  let row: any = null;
+  try {
+    const { data } = await db.from("house_subscriptions").select("*").eq("email", email).maybeSingle();
+    row = data;
+  } catch (_) { /* table not created yet: no membership */ }
+  if (!row) {
+    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE };
+  }
+  const paidUntil: string | null = plans.basicUntil;
+  const paidMs = paidUntil ? Date.parse(paidUntil) : 0;
+  const active = row.status !== "cancelled" && paidMs > Date.now();
+  const status = row.status === "cancelled" ? "cancelled" : active ? "active" : row.started_at ? "lapsed" : "pending";
+  const startedAt: string | null = row.started_at ?? (active ? new Date().toISOString() : null);
+  const storedDue = row.next_payment_due ? Date.parse(String(row.next_payment_due)) : 0;
+  if (status !== row.status || startedAt !== row.started_at || (paidMs && Math.abs(storedDue - paidMs) > 60000)) {
+    try {
+      await db.from("house_subscriptions").update({
+        status, started_at: startedAt, next_payment_due: paidUntil, updated_at: new Date().toISOString(),
+      }).eq("email", email);
+    } catch (_) { /* the state is recomputed on the next call */ }
+  }
+  const termEnds = startedAt
+    ? new Date(new Date(startedAt).setFullYear(new Date(startedAt).getFullYear() + Number(row.term_years ?? 1))).toISOString()
+    : null;
+  return {
+    signed: true, active, status, termYears: Number(row.term_years ?? 1), fullName: row.full_name ?? "",
+    agreedAt: row.agreed_at, startedAt, termEnds, nextDue: paidUntil, price: HW_BASIC_PRICE,
+  };
+}
+
 /** Deletes one worker photo from storage. Only touches house-workers/ files. */
 async function hwRemovePhoto(db: any, url: string): Promise<void> {
   const marker = "/storage/v1/object/public/media/";
@@ -2033,6 +2101,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
         id: r.id, status: r.status, details: r.details, address: r.address, city: r.city,
         category: r.category, bestTime: r.best_time, createdAt: r.created_at,
         acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
+        laborFree: r.labor_free === true, materialsCost: r.materials_cost ?? null, laborCost: r.labor_cost ?? null,
         worker: { ...hwPublicWorker(w), phone: shared ? (w.phone ?? "") : "" },
       };
     });
@@ -2045,6 +2114,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
         state: r.state, category: r.category, bestTime: r.best_time, createdAt: r.created_at,
         acceptedAt: r.accepted_at, doneAt: r.done_at, rating: r.rating, review: r.review,
         clientName: r.client_name,
+        laborFree: r.labor_free === true, materialsCost: r.materials_cost ?? null, laborCost: r.labor_cost ?? null,
         clientPhone: (r.status === "accepted" || r.status === "done") ? r.client_phone : "",
       }));
     }
@@ -2063,7 +2133,62 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       isAdmin,
       eligibility: myElig ?? null,
       plans: await hwPlans(db, email),
+      care: await hwCare(db, email),
     });
+  }
+
+  if (action === "hwCare") {
+    return jsonOk({ ok: true, care: await hwCare(db, email), eligibility: (await hwEligibility(db, [email])).get(email) ?? null });
+  }
+
+  if (action === "hwCareSign") {
+    const limited = await enforceRateLimit(req, "hw_care", email, 6, 86400);
+    if (limited) return limited;
+    const elig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !elig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to join House Care." }, 403);
+    }
+    const termYears = Math.round(Number(body?.termYears ?? 0));
+    if (!HW_CARE_TERMS.includes(termYears)) return jsonOk({ ok: false, error: "Choose how long you want to stay." }, 400);
+    const fullName = hwText(body?.fullName, 80);
+    if (fullName.length < 3) return jsonOk({ ok: false, error: "Type your full name." }, 400);
+    if (body?.accepted !== true) return jsonOk({ ok: false, error: "Accept the agreement first." }, 400);
+    if (typeof body?.signatureBase64 !== "string" || body.signatureBase64.length < 50) {
+      return jsonOk({ ok: false, error: "Sign the agreement first." }, 400);
+    }
+    if (typeof body?.selfieBase64 !== "string" || body.selfieBase64.length < 50) {
+      return jsonOk({ ok: false, error: "Take a selfie of yourself and upload it." }, 400);
+    }
+    let prev: any = null;
+    try {
+      const { data } = await db.from("house_subscriptions").select("*").eq("email", email).maybeSingle();
+      prev = data;
+    } catch (_) { /* first membership */ }
+    if (prev && prev.status === "active") {
+      return jsonOk({ ok: false, error: "You already have an active agreement." }, 409);
+    }
+    let signatureUrl = "";
+    let selfieUrl = "";
+    try {
+      signatureUrl = await hwUploadCareImage(db, email, "signature", body.signatureBase64, "image/png");
+      selfieUrl = await hwUploadCareImage(db, email, "selfie", body.selfieBase64, String(body?.selfieMime ?? ""));
+    } catch (e) {
+      if (signatureUrl) await hwRemoveCareImage(db, signatureUrl);
+      return jsonOk({ ok: false, error: String((e as Error).message ?? e) }, 400);
+    }
+    const { error } = await db.from("house_subscriptions").upsert({
+      email, full_name: fullName, term_years: termYears, state: elig?.state || hwText(body?.state, 60),
+      signature_url: signatureUrl, selfie_url: selfieUrl, agreement_version: HW_CARE_VERSION,
+      agreed_at: now, status: "pending", started_at: null, next_payment_due: null, updated_at: now,
+    });
+    if (error) {
+      await hwRemoveCareImage(db, signatureUrl);
+      await hwRemoveCareImage(db, selfieUrl);
+      return jsonOk({ ok: false, error: error.message }, 500);
+    }
+    if (prev?.signature_url) await hwRemoveCareImage(db, String(prev.signature_url));
+    if (prev?.selfie_url) await hwRemoveCareImage(db, String(prev.selfie_url));
+    return jsonOk({ ok: true, care: await hwCare(db, email) });
   }
 
   if (action === "hwPlanCashApp") {
@@ -2099,11 +2224,14 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   if (action === "hwPostJob") {
     const limited = await enforceRateLimit(req, "hw_post", email, 10, 3600);
     if (limited) return limited;
-    const plans = await hwPlans(db, email);
-    if (!isAdmin && !plans.canPost) {
-      return jsonOk({ ok: false, needsPlan: "basic", error: `Posting jobs needs the $${HW_BASIC_PRICE}/month plan.` }, 402);
+    // Anyone registered in Civic Registry can post work, in the state they are registered in.
+    // A House Care member pays for materials only; everyone else is charged like normal work.
+    const postElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !postElig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to submit work." }, 403);
     }
-    const state = hwText(body?.state, 60);
+    const state = postElig?.state || hwText(body?.state, 60);
+    const laborFree = (await hwCare(db, email)).active;
     const details = hwLongText(body?.details, 1500);
     const clientName = hwText(body?.clientName, 80);
     const clientPhone = hwPhone(body?.clientPhone);
@@ -2115,14 +2243,20 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if ((count ?? 0) >= 5) {
       return jsonOk({ ok: false, error: "You already have 5 jobs waiting. Wait for a worker to pick one up first." }, 429);
     }
-    const { data, error } = await db.from("house_work_requests").insert({
+    const jobRow: Record<string, unknown> = {
       client_email: email, client_name: clientName, client_phone: clientPhone,
       worker_email: null, status: "open", state, city: hwText(body?.city, 60),
       address: hwText(body?.address, 200), category: hwText(body?.category, 60),
-      details, best_time: hwText(body?.bestTime, 80),
-    }).select("id").single();
-    if (error) return jsonOk({ ok: false, error: error.message }, 500);
-    return jsonOk({ ok: true, id: data?.id });
+      details, best_time: hwText(body?.bestTime, 80), labor_free: laborFree,
+    };
+    let ins = await db.from("house_work_requests").insert(jobRow).select("id").single();
+    if (ins.error && /labor_free/i.test(ins.error.message ?? "")) {
+      // The House Care columns are not in the database yet: post the job without the flag.
+      delete jobRow.labor_free;
+      ins = await db.from("house_work_requests").insert(jobRow).select("id").single();
+    }
+    if (ins.error) return jsonOk({ ok: false, error: ins.error.message }, 500);
+    return jsonOk({ ok: true, id: ins.data?.id, laborFree });
   }
 
   if (action === "hwJobs" || action === "hwPickJob") {
@@ -2136,6 +2270,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       const jobs = (data ?? []).map((r: any) => ({
         id: r.id, details: r.details, city: r.city, state: r.state, category: r.category,
         bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80).split(" ")[0],
+        laborFree: r.labor_free === true,
       }));
       return jsonOk({ ok: true, jobs, state: me.state });
     }
@@ -2148,7 +2283,10 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (!picked || picked.length === 0) {
       return jsonOk({ ok: false, error: "Another worker already picked up this job." }, 409);
     }
-    return jsonOk({ ok: true, clientPhone: picked[0].client_phone, clientName: picked[0].client_name });
+    return jsonOk({
+      ok: true, clientPhone: picked[0].client_phone, clientName: picked[0].client_name,
+      address: picked[0].address, laborFree: picked[0].labor_free === true,
+    });
   }
 
   if (action === "hwApply") {
@@ -2286,8 +2424,20 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (action === "hwDone") {
       if (!isWorker && !isClient) return jsonOk({ ok: false, error: "Not your request." }, 403);
       if (r.status !== "accepted") return jsonOk({ ok: false, error: "Only accepted work can be marked done." }, 409);
-      const { data: upd } = await db.from("house_work_requests").update({ status: "done", done_at: now })
+      // The worker can record what the work cost: materials, and labor. A House Care member's
+      // work has no labor charge, so labor is always 0 on those jobs.
+      const patch: Record<string, unknown> = { status: "done", done_at: now };
+      if (isWorker) {
+        patch.materials_cost = Math.max(0, Math.min(100000, Number(body?.materialsCost ?? 0) || 0));
+        patch.labor_cost = r.labor_free === true ? 0 : Math.max(0, Math.min(100000, Number(body?.laborCost ?? 0) || 0));
+      }
+      let doneRes = await db.from("house_work_requests").update(patch)
         .eq("id", id).eq("status", "accepted").select("id");
+      if (doneRes.error && /materials_cost|labor_cost/i.test(doneRes.error.message ?? "")) {
+        doneRes = await db.from("house_work_requests").update({ status: "done", done_at: now })
+          .eq("id", id).eq("status", "accepted").select("id");
+      }
+      const upd = doneRes.data;
       if (upd && upd.length) {
         const { data: w } = await db.from("house_workers").select("jobs_done").eq("email", r.worker_email).maybeSingle();
         await db.from("house_workers").update({ jobs_done: Number(w?.jobs_done ?? 0) + 1 }).eq("email", r.worker_email);
@@ -2322,6 +2472,23 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   }
 
   if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+  if (action === "hwAdminCare") {
+    // Every House Care agreement: who signed, the signature, the selfie, the term and when the next payment is due.
+    const { data, error } = await db.from("house_subscriptions").select("*")
+      .order("agreed_at", { ascending: false }).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const members = [];
+    for (const row of data ?? []) {
+      const care: any = await hwCare(db, String(row.email));
+      members.push({
+        email: row.email, fullName: row.full_name, state: row.state, termYears: row.term_years,
+        signatureUrl: row.signature_url, selfieUrl: row.selfie_url, agreedAt: row.agreed_at,
+        status: care.status, startedAt: care.startedAt, nextDue: care.nextDue, termEnds: care.termEnds,
+        agreementVersion: row.agreement_version,
+      });
+    }
+    return jsonOk({ ok: true, members });
+  }
   if (action === "hwAdminList") {
     const { data } = await db.from("house_workers").select("*").order("created_at", { ascending: false }).limit(500);
     const rank: Record<string, number> = { pending: 0, approved: 1, rejected: 2, removed: 3 };

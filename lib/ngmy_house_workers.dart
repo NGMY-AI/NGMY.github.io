@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -9,7 +12,11 @@ import 'ngmy_circle_cropper.dart';
 import 'ngmy_edge_invoke.dart';
 import 'ngmy_house_insurance.dart';
 import 'ngmy_state_picker.dart';
+import 'ngmy_stripe_payments.dart';
 import 'ngmy_upload_shrink.dart';
+
+// The House Care membership, the post-work sheet, the live job board and the admin list.
+part 'ngmy_house_care_sheets.dart';
 
 /// House & Insurance workers: people who fix houses. Users see the approved
 /// workers of their state, send them work, and rate them when it is done.
@@ -32,7 +39,14 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> busy(String workerId, DateTime day) => _call('hwBusy', {'workerId': workerId, 'date': _isoDay(day)});
   static Future<Map<String, dynamic>> respond(String id, bool accept) =>
       _call('hwRespond', {'requestId': id, 'decision': accept ? 'accept' : 'decline'});
-  static Future<Map<String, dynamic>> done(String id) => _call('hwDone', {'requestId': id});
+  static Future<Map<String, dynamic>> done(String id, {double? materialsCost, double? laborCost}) => _call('hwDone', {
+        'requestId': id,
+        if (materialsCost != null) 'materialsCost': materialsCost,
+        if (laborCost != null) 'laborCost': laborCost,
+      });
+  static Future<Map<String, dynamic>> care() => _call('hwCare');
+  static Future<Map<String, dynamic>> careSign(Map<String, dynamic> form) => _call('hwCareSign', form);
+  static Future<Map<String, dynamic>> adminCare() => _call('hwAdminCare');
   static Future<Map<String, dynamic>> rate(String id, int rating, String review) =>
       _call('hwRate', {'requestId': id, 'rating': rating, 'review': review});
   static Future<Map<String, dynamic>> cancel(String id) => _call('hwCancel', {'requestId': id});
@@ -246,6 +260,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
 
   @override
   void dispose() {
+    _jobsTimer?.cancel();
     _spin.dispose();
     super.dispose();
   }
@@ -266,6 +281,85 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       }
       if (results[1]['ok'] == true) _me = Map<String, dynamic>.from(results[1]);
     });
+    _syncJobsPolling();
+  }
+
+  // Approved workers see new work as it is posted, like orders popping up for a delivery driver.
+  Timer? _jobsTimer;
+  int _openJobs = 0;
+
+  void _syncJobsPolling() {
+    final approved = _myWorker?['status'] == 'approved';
+    if (!approved) {
+      _jobsTimer?.cancel();
+      _jobsTimer = null;
+      if (_openJobs != 0 && mounted) setState(() => _openJobs = 0);
+      return;
+    }
+    if (_jobsTimer != null) return;
+    unawaited(_pollJobs());
+    _jobsTimer = Timer.periodic(const Duration(seconds: 15), (_) => _pollJobs());
+  }
+
+  Future<void> _pollJobs() async {
+    final res = await NgmyHouseWorkersApi.jobs();
+    if (!mounted || res['ok'] != true) return;
+    final n = _maps(res['jobs']).length;
+    if (n > _openJobs) HapticFeedback.mediumImpact();
+    if (n != _openJobs) setState(() => _openJobs = n);
+  }
+
+  Map<String, dynamic> get _care =>
+      _me?['care'] is Map ? Map<String, dynamic>.from(_me!['care'] as Map) : const <String, dynamic>{};
+
+  Map<String, dynamic> get _eligibility =>
+      _me?['eligibility'] is Map ? Map<String, dynamic>.from(_me!['eligibility'] as Map) : const <String, dynamic>{};
+
+  Future<void> _openPostWork() async {
+    final posted = await showNgmyPostWorkSheet(
+      context,
+      state: widget.state,
+      clientName: widget.clientName,
+      clientPhone: widget.clientPhone,
+      care: _care,
+      hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
+      onJoinCare: _openCare,
+    );
+    if (posted) _load();
+  }
+
+  Future<void> _openCare() async {
+    await showNgmyHouseCareSheet(
+      context,
+      care: _care,
+      hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
+      state: widget.state,
+      clientName: widget.clientName,
+      clientEmail: widget.clientEmail,
+      cashAppUrl: widget.cashAppUrl,
+      cashAppTag: widget.cashAppTag,
+    );
+    _load();
+  }
+
+  Future<void> _openJobBoard() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobBoardSheet(workerName: (_myWorker?['name'] ?? '').toString()),
+    );
+    _load();
+    _pollJobs();
+  }
+
+  Future<void> _openAdminCare() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AdminCareSheet(),
+    );
   }
 
   Map<String, dynamic>? get _myWorker =>
@@ -453,9 +547,20 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
             spacing: 6,
             runSpacing: 6,
             children: [
+              _pill('Post work', Icons.add_task_rounded, const Color(0xFFF97316), _openPostWork),
+              _pill(
+                _care['active'] == true ? 'House Care: member' : (_care['signed'] == true ? 'House Care: pay to start' : 'Join House Care'),
+                Icons.verified_user_rounded,
+                const Color(0xFF14B8A6),
+                _openCare,
+              ),
               _pill('My requests', Icons.assignment_rounded, _kHwAccent, _openMyRequests, badge: _openRequests),
               if (workerApproved)
+                _pill('Job board', Icons.bolt_rounded, const Color(0xFFF97316), _openJobBoard, badge: _openJobs),
+              if (workerApproved)
                 _pill('Work inbox', Icons.inbox_rounded, _kHwGreen, _openInbox, badge: _newJobs),
+              if (widget.isAdmin)
+                _pill('House Care members', Icons.fact_check_rounded, const Color(0xFF14B8A6), _openAdminCare),
               if (myWorker != null && !workerApproved)
                 _pill(
                   myWorker['status'] == 'pending'
@@ -1501,8 +1606,17 @@ class _WorkInboxSheetState extends State<_WorkInboxSheet> {
                             [r['category'], r['city'], _shortDate(r['createdAt'])].where((e) => (e ?? '').toString().isNotEmpty).join(' · '),
                             style: TextStyle(fontSize: 11, color: c.muted),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
+                          _laborBadge(r['laborFree'] == true),
+                          const SizedBox(height: 6),
                           Text((r['details'] ?? '').toString(), style: TextStyle(fontSize: 12.5, color: c.ink.withOpacity(0.85))),
+                          if (r['materialsCost'] != null || r['laborCost'] != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Materials \$${((r['materialsCost'] as num?) ?? 0).toStringAsFixed(2)} · Labor \$${((r['laborCost'] as num?) ?? 0).toStringAsFixed(2)}',
+                              style: TextStyle(fontSize: 11.5, color: c.muted, fontWeight: FontWeight.w700),
+                            ),
+                          ],
                           if ((r['address'] ?? '').toString().isNotEmpty || (r['bestTime'] ?? '').toString().isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Text(
@@ -1551,7 +1665,14 @@ class _WorkInboxSheetState extends State<_WorkInboxSheet> {
                                 ),
                               if (status == 'accepted')
                                 OutlinedButton(
-                                  onPressed: () => _act(NgmyHouseWorkersApi.done(r['id'].toString()), 'Marked as done. The client can now rate you.'),
+                                  onPressed: () async {
+                                    final costs = await _askWorkCosts(context, laborFree: r['laborFree'] == true);
+                                    if (costs == null) return;
+                                    _act(
+                                      NgmyHouseWorkersApi.done(r['id'].toString(), materialsCost: costs.materials, laborCost: costs.labor),
+                                      'Marked as done. The client can now rate you.',
+                                    );
+                                  },
                                   style: OutlinedButton.styleFrom(visualDensity: VisualDensity.compact),
                                   child: const Text('Mark done'),
                                 ),

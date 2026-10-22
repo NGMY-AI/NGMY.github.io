@@ -20,6 +20,8 @@ import 'ngmy_delete_confirm_dialog.dart';
 import 'ngmy_helper_alarm_memory.dart';
 import 'ngmy_home_card_image_crop.dart';
 import 'ngmy_home_essentials_hub.dart';
+import 'ngmy_house_care_card.dart';
+import 'ngmy_house_workers.dart' show NgmyHouseWorkersApi;
 import 'ngmy_home_vote_ad_card.dart';
 import 'ngmy_home_vote_ads.dart';
 import 'ngmy_item_reminder_storage.dart';
@@ -78,6 +80,7 @@ class NgmySpendingEntry {
     this.pinnedEssentialsKind = '',
     this.businessCardJson = '',
     this.civicIdJson = '',
+    this.houseCareJson = '',
     this.cardTemplateId = '',
     this.receiptItems = const [],
     this.receiptMerchant = '',
@@ -104,6 +107,8 @@ class NgmySpendingEntry {
   final String businessCardJson;
   /// JSON of a pinned Civic Registry ID record.
   final String civicIdJson;
+  /// Snapshot of the member's House Care membership (status, next payment date, term).
+  final String houseCareJson;
   /// Money-card face template id (see [kNgmyMoneyCardTemplates]).
   final String cardTemplateId;
   /// Line items on a real receipt (item + qty + price).
@@ -117,13 +122,14 @@ class NgmySpendingEntry {
       pinnedEssentialsKind.trim().isNotEmpty || pinnedNoteText.trim().isNotEmpty || pinnedAlarmText.trim().isNotEmpty;
   bool get hasBusinessCard => businessCardJson.trim().isNotEmpty && !isVoteAd;
   bool get hasCivicId => civicIdJson.trim().isNotEmpty;
+  bool get hasHouseCare => houseCareJson.trim().isNotEmpty;
   bool get hasReceipt => receiptItems.isNotEmpty;
   bool get isVoteAd => id == kNgmyHomeVoteAdCardId || category == kNgmyHomeVoteAdCategory;
   bool get hideModePill =>
-      hasImage || isPassword || hasBusinessCard || hasCivicId || isVoteAd || (hasPinnedEssentials && amount <= 0);
+      hasImage || isPassword || hasBusinessCard || hasCivicId || hasHouseCare || isVoteAd || (hasPinnedEssentials && amount <= 0);
   /// Money / category face that should fill the whole frosted card like a photo.
   bool get showsCreditFace =>
-      !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !isVoteAd && !(hasPinnedEssentials && amount <= 0);
+      !hasImage && !isPassword && !hasBusinessCard && !hasCivicId && !hasHouseCare && !isVoteAd && !(hasPinnedEssentials && amount <= 0);
 
   double get receiptTotal => receiptItems.fold(0.0, (a, b) => a + b.lineTotal);
 
@@ -142,6 +148,7 @@ class NgmySpendingEntry {
     String? pinnedEssentialsKind,
     String? businessCardJson,
     String? civicIdJson,
+    String? houseCareJson,
     String? cardTemplateId,
     List<NgmyReceiptItem>? receiptItems,
     String? receiptMerchant,
@@ -161,6 +168,7 @@ class NgmySpendingEntry {
         pinnedEssentialsKind: pinnedEssentialsKind ?? this.pinnedEssentialsKind,
         businessCardJson: businessCardJson ?? this.businessCardJson,
         civicIdJson: civicIdJson ?? this.civicIdJson,
+        houseCareJson: houseCareJson ?? this.houseCareJson,
         cardTemplateId: cardTemplateId ?? this.cardTemplateId,
         receiptItems: receiptItems ?? this.receiptItems,
         receiptMerchant: receiptMerchant ?? this.receiptMerchant,
@@ -181,6 +189,7 @@ class NgmySpendingEntry {
         'pinnedEssentialsKind': pinnedEssentialsKind,
         'businessCardJson': businessCardJson,
         'civicIdJson': civicIdJson,
+        'houseCareJson': houseCareJson,
         'cardTemplateId': cardTemplateId,
         'receiptItems': receiptItems.map((e) => e.toJson()).toList(),
         'receiptMerchant': receiptMerchant,
@@ -209,6 +218,7 @@ class NgmySpendingEntry {
       pinnedEssentialsKind: j['pinnedEssentialsKind']?.toString() ?? '',
       businessCardJson: j['businessCardJson']?.toString() ?? '',
       civicIdJson: j['civicIdJson']?.toString() ?? '',
+      houseCareJson: j['houseCareJson']?.toString() ?? '',
       cardTemplateId: j['cardTemplateId']?.toString() ?? '',
       receiptItems: items,
       receiptMerchant: j['receiptMerchant']?.toString() ?? '',
@@ -493,6 +503,7 @@ bool _spendingListsEqual(List<NgmySpendingEntry> a, List<NgmySpendingEntry> b) {
     if (a[i].category != b[i].category) return false;
     if (a[i].note != b[i].note) return false;
     if (a[i].civicIdJson != b[i].civicIdJson) return false;
+    if (a[i].houseCareJson != b[i].houseCareJson) return false;
     if (a[i].businessCardJson != b[i].businessCardJson) return false;
     if (a[i].imageBase64.length != b[i].imageBase64.length) return false;
   }
@@ -516,6 +527,7 @@ String homeCardsDeckFingerprint(List<NgmySpendingEntry> cards) {
       ..write(e.hasCivicId)
       ..write('|')
       ..write(e.civicIdJson.hashCode)
+      ..write(e.houseCareJson.hashCode)
       ..write('|')
       ..write(e.businessCardJson.hashCode)
       ..write('|')
@@ -2219,7 +2231,10 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       if (!mounted || gen != _loadGen) return;
       final s1 = await _syncBusinessCardSnapshots(base);
       if (!mounted || gen != _loadGen) return;
-      final s2 = await _hydrateCivicIdCards(s1);
+      final s2a = await _hydrateCivicIdCards(s1);
+      if (!mounted || gen != _loadGen) return;
+      // The House Care card (saved to the account) with its next payment date.
+      final s2 = await _syncHouseCareCard(s2a);
       if (!mounted || gen != _loadGen) return;
       final voteStale = _lastVoteCloudAt == null ||
           DateTime.now().difference(_lastVoteCloudAt!) > const Duration(minutes: 5);
@@ -2238,6 +2253,45 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       _applyHomeDeck(merged, deck: deck, acks: _alarmAcks);
     } catch (e) {
       debugPrint('[home cards] background enrich: $e');
+    }
+  }
+
+  DateTime? _houseCareCheckedAt;
+
+  /// Keeps a House Care card on the home screen for a member who signed the agreement: it shows
+  /// the status and when the next payment is due. It is added and updated automatically and is
+  /// saved with the other cards, so it follows the account to another phone.
+  Future<List<NgmySpendingEntry>> _syncHouseCareCard(List<NgmySpendingEntry> cards) async {
+    try {
+      final last = _houseCareCheckedAt;
+      if (last != null && DateTime.now().difference(last) < const Duration(minutes: 10)) return cards;
+      final res = await NgmyHouseWorkersApi.care();
+      if (res['ok'] != true) return cards;
+      _houseCareCheckedAt = DateTime.now();
+      final care = res['care'] is Map ? Map<String, dynamic>.from(res['care'] as Map) : const <String, dynamic>{};
+      final existing = cards.where((e) => e.hasHouseCare).toList();
+      if (care['signed'] != true) {
+        if (existing.isEmpty) return cards;
+        final next = cards.where((e) => !e.hasHouseCare).toList();
+        await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+        return next;
+      }
+      final snapshot = ngmyHouseCareSnapshot(care, widget.displayName ?? '');
+      if (existing.isNotEmpty && existing.first.houseCareJson == snapshot) return cards;
+      final entry = NgmySpendingEntry(
+        id: kNgmyHouseCareCardId,
+        amount: 0,
+        description: 'House Care',
+        category: 'House Care',
+        date: existing.isNotEmpty ? existing.first.date : DateTime.now(),
+        houseCareJson: snapshot,
+      );
+      final next = [entry, ...cards.where((e) => !e.hasHouseCare)];
+      await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);
+      return next;
+    } catch (e) {
+      debugPrint('[home cards] house care: $e');
+      return cards;
     }
   }
 
@@ -2844,6 +2898,8 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                           ? const [Color(0xFF052E16), Color(0xFF7F1D1D)]
                           : entry.hasImage
                           ? const [Color(0xFF111827), Color(0xFF1F2937)]
+                          : entry.hasHouseCare
+                              ? const [Color(0xFF0C4A6E), Color(0xFF0F766E)]
                           : isCivic
                               ? const [Color(0xFF0B1220), Color(0xFF1E3A5F)]
                               : entry.hasBusinessCard
@@ -2869,6 +2925,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
                       entry.hasImage ||
                       entry.showsCreditFace ||
                       entry.hasBusinessCard ||
+                      entry.hasHouseCare ||
                       isCivic ||
                       (entry.hasPinnedEssentials && entry.amount <= 0),
                   child: showNoteFace
@@ -2993,6 +3050,9 @@ class _SpendingCardContent extends StatelessWidget {
     }
     if (entry.hasBusinessCard) {
       return _BusinessCardBody(json: entry.businessCardJson);
+    }
+    if (entry.hasHouseCare) {
+      return NgmyHouseCareCardFace(json: entry.houseCareJson);
     }
     if (entry.hasCivicId) {
       return _CivicIdCardBody(
