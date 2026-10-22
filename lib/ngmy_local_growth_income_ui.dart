@@ -1136,12 +1136,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 onTap: onBack,
                 isDark: true,
               ),
-              trailing: _roundIcon(
-                context,
-                icon: Icons.forum_rounded,
-                onTap: onOpenHelper,
-                isDark: true,
-              ),
+              trailing: _helperButton(context, onTap: onOpenHelper),
             ),
             const SizedBox(height: 16),
             Row(
@@ -1204,37 +1199,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            _giFramedCard(
-              radius: 24,
-              accent: glassGreen,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(color: glassGreen, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 10),
-                        Text('LIVE ACTIVITY', style: TextStyle(color: muted, fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 1.1)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (recent.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Text('No activity yet. Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w700)),
-                      )
-                    else
-                      ...recent.map((t) => _activityRow(context, t, isDark: true)),
-                  ],
-                ),
-              ),
-            ),
+            _liveActivityPanel(context, recent, glassGreen, muted),
           ],
         ),
       ),
@@ -1267,6 +1232,107 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     );
   }
 
+  // ── Redesigned home pieces ─────────────────────────────────────────────────
+
+  /// The helper (message) button: a glowing rounded square with a chat bubble and a spark.
+  Widget _helperButton(BuildContext context, {required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF8B5CF6), Color(0xFF22D3EE)],
+                ),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFF8B5CF6).withValues(alpha: 0.45), blurRadius: 16, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: const Color(0xFF0B1020).withValues(alpha: 0.78),
+                ),
+                child: const Icon(Icons.chat_bubble_rounded, color: Colors.white, size: 19),
+              ),
+            ),
+            Positioned(
+              right: -1,
+              top: -3,
+              child: Container(
+                width: 17,
+                height: 17,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFFACC15),
+                  border: Border.all(color: const Color(0xFF101010), width: 2),
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, size: 9, color: Color(0xFF3B2A00)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A soft glass panel with a colored light in one corner. [glow] is that light.
+  Widget _glassPanel({
+    required Widget child,
+    required double radius,
+    required Color glow,
+    Alignment glowAt = Alignment.topRight,
+    EdgeInsets padding = EdgeInsets.zero,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1B1F2A), Color(0xFF12151C)],
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius - 1),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: glowAt,
+                    radius: 1.15,
+                    colors: [glow.withValues(alpha: 0.22), glow.withValues(alpha: 0)],
+                  ),
+                ),
+              ),
+            ),
+            Padding(padding: padding, child: child),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _topMetricCard({
     required IconData icon,
     required Color iconColor,
@@ -1276,189 +1342,175 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     required Color card,
     VoidCallback? onTap,
   }) {
-    final content = _giFramedCard(
-      radius: 18,
-      accent: iconColor,
+    final content = _glassPanel(
+      radius: 22,
+      glow: iconColor,
+      glowAt: Alignment.topRight,
       child: SizedBox(
-        height: 88,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        height: 104,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -10,
+              bottom: -14,
+              child: Icon(icon, size: 82, color: iconColor.withValues(alpha: 0.10)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(15, 13, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 29,
-                    height: 29,
+                    padding: const EdgeInsets.fromLTRB(6, 4, 10, 4),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [iconColor.withValues(alpha: 0.95), iconColor.withValues(alpha: 0.55)],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                      boxShadow: [BoxShadow(color: iconColor.withValues(alpha: 0.28), blurRadius: 12)],
+                      color: iconColor.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: iconColor.withValues(alpha: 0.4)),
                     ),
-                    child: Icon(icon, color: Colors.white, size: 17),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, color: iconColor, size: 15),
+                        const SizedBox(width: 5),
+                        Text(
+                          title.toUpperCase(),
+                          style: TextStyle(color: iconColor, fontWeight: FontWeight.w900, fontSize: 10.5, letterSpacing: 1),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 9),
-                  Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontWeight: FontWeight.w800, fontSize: 12)),
+                  const Spacer(),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, maxLines: 1, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 26, height: 1)),
+                  ),
                 ],
               ),
-              const Spacer(),
-              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 20)),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
     if (onTap == null) return content;
-    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: content);
+    return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(22), child: content);
   }
 
   Widget _networkStatus({required Color card, required Color green}) {
-    return _giFramedCard(
-      radius: 22,
-      accent: green,
-      child: SizedBox(
-        height: 76,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [green.withValues(alpha: 0.92), const Color(0xFF047857).withValues(alpha: 0.65)],
+    return _glassPanel(
+      radius: 26,
+      glow: green,
+      glowAt: Alignment.centerLeft,
+      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      child: Row(
+        children: [
+          // A live signal: three rising bars in a ring.
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: green.withValues(alpha: 0.55), width: 2),
+              color: green.withValues(alpha: 0.12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final h in const [10.0, 16.0, 23.0])
+                  Container(
+                    width: 5,
+                    height: h,
+                    margin: const EdgeInsets.fromLTRB(2, 0, 2, 13),
+                    decoration: BoxDecoration(color: green, borderRadius: BorderRadius.circular(3)),
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                  boxShadow: [BoxShadow(color: green.withValues(alpha: 0.44), blurRadius: 18)],
-                ),
-                child: const Icon(Icons.wifi_rounded, color: Colors.white, size: 25),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w900)),
-                    Text('Real-time statistics', style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12, fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-              InkWell(
-                onTap: onOpenGameCenter,
-                borderRadius: BorderRadius.circular(24),
-                child: Container(
-                  padding: const EdgeInsets.all(2.2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white.withValues(alpha: 0.55),
-                        green.withValues(alpha: 0.70),
-                        Colors.white.withValues(alpha: 0.22),
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
-                      BoxShadow(color: green.withValues(alpha: 0.28), blurRadius: 14),
-                    ],
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [green.withValues(alpha: 0.95), const Color(0xFF16A34A).withValues(alpha: 0.82)],
-                      ),
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.38)),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.sports_esports_rounded, color: Colors.white, size: 14),
-                        SizedBox(width: 6),
-                        Text('ACTIVE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
-                        SizedBox(width: 7),
-                        Icon(Icons.flash_on_rounded, color: Colors.white, size: 13),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _giFramedCard({
-    required Widget child,
-    required double radius,
-    Color accent = const Color(0xFF2EF6A3),
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(radius + 3),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.28),
-            accent.withValues(alpha: 0.34),
-            Colors.white.withValues(alpha: 0.10),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.42), blurRadius: 18, offset: const Offset(0, 8)),
-          BoxShadow(color: accent.withValues(alpha: 0.14), blurRadius: 20, offset: const Offset(0, 3)),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Network Status', style: TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Row(children: [
+                  Container(width: 7, height: 7, decoration: BoxDecoration(color: green, shape: BoxShape.circle, boxShadow: [BoxShadow(color: green, blurRadius: 6)])),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text('Live · real-time statistics', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11.5, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: onOpenGameCenter,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
+                boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 4))],
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.sports_esports_rounded, color: Colors.white, size: 20),
+                  SizedBox(height: 2),
+                  Text('PLAY', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                ],
+              ),
+            ),
+          ),
         ],
-      ),
-      padding: const EdgeInsets.all(1.7),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(radius),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF262B34), Color(0xFF16191F)],
-          ),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: child,
       ),
     );
   }
 
   Widget _smallTotalBox(String title, String value, {required Color card, VoidCallback? onTap}) {
-    final content = _giFramedCard(
-      radius: 18,
-      accent: const Color(0xFF67E8F9),
+    final isProfit = title.toLowerCase().contains('profit');
+    final accent = isProfit ? const Color(0xFFFACC15) : const Color(0xFF38BDF8);
+    final content = _glassPanel(
+      radius: 20,
+      glow: accent,
+      glowAt: Alignment.bottomLeft,
       child: SizedBox(
-        height: 76,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: TextStyle(color: Colors.white.withValues(alpha: 0.52), fontSize: 11, fontWeight: FontWeight.w800)),
-              const Spacer(),
-              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-            ],
-          ),
+        height: 86,
+        child: Row(
+          children: [
+            Container(
+              width: 5,
+              margin: const EdgeInsets.fromLTRB(0, 16, 0, 16),
+              decoration: BoxDecoration(color: accent, borderRadius: const BorderRadius.horizontal(right: Radius.circular(4))),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(children: [
+                    Icon(isProfit ? Icons.north_east_rounded : Icons.savings_rounded, color: accent, size: 14),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 11.5, fontWeight: FontWeight.w800)),
+                    ),
+                  ]),
+                  const SizedBox(height: 6),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, height: 1)),
+                  ),
+                ],
+              ),
+            ),
+            if (onTap != null)
+              Padding(padding: const EdgeInsets.only(right: 10), child: Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.35))),
+          ],
         ),
       ),
     );
@@ -1466,28 +1518,75 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(20), child: content);
   }
 
+  Widget _liveActivityPanel(BuildContext context, List<AppTransaction> recent, Color green, Color muted) {
+    return _glassPanel(
+      radius: 26,
+      glow: green,
+      glowAt: Alignment.topCenter,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(width: 9, height: 9, decoration: BoxDecoration(color: green, shape: BoxShape.circle, boxShadow: [BoxShadow(color: green, blurRadius: 8)])),
+              const SizedBox(width: 9),
+              Text('LIVE ACTIVITY', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontWeight: FontWeight.w900, fontSize: 12.5, letterSpacing: 1.3)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(20)),
+                child: Text('${recent.length}', style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (recent.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 22),
+              child: Column(children: [
+                Icon(Icons.bolt_rounded, color: muted, size: 30),
+                const SizedBox(height: 6),
+                Text('Nothing yet', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontWeight: FontWeight.w900)),
+                const SizedBox(height: 2),
+                Text('Deposit, invest, or clock in to begin.', textAlign: TextAlign.center, style: TextStyle(color: muted, fontWeight: FontWeight.w600, fontSize: 12)),
+              ]),
+            )
+          else
+            for (var i = 0; i < recent.length; i++) ...[
+              if (i > 0) Divider(height: 1, color: Colors.white.withValues(alpha: 0.07)),
+              _activityRow(context, recent[i], isDark: true),
+            ],
+        ],
+      ),
+    );
+  }
+
   Widget _activityRow(BuildContext context, AppTransaction t, {required bool isDark}) {
     final isDebit = t.type == TransactionType.withdrawal || t.type == TransactionType.adminRemove;
-    final color = isDebit ? Colors.redAccent : WorksheetPalette.green;
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : const Color(0xFF64748B);
+    final color = isDebit ? const Color(0xFFFB7185) : const Color(0xFF2EF6A3);
+    final muted = Colors.white.withValues(alpha: 0.5);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
           Container(
-            width: 31,
-            height: 31,
+            width: 38,
+            height: 38,
             alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: color.withValues(alpha: 0.14)),
-            child: Icon(isDebit ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color.withValues(alpha: 0.28), color.withValues(alpha: 0.08)]),
+              border: Border.all(color: color.withValues(alpha: 0.35)),
+            ),
+            child: Icon(isDebit ? Icons.north_east_rounded : Icons.south_west_rounded, color: color, size: 18),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(ngmyActivityTitle(t), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: titleColor, fontSize: 12, fontWeight: FontWeight.w800)),
+                Text(ngmyActivityTitle(t), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
                 Text(_formatTxnDateTime(t.timestamp), style: TextStyle(color: muted, fontSize: 11, fontWeight: FontWeight.w600)),
               ],
             ),
@@ -1495,10 +1594,15 @@ class _LocalGrowthHomeTab extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '${isDebit ? '-' : '+'}\$${formatCurrency(t.amount)}',
-                style: TextStyle(color: color, fontWeight: FontWeight.w900),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
+                child: Text(
+                  '${isDebit ? '-' : '+'}\$${formatCurrency(t.amount)}',
+                  style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 13),
+                ),
               ),
+              const SizedBox(height: 3),
               Text(ngmyBankStatusLabel(t), style: TextStyle(color: muted, fontSize: 10, fontWeight: FontWeight.w700)),
             ],
           ),
