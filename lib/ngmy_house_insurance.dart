@@ -3,10 +3,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'ngmy_stripe_payments.dart';
 
-/// Free House Insurance — \$50/month subscription for covered small home fixes.
+/// Free House Insurance — $125/month subscription for covered small home fixes.
 /// Categories can be expanded later; this ships a starter covered-fix list.
 class NgmyHouseInsurance {
-  static const double defaultMonthlyFee = 50.0;
+  static const double defaultMonthlyFee = 125.0;
 
   /// Starter covered-fix categories (admin/user-facing). Expand when you send the full list.
   static const List<({String id, String title, String detail, IconData icon})> coveredCategories = [
@@ -22,7 +22,8 @@ class NgmyHouseInsurance {
 
   static double monthlyFeeFromConfig(dynamic config) {
     final v = (config as dynamic).houseInsuranceMonthlyFee;
-    if (v is num && v >= 0) return v.toDouble();
+    // The old saved price was $50; the plan is now $125 a month.
+    if (v is num && v >= 0) return v.toDouble() == 50.0 ? defaultMonthlyFee : v.toDouble();
     return defaultMonthlyFee;
   }
 
@@ -113,7 +114,7 @@ class NgmyHouseInsurance {
     return onPersistConfig();
   }
 
-  /// Opens Stripe checkout for the \$50 plan. Returns false when the Payment
+  /// Opens Stripe checkout for the $125 plan. Returns false when the Payment
   /// Link is not in the app yet, or the buyer closes checkout.
   static Future<bool> payWithStripe({
     required BuildContext context,
@@ -132,7 +133,7 @@ class NgmyHouseInsurance {
       email: email,
       isAdmin: false,
       title: 'House Insurance',
-      message: '\$50 for 30 days of the coverages you selected.',
+      message: '\$125 for 30 days of the coverages you selected.',
     );
     if (!paid) return false;
     await activateAfterPayment(

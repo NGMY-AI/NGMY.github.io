@@ -64,6 +64,7 @@ import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
+import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -4736,7 +4737,7 @@ Map<String, dynamic> _userSignupRowForCloud(UserData u) {
   final row = <String, dynamic>{
     'email': ngmyNormalizeEmail(u.email),
     'username': username,
-    'phone': u.phone.trim(),
+    if (ngmyUserPhoneOnFile(u.phone)) 'phone': u.phone.trim(),
     'status': u.status.trim().isEmpty ? 'active' : u.status,
     'isAdmin': u.isAdmin,
   };
@@ -5576,6 +5577,8 @@ Map<String, dynamic> _userRowForBulkSync(UserData u, {bool includeFreeTrial = fa
   final row = Map<String, dynamic>.from(u.toJson());
   _stripUserMediaProfileFieldsFromBulkRow(row);
   row['referralCode'] = ngmyReferralCodeForEmail(u.email);
+  // A phone with no number saved must never blank the number another phone already saved.
+  if (!ngmyUserPhoneOnFile(u.phone)) row.remove('phone');
   if (!includeFreeTrial) {
     row.remove('freeTrialActive');
     row.remove('freeTrialDailyAmount');
@@ -23671,6 +23674,14 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Icons.timer_rounded,
                 const Color(0xFFF59E0B),
                 () => unawaited(_openGameTimersAdmin(isDark)),
+                isDark,
+                animDelayMs: 200,
+              ),
+              _menuFrame(
+                'House Care',
+                Icons.home_work_rounded,
+                const Color(0xFF0F766E),
+                () => unawaited(showNgmyAdminHouseCareSheet(context)),
                 isDark,
                 animDelayMs: 200,
               ),

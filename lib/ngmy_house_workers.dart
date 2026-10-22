@@ -56,7 +56,9 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> postJob(Map<String, dynamic> form) => _call('hwPostJob', form);
   static Future<Map<String, dynamic>> jobs() => _call('hwJobs');
   static Future<Map<String, dynamic>> pickJob(String id) => _call('hwPickJob', {'requestId': id});
-  static Future<Map<String, dynamic>> planCashApp(String plan) => _call('hwPlanCashApp', {'plan': plan});
+  static Future<Map<String, dynamic>> planCashApp(String plan, {bool term = false}) => _call('hwPlanCashApp', {'plan': plan, if (term) 'term': true});
+  static Future<Map<String, dynamic>> adminCareRevoke(String email) => _call('hwAdminCareRevoke', {'memberEmail': email});
+  static Future<Map<String, dynamic>> adminCareRestore(String email) => _call('hwAdminCareRestore', {'memberEmail': email});
   static Future<Map<String, dynamic>> adminList() => _call('hwAdminList');
   static Future<Map<String, dynamic>> adminDecide(String email, String decision) =>
       // Not 'email': that key is stripped from every signed-in request.
@@ -290,6 +292,12 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
   bool _needsRegistry = false;
 
   /// The state on the person's Civic Registry record. Workers and work are always for this state.
+  /// The name on the user's Civic Registry membership; the app username only if there is none.
+  String get _displayName {
+    final r = (_me?['registryName'] ?? '').toString().trim();
+    return r.isNotEmpty ? r : widget.clientName;
+  }
+
   String get _registryState {
     final s = (_me?['registryState'] ?? '').toString().trim();
     return s.isEmpty ? widget.state.trim() : s;
@@ -305,7 +313,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
     final posted = await showNgmyPostWorkSheet(
       context,
       state: _registryState,
-      clientName: widget.clientName,
+      clientName: _displayName,
       clientPhone: widget.clientPhone,
       care: _care,
       hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
@@ -320,7 +328,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       care: _care,
       hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
       state: _registryState,
-      clientName: widget.clientName,
+      clientName: _displayName,
       clientEmail: widget.clientEmail,
       cashAppUrl: widget.cashAppUrl,
       cashAppTag: widget.cashAppTag,
@@ -368,7 +376,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
           final sent = await showNgmySubmitWorkSheet(
             context,
             worker: w,
-            clientName: widget.clientName,
+            clientName: _displayName,
             clientPhone: widget.clientPhone,
           );
           if (sent) _load();
@@ -585,7 +593,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
                       : (myWorker['status'] == 'deactivated' ? 'Worker: paused' : 'Worker application: ${myWorker['status']}'),
                   Icons.hourglass_top_rounded,
                   const Color(0xFFF59E0B),
-                  () => showNgmyWorkerApplySheet(context, state: _registryState, clientName: widget.clientName, clientPhone: widget.clientPhone).then((_) => _load()),
+                  () => showNgmyWorkerApplySheet(context, state: _registryState, clientName: _displayName, clientPhone: widget.clientPhone).then((_) => _load()),
                 ),
               if (widget.isAdmin)
                 _pill('Worker applications', Icons.admin_panel_settings_rounded, const Color(0xFF8B5CF6), _openAdmin),

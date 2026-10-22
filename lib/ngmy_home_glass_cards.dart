@@ -2270,7 +2270,7 @@ class _NgmyHomeGlassCardsPanelState extends State<NgmyHomeGlassCardsPanel> with 
       _houseCareCheckedAt = DateTime.now();
       final care = res['care'] is Map ? Map<String, dynamic>.from(res['care'] as Map) : const <String, dynamic>{};
       final existing = cards.where((e) => e.hasHouseCare).toList();
-      if (care['signed'] != true) {
+      if (care['signed'] != true || care['status'] == 'cancelled') {
         if (existing.isEmpty) return cards;
         final next = cards.where((e) => !e.hasHouseCare).toList();
         await NgmyHomeLocalStore.saveSpending(widget.userEmail, next);

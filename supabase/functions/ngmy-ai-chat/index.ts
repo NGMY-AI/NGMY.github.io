@@ -1586,7 +1586,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
-  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay",
+  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -1652,6 +1652,9 @@ const HW_MAX_CLAIMS = 3;
 type HwElig = {
   /** The state on the person's Civic Registry record ("" when it has none). */
   state: string;
+  /** The person's name and phone on their Civic Registry record. */
+  name: string;
+  phone: string;
   hasRegistryId: boolean;
   hasBio: boolean;
   missed: number;
@@ -1725,6 +1728,8 @@ async function hwEligibility(db: any, emails: string[]): Promise<Map<string, HwE
     const deactivated = missed > HW_MAX_MISSED || c > HW_MAX_CLAIMS;
     out.set(e, {
       state: hwText(m?.state ?? m?.stateName ?? "", 60),
+      name: hwText(m?.fullName ?? m?.name ?? m?.legalName ?? "", 80),
+      phone: hwPhone(m?.phone ?? ""),
       hasRegistryId,
       hasBio,
       missed,
@@ -1956,7 +1961,7 @@ async function handleStoreAccess(req: Request, action: string, body: any): Promi
 // Plans: basic ($50/mo, card or Cash App) lets a member post jobs to the
 // board; premium ($65/mo, Cash App) also lets them send work straight to a
 // worker they choose. Card payments for basic land in ngmy_stripe_access.
-const HW_BASIC_PRICE = 50;
+const HW_BASIC_PRICE = 125;
 const HW_PREMIUM_PRICE = 65;
 const HW_PLAN_DAYS = 30;
 // Off until the job board and plan screens ship in the app: until then a
@@ -2050,6 +2055,9 @@ async function hwCare(db: any, email: string) {
   return {
     signed: true, active, status, termYears: Number(row.term_years ?? 1), fullName: row.full_name ?? "",
     agreedAt: row.agreed_at, startedAt, termEnds, nextDue: paidUntil, price: HW_BASIC_PRICE,
+    // Paid ahead for a long time (the whole term): no payment is due until it runs down.
+    prepaid: active && paidMs > Date.now() + 40 * 86400000,
+    termPrice: HW_BASIC_PRICE * 12 * Number(row.term_years ?? 1),
   };
 }
 
@@ -2177,6 +2185,8 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       isAdmin,
       eligibility: myElig ?? null,
       registryState: myElig?.state ?? "",
+      registryName: myElig?.name ?? "",
+      registryPhone: myElig?.phone ?? "",
       stats: me ? await hwWorkerStats(db, email) : null,
       plans: await hwPlans(db, email),
       care: await hwCare(db, email),
@@ -2249,8 +2259,30 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to pay for House & Insurance." }, 403);
     }
     const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
-    const base = Math.max(Date.now(), Date.parse(String(prev?.access_until ?? "")) || 0);
-    const until = new Date(base + HW_PLAN_DAYS * 86400000).toISOString();
+    const prevMs = Date.parse(String(prev?.access_until ?? "")) || 0;
+    const base = Math.max(Date.now(), prevMs);
+    // Paid ahead (a whole term, or many months): nothing more to pay until that time is nearly over.
+    if (plan === "basic" && prevMs > Date.now() + 40 * 86400000) {
+      return jsonOk({
+        ok: false,
+        error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. No payment is needed before then.`,
+      }, 409);
+    }
+    let until = new Date(base + HW_PLAN_DAYS * 86400000).toISOString();
+    if (body?.term === true && plan === "basic") {
+      // The whole agreement at once: the monthly price for every month of the term the member signed.
+      let years = 0;
+      try {
+        const { data: sub } = await db.from("house_subscriptions").select("term_years").eq("email", email).maybeSingle();
+        years = Number(sub?.term_years ?? 0);
+      } catch (_) { /* no agreement yet */ }
+      if (!(years >= 1 && years <= 4)) {
+        return jsonOk({ ok: false, error: "Sign the House Care agreement first, then you can pay the whole term." }, 400);
+      }
+      const d = new Date(base);
+      d.setFullYear(d.getFullYear() + years);
+      until = d.toISOString();
+    }
     const { error } = await db.from("house_plans").upsert({
       email, plan, method: "cashapp", access_until: until, updated_at: now,
     });
@@ -2570,6 +2602,25 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       .eq("id", id).eq("status", "done").select("id");
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     if (!data || data.length === 0) return jsonOk({ ok: false, error: "That job is not finished." }, 409);
+    return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminCareRevoke" || action === "hwAdminCareRestore") {
+    // The admin ends (or brings back) a member's House Care. Ending it stops the free labor and
+    // removes the House Care card from the member's home screen.
+    const target = emailKey(String(body?.memberEmail ?? ""));
+    if (!target) return jsonOk({ ok: false, error: "Pick a member." }, 400);
+    if (action === "hwAdminCareRevoke") {
+      const { data, error } = await db.from("house_subscriptions")
+        .update({ status: "cancelled", updated_at: now }).eq("email", target).select("email");
+      if (error) return jsonOk({ ok: false, error: error.message }, 500);
+      if (!data || data.length === 0) return jsonOk({ ok: false, error: "That member has no House Care." }, 404);
+      // Stop the paid time too, so labor is charged again straight away.
+      await db.from("house_plans").update({ access_until: now, updated_at: now }).eq("email", target).eq("plan", "basic");
+      return jsonOk({ ok: true });
+    }
+    const { error } = await db.from("house_subscriptions")
+      .update({ status: "pending", updated_at: now }).eq("email", target);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
     return jsonOk({ ok: true });
   }
   if (action === "hwAdminCare") {
@@ -10062,6 +10113,8 @@ serve(async (req) => {
       hi: "hwAdminCare",
       hj: "hwAdminPayList",
       hk: "hwAdminPay",
+      hl: "hwAdminCareRevoke",
+      hm: "hwAdminCareRestore",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

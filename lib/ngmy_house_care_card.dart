@@ -20,7 +20,7 @@ String ngmyHouseCareSnapshot(Map<String, dynamic> care, String name) => jsonEnco
       'nextDue': care['nextDue']?.toString() ?? '',
       'termYears': (care['termYears'] as num?)?.toInt() ?? 0,
       'termEnds': care['termEnds']?.toString() ?? '',
-      'price': (care['price'] as num?)?.toDouble() ?? 50,
+      'price': (care['price'] as num?)?.toDouble() ?? 125,
     });
 
 /// The face of the House Care card: the membership at a glance, and when the next payment is due.
@@ -42,7 +42,7 @@ class NgmyHouseCareCardFace extends StatelessWidget {
     final daysLeft = due == null ? null : (due.difference(DateTime.now()).inMinutes / 1440).ceil();
     final name = (data['name'] ?? '').toString();
     final termYears = (data['termYears'] as num?)?.toInt() ?? 0;
-    final price = (data['price'] as num?)?.toDouble() ?? 50;
+    final price = (data['price'] as num?)?.toDouble() ?? 125;
     final (label, color) = switch (status) {
       'active' => ('ACTIVE', const Color(0xFF34D399)),
       'lapsed' => ('PAYMENT DUE', const Color(0xFFFBBF24)),

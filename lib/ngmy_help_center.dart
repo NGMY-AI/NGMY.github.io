@@ -182,7 +182,7 @@ class NgmyHelpCenterConfig {
         NgmyHelpCenterService(
           id: 'house_fixture',
           name: 'House Fixture',
-          description: 'Repairs + Free House Insurance (\$50/mo)',
+          description: 'Repairs + Free House Insurance (\$125/mo)',
           icon: 'home_repair_service',
           defaultPrice: '150',
           defaultQty: '1',
@@ -315,7 +315,7 @@ class NgmyHelpCenterConfig {
       ..writeln(who);
     if (clientPhone.trim().isNotEmpty) buf.writeln(clientPhone.trim());
     if (clientEmail.trim().isNotEmpty) buf.writeln(clientEmail.trim());
-    final plan = housePlanLine.trim().isEmpty ? '\$50 for 30 days' : housePlanLine.trim();
+    final plan = housePlanLine.trim().isEmpty ? '\$125 for 30 days' : housePlanLine.trim();
     buf
       ..writeln()
       ..writeln('*Subscription*')

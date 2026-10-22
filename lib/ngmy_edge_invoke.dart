@@ -112,6 +112,8 @@ const Map<String, String> kNgmyEdgeActionToWire = {
   'hwAdminCare': 'hi',
   'hwAdminPayList': 'hj',
   'hwAdminPay': 'hk',
+  'hwAdminCareRevoke': 'hl',
+  'hwAdminCareRestore': 'hm',
   'storeGrant': 's1',
   'storeRevoke': 's2',
   'storeList': 's3',

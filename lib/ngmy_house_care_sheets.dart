@@ -24,7 +24,7 @@ const List<(String, String)> _kCareAgreement = [
   ),
   (
     'The monthly payment',
-    'The membership is \$50 every month. If a payment is missed, the free labor pauses until the payment is made. '
+    'The membership is \$125 every month. If a payment is missed, the free labor pauses until the payment is made. '
         'Work you post while the membership is not paid is charged like normal work.'
   ),
   (
@@ -971,7 +971,7 @@ class _CareSheetState extends State<_CareSheet> {
       email: widget.clientEmail,
       isAdmin: false,
       title: 'House Care',
-      message: '\$50 for 30 days of House Care.',
+      message: '\$${_price.toStringAsFixed(0)} for 30 days of House Care.',
     );
     if (!mounted) return;
     if (paid) {
@@ -980,19 +980,24 @@ class _CareSheetState extends State<_CareSheet> {
     }
   }
 
-  Future<void> _payCashApp() async {
+  double get _price => (_care['price'] as num?)?.toDouble() ?? 125;
+  int get _years => (_care['termYears'] as num?)?.toInt() ?? 1;
+  double get _termPrice => (_care['termPrice'] as num?)?.toDouble() ?? _price * 12 * _years;
+
+  Future<void> _payCashApp({bool fullTerm = false}) async {
     final base = widget.cashAppUrl.trim();
     if (base.isEmpty) {
       _snack(context, 'Cash App is not set up yet.', error: true);
       return;
     }
-    final payUrl = base.endsWith('/') ? '${base}50' : '$base/50';
+    final amount = (fullTerm ? _termPrice : _price).toStringAsFixed(0);
+    final payUrl = base.endsWith('/') ? '$base$amount' : '$base/$amount';
     final opened = await launchUrl(Uri.parse(payUrl), mode: LaunchMode.externalApplication);
     if (!opened || !mounted) return;
-    final sent = await showNgmyCashAppPaymentConfirm(context, amountText: '50', cashAppTag: widget.cashAppTag);
+    final sent = await showNgmyCashAppPaymentConfirm(context, amountText: amount, cashAppTag: widget.cashAppTag);
     if (sent != true || !mounted) return;
     setState(() => _busy = true);
-    final res = await NgmyHouseWorkersApi.planCashApp('basic');
+    final res = await NgmyHouseWorkersApi.planCashApp('basic', term: fullTerm);
     if (!mounted) return;
     setState(() => _busy = false);
     if (res['ok'] == true) {
@@ -1024,11 +1029,23 @@ class _CareSheetState extends State<_CareSheet> {
         ]),
       );
 
-  Widget _payButtons() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _primaryButton('Pay \$50 with card', Icons.credit_card_rounded, _payCard, color: const Color(0xFF6366F1), busy: _busy),
-        const SizedBox(height: 8),
-        _primaryButton('Pay \$50 with Cash App', Icons.attach_money_rounded, _payCashApp, color: const Color(0xFF00B84A), busy: _busy),
-      ]);
+  Widget _payButtons() {
+    if (_care['prepaid'] == true) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFF34D399).withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF34D399).withOpacity(0.5))),
+        child: Text('Paid in full until ${_careDate(_care['nextDue'])}. No payment is needed until then.', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+      );
+    }
+    final p = _price.toStringAsFixed(0);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _primaryButton('Pay \$$p with card', Icons.credit_card_rounded, _payCard, color: const Color(0xFF6366F1), busy: _busy),
+      const SizedBox(height: 8),
+      _primaryButton('Pay \$$p with Cash App', Icons.attach_money_rounded, () => _payCashApp(), color: const Color(0xFF00B84A), busy: _busy),
+      const SizedBox(height: 8),
+      _primaryButton('Pay full $_years-year agreement \$${_termPrice.toStringAsFixed(0)}', Icons.workspace_premium_rounded, () => _payCashApp(fullTerm: true), color: const Color(0xFFF59E0B), busy: _busy),
+    ]);
+  }
 
   Widget _activeView(_HwColors c) {
     Widget row(String k, String v) => Padding(
@@ -1061,7 +1078,7 @@ class _CareSheetState extends State<_CareSheet> {
         ]),
       ),
       const SizedBox(height: 12),
-      row('Monthly fee', '\$${((_care['price'] as num?) ?? 50).toStringAsFixed(0)}'),
+      row('Monthly fee', '\$${((_care['price'] as num?) ?? 125).toStringAsFixed(0)}'),
       row('Agreement', '${_care['termYears'] ?? 1} year${(_care['termYears'] ?? 1) == 1 ? '' : 's'}'),
       row('Started', _careDate(_care['startedAt'])),
       row('Agreement ends', _careDate(_care['termEnds'])),
@@ -1103,7 +1120,7 @@ class _CareSheetState extends State<_CareSheet> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text('NGMY House Care', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.ink)),
       const SizedBox(height: 4),
-      Text('\$50 a month. We work for you, you pay for materials.', style: TextStyle(color: c.muted, fontSize: 12.5)),
+      Text('\$125 a month. We work for you, you pay for materials.', style: TextStyle(color: c.muted, fontSize: 12.5)),
       const SizedBox(height: 14),
       _benefit(c, Icons.engineering_rounded, 'No labor charge', 'The work is free of labor charges. You pay for the materials only.'),
       _benefit(c, Icons.event_repeat_rounded, 'Every month', 'Contact us once a month: if anything is wrong with the house, we go and fix it.'),
@@ -1289,6 +1306,14 @@ class _InkPainter extends CustomPainter {
 
 // ── Admin: every House Care agreement ───────────────────────────────────────
 
+/// Opens the admin list of House Care members (signatures, selfies, revoke) from the Admin Dashboard.
+Future<void> showNgmyAdminHouseCareSheet(BuildContext context) => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _AdminCareSheet(),
+    );
+
 class _AdminCareSheet extends StatefulWidget {
   const _AdminCareSheet();
 
@@ -1409,8 +1434,47 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
             child: sig.isEmpty ? const SizedBox() : Image.network(sig, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded)),
           ),
         ),
+        const SizedBox(height: 10),
+        status == 'cancelled'
+            ? OutlinedButton.icon(
+                onPressed: () => _setRevoked(m, false),
+                icon: const Icon(Icons.restore_rounded, size: 18),
+                label: const Text('Restore subscription'),
+              )
+            : OutlinedButton.icon(
+                onPressed: () => _setRevoked(m, true),
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444))),
+                icon: const Icon(Icons.block_rounded, size: 18),
+                label: const Text('Revoke subscription'),
+              ),
       ]),
     );
+  }
+
+  Future<void> _setRevoked(Map<String, dynamic> m, bool revoke) async {
+    final email = (m['email'] ?? '').toString();
+    if (revoke) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Revoke House Care?'),
+          content: Text('${m['fullName']} will lose free labor and the House Care card will leave their home screen.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Revoke')),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    final res = revoke ? await NgmyHouseWorkersApi.adminCareRevoke(email) : await NgmyHouseWorkersApi.adminCareRestore(email);
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      _snack(context, revoke ? 'Subscription revoked.' : 'Subscription restored.');
+      _load();
+    } else {
+      _snack(context, (res['error'] ?? 'Could not update.').toString(), error: true);
+    }
   }
 }
 
