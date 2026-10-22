@@ -276,6 +276,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       _loading = false;
       if (results[0]['ok'] == true) {
         _workers = _maps(results[0]['workers']);
+        _needsRegistry = results[0]['needsRegistry'] == true;
       } else {
         _error = (results[0]['error'] ?? 'Could not load workers.').toString();
       }
@@ -309,6 +310,15 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
     if (n != _openJobs) setState(() => _openJobs = n);
   }
 
+  /// True when the server says this account is not in Civic Registry: no workers shown, no work sent.
+  bool _needsRegistry = false;
+
+  /// The state on the person's Civic Registry record. Workers and work are always for this state.
+  String get _registryState {
+    final s = (_me?['registryState'] ?? '').toString().trim();
+    return s.isEmpty ? widget.state.trim() : s;
+  }
+
   Map<String, dynamic> get _care =>
       _me?['care'] is Map ? Map<String, dynamic>.from(_me!['care'] as Map) : const <String, dynamic>{};
 
@@ -318,7 +328,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
   Future<void> _openPostWork() async {
     final posted = await showNgmyPostWorkSheet(
       context,
-      state: widget.state,
+      state: _registryState,
       clientName: widget.clientName,
       clientPhone: widget.clientPhone,
       care: _care,
@@ -333,7 +343,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       context,
       care: _care,
       hasRegistryId: _eligibility['hasRegistryId'] == true || widget.isAdmin,
-      state: widget.state,
+      state: _registryState,
       clientName: widget.clientName,
       clientEmail: widget.clientEmail,
       cashAppUrl: widget.cashAppUrl,
@@ -479,7 +489,9 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  widget.state.trim().isEmpty ? 'House workers' : 'Workers in ${widget.state}',
+                  _needsRegistry
+                      ? 'House workers'
+                      : (_registryState.isEmpty ? 'House workers' : 'Workers in $_registryState'),
                   style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: c.ink),
                 ),
               ),
@@ -499,7 +511,9 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
                 : (_workers.isEmpty
                     ? Center(
                         child: Text(
-                          _error ?? 'No workers in ${widget.state.trim().isEmpty ? 'your state' : widget.state} yet.',
+                          _needsRegistry
+                              ? 'Register in Civic Registry to see the workers in your state and to send work. Your account email must be connected to your registry record.'
+                              : (_error ?? 'No workers in ${_registryState.isEmpty ? 'your state' : _registryState} yet.'),
                           textAlign: TextAlign.center,
                           style: TextStyle(color: c.muted, fontSize: 12),
                         ),
@@ -568,7 +582,7 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
                       : (myWorker['status'] == 'deactivated' ? 'Worker: paused' : 'Worker application: ${myWorker['status']}'),
                   Icons.hourglass_top_rounded,
                   const Color(0xFFF59E0B),
-                  () => showNgmyWorkerApplySheet(context, state: widget.state, clientName: widget.clientName, clientPhone: widget.clientPhone).then((_) => _load()),
+                  () => showNgmyWorkerApplySheet(context, state: _registryState, clientName: widget.clientName, clientPhone: widget.clientPhone).then((_) => _load()),
                 ),
               if (widget.isAdmin)
                 _pill('Worker applications', Icons.admin_panel_settings_rounded, const Color(0xFF8B5CF6), _openAdmin),
@@ -694,7 +708,7 @@ class _NgmyApplyWorkerButtonState extends State<NgmyApplyWorkerButton> {
         borderRadius: BorderRadius.circular(12),
         onTap: () => showNgmyWorkerApplySheet(
           context,
-          state: widget.state,
+          state: ((me['registryState'] ?? '').toString().trim().isEmpty ? widget.state : me['registryState'].toString()),
           clientName: widget.clientName,
           clientPhone: widget.clientPhone,
         ).then((_) => _load()),

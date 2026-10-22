@@ -2074,11 +2074,16 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   const isAdmin = isNgmyAdminEmail(email);
 
   if (action === "hwList") {
-    const state = hwText(body?.state, 60);
-    if (!state) return jsonOk({ ok: true, workers: [] });
-    const { data, error } = await db.from("house_workers").select("*")
-      .eq("status", "approved").ilike("state", state).limit(200);
+    // A person only sees the workers of the state they are registered in (Civic Registry).
+    // The state is read from their registry record, never from what the phone sends. Admins may look at any state.
+    const myElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !myElig?.hasRegistryId) return jsonOk({ ok: true, workers: [], needsRegistry: true });
+    const state = isAdmin ? (hwText(body?.state, 60) || myElig?.state || "") : (myElig?.state ?? "");
+    if (!state) return jsonOk({ ok: true, workers: [], registryState: "" });
+    const { data: rows, error } = await db.from("house_workers").select("*")
+      .eq("status", "approved").limit(500);
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const data = (rows ?? []).filter((w: any) => statesMatch(String(w.state ?? ""), state));
     const elig = await hwEligibility(db, (data ?? []).map((w: any) => w.email));
     const workers = (data ?? []).filter((w: any) => hwCanWork(elig.get(emailKey(w.email)), w.email)).map(hwPublicWorker)
       .sort((a: any, b: any) => (b.rating - a.rating) || (b.jobsDone - a.jobsDone));
@@ -2132,6 +2137,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       inbox,
       isAdmin,
       eligibility: myElig ?? null,
+      registryState: myElig?.state ?? "",
       plans: await hwPlans(db, email),
       care: await hwCare(db, email),
     });
@@ -2230,7 +2236,11 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (!isAdmin && !postElig?.hasRegistryId) {
       return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to submit work." }, 403);
     }
-    const state = postElig?.state || hwText(body?.state, 60);
+    // The work goes to the state on their Civic Registry record, nowhere else.
+    const state = isAdmin ? (postElig?.state || hwText(body?.state, 60)) : (postElig?.state ?? "");
+    if (!state) {
+      return jsonOk({ ok: false, error: "Your Civic Registry record has no state, so we cannot send your work to workers yet." }, 400);
+    }
     const laborFree = (await hwCare(db, email)).active;
     const details = hwLongText(body?.details, 1500);
     const clientName = hwText(body?.clientName, 80);
@@ -2264,9 +2274,11 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const canWork = me?.status === "approved" && hwCanWork((await hwEligibility(db, [email])).get(email), email);
     if (!canWork) return jsonOk({ ok: false, error: "Only approved workers in good standing can pick up jobs." }, 403);
     if (action === "hwJobs") {
-      const { data } = await db.from("house_work_requests").select("*")
-        .eq("status", "open").ilike("state", me.state).neq("client_email", email)
-        .order("created_at", { ascending: false }).limit(60);
+      // A worker only sees work posted in their own state.
+      const { data: openRows } = await db.from("house_work_requests").select("*")
+        .eq("status", "open").neq("client_email", email)
+        .order("created_at", { ascending: false }).limit(300);
+      const data = (openRows ?? []).filter((r: any) => statesMatch(String(r.state ?? ""), String(me.state ?? ""))).slice(0, 60);
       const jobs = (data ?? []).map((r: any) => ({
         id: r.id, details: r.details, city: r.city, state: r.state, category: r.category,
         bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80).split(" ")[0],
@@ -2275,11 +2287,15 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: true, jobs, state: me.state });
     }
     const id = hwText(body?.requestId, 60);
+    // Only work from the worker's own state can be picked up.
+    const { data: target } = await db.from("house_work_requests").select("state").eq("id", id).maybeSingle();
+    if (!target || !statesMatch(String(target.state ?? ""), String(me.state ?? ""))) {
+      return jsonOk({ ok: false, error: "This job is not in your state." }, 403);
+    }
     // First worker to tap wins: the update only matches while the job is still open.
     const { data: picked } = await db.from("house_work_requests").update({
       worker_email: email, status: "accepted", accepted_at: now,
-    }).eq("id", id).eq("status", "open").is("worker_email", null).neq("client_email", email)
-      .ilike("state", me.state).select("*");
+    }).eq("id", id).eq("status", "open").is("worker_email", null).neq("client_email", email).select("*");
     if (!picked || picked.length === 0) {
       return jsonOk({ ok: false, error: "Another worker already picked up this job." }, 409);
     }
@@ -2312,6 +2328,10 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
           ? "You cannot work right now: more than 5 missed or more than 3 claims in Civic Registry."
           : "You need at least one bio page (Menu Studio → Bio Studio) to be a worker.",
       }, 403);
+    }
+    // A worker works in the state they are registered in, and only there.
+    if (!isAdmin && elig?.state && !statesMatch(elig.state, state)) {
+      return jsonOk({ ok: false, error: `You are registered in ${displayStateName(elig.state)}, so you can only work in ${displayStateName(elig.state)}.` }, 403);
     }
     const { data: prev } = await db.from("house_workers").select("*").eq("email", email).maybeSingle();
     if (prev?.status === "removed") {
@@ -2365,6 +2385,14 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       return jsonOk({ ok: false, error: "This worker is not available." }, 404);
     }
     if (w.email === email) return jsonOk({ ok: false, error: "You cannot send work to yourself." }, 400);
+    // Only someone registered in Civic Registry can send work, and only to a worker of their own state.
+    const reqElig = (await hwEligibility(db, [email])).get(email);
+    if (!isAdmin && !reqElig?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to send work." }, 403);
+    }
+    if (!isAdmin && !statesMatch(reqElig?.state ?? "", String(w.state ?? ""))) {
+      return jsonOk({ ok: false, error: "You can only send work to workers in your own state." }, 403);
+    }
     // A booking is a worker, a day, and a time. Only one open booking per slot.
     const bookingDate = hwDate(body?.bookingDate);
     const bookingTime = hwSlot(body?.bookingTime);
