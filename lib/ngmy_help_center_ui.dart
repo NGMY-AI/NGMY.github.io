@@ -273,11 +273,77 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     return '$feeBit · covered until ${until.month}/${until.day}/${until.year}';
   }
 
+  // House & Insurance is only for people registered in Civic Registry (their email is connected
+  // to a registry record). Everyone else can do nothing here: no work, no requests, no payments.
+  bool? _houseRegistered;
+  bool _houseRegistryLoading = false;
+  bool _houseRegistryFailed = false;
+
+  bool get _houseAllowed => widget.isAdmin || _houseRegistered == true;
+
+  Future<void> _loadHouseRegistry() async {
+    if (_houseRegistryLoading) return;
+    _houseRegistryLoading = true;
+    _houseRegistryFailed = false;
+    final res = await NgmyHouseWorkersApi.me();
+    if (!mounted) return;
+    setState(() {
+      _houseRegistryLoading = false;
+      if (res['ok'] == true) {
+        final e = res['eligibility'];
+        _houseRegistered = (e is Map && e['hasRegistryId'] == true) || res['isAdmin'] == true;
+      } else {
+        _houseRegistryFailed = true;
+      }
+    });
+  }
+
+  Widget _houseLockedCard(bool isDark) {
+    final checking = _houseRegistered == null && !_houseRegistryFailed;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        color: const Color(0xFFEF4444).withOpacity(isDark ? 0.12 : 0.08),
+        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.45)),
+      ),
+      child: Column(
+        children: [
+          Icon(checking ? Icons.hourglass_top_rounded : Icons.lock_rounded, size: 34, color: const Color(0xFFEF4444)),
+          const SizedBox(height: 10),
+          Text(
+            checking ? 'Checking Civic Registry…' : 'Civic Registry only',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _houseRegistryFailed
+                ? 'Could not check your Civic Registry status. Check your connection and try again.'
+                : (checking
+                    ? 'One moment.'
+                    : 'House & Insurance is only for people registered in Civic Registry. Register first (your account email must be connected to your registry record). Until then you cannot request work, send work, or pay for anything here.'),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, height: 1.4, color: isDark ? Colors.white70 : const Color(0xFF475569)),
+          ),
+          if (_houseRegistryFailed) ...[
+            const SizedBox(height: 10),
+            OutlinedButton(onPressed: _loadHouseRegistry, child: const Text('Try again')),
+          ],
+        ],
+      ),
+    );
+  }
+
   bool get _houseSubscribed =>
       widget.appConfig != null &&
       NgmyHouseInsurance.hasActiveSubscription(widget.appConfig, widget.clientEmail);
 
   Future<void> _payHouseInsuranceStripe() async {
+    if (!_houseAllowed) {
+      _snack('Payments here are only for people registered in Civic Registry.');
+      return;
+    }
     if (!NgmyStripePayments.hasCheckoutLink(NgmyStripeProduct.houseInsurance)) {
       _snack('Card checkout is not linked yet. Use Cash App to send the \$${NgmyHouseInsurance.monthlyFeeFromConfig(widget.appConfig).toStringAsFixed(0)}.');
       return;
@@ -297,6 +363,10 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
   }
 
   Future<void> _payHouseInsuranceCashApp() async {
+    if (!_houseAllowed) {
+      _snack('Payments here are only for people registered in Civic Registry.');
+      return;
+    }
     final url = _cfg.resolvedCashAppUrl();
     if (url.isEmpty) {
       _snack('Cash App is not configured yet.');
@@ -483,7 +553,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
           (double.tryParse(_mileageC.text.trim()) ?? 0) > 0;
     }
     if (_isHouseFixture) {
-      return _houseSubscribed && _selectedCoverage.isNotEmpty;
+      return _houseAllowed && _houseSubscribed && _selectedCoverage.isNotEmpty;
     }
     return true;
   }
@@ -1099,6 +1169,16 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
             _field('Estimated mileage (miles) *', _mileageC, isDark, onChanged: (_) => _touchForm()),
             const SizedBox(height: 10),
             _deliveryFeeBox(isDark),
+          ] else if (_isHouseFixture && !_houseAllowed) ...[
+            const SizedBox(height: 10),
+            Builder(builder: (context) {
+              if (_houseRegistered == null && !_houseRegistryLoading && !_houseRegistryFailed) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) unawaited(_loadHouseRegistry());
+                });
+              }
+              return _houseLockedCard(isDark);
+            }),
           ] else if (_isHouseFixture) ...[
             const SizedBox(height: 10),
             NgmyHouseWorkersSection(

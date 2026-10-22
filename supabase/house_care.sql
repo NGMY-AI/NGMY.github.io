@@ -32,3 +32,6 @@ alter table public.house_subscriptions enable row level security;
 alter table public.house_work_requests add column if not exists labor_free boolean not null default false;
 alter table public.house_work_requests add column if not exists materials_cost numeric;
 alter table public.house_work_requests add column if not exists labor_cost numeric;
+
+-- What NGMY paid the worker for a House Care job (set by an admin); a worker's monthly record adds this to labor_cost.
+alter table public.house_work_requests add column if not exists worker_pay numeric;

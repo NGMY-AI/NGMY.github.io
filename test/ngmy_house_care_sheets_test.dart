@@ -92,4 +92,44 @@ void main() {
     expect(tester.widget<ElevatedButton>(find.widgetWithText(ElevatedButton, 'Post work')).onPressed, isNull);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('work arrives as an offer with one big Accept, and the record shows each month', (tester) async {
+    tester.view.physicalSize = const Size(430, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: ngmyOfferSheetForTest({
+          'id': 'j1',
+          'category': 'Faucet & sink leaks',
+          'city': 'Atlanta',
+          'state': 'Georgia',
+          'details': 'Kitchen tap drips all night.',
+          'laborFree': true,
+        }),
+      ),
+    ));
+    expect(find.text('Accept'), findsOneWidget);
+    expect(find.text('Faucet & sink leaks'), findsOneWidget);
+    expect(find.textContaining('materials only'), findsOneWidget);
+
+    final stats = {
+      'totalDone': 5,
+      'totalEarned': 240.5,
+      'thisMonth': {'month': '2026-10', 'done': 3, 'earned': 150.0, 'materials': 20.0},
+      'months': [
+        {'month': '2026-10', 'done': 3, 'earned': 150.0, 'materials': 20.0},
+        {'month': '2026-09', 'done': 2, 'earned': 90.5, 'materials': 5.0},
+      ],
+    };
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ngmyWorkRecordSheetForTest(stats))));
+    expect(find.text('October 2026'), findsOneWidget);
+    expect(find.text('September 2026'), findsOneWidget);
+    expect(find.text('\$240.50'), findsOneWidget);
+    expect(find.text('3 jobs'), findsOneWidget);
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: ngmyWorkRecordCardForTest(stats))));
+    expect(find.textContaining('3 jobs done'), findsOneWidget);
+    expect(find.textContaining('\$150.00 earned'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

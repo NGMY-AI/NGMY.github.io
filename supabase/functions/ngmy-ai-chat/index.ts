@@ -1586,7 +1586,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
-  "hwCare", "hwCareSign", "hwAdminCare",
+  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -2053,6 +2053,45 @@ async function hwCare(db: any, email: string) {
   };
 }
 
+/** A worker's record: jobs finished and money earned, by month and in total. */
+async function hwWorkerStats(db: any, email: string) {
+  let rows: any[] = [];
+  const first = await db.from("house_work_requests")
+    .select("done_at,labor_cost,materials_cost,worker_pay,labor_free")
+    .eq("worker_email", email).eq("status", "done").order("done_at", { ascending: false }).limit(2000);
+  if (first.error) {
+    // The pay columns are not in the database yet: count jobs only.
+    const second = await db.from("house_work_requests").select("done_at")
+      .eq("worker_email", email).eq("status", "done").order("done_at", { ascending: false }).limit(2000);
+    rows = second.data ?? [];
+  } else {
+    rows = first.data ?? [];
+  }
+  const byMonth = new Map<string, { month: string; done: number; earned: number; materials: number }>();
+  let totalDone = 0;
+  let totalEarned = 0;
+  for (const r of rows) {
+    const month = String(r.done_at ?? "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    const earned = (Number(r.labor_cost ?? 0) || 0) + (Number(r.worker_pay ?? 0) || 0);
+    const entry = byMonth.get(month) ?? { month, done: 0, earned: 0, materials: 0 };
+    entry.done += 1;
+    entry.earned += earned;
+    entry.materials += Number(r.materials_cost ?? 0) || 0;
+    byMonth.set(month, entry);
+    totalDone += 1;
+    totalEarned += earned;
+  }
+  const months = [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month));
+  const nowMonth = new Date().toISOString().slice(0, 7);
+  return {
+    months,
+    totalDone,
+    totalEarned,
+    thisMonth: byMonth.get(nowMonth) ?? { month: nowMonth, done: 0, earned: 0, materials: 0 },
+  };
+}
+
 /** Deletes one worker photo from storage. Only touches house-workers/ files. */
 async function hwRemovePhoto(db: any, url: string): Promise<void> {
   const marker = "/storage/v1/object/public/media/";
@@ -2138,6 +2177,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       isAdmin,
       eligibility: myElig ?? null,
       registryState: myElig?.state ?? "",
+      stats: me ? await hwWorkerStats(db, email) : null,
       plans: await hwPlans(db, email),
       care: await hwCare(db, email),
     });
@@ -2204,6 +2244,10 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (limited) return limited;
     const plan = body?.plan === "premium" ? "premium" : body?.plan === "basic" ? "basic" : "";
     if (!plan) return jsonOk({ ok: false, error: "Pick a plan." }, 400);
+    // Paying for House & Insurance needs a Civic Registry record.
+    if (!isAdmin && !(await hwEligibility(db, [email])).get(email)?.hasRegistryId) {
+      return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to pay for House & Insurance." }, 403);
+    }
     const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
     const base = Math.max(Date.now(), Date.parse(String(prev?.access_until ?? "")) || 0);
     const until = new Date(base + HW_PLAN_DAYS * 86400000).toISOString();
@@ -2500,6 +2544,34 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
   }
 
   if (!isAdmin) return jsonOk({ ok: false, error: "Admin only." }, 403);
+  if (action === "hwAdminPayList") {
+    // Finished House Care jobs (no labor charge to the member) that have not been paid to the worker yet.
+    const { data, error } = await db.from("house_work_requests").select("*")
+      .eq("status", "done").eq("labor_free", true).is("worker_pay", null)
+      .order("done_at", { ascending: false }).limit(100);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const emails = [...new Set((data ?? []).map((r: any) => r.worker_email).filter(Boolean))];
+    const { data: ws } = emails.length ? await db.from("house_workers").select("email,name").in("email", emails) : { data: [] as any[] };
+    const names = new Map((ws ?? []).map((w: any) => [w.email, w.name]));
+    return jsonOk({
+      ok: true,
+      jobs: (data ?? []).map((r: any) => ({
+        id: r.id, workerEmail: r.worker_email, workerName: names.get(r.worker_email) ?? r.worker_email,
+        category: r.category, city: r.city, details: hwText(r.details, 200), doneAt: r.done_at,
+        materialsCost: r.materials_cost ?? null,
+      })),
+    });
+  }
+  if (action === "hwAdminPay") {
+    const id = hwText(body?.requestId, 60);
+    const amount = Math.round((Number(body?.amount ?? 0) || 0) * 100) / 100;
+    if (!id || amount < 0 || amount > 100000) return jsonOk({ ok: false, error: "Enter the amount paid." }, 400);
+    const { data, error } = await db.from("house_work_requests").update({ worker_pay: amount })
+      .eq("id", id).eq("status", "done").select("id");
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    if (!data || data.length === 0) return jsonOk({ ok: false, error: "That job is not finished." }, 409);
+    return jsonOk({ ok: true });
+  }
   if (action === "hwAdminCare") {
     // Every House Care agreement: who signed, the signature, the selfie, the term and when the next payment is due.
     const { data, error } = await db.from("house_subscriptions").select("*")

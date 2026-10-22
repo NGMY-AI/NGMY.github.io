@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -47,6 +48,8 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> care() => _call('hwCare');
   static Future<Map<String, dynamic>> careSign(Map<String, dynamic> form) => _call('hwCareSign', form);
   static Future<Map<String, dynamic>> adminCare() => _call('hwAdminCare');
+  static Future<Map<String, dynamic>> adminPayList() => _call('hwAdminPayList');
+  static Future<Map<String, dynamic>> adminPay(String requestId, double amount) => _call('hwAdminPay', {'requestId': requestId, 'amount': amount});
   static Future<Map<String, dynamic>> rate(String id, int rating, String review) =>
       _call('hwRate', {'requestId': id, 'rating': rating, 'review': review});
   static Future<Map<String, dynamic>> cancel(String id) => _call('hwCancel', {'requestId': id});
@@ -260,7 +263,6 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
 
   @override
   void dispose() {
-    _jobsTimer?.cancel();
     _spin.dispose();
     super.dispose();
   }
@@ -282,32 +284,6 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
       }
       if (results[1]['ok'] == true) _me = Map<String, dynamic>.from(results[1]);
     });
-    _syncJobsPolling();
-  }
-
-  // Approved workers see new work as it is posted, like orders popping up for a delivery driver.
-  Timer? _jobsTimer;
-  int _openJobs = 0;
-
-  void _syncJobsPolling() {
-    final approved = _myWorker?['status'] == 'approved';
-    if (!approved) {
-      _jobsTimer?.cancel();
-      _jobsTimer = null;
-      if (_openJobs != 0 && mounted) setState(() => _openJobs = 0);
-      return;
-    }
-    if (_jobsTimer != null) return;
-    unawaited(_pollJobs());
-    _jobsTimer = Timer.periodic(const Duration(seconds: 15), (_) => _pollJobs());
-  }
-
-  Future<void> _pollJobs() async {
-    final res = await NgmyHouseWorkersApi.jobs();
-    if (!mounted || res['ok'] != true) return;
-    final n = _maps(res['jobs']).length;
-    if (n > _openJobs) HapticFeedback.mediumImpact();
-    if (n != _openJobs) setState(() => _openJobs = n);
   }
 
   /// True when the server says this account is not in Civic Registry: no workers shown, no work sent.
@@ -352,15 +328,13 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
     _load();
   }
 
-  Future<void> _openJobBoard() async {
+  Future<void> _openAdminPay() async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _JobBoardSheet(workerName: (_myWorker?['name'] ?? '').toString()),
+      builder: (_) => const _AdminPaySheet(),
     );
-    _load();
-    _pollJobs();
   }
 
   Future<void> _openAdminCare() async {
@@ -503,6 +477,17 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
               ),
             ],
           ),
+          // An approved worker never has to open anything: work rolls in here live and is accepted
+          // with one tap, and the month's record sits right under it.
+          if (workerApproved) ...[
+            const SizedBox(height: 6),
+            _LiveWorkFeed(workerName: (myWorker?['name'] ?? '').toString(), onChanged: _load),
+            if (_me?['stats'] is Map) ...[
+              const SizedBox(height: 8),
+              _WorkRecordCard(stats: Map<String, dynamic>.from(_me!['stats'] as Map)),
+            ],
+            const SizedBox(height: 10),
+          ],
           const SizedBox(height: 6),
           SizedBox(
             height: 112,
@@ -570,11 +555,11 @@ class _NgmyHouseWorkersSectionState extends State<NgmyHouseWorkersSection> with 
               ),
               _pill('My requests', Icons.assignment_rounded, _kHwAccent, _openMyRequests, badge: _openRequests),
               if (workerApproved)
-                _pill('Job board', Icons.bolt_rounded, const Color(0xFFF97316), _openJobBoard, badge: _openJobs),
-              if (workerApproved)
                 _pill('Work inbox', Icons.inbox_rounded, _kHwGreen, _openInbox, badge: _newJobs),
               if (widget.isAdmin)
                 _pill('House Care members', Icons.fact_check_rounded, const Color(0xFF14B8A6), _openAdminCare),
+              if (widget.isAdmin)
+                _pill('Pay workers', Icons.payments_rounded, const Color(0xFFF59E0B), _openAdminPay),
               if (myWorker != null && !workerApproved)
                 _pill(
                   myWorker['status'] == 'pending'

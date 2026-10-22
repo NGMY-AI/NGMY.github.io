@@ -270,69 +270,89 @@ Future<bool> showNgmyPostWorkSheet(
   return posted == true;
 }
 
-// ── Job board (workers) ─────────────────────────────────────────────────────
+// ── Live work feed (workers) ────────────────────────────────────────────────
+// Work rolls in by itself, like batches on a delivery app: no button to open. Each new job slides in,
+// the phone buzzes, an offer card pops up, and the worker just taps Accept.
 
-class _JobBoardSheet extends StatefulWidget {
-  const _JobBoardSheet({required this.workerName});
+class _LiveWorkFeed extends StatefulWidget {
+  const _LiveWorkFeed({required this.workerName, required this.onChanged});
   final String workerName;
+  final VoidCallback onChanged;
 
   @override
-  State<_JobBoardSheet> createState() => _JobBoardSheetState();
+  State<_LiveWorkFeed> createState() => _LiveWorkFeedState();
 }
 
-class _JobBoardSheetState extends State<_JobBoardSheet> {
+class _LiveWorkFeedState extends State<_LiveWorkFeed> with SingleTickerProviderStateMixin {
   List<Map<String, dynamic>> _jobs = [];
   final Set<String> _seen = {};
   final Set<String> _fresh = {};
-  bool _loading = true;
+  final Set<String> _offered = {};
+  bool _firstLoad = true;
+  bool _offerOpen = false;
   String? _error;
-  String _state = '';
   String? _picking;
   Timer? _timer;
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))..repeat(reverse: true);
 
   @override
   void initState() {
     super.initState();
     _load();
-    _timer = Timer.periodic(const Duration(seconds: 6), (_) => _load(quiet: true));
+    _timer = Timer.periodic(const Duration(seconds: 6), (_) => _load());
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _pulse.dispose();
     super.dispose();
   }
 
-  Future<void> _load({bool quiet = false}) async {
+  Future<void> _load() async {
     final res = await NgmyHouseWorkersApi.jobs();
     if (!mounted) return;
     if (res['ok'] != true) {
-      if (!quiet || _jobs.isEmpty) setState(() {
-        _loading = false;
-        _error = (res['error'] ?? 'Could not load work.').toString();
-      });
+      if (_jobs.isEmpty) setState(() => _error = (res['error'] ?? '').toString());
       return;
     }
     final jobs = _maps(res['jobs']);
-    final first = _seen.isEmpty && _loading;
-    final newOnes = <String>{
+    final newOnes = <Map<String, dynamic>>[
       for (final j in jobs)
-        if (!_seen.contains((j['id'] ?? '').toString()) && !first) (j['id'] ?? '').toString(),
-    };
-    if (newOnes.isNotEmpty) {
-      HapticFeedback.mediumImpact();
-      SystemSound.play(SystemSoundType.alert);
-    }
+        if (!_seen.contains(j['id'].toString())) j,
+    ];
     setState(() {
-      _loading = false;
       _error = null;
-      _state = (res['state'] ?? '').toString();
       _jobs = jobs;
-      _fresh
-        ..removeWhere((id) => !jobs.any((j) => j['id'].toString() == id))
-        ..addAll(newOnes);
-      _seen.addAll(jobs.map((j) => (j['id'] ?? '').toString()));
+      _fresh.removeWhere((id) => !jobs.any((j) => j['id'].toString() == id));
+      if (!_firstLoad) _fresh.addAll(newOnes.map((j) => j['id'].toString()));
+      _seen.addAll(jobs.map((j) => j['id'].toString()));
     });
+    final wasFirst = _firstLoad;
+    _firstLoad = false;
+    if (newOnes.isNotEmpty) {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+      // The newest offer pops up by itself (on the very first load only if something is waiting).
+      if (!_offerOpen && (!wasFirst || jobs.isNotEmpty)) {
+        final next = newOnes.firstWhere((j) => !_offered.contains(j['id'].toString()), orElse: () => const {});
+        if (next.isNotEmpty) unawaited(_showOffer(next));
+      }
+    }
+  }
+
+  Future<void> _showOffer(Map<String, dynamic> job) async {
+    final id = job['id'].toString();
+    _offered.add(id);
+    _offerOpen = true;
+    final accepted = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _OfferSheet(job: job),
+    );
+    _offerOpen = false;
+    if (accepted == true && mounted) await _pick(job);
   }
 
   Future<void> _pick(Map<String, dynamic> job) async {
@@ -342,7 +362,7 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
     if (!mounted) return;
     setState(() => _picking = null);
     if (res['ok'] != true) {
-      _snack(context, (res['error'] ?? 'Could not pick up this job.').toString(), error: true);
+      _snack(context, (res['error'] ?? 'Could not accept this work.').toString(), error: true);
       _load();
       return;
     }
@@ -350,6 +370,7 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
     final name = (res['clientName'] ?? 'the client').toString();
     final address = (res['address'] ?? '').toString();
     final laborFree = res['laborFree'] == true;
+    widget.onChanged();
     await showDialog<void>(
       context: context,
       builder: (ctx) {
@@ -359,7 +380,7 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
           title: Row(children: [
             const Icon(Icons.check_circle_rounded, color: _kHwGreen),
             const SizedBox(width: 8),
-            Text('The job is yours', style: TextStyle(color: c.ink, fontWeight: FontWeight.w900)),
+            Text('The work is yours', style: TextStyle(color: c.ink, fontWeight: FontWeight.w900)),
           ]),
           content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('$name\n${address.isEmpty ? '' : '$address\n'}${phone.isEmpty ? '' : phone}', style: TextStyle(color: c.ink, height: 1.4)),
@@ -374,7 +395,7 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
               FilledButton.icon(
                 onPressed: () {
                   Navigator.pop(ctx);
-                  ngmyOpenWhatsApp(context, phone, 'Hi $name, this is ${widget.workerName} from NGMY House & Insurance. I picked up your work and I am ready to talk about it.');
+                  ngmyOpenWhatsApp(context, phone, 'Hi $name, this is ${widget.workerName} from NGMY House & Insurance. I accepted your work and I am ready to talk about it.');
                 },
                 icon: const Icon(Icons.chat_rounded, size: 16),
                 label: const Text('WhatsApp client'),
@@ -390,58 +411,71 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
   @override
   Widget build(BuildContext context) {
     final c = _HwColors(context);
-    return _sheetFrame(
-      context,
-      title: _state.isEmpty ? 'Job board' : 'Job board · $_state',
-      icon: Icons.bolt_rounded,
-      child: _loading
-          ? const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
-          : (_error != null && _jobs.isEmpty)
-              ? Padding(padding: const EdgeInsets.all(30), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
-              : ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(children: [
-                        Container(width: 8, height: 8, decoration: const BoxDecoration(color: _kHwGreen, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text('Live: new work appears here by itself. Tap Pick up to take it.', style: TextStyle(fontSize: 11.5, color: c.muted))),
-                      ]),
-                    ),
-                    if (_jobs.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(30),
-                        child: Text('No work waiting right now.\nStay on this screen and it will pop up.', textAlign: TextAlign.center, style: TextStyle(color: c.muted, height: 1.4)),
-                      ),
-                    for (final job in _jobs)
-                      TweenAnimationBuilder<double>(
-                        key: ValueKey(job['id']),
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutBack,
-                        builder: (context, t, child) => Opacity(
-                          opacity: t.clamp(0.0, 1.0),
-                          child: Transform.translate(offset: Offset(0, (1 - t) * 24), child: child),
-                        ),
-                        child: _jobCard(job, c),
-                      ),
-                  ],
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      decoration: BoxDecoration(
+        color: c.sheet,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kJobOrange.withOpacity(0.45)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            FadeTransition(
+              opacity: Tween(begin: 0.35, end: 1.0).animate(_pulse),
+              child: Container(width: 9, height: 9, decoration: const BoxDecoration(color: _kHwGreen, shape: BoxShape.circle)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _jobs.isEmpty ? 'Looking for work…' : '${_jobs.length} available ${_jobs.length == 1 ? 'job' : 'jobs'}',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14.5, color: c.ink),
+              ),
+            ),
+            Text('LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.4, color: _kHwGreen.withOpacity(0.9))),
+          ]),
+          const SizedBox(height: 8),
+          if (_jobs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _kJobOrange)),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    _error != null && _error!.isNotEmpty ? _error! : 'New work appears here by itself.',
+                    style: TextStyle(color: c.muted, fontSize: 12.5),
+                  ),
                 ),
+              ]),
+            ),
+          for (final job in _jobs)
+            TweenAnimationBuilder<double>(
+              key: ValueKey(job['id']),
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 460),
+              curve: Curves.easeOutBack,
+              builder: (context, t, child) => Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: Transform.translate(offset: Offset(0, (1 - t) * 26), child: child),
+              ),
+              child: _card(job, c),
+            ),
+        ],
+      ),
     );
   }
 
-  Widget _jobCard(Map<String, dynamic> job, _HwColors c) {
+  Widget _card(Map<String, dynamic> job, _HwColors c) {
     final id = job['id'].toString();
     final fresh = _fresh.contains(id);
-    final busy = _picking == id;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: c.tile,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: fresh ? _kJobOrange : c.line, width: fresh ? 1.8 : 1),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -456,23 +490,317 @@ class _JobBoardSheetState extends State<_JobBoardSheet> {
           Expanded(
             child: Text(
               (job['category'] ?? '').toString().isEmpty ? 'Home work' : job['category'].toString(),
-              style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 14),
+              style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 16),
             ),
           ),
           Text(_ago(job['createdAt']), style: TextStyle(fontSize: 11, color: c.muted)),
         ]),
-        const SizedBox(height: 4),
-        Text(
-          [job['city'], job['clientName']].where((e) => (e ?? '').toString().isNotEmpty).join(' · '),
-          style: TextStyle(fontSize: 11.5, color: c.muted),
-        ),
-        const SizedBox(height: 8),
-        Text((job['details'] ?? '').toString(), style: TextStyle(fontSize: 13, color: c.ink.withOpacity(0.9), height: 1.35)),
+        const SizedBox(height: 2),
+        Text([job['city'], job['clientName']].where((e) => (e ?? '').toString().isNotEmpty).join(' · '), style: TextStyle(fontSize: 11.5, color: c.muted)),
+        const SizedBox(height: 6),
+        Text((job['details'] ?? '').toString(), maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: c.ink.withOpacity(0.9), height: 1.35)),
         const SizedBox(height: 8),
         Align(alignment: Alignment.centerLeft, child: _laborBadge(job['laborFree'] == true)),
         const SizedBox(height: 10),
-        _primaryButton('Pick up this job', Icons.bolt_rounded, () => _pick(job), color: _kJobOrange, busy: busy),
+        SizedBox(
+          height: 46,
+          child: ElevatedButton(
+            onPressed: _picking != null ? null : () => _pick(job),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3FA535),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _picking == id
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('Accept', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          ),
+        ),
       ]),
+    );
+  }
+}
+
+/// The offer card that pops up when new work arrives: details and one big Accept button.
+class _OfferSheet extends StatelessWidget {
+  const _OfferSheet({required this.job});
+  final Map<String, dynamic> job;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 14),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+      decoration: BoxDecoration(color: c.sheet, borderRadius: BorderRadius.circular(24), border: Border.all(color: c.line)),
+      child: SafeArea(
+        top: false,
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: c.line, borderRadius: BorderRadius.circular(3)))),
+          const SizedBox(height: 14),
+          Center(child: Text('New work', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, letterSpacing: 1.6, color: _kJobOrange))),
+          const SizedBox(height: 6),
+          Center(
+            child: Text(
+              (job['category'] ?? '').toString().isEmpty ? 'Home work' : job['category'].toString(),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: c.ink),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Center(
+            child: Text(
+              [job['city'], job['state']].where((e) => (e ?? '').toString().isNotEmpty).join(', '),
+              style: TextStyle(fontSize: 14, color: c.muted),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text((job['details'] ?? '').toString(), maxLines: 5, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 15, height: 1.4, color: c.ink.withOpacity(0.9))),
+          const SizedBox(height: 12),
+          Center(child: _laborBadge(job['laborFree'] == true)),
+          const SizedBox(height: 18),
+          SizedBox(
+            height: 54,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF3FA535),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Accept', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+            ),
+          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Not now', style: TextStyle(color: c.muted, fontWeight: FontWeight.w700))),
+        ]),
+      ),
+    );
+  }
+}
+
+// ── Work record: jobs done and money earned, month by month ─────────────────
+
+String _monthName(String key) {
+  const names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  final parts = key.split('-');
+  if (parts.length != 2) return key;
+  final m = int.tryParse(parts[1]) ?? 0;
+  return m >= 1 && m <= 12 ? '${names[m - 1]} ${parts[0]}' : key;
+}
+
+String _money(dynamic v) => '\$${((v as num?) ?? 0).toDouble().toStringAsFixed(2)}';
+
+/// A small card with this month's count and earnings. Tap it for every month.
+class _WorkRecordCard extends StatelessWidget {
+  const _WorkRecordCard({required this.stats});
+  final Map<String, dynamic> stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    final month = stats['thisMonth'] is Map ? Map<String, dynamic>.from(stats['thisMonth'] as Map) : const <String, dynamic>{};
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _WorkRecordSheet(stats: stats),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: c.sheet, borderRadius: BorderRadius.circular(16), border: Border.all(color: _kHwGreen.withOpacity(0.45))),
+        child: Row(children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: _kHwGreen.withOpacity(0.16), borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.query_stats_rounded, color: _kHwGreen),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('My work record · ${_monthName((month['month'] ?? '').toString())}', style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 13)),
+              const SizedBox(height: 3),
+              Text(
+                '${month['done'] ?? 0} job${(month['done'] ?? 0) == 1 ? '' : 's'} done · ${_money(month['earned'])} earned',
+                style: TextStyle(color: c.muted, fontSize: 12.5, fontWeight: FontWeight.w700),
+              ),
+            ]),
+          ),
+          Icon(Icons.chevron_right_rounded, color: c.muted),
+        ]),
+      ),
+    );
+  }
+}
+
+class _WorkRecordSheet extends StatelessWidget {
+  const _WorkRecordSheet({required this.stats});
+  final Map<String, dynamic> stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    final months = _maps(stats['months']);
+    return _sheetFrame(
+      context,
+      title: 'My work record',
+      icon: Icons.query_stats_rounded,
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
+        children: [
+          Row(children: [
+            Expanded(child: _recordBox(c, 'All time', '${stats['totalDone'] ?? 0}', 'jobs done')),
+            const SizedBox(width: 10),
+            Expanded(child: _recordBox(c, 'All time', _money(stats['totalEarned']), 'earned')),
+          ]),
+          const SizedBox(height: 16),
+          Text('MONTH BY MONTH', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: c.muted)),
+          const SizedBox(height: 8),
+          if (months.isEmpty)
+            Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Text('No finished jobs yet. Accept work and mark it done to start your record.', textAlign: TextAlign.center, style: TextStyle(color: c.muted))),
+          for (final m in months)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.line)),
+              child: Row(children: [
+                Expanded(child: Text(_monthName((m['month'] ?? '').toString()), style: TextStyle(fontWeight: FontWeight.w900, color: c.ink))),
+                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('${m['done']} job${m['done'] == 1 ? '' : 's'}', style: TextStyle(fontWeight: FontWeight.w800, color: c.ink)),
+                  Text('${_money(m['earned'])} paid', style: TextStyle(fontSize: 12, color: _kHwGreen, fontWeight: FontWeight.w800)),
+                ]),
+              ]),
+            ),
+          const SizedBox(height: 6),
+          Text(
+            'Earned adds the labor you charged on standard jobs and what NGMY paid you for House Care member jobs.',
+            style: TextStyle(fontSize: 11.5, color: c.muted, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _recordBox(_HwColors c, String top, String big, String bottom) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.line)),
+        child: Column(children: [
+          Text(top.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: c.muted)),
+          const SizedBox(height: 4),
+          FittedBox(fit: BoxFit.scaleDown, child: Text(big, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: c.ink))),
+          Text(bottom, style: TextStyle(fontSize: 12, color: c.muted)),
+        ]),
+      );
+}
+
+// ── Admin: record what NGMY paid workers for House Care jobs ────────────────
+
+class _AdminPaySheet extends StatefulWidget {
+  const _AdminPaySheet();
+
+  @override
+  State<_AdminPaySheet> createState() => _AdminPaySheetState();
+}
+
+class _AdminPaySheetState extends State<_AdminPaySheet> {
+  List<Map<String, dynamic>> _jobs = [];
+  bool _loading = true;
+  String? _error;
+  final Map<String, TextEditingController> _amounts = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _amounts.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final res = await NgmyHouseWorkersApi.adminPayList();
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (res['ok'] == true) {
+        _jobs = _maps(res['jobs']);
+        _error = null;
+      } else {
+        _error = (res['error'] ?? 'Could not load.').toString();
+      }
+    });
+  }
+
+  Future<void> _pay(Map<String, dynamic> job) async {
+    final id = job['id'].toString();
+    final amount = double.tryParse((_amounts[id]?.text ?? '').trim().replaceAll(',', '.'));
+    if (amount == null || amount < 0) {
+      _snack(context, 'Type the amount you paid.', error: true);
+      return;
+    }
+    final res = await NgmyHouseWorkersApi.adminPay(id, amount);
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      _snack(context, 'Saved: ${_money(amount)} paid to ${job['workerName']}.');
+      _load();
+    } else {
+      _snack(context, (res['error'] ?? 'Could not save.').toString(), error: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = _HwColors(context);
+    return _sheetFrame(
+      context,
+      title: 'Pay workers',
+      icon: Icons.payments_rounded,
+      child: _loading
+          ? const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
+          : _error != null
+              ? Padding(padding: const EdgeInsets.all(30), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
+              : _jobs.isEmpty
+                  ? Padding(padding: const EdgeInsets.all(30), child: Text('Nothing to pay right now. Finished House Care jobs show here until you record the pay.', textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
+                  : ListView(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+                      children: [
+                        for (final j in _jobs)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.line)),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                              Text('${j['workerName']}', style: TextStyle(fontWeight: FontWeight.w900, color: c.ink)),
+                              Text([j['category'], j['city'], _shortDate(j['doneAt'])].where((e) => (e ?? '').toString().isNotEmpty).join(' · '), style: TextStyle(fontSize: 11.5, color: c.muted)),
+                              const SizedBox(height: 6),
+                              Text((j['details'] ?? '').toString(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: c.ink.withOpacity(0.85))),
+                              const SizedBox(height: 8),
+                              Row(children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _amounts.putIfAbsent(j['id'].toString(), () => TextEditingController()),
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: _field(context, 'Amount paid (\$)', icon: Icons.attach_money_rounded),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton(onPressed: () => _pay(j), child: const Text('Save')),
+                              ]),
+                            ]),
+                          ),
+                      ],
+                    ),
     );
   }
 }
@@ -1085,3 +1413,13 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
     );
   }
 }
+
+/// The work record sheet and the offer card as plain widgets, for tests.
+@visibleForTesting
+Widget ngmyWorkRecordSheetForTest(Map<String, dynamic> stats) => _WorkRecordSheet(stats: stats);
+
+@visibleForTesting
+Widget ngmyOfferSheetForTest(Map<String, dynamic> job) => _OfferSheet(job: job);
+
+@visibleForTesting
+Widget ngmyWorkRecordCardForTest(Map<String, dynamic> stats) => _WorkRecordCard(stats: stats);
