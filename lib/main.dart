@@ -10649,6 +10649,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       unawaited(_checkIncomingGameInvites());
       unawaited(_checkHouseCareExpiry());
+      unawaited(_checkNewHouseJobs());
       unawaited(_flushTxnOutbox());
       // Do not force a viewport resettle on every resume — returning from the
       // image picker was making Menu/Bio feel like the app was refreshing/crashing.
@@ -10845,6 +10846,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     ngmyInAppNotify = null;
     NgmyAdminLiveRefresh.removeListener(_scheduleAdminAlertSweep);
     _adminAlertDebounce?.cancel();
+    _houseJobsTimer?.cancel();
     ngmyOnStoreOrdersChanged = null;
     _pauseBackgroundSync(disableRealtimeLoop: true);
     try { _startupRebuildDebounce?.cancel(); } catch (_) {}
@@ -12755,6 +12757,49 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   Timer? _adminAlertDebounce;
   DateTime? _lastInviteCheck;
   final Set<String> _notifiedInviteIds = {};
+
+  final Set<String> _notifiedHouseJobIds = {};
+  DateTime? _houseJobsCheckedAt;
+  DateTime? _notHouseWorkerSince;
+  Timer? _houseJobsTimer;
+
+  /// An approved house worker sees a top notification as soon as new work is posted in their state.
+  /// People who are not approved workers are checked again only every half hour.
+  Future<void> _checkNewHouseJobs() async {
+    final u = _currentUser;
+    if (u == null) return;
+    final skipSince = _notHouseWorkerSince;
+    if (skipSince != null && DateTime.now().difference(skipSince) < const Duration(minutes: 30)) return;
+    final last = _houseJobsCheckedAt;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 25)) return;
+    _houseJobsCheckedAt = DateTime.now();
+    try {
+      final res = await NgmyHouseWorkersApi.jobs();
+      if (res['ok'] != true) {
+        _notHouseWorkerSince = DateTime.now();
+        _houseJobsTimer?.cancel();
+        _houseJobsTimer = null;
+        return;
+      }
+      _notHouseWorkerSince = null;
+      _houseJobsTimer ??= Timer.periodic(const Duration(seconds: 45), (_) => unawaited(_checkNewHouseJobs()));
+      final jobs = res['jobs'] is List ? (res['jobs'] as List).whereType<Map>().toList() : <Map>[];
+      final fresh = [for (final j in jobs) if (_notifiedHouseJobIds.add('${j['id']}')) j];
+      if (fresh.isEmpty) return;
+      final first = fresh.first;
+      final what = '${first['category'] ?? ''}'.trim().isEmpty ? 'Home work' : '${first['category']}';
+      final where = '${first['city'] ?? ''}'.trim();
+      await _pushInAppNotification(
+        title: fresh.length == 1 ? 'New work available' : '${fresh.length} new jobs available',
+        body: fresh.length == 1 ? (where.isEmpty ? what : '$what · $where') : 'Open House & Insurance to accept.',
+        tag: 'house_job_${first['id']}',
+        cooldown: const Duration(seconds: 10),
+        important: true,
+      );
+    } catch (e) {
+      debugPrint('[house jobs] check: $e');
+    }
+  }
 
   DateTime? _lastCareExpiryCheck;
 
@@ -14781,6 +14826,7 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       _scheduleAdminAlertSweep();
       unawaited(_checkIncomingGameInvites());
       unawaited(_checkHouseCareExpiry());
+      unawaited(_checkNewHouseJobs());
       await _persistLocalSnapshot();
       unawaited(_notifyStoreMarketDayListings());
   }

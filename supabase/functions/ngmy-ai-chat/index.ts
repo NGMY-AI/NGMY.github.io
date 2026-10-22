@@ -2415,7 +2415,7 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
       const data = (openRows ?? []).filter((r: any) => statesMatch(String(r.state ?? ""), String(me.state ?? ""))).slice(0, 60);
       const jobs = (data ?? []).map((r: any) => ({
         id: r.id, details: r.details, city: r.city, state: r.state, category: r.category,
-        bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80).split(" ")[0],
+        bestTime: r.best_time, createdAt: r.created_at, clientName: hwText(r.client_name, 80), address: hwText(r.address, 200),
         laborFree: r.labor_free === true,
       }));
       return jsonOk({ ok: true, jobs, state: me.state });
