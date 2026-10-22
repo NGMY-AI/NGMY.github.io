@@ -86,18 +86,73 @@ Future<NgmyServerWalletResult?> ngmySettleGameTxnOnServer(Map<String, dynamic> t
 /// an old, higher number back up.
 final Map<String, double> ngmyLastServerBalance = {};
 
+/// Net effect (bets negative, payouts positive) of this phone's game receipts that the server has
+/// not confirmed yet. The phone's balance already shows them, but the server step will apply them,
+/// so a balance save must not apply them a second time.
+final Map<String, ({String key, double delta})> ngmyUnsettledGameTxns = {};
+
+double ngmyUnsettledGameNetFor(String key) {
+  var sum = 0.0;
+  for (final e in ngmyUnsettledGameTxns.values) {
+    if (e.key == key) sum += e.delta;
+  }
+  return sum;
+}
+
+/// When this phone last saved a spend (a lower balance) for an account. Debits older than this have
+/// already been saved and cannot explain a new drop.
+final Map<String, DateTime> ngmyDebitsSavedAt = {};
+
+/// Spends made on this phone that have no ledger receipt in the app's list (Growth Income plan buys).
+final List<({String key, double amount, DateTime at})> ngmyNotedDebits = [];
+
+void ngmyNoteLocalDebit(String email, double amount) {
+  if (amount < 0.005) return;
+  final k = email.toLowerCase().trim();
+  final key = k.endsWith('+local.ngmy') ? k.substring(0, k.length - '+local.ngmy'.length) : k;
+  ngmyNotedDebits.add((key: key, amount: amount, at: DateTime.now()));
+  if (ngmyNotedDebits.length > 200) ngmyNotedDebits.removeRange(0, ngmyNotedDebits.length - 200);
+}
+
+double ngmyNotedDebitsSince(String key, DateTime since) {
+  var sum = 0.0;
+  for (final d in ngmyNotedDebits) {
+    if (d.key == key && d.at.isAfter(since)) sum += d.amount;
+  }
+  return sum;
+}
+
 /// The balance to save for an account, given this phone's figure ([local]), the last figure the
 /// server confirmed to this phone ([known]) and the server's balance right now ([cloud]).
 /// Only the change this phone made since it last looked is applied on top of the server's number,
 /// so an old, higher figure on a phone can never bring money back after another phone spent it.
-double ngmyBalanceToSave({required double local, required double? known, required double? cloud}) {
+///
+/// [explainedDebit] is the total of real spends (withdrawals, purchases, plan buys, admin removals)
+/// this phone made since its last save. A drop larger than that has no reason behind it (a stale or
+/// half-loaded balance on this phone), so the server's balance is kept instead. Money never leaves
+/// an account without a spend that explains it. Null means "no check" (older callers).
+double ngmyBalanceToSave({
+  required double local,
+  required double? known,
+  required double? cloud,
+  double? explainedDebit,
+}) {
   if (cloud == null) return local < 0 ? 0 : local;
   double target;
   if (known != null) {
     final change = local - known;
-    target = change.abs() < 0.005 ? cloud : cloud + change;
+    if (change.abs() < 0.005) {
+      target = cloud;
+    } else if (change < 0 && explainedDebit != null && -change > explainedDebit + 0.01) {
+      target = cloud;
+    } else {
+      target = cloud + change;
+    }
   } else {
     target = local > cloud + 0.01 ? cloud : local;
+    if (explainedDebit != null && target < cloud - 0.005 && cloud - target > explainedDebit + 0.01) {
+      target = cloud;
+    }
   }
   return target < 0 ? 0 : target;
 }

@@ -60,6 +60,7 @@ begin
   insert into public.transactions (id, "userEmail", amount, type, method, "sourceDetails", status, timestamp)
   values (v_id, v_email, v_amount, v_type, v_method, v_note, v_status, coalesce(p_txn->>'timestamp', ''));
 
+  perform set_config('ngmy.via', 'game_rpc', true);
   update public.users
      set "accountBalance" = v_balance + v_delta
    where lower(email) = v_email

@@ -15,6 +15,7 @@ import 'ngmy_local_deposit_qr.dart';
 import 'ngmy_bottom_nav_frame.dart';
 import 'ngmy_feature_sync_session.dart';
 import 'ngmy_game_session.dart';
+import 'ngmy_wallet_server.dart';
 import 'ngmy_local_growth_income.dart';
 import 'ngmy_back_scope.dart';
 import 'ngmy_nav.dart';
@@ -122,6 +123,8 @@ class _NgmyLocalGrowthIncomeScreenState extends State<NgmyLocalGrowthIncomeScree
       growthIncomeBalance: balance,
       allowDecrease: allowDecrease,
     );
+    final before = _appBalance;
+    if (bal < before - 0.005) ngmyNoteLocalDebit(widget.liveUser.email, before - bal);
     _alignedBase = bal;
     final user = _user;
     if (user != null) user.accountBalance = bal;

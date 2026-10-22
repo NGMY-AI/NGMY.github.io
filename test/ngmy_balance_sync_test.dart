@@ -74,4 +74,38 @@ void main() {
     ngmyNotifyBalanceChanged(email: email, balance: 150);
     expect(ngmyLiveBalanceFor(email), 150);
   });
+
+  group('money never leaves an account without a spend that explains it', () {
+    test('a stale low balance on a phone cannot pull 900 down to 8 dollars', () {
+      expect(ngmyBalanceToSave(local: 8, known: 900, cloud: 900, explainedDebit: 0), 900);
+      expect(ngmyBalanceToSave(local: 8, known: null, cloud: 900, explainedDebit: 0), 900);
+    });
+
+    test('a real spend still lowers the balance', () {
+      expect(ngmyBalanceToSave(local: 850, known: 900, cloud: 900, explainedDebit: 50), 850);
+      expect(ngmyBalanceToSave(local: 850, known: null, cloud: 900, explainedDebit: 50), 850);
+    });
+
+    test('a drop larger than the spends behind it is refused', () {
+      expect(ngmyBalanceToSave(local: 700, known: 900, cloud: 900, explainedDebit: 50), 900);
+    });
+
+    test('a spend made while another phone also spent keeps both', () {
+      expect(ngmyBalanceToSave(local: 850, known: 900, cloud: 880, explainedDebit: 50), 830);
+    });
+
+    test('game receipts the server has not confirmed are tracked per receipt', () {
+      ngmyUnsettledGameTxns['t1'] = (key: 'g@x.com', delta: -2.0);
+      ngmyUnsettledGameTxns['t2'] = (key: 'g@x.com', delta: 5.0);
+      expect(ngmyUnsettledGameNetFor('g@x.com'), 3.0);
+      ngmyUnsettledGameTxns.clear();
+      expect(ngmyUnsettledGameNetFor('g@x.com'), 0.0);
+    });
+
+    test('plan buys noted on this phone explain a drop only after the last save', () {
+      ngmyNoteLocalDebit('p@x.com+local.ngmy', 120);
+      expect(ngmyNotedDebitsSince('p@x.com', DateTime.now().subtract(const Duration(minutes: 1))), 120);
+      expect(ngmyNotedDebitsSince('p@x.com', DateTime.now().add(const Duration(seconds: 1))), 0);
+    });
+  });
 }

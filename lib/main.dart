@@ -5657,9 +5657,12 @@ Future<bool> _pushUserBalanceToCloud(
   // A game still on its way to the server owns the balance until it answers.
   await ngmyWaitForGameSettles();
   final key = ngmyNormalizeEmail(email);
-  final local = u.accountBalance.clamp(0.0, double.infinity).toDouble();
+  final shown = u.accountBalance.clamp(0.0, double.infinity).toDouble();
   // A $0 from an account that hasn't finished loading must never be saved over real money.
-  if (ngmyBalanceOrRemembered(email, local) > local + 0.009) return false;
+  if (ngmyBalanceOrRemembered(email, shown) > shown + 0.009) return false;
+  // Game receipts the server has not confirmed yet are already in the figure shown here; the
+  // server step applies them, so this save must not apply them too.
+  final local = (shown - ngmyUnsettledGameNetFor(key)).clamp(0.0, double.infinity).toDouble();
   try {
     // The server holds the real balance, and another phone may have changed it since this one
     // last looked. So only the CHANGE made here since then (local minus the last server figure
@@ -5673,13 +5676,31 @@ Future<bool> _pushUserBalanceToCloud(
       single: true,
       timeout: kNgmyCloudLoadTimeout,
     );
-    if (rows.isNotEmpty) cloud = ((rows.first['accountBalance'] ?? 0.0) as num).toDouble();
+    if (rows.isNotEmpty) {
+      final raw = rows.first['accountBalance'];
+      if (raw is num) cloud = raw.toDouble();
+    }
+    // The server's balance could not be read (offline, slow, or an error). Saving this phone's
+    // number without seeing the server's is how a stale balance replaced real money.
+    if (cloud == null) return false;
     final known = ngmyLastServerBalance[key];
-    final target = ngmyBalanceToSave(local: local, known: known, cloud: cloud);
-    final adoptedOnly = cloud != null && (target - cloud).abs() < 0.005;
-    u.accountBalance = target;
+    final since = ngmyDebitsSavedAt[key] ?? DateTime.now().subtract(const Duration(hours: 2));
+    var explainedDebit = 0.0;
+    for (final t in ledgerTransactions ?? ngmyAppTransactionsForWallet?.call() ?? const <AppTransaction>[]) {
+      if (ngmyNormalizeEmail(t.userEmail) != key) continue;
+      if (!t.timestamp.isAfter(since)) continue;
+      if (ngmyIsGameLedgerTransaction(t)) continue;
+      final spend = (t.status == TransactionStatus.pending && t.type == TransactionType.withdrawal) ||
+          (t.status == TransactionStatus.approved && !_ngmyTxnIncreasesBalance(t));
+      if (spend) explainedDebit += t.amount;
+    }
+    explainedDebit += ngmyNotedDebitsSince(key, since);
+    final target = ngmyBalanceToSave(local: local, known: known, cloud: cloud, explainedDebit: explainedDebit);
+    if (target < cloud - 0.005) ngmyDebitsSavedAt[key] = DateTime.now();
+    final adoptedOnly = (target - cloud).abs() < 0.005;
+    u.accountBalance = target + ngmyUnsettledGameNetFor(key);
     ngmyLastServerBalance[key] = target;
-    if (!adoptedOnly || rows.isEmpty) {
+    if (!adoptedOnly) {
       await _safeUpsertUserRow({
         'email': email,
         'accountBalance': target,
@@ -5697,8 +5718,9 @@ Future<bool> _pushUserBalanceToCloud(
       });
     }
     if ((target - local).abs() >= 0.005) {
-      ngmySeedLiveBalance(email, target, allowIncrease: true);
-      ngmyNotifyBalanceChanged(email: email, balance: target, allowIncrease: true);
+      final shownTarget = target + ngmyUnsettledGameNetFor(key);
+      ngmySeedLiveBalance(email, shownTarget, allowIncrease: true);
+      ngmyNotifyBalanceChanged(email: email, balance: shownTarget, allowIncrease: true);
     }
     return true;
   } catch (e) {
@@ -10990,6 +11012,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
   /// shows. Falls back to the outbox when the server cannot be reached.
   Future<void> _settleGameTxnOnServer(AppTransaction t) async {
     ngmyBeginGameSettle();
+    ngmyUnsettledGameTxns[t.id] = (
+      key: ngmyNormalizeEmail(t.userEmail),
+      delta: _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount,
+    );
     try {
       await _settleGameTxnOnServerInner(t);
     } finally {
@@ -11039,8 +11065,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
       if (mounted) setState(() {});
     }
     if (result.applied || result.reason == 'duplicate') {
+      ngmyUnsettledGameTxns.remove(t.id);
       _txnOutboxDone(t.id);
     } else {
+      if (result.reason == 'insufficient' || result.reason == 'no_user') ngmyUnsettledGameTxns.remove(t.id);
       debugPrint('[wallet server] game txn not applied: ${result.reason}');
       if (mounted) {
         final why = result.reason == 'insufficient'
@@ -11915,7 +11943,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     }
     if (!ok) {
       try {
-        await _safeUpsertRows('users', [Map<String, dynamic>.from(user.toJson())], onConflict: 'email');
+        await _safeUpsertRows(
+          'users',
+          [Map<String, dynamic>.from(user.toJson())..remove('accountBalance')],
+          onConflict: 'email',
+        );
         ok = true;
       } catch (e) {
         debugPrint('[user media sync] fallback upsert failed: $e');
