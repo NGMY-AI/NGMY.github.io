@@ -42,7 +42,8 @@ const List<(String, String)> _kCareAgreement = [
   ),
 ];
 
-Widget _laborBadge(bool laborFree) {
+Widget _laborBadge(bool laborFree, {NgmyLangStore? store}) {
+  final tr = (store ?? NgmyUiLang.civic).t;
   final color = laborFree ? _kCareTeal : _kJobOrange;
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
@@ -53,8 +54,8 @@ Widget _laborBadge(bool laborFree) {
       Flexible(
         child: Text(
           laborFree
-              ? ngmyT('House Care member: materials only, no labor charge', 'Mwanachama wa House Care: vifaa tu, hakuna malipo ya kazi')
-              : ngmyT('Standard work: labor + materials', 'Kazi ya kawaida: kazi + vifaa'),
+              ? tr('House Care member: materials only, no labor charge', 'Mwanachama wa House Care: vifaa tu, hakuna malipo ya kazi')
+              : tr('Standard work: labor + materials', 'Kazi ya kawaida: kazi + vifaa'),
           style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: color),
         ),
       ),
@@ -130,6 +131,8 @@ Future<({double materials, double labor})?> _askWorkCosts(BuildContext context, 
   );
 }
 
+String _pt(String en, String sw) => NgmyUiLang.post.t(en, sw);
+
 // ── Post work ───────────────────────────────────────────────────────────────
 
 /// Short names for the nine work categories (English / Swahili), by category id.
@@ -178,7 +181,7 @@ Future<bool> showNgmyPostWorkSheet(
     },
   );
   if (posted == true && context.mounted) {
-    _snack(context, ngmyT('Your work is posted. The first worker to pick it up will show in My requests.', 'Kazi yako imetumwa. Fundi wa kwanza atakayeipokea ataonekana kwenye Maombi yangu.'));
+    _snack(context, _pt('Your work is posted. The first worker to pick it up will show in My requests.', 'Kazi yako imetumwa. Fundi wa kwanza atakayeipokea ataonekana kwenye Maombi yangu.'));
   }
   return posted == true;
 }
@@ -228,8 +231,8 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
   @override
   void initState() {
     super.initState();
-    NgmyUiLang.code.addListener(_langChanged);
-    unawaited(NgmyUiLang.load());
+    NgmyUiLang.post.code.addListener(_langChanged);
+    unawaited(NgmyUiLang.post.load());
     for (final c in [_name, _phone, _address, _city, _details]) {
       c.addListener(() {
         if (mounted) setState(() {});
@@ -239,7 +242,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
 
   @override
   void dispose() {
-    NgmyUiLang.code.removeListener(_langChanged);
+    NgmyUiLang.post.code.removeListener(_langChanged);
     for (final c in [_name, _phone, _address, _city, _details]) {
       c.dispose();
     }
@@ -253,10 +256,10 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
   String get _whenText {
     final d = _when;
     if (d == null) return '';
-    final days = NgmyUiLang.isSw
+    final days = NgmyUiLang.post.isSw
         ? ['Jumatatu', 'Jumanne', 'Jumatano', 'Alhamisi', 'Ijumaa', 'Jumamosi', 'Jumapili']
         : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final months = NgmyUiLang.isSw
+    final months = NgmyUiLang.post.isSw
         ? ['Jan', 'Feb', 'Mac', 'Apr', 'Mei', 'Jun', 'Jul', 'Ago', 'Sep', 'Okt', 'Nov', 'Des']
         : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
@@ -271,13 +274,13 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
       initialDate: _when ?? now,
       firstDate: DateTime(now.year, now.month, now.day),
       lastDate: now.add(const Duration(days: 180)),
-      helpText: ngmyT('Pick the day', 'Chagua siku'),
+      helpText: _pt('Pick the day', 'Chagua siku'),
     );
     if (date == null || !mounted) return;
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(_when ?? now.add(const Duration(hours: 1))),
-      helpText: ngmyT('Pick the time', 'Chagua saa'),
+      helpText: _pt('Pick the time', 'Chagua saa'),
     );
     if (time == null || !mounted) return;
     setState(() => _when = DateTime(date.year, date.month, date.day, time.hour, time.minute));
@@ -305,7 +308,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
     } else {
       setState(() {
         _busy = false;
-        _error = (res['error'] ?? ngmyT('Could not post. Try again.', 'Imeshindikana kutuma. Jaribu tena.')).toString();
+        _error = (res['error'] ?? _pt('Could not post. Try again.', 'Imeshindikana kutuma. Jaribu tena.')).toString();
       });
     }
   }
@@ -349,7 +352,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
         final cat = cats[i];
         final on = _category == cat.title;
         final label = _kWorkLabels[cat.id];
-        final text = label == null ? cat.title : ngmyT(label.$1, label.$2);
+        final text = label == null ? cat.title : _pt(label.$1, label.$2);
         return GestureDetector(
           onTap: () {
             HapticFeedback.selectionClick();
@@ -418,8 +421,8 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                       child: const Icon(Icons.add_task_rounded, color: Colors.white, size: 21),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(ngmyT('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19))),
-                    const NgmyLangFlag(),
+                    Expanded(child: Text(_pt('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19))),
+                    NgmyLangFlag(store: NgmyUiLang.post),
                     IconButton(onPressed: () => Navigator.pop(context, false), icon: Icon(Icons.close_rounded, color: Colors.white.withOpacity(0.6))),
                   ]),
                 ),
@@ -430,7 +433,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                       _rise(
                         0,
                         Text(
-                          ngmyT(
+                          _pt(
                             'Write the work you want done. It shows up for the workers in your state right away, and the first worker to pick it up gets it.',
                             'Andika kazi unayotaka ifanyike. Inaonekana mara moja kwa mafundi wa jimbo lako, na fundi wa kwanza kuipokea ataipata.',
                           ),
@@ -441,45 +444,45 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                       if (!_canSend)
                         _notice(
                           _orange,
-                          ngmyT('Join House Care and pay for it to send work. Members do not pay for labor, only materials.', 'Jiunge na House Care na ulipe ili kutuma kazi. Wanachama hawalipi kazi, vifaa tu.'),
+                          _pt('Join House Care and pay for it to send work. Members do not pay for labor, only materials.', 'Jiunge na House Care na ulipe ili kutuma kazi. Wanachama hawalipi kazi, vifaa tu.'),
                           action: TextButton(
                             onPressed: () async {
                               Navigator.pop(context, false);
                               await widget.onJoinCare();
                             },
-                            child: Text(ngmyT('Join', 'Jiunge'), style: const TextStyle(color: _orange, fontWeight: FontWeight.w900)),
+                            child: Text(_pt('Join', 'Jiunge'), style: const TextStyle(color: _orange, fontWeight: FontWeight.w900)),
                           ),
                         ),
                       if (!widget.hasRegistryId)
                         _notice(
                           const Color(0xFFEF4444),
-                          ngmyT(
+                          _pt(
                             'To submit work you need to be registered in Civic Registry. Your work goes to the workers in the state you are registered in.',
                             'Ili kutuma kazi lazima uwe umesajiliwa kwenye Civic Registry. Kazi yako huenda kwa mafundi wa jimbo ulilosajiliwa.',
                           ),
                         ),
-                      _rise(1, Align(alignment: Alignment.centerLeft, child: _laborBadge(_member))),
+                      _rise(1, Align(alignment: Alignment.centerLeft, child: _laborBadge(_member, store: NgmyUiLang.post))),
                       const SizedBox(height: 14),
-                      _rise(2, _label(ngmyT('What kind of work?', 'Kazi ya aina gani?'))),
+                      _rise(2, _label(_pt('What kind of work?', 'Kazi ya aina gani?'))),
                       _rise(2, _categoryGrid()),
                       const SizedBox(height: 16),
-                      _rise(3, _label(ngmyT('What needs to be fixed', 'Kinachohitaji kutengenezwa'))),
+                      _rise(3, _label(_pt('What needs to be fixed', 'Kinachohitaji kutengenezwa'))),
                       _rise(
                         3,
                         TextField(
                           controller: _details,
                           maxLines: 4,
                           style: const TextStyle(color: Colors.white),
-                          decoration: _dark(ngmyT('Describe the work *', 'Eleza kazi *'), hint: ngmyT('What is broken, leaking, or not working…', 'Nini kimeharibika, kinavuja, au hakifanyi kazi…')),
+                          decoration: _dark(_pt('Describe the work *', 'Eleza kazi *'), hint: _pt('What is broken, leaking, or not working…', 'Nini kimeharibika, kinavuja, au hakifanyi kazi…')),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _rise(4, _label(ngmyT('Where', 'Mahali'))),
-                      _rise(4, TextField(controller: _address, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('Address', 'Anwani'), icon: Icons.home_rounded))),
+                      _rise(4, _label(_pt('Where', 'Mahali'))),
+                      _rise(4, TextField(controller: _address, style: const TextStyle(color: Colors.white), decoration: _dark(_pt('Address', 'Anwani'), icon: Icons.home_rounded))),
                       const SizedBox(height: 10),
-                      _rise(4, TextField(controller: _city, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('City', 'Jiji'), icon: Icons.location_city_rounded))),
+                      _rise(4, TextField(controller: _city, style: const TextStyle(color: Colors.white), decoration: _dark(_pt('City', 'Jiji'), icon: Icons.location_city_rounded))),
                       const SizedBox(height: 16),
-                      _rise(5, _label(ngmyT('Best time', 'Muda mzuri'))),
+                      _rise(5, _label(_pt('Best time', 'Muda mzuri'))),
                       _rise(
                         5,
                         GestureDetector(
@@ -496,7 +499,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  _when == null ? ngmyT('Tap to choose a day and time', 'Gusa kuchagua siku na saa') : _whenText,
+                                  _when == null ? _pt('Tap to choose a day and time', 'Gusa kuchagua siku na saa') : _whenText,
                                   style: TextStyle(color: _when == null ? Colors.white54 : Colors.white, fontWeight: FontWeight.w800, fontSize: 13.5),
                                 ),
                               ),
@@ -512,8 +515,8 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      _rise(6, _label(ngmyT('You', 'Wewe'))),
-                      _rise(6, TextField(controller: _name, style: const TextStyle(color: Colors.white), decoration: _dark(ngmyT('Your name *', 'Jina lako *'), icon: Icons.person_rounded))),
+                      _rise(6, _label(_pt('You', 'Wewe'))),
+                      _rise(6, TextField(controller: _name, style: const TextStyle(color: Colors.white), decoration: _dark(_pt('Your name *', 'Jina lako *'), icon: Icons.person_rounded))),
                       const SizedBox(height: 10),
                       _rise(
                         6,
@@ -522,7 +525,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                           keyboardType: TextInputType.phone,
                           inputFormatters: const [NgmyPhoneDashFormatter()],
                           style: const TextStyle(color: Colors.white),
-                          decoration: _dark(ngmyT('Phone number (WhatsApp) *', 'Namba ya simu (WhatsApp) *'), hint: '123-456-7890', icon: Icons.phone_rounded),
+                          decoration: _dark(_pt('Phone number (WhatsApp) *', 'Namba ya simu (WhatsApp) *'), hint: '123-456-7890', icon: Icons.phone_rounded),
                         ),
                       ),
                       if (_error != null) ...[
@@ -553,7 +556,7 @@ class _PostWorkDialogState extends State<_PostWorkDialog> {
                                       : Row(mainAxisSize: MainAxisSize.min, children: [
                                           const Icon(Icons.send_rounded, color: Colors.white, size: 20),
                                           const SizedBox(width: 10),
-                                          Text(ngmyT('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.3)),
+                                          Text(_pt('Post work', 'Tuma kazi'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17, letterSpacing: 0.3)),
                                         ]),
                                 ),
                               ),

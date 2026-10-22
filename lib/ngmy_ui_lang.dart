@@ -6,59 +6,83 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ngmy_offline_icons.dart';
 
-/// The language chosen with the flag button (English or Swahili). It is saved on the phone and
-/// only changes when the user taps the flag.
-class NgmyUiLang {
-  static const _prefsKey = 'ngmy_ui_lang_v1';
-  static final ValueNotifier<String> code = ValueNotifier<String>('en');
-  static bool _loaded = false;
+/// One saved language choice (English or Swahili). It is kept on the phone and only changes
+/// when the user taps a flag button, so it is the same after the app is closed and opened again.
+class NgmyLangStore {
+  NgmyLangStore(this.key);
 
-  static bool get isSw => code.value == 'sw';
+  final String key;
+  final ValueNotifier<String> code = ValueNotifier<String>('en');
+  Future<void>? _loading;
 
-  static Future<void> load() async {
-    if (_loaded) return;
-    _loaded = true;
+  bool get isSw => code.value == 'sw';
+
+  /// Reads the saved choice once.
+  Future<void> load() => _loading ??= _read();
+
+  Future<void> _read() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString(_prefsKey);
+      final saved = prefs.getString(key);
       if (saved == 'sw' || saved == 'en') code.value = saved!;
     } catch (_) {}
   }
 
-  static Future<void> set(String value) async {
+  Future<void> set(String value) async {
+    // A choice made before the saved one was read must still win.
+    _loading ??= Future<void>.value();
     code.value = value == 'sw' ? 'sw' : 'en';
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefsKey, code.value);
+      await prefs.setString(key, code.value);
     } catch (_) {}
   }
 
-  static Future<void> toggle() => set(isSw ? 'en' : 'sw');
+  Future<void> toggle() => set(isSw ? 'en' : 'sw');
+
+  String t(String en, String sw) => isSw ? sw : en;
 }
 
-/// English or Swahili text, by the saved language.
-String ngmyT(String en, String sw) => NgmyUiLang.isSw ? sw : en;
+class NgmyUiLang {
+  /// Civic Registry (and the rest of the app).
+  static final NgmyLangStore civic = NgmyLangStore('ngmy_ui_lang_v1');
+
+  /// Post work has its own choice and starts in English.
+  static final NgmyLangStore post = NgmyLangStore('ngmy_post_work_lang_v1');
+
+  static ValueNotifier<String> get code => civic.code;
+  static bool get isSw => civic.isSw;
+  static Future<void> load() => civic.load();
+  static Future<void> set(String value) => civic.set(value);
+  static Future<void> toggle() => civic.toggle();
+}
+
+/// English or Swahili text, by the Civic Registry language.
+String ngmyT(String en, String sw) => NgmyUiLang.civic.t(en, sw);
 
 /// Rebuilds [builder] whenever the language changes.
 class NgmyLangBuilder extends StatefulWidget {
-  const NgmyLangBuilder({super.key, required this.builder});
+  const NgmyLangBuilder({super.key, required this.builder, this.store});
   final WidgetBuilder builder;
+  final NgmyLangStore? store;
 
   @override
   State<NgmyLangBuilder> createState() => _NgmyLangBuilderState();
 }
 
 class _NgmyLangBuilderState extends State<NgmyLangBuilder> {
+  NgmyLangStore get _store => widget.store ?? NgmyUiLang.civic;
+
   @override
   void initState() {
     super.initState();
-    NgmyUiLang.code.addListener(_changed);
-    unawaited(NgmyUiLang.load());
+    _store.code.addListener(_changed);
+    unawaited(_store.load());
   }
 
   @override
   void dispose() {
-    NgmyUiLang.code.removeListener(_changed);
+    _store.code.removeListener(_changed);
     super.dispose();
   }
 
@@ -72,7 +96,8 @@ class _NgmyLangBuilderState extends State<NgmyLangBuilder> {
 
 /// A small flag button: tap it to switch between English and Swahili (the flag flips).
 class NgmyLangFlag extends StatefulWidget {
-  const NgmyLangFlag({super.key});
+  const NgmyLangFlag({super.key, this.store});
+  final NgmyLangStore? store;
 
   @override
   State<NgmyLangFlag> createState() => _NgmyLangFlagState();
@@ -80,17 +105,18 @@ class NgmyLangFlag extends StatefulWidget {
 
 class _NgmyLangFlagState extends State<NgmyLangFlag> with SingleTickerProviderStateMixin {
   late final AnimationController _fx = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+  NgmyLangStore get _store => widget.store ?? NgmyUiLang.civic;
 
   @override
   void initState() {
     super.initState();
-    NgmyUiLang.code.addListener(_changed);
-    unawaited(NgmyUiLang.load());
+    _store.code.addListener(_changed);
+    unawaited(_store.load());
   }
 
   @override
   void dispose() {
-    NgmyUiLang.code.removeListener(_changed);
+    _store.code.removeListener(_changed);
     _fx.dispose();
     super.dispose();
   }
@@ -101,13 +127,13 @@ class _NgmyLangFlagState extends State<NgmyLangFlag> with SingleTickerProviderSt
 
   Future<void> _tap() async {
     await _fx.forward(from: 0);
-    await NgmyUiLang.toggle();
+    await _store.toggle();
     if (mounted) _fx.reset();
   }
 
   @override
   Widget build(BuildContext context) {
-    final sw = NgmyUiLang.isSw;
+    final sw = _store.isSw;
     return Tooltip(
       message: sw ? 'Kiswahili — gusa kubadilisha' : 'English — tap to change',
       child: Material(
