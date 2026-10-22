@@ -190,6 +190,7 @@ Future<bool?> showNgmyCashAppPaymentConfirm(
   BuildContext context, {
   required String amountText,
   required String cashAppTag,
+  bool needsApproval = false,
 }) {
   return showGeneralDialog<bool>(
     context: context,
@@ -198,7 +199,7 @@ Future<bool?> showNgmyCashAppPaymentConfirm(
     barrierColor: Colors.black.withValues(alpha: 0.55),
     transitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (ctx, _, __) {
-      return _NgmyCashAppConfirmCard(amountText: amountText, cashAppTag: cashAppTag);
+      return _NgmyCashAppConfirmCard(amountText: amountText, cashAppTag: cashAppTag, needsApproval: needsApproval);
     },
     transitionBuilder: (ctx, animation, _, child) {
       final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
@@ -217,10 +218,12 @@ class _NgmyCashAppConfirmCard extends StatelessWidget {
   const _NgmyCashAppConfirmCard({
     required this.amountText,
     required this.cashAppTag,
+    this.needsApproval = false,
   });
 
   final String amountText;
   final String cashAppTag;
+  final bool needsApproval;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +303,9 @@ class _NgmyCashAppConfirmCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'Cash App should be open. Come back here and confirm after the payment goes through.',
+                      needsApproval
+                          ? 'Send the money on Cash App, then tap below. An admin checks the payment and approves it, and your House Care starts once it is approved.'
+                          : 'Cash App should be open. Come back here and confirm after the payment goes through.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, height: 1.3, fontWeight: FontWeight.w600, color: muted),
                     ),
@@ -315,7 +320,7 @@ class _NgmyCashAppConfirmCard extends StatelessWidget {
                           foregroundColor: const Color(0xFF052E16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
-                        child: Text('I sent \$$amountText', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
+                        child: Text(needsApproval ? 'I sent \$$amountText · ask for approval' : 'I sent \$$amountText', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
                       ),
                     ),
                     SizedBox(

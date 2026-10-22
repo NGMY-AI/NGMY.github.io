@@ -994,7 +994,7 @@ class _CareSheetState extends State<_CareSheet> {
     final payUrl = base.endsWith('/') ? '$base$amount' : '$base/$amount';
     final opened = await launchUrl(Uri.parse(payUrl), mode: LaunchMode.externalApplication);
     if (!opened || !mounted) return;
-    final sent = await showNgmyCashAppPaymentConfirm(context, amountText: amount, cashAppTag: widget.cashAppTag);
+    final sent = await showNgmyCashAppPaymentConfirm(context, amountText: amount, cashAppTag: widget.cashAppTag, needsApproval: true);
     if (sent != true || !mounted) return;
     setState(() => _busy = true);
     final res = await NgmyHouseWorkersApi.planCashApp('basic', term: fullTerm);

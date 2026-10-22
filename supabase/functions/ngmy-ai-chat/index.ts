@@ -2310,7 +2310,10 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     const { error } = await db.from("house_care_payments").insert({
       email, plan, term: body?.term === true && plan === "basic", amount: unpaid.amount, status: "pending",
     });
-    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    if (error) {
+      const missing = /house_care_payments/i.test(error.message);
+      return jsonOk({ ok: false, error: missing ? "Payments are not switched on yet. Please tell the admin to finish the House Care setup." : error.message }, 500);
+    }
     return jsonOk({ ok: true, pending: true, care: await hwCare(db, email), plans: await hwPlans(db, email) });
   }
 
