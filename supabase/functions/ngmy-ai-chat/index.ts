@@ -1586,7 +1586,7 @@ async function handleAdvisorRelationship(req: Request, action: string, body: any
 const HW_ACTIONS = new Set([
   "hwList", "hwMe", "hwApply", "hwRequest", "hwRespond", "hwDone", "hwRate", "hwCancel",
   "hwAdminList", "hwAdminDecide", "hwPostJob", "hwJobs", "hwPickJob", "hwPlanCashApp", "hwBusy",
-  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore",
+  "hwCare", "hwCareSign", "hwAdminCare", "hwAdminPayList", "hwAdminPay", "hwAdminCareRevoke", "hwAdminCareRestore", "hwAdminCarePayments", "hwAdminCarePaymentDecide",
 ]);
 const HW_MAX_PHOTO_BYTES = 900 * 1024;
 
@@ -1994,6 +1994,34 @@ async function hwPlans(db: any, email: string) {
   };
 }
 
+/** When a plan's access would run until if its next payment were approved now, and what that payment costs. */
+async function hwPlanUntil(db: any, email: string, plan: string, term: boolean):
+  Promise<{ until: string; amount: number } | { error: string; status: number }> {
+  const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
+  const prevMs = Date.parse(String(prev?.access_until ?? "")) || 0;
+  const base = Math.max(Date.now(), prevMs);
+  const price = plan === "premium" ? HW_PREMIUM_PRICE : HW_BASIC_PRICE;
+  // Paid ahead (a whole term, or many months): nothing more to pay until that time is nearly over.
+  if (plan === "basic" && prevMs > Date.now() + 40 * 86400000) {
+    return { error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. No payment is needed before then.`, status: 409 };
+  }
+  if (term && plan === "basic") {
+    // The whole agreement at once: the monthly price for every month of the term the member signed.
+    let years = 0;
+    try {
+      const { data: sub } = await db.from("house_subscriptions").select("term_years").eq("email", email).maybeSingle();
+      years = Number(sub?.term_years ?? 0);
+    } catch (_) { /* no agreement yet */ }
+    if (!(years >= 1 && years <= 4)) {
+      return { error: "Sign the House Care agreement first, then you can pay the whole term.", status: 400 };
+    }
+    const d = new Date(base);
+    d.setFullYear(d.getFullYear() + years);
+    return { until: d.toISOString(), amount: price * 12 * years };
+  }
+  return { until: new Date(base + HW_PLAN_DAYS * 86400000).toISOString(), amount: price };
+}
+
 // ── House Care membership ───────────────────────────────────────────────────
 // A member signs the NGMY agreement (a chosen term, a signature and a selfie) and pays the monthly
 // plan. While the plan is paid, their posted work carries no labor charge: they only pay for
@@ -2028,13 +2056,19 @@ async function hwRemoveCareImage(db: any, url: string): Promise<void> {
 
 async function hwCare(db: any, email: string) {
   const plans = await hwPlans(db, email);
+  let pendingPayment: any = null;
+  try {
+    const { data: pend } = await db.from("house_care_payments").select("amount,term,created_at")
+      .eq("email", email).eq("plan", "basic").eq("status", "pending").order("created_at", { ascending: false }).limit(1);
+    if (pend && pend.length > 0) pendingPayment = { amount: Number(pend[0].amount ?? 0), term: pend[0].term === true, createdAt: pend[0].created_at };
+  } catch (_) { /* payments table not created yet */ }
   let row: any = null;
   try {
     const { data } = await db.from("house_subscriptions").select("*").eq("email", email).maybeSingle();
     row = data;
   } catch (_) { /* table not created yet: no membership */ }
   if (!row) {
-    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE };
+    return { signed: false, active: false, termYears: 0, status: "none", nextDue: plans.basicUntil, price: HW_BASIC_PRICE, pendingPayment };
   }
   const paidUntil: string | null = plans.basicUntil;
   const paidMs = paidUntil ? Date.parse(paidUntil) : 0;
@@ -2058,6 +2092,7 @@ async function hwCare(db: any, email: string) {
     // Paid ahead for a long time (the whole term): no payment is due until it runs down.
     prepaid: active && paidMs > Date.now() + 40 * 86400000,
     termPrice: HW_BASIC_PRICE * 12 * Number(row.term_years ?? 1),
+    pendingPayment,
   };
 }
 
@@ -2258,36 +2293,25 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     if (!isAdmin && !(await hwEligibility(db, [email])).get(email)?.hasRegistryId) {
       return jsonOk({ ok: false, needsRegistry: true, error: "You need to be registered in Civic Registry to pay for House & Insurance." }, 403);
     }
-    const { data: prev } = await db.from("house_plans").select("access_until").eq("email", email).eq("plan", plan).maybeSingle();
-    const prevMs = Date.parse(String(prev?.access_until ?? "")) || 0;
-    const base = Math.max(Date.now(), prevMs);
-    // Paid ahead (a whole term, or many months): nothing more to pay until that time is nearly over.
-    if (plan === "basic" && prevMs > Date.now() + 40 * 86400000) {
-      return jsonOk({
-        ok: false,
-        error: `You are already paid until ${new Date(prevMs).toISOString().slice(0, 10)}. No payment is needed before then.`,
-      }, 409);
+    const unpaid = await hwPlanUntil(db, email, plan, body?.term === true);
+    if ("error" in unpaid) return jsonOk({ ok: false, error: unpaid.error }, unpaid.status);
+    // An admin's own payment counts straight away; everyone else's waits for an admin to approve it.
+    if (isAdmin) {
+      const { error } = await db.from("house_plans").upsert({
+        email, plan, method: "cashapp", access_until: unpaid.until, updated_at: now,
+      });
+      if (error) return jsonOk({ ok: false, error: error.message }, 500);
+      return jsonOk({ ok: true, plans: await hwPlans(db, email) });
     }
-    let until = new Date(base + HW_PLAN_DAYS * 86400000).toISOString();
-    if (body?.term === true && plan === "basic") {
-      // The whole agreement at once: the monthly price for every month of the term the member signed.
-      let years = 0;
-      try {
-        const { data: sub } = await db.from("house_subscriptions").select("term_years").eq("email", email).maybeSingle();
-        years = Number(sub?.term_years ?? 0);
-      } catch (_) { /* no agreement yet */ }
-      if (!(years >= 1 && years <= 4)) {
-        return jsonOk({ ok: false, error: "Sign the House Care agreement first, then you can pay the whole term." }, 400);
-      }
-      const d = new Date(base);
-      d.setFullYear(d.getFullYear() + years);
-      until = d.toISOString();
+    const { data: waiting } = await db.from("house_care_payments").select("id").eq("email", email).eq("plan", plan).eq("status", "pending").limit(1);
+    if (waiting && waiting.length > 0) {
+      return jsonOk({ ok: false, error: "Your last payment is still waiting for approval." }, 409);
     }
-    const { error } = await db.from("house_plans").upsert({
-      email, plan, method: "cashapp", access_until: until, updated_at: now,
+    const { error } = await db.from("house_care_payments").insert({
+      email, plan, term: body?.term === true && plan === "basic", amount: unpaid.amount, status: "pending",
     });
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
-    return jsonOk({ ok: true, plans: await hwPlans(db, email) });
+    return jsonOk({ ok: true, pending: true, care: await hwCare(db, email), plans: await hwPlans(db, email) });
   }
 
   if (action === "hwBusy") {
@@ -2620,6 +2644,43 @@ async function handleHouseWorkers(req: Request, action: string, body: any): Prom
     }
     const { error } = await db.from("house_subscriptions")
       .update({ status: "pending", updated_at: now }).eq("email", target);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    return jsonOk({ ok: true });
+  }
+  if (action === "hwAdminCarePayments") {
+    // Cash App payments members say they sent, waiting for an admin to check the money and approve.
+    const { data, error } = await db.from("house_care_payments").select("*")
+      .order("created_at", { ascending: false }).limit(200);
+    if (error) return jsonOk({ ok: false, error: error.message }, 500);
+    const emails = [...new Set((data ?? []).map((r: any) => String(r.email)))];
+    const names: Record<string, string> = {};
+    if (emails.length > 0) {
+      const { data: subs } = await db.from("house_subscriptions").select("email,full_name").in("email", emails);
+      for (const s of subs ?? []) names[String(s.email)] = String(s.full_name ?? "");
+    }
+    const payments = (data ?? []).map((r: any) => ({
+      id: r.id, email: r.email, name: names[String(r.email)] || String(r.email), plan: r.plan, term: r.term === true,
+      amount: Number(r.amount ?? 0), status: r.status, createdAt: r.created_at, decidedAt: r.decided_at,
+    }));
+    return jsonOk({ ok: true, payments, pending: payments.filter((p: any) => p.status === "pending").length });
+  }
+  if (action === "hwAdminCarePaymentDecide") {
+    const id = hwText(body?.paymentId, 60);
+    const decision = body?.decision === "approve" ? "approved" : body?.decision === "reject" ? "rejected" : "";
+    if (!id || !decision) return jsonOk({ ok: false, error: "Pick a payment." }, 400);
+    const { data: pay } = await db.from("house_care_payments").select("*").eq("id", id).maybeSingle();
+    if (!pay) return jsonOk({ ok: false, error: "That payment was not found." }, 404);
+    if (pay.status !== "pending") return jsonOk({ ok: false, error: `That payment was already ${pay.status}.` }, 409);
+    if (decision === "approved") {
+      const grant = await hwPlanUntil(db, String(pay.email), String(pay.plan), pay.term === true);
+      if ("error" in grant) return jsonOk({ ok: false, error: grant.error }, grant.status);
+      const { error: planErr } = await db.from("house_plans").upsert({
+        email: pay.email, plan: pay.plan, method: "cashapp", access_until: grant.until, updated_at: now,
+      });
+      if (planErr) return jsonOk({ ok: false, error: planErr.message }, 500);
+    }
+    const { error } = await db.from("house_care_payments")
+      .update({ status: decision, decided_at: now, decided_by: email }).eq("id", id).eq("status", "pending");
     if (error) return jsonOk({ ok: false, error: error.message }, 500);
     return jsonOk({ ok: true });
   }
@@ -10115,6 +10176,8 @@ serve(async (req) => {
       hk: "hwAdminPay",
       hl: "hwAdminCareRevoke",
       hm: "hwAdminCareRestore",
+      hn: "hwAdminCarePayments",
+      ho: "hwAdminCarePaymentDecide",
       s1: "storeGrant",
       s2: "storeRevoke",
       s3: "storeList",

@@ -57,6 +57,9 @@ class NgmyHouseWorkersApi {
   static Future<Map<String, dynamic>> jobs() => _call('hwJobs');
   static Future<Map<String, dynamic>> pickJob(String id) => _call('hwPickJob', {'requestId': id});
   static Future<Map<String, dynamic>> planCashApp(String plan, {bool term = false}) => _call('hwPlanCashApp', {'plan': plan, if (term) 'term': true});
+  static Future<Map<String, dynamic>> adminCarePayments() => _call('hwAdminCarePayments');
+  static Future<Map<String, dynamic>> adminCarePaymentDecide(String id, bool approve) =>
+      _call('hwAdminCarePaymentDecide', {'paymentId': id, 'decision': approve ? 'approve' : 'reject'});
   static Future<Map<String, dynamic>> adminCareRevoke(String email) => _call('hwAdminCareRevoke', {'memberEmail': email});
   static Future<Map<String, dynamic>> adminCareRestore(String email) => _call('hwAdminCareRestore', {'memberEmail': email});
   static Future<Map<String, dynamic>> adminList() => _call('hwAdminList');

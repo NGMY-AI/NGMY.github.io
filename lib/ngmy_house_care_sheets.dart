@@ -1002,7 +1002,7 @@ class _CareSheetState extends State<_CareSheet> {
     setState(() => _busy = false);
     if (res['ok'] == true) {
       await _reload();
-      if (mounted) _snack(context, 'Thank you. Your House Care is active.');
+      if (mounted) _snack(context, res['pending'] == true ? 'Payment sent. It starts once an admin confirms it.' : 'Thank you. Your House Care is active.');
     } else {
       _snack(context, (res['error'] ?? 'Could not record the payment.').toString(), error: true);
     }
@@ -1035,6 +1035,23 @@ class _CareSheetState extends State<_CareSheet> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: const Color(0xFF34D399).withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF34D399).withOpacity(0.5))),
         child: Text('Paid in full until ${_careDate(_care['nextDue'])}. No payment is needed until then.', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5)),
+      );
+    }
+    final waiting = _care['pendingPayment'];
+    if (waiting is Map) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: const Color(0xFFF59E0B).withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.5))),
+        child: Row(children: [
+          const Icon(Icons.hourglass_top_rounded, color: Color(0xFFF59E0B), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Your \$${((waiting['amount'] as num?) ?? 0).toStringAsFixed(0)} Cash App payment is waiting for approval. House Care starts as soon as an admin confirms it.',
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, height: 1.3),
+            ),
+          ),
+        ]),
       );
     }
     final p = _price.toStringAsFixed(0);
@@ -1323,7 +1340,9 @@ class _AdminCareSheet extends StatefulWidget {
 
 class _AdminCareSheetState extends State<_AdminCareSheet> {
   List<Map<String, dynamic>> _rows = [];
+  List<Map<String, dynamic>> _payments = [];
   bool _loading = true;
+  bool _showPayments = false;
   String? _error;
 
   @override
@@ -1333,17 +1352,31 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
   }
 
   Future<void> _load() async {
-    final res = await NgmyHouseWorkersApi.adminCare();
+    final results = await Future.wait([NgmyHouseWorkersApi.adminCare(), NgmyHouseWorkersApi.adminCarePayments()]);
     if (!mounted) return;
     setState(() {
       _loading = false;
-      if (res['ok'] == true) {
-        _rows = _maps(res['members']);
+      if (results[0]['ok'] == true) {
+        _rows = _maps(results[0]['members']);
         _error = null;
       } else {
-        _error = (res['error'] ?? 'Could not load.').toString();
+        _error = (results[0]['error'] ?? 'Could not load.').toString();
       }
+      if (results[1]['ok'] == true) _payments = _maps(results[1]['payments']);
     });
+  }
+
+  int get _pendingPayments => _payments.where((p) => p['status'] == 'pending').length;
+
+  Future<void> _decide(Map<String, dynamic> p, bool approve) async {
+    final res = await NgmyHouseWorkersApi.adminCarePaymentDecide((p['id'] ?? '').toString(), approve);
+    if (!mounted) return;
+    if (res['ok'] == true) {
+      _snack(context, approve ? 'Payment approved. House Care is active.' : 'Payment rejected.');
+      _load();
+    } else {
+      _snack(context, (res['error'] ?? 'Could not update.').toString(), error: true);
+    }
   }
 
   void _zoom(String url, String title) {
@@ -1362,26 +1395,101 @@ class _AdminCareSheetState extends State<_AdminCareSheet> {
     );
   }
 
+  Widget _tab(_HwColors c, String label, bool on, VoidCallback tap) => Expanded(
+        child: GestureDetector(
+          onTap: tap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: on ? _kCareTeal.withOpacity(0.18) : c.tile,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: on ? _kCareTeal : c.line),
+            ),
+            child: Text(label, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12.5, color: on ? _kCareTeal : c.muted)),
+          ),
+        ),
+      );
+
+  Widget _paymentCard(Map<String, dynamic> p, _HwColors c) {
+    final status = (p['status'] ?? '').toString();
+    final color = status == 'approved' ? _kHwGreen : (status == 'rejected' ? const Color(0xFFEF4444) : const Color(0xFFF59E0B));
+    final what = p['term'] == true ? 'Full agreement' : (p['plan'] == 'premium' ? 'Premium month' : 'Monthly');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: c.tile, borderRadius: BorderRadius.circular(16), border: Border.all(color: c.line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text((p['name'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w900, color: c.ink, fontSize: 14)),
+              Text('${p['email']}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: c.muted)),
+              Text('$what · ${_careDate(p['createdAt'])} · Cash App', style: TextStyle(fontSize: 11.5, color: c.muted)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text('\$${((p['amount'] as num?) ?? 0).toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: c.ink)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(999)),
+              child: Text(status.toUpperCase(), style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w900, color: color)),
+            ),
+          ]),
+        ]),
+        if (status == 'pending') ...[
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _decide(p, false),
+                style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFFEF4444), side: const BorderSide(color: Color(0xFFEF4444))),
+                child: const Text('Reject'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: FilledButton(onPressed: () => _decide(p, true), style: FilledButton.styleFrom(backgroundColor: _kHwGreen), child: const Text('Approve'))),
+          ]),
+        ],
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = _HwColors(context);
+    Widget body;
+    if (_loading) {
+      body = const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()));
+    } else if (_showPayments) {
+      body = _payments.isEmpty
+          ? Padding(padding: const EdgeInsets.all(30), child: Text('No Cash App payments yet.', textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
+          : Column(children: [for (final p in _payments) _paymentCard(p, c)]);
+    } else if (_error != null) {
+      body = Padding(padding: const EdgeInsets.all(30), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)));
+    } else if (_rows.isEmpty) {
+      body = Padding(padding: const EdgeInsets.all(30), child: Text('Nobody has signed the agreement yet.', textAlign: TextAlign.center, style: TextStyle(color: c.muted)));
+    } else {
+      body = Column(children: [for (final m in _rows) _memberCard(m, c)]);
+    }
     return _sheetFrame(
       context,
       title: 'House Care members',
       icon: Icons.fact_check_rounded,
-      child: _loading
-          ? const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()))
-          : _error != null
-              ? Padding(padding: const EdgeInsets.all(30), child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
-              : _rows.isEmpty
-                  ? Padding(padding: const EdgeInsets.all(30), child: Text('Nobody has signed the agreement yet.', textAlign: TextAlign.center, style: TextStyle(color: c.muted)))
-                  : ListView(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-                      children: [
-                        for (final m in _rows) _memberCard(m, c),
-                      ],
-                    ),
+      child: ListView(
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        children: [
+          Row(children: [
+            _tab(c, 'Signatures (${_rows.length})', !_showPayments, () => setState(() => _showPayments = false)),
+            const SizedBox(width: 8),
+            _tab(c, _pendingPayments > 0 ? 'Payments ($_pendingPayments new)' : 'Payments', _showPayments, () => setState(() => _showPayments = true)),
+          ]),
+          const SizedBox(height: 12),
+          body,
+        ],
+      ),
     );
   }
 

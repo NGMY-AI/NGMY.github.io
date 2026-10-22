@@ -64,7 +64,7 @@ import 'ngmy_price_calculator_panel.dart';
 import 'ngmy_repair_estimate_flow.dart';
 import 'ngmy_repair_estimate_payments.dart';
 import 'ngmy_house_insurance.dart';
-import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet;
+import 'ngmy_house_workers.dart' show showNgmyAdminHouseCareSheet, NgmyHouseWorkersApi;
 import 'ngmy_civic_helper_gifts.dart';
 import 'ngmy_civic_helper_gift_admin_popup.dart';
 import 'ngmy_civic_helper_gift_ui.dart';
@@ -12817,8 +12817,23 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
               NgmyAdminAlertItem('txn:${t.id}', '\$${formatCurrency(t.amount)} · ${who(t.userEmail)}'),
         ];
     final recent = DateTime.now().subtract(const Duration(days: 7));
+    // House Care Cash App payments wait for an admin like every other payment.
+    final careItems = <NgmyAdminAlertItem>[];
+    if (isAdmin) {
+      try {
+        final res = await NgmyHouseWorkersApi.adminCarePayments();
+        if (res['ok'] == true && res['payments'] is List) {
+          for (final p in res['payments'] as List) {
+            if (p is Map && p['status'] == 'pending') {
+              careItems.add(NgmyAdminAlertItem('carepay:${p['id']}', '\$${p['amount']} · ${p['name']}'));
+            }
+          }
+        }
+      } catch (_) {/* the alert is skipped this time */}
+    }
     final cats = <NgmyAdminAlertCategory>[
       if (isAdmin) ...[
+        NgmyAdminAlertCategory('house_care_payments', 'New House Care payment', 'new House Care payments', careItems),
         NgmyAdminAlertCategory('civic_members', 'New civic registry member', 'new civic registry members', rows(_config.civicRegistryMembers)),
         NgmyAdminAlertCategory('civic_contributions', 'New civic contribution', 'new civic contributions',
             txns((t) => t.type == TransactionType.contribution && t.timestamp.isAfter(recent))),

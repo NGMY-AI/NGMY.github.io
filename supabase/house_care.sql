@@ -35,3 +35,18 @@ alter table public.house_work_requests add column if not exists labor_cost numer
 
 -- What NGMY paid the worker for a House Care job (set by an admin); a worker's monthly record adds this to labor_cost.
 alter table public.house_work_requests add column if not exists worker_pay numeric;
+
+-- Cash App payments for House Care / House plans: a member says they sent it, an admin checks the money and approves.
+create table if not exists public.house_care_payments (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  plan text not null default 'basic',
+  term boolean not null default false,
+  amount numeric not null default 0,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now(),
+  decided_at timestamptz,
+  decided_by text
+);
+create index if not exists house_care_payments_email_idx on public.house_care_payments (email, status);
+alter table public.house_care_payments enable row level security;

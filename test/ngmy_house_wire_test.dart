@@ -7,7 +7,7 @@ void main() {
       'hwList', 'hwMe', 'hwApply', 'hwRequest', 'hwRespond', 'hwDone', 'hwRate', 'hwCancel',
       'hwAdminList', 'hwAdminDecide', 'hwPostJob', 'hwJobs', 'hwPickJob', 'hwPlanCashApp', 'hwBusy',
       'hwCare', 'hwCareSign', 'hwAdminCare', 'hwAdminPayList', 'hwAdminPay',
-      'hwAdminCareRevoke', 'hwAdminCareRestore',
+      'hwAdminCareRevoke', 'hwAdminCareRestore', 'hwAdminCarePayments', 'hwAdminCarePaymentDecide',
     ];
     final codes = <String>{};
     for (final a in actions) {
