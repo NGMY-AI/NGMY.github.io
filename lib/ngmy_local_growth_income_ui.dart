@@ -1744,7 +1744,10 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
                       child: AnimatedBuilder(
                         animation: _fxCtrl,
                         builder: (context, _) => CustomPaint(
-                          painter: _ClockInFxPainter(t: _fxCtrl.value, intense: widget.clockedIn, gold: _gold, goldLight: _goldLight),
+                          // Running session: coins and sparks. Day complete: a different, celebratory scene.
+                          painter: widget.clockedIn
+                              ? _ClockInFxPainter(t: _fxCtrl.value, intense: true, gold: _gold, goldLight: _goldLight)
+                              : _ClockInDonePainter(t: _fxCtrl.value, gold: _gold, goldLight: _goldLight),
                         ),
                       ),
                     ),
@@ -2050,6 +2053,101 @@ class _ClockInFxPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ClockInFxPainter old) => old.t != t || old.intense != intense;
+}
+
+/// The "day complete" celebration: slow golden rays behind the circle, confetti drifting down,
+/// small fireworks bursting in the corners and a light shimmer sweeping over the frame.
+/// Different from the clock-in animation on purpose. [t] loops 0..1 with whole cycles only.
+class _ClockInDonePainter extends CustomPainter {
+  _ClockInDonePainter({required this.t, required this.gold, required this.goldLight});
+
+  final double t;
+  final Color gold;
+  final Color goldLight;
+
+  static const _confetti = [Color(0xFFF6E27A), Color(0xFFFFFFFF), Color(0xFF2EF6A3), Color(0xFFF472B6), Color(0xFF67E8F9), Color(0xFFD4AF37)];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final tau = math.pi * 2;
+
+    // Rays turning slowly behind the circle.
+    const rays = 14;
+    final ray = Paint()..color = goldLight.withValues(alpha: 0.075);
+    for (var i = 0; i < rays; i++) {
+      final a = t * tau + i * tau / rays;
+      final w = tau / rays * 0.32;
+      final path = Path()
+        ..moveTo(c.dx + math.cos(a - w) * 130, c.dy + math.sin(a - w) * 130)
+        ..lineTo(c.dx + math.cos(a - w) * 330, c.dy + math.sin(a - w) * 330)
+        ..lineTo(c.dx + math.cos(a + w) * 330, c.dy + math.sin(a + w) * 330)
+        ..lineTo(c.dx + math.cos(a + w) * 130, c.dy + math.sin(a + w) * 130)
+        ..close();
+      canvas.drawPath(path, ray);
+    }
+
+    // Light sweeping across.
+    final sweepX = ((t * 2) % 1.0) * (size.width + 240) - 120;
+    canvas.save();
+    canvas.translate(sweepX, 0);
+    canvas.rotate(0.35);
+    canvas.drawRect(
+      Rect.fromLTWH(-18, -size.height, 36, size.height * 3),
+      Paint()
+        ..shader = LinearGradient(colors: [Colors.white.withValues(alpha: 0), Colors.white.withValues(alpha: 0.07), Colors.white.withValues(alpha: 0)])
+            .createShader(const Rect.fromLTWH(-18, 0, 36, 1)),
+    );
+    canvas.restore();
+
+    // Confetti falling and swaying.
+    const pieces = 34;
+    for (var i = 0; i < pieces; i++) {
+      final seed = (math.sin(i * 91.7) * 43758.5453).abs() % 1.0;
+      final cycles = 1 + (i % 2);
+      final phase = (t * cycles + i / pieces) % 1.0;
+      final x = seed * size.width + math.sin(phase * tau * 2 + i) * 14;
+      final y = phase * (size.height + 40) - 20;
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(phase * tau * (2 + i % 3));
+      canvas.scale(1, math.cos(phase * tau * 3 + i).abs().clamp(0.3, 1.0));
+      final alpha = (phase < 0.08 ? phase / 0.08 : (phase > 0.9 ? (1 - phase) / 0.1 : 1.0)).clamp(0.0, 1.0);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(const Rect.fromLTWH(-3, -5, 6, 10), const Radius.circular(1.5)),
+        Paint()..color = _confetti[i % _confetti.length].withValues(alpha: alpha * 0.9),
+      );
+      canvas.restore();
+    }
+
+    // Small fireworks bursting at three spots.
+    final spots = [Offset(size.width * 0.18, size.height * 0.2), Offset(size.width * 0.82, size.height * 0.26), Offset(size.width * 0.5, size.height * 0.07)];
+    for (var k = 0; k < spots.length; k++) {
+      final phase = (t * 2 + k / spots.length) % 1.0;
+      if (phase > 0.5) continue;
+      final p = phase / 0.5;
+      final r = 6 + p * 44;
+      final alpha = (1 - p).clamp(0.0, 1.0);
+      for (var i = 0; i < 14; i++) {
+        final a = i * tau / 14;
+        final dir = Offset(math.cos(a), math.sin(a));
+        final color = _confetti[(i + k) % _confetti.length].withValues(alpha: alpha);
+        canvas.drawLine(
+          spots[k] + dir * (r * 0.62),
+          spots[k] + dir * r,
+          Paint()
+            ..strokeWidth = 2
+            ..strokeCap = StrokeCap.round
+            ..color = color,
+        );
+        canvas.drawCircle(spots[k] + dir * (r + 5), 1.6, Paint()..color = color);
+      }
+      canvas.drawCircle(spots[k], 5 * (1 - p), Paint()..color = Colors.white.withValues(alpha: alpha));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ClockInDonePainter old) => old.t != t;
 }
 
 class _ClockInCirclePainter extends CustomPainter {
