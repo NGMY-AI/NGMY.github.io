@@ -1138,7 +1138,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               ),
               trailing: _helperButton(context, onTap: onOpenHelper),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
@@ -1175,7 +1175,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 12),
             _LocalClockInShowcase(
               profileDisplayName: profileDisplayName,
               dailyGoal: dailyGoal,
@@ -1188,9 +1188,9 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               liveEarningsAt: _liveEarningsAt,
               onClockIn: onClockIn,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             _networkStatus(card: card, green: glassGreen),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(child: _smallTotalBox('Total Profit', '\$${formatCurrency(user.totalProfit)}', card: card)),
@@ -1198,7 +1198,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                 Expanded(child: _smallTotalBox('Total Investment', '\$${formatCurrency(active?.amount ?? 0)}', card: card, onTap: onOpenInvest)),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 10),
             _liveActivityPanel(context, recent, glassGreen, muted),
           ],
         ),
@@ -1347,16 +1347,16 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       glow: iconColor,
       glowAt: Alignment.topRight,
       child: SizedBox(
-        height: 104,
+        height: 80,
         child: Stack(
           children: [
             Positioned(
               right: -10,
               bottom: -14,
-              child: Icon(icon, size: 82, color: iconColor.withValues(alpha: 0.10)),
+              child: Icon(icon, size: 64, color: iconColor.withValues(alpha: 0.10)),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(15, 13, 14, 12),
+              padding: const EdgeInsets.fromLTRB(13, 10, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1383,7 +1383,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(value, maxLines: 1, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 26, height: 1)),
+                    child: Text(value, maxLines: 1, style: TextStyle(color: valueColor, fontWeight: FontWeight.w900, fontSize: 21, height: 1)),
                   ),
                 ],
               ),
@@ -1401,13 +1401,13 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       radius: 26,
       glow: green,
       glowAt: Alignment.centerLeft,
-      padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+      padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
       child: Row(
         children: [
           // A live signal: three rising bars in a ring.
           Container(
-            width: 52,
-            height: 52,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(color: green.withValues(alpha: 0.55), width: 2),
@@ -1417,11 +1417,11 @@ class _LocalGrowthHomeTab extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                for (final h in const [10.0, 16.0, 23.0])
+                for (final h in const [8.0, 13.0, 19.0])
                   Container(
                     width: 5,
                     height: h,
-                    margin: const EdgeInsets.fromLTRB(2, 0, 2, 13),
+                    margin: const EdgeInsets.fromLTRB(2, 0, 2, 10),
                     decoration: BoxDecoration(color: green, borderRadius: BorderRadius.circular(3)),
                   ),
               ],
@@ -1449,7 +1449,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
             onTap: onOpenGameCenter,
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: const LinearGradient(colors: [Color(0xFFF59E0B), Color(0xFFEF4444)]),
@@ -1478,7 +1478,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       glow: accent,
       glowAt: Alignment.bottomLeft,
       child: SizedBox(
-        height: 86,
+        height: 66,
         child: Row(
           children: [
             Container(
@@ -1503,7 +1503,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: Text(value, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900, height: 1)),
+                    child: Text(value, maxLines: 1, style: const TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w900, height: 1)),
                   ),
                 ],
               ),
@@ -1523,7 +1523,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
       radius: 26,
       glow: green,
       glowAt: Alignment.topCenter,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
       child: Column(
         children: [
           Row(
@@ -1566,7 +1566,7 @@ class _LocalGrowthHomeTab extends StatelessWidget {
     final color = isDebit ? const Color(0xFFFB7185) : const Color(0xFF2EF6A3);
     final muted = Colors.white.withValues(alpha: 0.5);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: Row(
         children: [
           Container(
@@ -1655,12 +1655,33 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
     super.initState();
     _waveCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 2600))..repeat();
     _smokeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 4200))..repeat();
+    _fxCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 7000));
+    _syncFx();
+  }
+
+  /// Coins, sparks and ripples fly out of the circle while a session is running (and gently after payout).
+  late final AnimationController _fxCtrl;
+
+  void _syncFx() {
+    final on = widget.clockedIn || widget.sessionComplete;
+    if (on && !_fxCtrl.isAnimating) {
+      _fxCtrl.repeat();
+    } else if (!on && _fxCtrl.isAnimating) {
+      _fxCtrl.stop();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LocalClockInShowcase oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncFx();
   }
 
   @override
   void dispose() {
     _waveCtrl.dispose();
     _smokeCtrl.dispose();
+    _fxCtrl.dispose();
     super.dispose();
   }
 
@@ -1713,6 +1734,23 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
               Positioned(right: -30, top: -36, child: _glowBlob(const Color(0xFF22D3EE), 120)),
               Positioned(left: -36, bottom: -40, child: _glowBlob(widget.green, 130)),
             ],
+            // Things flying out of the circle, all over the frame.
+            if (filledGold)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(32),
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _fxCtrl,
+                        builder: (context, _) => CustomPaint(
+                          painter: _ClockInFxPainter(t: _fxCtrl.value, intense: widget.clockedIn, gold: _gold, goldLight: _goldLight),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
               top: 14,
               left: 14,
@@ -1896,6 +1934,122 @@ class _LocalClockInShowcaseState extends State<_LocalClockInShowcase> with Ticke
       ),
     );
   }
+}
+
+/// Coins, sparks, ripples and twinkles that fly out of the clock-in circle across the whole frame.
+/// [t] runs 0..1 and loops; every motion completes whole cycles so the loop has no jump.
+class _ClockInFxPainter extends CustomPainter {
+  _ClockInFxPainter({required this.t, required this.intense, required this.gold, required this.goldLight});
+
+  final double t;
+  final bool intense;
+  final Color gold;
+  final Color goldLight;
+
+  static final TextPainter _dollar = TextPainter(
+    text: const TextSpan(text: '\$', style: TextStyle(color: Color(0xFF5B4308), fontSize: 9, fontWeight: FontWeight.w900)),
+    textDirection: TextDirection.ltr,
+  )..layout();
+
+  void _star(Canvas canvas, Offset p, double s, Paint paint) {
+    final path = Path()
+      ..moveTo(p.dx, p.dy - s)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx + s, p.dy)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy + s)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx - s, p.dy)
+      ..quadraticBezierTo(p.dx, p.dy, p.dx, p.dy - s)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    const r0 = 138.0;
+    final tau = math.pi * 2;
+
+    // Twinkling stars scattered over the frame.
+    for (var i = 0; i < 16; i++) {
+      final x = (math.sin(i * 12.9898) * 43758.5453).abs() % 1.0;
+      final y = (math.sin(i * 78.233) * 24634.6345).abs() % 1.0;
+      final a = (math.sin(t * tau * (1 + i % 3) + i) + 1) / 2;
+      final paint = Paint()..color = Colors.white.withValues(alpha: 0.10 + a * 0.5);
+      _star(canvas, Offset(x * size.width, y * size.height), 2 + a * 2.2, paint);
+    }
+
+    // Ripples leaving the circle.
+    for (var k = 0; k < 3; k++) {
+      final p = (t * 2 + k / 3) % 1.0;
+      final ring = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = goldLight.withValues(alpha: (1 - p) * (intense ? 0.38 : 0.2));
+      canvas.drawCircle(c, r0 + p * 90, ring);
+    }
+
+    // Coins, stars and dots flying outward.
+    final n = intense ? 28 : 12;
+    for (var i = 0; i < n; i++) {
+      final cycles = 1 + (i % 2);
+      final phase = (t * cycles + i / n) % 1.0;
+      final angle = i * 2.399963 + math.sin(i * 1.7) * 0.2;
+      final dist = r0 * 0.82 + phase * (70 + (i % 5) * 18);
+      final p = c + Offset(math.cos(angle) * dist, math.sin(angle) * dist * 0.96);
+      final alpha = math.sin(phase * math.pi).clamp(0.0, 1.0);
+      switch (i % 4) {
+        case 0:
+          final flip = math.cos(phase * tau * 3).abs().clamp(0.28, 1.0);
+          canvas.save();
+          canvas.translate(p.dx, p.dy);
+          canvas.scale(flip, 1);
+          final body = Paint()..color = gold.withValues(alpha: alpha);
+          canvas.drawCircle(Offset.zero, 6.5, body);
+          canvas.drawCircle(
+            Offset.zero,
+            6.5,
+            Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 1.2
+              ..color = goldLight.withValues(alpha: alpha),
+          );
+          if (flip > 0.6 && alpha > 0.35) {
+            _dollar.paint(canvas, Offset(-_dollar.width / 2, -_dollar.height / 2));
+          }
+          canvas.restore();
+        case 1:
+          _star(canvas, p, 3 + alpha * 3, Paint()..color = goldLight.withValues(alpha: alpha * 0.95));
+        case 2:
+          canvas.drawCircle(p, 1.6 + alpha * 1.8, Paint()..color = Colors.white.withValues(alpha: alpha * 0.8));
+        default:
+          // A short streak pointing away from the circle.
+          final dir = Offset(math.cos(angle), math.sin(angle));
+          canvas.drawLine(
+            p,
+            p - dir * (7 + alpha * 7),
+            Paint()
+              ..strokeWidth = 1.8
+              ..strokeCap = StrokeCap.round
+              ..color = gold.withValues(alpha: alpha * 0.8),
+          );
+      }
+    }
+
+    // Three bright sparks circling the rim, each with a fading tail.
+    for (var j = 0; j < 3; j++) {
+      final base = t * tau + j * tau / 3;
+      for (var s = 0; s < 8; s++) {
+        final a = base - s * 0.09;
+        final p = c + Offset(math.cos(a), math.sin(a)) * (r0 + 6);
+        final k = 1 - s / 8;
+        canvas.drawCircle(p, 1.4 + k * 2.6, Paint()..color = goldLight.withValues(alpha: k * 0.85));
+      }
+      final head = c + Offset(math.cos(base), math.sin(base)) * (r0 + 6);
+      canvas.drawCircle(head, 7, Paint()..color = gold.withValues(alpha: 0.28)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ClockInFxPainter old) => old.t != t || old.intense != intense;
 }
 
 class _ClockInCirclePainter extends CustomPainter {
