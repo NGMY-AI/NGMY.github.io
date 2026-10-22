@@ -20,6 +20,7 @@ import 'ngmy_house_workers.dart';
 import 'ngmy_nav.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_qr_download.dart';
+import 'ngmy_service_texture.dart';
 
 const _accent = Color(0xFF00E5FF);
 const _accent2 = Color(0xFF7C3AED);
@@ -790,7 +791,7 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                                       key: ValueKey('hc-${_selected!.id}'),
                                       children: [
                                         const SizedBox(height: 8),
-                                        _summaryCard(isDark),
+                                        _texturedSummary(isDark),
                                         const SizedBox(height: 16),
                                         _contactButtons(isDark),
                                       ],
@@ -1012,7 +1013,24 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
-  Widget _summaryCard(bool isDark) {
+  /// The look of the service that is open: house, money, moving or general help.
+  NgmyServiceLook? get _serviceLook {
+    if (_selected == null) return null;
+    if (_isHouseFixture) return NgmyServiceLook.house;
+    if (_isSendMoney) return NgmyServiceLook.money;
+    if (_isMovingDelivery) return NgmyServiceLook.moving;
+    if (_isGeneralHelp) return NgmyServiceLook.general;
+    return null;
+  }
+
+  /// The open service on its own textured card (dark, so its text is light in both themes).
+  Widget _texturedSummary(bool isDark) {
+    final look = _serviceLook;
+    if (look == null) return _summaryCard(isDark);
+    return NgmyServiceTexture(look: look, child: _summaryCard(true, textured: true));
+  }
+
+  Widget _summaryCard(bool isDark, {bool textured = false}) {
     final s = _selected!;
     final isMoney = ngmyHelpCenterIsSendMoney(s);
     final amount = double.tryParse(_priceC.text.trim()) ?? 0;
@@ -1024,12 +1042,14 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
 
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: isDark ? const Color(0xFF0C1220) : Colors.white,
-        border: Border.all(color: _accent.withOpacity(0.35)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 16)],
-      ),
+      decoration: textured
+          ? null
+          : BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: isDark ? const Color(0xFF0C1220) : Colors.white,
+              border: Border.all(color: _accent.withOpacity(0.35)),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(isDark ? 0.3 : 0.06), blurRadius: 16)],
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
