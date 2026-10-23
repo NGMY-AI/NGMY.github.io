@@ -8,6 +8,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'ngmy_studio_kit.dart';
+
 /// Reaction Lab: a studio where you drop parts on a board and wire them together.
 /// A signal travels along every wire. Sources start signals, logic parts change them
 /// and reaction parts turn them into light, sparks, balls, shakes and more.
@@ -155,6 +157,18 @@ class _Lab extends ChangeNotifier {
 
   void poke() => notifyListeners();
 
+  /// Sounds for the reactions (off when [soundOn] is false, and never too many at once).
+  bool soundOn = false;
+  int _lastTone = -1000;
+
+  double _note(int semis) => NgmyTone.note(semis);
+
+  void _tone(double freq, int ms, String wave, {double sweep = 0, double vol = 0.55}) {
+    if (!soundOn || now - _lastTone < 35) return;
+    _lastTone = now;
+    NgmyTone.play(freq, ms: ms, wave: wave, sweep: sweep, volume: vol);
+  }
+
   void clear() {
     nodes.clear();
     edges.clear();
@@ -221,33 +235,45 @@ class _Lab extends ChangeNotifier {
     var passOn = pass;
     switch (n.kind) {
       case 'light':
-        rings.add(_Ring(c, color, now, max: 60));
-        for (var i = 0; i < 6; i++) {
+        rings.add(_Ring(c, color, now, max: 90));
+        rings.add(_Ring(c, Colors.white, now, max: 50));
+        for (var i = 0; i < 12; i++) {
           final a = rnd.nextDouble() * math.pi * 2;
-          sparks.add(_Spark(c, Offset(math.cos(a), math.sin(a)) * 60, color, 3, 500, now));
+          sparks.add(_Spark(c, Offset(math.cos(a), math.sin(a)) * 110, color, 4, 600, now));
         }
+        _tone(_note([0, 4, 7, 12, 16, 19][n.param % 6] + 12), 220, 'tri');
       case 'burst':
-        for (var i = 0; i < 34; i++) {
+        for (var i = 0; i < 70; i++) {
           final a = rnd.nextDouble() * math.pi * 2;
-          final sp = 80 + rnd.nextDouble() * 260;
-          sparks.add(_Spark(c, Offset(math.cos(a), math.sin(a)) * sp, Color.lerp(color, Colors.white, rnd.nextDouble() * 0.5)!, 2 + rnd.nextDouble() * 3.5, 900 + rnd.nextInt(600), now));
+          final sp = 100 + rnd.nextDouble() * 320;
+          sparks.add(_Spark(c, Offset(math.cos(a), math.sin(a)) * sp, Color.lerp(color, Colors.white, rnd.nextDouble() * 0.5)!, 3 + rnd.nextDouble() * 4.5, 1000 + rnd.nextInt(700), now));
         }
+        rings.add(_Ring(c, color, now, max: 120));
+        _tone(120, 200, 'noise', vol: 0.5);
+        _tone(_note([7, 12, 16, 19][rnd.nextInt(4)] + 12), 260, 'tri');
       case 'ripple':
-        rings.add(_Ring(c, color, now, max: 190));
-        rings.add(_Ring(c, color, now + 160, max: 130));
+        rings.add(_Ring(c, color, now, max: 230));
+        rings.add(_Ring(c, color, now + 160, max: 160));
+        rings.add(_Ring(c, color, now + 320, max: 100));
+        _tone(180 + rnd.nextInt(80).toDouble(), 330, 'sine', sweep: 0.6);
       case 'ball':
-        balls.add(_Ball(c, Offset((rnd.nextDouble() - 0.5) * 220, -220 - rnd.nextDouble() * 160), color, now));
+        balls.add(_Ball(c, Offset((rnd.nextDouble() - 0.5) * 220, -260 - rnd.nextDouble() * 180), color, now));
+        _tone(300 + rnd.nextInt(300).toDouble(), 110, 'sine', sweep: 0.8);
       case 'comet':
         final a = rnd.nextDouble() * math.pi * 2;
-        comets.add(_Comet(c, c + Offset(math.cos(a), math.sin(a)) * (210 + rnd.nextDouble() * 160), color, now));
+        comets.add(_Comet(c, c + Offset(math.cos(a), math.sin(a)) * (260 + rnd.nextDouble() * 200), color, now));
+        _tone(380, 400, 'tri', sweep: 2.0, vol: 0.4);
       case 'shake':
-        shakeUntil = now + 380;
-        HapticFeedback.mediumImpact();
+        shakeUntil = now + 450;
+        HapticFeedback.heavyImpact();
+        _tone(70, 260, 'sine', sweep: 0.5, vol: 0.9);
       case 'pop':
         pops.add(_Pop(c, _kWords[n.param % _kWords.length], color, now));
+        _tone(_note([0, 5, 9, 12][rnd.nextInt(4)] + 12), 150, 'square', vol: 0.35);
       case 'wash':
         washColor = color;
-        washUntil = now + 650;
+        washUntil = now + 800;
+        _tone(_note(0) + 40, 420, 'tri', vol: 0.4);
       case 'echo':
         final gap = _kEchoMs[n.param % _kEchoMs.length];
         for (var k = 1; k <= 3; k++) {
@@ -474,10 +500,66 @@ class _NgmyReactionLabScreenState extends State<NgmyReactionLabScreen> with Sing
   Offset _connectTo = Offset.zero;
   Timer? _saveTimer;
   bool _movedDuringDrag = false;
+  bool _coach = false;
+  bool _sound = true;
+  String _descSig = '';
+  List<String> _descLines = const [];
+
+  static const _coachKey = 'ngmy_core_lab_coach_v1';
+
+  Future<void> _loadCoach() async {
+    try {
+      final seen = (await SharedPreferences.getInstance()).getBool(_coachKey) ?? false;
+      if (!seen && mounted) setState(() => _coach = true);
+    } catch (_) {}
+  }
+
+  Future<void> _closeCoach() async {
+    setState(() => _coach = false);
+    try {
+      (await SharedPreferences.getInstance()).setBool(_coachKey, true);
+    } catch (_) {}
+  }
+
+  /// The board in plain words: "Clock (every 0.8s) → Delay → Ripple".
+  List<String> _describe() {
+    final sig = '${_lab.nodes.length}|${_lab.edges.length}|${_lab.nodes.values.fold<int>(0, (a, n) => a + n.param * 7 + n.kind.hashCode % 97)}|${_lab.edges.fold<int>(0, (a, e) => a + e.from.hashCode % 31 + e.to.hashCode % 17)}';
+    if (sig == _descSig) return _descLines;
+    String name(_N n) {
+      final p = _kParts[n.kind]!;
+      return p.opts.isNotEmpty ? '${p.label} (${p.opts[n.param % p.opts.length]})' : p.label;
+    }
+
+    final out = <String>[];
+    void walk(_N n, List<String> path, int depth) {
+      final next = _lab.edges.where((e) => e.from == n.id).map((e) => _lab.nodes[e.to]).whereType<_N>().toList();
+      if (next.isEmpty || depth > 4) {
+        if (path.length > 1) out.add(path.join('  →  '));
+        return;
+      }
+      for (final m in next) {
+        if (out.length >= 6) return;
+        walk(m, [...path, name(m)], depth + 1);
+      }
+    }
+
+    for (final n in _lab.nodes.values.where((n) => _kParts[n.kind]!.role == _Role.source)) {
+      final hasWire = _lab.edges.any((e) => e.from == n.id);
+      if (!hasWire) {
+        out.add('${name(n)}  →  (not connected: drag from its right dot)');
+      } else {
+        walk(n, [name(n)], 0);
+      }
+    }
+    _descSig = sig;
+    return _descLines = out.take(5).toList();
+  }
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadCoach());
+    _lab.soundOn = _sound;
     _ticker = createTicker((elapsed) {
       final dt = ((elapsed - _last).inMicroseconds / 1e6).clamp(0.0, 0.05);
       _last = elapsed;
@@ -769,22 +851,50 @@ class _NgmyReactionLabScreenState extends State<NgmyReactionLabScreen> with Sing
                 onPanCancel: _panEnd,
                 onLongPressStart: (d) => _longPress(d.localPosition),
                 child: ClipRect(
-                  child: CustomPaint(
-                    size: size,
-                    painter: _LabPainter(_lab, showMode: _show, connectFrom: () => _connectFrom, connectTo: () => _connectTo),
-                    child: _lab.nodes.isEmpty && _loaded
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(32),
-                              child: Text(
-                                'Tap a part below to put it on the board.\nDrag from the right dot of one part to another to connect them.',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white38, height: 1.5),
+                  child: Stack(fit: StackFit.expand, children: [
+                    CustomPaint(
+                      size: size,
+                      painter: _LabPainter(_lab, showMode: _show, connectFrom: () => _connectFrom, connectTo: () => _connectTo),
+                      child: _lab.nodes.isEmpty && _loaded
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(32),
+                                child: Text(
+                                  'Tap a part below to put it on the board.\nDrag from the right dot of one part to another to connect them.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.white38, height: 1.5),
+                                ),
                               ),
-                            ),
-                          )
-                        : null,
-                  ),
+                            )
+                          : null,
+                    ),
+                    // What this board does, in plain words.
+                    if (!_show && _loaded)
+                      Positioned(
+                        left: 10,
+                        right: 10,
+                        top: 6,
+                        child: IgnorePointer(
+                          child: AnimatedBuilder(
+                            animation: _lab,
+                            builder: (_, __) {
+                              final lines = _describe();
+                              if (lines.isEmpty) return const SizedBox.shrink();
+                              return Container(
+                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                                  const Text('WHAT HAPPENS', style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
+                                  const SizedBox(height: 3),
+                                  for (final l in lines) Text(l, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 11.5, height: 1.3)),
+                                ]),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    if (_coach) _coachCard(),
+                  ]),
                 ),
               );
             }),
@@ -795,15 +905,65 @@ class _NgmyReactionLabScreenState extends State<NgmyReactionLabScreen> with Sing
     );
   }
 
+  /// A short guide, shown the first time and from the ? button.
+  Widget _coachCard() {
+    Widget step(IconData icon, Color color, String title, String body) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 38, height: 38, decoration: BoxDecoration(color: color.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.6))), child: Icon(icon, color: color, size: 21)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 13.5)),
+                const SizedBox(height: 2),
+                Text(body, style: const TextStyle(color: Colors.white70, fontSize: 12.5, height: 1.4)),
+              ]),
+            ),
+          ]),
+        );
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
+            constraints: const BoxConstraints(maxWidth: 380),
+            decoration: BoxDecoration(color: const Color(0xFF1B1B1F), borderRadius: BorderRadius.circular(26), border: Border.all(color: const Color(0xFF34D399).withValues(alpha: 0.5))),
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('How the Lab works', style: TextStyle(color: Color(0xFF34D399), fontWeight: FontWeight.w900, fontSize: 17)),
+                const SizedBox(height: 4),
+                const Text('You build a machine. A little light runs along the wires, and every part it touches does something.', style: TextStyle(color: Colors.white60, fontSize: 12.5, height: 1.4)),
+                const SizedBox(height: 14),
+                step(Icons.timer_rounded, const Color(0xFF34D399), '1. Something starts it', 'Clock sends a signal on its own. Button sends one when you tap it. Dice sends them at random.'),
+                step(Icons.swap_vert_rounded, const Color(0xFF60A5FA), '2. Something can change it', 'Delay holds it back. Echo repeats it. Every 3rd and Chance let only some through.'),
+                step(Icons.celebration_rounded, const Color(0xFFF472B6), '3. Something shows it', 'Burst, Ripple, Light, Ball, Comet, Shake, Pop and Wash are the reactions you see and hear.'),
+                step(Icons.cable_rounded, const Color(0xFFFACC15), '4. You connect them', 'Drag from the right dot of one part to the left dot of the next. Tap a wire to cut it, tap a part to change its setting, press and hold a part to remove it.'),
+                const Text('The WHAT HAPPENS box at the top reads your machine back to you. Press the sparkle button for ready-made machines to learn from.', style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.4)),
+                Align(alignment: Alignment.centerRight, child: TextButton(onPressed: _closeCoach, child: const Text("Let's go"))),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _topBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 4, 8, 2),
       child: Row(children: [
         IconButton(onPressed: () => Navigator.of(context).maybePop(), icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-        const Expanded(child: Text('REACTION LAB', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.8, fontSize: 15))),
+        const Expanded(child: Text('REACTION LAB', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2, fontSize: 14))),
+        _barButton(Icons.help_outline_rounded, 'How it works', () => setState(() => _coach = true), iconOnly: true),
+        _barButton(_sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, 'Sound', () => setState(() {
+              _sound = !_sound;
+              _lab.soundOn = _sound;
+            }), iconOnly: true),
         _barButton(Icons.auto_awesome_rounded, 'Ideas', _presets, iconOnly: true),
         _barButton(Icons.delete_sweep_rounded, 'Clear', _clear, iconOnly: true),
-        _barButton(Icons.play_arrow_rounded, 'Show', () => setState(() => _show = true), strong: true),
+        _barButton(Icons.play_arrow_rounded, 'Show', () => setState(() => _show = true), strong: true, iconOnly: true),
       ]),
     );
   }
@@ -820,7 +980,7 @@ class _NgmyReactionLabScreenState extends State<NgmyReactionLabScreen> with Sing
           child: Tooltip(
             message: label,
             child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: iconOnly ? 8 : 10, vertical: 8),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, size: iconOnly ? 20 : 17, color: strong ? Colors.black : Colors.white),
               if (!iconOnly) ...[
@@ -942,8 +1102,8 @@ class _LabPainter extends CustomPainter {
       }
     }
     if (now < lab.washUntil) {
-      final k = (lab.washUntil - now) / 650;
-      canvas.drawRect(Offset.zero & size, Paint()..color = lab.washColor.withValues(alpha: 0.28 * k));
+      final k = (lab.washUntil - now) / 800;
+      canvas.drawRect(Offset.zero & size, Paint()..color = lab.washColor.withValues(alpha: 0.4 * k));
     }
 
     // Wires.

@@ -5,6 +5,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import 'ngmy_core_reaction_lab.dart';
+import 'ngmy_core_studios_a.dart';
+import 'ngmy_core_studios_b.dart';
+import 'ngmy_studio_kit.dart';
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
 /// different, physically-shaded way (a folding accordion, flipping panels, rising towers, and
@@ -188,7 +191,6 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
         body: active == null
             ? _SequencePicker(
                 onPick: (s) => setState(() => _active = s),
-                onLab: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyReactionLabScreen())),
                 onClose: () => Navigator.of(context).maybePop(),
               )
             : _SequenceCanvas(key: ValueKey(active.title), meta: active, onExit: () => setState(() => _active = null)),
@@ -199,54 +201,93 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
 
 // ── Picker: three boxes in every row ────────────────────────────────────────
 
+class _StudioDef {
+  const _StudioDef(this.title, this.blurb, this.icon, this.color, this.build);
+  final String title;
+  final String blurb;
+  final IconData icon;
+  final Color color;
+  final Widget Function() build;
+}
+
+final List<_StudioDef> _kStudios = [
+  _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
+  _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
+  _StudioDef('MANDALA MAKER', 'Draw once, it repeats', Icons.filter_vintage_rounded, const Color(0xFFA78BFA), () => const NgmyMandalaStudio()),
+  _StudioDef('GRAVITY TOY', 'Balls, ramps and push', Icons.sports_basketball_rounded, const Color(0xFF38BDF8), () => const NgmyGravityStudio()),
+  _StudioDef('ORBIT STUDIO', 'Slingshot planets', Icons.public_rounded, const Color(0xFFFB923C), () => const NgmyOrbitStudio()),
+  _StudioDef('SWARM STUDIO', 'A living school of fish', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmySwarmStudio()),
+  _StudioDef('FIREWORKS', 'Design a sky show', Icons.celebration_rounded, const Color(0xFFFACC15), () => const NgmyFireworkStudio()),
+  _StudioDef('CHAIN BURST', 'One tap, a whole chain', Icons.bolt_rounded, const Color(0xFFF472B6), () => const NgmyChainBurstStudio()),
+  _StudioDef('BEAT MAKER', 'Build a loop and hear it', Icons.graphic_eq_rounded, const Color(0xFF4ADE80), () => const NgmyBeatStudio()),
+  _StudioDef('PALETTE LAB', 'Colours that go together', Icons.palette_rounded, const Color(0xFF2DD4BF), () => const NgmyPaletteStudio()),
+  _StudioDef('TITLE ANIMATOR', 'Make a moving title', Icons.title_rounded, const Color(0xFFFACC15), () => const NgmyTitleStudio()),
+];
+
 class _SequencePicker extends StatelessWidget {
-  const _SequencePicker({required this.onPick, required this.onLab, required this.onClose});
+  const _SequencePicker({required this.onPick, required this.onClose});
   final ValueChanged<_UnfoldMeta> onPick;
-  final VoidCallback onLab;
   final VoidCallback onClose;
+
+  static const _grid = SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82);
+
+  Widget _heading(String t, String sub) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.6, fontSize: 12.5)),
+          const SizedBox(height: 2),
+          Text(sub, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Column(children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 6, 16, 4),
+          padding: const EdgeInsets.fromLTRB(8, 6, 16, 0),
           child: Row(children: [
             IconButton(onPressed: onClose, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
             const SizedBox(width: 2),
-            const Expanded(
-              child: Text('CORE PROTOCOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 17)),
-            ),
+            const Expanded(child: Text('CORE PROTOCOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 17))),
           ]),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Build your own in the Lab, or watch a sequence play.', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
-          ),
-        ),
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82),
-            itemCount: _kSequences.length + 1,
-            itemBuilder: (_, i) => i == 0 ? _LabTile(onTap: onLab) : _PickTile(meta: _kSequences[i - 1], onTap: () => onPick(_kSequences[i - 1])),
-          ),
+          child: CustomScrollView(slivers: [
+            SliverToBoxAdapter(child: _heading('STUDIOS', 'Play, make things, and keep what you make')),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              sliver: SliverGrid(
+                gridDelegate: _grid,
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => _StudioTile(def: _kStudios[i], onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _kStudios[i].build()))),
+                  childCount: _kStudios.length,
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(child: _heading('SCENES', 'Each one is a studio too: change the style, colours and words')),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 30),
+              sliver: SliverGrid(
+                gridDelegate: _grid,
+                delegate: SliverChildBuilderDelegate((_, i) => _PickTile(meta: _kSequences[i], onTap: () => onPick(_kSequences[i])), childCount: _kSequences.length),
+              ),
+            ),
+          ]),
         ),
       ]),
     );
   }
 }
 
-/// The Lab: a box with a glow, so it stands out as the place to build.
-class _LabTile extends StatelessWidget {
-  const _LabTile({required this.onTap});
+class _StudioTile extends StatelessWidget {
+  const _StudioTile({required this.def, required this.onTap});
+  final _StudioDef def;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    const c = Color(0xFF34D399);
+    final c = def.color;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -256,21 +297,21 @@ class _LabTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F3D2C), Color(0xFF151518)]),
-            border: Border.all(color: c.withValues(alpha: 0.8), width: 1.4),
-            boxShadow: [BoxShadow(color: c.withValues(alpha: 0.3), blurRadius: 18, spreadRadius: -4)],
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c, 0.3)!, const Color(0xFF151518)]),
+            border: Border.all(color: c.withValues(alpha: 0.6), width: 1.2),
+            boxShadow: [BoxShadow(color: c.withValues(alpha: 0.22), blurRadius: 14, spreadRadius: -4)],
           ),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF047857)]), boxShadow: [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 12)]),
-              child: const Icon(Icons.hub_rounded, color: Colors.white, size: 26),
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [c, Color.lerp(c, Colors.black, 0.45)!]), boxShadow: [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 12)]),
+              child: Icon(def.icon, color: Colors.white, size: 24),
             ),
             const SizedBox(height: 8),
-            const Text('REACTION LAB', textAlign: TextAlign.center, style: TextStyle(color: c, fontWeight: FontWeight.w900, letterSpacing: 0.8, fontSize: 11)),
+            Text(def.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: c, fontWeight: FontWeight.w900, letterSpacing: 0.5, fontSize: 10.5, height: 1.15)),
             const SizedBox(height: 3),
-            Text('Connect parts, make your own', textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 9.5, height: 1.25)),
+            Text(def.blurb, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 9.5, height: 1.2)),
           ]),
         ),
       ),
@@ -319,7 +360,7 @@ class _PickTile extends StatelessWidget {
             const SizedBox(height: 10),
             Text(meta.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 10.5, height: 1.2)),
             const SizedBox(height: 4),
-            Icon(Icons.play_circle_fill_rounded, color: c.first, size: 20),
+            Icon(Icons.tune_rounded, color: c.first, size: 18),
           ]),
         ),
       ),
@@ -534,9 +575,40 @@ class _SequenceCanvas extends StatefulWidget {
   State<_SequenceCanvas> createState() => _SequenceCanvasState();
 }
 
+/// Colour themes you can switch a scene to.
+const List<List<Color>> _kThemes = [
+  [Color(0xFF818CF8), Color(0xFF4338CA)],
+  [Color(0xFF2DD4BF), Color(0xFF0F766E)],
+  [Color(0xFF34D399), Color(0xFF047857)],
+  [Color(0xFFA78BFA), Color(0xFFDB2777)],
+  [Color(0xFFFBBF24), Color(0xFFB45309)],
+  [Color(0xFFF87171), Color(0xFFB91C1C)],
+  [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
+  [Color(0xFFF472B6), Color(0xFFBE185D)],
+  [Color(0xFFFB923C), Color(0xFF9A3412)],
+  [Color(0xFF94A3B8), Color(0xFF334155)],
+];
+
+/// Icons you can put on a slab.
+const List<IconData> _kIconChoices = [
+  Icons.mail_rounded, Icons.sms_rounded, Icons.campaign_rounded, Icons.lock_open_rounded, Icons.key_rounded, Icons.shield_rounded,
+  Icons.savings_rounded, Icons.trending_up_rounded, Icons.payments_rounded, Icons.rocket_launch_rounded, Icons.bolt_rounded, Icons.auto_awesome_rounded,
+  Icons.favorite_rounded, Icons.star_rounded, Icons.emoji_events_rounded, Icons.home_rounded, Icons.school_rounded, Icons.work_rounded,
+  Icons.music_note_rounded, Icons.camera_alt_rounded, Icons.restaurant_rounded, Icons.flight_rounded, Icons.directions_car_rounded, Icons.shopping_bag_rounded,
+  Icons.cake_rounded, Icons.pets_rounded, Icons.fitness_center_rounded, Icons.local_hospital_rounded, Icons.church_rounded, Icons.celebration_rounded,
+];
+
 class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderStateMixin {
   late final AnimationController _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 11000))..repeat();
   late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))..repeat(reverse: true);
+  final GlobalKey _shot = GlobalKey();
+  late _UnfoldStyle _style = widget.meta.style;
+  late List<Color> _colors = List.of(widget.meta.colors);
+  late List<IconData> _icons = List.of(widget.meta.icons);
+  late List<String> _labels = List.of(widget.meta.labels);
+  late List<String> _subs = List.of(widget.meta.subs);
+  double _speed = 1.0;
+  bool _playing = true;
 
   @override
   void dispose() {
@@ -547,42 +619,137 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
 
   static double seg(double t, double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
 
-  @override
-  Widget build(BuildContext context) {
-    final meta = widget.meta;
-    return Stack(fit: StackFit.expand, children: [
-      // A very faint wash of the sequence colour on a dark page, no blue cast.
-      AnimatedBuilder(
-        animation: _pulse,
-        builder: (_, __) => DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: RadialGradient(center: const Alignment(0, 0.1), radius: 0.9, colors: [meta.glow.withValues(alpha: 0.06 + 0.03 * _pulse.value), _kBg]),
+  _UnfoldMeta get _meta => _UnfoldMeta(style: _style, title: widget.meta.title, blurb: widget.meta.blurb, colors: _colors, icons: _icons, labels: _labels, subs: _subs);
+
+  void _play() {
+    _seq.repeat(period: Duration(milliseconds: (11000 / _speed).round()));
+    setState(() => _playing = true);
+  }
+
+  void _pause() {
+    _seq.stop();
+    setState(() => _playing = false);
+  }
+
+  Future<void> _edit() async {
+    final labelC = [for (final l in _labels) TextEditingController(text: l)];
+    final subC = [for (final s in _subs) TextEditingController(text: s)];
+    final icons = List.of(_icons);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1B1B1F),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.86),
+              child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 16), shrinkWrap: true, children: [
+                const Text('Make it yours', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                const SizedBox(height: 4),
+                const Text('Change the words and pictures on the three slabs.', style: TextStyle(color: Colors.white54, fontSize: 12.5)),
+                const SizedBox(height: 12),
+                for (var i = 0; i < 3; i++) ...[
+                  Text('SLAB ${i + 1}', style: const TextStyle(color: Colors.white38, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 1.3)),
+                  const SizedBox(height: 6),
+                  Row(children: [
+                    Expanded(child: _field(labelC[i], 'Title')),
+                    const SizedBox(width: 8),
+                    Expanded(flex: 2, child: _field(subC[i], 'Small line')),
+                  ]),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 44,
+                    child: ListView(scrollDirection: Axis.horizontal, children: [
+                      for (final ic in _kIconChoices)
+                        GestureDetector(
+                          onTap: () => setSheet(() => icons[i] = ic),
+                          child: Container(
+                            width: 42,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: icons[i] == ic ? _colors.first.withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.06), border: Border.all(color: icons[i] == ic ? _colors.first : Colors.white12, width: icons[i] == ic ? 1.8 : 1)),
+                            child: Icon(ic, color: icons[i] == ic ? Colors.white : Colors.white60, size: 22),
+                          ),
+                        ),
+                    ]),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      for (var i = 0; i < 3; i++) {
+                        _labels[i] = labelC[i].text.trim().isEmpty ? _labels[i] : labelC[i].text.trim();
+                        _subs[i] = subC[i].text.trim();
+                        _icons[i] = icons[i];
+                      }
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Done'),
+                ),
+              ]),
+            ),
           ),
         ),
       ),
-      SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 16, 0),
-            child: Row(children: [
-              IconButton(onPressed: widget.onExit, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
-              Expanded(child: Text(meta.title, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.8, fontSize: 14))),
-            ]),
+    );
+    for (final c in [...labelC, ...subC]) {
+      c.dispose();
+    }
+  }
+
+  Widget _field(TextEditingController c, String hint) => TextField(
+        controller: c,
+        maxLength: 28,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        decoration: InputDecoration(
+          counterText: '',
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.white30),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.06),
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = _meta;
+    return StudioPage(
+      title: meta.title,
+      accent: meta.glow,
+      help: 'A scene that builds itself. Everything on it is yours to change.\n\nStyle switches how it builds: Fold, Flip, Rise or Assemble. Theme changes the colours. Edit lets you write your own words and pick your own pictures for the three slabs.\n\nDrag the timeline to scrub through it, change the speed, pause on any moment, and Share saves a picture of your scene.',
+      actions: [
+        IconButton(onPressed: _edit, icon: const Icon(Icons.edit_rounded, color: Colors.white70, size: 21), tooltip: 'Edit words and pictures'),
+        IconButton(onPressed: () => studioShare(context, _shot, name: 'scene'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share'),
+      ],
+      stage: RepaintBoundary(
+        key: _shot,
+        child: Stack(fit: StackFit.expand, children: [
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) => DecoratedBox(
+              decoration: BoxDecoration(gradient: RadialGradient(center: const Alignment(0, 0.1), radius: 0.9, colors: [meta.glow.withValues(alpha: 0.06 + 0.03 * _pulse.value), _kBg])),
+            ),
           ),
-          Expanded(
-            child: LayoutBuilder(builder: (context, box) {
-              final w = math.min(box.maxWidth - 36, 350.0);
-              return Center(
+          LayoutBuilder(builder: (context, box) {
+            final w = math.min(box.maxWidth - 36, 350.0);
+            return Center(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
                 child: AnimatedBuilder(
                   animation: Listenable.merge([_seq, _pulse]),
                   builder: (context, _) {
                     final t = _seq.value;
-                    // Built by about 0.5, held, then faded for the replay.
                     final fade = t < 0.9 ? 1.0 : (1 - seg(t, 0.9, 0.98));
                     final pulse = Curves.easeInOut.transform(_pulse.value);
                     return Opacity(
                       opacity: fade,
-                      child: switch (meta.style) {
+                      child: switch (_style) {
                         _UnfoldStyle.accordion => _accordion(meta, t, pulse, w),
                         _UnfoldStyle.flip => _flip(meta, t, pulse, w),
                         _UnfoldStyle.towers => _towers(meta, t, pulse, w),
@@ -591,16 +758,70 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
                     );
                   },
                 ),
-              );
-            }),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: Text(meta.blurb, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12)),
-          ),
+              ),
+            );
+          }),
         ]),
       ),
-    ]);
+      tools: Column(mainAxisSize: MainAxisSize.min, children: [
+        // The timeline: drag to look at any moment.
+        Row(children: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            onPressed: _playing ? _pause : _play,
+            icon: Icon(_playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: meta.glow, size: 34),
+          ),
+          Expanded(
+            child: AnimatedBuilder(
+              animation: _seq,
+              builder: (_, __) => SliderTheme(
+                data: SliderTheme.of(context).copyWith(activeTrackColor: meta.glow, thumbColor: meta.glow, inactiveTrackColor: Colors.white12, trackHeight: 3.5),
+                child: Slider(
+                  value: _seq.value.clamp(0.0, 1.0),
+                  onChanged: (v) {
+                    _seq.value = v;
+                    if (_playing) setState(() => _playing = false);
+                  },
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: 'Replay',
+            onPressed: () {
+              _seq.value = 0;
+              _play();
+            },
+            icon: const Icon(Icons.replay_rounded, color: Colors.white70),
+          ),
+        ]),
+        StudioSlider(label: 'Speed', value: _speed, min: 0.4, max: 2.5, display: '${_speed.toStringAsFixed(1)}x', color: meta.glow, onChanged: (v) {
+          setState(() => _speed = v);
+          if (_playing) _play();
+        }),
+        StudioRow(label: 'STYLE', children: [
+          for (final s in const [(_UnfoldStyle.accordion, 'Fold', Icons.unfold_more_rounded), (_UnfoldStyle.flip, 'Flip', Icons.flip_rounded), (_UnfoldStyle.towers, 'Rise', Icons.bar_chart_rounded), (_UnfoldStyle.assemble, 'Assemble', Icons.join_inner_rounded)])
+            StudioChip(label: s.$2, icon: s.$3, selected: _style == s.$1, color: meta.glow, onTap: () {
+              setState(() => _style = s.$1);
+              _seq.value = 0;
+              if (_playing) _play();
+            }),
+        ]),
+        StudioRow(label: 'THEME', children: [
+          for (final th in _kThemes)
+            GestureDetector(
+              onTap: () => setState(() => _colors = List.of(th)),
+              child: Container(
+                margin: const EdgeInsets.only(right: 9),
+                width: _colors.first == th.first ? 34 : 28,
+                height: _colors.first == th.first ? 34 : 28,
+                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: th), border: Border.all(color: _colors.first == th.first ? Colors.white : Colors.white24, width: _colors.first == th.first ? 2.5 : 1)),
+              ),
+            ),
+        ]),
+      ]),
+    );
   }
 
   // 1. Accordion: each panel hangs from a hinge on the one above and swings down into place.

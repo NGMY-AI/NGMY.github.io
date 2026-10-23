@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_core_protocol_sims.dart';
 import 'package:ngmy/ngmy_core_reaction_lab.dart';
+import 'package:ngmy/ngmy_studio_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    NgmyTone.enabled = false;
+  });
   _engineTests();
 
   testWidgets('Core Protocol shows the Lab and the sequences three to a row, and each sequence plays', (tester) async {
@@ -14,10 +18,12 @@ void main() {
     addTearDown(tester.view.reset);
     await tester.pumpWidget(const MaterialApp(home: NgmyCoreProtocolSimsScreen()));
     expect(find.text('REACTION LAB'), findsOneWidget);
-    // Three boxes in a row: the first three tiles share a top edge.
-    final tops = [for (final t in ['REACTION LAB', 'MESSAGE FUNNEL', 'VAULT UNLOCK']) tester.getTopLeft(find.text(t)).dy];
+    // Three boxes in a row: the first three studio tiles share a top edge.
+    final tops = [for (final t in ['REACTION LAB', 'SPARK PAINTER', 'MANDALA MAKER']) tester.getTopLeft(find.text(t)).dy];
     expect((tops[0] - tops[1]).abs() < 40 && (tops[1] - tops[2]).abs() < 40, isTrue);
     for (final title in ['MESSAGE FUNNEL', 'VAULT UNLOCK', 'GROWTH SKYLINE', 'ORBIT ASSEMBLY']) {
+      await tester.scrollUntilVisible(find.text(title), 300, scrollable: find.byType(Scrollable).first);
+      await tester.pump(const Duration(milliseconds: 100));
       await tester.tap(find.text(title));
       await tester.pump(const Duration(milliseconds: 100));
       for (var i = 0; i < 24; i++) {
@@ -58,7 +64,7 @@ void main() {
     for (var i = 0; i < 24; i++) {
       await tester.pump(const Duration(milliseconds: 250));
     }
-    await tester.tap(find.text('Show'));
+    await tester.tap(find.byTooltip('Show'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Back to building'), findsOneWidget);
     await tester.tap(find.text('Back to building'));
