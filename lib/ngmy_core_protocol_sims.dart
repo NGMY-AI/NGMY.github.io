@@ -12,6 +12,8 @@ import 'ngmy_core_studios_b.dart';
 import 'ngmy_core_studios_c.dart';
 import 'ngmy_core_studios_e.dart';
 import 'ngmy_studio_kit.dart';
+import 'ngmy_ai_inventor.dart';
+import 'ngmy_electronics_lab.dart';
 import 'ngmy_play_hub.dart';
 import 'ngmy_universe_hub.dart';
 
@@ -254,6 +256,8 @@ class _StudioDef {
 
 final List<_StudioDef> _kStudios = [
   _StudioDef('UNIVERSE', 'Earth, space and gravity', Icons.travel_explore_rounded, const Color(0xFF38BDF8), () => const NgmyUniverseHub()),
+  _StudioDef('ELECTRONICS LAB', 'Batteries, wires, real circuits', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
+  _StudioDef('AI INVENTOR', 'Say it, watch it get built', Icons.auto_awesome_rounded, const Color(0xFFA78BFA), () => const NgmyInventorStudio()),
   _StudioDef('BLOCK BUILDER', 'Snap blocks, make games', Icons.extension_rounded, const Color(0xFFFACC15), ngmyBlockBuilderScreen),
   _StudioDef('DISCOVERY LAB', 'Elements, sky, dinosaurs', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyDiscoveryHub()),
   _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
@@ -316,7 +320,10 @@ class _SequencePicker extends StatelessWidget {
               sliver: SliverGrid(
                 gridDelegate: _grid,
                 delegate: SliverChildBuilderDelegate(
-                  (_, i) => _StudioTile(def: _kStudios[i], onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _kStudios[i].build()))),
+                  (_, i) => _StudioTile(def: _kStudios[i], onTap: () {
+                    NgmyTone.theme = kStudioSoundThemes[_kStudios[i].title] ?? 'music';
+                    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => _kStudios[i].build()));
+                  }),
                   childCount: _kStudios.length,
                 ),
               ),

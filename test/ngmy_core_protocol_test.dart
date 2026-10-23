@@ -20,7 +20,7 @@ void main() {
     expect(find.text('REACTION LAB'), findsOneWidget);
     expect(find.text('UNIVERSE'), findsOneWidget);
     // Three boxes in a row: the first three studio tiles share a top edge.
-    final tops = [for (final t in ['UNIVERSE', 'BLOCK BUILDER', 'DISCOVERY LAB']) tester.getTopLeft(find.text(t)).dy];
+    final tops = [for (final t in ['UNIVERSE', 'ELECTRONICS LAB', 'AI INVENTOR']) tester.getTopLeft(find.text(t)).dy];
     expect((tops[0] - tops[1]).abs() < 40 && (tops[1] - tops[2]).abs() < 40, isTrue);
     for (final title in ['MESSAGE FUNNEL', 'VAULT UNLOCK', 'GROWTH SKYLINE', 'ORBIT ASSEMBLY']) {
       await tester.scrollUntilVisible(find.text(title), 300, scrollable: find.byType(Scrollable).first);

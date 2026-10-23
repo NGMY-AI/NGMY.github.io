@@ -16,6 +16,32 @@ const Color kStudioBg = Color(0xFF121212);
 const Color kStudioPanel = Color(0xFF17171A);
 
 /// The page every studio sits in: a back button, a title, a help button, the stage and a tool panel.
+/// The sound style of each studio (by its title). Studios not listed here are about music.
+const Map<String, String> kStudioSoundThemes = {
+  'SPARK PAINTER': 'sparkle',
+  'MANDALA MAKER': 'sparkle',
+  'TITLE ANIMATOR': 'whoosh',
+  'PALETTE LAB': 'click',
+  'GRAVITY TOY': 'bounce',
+  'ORBIT STUDIO': 'space',
+  'SWARM STUDIO': 'bubble',
+  'FIREWORK DESIGNER': 'pop',
+  'CHAIN BURST': 'zap',
+  'CIRCUIT LAB': 'tech',
+  'PERIODIC TABLE': 'lab',
+  'BODY EXPLORER': 'organic',
+  'SPIN THE WHEEL': 'click',
+  'FOCUS TIMER': 'tech',
+  'MEMORY MATCH': 'bubble',
+  'LUCKY POCKET': 'click',
+  'ELECTRONICS LAB': 'tech',
+  'AI INVENTOR': 'tech',
+  'MAGNET LAB': 'tech',
+  'RADIO LAB': 'tech',
+  'POWER PLANT': 'tech',
+  'PIXEL TV': 'tech',
+};
+
 class StudioPage extends StatelessWidget {
   const StudioPage({
     super.key,
@@ -38,6 +64,8 @@ class StudioPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Each studio gets sounds that match what it is about.
+    NgmyTone.theme = kStudioSoundThemes[title] ?? 'music';
     return Scaffold(
       backgroundColor: kStudioBg,
       body: SafeArea(
@@ -328,6 +356,10 @@ class NgmyTone {
   static int _next = 0;
   static bool enabled = true;
 
+  /// What kind of sounds the open studio makes. 'music' and 'space' use the real instruments; the
+  /// others turn every note into a sound that matches the studio (blips, pops, thumps, zaps...).
+  static String theme = 'music';
+
   /// The note names C, C#, D … B.
   static const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -446,12 +478,62 @@ class NgmyTone {
   }
 
   /// A note on an instrument, by semitones above middle C.
-  static Future<void> playNote(String inst, int semis, {int ms = 600, double volume = 0.7}) => play(note(semis), ms: ms, inst: inst, volume: volume);
+  static Future<void> playNote(String inst, int semis, {int ms = 600, double volume = 0.7}) {
+    if (theme == 'music') return play(note(semis), ms: ms, inst: inst, volume: volume);
+    if (theme == 'space') return play(note(semis), ms: ms, inst: inst == 'piano' || inst == 'bell' || inst == 'pluck' ? 'synth' : inst, volume: volume);
+    return sfx(theme, semis, ms: ms, volume: volume);
+  }
+
+  /// A themed sound effect. [semis] only changes its pitch a little, so it still feels alive.
+  static Future<void> sfx(String kind, int semis, {int ms = 200, double volume = 0.6}) {
+    final f = note(semis.clamp(-12, 36));
+    final short = math.min(ms, 260);
+    switch (kind) {
+      case 'tech':
+        return play(f * 2, ms: math.min(short, 110), wave: 'square', volume: volume * 0.45);
+      case 'sparkle':
+        return play(f * 2.5, ms: 130, wave: 'tri', sweep: -0.35, volume: volume * 0.6);
+      case 'bounce':
+        return play(140 + (semis % 12) * 9, ms: 150, sweep: 0.9, volume: volume);
+      case 'bubble':
+        return play(260 + (semis % 12) * 22, ms: 120, sweep: -0.55, volume: volume * 0.85);
+      case 'pop':
+        play(f, ms: 160, wave: 'tri', sweep: -0.7, volume: volume * 0.4);
+        return play(900, ms: 90, wave: 'noise', volume: volume * 0.45);
+      case 'zap':
+        return play(f * 3, ms: 150, wave: 'square', sweep: 1.6, volume: volume * 0.4);
+      case 'click':
+        return play(2600 + (semis % 7) * 180, ms: 30, wave: 'noise', volume: volume * 0.5);
+      case 'whoosh':
+        play(320, ms: 220, sweep: -0.7, volume: volume * 0.35);
+        return play(1500, ms: 200, wave: 'noise', volume: volume * 0.22);
+      case 'organic':
+        return play(85 + (semis % 12) * 5, ms: 190, sweep: 1.1, volume: volume);
+      case 'lab':
+        return play(f * 1.6, ms: 140, wave: 'tri', sweep: -0.3, volume: volume * 0.55);
+      default:
+        return play(f, ms: short, wave: 'tri', volume: volume * 0.5);
+    }
+  }
 
   /// Several notes at the same moment.
   static void chord(String inst, List<int> semis, {int ms = 900, double volume = 0.5}) {
-    for (final s in semis) {
-      playNote(inst, s, ms: ms, volume: volume);
+    if (theme == 'music' || theme == 'space') {
+      for (final s in semis) {
+        playNote(inst, s, ms: ms, volume: volume);
+      }
+      return;
+    }
+    if (!enabled) return;
+    // A quick run of the themed sound instead of a piano chord.
+    var i = 0;
+    for (final s in semis.take(4)) {
+      final d = i++ * 70;
+      if (d == 0) {
+        playNote(inst, s, ms: ms, volume: volume);
+      } else {
+        Future<void>.delayed(Duration(milliseconds: d), () => playNote(inst, s, ms: ms, volume: volume));
+      }
     }
   }
 

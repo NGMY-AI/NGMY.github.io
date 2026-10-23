@@ -1350,68 +1350,71 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
 
   Widget _card(NgmyBusinessNote n, NgmyHubTheme hub) {
     final dark = n.darkTheme;
-    final fg = dark ? Colors.white : const Color(0xFF0F172A);
+    final fg = dark ? Colors.white : const Color(0xFF111827);
     final sub = dark ? Colors.white70 : const Color(0xFF475569);
     final body = n.displayBody.trim();
+    const fold = 30.0;
     return GestureDetector(
       onTap: () => n.isTrashed ? _noteMenu(n) : _openEditor(note: n),
       onLongPress: () => _noteMenu(n),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 14, offset: const Offset(0, 5))],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(children: [
-            Positioned.fill(child: _NoteBackgroundLayer(note: n, compact: true)),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Row(children: [
-                  NgmyOfflineEmoji(n.icon.trim().isEmpty ? '📝' : n.icon.trim(), fontSize: 22),
-                  const Spacer(),
-                  if (n.pinned) const Icon(Icons.push_pin_rounded, size: 15, color: Color(0xFF8B5CF6)),
-                ]),
-                const SizedBox(height: 8),
-                Text(n.preview, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 16, height: 1.2, letterSpacing: -0.2)),
-                if (body.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(body.replaceAll(RegExp(r'\n{2,}'), '\n'), maxLines: 6, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub, fontSize: 12.5, height: 1.4)),
-                ],
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: Text(n.isTrashed ? _trashExpiryLabel(n.deletedAt!) : n.folder, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: n.isTrashed ? const Color(0xFFEF4444) : sub.withValues(alpha: 0.8), fontSize: 10.5, fontWeight: FontWeight.w800))),
-                  Text(_formatDate(n.updatedAt), style: TextStyle(color: sub.withValues(alpha: 0.7), fontSize: 10.5, fontWeight: FontWeight.w600)),
-                ]),
+      child: PhysicalShape(
+        clipper: const _FoldClipper(fold),
+        color: Colors.white,
+        elevation: 6,
+        shadowColor: Colors.black.withValues(alpha: 0.55),
+        child: Stack(children: [
+          Positioned.fill(child: _NoteBackgroundLayer(note: n, compact: true)),
+          // Faint ruled lines, like a page of a notebook.
+          Positioned.fill(child: CustomPaint(painter: _RuledPainter(dark ? Colors.white.withValues(alpha: 0.07) : Colors.black.withValues(alpha: 0.06)))),
+          // A big soft emoji in the corner.
+          Positioned(right: -10, bottom: -14, child: Opacity(opacity: dark ? 0.2 : 0.16, child: NgmyOfflineEmoji(n.icon.trim().isEmpty ? '📝' : n.icon.trim(), fontSize: 82))),
+          // The folded corner.
+          Positioned(top: 0, right: 0, child: CustomPaint(size: const Size(fold, fold), painter: _FoldPainter(dark))),
+          // A coloured spine down the left edge.
+          Positioned(left: 0, top: 0, bottom: 0, child: Container(width: 6, color: const Color(0xFF8B5CF6).withValues(alpha: n.pinned ? 1 : 0.55))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.14) : Colors.white.withValues(alpha: 0.85), shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 4)]),
+                  child: NgmyOfflineEmoji(n.icon.trim().isEmpty ? '📝' : n.icon.trim(), fontSize: 16),
+                ),
+                const Spacer(),
+                if (n.pinned) const Padding(padding: EdgeInsets.only(right: 22), child: Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF8B5CF6))),
               ]),
-            ),
-          ]),
-        ),
+              const SizedBox(height: 9),
+              Text(n.preview, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.2, letterSpacing: -0.2)),
+              if (body.isNotEmpty) ...[
+                const SizedBox(height: 5),
+                Expanded(child: Text(body.replaceAll(RegExp(r'\n{2,}'), '\n'), overflow: TextOverflow.fade, style: TextStyle(color: sub, fontSize: 12.2, height: 1.45))),
+              ] else
+                const Spacer(),
+              const SizedBox(height: 6),
+              Row(children: [
+                Expanded(child: Text(n.isTrashed ? _trashExpiryLabel(n.deletedAt!) : n.folder.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: n.isTrashed ? const Color(0xFFEF4444) : const Color(0xFF8B5CF6), fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1))),
+                Text(_formatDate(n.updatedAt), style: TextStyle(color: sub.withValues(alpha: 0.75), fontSize: 10.5, fontWeight: FontWeight.w700)),
+              ]),
+            ]),
+          ),
+        ]),
       ),
     );
   }
 
+  /// Notes sit in neat rows of two, all the same size.
   Widget _grid(List<NgmyBusinessNote> list, NgmyHubTheme hub) {
-    final left = <Widget>[];
-    final right = <Widget>[];
-    var lh = 0, rh = 0;
-    for (final n in list) {
-      final h = 90 + math.min(n.displayBody.length, 260) ~/ 3;
-      if (lh <= rh) {
-        left.add(_card(n, hub));
-        lh += h;
-      } else {
-        right.add(_card(n, hub));
-        rh += h;
-      }
-    }
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(child: Column(children: left)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(children: right)),
-    ]);
+    return LayoutBuilder(builder: (context, box) {
+      final w = (box.maxWidth - 14) / 2;
+      return Wrap(
+        spacing: 14,
+        runSpacing: 16,
+        children: [for (final n in list) SizedBox(width: w, height: w * 1.12, child: _card(n, hub))],
+      );
+    });
   }
 
   Widget _label(String t, NgmyHubTheme hub) => Padding(
@@ -4135,3 +4138,63 @@ class _AnimatedTextEffectState extends State<_AnimatedTextEffect> with SingleTic
 
 // Alias for editor/list usage
 typedef _NoteBackgroundLayer = _NoteAnimatedBackgroundLayer;
+
+/// A note's outline: a rounded sheet with the top-right corner folded over.
+class _FoldClipper extends CustomClipper<Path> {
+  const _FoldClipper(this.fold);
+  final double fold;
+
+  @override
+  Path getClip(Size size) {
+    const r = 18.0;
+    return Path()
+      ..moveTo(r, 0)
+      ..lineTo(size.width - fold, 0)
+      ..lineTo(size.width, fold)
+      ..lineTo(size.width, size.height - r)
+      ..quadraticBezierTo(size.width, size.height, size.width - r, size.height)
+      ..lineTo(r, size.height)
+      ..quadraticBezierTo(0, size.height, 0, size.height - r)
+      ..lineTo(0, r)
+      ..quadraticBezierTo(0, 0, r, 0)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant _FoldClipper old) => old.fold != fold;
+}
+
+class _FoldPainter extends CustomPainter {
+  const _FoldPainter(this.dark);
+  final bool dark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final tri = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(tri, Paint()..shader = LinearGradient(begin: Alignment.topRight, end: Alignment.bottomLeft, colors: dark ? const [Color(0xFF475569), Color(0xFF1E293B)] : const [Color(0xFFF8FAFC), Color(0xFFCBD5E1)]).createShader(Offset.zero & size));
+    canvas.drawPath(tri, Paint()..style = PaintingStyle.stroke..strokeWidth = 0.8..color = Colors.black.withValues(alpha: 0.15));
+  }
+
+  @override
+  bool shouldRepaint(covariant _FoldPainter old) => old.dark != dark;
+}
+
+class _RuledPainter extends CustomPainter {
+  const _RuledPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color..strokeWidth = 1;
+    for (var y = 70.0; y < size.height - 24; y += 19) {
+      canvas.drawLine(Offset(16, y), Offset(size.width - 10, y), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RuledPainter old) => old.color != color;
+}

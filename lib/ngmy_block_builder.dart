@@ -561,7 +561,7 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
       }
       list.insert(at.clamp(0, list.length), put);
     });
-    NgmyTone.playNote('bell', 24, ms: 120, volume: 0.3);
+    NgmyTone.play(1100, ms: 45, wave: 'tri', volume: 0.3);
   }
 
   void _dropNewScript(_Drag d) {
@@ -580,7 +580,7 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
         _cur.scripts.add(sc);
       }
     });
-    NgmyTone.playNote('bell', 28, ms: 140, volume: 0.3);
+    NgmyTone.play(1400, ms: 50, wave: 'tri', volume: 0.3);
   }
 
   void _trash(_Drag d) {
@@ -604,7 +604,7 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
         _cur.scripts.last.body.add(Blk(d.kind));
       }
     });
-    NgmyTone.playNote('bell', 12 + (kBbDefs.indexWhere((x) => x.kind == d.kind) % 12), ms: 160, volume: 0.35);
+    NgmyTone.play(900 + (kBbDefs.indexWhere((x) => x.kind == d.kind) % 12) * 40, ms: 50, wave: 'tri', volume: 0.3);
   }
 
   Future<void> _editParam(Blk b, int i, String kind) async {

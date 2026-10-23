@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_block_builder.dart';
 import 'ngmy_body_explorer.dart';
+import 'ngmy_ai_inventor.dart';
+import 'ngmy_electronics_lab.dart';
 import 'ngmy_play_studios_a.dart';
-import 'ngmy_play_studios_b.dart';
+import 'ngmy_tech_labs.dart';
 import 'ngmy_play_toolbox.dart';
 
 class PlayTile {
@@ -69,14 +71,16 @@ class NgmyDiscoveryHub extends StatelessWidget {
   @override
   Widget build(BuildContext context) => NgmyTileHub(
         title: 'DISCOVERY LAB',
-        intro: 'Real science data to explore, hear and play with. Works offline.',
+        intro: 'Hands-on technology and science. Build, connect, spin and see how things really work.',
         tiles: [
-          PlayTile('PERIODIC TABLE', 'All 118 elements. Mix two!', Icons.science_rounded, const Color(0xFF38BDF8), () => const NgmyPeriodicStudio()),
-          PlayTile('SKY MAP', 'Stars and 88 constellations', Icons.auto_awesome_rounded, const Color(0xFF818CF8), () => const NgmySkyStudio()),
-          PlayTile('PLATES & QUAKES', 'The moving Earth', Icons.public_rounded, const Color(0xFFF87171), () => const NgmyQuakeStudio()),
-          PlayTile('DINOSAURS', 'Timeline, size and quiz', Icons.pets_rounded, const Color(0xFF4ADE80), () => const NgmyDinoStudio()),
-          PlayTile('ANIMAL ARENA', 'Race and compare', Icons.emoji_nature_rounded, const Color(0xFFFB923C), () => const NgmyAnimalStudio()),
-          PlayTile('BODY EXPLORER', 'Meet your organs', Icons.favorite_rounded, const Color(0xFFF472B6), () => const NgmyBodyExplorer()),
+          PlayTile('ELECTRONICS LAB', 'Batteries, wires, bulbs', Icons.electrical_services_rounded, const Color(0xFF38BDF8), () => const NgmyElectronicsLab()),
+          PlayTile('AI INVENTOR', 'Say it, watch it built', Icons.auto_awesome_rounded, const Color(0xFFA78BFA), () => const NgmyInventorStudio()),
+          PlayTile('POWER PLANT', 'How electricity is made', Icons.wind_power_rounded, const Color(0xFFFBBF24), () => const NgmyPowerPlantStudio()),
+          PlayTile('MAGNET LAB', 'Fields and electromagnets', Icons.sync_alt_rounded, const Color(0xFFEF4444), () => const NgmyMagnetLab()),
+          PlayTile('RADIO LAB', 'Tune in the invisible', Icons.radio_rounded, const Color(0xFFE879F9), () => const NgmyRadioLab()),
+          PlayTile('PIXEL TV', 'How a screen makes colour', Icons.live_tv_rounded, const Color(0xFF22D3EE), () => const NgmyPixelTvStudio()),
+          PlayTile('PERIODIC TABLE', 'All 118 elements. Mix two!', Icons.science_rounded, const Color(0xFF4ADE80), () => const NgmyPeriodicStudio()),
+          PlayTile('BODY EXPLORER', '3D human, inside and out', Icons.accessibility_new_rounded, const Color(0xFFF472B6), () => const NgmyBodyExplorer()),
         ],
       );
 }

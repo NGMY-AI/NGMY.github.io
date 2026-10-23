@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ngmy/ngmy_ai_inventor.dart';
 import 'package:ngmy/ngmy_block_builder.dart';
+import 'package:ngmy/ngmy_electronics_lab.dart';
+import 'package:ngmy/ngmy_tech_labs.dart';
 import 'package:ngmy/ngmy_body_explorer.dart';
 import 'package:ngmy/ngmy_play_data.dart';
 import 'package:ngmy/ngmy_play_hub.dart';
 import 'package:ngmy/ngmy_play_studios_a.dart';
-import 'package:ngmy/ngmy_play_studios_b.dart';
 import 'package:ngmy/ngmy_play_toolbox.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 
@@ -15,8 +17,6 @@ void main() {
   Future<void> open(WidgetTester t, Widget w) async {
     await t.runAsync(() async {
       await NgmyPlayData.json("elements");
-      await NgmyPlayData.json("sky");
-      await NgmyPlayData.json("earth_quakes");
     });
     t.view.physicalSize = const Size(430, 932);
     t.view.devicePixelRatio = 1.0;
@@ -30,11 +30,6 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     final el = await NgmyPlayData.json('elements') as List;
     expect(el.length, greaterThanOrEqualTo(118));
-    final sky = await NgmyPlayData.json('sky') as Map;
-    expect((sky['cons'] as List).length, greaterThan(80));
-    expect((sky['stars'] as List).length, greaterThan(500));
-    final q = await NgmyPlayData.json('earth_quakes') as Map;
-    expect((q['bounds'] as List), isNotEmpty);
   });
 
   test('block projects survive saving and loading', () {
@@ -46,7 +41,7 @@ void main() {
   });
 
   testWidgets('every discovery studio opens and runs', (t) async {
-    for (final w in const <Widget>[NgmyPeriodicStudio(), NgmySkyStudio(), NgmyQuakeStudio(), NgmyDinoStudio(), NgmyAnimalStudio(), NgmyBodyExplorer(), NgmyWheelStudio(), NgmyFocusTimerStudio(), NgmyBreatheStudio(), NgmyDrawPadStudio(), NgmyMemoryStudio(), NgmySimonStudio(), NgmyTipStudio(), NgmyLuckyStudio()]) {
+    for (final w in const <Widget>[NgmyPeriodicStudio(), NgmyMagnetLab(), NgmyRadioLab(), NgmyPowerPlantStudio(), NgmyPixelTvStudio(), NgmyElectronicsLab(), NgmyInventorStudio(), NgmyBodyExplorer(), NgmyWheelStudio(), NgmyFocusTimerStudio(), NgmyBreatheStudio(), NgmyDrawPadStudio(), NgmyMemoryStudio(), NgmySimonStudio(), NgmyTipStudio(), NgmyLuckyStudio()]) {
       await open(t, w);
       await t.pump(const Duration(milliseconds: 800));
       expect(t.takeException(), isNull, reason: '$w');
@@ -96,4 +91,56 @@ void main() {
     await open(t, const NgmyToolboxHub());
     expect(find.text('Spin the Wheel'), findsOneWidget);
   });
+  testWidgets('3D body: turn, tap a part, look inside', (t) async {
+    await open(t, const NgmyBodyExplorer());
+    // Turn it with a drag.
+    await t.dragFrom(const Offset(215, 300), const Offset(120, 0));
+    await t.pump(const Duration(milliseconds: 200));
+    // Tap the chest.
+    await t.tapAt(const Offset(215, 330));
+    await t.pump(const Duration(milliseconds: 600));
+    // Peel back the skin to the organs, then pick the heart from the list.
+    await t.ensureVisible(find.text('Organs'));
+    await t.tap(find.text('Organs'), warnIfMissed: false);
+    await t.pump(const Duration(milliseconds: 300));
+    await t.ensureVisible(find.text('Heart'));
+    await t.tap(find.text('Heart'), warnIfMissed: false);
+    await t.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('fist'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('AI inventor builds the design it is given, part by part', (t) async {
+    const reply = '{"title":"Test lamp","explain":"A battery lights a bulb.","honest":"","steps":["Add the battery","Add the bulb","Wire it up"],'
+        '"parts":[{"id":"a","kind":"battery","x":0.25,"y":0.3,"volts":3},{"id":"b","kind":"bulb","x":0.75,"y":0.3}],'
+        '"wires":[["a",0,"b",0],["b",1,"a",1]]}';
+    await open(t, NgmyInventorStudio(ai: (p) async => reply));
+    await t.enterText(find.byType(TextField), 'a lamp');
+    await t.tap(find.text('Invent'));
+    for (var i = 0; i < 40; i++) {
+      await t.pump(const Duration(milliseconds: 150));
+    }
+    expect(find.text('Test lamp'), findsOneWidget);
+    expect(t.takeException(), isNull);
+    await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('AI inventor is honest about free energy when the AI is not reachable', (t) async {
+    await open(t, NgmyInventorStudio(ai: (p) async => null));
+    await t.enterText(find.byType(TextField), 'free electricity forever');
+    await t.tap(find.text('Invent'));
+    for (var i = 0; i < 30; i++) {
+      await t.pump(const Duration(milliseconds: 150));
+    }
+    expect(find.textContaining('no machine can make energy from nothing', findRichText: true), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+  });
+
+  test('inventor designs always work in the simulator', () {
+    for (final w in ['a radio', 'a torch', 'a doorbell', 'free energy', 'a fan powered by wind', 'something strange']) {
+      expect(designWorks(localDesign(w).recipe), isTrue, reason: w);
+    }
+    expect(parseDesign('not json'), isNull);
+  });
+
 }
