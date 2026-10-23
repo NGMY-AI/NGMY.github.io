@@ -21,6 +21,7 @@ import 'ngmy_nav.dart';
 import 'ngmy_stripe_payments.dart';
 import 'ngmy_qr_download.dart';
 import 'ngmy_service_texture.dart';
+import 'ngmy_service_tile_3d.dart';
 
 const _accent = Color(0xFF00E5FF);
 const _accent2 = Color(0xFF7C3AED);
@@ -753,26 +754,30 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
                             if (services.isEmpty)
                               _enterBlock(begin: 0.25, end: 0.6, child: _emptyServices(isDark))
                             else
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 2,
-                                  mainAxisSpacing: 10,
-                                  crossAxisSpacing: 10,
-                                  childAspectRatio: 0.92,
+                              NgmyTileFrame(
+                                animation: _pulse,
+                                child: GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    mainAxisSpacing: 14,
+                                    crossAxisSpacing: 14,
+                                    childAspectRatio: 0.9,
+                                  ),
+                                  itemCount: services.length,
+                                  itemBuilder: (_, i) {
+                                    final t0 = (0.22 + i * 0.06).clamp(0.0, 0.85);
+                                    final t1 = (t0 + 0.28).clamp(0.0, 1.0);
+                                    return _enterBlock(
+                                      begin: t0,
+                                      end: t1,
+                                      from: Offset(i.isEven ? -0.06 : 0.06, 0.1),
+                                      child: _serviceGridTile(services[i], isDark, index: i),
+                                    );
+                                  },
                                 ),
-                                itemCount: services.length,
-                                itemBuilder: (_, i) {
-                                  final t0 = (0.22 + i * 0.06).clamp(0.0, 0.85);
-                                  final t1 = (t0 + 0.28).clamp(0.0, 1.0);
-                                  return _enterBlock(
-                                    begin: t0,
-                                    end: t1,
-                                    from: Offset(i.isEven ? -0.06 : 0.06, 0.1),
-                                    child: _serviceGridTile(services[i], isDark),
-                                  );
-                                },
                               ),
                             AnimatedSwitcher(
                               duration: const Duration(milliseconds: 380),
@@ -946,68 +951,65 @@ class _NgmyHelpCenterScreenState extends State<NgmyHelpCenterScreen> with Ticker
     );
   }
 
-  Widget _serviceGridTile(NgmyHelpCenterService s, bool isDark) {
+  NgmyServiceLook? _lookForService(NgmyHelpCenterService s) {
+    if (ngmyHelpCenterIsHouseFixture(s)) return NgmyServiceLook.house;
+    if (ngmyHelpCenterIsSendMoney(s)) return NgmyServiceLook.money;
+    if (ngmyHelpCenterIsMovingDelivery(s)) return NgmyServiceLook.moving;
+    if (ngmyHelpCenterIsGeneralHelp(s)) return NgmyServiceLook.general;
+    return null;
+  }
+
+  Widget _serviceGridTile(NgmyHelpCenterService s, bool isDark, {int index = 0}) {
     final selected = _selected?.id == s.id;
-    final isMoney = ngmyHelpCenterIsSendMoney(s);
     final isHouse = ngmyHelpCenterIsHouseFixture(s);
     final name = isHouse ? 'House + Insurance' : s.name;
     final description = s.description.trim();
-    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final muted = isDark ? Colors.white60 : Colors.black54;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _selectService(s),
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
-            border: Border.all(
-              color: selected ? _accent.withOpacity(0.85) : (isDark ? Colors.white12 : Colors.black12),
-              width: 1,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: LinearGradient(
-                      colors: isMoney
-                          ? [const Color(0xFF059669), const Color(0xFF10B981)]
-                          : [s.id.hashCode.isEven ? _accent2 : _accent, s.id.hashCode.isEven ? _accent : _accent2],
-                    ),
-                  ),
-                  child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 24),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, height: 1.15, color: titleColor),
-                ),
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 10, height: 1.25, fontWeight: FontWeight.w500, color: muted),
-                  ),
+    final colors = NgmyTileColors.of(_lookForService(s));
+    return NgmyTile3D(
+      colors: colors,
+      float: _pulse,
+      phase: index * 0.22,
+      selected: selected,
+      onTap: () => _selectService(s),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [colors.glow, Color.lerp(colors.glow, Colors.black, 0.45)!]),
+                border: Border.all(color: Colors.white.withOpacity(0.35)),
+                boxShadow: [
+                  BoxShadow(color: colors.glow.withOpacity(0.55), blurRadius: 14, offset: const Offset(0, 5)),
+                  BoxShadow(color: Colors.black.withOpacity(0.35), offset: const Offset(0, 3)),
                 ],
-              ],
+              ),
+              child: Icon(ngmyHelpCenterServiceIcon(s), color: Colors.white, size: 26),
             ),
-          ),
+            const SizedBox(height: 10),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13.5, height: 1.15, color: Colors.white, shadows: [Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2))]),
+            ),
+            if (description.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, height: 1.25, fontWeight: FontWeight.w500, color: Colors.white.withOpacity(0.7)),
+              ),
+            ],
+          ],
         ),
       ),
     );
