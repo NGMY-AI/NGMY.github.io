@@ -4,6 +4,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import 'ngmy_core_reaction_lab.dart';
+
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
 /// different, physically-shaded way (a folding accordion, flipping panels, rising towers, and
 /// pieces flying in to assemble). No touch needed; they loop.
@@ -78,6 +80,96 @@ const _kSequences = <_UnfoldMeta>[
     labels: ['Launch', 'Charge', 'Shine'],
     subs: ['Lifts off', 'Powers up', 'Lights the sky'],
   ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.accordion,
+    title: 'SHIELD STACK',
+    blurb: 'Three layers of protection fold down into place',
+    colors: [Color(0xFFFBBF24), Color(0xFFB45309)],
+    icons: [Icons.security_rounded, Icons.verified_user_rounded, Icons.gpp_good_rounded],
+    labels: ['Guard', 'Verify', 'Safe'],
+    subs: ['Watches the door', 'Checks who you are', 'Everything is locked'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.accordion,
+    title: 'NEWS FLASH',
+    blurb: 'A story unfolds from headline to share',
+    colors: [Color(0xFFF87171), Color(0xFFB91C1C)],
+    icons: [Icons.newspaper_rounded, Icons.notifications_active_rounded, Icons.share_rounded],
+    labels: ['Story', 'Alert', 'Share'],
+    subs: ['The headline', 'Everyone is told', 'It spreads'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.accordion,
+    title: 'SKY DECK',
+    blurb: 'Plan the trip: fly, find, stay',
+    colors: [Color(0xFF2DD4BF), Color(0xFF115E59)],
+    icons: [Icons.flight_rounded, Icons.map_rounded, Icons.hotel_rounded],
+    labels: ['Fly', 'Find', 'Stay'],
+    subs: ['Wheels up', 'Know the way', 'A bed waits'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.flip,
+    title: 'PAYMENT PATH',
+    blurb: 'Card, bank, done: three panels flip',
+    colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
+    icons: [Icons.credit_card_rounded, Icons.account_balance_rounded, Icons.check_circle_rounded],
+    labels: ['Card', 'Bank', 'Done'],
+    subs: ['Tap to pay', 'Moves the money', 'All paid'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.flip,
+    title: 'DREAM BOARD',
+    blurb: 'What you love, what shines, what you win',
+    colors: [Color(0xFFF472B6), Color(0xFFBE185D)],
+    icons: [Icons.favorite_rounded, Icons.star_rounded, Icons.emoji_events_rounded],
+    labels: ['Love', 'Shine', 'Win'],
+    subs: ['Keep it close', 'Be seen', 'Take the prize'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.flip,
+    title: 'STAGE LIGHTS',
+    blurb: 'Mic, music, curtain up',
+    colors: [Color(0xFFC084FC), Color(0xFF6B21A8)],
+    icons: [Icons.mic_rounded, Icons.headphones_rounded, Icons.theaters_rounded],
+    labels: ['Mic', 'Music', 'Show'],
+    subs: ['Say it loud', 'Feel the beat', 'The curtain rises'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.towers,
+    title: 'CITY BUILD',
+    blurb: 'A home, a block and a whole city rise',
+    colors: [Color(0xFFFB923C), Color(0xFF9A3412)],
+    icons: [Icons.home_rounded, Icons.apartment_rounded, Icons.location_city_rounded],
+    labels: ['Home', 'Block', 'City'],
+    subs: ['', '', ''],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.towers,
+    title: 'SIGNAL RISE',
+    blurb: 'Wi-Fi, towers and satellites climb',
+    colors: [Color(0xFF22D3EE), Color(0xFF0E7490)],
+    icons: [Icons.wifi_rounded, Icons.cell_tower_rounded, Icons.satellite_alt_rounded],
+    labels: ['Wi-Fi', 'Tower', 'Space'],
+    subs: ['', '', ''],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.assemble,
+    title: 'COMET CREW',
+    blurb: 'A crew arrives from every side',
+    colors: [Color(0xFF4ADE80), Color(0xFF15803D)],
+    icons: [Icons.flight_takeoff_rounded, Icons.public_rounded, Icons.groups_rounded],
+    labels: ['Depart', 'World', 'Crew'],
+    subs: ['Takes off', 'Crosses the globe', 'Everyone meets'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.assemble,
+    title: 'NEON DROP',
+    blurb: 'Music, sparks and a celebration drop in',
+    colors: [Color(0xFFFACC15), Color(0xFFEA580C)],
+    icons: [Icons.music_note_rounded, Icons.flash_on_rounded, Icons.celebration_rounded],
+    labels: ['Music', 'Spark', 'Party'],
+    subs: ['The first beat', 'Lights flash', 'Hands up'],
+  ),
 ];
 
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
@@ -94,18 +186,23 @@ class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen>
       child: Scaffold(
         backgroundColor: _kBg,
         body: active == null
-            ? _SequencePicker(onPick: (s) => setState(() => _active = s), onClose: () => Navigator.of(context).maybePop())
+            ? _SequencePicker(
+                onPick: (s) => setState(() => _active = s),
+                onLab: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NgmyReactionLabScreen())),
+                onClose: () => Navigator.of(context).maybePop(),
+              )
             : _SequenceCanvas(key: ValueKey(active.title), meta: active, onExit: () => setState(() => _active = null)),
       ),
     );
   }
 }
 
-// ── Picker ──────────────────────────────────────────────────────────────────
+// ── Picker: three boxes in every row ────────────────────────────────────────
 
 class _SequencePicker extends StatelessWidget {
-  const _SequencePicker({required this.onPick, required this.onClose});
+  const _SequencePicker({required this.onPick, required this.onLab, required this.onClose});
   final ValueChanged<_UnfoldMeta> onPick;
+  final VoidCallback onLab;
   final VoidCallback onClose;
 
   @override
@@ -126,18 +223,57 @@ class _SequencePicker extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text('Pick a sequence. It plays by itself.', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+            child: Text('Build your own in the Lab, or watch a sequence play.', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
           ),
         ),
         Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
-            itemCount: _kSequences.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 14),
-            itemBuilder: (_, i) => _PickTile(meta: _kSequences[i], onTap: () => onPick(_kSequences[i])),
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 12, crossAxisSpacing: 12, childAspectRatio: 0.82),
+            itemCount: _kSequences.length + 1,
+            itemBuilder: (_, i) => i == 0 ? _LabTile(onTap: onLab) : _PickTile(meta: _kSequences[i - 1], onTap: () => onPick(_kSequences[i - 1])),
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// The Lab: a box with a glow, so it stands out as the place to build.
+class _LabTile extends StatelessWidget {
+  const _LabTile({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const c = Color(0xFF34D399);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF0F3D2C), Color(0xFF151518)]),
+            border: Border.all(color: c.withValues(alpha: 0.8), width: 1.4),
+            boxShadow: [BoxShadow(color: c.withValues(alpha: 0.3), blurRadius: 18, spreadRadius: -4)],
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF047857)]), boxShadow: [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 12)]),
+              child: const Icon(Icons.hub_rounded, color: Colors.white, size: 26),
+            ),
+            const SizedBox(height: 8),
+            const Text('REACTION LAB', textAlign: TextAlign.center, style: TextStyle(color: c, fontWeight: FontWeight.w900, letterSpacing: 0.8, fontSize: 11)),
+            const SizedBox(height: 3),
+            Text('Connect parts, make your own', textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 9.5, height: 1.25)),
+          ]),
+        ),
+      ),
     );
   }
 }
@@ -153,42 +289,37 @@ class _PickTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Ink(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c.first, 0.22)!, const Color(0xFF151518)]),
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c.first, 0.24)!, const Color(0xFF151518)]),
             border: Border.all(color: c.first.withValues(alpha: 0.35)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 8))],
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 6))],
           ),
-          child: Row(children: [
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             SizedBox(
-              width: 76,
+              width: 58,
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 for (var i = 0; i < 3; i++)
                   Container(
-                    margin: EdgeInsets.only(bottom: i == 2 ? 0 : 5, left: i * 5.0, right: (2 - i) * 5.0),
-                    height: 22,
+                    margin: EdgeInsets.only(bottom: i == 2 ? 0 : 4, left: i * 4.0, right: (2 - i) * 4.0),
+                    height: 17,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(7),
+                      borderRadius: BorderRadius.circular(6),
                       gradient: LinearGradient(colors: [c.first, c.last]),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), offset: const Offset(0, 3))],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.45), offset: const Offset(0, 2.5))],
                     ),
-                    child: Icon(meta.icons[i], size: 14, color: Colors.white),
+                    child: Icon(meta.icons[i], size: 11, color: Colors.white),
                   ),
               ]),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(meta.title, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(meta.blurb, style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12.5, height: 1.3)),
-              ]),
-            ),
-            Icon(Icons.play_circle_fill_rounded, color: c.first, size: 34),
+            const SizedBox(height: 10),
+            Text(meta.title, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 0.6, fontSize: 10.5, height: 1.2)),
+            const SizedBox(height: 4),
+            Icon(Icons.play_circle_fill_rounded, color: c.first, size: 20),
           ]),
         ),
       ),

@@ -195,7 +195,7 @@ class _TechFrameSpec {
   static const core = _TechFrameSpec(
     kind: _TechKind.core,
     title: 'CORE PROTOCOL',
-    subtitle: 'Unfold sequences',
+    subtitle: 'Reaction Lab · sequences',
     badge: 'MAINFRAME',
     colors: [Color(0xFF34D399), Color(0xFF06B6D4), Color(0xFF818CF8)],
     icon: Icons.memory_rounded,
