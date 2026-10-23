@@ -1,1768 +1,411 @@
 import 'dart:math' as math;
+
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
-/// Full-screen Core Protocol simulations — drag finger for protocol effects.
+/// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
+/// different, physically-shaded way (a folding accordion, flipping panels, rising towers, and
+/// pieces flying in to assemble). No touch needed; they loop.
 class NgmyCoreProtocolSimsScreen extends StatefulWidget {
   const NgmyCoreProtocolSimsScreen({super.key});
 
   @override
-  State<NgmyCoreProtocolSimsScreen> createState() =>
-      _NgmyCoreProtocolSimsScreenState();
+  State<NgmyCoreProtocolSimsScreen> createState() => _NgmyCoreProtocolSimsScreenState();
 }
 
-enum _ProtocolSimKind {
-  pulseWeave,
-  signalLattice,
-  orbitHandler,
-  hexHandshake,
-  fluxStream,
-  echoField,
-  liquidCore,
-  tidalPool,
-  mercuryDrag,
-  vortexFluid,
-}
+/// The same dark page colour as the home screen.
+const Color _kBg = Color(0xFF121212);
 
-class _SimMeta {
-  const _SimMeta({
-    required this.kind,
-    required this.title,
-    required this.blurb,
-    required this.colors,
-    required this.icon,
-  });
+enum _UnfoldStyle { accordion, flip, towers, assemble }
 
-  final _ProtocolSimKind kind;
-  final String title;
-  final String blurb;
-  final List<Color> colors;
-  final IconData icon;
-}
-
-const _kSims = <_SimMeta>[
-  _SimMeta(
-    kind: _ProtocolSimKind.pulseWeave,
-    title: 'PULSE WEAVE',
-    blurb: 'Drag trails of live protocol pulses',
-    colors: [Color(0xFF34D399), Color(0xFF06B6D4)],
-    icon: Icons.graphic_eq_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.signalLattice,
-    title: 'SIGNAL LATTICE',
-    blurb: 'Energize nodes as your finger routes',
-    colors: [Color(0xFF22D3EE), Color(0xFF818CF8)],
-    icon: Icons.grid_on_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.orbitHandler,
-    title: 'ORBIT HANDLER',
-    blurb: 'Pull orbital packets around the core',
-    colors: [Color(0xFFA78BFA), Color(0xFFEC4899)],
-    icon: Icons.blur_circular_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.hexHandshake,
-    title: 'HEX HANDSHAKE',
-    blurb: 'Wake hexagonal handshake cells',
-    colors: [Color(0xFFFBBF24), Color(0xFF34D399)],
-    icon: Icons.hexagon_outlined,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.fluxStream,
-    title: 'FLUX STREAM',
-    blurb: 'Bend flowing protocol current',
-    colors: [Color(0xFF06B6D4), Color(0xFF6366F1)],
-    icon: Icons.waves_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.echoField,
-    title: 'ECHO FIELD',
-    blurb: 'Cast expanding echo rings',
-    colors: [Color(0xFFF472B6), Color(0xFF818CF8)],
-    icon: Icons.podcasts_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.liquidCore,
-    title: 'LIQUID CORE',
-    blurb: 'Morph a living fluid mass',
-    colors: [Color(0xFF22D3EE), Color(0xFF34D399)],
-    icon: Icons.water_drop_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.tidalPool,
-    title: 'TIDAL POOL',
-    blurb: 'Stir liquid ripples on touch',
-    colors: [Color(0xFF38BDF8), Color(0xFF6366F1)],
-    icon: Icons.waterfall_chart_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.mercuryDrag,
-    title: 'MERCURY DRAG',
-    blurb: 'Pull liquid-metal ribbons',
-    colors: [Color(0xFFE2E8F0), Color(0xFF94A3B8)],
-    icon: Icons.blur_on_rounded,
-  ),
-  _SimMeta(
-    kind: _ProtocolSimKind.vortexFluid,
-    title: 'VORTEX FLUID',
-    blurb: 'Spin a liquid whirlpool',
-    colors: [Color(0xFF2DD4BF), Color(0xFF818CF8)],
-    icon: Icons.cyclone_rounded,
-  ),
-];
-
-/// A three-stage glass-panel reveal — one tile unfolds, a glowing link
-/// draws down to the next, it unfolds, and so on. Auto-plays, no touch
-/// input needed (unlike the drag sims above).
 class _UnfoldMeta {
   const _UnfoldMeta({
+    required this.style,
     required this.title,
     required this.blurb,
     required this.colors,
     required this.icons,
+    required this.labels,
+    required this.subs,
   });
 
+  final _UnfoldStyle style;
   final String title;
   final String blurb;
   final List<Color> colors;
-  final List<IconData> icons; // exactly 3, top to bottom
+  final List<IconData> icons; // three, top to bottom
+  final List<String> labels;
+  final List<String> subs;
 
-  Color get glow => Color.lerp(colors.first, colors.last, 0.5)!;
+  Color get glow => Color.lerp(colors.first, colors.last, 0.4)!;
 }
 
-const _kUnfoldSims = <_UnfoldMeta>[
+const _kSequences = <_UnfoldMeta>[
   _UnfoldMeta(
+    style: _UnfoldStyle.accordion,
     title: 'MESSAGE FUNNEL',
-    blurb: 'Mail rises into place, then SMS, then the ad',
-    colors: [Color(0xFF818CF8), Color(0xFF6366F1)],
+    blurb: 'Panels fold out of each other, one hinge at a time',
+    colors: [Color(0xFF818CF8), Color(0xFF4338CA)],
     icons: [Icons.mail_rounded, Icons.sms_rounded, Icons.campaign_rounded],
+    labels: ['Mail', 'SMS', 'Ad'],
+    subs: ['Lands in the inbox', 'Texts the phone', 'Shows on the feed'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.flip,
+    title: 'VAULT UNLOCK',
+    blurb: 'Locked panels flip over to reveal what is inside',
+    colors: [Color(0xFF2DD4BF), Color(0xFF0F766E)],
+    icons: [Icons.lock_open_rounded, Icons.key_rounded, Icons.shield_rounded],
+    labels: ['Unlock', 'Verify', 'Secure'],
+    subs: ['Opens the door', 'Checks the key', 'Locks it safe'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.towers,
+    title: 'GROWTH SKYLINE',
+    blurb: 'Solid towers rise from the floor and light up',
+    colors: [Color(0xFF34D399), Color(0xFF047857)],
+    icons: [Icons.savings_rounded, Icons.trending_up_rounded, Icons.payments_rounded],
+    labels: ['Save', 'Grow', 'Earn'],
+    subs: ['', '', ''],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.assemble,
+    title: 'ORBIT ASSEMBLY',
+    blurb: 'Pieces spiral in from all sides and lock together',
+    colors: [Color(0xFFA78BFA), Color(0xFFDB2777)],
+    icons: [Icons.rocket_launch_rounded, Icons.bolt_rounded, Icons.auto_awesome_rounded],
+    labels: ['Launch', 'Charge', 'Shine'],
+    subs: ['Lifts off', 'Powers up', 'Lights the sky'],
   ),
 ];
 
-class _NgmyCoreProtocolSimsScreenState
-    extends State<NgmyCoreProtocolSimsScreen> {
-  /// Original CORE PROTOCOL boot loads first, then the sims hub.
-  bool _booting = true;
-  _SimMeta? _active;
-  _UnfoldMeta? _activeUnfold;
-
-  void _exitSim() => setState(() => _active = null);
-  void _exitUnfold() => setState(() => _activeUnfold = null);
+class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
+  _UnfoldMeta? _active;
 
   @override
   Widget build(BuildContext context) {
     final active = _active;
-    final activeUnfold = _activeUnfold;
     return PopScope(
-      canPop: !_booting && active == null && activeUnfold == null,
+      canPop: active == null,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
-        if (active != null) {
-          _exitSim();
-        } else if (activeUnfold != null) {
-          _exitUnfold();
-        }
+        if (!didPop && active != null) setState(() => _active = null);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF030712),
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const _CoreBackdrop(),
-            if (_booting)
-              _CoreProtocolBootSplash(
-                onFinished: () {
-                  if (mounted) setState(() => _booting = false);
-                },
-              )
-            else if (active == null && activeUnfold == null)
-              _SimPicker(
-                onPick: (s) => setState(() => _active = s),
-                onPickUnfold: (s) => setState(() => _activeUnfold = s),
-                onClose: () => Navigator.of(context).maybePop(),
-              )
-            else if (active != null)
-              _ProtocolSimCanvas(meta: active, onExit: _exitSim)
-            else
-              _UnfoldSimCanvas(meta: activeUnfold!, onExit: _exitUnfold),
-          ],
-        ),
+        backgroundColor: _kBg,
+        body: active == null
+            ? _SequencePicker(onPick: (s) => setState(() => _active = s), onClose: () => Navigator.of(context).maybePop())
+            : _SequenceCanvas(key: ValueKey(active.title), meta: active, onExit: () => setState(() => _active = null)),
       ),
     );
   }
 }
 
-/// Same boot / loading beat as the original CORE PROTOCOL pulse screen —
-/// runs fully before the simulation hub opens.
-class _CoreProtocolBootSplash extends StatefulWidget {
-  const _CoreProtocolBootSplash({required this.onFinished});
+// ── Picker ──────────────────────────────────────────────────────────────────
 
-  final VoidCallback onFinished;
-
-  @override
-  State<_CoreProtocolBootSplash> createState() =>
-      _CoreProtocolBootSplashState();
-}
-
-class _CoreProtocolBootSplashState extends State<_CoreProtocolBootSplash>
-    with TickerProviderStateMixin {
-  static const _coreColors = [Color(0xFF34D399), Color(0xFF06B6D4)];
-
-  late final AnimationController _boot;
-  late final AnimationController _spin;
-  late final AnimationController _wave;
-  bool _notified = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _boot = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..forward();
-    _spin = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 4800),
-    )..repeat();
-    _wave = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2600),
-    )..repeat();
-    _boot.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        Future<void>.delayed(const Duration(milliseconds: 900), () {
-          if (!mounted || _notified) return;
-          _notified = true;
-          widget.onFinished();
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _boot.dispose();
-    _spin.dispose();
-    _wave.dispose();
-    super.dispose();
-  }
-
-  String _statusLine(double t) {
-    final step = (t * 4).floor() % 4;
-    return const [
-      'Booting core modules…',
-      'Loading protocol stack…',
-      'Integrity check OK.',
-      'Mainframe online.',
-    ][step];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_boot, _spin, _wave]),
-      builder: (context, _) {
-        final boot = Curves.easeOutCubic.transform(_boot.value.clamp(0.0, 1.0));
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(
-              color: const Color(0xFF030712).withValues(alpha: 0.92 * boot),
-            ),
-            CustomPaint(
-              painter: _BootBackdropPainter(
-                colors: _coreColors,
-                spin: _spin.value,
-                wave: _wave.value,
-                boot: boot,
-              ),
-            ),
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 28),
-                child: Column(
-                  children: [
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'SYSTEM · MAINFRAME',
-                        style: TextStyle(
-                          color: _coreColors.first.withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Transform.scale(
-                      scale: 0.7 + boot * 0.35,
-                      child: SizedBox(
-                        width: 220,
-                        height: 220,
-                        child: CustomPaint(
-                          painter: _BootOrbPainter(
-                            colors: _coreColors,
-                            pulse:
-                                0.4 + math.sin(_wave.value * math.pi * 2) * 0.5,
-                            orbit: _spin.value,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Opacity(
-                      opacity: boot,
-                      child: Column(
-                        children: [
-                          const Text(
-                            'CORE PROTOCOL',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2.2,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _statusLine(_wave.value),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.65),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 22),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: SizedBox(
-                              height: 6,
-                              width: 180,
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ColoredBox(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                  ),
-                                  FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor: boot.clamp(0.2, 1.0),
-                                    child: const DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: _coreColors,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'LOADING SIMULATIONS…',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.6,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _BootBackdropPainter extends CustomPainter {
-  _BootBackdropPainter({
-    required this.colors,
-    required this.spin,
-    required this.wave,
-    required this.boot,
-  });
-
-  final List<Color> colors;
-  final double spin;
-  final double wave;
-  final double boot;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height * 0.42);
-    for (var i = 1; i <= 5; i++) {
-      canvas.drawCircle(
-        c,
-        40.0 * i + wave * 20,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = colors.first.withValues(alpha: (0.12 / i) * boot),
-      );
-    }
-    final grid = Paint()
-      ..color = Colors.white.withValues(alpha: 0.04 * boot)
-      ..strokeWidth = 1;
-    for (var x = 0.0; x < size.width; x += 28) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
-    }
-    for (var y = 0.0; y < size.height; y += 28) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
-    }
-    canvas.drawArc(
-      Rect.fromCircle(center: c, radius: 150),
-      spin * math.pi * 2,
-      1.4,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = colors.last.withValues(alpha: 0.45 * boot),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _BootBackdropPainter old) =>
-      old.spin != spin || old.wave != wave || old.boot != boot;
-}
-
-class _BootOrbPainter extends CustomPainter {
-  _BootOrbPainter({
-    required this.colors,
-    required this.pulse,
-    required this.orbit,
-  });
-
-  final List<Color> colors;
-  final double pulse;
-  final double orbit;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide * 0.34 * (0.92 + pulse * 0.08);
-    for (var i = 3; i >= 1; i--) {
-      canvas.drawCircle(
-        c,
-        radius + i * 10,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = colors.first.withValues(alpha: 0.14 * i),
-      );
-    }
-    canvas.drawCircle(
-      c,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.55),
-            colors.first.withValues(alpha: 0.9),
-            colors.last.withValues(alpha: 0.55),
-          ],
-        ).createShader(Rect.fromCircle(center: c, radius: radius)),
-    );
-    for (var i = 0; i < 8; i++) {
-      final a = orbit * math.pi * 2 + i * (math.pi / 4);
-      final p = Offset(
-        c.dx + math.cos(a) * (radius + 18),
-        c.dy + math.sin(a) * (radius + 18),
-      );
-      canvas.drawCircle(
-        p,
-        3.2,
-        Paint()..color = colors.last.withValues(alpha: 0.85),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _BootOrbPainter old) =>
-      old.pulse != pulse || old.orbit != orbit;
-}
-
-class _CoreBackdrop extends StatelessWidget {
-  const _CoreBackdrop();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _CoreBackdropPainter(),
-      child: const SizedBox.expand(),
-    );
-  }
-}
-
-class _CoreBackdropPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF030712), Color(0xFF0B1220), Color(0xFF020617)],
-        ).createShader(rect),
-    );
-    final glow = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(0, -0.2),
-        radius: 0.85,
-        colors: [
-          const Color(0xFF34D399).withValues(alpha: 0.16),
-          const Color(0xFF06B6D4).withValues(alpha: 0.06),
-          Colors.transparent,
-        ],
-      ).createShader(rect);
-    canvas.drawRect(rect, glow);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _SimPicker extends StatelessWidget {
-  const _SimPicker({
-    required this.onPick,
-    required this.onPickUnfold,
-    required this.onClose,
-  });
-
-  final ValueChanged<_SimMeta> onPick;
-  final ValueChanged<_UnfoldMeta> onPickUnfold;
+class _SequencePicker extends StatelessWidget {
+  const _SequencePicker({required this.onPick, required this.onClose});
+  final ValueChanged<_UnfoldMeta> onPick;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SYSTEM · MAINFRAME',
-                        style: TextStyle(
-                          color: const Color(0xFF34D399).withValues(alpha: 0.9),
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.5,
-                          fontSize: 11,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'CORE PROTOCOL',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.8,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Pick a simulation — drag your finger to run it',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.62),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+      child: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 6, 16, 4),
+          child: Row(children: [
+            IconButton(onPressed: onClose, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+            const SizedBox(width: 2),
+            const Expanded(
+              child: Text('CORE PROTOCOL', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 2, fontSize: 17)),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Pick a sequence. It plays by itself.', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13)),
+          ),
+        ),
+        Expanded(
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+            itemCount: _kSequences.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            itemBuilder: (_, i) => _PickTile(meta: _kSequences[i], onTap: () => onPick(_kSequences[i])),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _PickTile extends StatelessWidget {
+  const _PickTile({required this.meta, required this.onTap});
+  final _UnfoldMeta meta;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = meta.colors;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(const Color(0xFF1B1B1F), c.first, 0.22)!, const Color(0xFF151518)]),
+            border: Border.all(color: c.first.withValues(alpha: 0.35)),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 8))],
+          ),
+          child: Row(children: [
+            SizedBox(
+              width: 76,
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                for (var i = 0; i < 3; i++)
+                  Container(
+                    margin: EdgeInsets.only(bottom: i == 2 ? 0 : 5, left: i * 5.0, right: (2 - i) * 5.0),
+                    height: 22,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(7),
+                      gradient: LinearGradient(colors: [c.first, c.last]),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.4), offset: const Offset(0, 3))],
+                    ),
+                    child: Icon(meta.icons[i], size: 14, color: Colors.white),
                   ),
-                ),
-                IconButton(
-                  onPressed: onClose,
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: Colors.white.withValues(alpha: 0.75),
-                  ),
-                ),
+              ]),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(meta.title, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.4, fontSize: 14)),
+                const SizedBox(height: 4),
+                Text(meta.blurb, style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12.5, height: 1.3)),
+              ]),
+            ),
+            Icon(Icons.play_circle_fill_rounded, color: c.first, size: 34),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+// ── The shared slab: a thick glass card lit from above ──────────────────────
+
+class _Slab extends StatelessWidget {
+  const _Slab({
+    required this.width,
+    required this.height,
+    required this.colors,
+    required this.icon,
+    required this.label,
+    required this.sub,
+    this.shade = 0,
+    this.glow = 0,
+    this.spec = -1,
+  });
+
+  final double width;
+  final double height;
+  final List<Color> colors;
+  final IconData icon;
+  final String label;
+  final String sub;
+
+  /// 0..1: how much it is turned away from the light (darker).
+  final double shade;
+
+  /// 0..1: how strongly it glows.
+  final double glow;
+
+  /// Position of the moving highlight (0..1), or -1 for none.
+  final double spec;
+
+  @override
+  Widget build(BuildContext context) {
+    const r = 22.0;
+    final edge = Color.lerp(colors.last, Colors.black, 0.62)!;
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(clipBehavior: Clip.none, children: [
+        // The thickness of the slab, seen from slightly above.
+        Positioned(
+          left: 2,
+          right: 2,
+          top: 8,
+          bottom: -8,
+          child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(r), color: edge)),
+        ),
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(r),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.55), blurRadius: 26, offset: const Offset(0, 18)),
+                BoxShadow(color: colors.first.withValues(alpha: 0.1 + 0.4 * glow), blurRadius: 30, spreadRadius: -6),
               ],
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-              children: [
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 0.92,
-                  ),
-                  itemCount: _kSims.length,
-                  itemBuilder: (context, i) {
-                    final s = _kSims[i];
-                    return _SimPickTile(meta: s, onTap: () => onPick(s));
-                  },
-                ),
-                const SizedBox(height: 26),
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 4),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'UNFOLD SEQUENCES',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.4,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Tap to watch · tap to exit',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.38),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                for (final s in _kUnfoldSims)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: SizedBox(
-                      height: 160,
-                      child: _UnfoldPickTile(
-                        meta: s,
-                        onTap: () => onPickUnfold(s),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(r),
+              child: Stack(children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color.lerp(colors.first, Colors.white, 0.14)!, colors.first, colors.last, Color.lerp(colors.last, Colors.black, 0.45)!],
+                        stops: const [0, 0.35, 0.75, 1],
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SimPickTile extends StatelessWidget {
-  const _SimPickTile({required this.meta, required this.onTap});
-
-  final _SimMeta meta;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                meta.colors.first.withValues(alpha: 0.2),
-                const Color(0xFF0B1220),
-                meta.colors.last.withValues(alpha: 0.12),
-              ],
-            ),
-            border: Border.all(
-              color: meta.colors.first.withValues(alpha: 0.45),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: meta.colors.first.withValues(alpha: 0.16),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(colors: meta.colors),
-                    boxShadow: [
-                      BoxShadow(
-                        color: meta.colors.first.withValues(alpha: 0.4),
-                        blurRadius: 10,
+                ),
+                // Light falling on the top half, like glass.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: height * 0.52,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.white.withValues(alpha: 0.28), Colors.white.withValues(alpha: 0)])),
+                  ),
+                ),
+                if (spec >= 0) Positioned.fill(child: CustomPaint(painter: _SpecPainter(spec))),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 1.4),
+                        boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.25 * glow), blurRadius: 14)],
                       ),
-                    ],
-                  ),
-                  child: Icon(meta.icon, color: Colors.white, size: 22),
+                      child: Icon(icon, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 19, shadows: [Shadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 2))])),
+                        if (sub.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.78), fontSize: 12, fontWeight: FontWeight.w600)),
+                        ],
+                        const SizedBox(height: 9),
+                        Container(height: 5, width: width * 0.42, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.28), borderRadius: BorderRadius.circular(3))),
+                      ]),
+                    ),
+                  ]),
                 ),
-                const Spacer(),
-                Text(
-                  meta.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  meta.blurb,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.58),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
+                // Turned away from the light: darker.
+                if (shade > 0) Positioned.fill(child: IgnorePointer(child: ColoredBox(color: Colors.black.withValues(alpha: (shade * 0.6).clamp(0.0, 0.7))))),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(decoration: BoxDecoration(borderRadius: BorderRadius.circular(r), border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.2))),
                   ),
                 ),
-              ],
+              ]),
             ),
           ),
         ),
-      ),
+      ]),
     );
   }
 }
 
-class _UnfoldPickTile extends StatelessWidget {
-  const _UnfoldPickTile({required this.meta, required this.onTap});
-
-  final _UnfoldMeta meta;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                meta.colors.first.withValues(alpha: 0.2),
-                const Color(0xFF0B1220),
-                meta.colors.last.withValues(alpha: 0.12),
-              ],
-            ),
-            border: Border.all(
-              color: meta.colors.first.withValues(alpha: 0.45),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: meta.colors.first.withValues(alpha: 0.16),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    for (var i = 0; i < meta.icons.length; i++)
-                      Padding(
-                        padding: EdgeInsets.only(left: i == 0 ? 0 : 6),
-                        child: Transform.rotate(
-                          angle: 0.7854, // 45°
-                          child: Container(
-                            width: 26,
-                            height: 26,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(7),
-                              gradient: LinearGradient(colors: meta.colors),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: meta.colors.first.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                  blurRadius: 8,
-                                ),
-                              ],
-                            ),
-                            child: Transform.rotate(
-                              angle: -0.7854,
-                              child: Icon(
-                                meta.icons[i],
-                                color: Colors.white,
-                                size: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const Spacer(),
-                Text(
-                  meta.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                    height: 1.15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  meta.blurb,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.58),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Interactive canvas ──────────────────────────────────────────────────────
-
-class _ProtocolSimCanvas extends StatefulWidget {
-  const _ProtocolSimCanvas({required this.meta, required this.onExit});
-
-  final _SimMeta meta;
-
-  /// Leave simulation with no on-screen chrome (device back / long-press).
-  final VoidCallback onExit;
-
-  @override
-  State<_ProtocolSimCanvas> createState() => _ProtocolSimCanvasState();
-}
-
-class _ProtocolSimCanvasState extends State<_ProtocolSimCanvas>
-    with SingleTickerProviderStateMixin {
-  late final Ticker _ticker;
-  Duration _elapsed = Duration.zero;
-  Offset? _finger;
-  final List<_TrailPoint> _trail = [];
-  final List<_Burst> _bursts = [];
-  final List<_EnergizedNode> _nodes = [];
-  double _orbitPull = 0;
-  Offset _orbitAim = Offset.zero;
-  final Set<int> _hexLit = {};
-  double _fluxAngle = 0;
-  int _echoCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _ticker = createTicker((d) {
-      _elapsed = d;
-      _decayTrail();
-      if (mounted) setState(() {});
-    })..start();
-  }
-
-  @override
-  void dispose() {
-    _ticker.dispose();
-    super.dispose();
-  }
-
-  void _decayTrail() {
-    final now = _elapsed.inMilliseconds;
-    _trail.removeWhere((p) => now - p.bornMs > 1400);
-    _bursts.removeWhere((b) => now - b.bornMs > 1800);
-    _nodes.removeWhere((n) => now - n.bornMs > 2200);
-  }
-
-  void _onDown(Offset p) {
-    _finger = p;
-    _pushTrail(p, force: 1);
-    _spawnBurst(p);
-    _energizeNear(p);
-    _lightHex(p);
-    _echoCount++;
-  }
-
-  void _onMove(Offset p) {
-    final prev = _finger;
-    _finger = p;
-    final force = prev == null ? 0.6 : (p - prev).distance.clamp(0.5, 28) / 28;
-    _pushTrail(p, force: force);
-    if (force > 0.35) _spawnBurst(p, small: true);
-    _energizeNear(p);
-    _lightHex(p);
-    if (prev != null) {
-      final d = p - prev;
-      _fluxAngle = math.atan2(d.dy, d.dx);
-    }
-    final size = MediaQuery.sizeOf(context);
-    final c = Offset(size.width / 2, size.height * 0.48);
-    _orbitAim = p - c;
-    _orbitPull = (_orbitAim.distance / (size.shortestSide * 0.42)).clamp(
-      0.0,
-      1.0,
-    );
-  }
-
-  void _onUp() {
-    if (_finger != null) _spawnBurst(_finger!);
-    _finger = null;
-  }
-
-  void _pushTrail(Offset p, {required double force}) {
-    _trail.add(_TrailPoint(p, _elapsed.inMilliseconds, force));
-    if (_trail.length > 120) _trail.removeRange(0, _trail.length - 120);
-  }
-
-  void _spawnBurst(Offset p, {bool small = false}) {
-    _bursts.add(_Burst(p, _elapsed.inMilliseconds, small ? 0.55 : 1.0));
-    if (_bursts.length > 24) _bursts.removeAt(0);
-  }
-
-  void _energizeNear(Offset p) {
-    const cols = 8;
-    const rows = 12;
-    final size = MediaQuery.sizeOf(context);
-    final cellW = size.width / (cols + 1);
-    final cellH = size.height / (rows + 1);
-    for (var r = 1; r <= rows; r++) {
-      for (var c = 1; c <= cols; c++) {
-        final o = Offset(c * cellW, r * cellH);
-        if ((o - p).distance < 56) {
-          _nodes.add(_EnergizedNode(o, _elapsed.inMilliseconds));
-        }
-      }
-    }
-    if (_nodes.length > 80) _nodes.removeRange(0, _nodes.length - 80);
-  }
-
-  void _lightHex(Offset p) {
-    const n = 42;
-    final size = MediaQuery.sizeOf(context);
-    final cx = size.width / 2;
-    final cy = size.height * 0.48;
-    final R = size.shortestSide * 0.095;
-    for (var i = 0; i < n; i++) {
-      final ring = (i / 7).floor();
-      final slot = i % 7;
-      final a = slot * (math.pi * 2 / 7) + ring * 0.22;
-      final d = ring * R * 1.75;
-      final o = Offset(cx + math.cos(a) * d, cy + math.sin(a) * d);
-      if ((o - p).distance < R * 0.95) {
-        _hexLit.add(i);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = _elapsed.inMilliseconds / 1000.0;
-    final meta = widget.meta;
-    // No visible buttons inside a simulation — long-press returns to the hub.
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onPanStart: (d) => _onDown(d.localPosition),
-      onPanUpdate: (d) => _onMove(d.localPosition),
-      onPanEnd: (_) => _onUp(),
-      onPanCancel: _onUp,
-      onTapDown: (d) => _onDown(d.localPosition),
-      onLongPress: widget.onExit,
-      child: CustomPaint(
-        painter: _ProtocolPainter(
-          kind: meta.kind,
-          colors: meta.colors,
-          time: t,
-          finger: _finger,
-          trail: List<_TrailPoint>.from(_trail),
-          bursts: List<_Burst>.from(_bursts),
-          nodes: List<_EnergizedNode>.from(_nodes),
-          orbitPull: _orbitPull,
-          orbitAim: _orbitAim,
-          hexLit: Set<int>.from(_hexLit),
-          fluxAngle: _fluxAngle,
-          echoCount: _echoCount,
-        ),
-        child: const SizedBox.expand(),
-      ),
-    );
-  }
-}
-
-class _TrailPoint {
-  _TrailPoint(this.p, this.bornMs, this.force);
-  final Offset p;
-  final int bornMs;
-  final double force;
-}
-
-class _Burst {
-  _Burst(this.p, this.bornMs, this.power);
-  final Offset p;
-  final int bornMs;
-  final double power;
-}
-
-class _EnergizedNode {
-  _EnergizedNode(this.p, this.bornMs);
-  final Offset p;
-  final int bornMs;
-}
-
-class _ProtocolPainter extends CustomPainter {
-  _ProtocolPainter({
-    required this.kind,
-    required this.colors,
-    required this.time,
-    required this.finger,
-    required this.trail,
-    required this.bursts,
-    required this.nodes,
-    required this.orbitPull,
-    required this.orbitAim,
-    required this.hexLit,
-    required this.fluxAngle,
-    required this.echoCount,
-  });
-
-  final _ProtocolSimKind kind;
-  final List<Color> colors;
-  final double time;
-  final Offset? finger;
-  final List<_TrailPoint> trail;
-  final List<_Burst> bursts;
-  final List<_EnergizedNode> nodes;
-  final double orbitPull;
-  final Offset orbitAim;
-  final Set<int> hexLit;
-  final double fluxAngle;
-  final int echoCount;
+class _SpecPainter extends CustomPainter {
+  _SpecPainter(this.t);
+  final double t;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height * 0.48);
-    switch (kind) {
-      case _ProtocolSimKind.pulseWeave:
-        _paintPulseWeave(canvas, size, c);
-        break;
-      case _ProtocolSimKind.signalLattice:
-        _paintSignalLattice(canvas, size, c);
-        break;
-      case _ProtocolSimKind.orbitHandler:
-        _paintOrbitHandler(canvas, size, c);
-        break;
-      case _ProtocolSimKind.hexHandshake:
-        _paintHexHandshake(canvas, size, c);
-        break;
-      case _ProtocolSimKind.fluxStream:
-        _paintFluxStream(canvas, size, c);
-        break;
-      case _ProtocolSimKind.echoField:
-        _paintEchoField(canvas, size, c);
-        break;
-      case _ProtocolSimKind.liquidCore:
-        _paintLiquidCore(canvas, size, c);
-        break;
-      case _ProtocolSimKind.tidalPool:
-        _paintTidalPool(canvas, size, c);
-        break;
-      case _ProtocolSimKind.mercuryDrag:
-        _paintMercuryDrag(canvas, size, c);
-        break;
-      case _ProtocolSimKind.vortexFluid:
-        _paintVortexFluid(canvas, size, c);
-        break;
-    }
-    _paintFingerGlow(canvas);
-  }
-
-  void _paintFingerGlow(Canvas canvas) {
-    final f = finger;
-    if (f == null) return;
-    canvas.drawCircle(
-      f,
-      18 + math.sin(time * 8) * 3,
-      Paint()
-        ..color = colors.first.withValues(alpha: 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
-    );
-    canvas.drawCircle(
-      f,
-      5,
-      Paint()..color = Colors.white.withValues(alpha: 0.9),
-    );
-  }
-
-  void _paintPulseWeave(Canvas canvas, Size size, Offset c) {
-    _drawCore(canvas, c, 46, time);
-    if (trail.length >= 2) {
-      final path = Path()..moveTo(trail.first.p.dx, trail.first.p.dy);
-      for (var i = 1; i < trail.length; i++) {
-        path.lineTo(trail[i].p.dx, trail[i].p.dy);
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4.5
-          ..strokeCap = StrokeCap.round
-          ..strokeJoin = StrokeJoin.round
-          ..shader = ui.Gradient.linear(
-            trail.first.p,
-            trail.last.p,
-            [colors.first, colors.last, Colors.white],
-            const [0, 0.55, 1],
-          )
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
-      );
-    }
-    for (final p in trail) {
-      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
-      final r = 4 + p.force * 10 * (1 - age);
-      canvas.drawCircle(
-        p.p,
-        r,
-        Paint()
-          ..color = Color.lerp(
-            colors.first,
-            colors.last,
-            p.force,
-          )!.withValues(alpha: 0.75 * (1 - age)),
-      );
-    }
-    for (final b in bursts) {
-      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
-      final r = 12 + age * 70 * b.power;
-      canvas.drawCircle(
-        b.p,
-        r,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2 * (1 - age)
-          ..color = colors.first.withValues(alpha: 0.7 * (1 - age)),
-      );
-    }
-  }
-
-  void _paintSignalLattice(Canvas canvas, Size size, Offset c) {
-    const cols = 8;
-    const rows = 12;
-    final cellW = size.width / (cols + 1);
-    final cellH = size.height / (rows + 1);
-    final pts = <Offset>[];
-    for (var r = 1; r <= rows; r++) {
-      for (var col = 1; col <= cols; col++) {
-        pts.add(Offset(col * cellW, r * cellH));
-      }
-    }
-    final line = Paint()
-      ..color = colors.first.withValues(alpha: 0.18)
-      ..strokeWidth = 1;
-    for (var r = 0; r < rows; r++) {
-      for (var col = 0; col < cols; col++) {
-        final i = r * cols + col;
-        if (col < cols - 1) canvas.drawLine(pts[i], pts[i + 1], line);
-        if (r < rows - 1) canvas.drawLine(pts[i], pts[i + cols], line);
-      }
-    }
-    for (final n in nodes) {
-      final age = ((_elapsedMs - n.bornMs) / 2200).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        n.p,
-        5 + (1 - age) * 6,
-        Paint()
-          ..color = colors.last.withValues(alpha: 0.85 * (1 - age))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-      );
-      canvas.drawCircle(
-        n.p,
-        3,
-        Paint()..color = Colors.white.withValues(alpha: 0.9 * (1 - age)),
-      );
-    }
-    for (final p in pts) {
-      canvas.drawCircle(
-        p,
-        2.2,
-        Paint()..color = colors.first.withValues(alpha: 0.35),
-      );
-    }
-    if (finger != null && trail.length >= 2) {
-      final path = Path()..moveTo(trail.first.p.dx, trail.first.p.dy);
-      for (var i = 1; i < trail.length; i++) {
-        path.lineTo(trail[i].p.dx, trail[i].p.dy);
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..color = colors.last.withValues(alpha: 0.7),
-      );
-    }
-    _drawCore(canvas, c, 36, time);
-  }
-
-  void _paintOrbitHandler(Canvas canvas, Size size, Offset c) {
-    final aim = orbitAim == Offset.zero ? Offset(1, 0) : orbitAim;
-    final pull = orbitPull;
-    final baseR = size.shortestSide * 0.12;
-    for (var ring = 1; ring <= 4; ring++) {
-      final rr = baseR * ring * (1 + pull * 0.35);
-      canvas.drawCircle(
-        c,
-        rr,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = colors.first.withValues(alpha: 0.22 + pull * 0.2),
-      );
-      for (var i = 0; i < 6 + ring * 2; i++) {
-        final a =
-            time * (0.6 + ring * 0.25) +
-            i * (math.pi * 2 / (6 + ring * 2)) +
-            pull;
-        final o = Offset(c.dx + math.cos(a) * rr, c.dy + math.sin(a) * rr);
-        final toward = Offset(
-          o.dx + aim.dx * 0.04 * pull,
-          o.dy + aim.dy * 0.04 * pull,
-        );
-        canvas.drawCircle(
-          toward,
-          2.5 + pull * 2,
-          Paint()..color = Color.lerp(colors.first, colors.last, i / 8)!,
-        );
-      }
-    }
-    if (finger != null) {
-      canvas.drawLine(
-        c,
-        finger!,
-        Paint()
-          ..color = colors.last.withValues(alpha: 0.45)
-          ..strokeWidth = 1.6,
-      );
-    }
-    _drawCore(canvas, c, 42 + pull * 10, time);
-  }
-
-  void _paintHexHandshake(Canvas canvas, Size size, Offset c) {
-    const n = 42;
-    final R = size.shortestSide * 0.095;
-    for (var i = 0; i < n; i++) {
-      final ring = (i / 7).floor();
-      final slot = i % 7;
-      final a = slot * (math.pi * 2 / 7) + ring * 0.22;
-      final d = ring * R * 1.75;
-      final o = ring == 0
-          ? c
-          : Offset(c.dx + math.cos(a) * d, c.dy + math.sin(a) * d);
-      final lit = hexLit.contains(i) || ring == 0;
-      _drawHex(
-        canvas,
-        o,
-        R * 0.72,
-        fill: lit
-            ? colors.first.withValues(alpha: 0.35)
-            : colors.first.withValues(alpha: 0.06),
-        stroke: lit ? colors.last : colors.first.withValues(alpha: 0.35),
-        pulse: lit ? 0.5 + 0.5 * math.sin(time * 6 + i) : 0,
-      );
-    }
-    if (trail.length >= 2) {
-      for (var i = 1; i < trail.length; i++) {
-        canvas.drawLine(
-          trail[i - 1].p,
-          trail[i].p,
-          Paint()
-            ..color = colors.last.withValues(alpha: 0.45)
-            ..strokeWidth = 2,
-        );
-      }
-    }
-  }
-
-  void _paintFluxStream(Canvas canvas, Size size, Offset c) {
-    final bands = 9;
-    for (var b = 0; b < bands; b++) {
-      final path = Path();
-      final y0 = size.height * (0.18 + b * 0.075);
-      path.moveTo(0, y0);
-      for (var x = 0.0; x <= size.width; x += 10) {
-        final phase = time * 2.2 + b * 0.55 + x * 0.02;
-        var y = y0 + math.sin(phase) * (10 + b * 1.5);
-        if (finger != null) {
-          final dx = (x - finger!.dx).abs();
-          final influence = math.exp(-dx / 90);
-          y += math.sin(fluxAngle) * 28 * influence;
-          y += math.cos(phase + fluxAngle) * 8 * influence;
-        }
-        path.lineTo(x, y);
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.1
-          ..color = Color.lerp(
-            colors.first,
-            colors.last,
-            b / bands,
-          )!.withValues(alpha: 0.55),
-      );
-    }
-    for (final p in trail) {
-      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        p.p,
-        3 + p.force * 5,
-        Paint()..color = Colors.white.withValues(alpha: 0.55 * (1 - age)),
-      );
-    }
-    _drawCore(canvas, c, 34, time);
-  }
-
-  void _paintEchoField(Canvas canvas, Size size, Offset c) {
-    _drawCore(canvas, c, 40, time);
-    final origins = <Offset>[c, ...bursts.map((b) => b.p)];
-    if (finger != null) origins.add(finger!);
-    for (var oi = 0; oi < origins.length; oi++) {
-      final o = origins[oi];
-      for (var ring = 0; ring < 5; ring++) {
-        final phase =
-            (time * 1.4 + ring * 0.35 + oi * 0.2 + echoCount * 0.05) % 1.0;
-        final r = 20 + phase * size.shortestSide * 0.55;
-        canvas.drawCircle(
-          o,
-          r,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2 * (1 - phase)
-            ..color = Color.lerp(
-              colors.first,
-              colors.last,
-              phase,
-            )!.withValues(alpha: 0.55 * (1 - phase)),
-        );
-      }
-    }
-    for (final p in trail) {
-      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        p.p,
-        2.5,
-        Paint()..color = colors.last.withValues(alpha: 0.7 * (1 - age)),
-      );
-    }
-  }
-
-  void _paintLiquidCore(Canvas canvas, Size size, Offset c) {
-    final target = finger ?? c;
-    final blob = Offset(
-      c.dx + (target.dx - c.dx) * 0.55,
-      c.dy + (target.dy - c.dy) * 0.55,
-    );
-    final baseR = size.shortestSide * 0.16;
-    for (var layer = 4; layer >= 1; layer--) {
-      final path = Path();
-      const steps = 36;
-      for (var i = 0; i <= steps; i++) {
-        final a = (i / steps) * math.pi * 2;
-        final wobble =
-            1 +
-            0.12 * math.sin(a * 3 + time * 2.4) +
-            0.08 * math.sin(a * 5 - time * 1.6) +
-            (finger != null
-                ? 0.1 *
-                      math.cos(
-                        a -
-                            math.atan2(
-                              target.dy - blob.dy,
-                              target.dx - blob.dx,
-                            ),
-                      )
-                : 0);
-        final r = (baseR + layer * 10) * wobble;
-        final p = Offset(blob.dx + math.cos(a) * r, blob.dy + math.sin(a) * r);
-        if (i == 0) {
-          path.moveTo(p.dx, p.dy);
-        } else {
-          path.lineTo(p.dx, p.dy);
-        }
-      }
-      path.close();
-      canvas.drawPath(
-        path,
-        Paint()
-          ..color = Color.lerp(
-            colors.first,
-            colors.last,
-            layer / 4,
-          )!.withValues(alpha: 0.18 + layer * 0.08)
-          ..maskFilter = MaskFilter.blur(
-            BlurStyle.normal,
-            layer == 1 ? 2 : 8.0,
-          ),
-      );
-      if (layer == 1) {
-        canvas.drawPath(
-          path,
-          Paint()
-            ..shader = RadialGradient(
-              colors: [
-                Colors.white.withValues(alpha: 0.55),
-                colors.first.withValues(alpha: 0.75),
-                colors.last.withValues(alpha: 0.35),
-              ],
-            ).createShader(Rect.fromCircle(center: blob, radius: baseR * 1.3)),
-        );
-      }
-    }
-    for (final b in bursts) {
-      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        b.p,
-        8 + age * 40 * b.power,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4 * (1 - age)
-          ..color = colors.first.withValues(alpha: 0.55 * (1 - age)),
-      );
-    }
-  }
-
-  void _paintTidalPool(Canvas canvas, Size size, Offset c) {
-    // Soft water floor
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            colors.last.withValues(alpha: 0.08),
-            colors.first.withValues(alpha: 0.14),
-            const Color(0xFF030712),
-          ],
-        ).createShader(Offset.zero & size),
-    );
-    for (var i = 0; i < 7; i++) {
-      final y = size.height * (0.2 + i * 0.1);
-      final path = Path()..moveTo(0, y);
-      for (var x = 0.0; x <= size.width; x += 8) {
-        path.lineTo(x, y + math.sin(time * 1.8 + x * 0.03 + i) * 6);
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = colors.first.withValues(alpha: 0.2),
-      );
-    }
-    for (final b in bursts) {
-      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
-      for (var ring = 0; ring < 4; ring++) {
-        final phase = (age + ring * 0.12).clamp(0.0, 1.0);
-        canvas.drawCircle(
-          b.p,
-          10 + phase * 90 * b.power,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.6 * (1 - phase)
-            ..color = Color.lerp(
-              colors.first,
-              colors.last,
-              phase,
-            )!.withValues(alpha: 0.65 * (1 - phase)),
-        );
-      }
-    }
-    if (finger != null) {
-      for (var ring = 0; ring < 3; ring++) {
-        final phase = (time * 1.5 + ring * 0.33) % 1.0;
-        canvas.drawCircle(
-          finger!,
-          16 + phase * 70,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2 * (1 - phase)
-            ..color = colors.last.withValues(alpha: 0.5 * (1 - phase)),
-        );
-      }
-    }
-    _drawCore(canvas, c, 28, time);
-  }
-
-  void _paintMercuryDrag(Canvas canvas, Size size, Offset c) {
-    _drawCore(canvas, c, 32, time);
-    if (trail.isEmpty) return;
-    for (var i = 0; i < trail.length; i++) {
-      final p = trail[i];
-      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
-      final r = 6 + p.force * 14 * (1 - age) + math.sin(time * 6 + i) * 1.5;
-      canvas.drawCircle(
-        p.p,
-        r,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              Colors.white.withValues(alpha: 0.9 * (1 - age)),
-              colors.first.withValues(alpha: 0.75 * (1 - age)),
-              colors.last.withValues(alpha: 0.2 * (1 - age)),
-            ],
-          ).createShader(Rect.fromCircle(center: p.p, radius: r)),
-      );
-      if (i > 0) {
-        final prev = trail[i - 1].p;
-        canvas.drawLine(
-          prev,
-          p.p,
-          Paint()
-            ..strokeWidth = (r * 0.85).clamp(2.0, 16.0)
-            ..strokeCap = StrokeCap.round
-            ..color = colors.first.withValues(alpha: 0.45 * (1 - age))
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-        );
-      }
-    }
-    for (final b in bursts) {
-      final age = ((_elapsedMs - b.bornMs) / 1800).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        b.p,
-        10 + (1 - age) * 18 * b.power,
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.35 * (1 - age))
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
-      );
-    }
-  }
-
-  void _paintVortexFluid(Canvas canvas, Size size, Offset c) {
-    final center = finger ?? c;
-    final arms = 7;
-    for (var arm = 0; arm < arms; arm++) {
-      final path = Path();
-      for (var s = 0; s < 48; s++) {
-        final t = s / 47;
-        final a = time * 2.2 + arm * (math.pi * 2 / arms) + t * 4.2;
-        final r =
-            18 +
-            t * size.shortestSide * 0.42 * (0.85 + 0.15 * math.sin(time + arm));
-        final p = Offset(
-          center.dx + math.cos(a) * r,
-          center.dy + math.sin(a) * r,
-        );
-        if (s == 0) {
-          path.moveTo(p.dx, p.dy);
-        } else {
-          path.lineTo(p.dx, p.dy);
-        }
-      }
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.4
-          ..strokeCap = StrokeCap.round
-          ..color = Color.lerp(
-            colors.first,
-            colors.last,
-            arm / arms,
-          )!.withValues(alpha: 0.55)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
-      );
-    }
-    for (final p in trail) {
-      final age = ((_elapsedMs - p.bornMs) / 1400).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        p.p,
-        3 + p.force * 4,
-        Paint()..color = colors.first.withValues(alpha: 0.65 * (1 - age)),
-      );
-    }
-    canvas.drawCircle(
-      center,
-      22 + math.sin(time * 5) * 3,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.7),
-            colors.first.withValues(alpha: 0.8),
-            colors.last.withValues(alpha: 0.0),
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: 40)),
-    );
-  }
-
-  int get _elapsedMs => (time * 1000).round();
-
-  void _drawCore(Canvas canvas, Offset c, double radius, double t) {
-    for (var i = 3; i >= 1; i--) {
-      canvas.drawCircle(
-        c,
-        radius + i * 8 + math.sin(t * 3) * 2,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
-          ..color = colors.first.withValues(alpha: 0.12 * i),
-      );
-    }
-    canvas.drawCircle(
-      c,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: 0.55),
-            colors.first.withValues(alpha: 0.85),
-            colors.last.withValues(alpha: 0.5),
-          ],
-        ).createShader(Rect.fromCircle(center: c, radius: radius)),
-    );
-    canvas.drawCircle(
-      c,
-      radius + 2,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = Colors.white.withValues(alpha: 0.55),
-    );
-  }
-
-  void _drawHex(
-    Canvas canvas,
-    Offset c,
-    double r, {
-    required Color fill,
-    required Color stroke,
-    required double pulse,
-  }) {
-    final path = Path();
-    for (var i = 0; i < 6; i++) {
-      final a = -math.pi / 2 + i * math.pi / 3;
-      final p = Offset(
-        c.dx + math.cos(a) * (r + pulse * 2),
-        c.dy + math.sin(a) * (r + pulse * 2),
-      );
-      if (i == 0) {
-        path.moveTo(p.dx, p.dy);
-      } else {
-        path.lineTo(p.dx, p.dy);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, Paint()..color = fill);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = stroke.withValues(alpha: 0.85),
-    );
+    final x = -size.width * 0.4 + (size.width * 1.8) * t;
+    final rect = Rect.fromLTWH(x, -10, size.width * 0.28, size.height + 20);
+    canvas.save();
+    canvas.translate(rect.center.dx, rect.center.dy);
+    canvas.rotate(0.35);
+    final r = Rect.fromCenter(center: Offset.zero, width: rect.width, height: rect.height * 1.6);
+    canvas.drawRect(r, Paint()..shader = LinearGradient(colors: [Colors.transparent, Colors.white.withValues(alpha: 0.3), Colors.transparent]).createShader(r));
+    canvas.restore();
   }
 
   @override
-  bool shouldRepaint(covariant _ProtocolPainter old) => true;
+  bool shouldRepaint(covariant _SpecPainter old) => old.t != t;
 }
 
-// ── Unfold reveal canvas ─────────────────────────────────────────────────────
+/// The back of a panel before it flips: dark glass with a fine grid and a lock ring.
+class _SlabBack extends StatelessWidget {
+  const _SlabBack({required this.width, required this.height, required this.colors});
+  final double width;
+  final double height;
+  final List<Color> colors;
 
-/// Fullscreen auto-playing reveal: stage 1 unfolds, a glowing link draws
-/// down to stage 2, it unfolds, a link draws to stage 3, it unfolds — then
-/// a hold, a soft fade, and the loop repeats. Tap anywhere to exit.
-class _UnfoldSimCanvas extends StatefulWidget {
-  const _UnfoldSimCanvas({required this.meta, required this.onExit});
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      height: height,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [const Color(0xFF26262B), const Color(0xFF111114)]),
+          border: Border.all(color: colors.first.withValues(alpha: 0.4), width: 1.2),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 24, offset: const Offset(0, 14))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: CustomPaint(painter: _BackPainter(colors.first), child: Center(child: Icon(Icons.lock_rounded, color: colors.first.withValues(alpha: 0.7), size: 34))),
+        ),
+      ),
+    );
+  }
+}
 
+class _BackPainter extends CustomPainter {
+  _BackPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color.withValues(alpha: 0.09)
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 18) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    }
+    for (double y = 0; y < size.height; y += 18) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
+    canvas.drawCircle(size.center(Offset.zero), 30, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.4..color = color.withValues(alpha: 0.35));
+  }
+
+  @override
+  bool shouldRepaint(covariant _BackPainter old) => false;
+}
+
+// ── The canvas that plays a sequence ────────────────────────────────────────
+
+class _SequenceCanvas extends StatefulWidget {
+  const _SequenceCanvas({super.key, required this.meta, required this.onExit});
   final _UnfoldMeta meta;
   final VoidCallback onExit;
 
   @override
-  State<_UnfoldSimCanvas> createState() => _UnfoldSimCanvasState();
+  State<_SequenceCanvas> createState() => _SequenceCanvasState();
 }
 
-class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
-    with TickerProviderStateMixin {
-  late final AnimationController _seq;
-  late final AnimationController _pulse;
-
-  // The big ad box lives fixed at the bottom the whole time. Mail and SMS
-  // are "born" there — they spawn small, tucked behind it — then rise to
-  // their own slot up top, one at a time.
-  static const double _topY = 0;
-  static const double _midY = 172;
-  static const double _botY = 344;
-  static const double _adWidth = 224.0;
-  static const double _boxWidth = 128.0;
-  static const double _adTotalH = _adWidth * 0.80 + _adWidth * 0.115;
-  static const double _stackHeight = _botY + _adTotalH;
-  static const double _stackWidth = 380;
-
-  @override
-  void initState() {
-    super.initState();
-    // Slow, deliberate pacing — this is meant to read like a polished ad,
-    // not a quick UI transition.
-    _seq = AnimationController(
-      vsync: this,
-      // 10s loop: ~4.3s to build the stack, then a full 5s hold so people
-      // can actually read it before it fades and replays.
-      duration: const Duration(milliseconds: 10000),
-    )..repeat();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1900),
-    )..repeat(reverse: true);
-  }
+class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderStateMixin {
+  late final AnimationController _seq = AnimationController(vsync: this, duration: const Duration(milliseconds: 11000))..repeat();
+  late final AnimationController _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))..repeat(reverse: true);
 
   @override
   void dispose() {
@@ -1771,645 +414,379 @@ class _UnfoldSimCanvasState extends State<_UnfoldSimCanvas>
     super.dispose();
   }
 
-  double _seg(double t, double start, double end) =>
-      ((t - start) / (end - start)).clamp(0.0, 1.0);
-
-  /// Returns (y, scale, riseProgress) for a box that's born (pops in small)
-  /// at the bottom slot during [bornStart]-[bornEnd], then rises to [home]
-  /// during [riseStart]-[riseEnd]. [riseProgress] also drives the trailing
-  /// link so the glow travels up in lockstep with the box itself.
-  (double, double, double) _riseState(
-    double t, {
-    required double bornStart,
-    required double bornEnd,
-    required double riseStart,
-    required double riseEnd,
-    required double home,
-  }) {
-    if (t < bornStart) return (_botY, 0.0, 0.0);
-    final born = Curves.easeOutBack.transform(_seg(t, bornStart, bornEnd));
-    if (t < riseStart) return (_botY, born.clamp(0.0, 1.0), 0.0);
-    final rise = Curves.easeInOutCubic.transform(_seg(t, riseStart, riseEnd));
-    final y = _botY + (home - _botY) * rise;
-    return (y, 1.0, rise);
-  }
+  static double seg(double t, double a, double b) => ((t - a) / (b - a)).clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
     final meta = widget.meta;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onExit,
-      child: SizedBox.expand(
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_seq, _pulse]),
-          builder: (context, _) {
-            final t = _seq.value;
-            final pulse = Curves.easeInOut.transform(_pulse.value);
-            // Everything is built by t≈0.43, then held fully visible for a
-            // solid ~5s (0.43–0.93 of a 10s loop) before fading for replay.
-            final holdFade = t < 0.93 ? 1.0 : 1.0 - _seg(t, 0.93, 0.99);
-            final restartGap = t > 0.995
-                ? 0.0
-                : 1.0; // fully hidden briefly before replay
-            final fade = holdFade * restartGap;
-
-            final (mailY, mailScale, mailRise) = _riseState(
-              t,
-              bornStart: 0.03,
-              bornEnd: 0.07,
-              riseStart: 0.07,
-              riseEnd: 0.21,
-              home: _topY,
-            );
-            final (smsY, smsScale, smsRise) = _riseState(
-              t,
-              bornStart: 0.25,
-              bornEnd: 0.29,
-              riseStart: 0.29,
-              riseEnd: 0.43,
-              home: _midY,
-            );
-
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                Container(color: const Color(0xFF030712)),
-                _UnfoldGlowBackdrop(color: meta.glow, pulse: pulse),
-                Center(
-                  child: SizedBox(
-                    width: _stackWidth,
-                    height: _stackHeight,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // The big box — fixed, always present, everything else is born from it.
-                        Positioned(
-                          top: _botY,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: _UnfoldBox3D(
-                              icon: meta.icons[2],
-                              colors: meta.colors,
-                              width: _adWidth,
-                              opacity: fade,
-                              scale: 1,
-                              pulse: pulse,
-                              isFinal: true,
-                            ),
-                          ),
-                        ),
-                        // Trailing glow links — drawn in lockstep with each box's rise.
-                        Positioned(
-                          top: _topY,
-                          left: 0,
-                          right: 0,
-                          height: _botY - _topY,
-                          child: _UnfoldLink(
-                            colors: meta.colors,
-                            progress: mailRise * fade,
-                          ),
-                        ),
-                        Positioned(
-                          top: _midY,
-                          left: 0,
-                          right: 0,
-                          height: _botY - _midY,
-                          child: _UnfoldLink(
-                            colors: meta.colors,
-                            progress: smsRise * fade,
-                          ),
-                        ),
-                        Positioned(
-                          top: mailY,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: _UnfoldBox3D(
-                              icon: meta.icons[0],
-                              colors: meta.colors,
-                              width: _boxWidth,
-                              opacity: mailScale * fade,
-                              scale: mailScale,
-                              pulse: pulse,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          top: smsY,
-                          left: 0,
-                          right: 0,
-                          child: Center(
-                            child: _UnfoldBox3D(
-                              icon: meta.icons[1],
-                              colors: meta.colors,
-                              width: _boxWidth,
-                              opacity: smsScale * fade,
-                              scale: smsScale,
-                              pulse: pulse,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  top: 0,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-                      child: Opacity(
-                        opacity: 0.85,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              meta.title,
-                              style: TextStyle(
-                                color: meta.glow,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.6,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Tap anywhere to exit',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.35),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// A soft radial wash behind the stack, breathing with [pulse].
-class _UnfoldGlowBackdrop extends StatelessWidget {
-  const _UnfoldGlowBackdrop({required this.color, required this.pulse});
-  final Color color;
-  final double pulse;
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(
-    painter: _UnfoldGlowPainter(color: color, pulse: pulse),
-  );
-}
-
-class _UnfoldGlowPainter extends CustomPainter {
-  _UnfoldGlowPainter({required this.color, required this.pulse});
-  final Color color;
-  final double pulse;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height * 0.46);
-    final r = size.shortestSide * (0.42 + pulse * 0.05);
-    final paint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          color.withValues(alpha: 0.16 + pulse * 0.06),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: c, radius: r));
-    canvas.drawCircle(c, r, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _UnfoldGlowPainter old) =>
-      old.pulse != pulse || old.color != color;
-}
-
-/// Rounds the corners of an arbitrary polygon by clipping [radius] in from
-/// each vertex along its adjacent edges and joining the cut with a quad
-/// curve — used to give the isometric box faces their soft "cut glass" edges.
-ui.Path _roundedPolygonPath(List<Offset> pts, double radius) {
-  final path = ui.Path();
-  final n = pts.length;
-  for (var i = 0; i < n; i++) {
-    final prev = pts[(i - 1 + n) % n];
-    final curr = pts[i];
-    final next = pts[(i + 1) % n];
-    final toPrev = prev - curr;
-    final toNext = next - curr;
-    final d1 = toPrev.distance, d2 = toNext.distance;
-    final r = math.min(radius, math.min(d1, d2) / 2);
-    final p1 = curr + toPrev * (d1 == 0 ? 0 : r / d1);
-    final p2 = curr + toNext * (d2 == 0 ? 0 : r / d2);
-    if (i == 0) {
-      path.moveTo(p1.dx, p1.dy);
-    } else {
-      path.lineTo(p1.dx, p1.dy);
-    }
-    path.quadraticBezierTo(curr.dx, curr.dy, p2.dx, p2.dy);
-  }
-  path.close();
-  return path;
-}
-
-/// A genuine isometric 3D box — a rounded diamond top face plus two shaded
-/// side faces extruded downward, like a real cut-glass block viewed at an
-/// angle (matching the reference ad mock). The first two stages are clear
-/// frosted glass, the final stage ([isFinal]) is the solid-color "ad"
-/// payload with a NEW ribbon, like real content sitting inside the glass.
-class _IsoBoxPainter extends CustomPainter {
-  _IsoBoxPainter({
-    required this.colors,
-    required this.depth,
-    required this.isFinal,
-    required this.glowAlpha,
-  });
-
-  final List<Color> colors;
-  final double depth;
-  final bool isFinal;
-  final double glowAlpha;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height - depth;
-    final cx = w / 2;
-    final topTip = Offset(cx, 0);
-    final rightTip = Offset(w, h / 2);
-    final botTip = Offset(cx, h);
-    final leftTip = Offset(0, h / 2);
-    Offset down(Offset o) => Offset(o.dx, o.dy + depth);
-
-    final base = colors.first;
-    final base2 = colors.last;
-
-    // One continuous rounded outline for the *whole* silhouette (top face +
-    // both extruded side faces) — this is what makes the glass edge curve
-    // smoothly into the side instead of stopping in a sharp corner. Radius
-    // is kept small relative to the short depth edges on purpose — too big
-    // here and those edges collapse into a shapeless blob.
-    final silhouette = _roundedPolygonPath([
-      topTip,
-      rightTip,
-      down(rightTip),
-      down(botTip),
-      down(leftTip),
-      leftTip,
-    ], math.min(w * 0.032, depth * 0.42));
-
-    // Soft ambient glow behind the whole shape.
-    canvas.drawPath(
-      silhouette,
-      Paint()
-        ..color = base.withValues(alpha: glowAlpha * 0.75)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
-    );
-
-    // Fill each face, clipped to the rounded silhouette so every outer
-    // corner — including where the top face wraps into a side face — comes
-    // out as a smooth curve rather than a hard point.
-    canvas.save();
-    canvas.clipPath(silhouette);
-
-    final rightFace = ui.Path()
-      ..moveTo(rightTip.dx, rightTip.dy)
-      ..lineTo(botTip.dx, botTip.dy)
-      ..lineTo(down(botTip).dx, down(botTip).dy)
-      ..lineTo(down(rightTip).dx, down(rightTip).dy)
-      ..close();
-    final leftFace = ui.Path()
-      ..moveTo(leftTip.dx, leftTip.dy)
-      ..lineTo(botTip.dx, botTip.dy)
-      ..lineTo(down(botTip).dx, down(botTip).dy)
-      ..lineTo(down(leftTip).dx, down(leftTip).dy)
-      ..close();
-    final topFace = ui.Path()
-      ..moveTo(topTip.dx, topTip.dy)
-      ..lineTo(rightTip.dx, rightTip.dy)
-      ..lineTo(botTip.dx, botTip.dy)
-      ..lineTo(leftTip.dx, leftTip.dy)
-      ..close();
-
-    canvas.drawPath(
-      rightFace,
-      Paint()
-        ..shader = LinearGradient(
-          colors: [
-            Color.lerp(base2, Colors.black, 0.42)!,
-            Color.lerp(base2, Colors.black, 0.6)!,
-          ],
-        ).createShader(rightFace.getBounds()),
-    );
-    canvas.drawPath(
-      leftFace,
-      Paint()
-        ..shader = LinearGradient(
-          colors: [
-            Color.lerp(base, Colors.black, 0.32)!,
-            Color.lerp(base, Colors.black, 0.5)!,
-          ],
-        ).createShader(leftFace.getBounds()),
-    );
-    canvas.drawPath(
-      topFace,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isFinal
-              ? [base.withValues(alpha: 0.90), base2.withValues(alpha: 0.97)]
-              : [
-                  Colors.white.withValues(alpha: 0.30),
-                  Colors.white.withValues(alpha: 0.09),
-                  base.withValues(alpha: 0.18),
-                ],
-        ).createShader(Rect.fromLTWH(0, 0, w, h)),
-    );
-    // A soft diagonal sheen across the glass top — the "you can see light
-    // passing through it" read.
-    if (!isFinal) {
-      canvas.drawPath(
-        topFace,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withValues(alpha: 0.32),
-              Colors.white.withValues(alpha: 0.0),
-              Colors.white.withValues(alpha: 0.0),
-            ],
-            stops: const [0.0, 0.45, 1.0],
-          ).createShader(Rect.fromLTWH(0, 0, w, h)),
-      );
-    }
-
-    // Subtle interior fold seams where the top face wraps into each side.
-    final seamStroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.black.withValues(alpha: 0.18);
-    canvas.drawLine(rightTip, botTip, seamStroke);
-    canvas.drawLine(leftTip, botTip, seamStroke);
-
-    canvas.restore();
-
-    // The continuous glass rim — brighter where light would catch the top
-    // edge, dimmer down the sides — drawn as one unbroken stroke so it
-    // visibly wraps all the way around to the other side.
-    canvas.drawPath(
-      silhouette,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.7
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: isFinal ? 0.65 : 0.85),
-            Colors.white.withValues(alpha: isFinal ? 0.22 : 0.34),
-          ],
-        ).createShader(Rect.fromLTWH(0, 0, w, size.height)),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _IsoBoxPainter old) =>
-      old.depth != depth ||
-      old.isFinal != isFinal ||
-      old.glowAlpha != glowAlpha ||
-      old.colors != colors;
-}
-
-class _UnfoldBox3D extends StatelessWidget {
-  const _UnfoldBox3D({
-    required this.icon,
-    required this.colors,
-    required this.width,
-    required this.opacity,
-    required this.scale,
-    required this.pulse,
-    this.isFinal = false,
-  });
-
-  final IconData icon;
-  final List<Color> colors;
-  final double width;
-  final double opacity;
-  final double scale;
-  final double pulse;
-  final bool isFinal;
-
-  @override
-  Widget build(BuildContext context) {
-    final depth = width * 0.115;
-    final topH = width * 0.80;
-    final totalH = topH + depth;
-    if (opacity <= 0.001) return SizedBox(width: width, height: totalH);
-    final glowAlpha = (0.30 + pulse * 0.20) * opacity;
-    return Opacity(
-      opacity: opacity.clamp(0.0, 1.0),
-      child: Transform.scale(
-        scale: 0.55 + scale * 0.45,
-        child: SizedBox(
-          width: width * 1.12,
-          height: totalH + depth * 0.7,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Grounding contact shadow — crisp solid shadow (no GPU blur filter).
-              Positioned(
-                left: width * 0.06,
-                top: totalH - depth * 0.35,
-                width: width,
-                height: depth * 1.3,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.28 * opacity),
-                    borderRadius: BorderRadius.circular(depth),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.22 * opacity),
-                        blurRadius: 6,
-                        offset: Offset(0, depth * 0.15),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: width * 0.06,
-                top: 0,
-                child: CustomPaint(
-                  size: Size(width, totalH),
-                  painter: _IsoBoxPainter(
-                    colors: colors,
-                    depth: depth,
-                    isFinal: isFinal,
-                    glowAlpha: glowAlpha,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: width * 0.06,
-                right: width * 0.06,
-                top: 0,
-                height: topH,
-                child: Center(
-                  child: Icon(
-                    icon,
-                    color: Colors.white.withValues(alpha: isFinal ? 1 : 0.94),
-                    size: width * 0.42,
-                  ),
-                ),
-              ),
-              if (isFinal)
-                Positioned(
-                  left: -width * 0.02,
-                  top: topH * 0.02,
-                  child: Transform.rotate(
-                    angle: -0.5236,
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Tucked fold shadow peeking from under the ribbon's near end.
-                        Positioned(
-                          left: 1,
-                          top: 12,
-                          child: Container(
-                            width: 12,
-                            height: 7,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF14532D),
-                              borderRadius: BorderRadius.circular(1.5),
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF4ADE80), Color(0xFF16A34A)],
-                            ),
-                            borderRadius: BorderRadius.circular(3),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.45),
-                              width: 0.6,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.35),
-                                blurRadius: 6,
-                                offset: const Offset(0, 3),
-                              ),
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF22C55E,
-                                ).withValues(alpha: 0.55),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            'NEW',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 10,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+    return Stack(fit: StackFit.expand, children: [
+      // A very faint wash of the sequence colour on a dark page, no blue cast.
+      AnimatedBuilder(
+        animation: _pulse,
+        builder: (_, __) => DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: RadialGradient(center: const Alignment(0, 0.1), radius: 0.9, colors: [meta.glow.withValues(alpha: 0.06 + 0.03 * _pulse.value), _kBg]),
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Glowing curved loop connecting two panels, drawn progressively as
-/// [progress] goes 0→1 — the "energy flowing to the next stage" beat.
-class _UnfoldLink extends StatelessWidget {
-  const _UnfoldLink({required this.colors, required this.progress});
-
-  final List<Color> colors;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _UnfoldLinkPainter(colors: colors, progress: progress),
+      SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 16, 0),
+            child: Row(children: [
+              IconButton(onPressed: widget.onExit, icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white70, size: 20)),
+              Expanded(child: Text(meta.title, style: TextStyle(color: meta.glow, fontWeight: FontWeight.w900, letterSpacing: 1.8, fontSize: 14))),
+            ]),
+          ),
+          Expanded(
+            child: LayoutBuilder(builder: (context, box) {
+              final w = math.min(box.maxWidth - 36, 350.0);
+              return Center(
+                child: AnimatedBuilder(
+                  animation: Listenable.merge([_seq, _pulse]),
+                  builder: (context, _) {
+                    final t = _seq.value;
+                    // Built by about 0.5, held, then faded for the replay.
+                    final fade = t < 0.9 ? 1.0 : (1 - seg(t, 0.9, 0.98));
+                    final pulse = Curves.easeInOut.transform(_pulse.value);
+                    return Opacity(
+                      opacity: fade,
+                      child: switch (meta.style) {
+                        _UnfoldStyle.accordion => _accordion(meta, t, pulse, w),
+                        _UnfoldStyle.flip => _flip(meta, t, pulse, w),
+                        _UnfoldStyle.towers => _towers(meta, t, pulse, w),
+                        _UnfoldStyle.assemble => _assemble(meta, t, pulse, w),
+                      },
+                    );
+                  },
+                ),
+              );
+            }),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: Text(meta.blurb, textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12)),
+          ),
+        ]),
       ),
+    ]);
+  }
+
+  // 1. Accordion: each panel hangs from a hinge on the one above and swings down into place.
+  Widget _accordion(_UnfoldMeta m, double t, double pulse, double w) {
+    const h = 112.0;
+    const gap = 6.0;
+    const starts = [0.04, 0.2, 0.36];
+    final total = 3 * h + 2 * gap;
+    final children = <Widget>[];
+    for (var i = 2; i >= 0; i--) {
+      final p = Curves.easeOutBack.transform(seg(t, starts[i], starts[i] + 0.15));
+      final angle = ((1 - p) * math.pi / 2).clamp(-0.1, math.pi / 2);
+      final shade = (angle / (math.pi / 2)).clamp(0.0, 1.0);
+      final settled = seg(t, starts[i] + 0.12, starts[i] + 0.2);
+      children.add(Positioned(
+        top: i * (h + gap),
+        left: 0,
+        right: 0,
+        child: Opacity(
+          opacity: seg(t, starts[i] - 0.01, starts[i] + 0.03),
+          child: Transform(
+            alignment: Alignment.topCenter,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0013)
+              ..rotateX(angle),
+            child: _Slab(
+              width: w,
+              height: h,
+              colors: m.colors,
+              icon: m.icons[i],
+              label: m.labels[i],
+              sub: m.subs[i],
+              shade: shade,
+              glow: settled * (0.4 + 0.6 * pulse),
+              spec: seg(t, starts[i] + 0.1, starts[i] + 0.3) > 0 && seg(t, starts[i] + 0.1, starts[i] + 0.3) < 1 ? seg(t, starts[i] + 0.1, starts[i] + 0.3) : -1,
+            ),
+          ),
+        ),
+      ));
+    }
+    // A glowing seam at each hinge as the panel swings out.
+    for (var i = 1; i < 3; i++) {
+      final s = seg(t, starts[i] - 0.02, starts[i] + 0.1);
+      children.add(Positioned(
+        top: i * (h + gap) - gap / 2 - 2,
+        left: 0,
+        right: 0,
+        height: 4,
+        child: CustomPaint(painter: _SeamPainter(m.colors.first, s, 1 - seg(t, starts[i] + 0.12, starts[i] + 0.22))),
+      ));
+    }
+    return SizedBox(width: w, height: total + 10, child: Stack(clipBehavior: Clip.none, children: children));
+  }
+
+  // 2. Flip: dark locked panels turn over, lifting toward you as they turn.
+  Widget _flip(_UnfoldMeta m, double t, double pulse, double w) {
+    const h = 108.0;
+    const gap = 22.0;
+    const starts = [0.05, 0.2, 0.35];
+    final total = 3 * h + 2 * gap;
+    final children = <Widget>[];
+    for (var i = 0; i < 3; i++) {
+      final p = Curves.easeInOutCubic.transform(seg(t, starts[i], starts[i] + 0.17));
+      final a = (1 - p) * math.pi;
+      final front = a < math.pi / 2;
+      final lift = 1 + math.sin(p * math.pi) * 0.08;
+      final settled = seg(t, starts[i] + 0.15, starts[i] + 0.25);
+      children.add(Positioned(
+        top: i * (h + gap),
+        left: 0,
+        right: 0,
+        child: Opacity(
+          opacity: seg(t, starts[i] - 0.03, starts[i] + 0.01),
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0011)
+              ..scale(lift)
+              ..rotateY(a),
+            child: front
+                ? _Slab(
+                    width: w,
+                    height: h,
+                    colors: m.colors,
+                    icon: m.icons[i],
+                    label: m.labels[i],
+                    sub: m.subs[i],
+                    shade: math.sin(a) * 0.5,
+                    glow: settled * (0.4 + 0.6 * pulse),
+                    spec: p > 0.5 && p < 1 ? (p - 0.5) * 2 : -1,
+                  )
+                : Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()..rotateY(math.pi),
+                    child: _SlabBack(width: w, height: h, colors: m.colors),
+                  ),
+          ),
+        ),
+      ));
+    }
+    return SizedBox(width: w, height: total + 10, child: Stack(clipBehavior: Clip.none, children: children));
+  }
+
+  // 3. Towers: three solid blocks grow up from a floor, then their windows light up.
+  Widget _towers(_UnfoldMeta m, double t, double pulse, double w) {
+    final maxH = math.min(300.0, w * 0.95);
+    const heights = [0.55, 0.78, 1.0];
+    const starts = [0.04, 0.17, 0.3];
+    final grow = [for (var i = 0; i < 3; i++) Curves.easeOutCubic.transform(seg(t, starts[i], starts[i] + 0.2))];
+    final lights = seg(t, 0.4, 0.62);
+    return SizedBox(
+      width: w,
+      height: maxH + 90,
+      child: Stack(clipBehavior: Clip.none, children: [
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _TowersPainter(colors: m.colors, grow: grow, heights: heights, maxH: maxH, lights: lights, pulse: pulse, scan: seg(t, 0.45, 0.7)),
+          ),
+        ),
+        // The icons sit on the front of each tower and the labels under the floor.
+        for (var i = 0; i < 3; i++)
+          Positioned(
+            left: _TowersPainter.towerLeft(w, i),
+            width: _TowersPainter.towerWidth(w),
+            top: maxH + 36 - heights[i] * maxH * grow[i] + 12,
+            child: Opacity(opacity: grow[i] > 0.85 ? 1 : 0, child: Icon(m.icons[i], color: Colors.white, size: 26)),
+          ),
+        for (var i = 0; i < 3; i++)
+          Positioned(
+            left: _TowersPainter.towerLeft(w, i),
+            width: _TowersPainter.towerWidth(w),
+            top: maxH + 52,
+            child: Opacity(opacity: seg(t, starts[i] + 0.15, starts[i] + 0.25), child: Text(m.labels[i], textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800, fontSize: 13))),
+          ),
+      ]),
     );
+  }
+
+  // 4. Assemble: slabs spiral in from three sides and lock into a neat stack with a ripple.
+  Widget _assemble(_UnfoldMeta m, double t, double pulse, double w) {
+    const h = 96.0;
+    final cw = w * 0.84;
+    const finals = [-92.0, 0.0, 92.0];
+    const starts = [0.04, 0.2, 0.36];
+    const restRot = [-0.045, 0.03, -0.015];
+    final starts0 = [Offset(-w * 1.0, -150.0), Offset(w * 1.0, -40.0), const Offset(0, 330.0)];
+    final children = <Widget>[];
+    for (var i = 0; i < 3; i++) {
+      final raw = seg(t, starts[i], starts[i] + 0.2);
+      final p = Curves.easeOutCubic.transform(raw);
+      final end = Offset(0, finals[i]);
+      final ctrl = Offset(starts0[i].dx * 0.35, starts0[i].dy * 0.2 - 90);
+      final pos = _bezier(starts0[i], ctrl, end, p);
+      final spin = (1 - p) * (i.isEven ? 2.8 : -2.8);
+      final settle = seg(t, starts[i] + 0.2, starts[i] + 0.3);
+      children.add(Positioned.fill(
+        child: Center(
+          child: Opacity(
+            opacity: seg(t, starts[i] - 0.01, starts[i] + 0.03),
+            child: Transform.translate(
+              offset: pos,
+              child: Transform(
+                alignment: Alignment.center,
+                transform: Matrix4.identity()
+                  ..setEntry(3, 2, 0.001)
+                  ..rotateZ(spin + restRot[i] * p)
+                  ..rotateY((1 - p) * 0.9)
+                  ..scale(0.55 + 0.45 * p),
+                child: _Slab(width: cw, height: h, colors: m.colors, icon: m.icons[i], label: m.labels[i], sub: m.subs[i], shade: (1 - p) * 0.4, glow: settle * (0.4 + 0.6 * pulse), spec: raw > 0.7 ? (raw - 0.7) / 0.3 : -1),
+              ),
+            ),
+          ),
+        ),
+      ));
+      // A ripple where the slab lands.
+      final rip = seg(t, starts[i] + 0.17, starts[i] + 0.33);
+      if (rip > 0 && rip < 1) {
+        children.add(Positioned.fill(
+          child: Center(child: Transform.translate(offset: Offset(0, finals[i] + h / 2 - 4), child: CustomPaint(size: Size(cw, 30), painter: _RipplePainter(m.colors.first, rip)))),
+        ));
+      }
+    }
+    return SizedBox(width: w, height: 330, child: Stack(clipBehavior: Clip.none, children: children));
+  }
+
+  static Offset _bezier(Offset a, Offset c, Offset b, double t) {
+    final u = 1 - t;
+    return Offset(u * u * a.dx + 2 * u * t * c.dx + t * t * b.dx, u * u * a.dy + 2 * u * t * c.dy + t * t * b.dy);
   }
 }
 
-class _UnfoldLinkPainter extends CustomPainter {
-  _UnfoldLinkPainter({required this.colors, required this.progress});
-  final List<Color> colors;
+class _SeamPainter extends CustomPainter {
+  _SeamPainter(this.color, this.progress, this.fade);
+  final Color color;
   final double progress;
+  final double fade;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress <= 0.001) return;
+    if (progress <= 0 || fade <= 0) return;
     final cx = size.width / 2;
-    // Starts at the bottom (the big box) and reveals upward — the glow
-    // trails behind the box as it rises, growing in lockstep with it.
-    final path = Path()
-      ..moveTo(cx, size.height)
-      ..cubicTo(
-        cx + 26,
-        size.height * 0.65,
-        cx - 26,
-        size.height * 0.35,
-        cx,
-        0,
-      );
-    final metric = path.computeMetrics().first;
-    final drawn = metric.extractPath(0, metric.length * progress);
-
-    final glow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
-      ..strokeCap = StrokeCap.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6)
-      ..shader = LinearGradient(
-        colors: colors,
-      ).createShader(Offset.zero & size);
-    canvas.drawPath(drawn, glow);
-
-    final core = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: 0.9);
-    canvas.drawPath(drawn, core);
+    final half = size.width / 2 * progress;
+    final rect = Rect.fromLTRB(cx - half, 0, cx + half, size.height);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+      Paint()
+        ..color = color.withValues(alpha: 0.9 * fade)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(2)), Paint()..color = Colors.white.withValues(alpha: 0.9 * fade));
   }
 
   @override
-  bool shouldRepaint(covariant _UnfoldLinkPainter old) =>
-      old.progress != progress || old.colors != colors;
+  bool shouldRepaint(covariant _SeamPainter old) => old.progress != progress || old.fade != fade;
+}
+
+class _RipplePainter extends CustomPainter {
+  _RipplePainter(this.color, this.t);
+  final Color color;
+  final double t;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = size.center(Offset.zero);
+    for (var i = 0; i < 2; i++) {
+      final k = (t - i * 0.18).clamp(0.0, 1.0);
+      if (k <= 0) continue;
+      final rect = Rect.fromCenter(center: c, width: size.width * (0.5 + k * 0.7), height: size.height * (0.3 + k * 0.9));
+      canvas.drawOval(rect, Paint()..style = PaintingStyle.stroke..strokeWidth = 2..color = color.withValues(alpha: (1 - k) * 0.7));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RipplePainter old) => old.t != t;
+}
+
+/// Three solid blocks with a lit front, a shaded side and a bright top, standing on a reflective floor.
+class _TowersPainter extends CustomPainter {
+  _TowersPainter({required this.colors, required this.grow, required this.heights, required this.maxH, required this.lights, required this.pulse, required this.scan});
+
+  final List<Color> colors;
+  final List<double> grow;
+  final List<double> heights;
+  final double maxH;
+  final double lights;
+  final double pulse;
+  final double scan;
+
+  static double towerWidth(double w) => w * 0.23;
+  static double towerLeft(double w, int i) => (w - (3 * towerWidth(w) + 2 * w * 0.1 + towerWidth(w) * 0.3)) / 2 + i * (towerWidth(w) + w * 0.1);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final base = maxH + 36;
+    final tw = towerWidth(size.width);
+    final d = tw * 0.34;
+    final dx = d * 0.85;
+    final dy = -d * 0.5;
+    // The floor, with a soft glow where the towers stand.
+    final floor = Rect.fromLTWH(0, base - 4, size.width, 60);
+    canvas.drawRect(floor, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [colors.first.withValues(alpha: 0.18), Colors.transparent]).createShader(floor));
+    canvas.drawLine(Offset(0, base), Offset(size.width, base), Paint()..color = Colors.white.withValues(alpha: 0.18)..strokeWidth = 1);
+
+    for (var i = 0; i < 3; i++) {
+      final g = grow[i];
+      if (g <= 0) continue;
+      final x = towerLeft(size.width, i);
+      final h = heights[i] * maxH * g;
+      // Contact shadow on the floor.
+      canvas.drawOval(Rect.fromLTWH(x - 4, base - 6, tw + dx + 8, 16), Paint()..color = Colors.black.withValues(alpha: 0.5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8));
+      final front = Rect.fromLTWH(x, base - h, tw, h);
+      canvas.drawRect(front, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(colors.first, Colors.white, 0.1)!, colors.last]).createShader(front));
+      final side = ui.Path()
+        ..moveTo(x + tw, base - h)
+        ..lineTo(x + tw + dx, base - h + dy)
+        ..lineTo(x + tw + dx, base + dy)
+        ..lineTo(x + tw, base)
+        ..close();
+      canvas.drawPath(side, Paint()..color = Color.lerp(colors.last, Colors.black, 0.5)!);
+      final top = ui.Path()
+        ..moveTo(x, base - h)
+        ..lineTo(x + dx, base - h + dy)
+        ..lineTo(x + tw + dx, base - h + dy)
+        ..lineTo(x + tw, base - h)
+        ..close();
+      canvas.drawPath(top, Paint()..color = Color.lerp(colors.first, Colors.white, 0.45)!);
+      final edge = Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white.withValues(alpha: 0.28);
+      canvas.drawRect(front, edge);
+      canvas.drawPath(side, edge);
+      canvas.drawPath(top, edge);
+      // Windows light up from the bottom, in turn.
+      final rows = (h / 22).floor();
+      for (var r = 0; r < rows; r++) {
+        final on = lights * rows * 1.3 > (rows - r) - 1;
+        final y = base - 14 - r * 22;
+        for (var c = 0; c < 3; c++) {
+          final wx = x + 8 + c * ((tw - 16) / 3);
+          final rect = Rect.fromLTWH(wx, y - 12, (tw - 16) / 3 - 5, 10);
+          if (y - 12 < base - h + 6) continue;
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+            Paint()..color = on ? Colors.white.withValues(alpha: 0.6 + 0.3 * pulse) : Colors.black.withValues(alpha: 0.22),
+          );
+        }
+      }
+      // A light that sweeps up the front once.
+      if (scan > 0 && scan < 1) {
+        final sy = base - h * scan;
+        final band = Rect.fromLTWH(x, sy - 14, tw, 28);
+        canvas.save();
+        canvas.clipRect(front);
+        canvas.drawRect(band, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.white.withValues(alpha: 0.4), Colors.transparent]).createShader(band));
+        canvas.restore();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TowersPainter old) => true;
 }
