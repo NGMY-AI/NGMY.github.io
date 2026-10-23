@@ -6,31 +6,6 @@ import 'package:flutter/services.dart';
 
 import 'ngmy_studio_kit.dart';
 
-/// A ticker that gives the studios a steady time step.
-mixin _Frames<T extends StatefulWidget> on State<T>, SingleTickerProviderStateMixin<T> {
-  late final Ticker _frameTicker;
-  Duration _lastFrame = Duration.zero;
-  int nowMs = 0;
-
-  void onFrame(double dt);
-
-  void startFrames() {
-    _frameTicker = createTicker((e) {
-      final dt = ((e - _lastFrame).inMicroseconds / 1e6).clamp(0.0, 0.04);
-      _lastFrame = e;
-      nowMs = e.inMilliseconds;
-      onFrame(dt);
-      if (mounted) setState(() {});
-    })..start();
-  }
-
-  @override
-  void dispose() {
-    _frameTicker.dispose();
-    super.dispose();
-  }
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
 // 5. GRAVITY TOY: drop balls, draw walls, tilt gravity, push things around.
 // ═════════════════════════════════════════════════════════════════════════════
@@ -50,7 +25,7 @@ class NgmyGravityStudio extends StatefulWidget {
   State<NgmyGravityStudio> createState() => _NgmyGravityStudioState();
 }
 
-class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTickerProviderStateMixin, StudioFrames {
   final GlobalKey _shot = GlobalKey();
   final List<_GBall> _balls = [];
   final List<(Offset, Offset)> _walls = [];
@@ -65,6 +40,17 @@ class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTicker
   Offset? _wallEnd;
   Offset? _finger;
   int _lastDrop = 0;
+  bool _sound = true;
+  int _lastPlink = 0;
+
+  /// A soft note, higher to the right, louder for a harder hit.
+  void _plink(Offset at, double speed) {
+    if (!_sound || speed < 120 || nowMs - _lastPlink < 55) return;
+    _lastPlink = nowMs;
+    const pent = [0, 2, 4, 7, 9];
+    final i = ((at.dx / (_size.width <= 0 ? 1 : _size.width)) * 10).floor().clamp(0, 9);
+    NgmyTone.playNote('bell', pent[i % 5] + 12 * (i ~/ 5) + 12, ms: 500, volume: (0.15 + speed / 1400).clamp(0.15, 0.6));
+  }
 
   @override
   void initState() {
@@ -116,6 +102,7 @@ class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTicker
         }
         if (b.p.dy > _size.height - b.r) {
           b.p = Offset(b.p.dx, _size.height - b.r);
+          _plink(b.p, b.v.dy.abs());
           b.v = Offset(b.v.dx * 0.98, -b.v.dy * _bounce);
         }
         if (b.p.dy < b.r) {
@@ -135,7 +122,10 @@ class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTicker
             final n = d / dist;
             b.p = q + n * (b.r + 3);
             final vn = b.v.dx * n.dx + b.v.dy * n.dy;
-            if (vn < 0) b.v = b.v - n * (vn * (1 + _bounce));
+            if (vn < 0) {
+              _plink(b.p, -vn);
+              b.v = b.v - n * (vn * (1 + _bounce));
+            }
           }
         }
       }
@@ -154,6 +144,7 @@ class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTicker
             final rel = b.v - a.v;
             final vn = rel.dx * n.dx + rel.dy * n.dy;
             if (vn < 0) {
+              _plink((a.p + b.p) / 2, -vn * 1.2);
               final imp = n * (vn * (1 + _bounce) / 2);
               a.v += imp;
               b.v -= imp;
@@ -229,6 +220,7 @@ class _NgmyGravityStudioState extends State<NgmyGravityStudio> with SingleTicker
         StudioSlider(label: 'Bounce', value: _bounce, min: 0.1, max: 0.98, display: '${(_bounce * 100).round()}%', onChanged: (v) => setState(() => _bounce = v), color: const Color(0xFF38BDF8)),
         StudioSlider(label: 'Ball size', value: _ballSize, min: 6, max: 30, display: _ballSize.round().toString(), onChanged: (v) => setState(() => _ballSize = v), color: const Color(0xFF38BDF8)),
         StudioRow(children: [
+          StudioChip(label: 'Sound', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFF38BDF8), onTap: () => setState(() => _sound = !_sound)),
           StudioButton(icon: Icons.grain_rounded, label: 'Rain', color: const Color(0xFF38BDF8), onTap: () {
             for (var i = 0; i < 28; i++) {
               _spawn(Offset(20 + _rnd.nextDouble() * (_size.width - 40), 10 + _rnd.nextDouble() * 60));
@@ -281,6 +273,8 @@ class _Planet {
   final double r;
   final Color color;
   final List<Offset> trail = [];
+  double prevX = 0;
+  int lastRing = -1000;
 }
 
 class NgmyOrbitStudio extends StatefulWidget {
@@ -290,7 +284,7 @@ class NgmyOrbitStudio extends StatefulWidget {
   State<NgmyOrbitStudio> createState() => _NgmyOrbitStudioState();
 }
 
-class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProviderStateMixin, StudioFrames {
   final GlobalKey _shot = GlobalKey();
   final List<_Planet> _planets = [];
   final math.Random _rnd = math.Random();
@@ -302,6 +296,7 @@ class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProv
   double _planetSize = 7;
   Offset? _aimStart;
   Offset? _aimEnd;
+  bool _sound = true;
 
   Offset get _center => Offset(_size.width / 2, _size.height / 2);
   double get _mu => 1000000.0 * _sun;
@@ -368,6 +363,21 @@ class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProv
       }
     }
     // A planet that hits the sun is swallowed, and one that flies far away is lost.
+    for (final p in _planets) {
+      // Each time a planet swings past the top of the sun it rings; farther out is lower.
+      final above = p.p.dy < c.dy;
+      final cross = above && (p.p.dx - c.dx).sign != (p.prevX - c.dx).sign && (p.p - c).distance < _size.shortestSide;
+      if (cross && _sound && nowMs - p.lastRing > 250) {
+        p.lastRing = nowMs;
+        final r = ((p.p - c).distance / (_size.shortestSide / 2)).clamp(0.0, 1.0);
+        const pent = [0, 2, 4, 7, 9, 12, 14, 16];
+        final i = ((1 - r) * (pent.length - 1)).round();
+        NgmyTone.playNote('bell', pent[i] + 12, ms: 900, volume: 0.4);
+      }
+      p.prevX = p.p.dx;
+    }
+    final lost = _planets.where((p) => (p.p - c).distance < 16).length;
+    if (lost > 0 && _sound) NgmyTone.play(70, ms: 300, sweep: 0.6, volume: 0.8);
     _planets.removeWhere((p) => (p.p - c).distance < 16 || (p.p - c).distance > _size.longestSide * 2.2);
   }
 
@@ -413,6 +423,7 @@ class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProv
               if (_aimStart != null && (_aimStart! - _aimEnd!).distance > 8) {
                 _planets.add(_Planet(_aimStart!, _launchVelocity, _planetSize, _randomColor()));
                 HapticFeedback.lightImpact();
+                if (_sound) NgmyTone.play(200, ms: 380, wave: 'tri', sweep: 2.2, volume: 0.35);
               }
               _aimStart = null;
               _aimEnd = null;
@@ -429,6 +440,7 @@ class _NgmyOrbitStudioState extends State<NgmyOrbitStudio> with SingleTickerProv
         StudioSlider(label: 'Time', value: _speed, min: 0.2, max: 3, display: '${_speed.toStringAsFixed(1)}x', onChanged: (v) => setState(() => _speed = v), color: const Color(0xFFFB923C)),
         StudioSlider(label: 'Planet size', value: _planetSize, min: 3, max: 16, display: _planetSize.round().toString(), onChanged: (v) => setState(() => _planetSize = v), color: const Color(0xFFFB923C)),
         StudioRow(children: [
+          StudioChip(label: 'Sound', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFFFB923C), onTap: () => setState(() => _sound = !_sound)),
           StudioChip(label: 'Trails', icon: Icons.timeline_rounded, selected: _trails, color: const Color(0xFFFB923C), onTap: () => setState(() => _trails = !_trails)),
           StudioChip(label: 'Planets pull each other', icon: Icons.hub_rounded, selected: _pull, color: const Color(0xFFFB923C), onTap: () => setState(() => _pull = !_pull)),
         ]),
@@ -508,7 +520,7 @@ class NgmySwarmStudio extends StatefulWidget {
   State<NgmySwarmStudio> createState() => _NgmySwarmStudioState();
 }
 
-class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProviderStateMixin, StudioFrames {
   final GlobalKey _shot = GlobalKey();
   final List<_Boid> _boids = [];
   final List<(Offset, int)> _food = [];
@@ -522,6 +534,8 @@ class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProv
   String _mode = 'attract';
   String _skin = 'fish';
   Offset? _finger;
+  bool _sound = true;
+  int _lastScare = 0;
 
   @override
   void initState() {
@@ -594,7 +608,13 @@ class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProv
       b.p += b.v * dt;
     }
     // Fish eat the food they reach.
+    final before = _food.length;
     _food.removeWhere((f) => _boids.where((b) => (b.p - f.$1).distance < 14).length >= 3);
+    if (_food.length < before && _sound) NgmyTone.playNote('bell', 12 + _rnd.nextInt(8) * 2, ms: 700, volume: 0.45);
+    if (_finger != null && (_mode == 'scare' || _mode == 'hunt') && _sound && nowMs - _lastScare > 420) {
+      _lastScare = nowMs;
+      NgmyTone.playNote('pluck', _mode == 'hunt' ? -12 : -5, ms: 400, volume: 0.45);
+    }
   }
 
   @override
@@ -615,7 +635,11 @@ class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProv
             onPanEnd: (_) => _finger = null,
             onTapDown: (d) {
               _finger = d.localPosition;
-              if (_mode == 'food') _food.add((d.localPosition, nowMs));
+              if (_mode == 'food') {
+                _food.add((d.localPosition, nowMs));
+                if (_sound) NgmyTone.play(520, ms: 140, sweep: -0.5, volume: 0.35);
+              }
+              if (_mode == 'attract' && _sound) NgmyTone.playNote('flute', 7, ms: 500, volume: 0.3);
             },
             onTapUp: (_) => _finger = null,
             onTapCancel: () => _finger = null,
@@ -634,6 +658,9 @@ class _NgmySwarmStudioState extends State<NgmySwarmStudio> with SingleTickerProv
                   _skin = s.$1;
                   _boids.clear();
                 })),
+        ]),
+        StudioRow(children: [
+          StudioChip(label: 'Sound', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFF4ADE80), onTap: () => setState(() => _sound = !_sound)),
         ]),
         StudioSlider(label: 'How many', value: _count, min: 15, max: 150, display: _count.round().toString(), onChanged: (v) => setState(() => _count = v), color: const Color(0xFF4ADE80)),
         StudioSlider(label: 'Together', value: _cohesion, max: 2.5, onChanged: (v) => setState(() => _cohesion = v), color: const Color(0xFF4ADE80)),
@@ -742,7 +769,7 @@ class NgmyFireworkStudio extends StatefulWidget {
   State<NgmyFireworkStudio> createState() => _NgmyFireworkStudioState();
 }
 
-class _NgmyFireworkStudioState extends State<NgmyFireworkStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmyFireworkStudioState extends State<NgmyFireworkStudio> with SingleTickerProviderStateMixin, StudioFrames {
   final GlobalKey _shot = GlobalKey();
   final List<_Rocket> _rockets = [];
   final List<_FP> _parts = [];
@@ -973,7 +1000,7 @@ class NgmyChainBurstStudio extends StatefulWidget {
   State<NgmyChainBurstStudio> createState() => _NgmyChainBurstStudioState();
 }
 
-class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmyChainBurstStudioState extends State<NgmyChainBurstStudio> with SingleTickerProviderStateMixin, StudioFrames {
   final List<_Dot> _dots = [];
   final math.Random _rnd = math.Random();
   Size _size = Size.zero;
@@ -1171,7 +1198,7 @@ class NgmyBeatStudio extends StatefulWidget {
   State<NgmyBeatStudio> createState() => _NgmyBeatStudioState();
 }
 
-class _NgmyBeatStudioState extends State<NgmyBeatStudio> with SingleTickerProviderStateMixin, _Frames {
+class _NgmyBeatStudioState extends State<NgmyBeatStudio> with SingleTickerProviderStateMixin, StudioFrames {
   static const _rows = ['Kick', 'Snare', 'Hat', 'Clap', 'Bell'];
   static const _colors = [Color(0xFFF87171), Color(0xFFFACC15), Color(0xFF38BDF8), Color(0xFFA78BFA), Color(0xFF4ADE80)];
   static const _pent = [0, 2, 4, 7, 9, 12, 9, 7];

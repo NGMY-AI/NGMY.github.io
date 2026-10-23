@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -50,6 +51,30 @@ class _NgmySparkPainterStudioState extends State<NgmySparkPainterStudio> with Si
   Color _bg = const Color(0xFF0B0B10);
   _PStroke? _cur;
   bool _touched = false;
+  bool _sound = true;
+  int _lastNote = 0;
+
+  /// Higher on the screen is a higher note; each brush has its own voice.
+  void _noteFor(Offset p, {bool force = false}) {
+    if (!_sound || (!force && _now - _lastNote < 120)) return;
+    _lastNote = _now;
+    final h = MediaQuery.of(context).size.height * 0.7;
+    final idx = ((1 - p.dy / h) * 10).floor().clamp(0, 9);
+    const pent = [0, 2, 4, 7, 9];
+    final semis = pent[idx % 5] + 12 * (idx ~/ 5) + 12;
+    switch (_brush) {
+      case 'glow':
+        NgmyTone.playNote('synth', semis, ms: 420, volume: 0.3);
+      case 'rainbow':
+        NgmyTone.playNote('bell', semis, ms: 700, volume: 0.35);
+      case 'stars':
+        NgmyTone.playNote('pluck', semis + 12, ms: 400, volume: 0.4);
+      case 'sparks':
+        NgmyTone.play(2400 + _rnd.nextInt(2000).toDouble(), ms: 60, wave: 'noise', volume: 0.18);
+      default:
+        NgmyTone.play(110 + _rnd.nextInt(60).toDouble(), ms: 140, wave: 'noise', volume: 0.22);
+    }
+  }
 
   @override
   void initState() {
@@ -99,6 +124,7 @@ class _NgmySparkPainterStudioState extends State<NgmySparkPainterStudio> with Si
       _strokes.add(_cur!);
     }
     _emit(p);
+    _noteFor(p, force: true);
     setState(() {});
   }
 
@@ -106,6 +132,7 @@ class _NgmySparkPainterStudioState extends State<NgmySparkPainterStudio> with Si
     final c = _cur;
     if (c != null && (c.pts.isEmpty || (c.pts.last - p).distance > 2.5)) c.pts.add(p);
     _emit(p);
+    _noteFor(p);
   }
 
   void _end() {
@@ -149,6 +176,7 @@ class _NgmySparkPainterStudioState extends State<NgmySparkPainterStudio> with Si
         ]),
         StudioSlider(label: 'Size', value: _size, min: 4, max: 36, display: _size.round().toString(), onChanged: (v) => setState(() => _size = v), color: const Color(0xFFF472B6)),
         StudioRow(children: [
+          StudioChip(label: 'Sound', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFFF472B6), onTap: () => setState(() => _sound = !_sound)),
           StudioButton(icon: Icons.undo_rounded, label: 'Undo', onTap: () => setState(() {
                 if (_strokes.isNotEmpty) _strokes.removeLast();
               })),
@@ -260,6 +288,9 @@ class _NgmyMandalaStudioState extends State<NgmyMandalaStudio> with SingleTicker
   int _color = 3;
   Size _size = Size.zero;
   _MStroke? _cur;
+  bool _sound = true;
+  double _walked = 0;
+  int _noteIdx = 0;
 
   @override
   void initState() {
@@ -307,7 +338,14 @@ class _NgmyMandalaStudioState extends State<NgmyMandalaStudio> with SingleTicker
               setState(() {});
             },
             onPanUpdate: (d) {
+              final prev = _cur?.pts.isEmpty ?? true ? null : _cur!.pts.last;
               _cur?.pts.add(_rel(d.localPosition));
+              if (prev != null) _walked += (_rel(d.localPosition) - prev).distance;
+              if (_sound && _walked > 46) {
+                _walked = 0;
+                const pent = [0, 2, 4, 7, 9, 12, 14, 16];
+                NgmyTone.playNote('bell', pent[_noteIdx++ % pent.length] + 12, ms: 800, volume: 0.35);
+              }
               setState(() {});
             },
             onPanEnd: (_) => _cur = null,
@@ -325,6 +363,7 @@ class _NgmyMandalaStudioState extends State<NgmyMandalaStudio> with SingleTicker
           StudioChip(label: 'Mirror', icon: Icons.flip_rounded, selected: _mirror, color: const Color(0xFFA78BFA), onTap: () => setState(() => _mirror = !_mirror)),
           StudioChip(label: 'Spin', icon: Icons.autorenew_rounded, selected: _auto, color: const Color(0xFFA78BFA), onTap: () => setState(() => _auto = !_auto)),
           StudioChip(label: 'Rainbow', icon: Icons.palette_rounded, selected: _rainbow, color: const Color(0xFFA78BFA), onTap: () => setState(() => _rainbow = !_rainbow)),
+          StudioChip(label: 'Sound', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFFA78BFA), onTap: () => setState(() => _sound = !_sound)),
         ]),
         StudioRow(children: [
           for (var i = 0; i < kStudioColors.length; i++) StudioSwatch(color: kStudioColors[i], selected: !_rainbow && _color == i, onTap: () => setState(() {
@@ -416,6 +455,36 @@ class _NgmyTitleStudioState extends State<NgmyTitleStudio> with SingleTickerProv
   int _color = 3;
   double _size = 56;
   int _bg = 0;
+  bool _sound = true;
+  double _prevT = 0;
+
+  
+  void initState() {
+    super.initState();
+    _c.addListener(_hear);
+  }
+
+  /// A note as each letter arrives (a click for the typewriter).
+  void _hear() {
+    final t = _c.value;
+    final n = math.max(1, _text.text.characters.length);
+    if (_sound && t >= _prevT) {
+      const pent = [0, 2, 4, 7, 9, 12, 14, 16];
+      for (var i = 0; i < n; i++) {
+        final at = _anim == 'type' ? i / n / 1.6 : (n <= 1 ? 0.0 : i / (n - 1) * 0.45);
+        if (_prevT < at && t >= at) {
+          if (_anim == 'type') {
+            NgmyTone.play(1500, ms: 35, wave: 'square', volume: 0.18);
+          } else if (_anim == 'glitch') {
+            NgmyTone.play(400 + i * 60.0, ms: 70, wave: 'square', volume: 0.2);
+          } else {
+            NgmyTone.playNote(_anim == 'neon' ? 'synth' : 'pluck', pent[i % pent.length] + 12, ms: 450, volume: 0.35);
+          }
+        }
+      }
+    }
+    _prevT = t;
+  }
 
   static const _bgs = [
     [Color(0xFF0B0B10), Color(0xFF0B0B10)],
@@ -499,6 +568,9 @@ class _NgmyTitleStudioState extends State<NgmyTitleStudio> with SingleTickerProv
         StudioRow(label: 'COLOUR', children: [
           for (var i = 0; i < kStudioColors.length; i++) StudioSwatch(color: kStudioColors[i], selected: _color == i, onTap: () => setState(() => _color = i)),
         ]),
+        StudioRow(label: 'SOUND', children: [
+          StudioChip(label: _sound ? 'On' : 'Off', icon: _sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, selected: _sound, color: const Color(0xFFFACC15), onTap: () => setState(() => _sound = !_sound)),
+        ]),
         StudioRow(label: 'BACK', children: [
           for (var i = 0; i < _bgs.length; i++) StudioSwatch(color: _bgs[i][0], selected: _bg == i, onTap: () => setState(() => _bg = i)),
           const SizedBox(width: 6),
@@ -579,6 +651,15 @@ class _NgmyPaletteStudioState extends State<NgmyPaletteStudio> {
   double _angle = 45;
   String _mode = 'analogous';
   final List<bool> _locked = List.filled(5, false);
+  final List<Timer> _timers = [];
+
+  @override
+  void dispose() {
+    for (final t in _timers) {
+      t.cancel();
+    }
+    super.dispose();
+  }
   late List<Color> _colors = _make();
 
   List<Color> _make() {
@@ -594,6 +675,18 @@ class _NgmyPaletteStudioState extends State<NgmyPaletteStudio> {
         return [h(20, 0.9, 1), h(340, 0.8, 0.95), h(300, 0.7, 0.8), h(260, 0.7, 0.6), h(230, 0.8, 0.4)];
       default:
         return [for (var i = 0; i < 5; i++) h(_hue + (i - 2) * 22, _sat, _val - i * 0.03)];
+    }
+  }
+
+  /// A colour as a note: red is low, violet is high.
+  void _hear(Color c, {int delayMs = 0}) {
+    final hue = HSVColor.fromColor(c).hue;
+    const pent = [0, 2, 4, 7, 9, 12, 14];
+    final semis = pent[(hue / 360 * pent.length).floor().clamp(0, pent.length - 1)] + 12;
+    if (delayMs == 0) {
+      NgmyTone.playNote('bell', semis, ms: 900, volume: 0.5);
+    } else {
+      _timers.add(Timer(Duration(milliseconds: delayMs), () => NgmyTone.playNote('bell', semis, ms: 900, volume: 0.5)));
     }
   }
 
@@ -642,7 +735,10 @@ class _NgmyPaletteStudioState extends State<NgmyPaletteStudio> {
           for (var i = 0; i < 5; i++)
             Expanded(
               child: GestureDetector(
-                onTap: () => _copy(_hex(_colors[i]), _hex(_colors[i])),
+                onTap: () {
+                  _hear(_colors[i]);
+                  _copy(_hex(_colors[i]), _hex(_colors[i]));
+                },
                 child: Container(
                   height: 112,
                   margin: EdgeInsets.only(right: i == 4 ? 0 : 8),
@@ -697,6 +793,9 @@ class _NgmyPaletteStudioState extends State<NgmyPaletteStudio> {
           StudioButton(icon: Icons.shuffle_rounded, label: 'Shuffle', color: const Color(0xFF2DD4BF), onTap: () {
             _hue = _rnd.nextDouble() * 360;
             _regen();
+            for (var i = 0; i < _colors.length; i++) {
+              _hear(_colors[i], delayMs: 120 * i);
+            }
           }),
           StudioButton(icon: Icons.css_rounded, label: 'Copy CSS', onTap: () => _copy('linear-gradient(${_angle.round()}deg, ${_colors.map(_hex).join(', ')})', 'CSS')),
           StudioButton(icon: Icons.code_rounded, label: 'Copy Flutter', onTap: () => _copy('LinearGradient(colors: [${_colors.map((c) => 'Color(0xFF${_hex(c).substring(1)})').join(', ')}])', 'Flutter code')),

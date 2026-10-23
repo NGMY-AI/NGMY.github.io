@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
@@ -6,6 +7,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -258,14 +260,78 @@ Future<void> studioShare(BuildContext context, GlobalKey boundaryKey, {String na
   }
 }
 
-/// A short musical tone made on the fly (no sound files needed). Fails quietly if sound is not available.
+/// Gives a studio a steady clock: [onFrame] is called every frame with the time step, and the
+/// studio redraws after it. [nowMs] counts up from when the studio opened.
+mixin StudioFrames<T extends StatefulWidget> on State<T>, SingleTickerProviderStateMixin<T> {
+  late final Ticker _frameTicker;
+  Duration _lastFrame = Duration.zero;
+  int nowMs = 0;
+
+  void onFrame(double dt);
+
+  final List<Timer> _laterTimers = [];
+
+  /// Runs [fn] after [ms], and cancels it if the studio is closed first.
+  void later(int ms, VoidCallback fn) {
+    late final Timer t;
+    t = Timer(Duration(milliseconds: ms), () {
+      _laterTimers.remove(t);
+      if (mounted) fn();
+    });
+    _laterTimers.add(t);
+  }
+
+  void startFrames() {
+    _frameTicker = createTicker((e) {
+      final dt = ((e - _lastFrame).inMicroseconds / 1e6).clamp(0.0, 0.04);
+      _lastFrame = e;
+      nowMs = e.inMilliseconds;
+      onFrame(dt);
+      if (mounted) setState(() {});
+    })..start();
+  }
+
+  @override
+  void dispose() {
+    for (final t in _laterTimers) {
+      t.cancel();
+    }
+    _frameTicker.dispose();
+    super.dispose();
+  }
+}
+
+/// Musical scales as semitone steps above the root.
+const Map<String, List<int>> kStudioScales = {
+  'Pentatonic': [0, 2, 4, 7, 9],
+  'Major': [0, 2, 4, 5, 7, 9, 11],
+  'Minor': [0, 2, 3, 5, 7, 8, 10],
+  'Blues': [0, 3, 5, 6, 7, 10],
+  'Dreamy': [0, 2, 4, 6, 7, 9, 11],
+};
+
+/// The instruments every studio can play. Each is built from sound waves, so no sound files are needed.
+const List<(String, String)> kStudioInstruments = [
+  ('piano', 'Piano'),
+  ('organ', 'Organ'),
+  ('bell', 'Bell'),
+  ('pluck', 'Pluck'),
+  ('synth', 'Synth'),
+  ('flute', 'Flute'),
+];
+
+/// Sounds made on the fly (no sound files). They fail quietly if sound is not available, and the
+/// visuals still play.
 class NgmyTone {
   static final Map<String, Uint8List> _cache = {};
   static final List<AudioPlayer> _pool = [];
   static int _next = 0;
   static bool enabled = true;
 
-  static Uint8List _wav(double freq, int ms, String wave, double sweep) {
+  /// The note names C, C#, D … B.
+  static const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  static Uint8List _wav(double freq, int ms, String wave, double sweep, String inst) {
     const rate = 22050;
     final n = rate * ms ~/ 1000;
     final data = ByteData(44 + n * 2);
@@ -290,30 +356,88 @@ class NgmyTone {
     data.setUint32(40, n * 2, Endian.little);
     final rnd = math.Random(3);
     var phase = 0.0;
+    // For instruments: the strength of each overtone, and how fast the sound dies away.
+    List<double> partials = const [1];
+    List<double> ratios = const [1];
+    var decay = 3.0;
+    var attack = 0.006;
+    var sustain = false;
+    var breath = 0.0;
+    switch (inst) {
+      case 'piano':
+        partials = const [1, 0.55, 0.32, 0.2, 0.12, 0.07];
+        ratios = const [1, 2, 3, 4, 5, 6];
+        decay = 3.4;
+      case 'organ':
+        partials = const [1, 0.6, 0.45, 0.3, 0.22, 0.15];
+        ratios = const [1, 2, 3, 4, 6, 8];
+        attack = 0.02;
+        sustain = true;
+      case 'bell':
+        partials = const [1, 0.6, 0.38, 0.22, 0.12];
+        ratios = const [1, 2.76, 5.4, 8.93, 13.3];
+        decay = 2.4;
+      case 'pluck':
+        partials = const [1, 0.7, 0.45, 0.28, 0.16, 0.1, 0.06];
+        ratios = const [1, 2, 3, 4, 5, 6, 7];
+        decay = 7;
+      case 'synth':
+        partials = const [1, 0.5, 0.33, 0.25, 0.2, 0.16, 0.14, 0.12];
+        ratios = const [1, 2, 3, 4, 5, 6, 7, 8];
+        attack = 0.012;
+        sustain = true;
+      case 'flute':
+        partials = const [1, 0.18, 0.06];
+        ratios = const [1, 2, 3];
+        attack = 0.07;
+        sustain = true;
+        breath = 0.035;
+    }
+    final phases = List<double>.filled(partials.length, 0);
     for (var i = 0; i < n; i++) {
       final t = i / n;
+      final secs = i / rate;
       final f = freq * (1 + sweep * (1 - t));
-      phase += 2 * math.pi * f / rate;
-      var s = switch (wave) {
-        'square' => math.sin(phase) >= 0 ? 0.6 : -0.6,
-        'noise' => (rnd.nextDouble() * 2 - 1) * 0.8,
-        'tri' => (2 / math.pi) * math.asin(math.sin(phase)),
-        _ => math.sin(phase),
-      };
-      // A quick attack and a smooth fade so it does not click.
-      final env = math.min(1.0, i / 120) * math.pow(1 - t, 1.6);
-      s *= env * 0.8;
-      data.setInt16(44 + i * 2, (s * 32000).round().clamp(-32768, 32767), Endian.little);
+      double s;
+      if (inst.isNotEmpty) {
+        s = 0;
+        for (var k = 0; k < partials.length; k++) {
+          phases[k] += 2 * math.pi * f * ratios[k] / rate;
+          // Higher overtones fade a little faster, like a real string or bell.
+          final d = inst == 'bell' || inst == 'piano' || inst == 'pluck' ? math.exp(-decay * secs * (1 + k * 0.35)) : 1.0;
+          s += math.sin(phases[k]) * partials[k] * d;
+        }
+        s /= 1.9;
+        if (breath > 0) s += (rnd.nextDouble() * 2 - 1) * breath;
+        final atk = math.min(1.0, secs / attack);
+        final tail = math.min(1.0, (n - i) / (rate * 0.09));
+        final env = sustain ? atk * tail : atk * tail * math.exp(-decay * 0.12 * secs);
+        s *= env;
+      } else {
+        phase += 2 * math.pi * f / rate;
+        s = switch (wave) {
+          'square' => math.sin(phase) >= 0 ? 0.6 : -0.6,
+          'noise' => (rnd.nextDouble() * 2 - 1) * 0.8,
+          'tri' => (2 / math.pi) * math.asin(math.sin(phase)),
+          _ => math.sin(phase),
+        };
+        // A quick attack and a smooth fade so it does not click.
+        final env = math.min(1.0, i / 120) * math.pow(1 - t, 1.6);
+        s *= env;
+      }
+      data.setInt16(44 + i * 2, (s * 0.8 * 32000).round().clamp(-32768, 32767), Endian.little);
     }
     return data.buffer.asUint8List();
   }
 
-  static Future<void> play(double freq, {int ms = 180, String wave = 'sine', double sweep = 0, double volume = 0.7}) async {
+  /// Plays a sound. [inst] picks an instrument (piano, organ, bell, pluck, synth, flute); without
+  /// one, [wave] (sine, square, tri, noise) makes a plain tone or a drum-like hit.
+  static Future<void> play(double freq, {int ms = 180, String wave = 'sine', double sweep = 0, double volume = 0.7, String inst = ''}) async {
     if (!enabled) return;
     try {
-      final key = '${freq.round()}|$ms|$wave|$sweep';
-      final bytes = _cache.putIfAbsent(key, () => _wav(freq, ms, wave, sweep));
-      if (_pool.length < 8) _pool.add(AudioPlayer()..setReleaseMode(ReleaseMode.stop));
+      final key = '${freq.round()}|$ms|$wave|$sweep|$inst';
+      final bytes = _cache.putIfAbsent(key, () => _wav(freq, ms, wave, sweep, inst));
+      if (_pool.length < 12) _pool.add(AudioPlayer()..setReleaseMode(ReleaseMode.stop));
       final p = _pool[_next++ % _pool.length];
       await p.play(BytesSource(bytes), volume: volume);
     } catch (_) {
@@ -321,8 +445,49 @@ class NgmyTone {
     }
   }
 
+  /// A note on an instrument, by semitones above middle C.
+  static Future<void> playNote(String inst, int semis, {int ms = 600, double volume = 0.7}) => play(note(semis), ms: ms, inst: inst, volume: volume);
+
+  /// Several notes at the same moment.
+  static void chord(String inst, List<int> semis, {int ms = 900, double volume = 0.5}) {
+    for (final s in semis) {
+      playNote(inst, s, ms: ms, volume: volume);
+    }
+  }
+
   /// A note by its number of semitones above middle C.
   static double note(int semis) => 261.63 * math.pow(2, semis / 12).toDouble();
 
-  static bool get supported => !kIsWeb || true;
+  static String nameOf(int semis) => names[((semis % 12) + 12) % 12];
+
+  /// Drum sounds, by name.
+  static void drum(String kind, {double volume = 0.8, int kit = 0}) {
+    final k = kit == 1 ? 1.25 : (kit == 2 ? 0.8 : 1.0);
+    switch (kind) {
+      case 'kick':
+        play(95 * k, ms: 200, sweep: 1.8, volume: volume);
+      case 'snare':
+        play(220 * k, ms: 140, wave: 'noise', volume: volume * 0.65);
+      case 'hat':
+        play(5000, ms: 50, wave: 'noise', volume: volume * 0.35);
+      case 'open':
+        play(5200, ms: 220, wave: 'noise', volume: volume * 0.35);
+      case 'clap':
+        play(1100 * k, ms: 100, wave: 'noise', volume: volume * 0.5);
+      case 'tom':
+        play(150 * k, ms: 230, sweep: 1.0, volume: volume);
+      case 'low':
+        play(100 * k, ms: 260, sweep: 0.9, volume: volume);
+      case 'rim':
+        play(1700 * k, ms: 60, wave: 'square', volume: volume * 0.4);
+      case 'cow':
+        play(820 * k, ms: 240, wave: 'square', volume: volume * 0.3);
+      case 'crash':
+        play(3200, ms: 650, wave: 'noise', volume: volume * 0.4);
+      case 'shake':
+        play(7000, ms: 90, wave: 'noise', volume: volume * 0.3);
+      default:
+        play(60 * k, ms: 300, wave: 'sine', volume: volume);
+    }
+  }
 }

@@ -3,7 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_core_reaction_lab.dart';
 import 'package:ngmy/ngmy_core_studios_a.dart';
+import 'package:ngmy/ngmy_core_circuit_lab.dart';
+import 'package:ngmy/ngmy_core_note_lab.dart';
 import 'package:ngmy/ngmy_core_studios_b.dart';
+import 'package:ngmy/ngmy_core_studios_c.dart';
+import 'package:ngmy/ngmy_core_studios_e.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -74,6 +78,51 @@ void main() {
   testWidgets('Chain Burst', (t) => _play(t, const NgmyChainBurstStudio(), 'chain'));
   testWidgets('Beat Maker', (t) => _play(t, const NgmyBeatStudio(), 'beat'));
   testWidgets('Reaction Lab', (t) => _play(t, const NgmyReactionLabScreen(), 'lab'));
+
+  testWidgets('Piano Studio', (t) => _play(t, const NgmyPianoStudio(), 'piano'));
+  testWidgets('Drum Pads', (t) => _play(t, const NgmyDrumStudio(), 'drums'));
+  testWidgets('Chord Lab', (t) => _play(t, const NgmyChordStudio(), 'chords'));
+  testWidgets('Name Melody', (t) => _play(t, const NgmyNameMelodyStudio(), 'name'));
+  testWidgets('Circuit Lab', (t) => _play(t, const NgmyCircuitStudio(), 'circuit'));
+  testWidgets('Note Lab', (t) => _play(t, const NgmyNoteLabScreen(), 'note lab'));
+  testWidgets('Marble Music', (t) => _play(t, const NgmyMarbleStudio(), 'marble'));
+  testWidgets('Orbit Sequencer', (t) => _play(t, const NgmyOrbitSequencerStudio(), 'orbit seq'));
+  testWidgets('Life Melody', (t) => _play(t, const NgmyLifeMelodyStudio(), 'life'));
+  testWidgets('Pendulum Waves', (t) => _play(t, const NgmyPendulumStudio(), 'pendulum'));
+
+  test('every piano song fits on the two octaves of the keyboard, and Twinkle starts right', () {
+    for (var i = 0; i < ngmySongCount; i++) {
+      final notes = ngmyParseSong(ngmySongNotes(i));
+      expect(notes, isNotEmpty);
+      for (final n in notes) {
+        expect(n.$1, inInclusiveRange(0, 23), reason: 'song $i has a note off the keyboard');
+        expect(n.$2, greaterThan(0));
+      }
+    }
+    final twinkle = ngmyParseSong(ngmySongNotes(0)).take(7).map((n) => n.$1).toList();
+    expect(twinkle, [0, 0, 7, 7, 9, 9, 7]);
+  });
+
+  testWidgets('Circuit Lab: the AND example loads, and a challenge can be checked', (tester) async {
+    tester.view.physicalSize = const Size(430, 932);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(home: NgmyCircuitStudio()));
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    await tester.ensureVisible(find.text('Both together'));
+    await tester.tap(find.text('Both together'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Check'), findsOneWidget);
+    await tester.tap(find.text('Check'));
+    await tester.pump(const Duration(milliseconds: 200));
+    // Nothing is wired yet, so it must not pass.
+    expect(find.textContaining('Not yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Palette Lab makes five matching colours and copies the code', (tester) async {
     tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, (call) async => null);

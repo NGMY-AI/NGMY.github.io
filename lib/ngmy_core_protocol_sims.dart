@@ -6,7 +6,11 @@ import 'package:flutter/material.dart';
 
 import 'ngmy_core_reaction_lab.dart';
 import 'ngmy_core_studios_a.dart';
+import 'ngmy_core_circuit_lab.dart';
+import 'ngmy_core_note_lab.dart';
 import 'ngmy_core_studios_b.dart';
+import 'ngmy_core_studios_c.dart';
+import 'ngmy_core_studios_e.dart';
 import 'ngmy_studio_kit.dart';
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
@@ -173,6 +177,42 @@ const _kSequences = <_UnfoldMeta>[
     labels: ['Music', 'Spark', 'Party'],
     subs: ['The first beat', 'Lights flash', 'Hands up'],
   ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.accordion,
+    title: 'HEALTH PATH',
+    blurb: 'Eat well, move, and get checked',
+    colors: [Color(0xFF4ADE80), Color(0xFF166534)],
+    icons: [Icons.restaurant_rounded, Icons.fitness_center_rounded, Icons.local_hospital_rounded],
+    labels: ['Eat', 'Move', 'Check'],
+    subs: ['Good food daily', 'Stay strong', 'See the doctor'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.flip,
+    title: 'SCHOOL DAY',
+    blurb: 'Learn, read and graduate',
+    colors: [Color(0xFFFACC15), Color(0xFFA16207)],
+    icons: [Icons.school_rounded, Icons.menu_book_rounded, Icons.workspace_premium_rounded],
+    labels: ['Learn', 'Read', 'Graduate'],
+    subs: ['Go to class', 'Open the book', 'Walk the stage'],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.towers,
+    title: 'MARKET RUN',
+    blurb: 'Shop, deliver and get paid',
+    colors: [Color(0xFFF472B6), Color(0xFF9D174D)],
+    icons: [Icons.shopping_bag_rounded, Icons.local_shipping_rounded, Icons.payments_rounded],
+    labels: ['Shop', 'Deliver', 'Paid'],
+    subs: ['', '', ''],
+  ),
+  _UnfoldMeta(
+    style: _UnfoldStyle.assemble,
+    title: 'FAMILY TIES',
+    blurb: 'Family, a birthday and a celebration',
+    colors: [Color(0xFF38BDF8), Color(0xFF0369A1)],
+    icons: [Icons.family_restroom_rounded, Icons.cake_rounded, Icons.celebration_rounded],
+    labels: ['Family', 'Birthday', 'Party'],
+    subs: ['All together', 'Make a wish', 'Cheers!'],
+  ),
 ];
 
 class _NgmyCoreProtocolSimsScreenState extends State<NgmyCoreProtocolSimsScreen> {
@@ -222,6 +262,16 @@ final List<_StudioDef> _kStudios = [
   _StudioDef('BEAT MAKER', 'Build a loop and hear it', Icons.graphic_eq_rounded, const Color(0xFF4ADE80), () => const NgmyBeatStudio()),
   _StudioDef('PALETTE LAB', 'Colours that go together', Icons.palette_rounded, const Color(0xFF2DD4BF), () => const NgmyPaletteStudio()),
   _StudioDef('TITLE ANIMATOR', 'Make a moving title', Icons.title_rounded, const Color(0xFFFACC15), () => const NgmyTitleStudio()),
+  _StudioDef('PIANO STUDIO', 'Play and learn songs', Icons.piano_rounded, const Color(0xFFFACC15), () => const NgmyPianoStudio()),
+  _StudioDef('DRUM PADS', 'Tap and record a loop', Icons.album_rounded, const Color(0xFFF87171), () => const NgmyDrumStudio()),
+  _StudioDef('CHORD LAB', 'Learn how chords work', Icons.library_music_rounded, const Color(0xFFA78BFA), () => const NgmyChordStudio()),
+  _StudioDef('NOTE LAB', 'Connect notes, hear music', Icons.cable_rounded, const Color(0xFF4ADE80), () => const NgmyNoteLabScreen()),
+  _StudioDef('CIRCUIT LAB', 'Connect logic, learn it', Icons.memory_rounded, const Color(0xFF60A5FA), () => const NgmyCircuitStudio()),
+  _StudioDef('MARBLE MUSIC', 'Marbles ring the notes', Icons.blur_circular_rounded, const Color(0xFF22D3EE), () => const NgmyMarbleStudio()),
+  _StudioDef('ORBIT SEQUENCER', 'Planets play the tune', Icons.track_changes_rounded, const Color(0xFFA78BFA), () => const NgmyOrbitSequencerStudio()),
+  _StudioDef('LIFE MELODY', 'Music that grows alive', Icons.bubble_chart_rounded, const Color(0xFF4ADE80), () => const NgmyLifeMelodyStudio()),
+  _StudioDef('NAME MELODY', 'Your name as a tune', Icons.record_voice_over_rounded, const Color(0xFFF472B6), () => const NgmyNameMelodyStudio()),
+  _StudioDef('PENDULUM WAVES', 'Swinging notes drift', Icons.vibration_rounded, const Color(0xFFFB923C), () => const NgmyPendulumStudio()),
 ];
 
 class _SequencePicker extends StatelessWidget {
@@ -609,6 +659,45 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
   late List<String> _subs = List.of(widget.meta.subs);
   double _speed = 1.0;
   bool _playing = true;
+  bool _sound = true;
+  double _prevT = 0;
+  bool _chimed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _seq.addListener(_soundTick);
+  }
+
+  /// A note as each slab arrives, and a chord when the whole scene has settled.
+  void _soundTick() {
+    final t = _seq.value;
+    if (t < _prevT) {
+      _prevT = 0;
+      _chimed = false;
+    }
+    if (_sound && _playing) {
+      final starts = switch (_style) {
+        _UnfoldStyle.accordion => const [0.04, 0.2, 0.36],
+        _UnfoldStyle.flip => const [0.05, 0.2, 0.35],
+        _UnfoldStyle.towers => const [0.04, 0.17, 0.3],
+        _UnfoldStyle.assemble => const [0.04, 0.2, 0.36],
+      };
+      const notes = [0, 4, 7];
+      for (var i = 0; i < 3; i++) {
+        final at = starts[i] + (_style == _UnfoldStyle.flip ? 0.09 : (_style == _UnfoldStyle.assemble ? 0.18 : 0.06));
+        if (_prevT < at && t >= at) {
+          NgmyTone.play(260 + 90.0 * i, ms: 260, sweep: 1.6, volume: 0.18, wave: 'tri');
+          NgmyTone.playNote('bell', notes[i] + 12 + (i == 2 ? 0 : 0), ms: 1000, volume: 0.55);
+        }
+      }
+      if (!_chimed && t >= 0.55) {
+        _chimed = true;
+        NgmyTone.chord('bell', const [12, 16, 19, 24], ms: 1400, volume: 0.35);
+      }
+    }
+    _prevT = t;
+  }
 
   @override
   void dispose() {
@@ -724,6 +813,7 @@ class _SequenceCanvasState extends State<_SequenceCanvas> with TickerProviderSta
       accent: meta.glow,
       help: 'A scene that builds itself. Everything on it is yours to change.\n\nStyle switches how it builds: Fold, Flip, Rise or Assemble. Theme changes the colours. Edit lets you write your own words and pick your own pictures for the three slabs.\n\nDrag the timeline to scrub through it, change the speed, pause on any moment, and Share saves a picture of your scene.',
       actions: [
+        IconButton(onPressed: () => setState(() => _sound = !_sound), icon: Icon(_sound ? Icons.volume_up_rounded : Icons.volume_off_rounded, color: Colors.white70, size: 21), tooltip: 'Sound'),
         IconButton(onPressed: _edit, icon: const Icon(Icons.edit_rounded, color: Colors.white70, size: 21), tooltip: 'Edit words and pictures'),
         IconButton(onPressed: () => studioShare(context, _shot, name: 'scene'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share'),
       ],
