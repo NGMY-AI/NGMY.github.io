@@ -2477,7 +2477,7 @@ class _NgmyCommunicateAvatarState extends State<NgmyCommunicateAvatar> {
         height: widget.size,
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.high,
+        filterQuality: FilterQuality.medium,
         errorBuilder: (_, __, ___) {
           if (_memoryProvider != null) {
             return Image(
@@ -3307,6 +3307,8 @@ class _NgmyCommunicateWorldScreenState extends State<NgmyCommunicateWorldScreen>
     return NgmyHudMotion(
       builder: (context, pulse, scan, orbit) {
         return GridView.builder(
+          addAutomaticKeepAlives: false,
+          cacheExtent: 500,
           padding: EdgeInsets.fromLTRB(16, topPad + 18, 16, bottomPad),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,

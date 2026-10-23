@@ -69,7 +69,7 @@ class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateM
     super.dispose();
   }
 
-  /// Redraws ~20 times a second (not 60) and holds still while the list scrolls — the whole
+  /// Redraws ~11 times a second (not 60) and holds still while the list scrolls — the whole
   /// grid of cards was being rebuilt every frame, which made Advisors slow to open and scroll.
   int _lastTick = 0;
   bool _scrolling = false;
@@ -85,7 +85,7 @@ class _NgmyHudMotionState extends State<NgmyHudMotion> with TickerProviderStateM
   void _onTick() {
     if (_scrolling || !mounted) return;
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastTick < 50) return;
+    if (now - _lastTick < 90) return;
     _lastTick = now;
     setState(() {});
   }
