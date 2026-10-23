@@ -702,49 +702,8 @@
 
     }
 
-    html.ngmy-app-light::before {
+    /* The page no longer paints a solid strip over the status bar: screens scroll under it, like other apps. */
 
-      content: '';
-
-      position: fixed;
-
-      top: 0;
-
-      left: 0;
-
-      right: 0;
-
-      height: env(safe-area-inset-top, 0px);
-
-      background: #ffffff;
-
-      z-index: 2147483646;
-
-      pointer-events: none;
-
-    }
-
-    html.ngmy-app-dark::before {
-
-      content: '';
-
-      position: fixed;
-
-      top: 0;
-
-      left: 0;
-
-      right: 0;
-
-      height: env(safe-area-inset-top, 0px);
-
-      background: #121212;
-
-      z-index: 2147483646;
-
-      pointer-events: none;
-
-    }
 
     #ngmy-splash {
 
