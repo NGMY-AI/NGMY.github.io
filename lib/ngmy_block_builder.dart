@@ -271,7 +271,6 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
   late BbProject _proj;
   int _spr = 0;
   String _cat = 'Motion';
-  Blk? _sel; // selected block (or hat)
   List<_Th> _threads = [];
   bool _running = false;
   double _score = 0;
@@ -512,7 +511,7 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
     }
   }
 
-  // ── Editing ────────────────────────────────────────────────────────────────
+  // ── Editing (drag and drop) ────────────────────────────────────────────────
 
   List<Blk>? _listOf(Blk target) {
     List<Blk>? find(List<Blk> l) {
@@ -524,103 +523,88 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
       return null;
     }
 
-    for (final sc in _cur.scripts) {
-      final r = find(sc.body);
-      if (r != null) return r;
+    for (final sprite in _proj.sprites) {
+      for (final sc in sprite.scripts) {
+        final r = find(sc.body);
+        if (r != null) return r;
+      }
     }
     return null;
   }
 
-  BbScript? _scriptOfHat(Blk h) {
-    for (final sc in _cur.scripts) {
-      if (identical(sc.hat, h)) return sc;
+  bool _listIn(Blk root, List<Blk> list) {
+    if (identical(root.kids, list)) return true;
+    for (final k in root.kids) {
+      if (_listIn(k, list)) return true;
     }
-    return null;
+    return false;
   }
 
-  void _add(BbDef d) {
-    final nb = Blk(d.kind);
+  /// Drop [d] into [list] at [index].
+  void _dropInto(List<Blk> list, int index, _Drag d) {
+    final b = d.blk;
+    if (b.def.isHat) return;
+    // A block can't go inside itself.
+    if (!d.fresh && _listIn(b, list)) return;
+    setState(() {
+      var at = index;
+      Blk put = b;
+      if (d.fresh) {
+        put = Blk(b.kind, List<dynamic>.from(b.p));
+      } else {
+        final src = _listOf(b);
+        if (src != null) {
+          final si = src.indexOf(b);
+          src.removeAt(si);
+          if (identical(src, list) && si < at) at--;
+        }
+      }
+      list.insert(at.clamp(0, list.length), put);
+    });
+    NgmyTone.playNote('bell', 24, ms: 120, volume: 0.3);
+  }
+
+  void _dropNewScript(_Drag d) {
+    final b = d.blk;
+    setState(() {
+      if (b.def.isHat) {
+        _cur.scripts.add(BbScript(Blk(b.kind)));
+      } else {
+        final sc = BbScript(Blk('flag'));
+        if (d.fresh) {
+          sc.body.add(Blk(b.kind, List<dynamic>.from(b.p)));
+        } else {
+          _listOf(b)?.remove(b);
+          sc.body.add(b);
+        }
+        _cur.scripts.add(sc);
+      }
+    });
+    NgmyTone.playNote('bell', 28, ms: 140, volume: 0.3);
+  }
+
+  void _trash(_Drag d) {
+    if (d.fresh) return;
+    setState(() {
+      if (d.script != null) {
+        _cur.scripts.remove(d.script);
+      } else {
+        _listOf(d.blk)?.remove(d.blk);
+      }
+    });
+    NgmyTone.play(110, ms: 160, sweep: -0.4, volume: 0.3);
+  }
+
+  void _quickAdd(BbDef d) {
     setState(() {
       if (d.isHat) {
-        final sc = BbScript(nb);
-        _cur.scripts.add(sc);
-        _sel = nb;
-        return;
-      }
-      final sel = _sel;
-      if (sel == null) {
-        if (_cur.scripts.isEmpty) _cur.scripts.add(BbScript(Blk('flag')));
-        _cur.scripts.last.body.add(nb);
+        _cur.scripts.add(BbScript(Blk(d.kind)));
       } else {
-        final hatScript = _scriptOfHat(sel);
-        if (hatScript != null) {
-          hatScript.body.insert(0, nb);
-        } else if (sel.def.isC) {
-          sel.kids.add(nb);
-        } else {
-          final l = _listOf(sel);
-          if (l == null) {
-            if (_cur.scripts.isEmpty) _cur.scripts.add(BbScript(Blk('flag')));
-            _cur.scripts.last.body.add(nb);
-          } else {
-            l.insert(l.indexOf(sel) + 1, nb);
-          }
-        }
+        if (_cur.scripts.isEmpty) _cur.scripts.add(BbScript(Blk('flag')));
+        _cur.scripts.last.body.add(Blk(d.kind));
       }
-      _sel = nb;
     });
     NgmyTone.playNote('bell', 12 + (kBbDefs.indexWhere((x) => x.kind == d.kind) % 12), ms: 160, volume: 0.35);
-  }
-
-  void _deleteSel() {
-    final sel = _sel;
-    if (sel == null) return;
-    setState(() {
-      final sc = _scriptOfHat(sel);
-      if (sc != null) {
-        _cur.scripts.remove(sc);
-      } else {
-        _listOf(sel)?.remove(sel);
-      }
-      _sel = null;
-    });
-  }
-
-  void _moveSel(int dir) {
-    final sel = _sel;
-    if (sel == null) return;
-    final sc = _scriptOfHat(sel);
-    setState(() {
-      if (sc != null) {
-        final i = _cur.scripts.indexOf(sc);
-        final j = i + dir;
-        if (j >= 0 && j < _cur.scripts.length) {
-          _cur.scripts.removeAt(i);
-          _cur.scripts.insert(j, sc);
-        }
-        return;
-      }
-      final l = _listOf(sel);
-      if (l == null) return;
-      final i = l.indexOf(sel);
-      final j = i + dir;
-      if (j >= 0 && j < l.length) {
-        l.removeAt(i);
-        l.insert(j, sel);
-      }
-    });
-  }
-
-  void _duplicateSel() {
-    final sel = _sel;
-    if (sel == null || _scriptOfHat(sel) != null) return;
-    final l = _listOf(sel);
-    if (l == null) return;
-    setState(() {
-      final c = sel.copy();
-      l.insert(l.indexOf(sel) + 1, c);
-      _sel = c;
-    });
   }
 
   Future<void> _editParam(Blk b, int i, String kind) async {
@@ -656,7 +640,6 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
     setState(() {
       _proj = BbProject.fromJson(p.toJson())!;
       _spr = 0;
-      _sel = null;
     });
   }
 
@@ -683,32 +666,21 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
   }
 
   Future<void> _projectsDialog() async {
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1B1B1F),
-        title: const Text('Open a project', style: TextStyle(color: Colors.white, fontSize: 16)),
-        content: SizedBox(
-          width: 320,
-          child: ListView(shrinkWrap: true, children: [
-            const Padding(padding: EdgeInsets.only(bottom: 4), child: Text('EXAMPLES TO REMIX', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1))),
-            for (final p in _starters)
-              ListTile(
-                dense: true,
-                leading: Text(kBbEmoji[p.sprites.first.emoji], style: const TextStyle(fontSize: 22)),
-                title: Text(p.name, style: const TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _loadProject(p);
-                },
-              ),
-            if (_saved.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 8, bottom: 4), child: Text('MY PROJECTS', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1))),
-            for (final p in _saved)
-              ListTile(
-                dense: true,
-                leading: Text(kBbEmoji[p.sprites.first.emoji], style: const TextStyle(fontSize: 22)),
-                title: Text(p.name, style: const TextStyle(color: Colors.white)),
-                trailing: IconButton(
+    Widget tile(BuildContext ctx, BbProject p, {bool mine = false}) => GestureDetector(
+          onTap: () {
+            Navigator.pop(ctx);
+            _loadProject(p);
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
+            child: Row(children: [
+              Container(width: 44, height: 44, alignment: Alignment.center, decoration: BoxDecoration(color: kBbBackdrops[p.backdrop % kBbBackdrops.length].$2.first, borderRadius: BorderRadius.circular(10)), child: Text(kBbEmoji[p.sprites.first.emoji], style: const TextStyle(fontSize: 24))),
+              const SizedBox(width: 12),
+              Expanded(child: Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
+              if (mine)
+                IconButton(
                   icon: const Icon(Icons.delete_outline_rounded, color: Colors.white38, size: 20),
                   onPressed: () {
                     setState(() => _saved.remove(p));
@@ -716,183 +688,303 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
                     Navigator.pop(ctx);
                   },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _loadProject(p);
-                },
-              ),
-          ]),
+            ]),
+          ),
+        );
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF17171C),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: 340,
+            child: ListView(shrinkWrap: true, children: [
+              const Text('Open a project', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 12),
+              const Text('EXAMPLES TO REMIX', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+              const SizedBox(height: 6),
+              for (final p in _starters) tile(ctx, p),
+              if (_saved.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                const Text('MY PROJECTS', style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                const SizedBox(height: 6),
+                for (final p in _saved) tile(ctx, p, mine: true),
+              ],
+            ]),
+          ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
       ),
     );
   }
 
   // ── UI ─────────────────────────────────────────────────────────────────────
 
+  static const Map<String, IconData> _catIcon = {
+    'Events': Icons.flag_rounded,
+    'Motion': Icons.open_with_rounded,
+    'Looks': Icons.visibility_rounded,
+    'Sound': Icons.music_note_rounded,
+    'Control': Icons.loop_rounded,
+    'Pen': Icons.edit_rounded,
+    'Score': Icons.emoji_events_rounded,
+  };
+
+  bool _dragging = false;
+
   @override
   Widget build(BuildContext context) {
     return StudioPage(
       title: 'BLOCK BUILDER',
       accent: const Color(0xFFFACC15),
-      help: 'Build your own games, art and music by snapping blocks together, like Scratch.\n\n1. Tap a block colour (Motion, Looks, Sound...) and tap a block to add it to your script. The block you tapped last is highlighted: new blocks go right after it. Tap a "repeat" or "forever" block and new blocks go inside it.\n2. Tap a number or word inside a block to change it. Colours and sounds change each time you tap them.\n3. Press Play to run. Press Stop to start over.\n\nEvent blocks (yellow) start your scripts: "when ▶ is pressed" starts when you press Play, and "when I am tapped" starts when you tap your character on the stage.\n\nOpen the Examples to see how a bouncing animal, a spiral drawing, an orbiting planet, a melody and a catch game are built. Change them and make them yours! Press Save to keep your project on this phone.',
+      help: 'Build your own games, art and music by dragging blocks, like Scratch.\n\n1. Pick a colour at the bottom (Motion, Looks, Sound...).\n2. Press and hold a block for a moment, then drag it into the big grey area. Blocks click into place under each other. You can also just tap a block to add it to the end.\n3. Tap a number or word inside a block to change it. Colours and sounds change each time you tap them.\n4. Press Play. Press Stop to start over.\n\nYellow blocks start a script: "when ▶ is pressed" starts when you press Play, and "when I am tapped" starts when you tap your character on the stage.\n\nTo throw a block away, drag it onto the bin that appears. Open Examples to see ready-made projects and change them to make them yours. Press Save to keep your project on this phone.',
       actions: [IconButton(onPressed: () => studioShare(context, _shot, name: 'block-builder'), icon: const Icon(Icons.ios_share_rounded, color: Colors.white70, size: 21), tooltip: 'Share a picture')],
       stage: Column(children: [
-        LayoutBuilder(builder: (context, box) {
-          final side = math.min(box.maxWidth - 20, MediaQuery.of(context).size.height * 0.30);
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
-            child: Center(
-              child: SizedBox(
-                width: side,
-                height: side,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(18),
-                  child: RepaintBoundary(
-                    key: _shot,
-                    child: LayoutBuilder(builder: (context, b2) {
-                      _stage = Size(b2.maxWidth, b2.maxHeight);
-                      return GestureDetector(
-                        onTapDown: (d) => _stageTap(d.localPosition),
-                        onPanStart: (d) => _dragSprite = _hitSprite(d.localPosition),
-                        onPanUpdate: (d) {
-                          if (_dragSprite < 0 || _running) return;
-                          final s = _proj.sprites[_dragSprite];
-                          setState(() {
-                            s.x0 = (d.localPosition.dx / _stage.width * 100).clamp(3.0, 97.0);
-                            s.y0 = (100 - d.localPosition.dy / _stage.height * 100).clamp(3.0, 97.0);
-                            s.reset();
-                          });
-                        },
-                        child: CustomPaint(size: _stage, painter: _StagePainter(this)),
-                      );
-                    }),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-        Expanded(child: _codeArea()),
-      ]),
-      tools: Column(mainAxisSize: MainAxisSize.min, children: [
-        StudioRow(children: [
-          StudioButton(icon: _running ? Icons.stop_rounded : Icons.play_arrow_rounded, label: _running ? 'Stop' : 'Play', color: _running ? const Color(0xFFF87171) : const Color(0xFF4ADE80), onTap: _running ? _stop : _run),
-          StudioButton(icon: Icons.folder_open_rounded, label: 'Examples', onTap: _projectsDialog),
-          StudioButton(icon: Icons.save_rounded, label: 'Save', onTap: _saveDialog),
-          StudioButton(icon: Icons.note_add_rounded, label: 'New', onTap: () => _loadProject(BbProject('My project', [BbSprite(0, 50, 50)]))),
-        ]),
-        StudioRow(label: 'ACTOR', children: [
-          for (var i = 0; i < _proj.sprites.length; i++)
-            StudioChip(label: kBbEmoji[_proj.sprites[i].emoji], selected: i == _spr, color: const Color(0xFFFACC15), onTap: () => setState(() {
-                  _spr = i;
-                  _sel = null;
-                })),
-          StudioChip(label: '+ Add', selected: false, color: const Color(0xFF4ADE80), onTap: () {
-            if (_proj.sprites.length >= 5) return;
-            setState(() {
-              _proj.sprites.add(BbSprite(_rnd.nextInt(kBbEmoji.length), 20 + _rnd.nextDouble() * 60, 20 + _rnd.nextDouble() * 60));
-              _spr = _proj.sprites.length - 1;
-              _sel = null;
-            });
-          }),
-          StudioChip(label: 'Change look', selected: false, color: const Color(0xFFA78BFA), onTap: () => setState(() {
-                _cur.emoji = (_cur.emoji + 1) % kBbEmoji.length;
-                _cur.reset();
-              })),
-          StudioChip(label: 'Backdrop', selected: false, color: const Color(0xFF38BDF8), onTap: () => setState(() => _proj.backdrop = (_proj.backdrop + 1) % kBbBackdrops.length)),
-          if (_proj.sprites.length > 1) StudioChip(label: 'Remove', icon: Icons.delete_outline_rounded, selected: false, color: const Color(0xFFF87171), onTap: () => setState(() {
-                _proj.sprites.removeAt(_spr);
-                _spr = 0;
-                _sel = null;
-              })),
-        ]),
-        StudioRow(children: [
-          for (final c in kBbCat.entries) StudioChip(label: c.key, selected: _cat == c.key, color: c.value, onTap: () => setState(() => _cat = c.key)),
-        ]),
-        StudioRow(children: [
-          for (final d in kBbDefs.where((d) => d.cat == _cat))
-            GestureDetector(
-              onTap: () => _add(d),
-              child: Container(
-                margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                decoration: BoxDecoration(color: kBbCat[d.cat]!.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(10)),
-                child: Text(d.tpl.replaceAllMapped(RegExp(r'\{\d\}'), (m) => '…'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 12.5)),
-              ),
-            ),
-        ]),
-        if (_sel != null)
-          StudioRow(label: 'BLOCK', children: [
-            StudioButton(icon: Icons.arrow_upward_rounded, label: 'Up', onTap: () => _moveSel(-1)),
-            StudioButton(icon: Icons.arrow_downward_rounded, label: 'Down', onTap: () => _moveSel(1)),
-            StudioButton(icon: Icons.copy_rounded, label: 'Copy', onTap: _duplicateSel),
-            StudioButton(icon: Icons.delete_rounded, label: 'Delete', color: const Color(0xFFF87171), onTap: _deleteSel),
-          ]),
+        _topPanel(),
+        Expanded(child: _workspace()),
+        _drawer(),
       ]),
     );
   }
 
-  int _hitSprite(Offset p) {
-    for (var i = _proj.sprites.length - 1; i >= 0; i--) {
-      final s = _proj.sprites[i];
-      if (!s.visible) continue;
-      final c = Offset(s.x / 100 * _stage.width, (100 - s.y) / 100 * _stage.height);
-      if ((c - p).distance < 22 + s.size / 100 * 12) return i;
-    }
-    return -1;
-  }
-
-  void _stageTap(Offset p) {
-    final i = _hitSprite(p);
-    if (i < 0) return;
-    if (!_running && _threads.isEmpty) _resetWorld();
-    setState(() {
-      _spr = i;
-      _tapSprite(_proj.sprites[i]);
+  Widget _topPanel() {
+    return LayoutBuilder(builder: (context, box) {
+      final side = math.min(box.maxWidth * 0.5, 200.0);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: side,
+            height: side,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: RepaintBoundary(
+                key: _shot,
+                child: LayoutBuilder(builder: (context, b2) {
+                  _stage = Size(b2.maxWidth, b2.maxHeight);
+                  return GestureDetector(
+                    onTapDown: (d) => _stageTap(d.localPosition),
+                    onPanStart: (d) => _dragSprite = _hitSprite(d.localPosition),
+                    onPanUpdate: (d) {
+                      if (_dragSprite < 0 || _running) return;
+                      final s = _proj.sprites[_dragSprite];
+                      setState(() {
+                        s.x0 = (d.localPosition.dx / _stage.width * 100).clamp(3.0, 97.0);
+                        s.y0 = (100 - d.localPosition.dy / _stage.height * 100).clamp(3.0, 97.0);
+                        s.reset();
+                      });
+                    },
+                    child: CustomPaint(size: _stage, painter: _StagePainter(this)),
+                  );
+                }),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SizedBox(
+              height: side,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                GestureDetector(
+                  onTap: _running ? _stop : _run,
+                  child: Container(
+                    height: 50,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: _running ? const [Color(0xFFF87171), Color(0xFFDC2626)] : const [Color(0xFF4ADE80), Color(0xFF16A34A)]),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: (_running ? const Color(0xFFF87171) : const Color(0xFF4ADE80)).withValues(alpha: 0.4), blurRadius: 12, offset: const Offset(0, 4))],
+                    ),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(_running ? Icons.stop_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 28),
+                      const SizedBox(width: 4),
+                      Text(_running ? 'Stop' : 'Play', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 17)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text('ACTORS', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 9.5, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                const SizedBox(height: 4),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  for (var i = 0; i < _proj.sprites.length; i++)
+                    GestureDetector(
+                      onTap: () => setState(() => _spr = i),
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: i == _spr ? 0.18 : 0.06), borderRadius: BorderRadius.circular(11), border: Border.all(color: i == _spr ? const Color(0xFFFACC15) : Colors.white12, width: i == _spr ? 2 : 1)),
+                        child: Text(kBbEmoji[_proj.sprites[i].emoji], style: const TextStyle(fontSize: 20)),
+                      ),
+                    ),
+                  if (_proj.sprites.length < 5) _miniBtn(Icons.add_rounded, () => setState(() {
+                        _proj.sprites.add(BbSprite(_rnd.nextInt(kBbEmoji.length), 20 + _rnd.nextDouble() * 60, 20 + _rnd.nextDouble() * 60));
+                        _spr = _proj.sprites.length - 1;
+                      }), const Color(0xFF4ADE80)),
+                ]),
+                const Spacer(),
+                Wrap(spacing: 6, runSpacing: 6, children: [
+                  _miniBtn(Icons.face_rounded, () => setState(() {
+                        _cur.emoji = (_cur.emoji + 1) % kBbEmoji.length;
+                        _cur.reset();
+                      }), const Color(0xFFA78BFA)),
+                  _miniBtn(Icons.wallpaper_rounded, () => setState(() => _proj.backdrop = (_proj.backdrop + 1) % kBbBackdrops.length), const Color(0xFF38BDF8)),
+                  _miniBtn(Icons.folder_open_rounded, _projectsDialog, Colors.white70),
+                  _miniBtn(Icons.save_rounded, _saveDialog, Colors.white70),
+                  _miniBtn(Icons.note_add_rounded, () => _loadProject(BbProject('My project', [BbSprite(0, 50, 50)])), Colors.white70),
+                  if (_proj.sprites.length > 1) _miniBtn(Icons.delete_outline_rounded, () => setState(() {
+                        _proj.sprites.removeAt(_spr);
+                        _spr = 0;
+                      }), const Color(0xFFF87171)),
+                ]),
+              ]),
+            ),
+          ),
+        ]),
+      );
     });
   }
 
-  Widget _codeArea() {
+  Widget _miniBtn(IconData icon, VoidCallback onTap, Color c) => GestureDetector(
+        onTap: onTap,
+        child: Container(width: 38, height: 38, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(11), border: Border.all(color: Colors.white12)), child: Icon(icon, color: c, size: 20)),
+      );
+
+  Widget _workspace() {
     final s = _cur;
-    if (s.scripts.isEmpty) {
-      return const Center(child: Padding(padding: EdgeInsets.all(24), child: Text('Tap a colour below, then a block, to start your script.\nOr open Examples to see ready-made ones.', textAlign: TextAlign.center, style: TextStyle(color: Colors.white38, height: 1.5))));
-    }
-    return ListView(padding: const EdgeInsets.fromLTRB(10, 4, 10, 10), children: [
-      for (final sc in s.scripts)
-        Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.04), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white12)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _blockTile(sc.hat, hat: true),
-            ..._blocks(sc.body, 0),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+      decoration: BoxDecoration(color: const Color(0xFF1B1D24), borderRadius: BorderRadius.circular(18), border: Border.all(color: Colors.white10)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(children: [
+          Positioned.fill(child: CustomPaint(painter: _DotsPainter())),
+          ListView(padding: const EdgeInsets.fromLTRB(12, 12, 12, 90), children: [
+            for (final sc in s.scripts)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _hatRow(sc),
+                  _slot(sc.body, 0),
+                  ..._blocks(sc.body),
+                ]),
+              ),
+            DragTarget<_Drag>(
+              onWillAcceptWithDetails: (_) => true,
+              onAcceptWithDetails: (d) => _dropNewScript(d.data),
+              builder: (context, cand, rej) => AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: s.scripts.isEmpty ? 220 : (cand.isNotEmpty ? 90 : 60),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: cand.isNotEmpty ? const Color(0xFFFACC15).withValues(alpha: 0.12) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cand.isNotEmpty ? const Color(0xFFFACC15) : Colors.white12, width: cand.isNotEmpty ? 2 : 1),
+                ),
+                child: Text(s.scripts.isEmpty ? 'Drag a block here to start\n(or tap a block below)' : 'Drop here for a new script', textAlign: TextAlign.center, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontWeight: FontWeight.w700, fontSize: 13, height: 1.4)),
+              ),
+            ),
           ]),
-        ),
+          if (_dragging)
+            Positioned(
+              right: 12,
+              bottom: 12,
+              child: DragTarget<_Drag>(
+                onWillAcceptWithDetails: (_) => true,
+                onAcceptWithDetails: (d) => _trash(d.data),
+                builder: (context, cand, rej) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: cand.isNotEmpty ? 76 : 64,
+                  height: cand.isNotEmpty ? 76 : 64,
+                  decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: cand.isNotEmpty ? 0.95 : 0.75), shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFEF4444).withValues(alpha: 0.5), blurRadius: 16)]),
+                  child: const Icon(Icons.delete_rounded, color: Colors.white, size: 30),
+                ),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _hatRow(BbScript sc) {
+    return Row(children: [
+      Draggable<_Drag>(
+        data: _Drag(sc.hat, fresh: false, script: sc),
+        onDragStarted: () => setState(() => _dragging = true),
+        onDragEnd: (_) => setState(() => _dragging = false),
+        feedback: Material(color: Colors.transparent, child: Opacity(opacity: 0.9, child: _blockView(sc.hat, hat: true, editable: false))),
+        childWhenDragging: Opacity(opacity: 0.3, child: _blockView(sc.hat, hat: true, editable: false)),
+        child: _blockView(sc.hat, hat: true, editable: false),
+      ),
     ]);
   }
 
-  List<Widget> _blocks(List<Blk> l, int depth) {
+  Widget _slot(List<Blk> list, int index) {
+    return DragTarget<_Drag>(
+      onWillAcceptWithDetails: (d) => !d.data.blk.def.isHat,
+      onAcceptWithDetails: (d) => _dropInto(list, index, d.data),
+      builder: (context, cand, rej) => AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        height: cand.isNotEmpty ? 38 : 8,
+        margin: EdgeInsets.symmetric(vertical: cand.isNotEmpty ? 2 : 0),
+        decoration: BoxDecoration(color: cand.isNotEmpty ? Colors.white.withValues(alpha: 0.22) : Colors.transparent, borderRadius: BorderRadius.circular(8), border: cand.isNotEmpty ? Border.all(color: Colors.white70, width: 1.5) : null),
+      ),
+    );
+  }
+
+  List<Widget> _blocks(List<Blk> l) {
     final out = <Widget>[];
-    for (final b in l) {
-      out.add(Padding(padding: EdgeInsets.only(left: depth * 16.0), child: _blockTile(b)));
-      if (b.def.isC) {
-        out.addAll(_blocks(b.kids, depth + 1));
-        if (b.kids.isEmpty) {
-          out.add(Padding(
-            padding: EdgeInsets.only(left: (depth + 1) * 16.0, top: 2, bottom: 2),
-            child: Text(identical(_sel, b) ? 'new blocks go in here' : 'empty: tap this block, then pick one', style: const TextStyle(color: Colors.white30, fontSize: 11)),
-          ));
-        }
-      }
+    for (var i = 0; i < l.length; i++) {
+      out.add(_blockWidget(l[i]));
+      out.add(_slot(l, i + 1));
     }
     return out;
   }
 
-  Widget _blockTile(Blk b, {bool hat = false}) {
+  Widget _blockWidget(Blk b) {
+    final view = b.def.isC ? _cBlock(b) : _blockView(b, editable: true);
+    return Draggable<_Drag>(
+      data: _Drag(b, fresh: false),
+      onDragStarted: () => setState(() => _dragging = true),
+      onDragEnd: (_) => setState(() => _dragging = false),
+      feedback: Material(color: Colors.transparent, child: Opacity(opacity: 0.92, child: b.def.isC ? _cBlock(b, preview: true) : _blockView(b, editable: false))),
+      childWhenDragging: Opacity(opacity: 0.25, child: view),
+      child: view,
+    );
+  }
+
+  Widget _cBlock(Blk b, {bool preview = false}) {
+    final col = kBbCat[b.def.cat]!;
+    final dark = Color.lerp(col, Colors.black, 0.28)!;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+      _blockView(b, editable: !preview),
+      IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Container(width: 18, color: col),
+          Padding(
+            padding: const EdgeInsets.only(left: 6),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 170),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: preview
+                  ? [for (final k in b.kids) _blockView(k, editable: false)]
+                  : [_slot(b.kids, 0), ..._blocks(b.kids)]),
+            ),
+          ),
+        ]),
+      ),
+      Container(
+        width: 150,
+        height: 16,
+        decoration: BoxDecoration(color: col, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)), border: Border(bottom: BorderSide(color: dark, width: 2.5))),
+      ),
+    ]);
+  }
+
+  /// A single block, drawn with the little notch on top and bump underneath.
+  Widget _blockView(Blk b, {bool hat = false, required bool editable}) {
     final d = b.def;
     final col = kBbCat[d.cat]!;
-    final sel = identical(_sel, b);
     final spans = <InlineSpan>[];
     var last = 0;
     for (final m in RegExp(r'\{(\d)\}').allMatches(d.tpl)) {
@@ -916,35 +1008,159 @@ class _NgmyBlockBuilderState extends State<NgmyBlockBuilder> with SingleTickerPr
           label = v is num ? (v == v.roundToDouble() ? '${v.round()}' : '$v') : '$v';
           if (label.isEmpty) label = '…';
       }
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: GestureDetector(
-          onTap: () => _editParam(b, i, kind),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 3),
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.85), borderRadius: BorderRadius.circular(9)),
-            child: Text(label, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 12.5)),
-          ),
-        ),
-      ));
+      final oval = Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+        child: Text(label, style: TextStyle(color: Color.lerp(col, Colors.black, 0.45), fontWeight: FontWeight.w900, fontSize: 13)),
+      );
+      spans.add(WidgetSpan(alignment: PlaceholderAlignment.middle, child: editable ? GestureDetector(onTap: () => _editParam(b, i, kind), child: oval) : oval));
       last = m.end;
     }
     if (last < d.tpl.length) spans.add(TextSpan(text: d.tpl.substring(last)));
-    return GestureDetector(
-      onTap: () => setState(() => _sel = sel ? null : b),
-      child: Container(
-        margin: const EdgeInsets.only(top: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: col.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(hat ? 18 : 8), bottom: const Radius.circular(8)),
-          border: Border.all(color: sel ? Colors.white : Colors.transparent, width: 2.2),
-        ),
-        child: Text.rich(TextSpan(children: spans, style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 13))),
+    final isHat = hat || d.isHat;
+    return CustomPaint(
+      painter: _BlockPainter(col, isHat),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(14, isHat ? 16 : 9, 16, 10),
+        child: Text.rich(TextSpan(children: spans, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14, shadows: [Shadow(color: Colors.black26, blurRadius: 1, offset: Offset(0, 1))]))),
       ),
     );
   }
+
+  Widget _drawer() {
+    final defs = kBbDefs.where((d) => d.cat == _cat).toList();
+    return Container(
+      decoration: BoxDecoration(color: const Color(0xFF14151B), border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.1)))),
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 10),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(
+          height: 58,
+          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10), children: [
+            for (final c in kBbCat.entries)
+              GestureDetector(
+                onTap: () => setState(() => _cat = c.key),
+                child: Container(
+                  width: 64,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(color: c.value.withValues(alpha: _cat == c.key ? 1 : 0.25), borderRadius: BorderRadius.circular(14), border: Border.all(color: _cat == c.key ? Colors.white : Colors.transparent, width: 2)),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(_catIcon[c.key], color: _cat == c.key ? Colors.white : c.value, size: 22),
+                    Text(c.key, style: TextStyle(color: _cat == c.key ? Colors.white : c.value, fontSize: 10, fontWeight: FontWeight.w900)),
+                  ]),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: defs.any((d) => d.isC) ? 92 : 56,
+          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 10), children: [
+            for (final d in defs)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: LongPressDraggable<_Drag>(
+                    delay: const Duration(milliseconds: 130),
+                    data: _Drag(Blk(d.kind), fresh: true),
+                    onDragStarted: () => setState(() => _dragging = true),
+                    onDragEnd: (_) => setState(() => _dragging = false),
+                    feedback: Material(color: Colors.transparent, child: Opacity(opacity: 0.92, child: d.isC ? _cBlock(Blk(d.kind), preview: true) : _blockView(Blk(d.kind), hat: d.isHat, editable: false))),
+                    child: GestureDetector(onTap: () => _quickAdd(d), child: d.isC ? _cBlock(Blk(d.kind), preview: true) : _blockView(Blk(d.kind), hat: d.isHat, editable: false)),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  int _hitSprite(Offset p) {
+    for (var i = _proj.sprites.length - 1; i >= 0; i--) {
+      final s = _proj.sprites[i];
+      if (!s.visible) continue;
+      final c = Offset(s.x / 100 * _stage.width, (100 - s.y) / 100 * _stage.height);
+      if ((c - p).distance < 22 + s.size / 100 * 12) return i;
+    }
+    return -1;
+  }
+
+  void _stageTap(Offset p) {
+    final i = _hitSprite(p);
+    if (i < 0) return;
+    if (!_running && _threads.isEmpty) _resetWorld();
+    setState(() {
+      _spr = i;
+      _tapSprite(_proj.sprites[i]);
+    });
+  }
+}
+
+class _Drag {
+  _Drag(this.blk, {required this.fresh, this.script});
+  final Blk blk;
+  final bool fresh;
+  final BbScript? script;
+}
+
+class _BlockPainter extends CustomPainter {
+  _BlockPainter(this.color, this.hat);
+  final Color color;
+  final bool hat;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const r = 9.0;
+    final w = size.width, h = size.height;
+    final path = Path();
+    if (hat) {
+      path.moveTo(0, 22);
+      path.quadraticBezierTo(w * 0.28, -6, w * 0.62, 12);
+      path.quadraticBezierTo(w * 0.8, 20, w, 18);
+      path.lineTo(w, h - r);
+    } else {
+      path.moveTo(0, r);
+      path.quadraticBezierTo(0, 0, r, 0);
+      path.lineTo(14, 0);
+      path.lineTo(18, 5);
+      path.lineTo(32, 5);
+      path.lineTo(36, 0);
+      path.lineTo(w - r, 0);
+      path.quadraticBezierTo(w, 0, w, r);
+      path.lineTo(w, h - r);
+    }
+    path.quadraticBezierTo(w, h, w - r, h);
+    path.lineTo(36, h);
+    path.lineTo(32, h + 5);
+    path.lineTo(18, h + 5);
+    path.lineTo(14, h);
+    path.lineTo(r, h);
+    path.quadraticBezierTo(0, h, 0, h - r);
+    path.close();
+    canvas.drawPath(path.shift(const Offset(0, 2)), Paint()..color = Color.lerp(color, Colors.black, 0.35)!);
+    canvas.drawPath(path, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color.lerp(color, Colors.white, 0.12)!, color]).createShader(Rect.fromLTWH(0, 0, w, h)));
+    canvas.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 1..color = Colors.white.withValues(alpha: 0.18));
+  }
+
+  @override
+  bool shouldRepaint(covariant _BlockPainter old) => old.color != color || old.hat != hat;
+}
+
+class _DotsPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = Colors.white.withValues(alpha: 0.05);
+    for (var x = 8.0; x < size.width; x += 22) {
+      for (var y = 8.0; y < size.height; y += 22) {
+        canvas.drawCircle(Offset(x, y), 1.2, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DotsPainter old) => false;
 }
 
 class _StagePainter extends CustomPainter {

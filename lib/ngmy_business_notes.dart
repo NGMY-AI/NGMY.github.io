@@ -978,12 +978,19 @@ class NgmyBusinessNote {
         next.add(images[i]);
         continue;
       }
+      final cacheKey = '$userEmail|$id|$imageId';
+      final cached = _kNoteImgCache[cacheKey];
+      if (cached != null) {
+        next.add(cached);
+        continue;
+      }
       final fromBlob = await ngmyBusinessNoteImageGet(
         userEmail: userEmail,
         noteId: id,
         imageId: imageId,
       );
       if (fromBlob != null && fromBlob.trim().isNotEmpty) {
+        _kNoteImgCache[cacheKey] = fromBlob;
         next.add(fromBlob);
       } else if (i < images.length && images[i].trim().isNotEmpty) {
         next.add(images[i]);
@@ -1006,13 +1013,17 @@ class NgmyBusinessNote {
       final imageId = (i < imageIds.length && imageIds[i].trim().isNotEmpty)
           ? imageIds[i].trim()
           : 'img_${DateTime.now().microsecondsSinceEpoch}_$i';
-      final ok = await ngmyBusinessNoteImagePut(
-        userEmail: userEmail,
-        noteId: id,
-        imageId: imageId,
-        dataUrl: dataUrl,
-      );
-      if (!ok) return false;
+      final cacheKey = '$userEmail|$id|$imageId';
+      if (_kNoteImgCache[cacheKey] != dataUrl) {
+        final ok = await ngmyBusinessNoteImagePut(
+          userEmail: userEmail,
+          noteId: id,
+          imageId: imageId,
+          dataUrl: dataUrl,
+        );
+        if (!ok) return false;
+        _kNoteImgCache[cacheKey] = dataUrl;
+      }
       nextIds.add(imageId);
       nextImages.add(dataUrl);
     }
@@ -1026,6 +1037,10 @@ class NgmyBusinessNote {
     return true;
   }
 }
+
+/// Photos already read from or written to the blob store, kept in memory so a
+/// save never re-reads or re-writes pictures that did not change.
+final Map<String, String> _kNoteImgCache = {};
 
 Future<List<NgmyBusinessNote>> _loadNotes(String userEmail) async {
   try {
@@ -1294,134 +1309,202 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
     await _reload();
   }
 
+  Future<void> _noteMenu(NgmyBusinessNote n) async {
+    final hub = NgmyHubTheme.of(context);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: hub.scaffold,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 8), decoration: BoxDecoration(color: hub.border, borderRadius: BorderRadius.circular(2))),
+            Padding(padding: const EdgeInsets.fromLTRB(8, 4, 8, 8), child: Text(n.preview, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 16))),
+            if (n.isTrashed) ...[
+              ListTile(leading: const Icon(Icons.restore_rounded, color: Color(0xFF10B981)), title: Text('Restore', style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'restore')),
+              ListTile(leading: const Icon(Icons.delete_forever_rounded, color: Color(0xFFEF4444)), title: const Text('Delete forever', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'delete')),
+            ] else ...[
+              ListTile(leading: Icon(n.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _accent), title: Text(n.pinned ? 'Unpin' : 'Pin to top', style: TextStyle(color: hub.title, fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'pin')),
+              ListTile(leading: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444)), title: const Text('Move to trash', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w700)), onTap: () => Navigator.pop(ctx, 'delete')),
+            ],
+          ]),
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    if (action == 'restore') {
+      await _restore(n);
+    } else if (action == 'delete') {
+      await _delete(n);
+    } else if (action == 'pin') {
+      final items = await _loadNotes(widget.userEmail);
+      final i = items.indexWhere((e) => e.id == n.id);
+      if (i >= 0) {
+        items[i].pinned = !items[i].pinned;
+        await _saveNotes(widget.userEmail, items);
+      }
+      await _reload();
+    }
+  }
+
+  Widget _card(NgmyBusinessNote n, NgmyHubTheme hub) {
+    final dark = n.darkTheme;
+    final fg = dark ? Colors.white : const Color(0xFF0F172A);
+    final sub = dark ? Colors.white70 : const Color(0xFF475569);
+    final body = n.displayBody.trim();
+    return GestureDetector(
+      onTap: () => n.isTrashed ? _noteMenu(n) : _openEditor(note: n),
+      onLongPress: () => _noteMenu(n),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 14, offset: const Offset(0, 5))],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(children: [
+            Positioned.fill(child: _NoteBackgroundLayer(note: n, compact: true)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Row(children: [
+                  NgmyOfflineEmoji(n.icon.trim().isEmpty ? '📝' : n.icon.trim(), fontSize: 22),
+                  const Spacer(),
+                  if (n.pinned) const Icon(Icons.push_pin_rounded, size: 15, color: Color(0xFF8B5CF6)),
+                ]),
+                const SizedBox(height: 8),
+                Text(n.preview, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 16, height: 1.2, letterSpacing: -0.2)),
+                if (body.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(body.replaceAll(RegExp(r'\n{2,}'), '\n'), maxLines: 6, overflow: TextOverflow.ellipsis, style: TextStyle(color: sub, fontSize: 12.5, height: 1.4)),
+                ],
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: Text(n.isTrashed ? _trashExpiryLabel(n.deletedAt!) : n.folder, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: n.isTrashed ? const Color(0xFFEF4444) : sub.withValues(alpha: 0.8), fontSize: 10.5, fontWeight: FontWeight.w800))),
+                  Text(_formatDate(n.updatedAt), style: TextStyle(color: sub.withValues(alpha: 0.7), fontSize: 10.5, fontWeight: FontWeight.w600)),
+                ]),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Widget _grid(List<NgmyBusinessNote> list, NgmyHubTheme hub) {
+    final left = <Widget>[];
+    final right = <Widget>[];
+    var lh = 0, rh = 0;
+    for (final n in list) {
+      final h = 90 + math.min(n.displayBody.length, 260) ~/ 3;
+      if (lh <= rh) {
+        left.add(_card(n, hub));
+        lh += h;
+      } else {
+        right.add(_card(n, hub));
+        rh += h;
+      }
+    }
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Expanded(child: Column(children: left)),
+      const SizedBox(width: 12),
+      Expanded(child: Column(children: right)),
+    ]);
+  }
+
+  Widget _label(String t, NgmyHubTheme hub) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 6, 4, 10),
+        child: Text(t, style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w900, fontSize: 11.5, letterSpacing: 1.2)),
+      );
+
   @override
   Widget build(BuildContext context) {
     final hub = NgmyHubTheme.of(context);
     final visible = _visible;
+    final pinned = visible.where((n) => n.pinned && !n.isTrashed).toList();
+    final others = visible.where((n) => !(n.pinned && !n.isTrashed)).toList();
+    final total = _notes.where((n) => !n.isTrashed).length;
+    int countFor(String f) => f == 'All' ? total : _notes.where((n) => !n.isTrashed && n.folder == f).length;
+    final trashCount = _notes.where((n) => n.isTrashed).length;
+
+    Widget chip(String label, bool sel, VoidCallback onTap, {int? count, Color? color}) {
+      final c = color ?? _accent;
+      return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: sel ? c : hub.chipIdleBg,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: sel ? Colors.transparent : hub.border),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5, color: sel ? Colors.white : hub.chipOffLabel)),
+            if (count != null && count > 0) ...[
+              const SizedBox(width: 6),
+              Text('$count', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11.5, color: sel ? Colors.white70 : hub.muted)),
+            ],
+          ]),
+        ),
+      );
+    }
+
     return Material(
       color: hub.scaffold,
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Stack(children: [
+        SafeArea(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: hub.iconButtonBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: hub.border)),
-                      child: Icon(Icons.arrow_back_ios_new_rounded, color: hub.iconButtonIcon, size: 18),
-                    ),
+              padding: const EdgeInsets.fromLTRB(14, 8, 18, 0),
+              child: Row(children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(color: hub.iconButtonBg, shape: BoxShape.circle, border: Border.all(color: hub.border)),
+                    child: Icon(Icons.arrow_back_ios_new_rounded, color: hub.iconButtonIcon, size: 16),
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Notes', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 24, letterSpacing: -0.5)),
-                        Text('Business Essentials', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w600, fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: _pickTemplateAndCreate,
-                        borderRadius: BorderRadius.circular(16),
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          child: Row(
-                            children: [
-                              Icon(Icons.add_rounded, color: Colors.white, size: 20),
-                              SizedBox(width: 6),
-                              Text('New', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                const Spacer(),
+                Text('$total ${total == 1 ? 'note' : 'notes'}', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w700, fontSize: 12.5)),
+              ]),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(22, 2, 22, 0),
+              child: Text('Notes', style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 38, letterSpacing: -1.2, height: 1.1)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: TextField(
                 onChanged: (v) => setState(() => _query = v),
-                style: TextStyle(color: hub.title, fontWeight: FontWeight.w500),
+                style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
-                  hintText: 'Search notes…',
-                  hintStyle: TextStyle(color: hub.muted),
+                  hintText: 'Search your notes',
+                  hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500),
                   prefixIcon: Icon(Icons.search_rounded, color: hub.muted),
                   filled: true,
                   fillColor: hub.inputFill,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: hub.inputBorder)),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: hub.inputBorder)),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  isDense: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 13),
                 ),
               ),
             ),
             SizedBox(
-              height: 44,
-              child: ListView.separated(
+              height: 52,
+              child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                itemCount: _noteFolders.length + 1,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  if (i == _noteFolders.length) {
-                    final sel = _folder == _kTrashFolder;
-                    final trashCount = _notes.where((n) => n.isTrashed).length;
-                    return GestureDetector(
-                      onTap: () => setState(() => _folder = _kTrashFolder),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          gradient: sel ? const LinearGradient(colors: [Color(0xFFEF4444), Color(0xFFB91C1C)]) : null,
-                          color: sel ? null : hub.chipIdleBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: sel ? Colors.transparent : hub.border),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.delete_outline_rounded, size: 14, color: sel ? Colors.white : (trashCount > 0 ? const Color(0xFFEF4444) : hub.chipOffLabel)),
-                            if (trashCount > 0) ...[
-                              const SizedBox(width: 4),
-                              Text('$trashCount', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: sel ? Colors.white : const Color(0xFFEF4444))),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-                  final f = _noteFolders[i];
-                  final sel = _folder == f;
-                  return GestureDetector(
-                    onTap: () => setState(() => _folder = f),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: sel ? const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]) : null,
-                        color: sel ? null : hub.chipIdleBg,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: sel ? Colors.transparent : hub.border),
-                      ),
-                      child: Text(f, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: sel ? Colors.white : hub.chipOffLabel)),
-                    ),
-                  );
-                },
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                children: [
+                  for (final f in _noteFolders) ...[
+                    chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)),
+                    const SizedBox(width: 8),
+                  ],
+                  chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
+                ],
               ),
             ),
             Expanded(
@@ -1429,169 +1512,62 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                   ? const Center(child: CircularProgressIndicator(color: _accent))
                   : visible.isEmpty
                       ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
+                          child: Padding(
+                            padding: const EdgeInsets.all(30),
+                            child: Column(mainAxisSize: MainAxisSize.min, children: [
                               Container(
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(color: hub.chipIdleBg, shape: BoxShape.circle),
-                                child: Icon(Icons.note_alt_outlined, size: 48, color: hub.muted.withValues(alpha: 0.6)),
+                                width: 110,
+                                height: 110,
+                                decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [_accent.withValues(alpha: 0.25), const Color(0xFF6366F1).withValues(alpha: 0.1)])),
+                                child: const Icon(Icons.edit_note_rounded, size: 58, color: _accent),
                               ),
-                              const SizedBox(height: 16),
-                              Text('No notes yet', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 18)),
-                              const SizedBox(height: 8),
-                              Text('Pick a template or start blank', style: TextStyle(color: hub.subtitle, fontSize: 13)),
-                              const SizedBox(height: 20),
-                              FilledButton.icon(
-                                onPressed: _pickTemplateAndCreate,
-                                icon: const Icon(Icons.dashboard_customize_outlined),
-                                label: const Text('Browse templates'),
-                                style: FilledButton.styleFrom(backgroundColor: _accent, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
-                              ),
-                            ],
+                              const SizedBox(height: 18),
+                              Text(_folder == _kTrashFolder ? 'Trash is empty' : (_query.isEmpty ? 'Your notes live here' : 'No notes match'), style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 20)),
+                              const SizedBox(height: 6),
+                              Text(_folder == _kTrashFolder ? 'Deleted notes stay for 24 hours.' : 'Tap New note to write your first one.', textAlign: TextAlign.center, style: TextStyle(color: hub.subtitle, fontSize: 13.5)),
+                            ]),
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                          itemCount: visible.length,
-                          itemBuilder: (_, i) {
-                            final n = visible[i];
-                            final dark = n.darkTheme;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Dismissible(
-                                key: ValueKey(n.id),
-                                direction: DismissDirection.endToStart,
-                                background: Container(
-                                  alignment: Alignment.centerRight,
-                                  padding: const EdgeInsets.only(right: 24),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFEF4444).withValues(alpha: 0.3)]),
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 26),
-                                ),
-                                onDismissed: (_) => _delete(n),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    onTap: () => _openEditor(note: n),
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: Stack(
-                                      children: [
-                                        Positioned.fill(
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(18),
-                                            child: _NoteBackgroundLayer(note: n, compact: true),
-                                          ),
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(18),
-                                            border: Border.all(color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05)),
-                                          ),
-                                          child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            width: 44,
-                                            height: 44,
-                                            alignment: Alignment.center,
-                                            decoration: BoxDecoration(
-                                              color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.04),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: NgmyOfflineEmoji(
-                                              n.icon.trim().isEmpty ? '📝' : n.icon.trim(),
-                                              fontSize: 22,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 14),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Expanded(
-                                                      child: _NoteTitleLines(
-                                                        text: n.preview,
-                                                        style: TextStyle(
-                                                          color: dark ? Colors.white : const Color(0xFF0F172A),
-                                                          fontWeight: FontWeight.w800,
-                                                          fontSize: 16,
-                                                          height: 1.2,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    if (n.pinned) const Padding(padding: EdgeInsets.only(left: 6, top: 2), child: Icon(Icons.push_pin_rounded, size: 14, color: Color(0xFF8B5CF6))),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  n.displayBody.trim().isEmpty ? 'Empty note' : n.displayBody.replaceAll('\n', ' '),
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(color: dark ? Colors.white60 : const Color(0xFF64748B), fontSize: 13, height: 1.35),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Row(
-                                                  children: n.isTrashed
-                                                      ? [
-                                                          GestureDetector(
-                                                            onTap: () => _restore(n),
-                                                            child: Container(
-                                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                              decoration: BoxDecoration(
-                                                                color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                                                borderRadius: BorderRadius.circular(8),
-                                                              ),
-                                                              child: const Row(
-                                                                mainAxisSize: MainAxisSize.min,
-                                                                children: [
-                                                                  Icon(Icons.restore_rounded, size: 12, color: Color(0xFF10B981)),
-                                                                  SizedBox(width: 3),
-                                                                  Text('Restore', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF10B981))),
-                                                                ],
-                                                              ),
-                                                            ),
-                                                          ),
-                                                          const Spacer(),
-                                                          Text(_trashExpiryLabel(n.deletedAt!), style: TextStyle(color: const Color(0xFFEF4444).withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w600)),
-                                                        ]
-                                                      : [
-                                                          Container(
-                                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                            decoration: BoxDecoration(
-                                                              color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                                                              borderRadius: BorderRadius.circular(8),
-                                                            ),
-                                                            child: Text(n.folder, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: dark ? Colors.white54 : const Color(0xFF94A3B8))),
-                                                          ),
-                                                          const Spacer(),
-                                                          Text(_formatDate(n.updatedAt), style: TextStyle(color: dark ? Colors.white38 : const Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600)),
-                                                        ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                      : ListView(
+                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                          children: [
+                            if (pinned.isNotEmpty) ...[_label('PINNED', hub), _grid(pinned, hub), if (others.isNotEmpty) _label('OTHERS', hub)],
+                            if (others.isNotEmpty) _grid(others, hub),
+                            Padding(padding: const EdgeInsets.only(top: 6), child: Center(child: Text('Press and hold a note for more options', style: TextStyle(color: hub.muted, fontSize: 11.5)))),
+                          ],
                         ),
             ),
-          ],
+          ]),
         ),
-      ),
+        Positioned(
+          right: 20,
+          bottom: 24,
+          child: SafeArea(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [BoxShadow(color: _accent.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 8))],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _pickTemplateAndCreate,
+                  borderRadius: BorderRadius.circular(30),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 22, vertical: 15),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                      SizedBox(width: 8),
+                      Text('New note', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 15)),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ]),
     );
   }
 
@@ -2168,13 +2144,38 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     );
   }
 
+  int _rev = 0;
+  Future<void>? _saving;
+  bool _saveAgain = false;
+
   void _markDirty() {
     _dirty = true;
+    _rev++;
     _autosave?.cancel();
-    _autosave = Timer(const Duration(milliseconds: 120), _persist);
+    // Wait for a pause in typing, so a long paragraph is saved in one go.
+    _autosave = Timer(const Duration(milliseconds: 700), _persist);
   }
 
-  Future<void> _persist() async {
+  /// Only one save runs at a time. If you keep typing during a save, another
+  /// save runs straight after with the newest text, so an older save can never
+  /// land last and cut your writing short.
+  Future<void> _persist() {
+    if (_saving != null) {
+      _saveAgain = true;
+      return _saving!;
+    }
+    return _saving = _persistLoop().whenComplete(() => _saving = null);
+  }
+
+  Future<void> _persistLoop() async {
+    do {
+      _saveAgain = false;
+      await _persistOnce();
+    } while (_saveAgain);
+  }
+
+  Future<void> _persistOnce() async {
+    final startRev = _rev;
     final contentChanged = widget.isNew || _hasTypedContentChange();
     _note.title = _title.text;
     _note.body = _storedBody;
@@ -2215,6 +2216,8 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
       }
       // Make sure this note keeps the editor's current photos even if _loadNotes
       // briefly hydrated an older empty list for the same id.
+      _note.body = _storedBody;
+      _note.title = _title.text;
       final idx = items.indexWhere((e) => e.id == _note.id);
       if (idx >= 0) {
         items[idx].images = List<String>.from(_note.images);
@@ -2233,7 +2236,7 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         items[idx].updatedAt = _note.updatedAt;
       }
       await _saveNotes(widget.userEmail, items);
-      _dirty = false;
+      if (_rev == startRev) _dirty = false;
     } catch (e) {
       debugPrint('[business notes] persist failed: $e');
       // Keep _dirty true so we retry — never pretend photos were saved.
@@ -2838,6 +2841,248 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
     final fg = dark ? Colors.white : const Color(0xFF0F172A);
     final muted = dark ? Colors.white60 : const Color(0xFF64748B);
     final viewPlain = _notePlainText(_storedBody, _note.textAnims);
+    final words = RegExp(r'\S+').allMatches(viewPlain).length;
+    final panel = dark ? const Color(0xFF111827).withValues(alpha: 0.92) : Colors.white.withValues(alpha: 0.94);
+    final titleSize = _note.titleFontSize.clamp(22.0, 40.0);
+    final bodyColor = dark ? Colors.white.withValues(alpha: 0.93) : const Color(0xFF1F2937);
+
+    Widget circleBtn(IconData icon, VoidCallback onTap, {Color? color, String? tip}) => Tooltip(
+          message: tip ?? '',
+          child: Material(
+            color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onTap,
+              child: SizedBox(width: 40, height: 40, child: Icon(icon, size: 20, color: color ?? fg)),
+            ),
+          ),
+        );
+
+    final meta = Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(color: const Color(0xFF8B5CF6).withValues(alpha: dark ? 0.3 : 0.14), borderRadius: BorderRadius.circular(20)),
+          child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: dark ? const Color(0xFFC4B5FD) : const Color(0xFF6D28D9))),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Text('${_formatDate(_note.updatedAt)}  ·  $words ${words == 1 ? 'word' : 'words'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: muted, fontWeight: FontWeight.w600))),
+      ]),
+    );
+
+    final topBar = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+      child: Row(children: [
+        circleBtn(Icons.arrow_back_ios_new_rounded, _onWillPop, tip: 'Back'),
+        const SizedBox(width: 10),
+        if (!_previewMode)
+          GestureDetector(
+            onTap: _showEmojiPicker,
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.06), shape: BoxShape.circle),
+              child: NgmyOfflineEmoji(_note.icon.trim().isEmpty ? '📝' : _note.icon.trim(), fontSize: 19),
+            ),
+          ),
+        Expanded(
+          child: _previewMode
+              ? const SizedBox.shrink()
+              : Align(
+                  alignment: Alignment.centerRight,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _dirty
+                    ? SizedBox(key: const ValueKey('s'), width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: muted))
+                    : const Icon(Icons.check_circle_rounded, key: ValueKey('d'), size: 15, color: Color(0xFF22C55E)),
+              ),
+              const SizedBox(width: 6),
+                      Text(_dirty ? "Saving" : "Saved", style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w700)),
+                    ]),
+                  ),
+                ),
+        ),
+        const SizedBox(width: 6),
+        circleBtn(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, () => setState(() {
+              _note.pinned = !_note.pinned;
+              _markDirty();
+            }), color: _note.pinned ? const Color(0xFF8B5CF6) : null, tip: 'Pin'),
+        const SizedBox(width: 6),
+        if (_previewMode)
+          FilledButton.icon(
+            onPressed: () => setState(() {
+              _previewMode = false;
+              _note.openInPreview = false;
+            }),
+            icon: const Icon(Icons.edit_rounded, size: 17),
+            label: const Text('Edit'),
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF8B5CF6), foregroundColor: Colors.white, shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10)),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: () async {
+              await _persist();
+              if (!mounted) return;
+              FocusManager.instance.primaryFocus?.unfocus();
+              setState(() => _previewMode = true);
+            },
+            icon: Icon(Icons.chrome_reader_mode_rounded, size: 17, color: fg),
+            label: Text('Read', style: TextStyle(color: fg, fontWeight: FontWeight.w800)),
+            style: OutlinedButton.styleFrom(side: BorderSide(color: fg.withValues(alpha: 0.25)), shape: const StadiumBorder(), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10)),
+          ),
+        const SizedBox(width: 6),
+        circleBtn(Icons.more_horiz_rounded, _showActions, tip: 'More'),
+      ]),
+    );
+
+    final toolbar = Container(
+      margin: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: dark ? Colors.white12 : Colors.black12),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.4 : 0.1), blurRadius: 16, offset: const Offset(0, 4))],
+      ),
+      child: Listener(
+        onPointerDown: (_) => _captureEditorSelection(),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
+            _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
+            _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
+            _tool(Icons.format_color_text_rounded, 'Text color', _showTextColorPicker, fg),
+            _toolSep(fg),
+            _tool(Icons.title_rounded, 'Heading', _toggleHeadingOnCurrentLine, fg),
+            _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
+            _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
+            _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
+            _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
+            _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
+            _toolSep(fg),
+            _tool(Icons.image_outlined, 'Photo', () => unawaited(_attachPhoto()), fg),
+            _tool(Icons.emoji_emotions_outlined, 'Emoji', _showBodyEmojiPicker, fg),
+            _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
+            _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
+            _toolSep(fg),
+            _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
+            _tool(Icons.palette_rounded, 'Any color', _showCustomColorPicker, fg),
+            _sizeSliderChip(
+              label: 'Title',
+              value: _note.titleFontSize,
+              min: 18,
+              max: 40,
+              fg: fg,
+              onChanged: (v) => setState(() {
+                _note.titleFontSize = v;
+                _markDirty();
+              }),
+            ),
+            _sizeSliderChip(
+              label: 'Lead',
+              value: _note.leadFontSize,
+              min: 12,
+              max: 32,
+              fg: fg,
+              onChanged: (v) {
+                setState(() {
+                  _note.leadFontSize = v;
+                  _applyLeadSizeToFirstParagraph(v);
+                });
+              },
+            ),
+          ]),
+        ),
+      ),
+    );
+
+    final editView = SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 6),
+          child: TextField(
+            controller: _title,
+            style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.6, height: 1.15),
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              hintText: 'Title',
+              hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1), fontSize: titleSize, fontWeight: FontWeight.w900),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
+          ),
+        ),
+        meta,
+        _notePhotosSection(dark: dark, editable: true),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+          child: TextField(
+            controller: _body,
+            focusNode: _bodyFocus,
+            style: TextStyle(fontSize: 17, height: 1.6, color: bodyColor),
+            textCapitalization: TextCapitalization.sentences,
+            keyboardType: TextInputType.multiline,
+            decoration: InputDecoration(
+              hintText: 'Start writing…',
+              hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
+              border: InputBorder.none,
+              isCollapsed: true,
+            ),
+            maxLines: null,
+            minLines: 8,
+          ),
+        ),
+        // Tapping the empty space below the text puts the cursor at the end.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            _bodyFocus.requestFocus();
+            _body.selection = TextSelection.collapsed(offset: _body.text.length);
+          },
+          child: const SizedBox(height: 260, width: double.infinity),
+        ),
+      ]),
+    );
+
+    final readView = SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 40),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 6),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            NgmyOfflineEmoji(_note.icon.trim().isEmpty ? '📝' : _note.icon.trim(), fontSize: titleSize),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _NoteTitleLines(
+                text: _title.text.trim().isEmpty ? 'Untitled' : _title.text,
+                style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.6, height: 1.15),
+              ),
+            ),
+          ]),
+        ),
+        meta,
+        _notePhotosSection(dark: dark, editable: false),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 0),
+          child: SelectableText(
+            viewPlain.trim().isEmpty ? 'Nothing here yet. Tap Edit to write.' : viewPlain,
+            style: TextStyle(fontSize: 17, height: 1.65, color: bodyColor, fontStyle: viewPlain.trim().isEmpty ? FontStyle.italic : FontStyle.normal),
+          ),
+        ),
+      ]),
+    );
 
     return PopScope(
       canPop: false,
@@ -2845,264 +3090,25 @@ class _NoteEditorPageState extends State<_NoteEditorPage> {
         if (!didPop) _onWillPop();
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         body: Stack(
           fit: StackFit.expand,
           children: [
             _NoteBackgroundLayer(note: _note),
             SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.arrow_back_ios_new_rounded, color: fg, size: 20),
-                          onPressed: _onWillPop,
-                        ),
-                        if (_previewMode) ...[
-                          NgmyOfflineEmoji(
-                            _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
-                            fontSize: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _NoteTitleLines(
-                              text: _title.text.trim().isEmpty ? 'Untitled' : _title.text,
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: fg, letterSpacing: -0.3, height: 1.2),
-                            ),
-                          ),
-                          _headerBtn(
-                            icon: Icons.edit_rounded,
-                            label: 'Edit',
-                            fg: fg,
-                            onTap: () => setState(() {
-                              _previewMode = false;
-                              _note.openInPreview = false;
-                            }),
-                          ),
-                        ] else ...[
-                          GestureDetector(
-                            onTap: _showEmojiPicker,
-                            child: Tooltip(
-                              message: 'Cover icon',
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                margin: const EdgeInsets.only(right: 6),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: dark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: dark ? Colors.white24 : Colors.black12),
-                                ),
-                                child: NgmyOfflineEmoji(
-                                  _note.icon.trim().isEmpty ? '📝' : _note.icon.trim(),
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, constraints) {
-                                final titleStyle = TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                  color: fg,
-                                  letterSpacing: -0.3,
-                                  height: 1.25,
-                                );
-                                final center = _noteTitleOverflowsOneLine(
-                                  _title.text,
-                                  titleStyle,
-                                  constraints.maxWidth,
-                                );
-                                return TextField(
-                                  controller: _title,
-                                  style: titleStyle,
-                                  textAlign: center ? TextAlign.center : TextAlign.start,
-                                  decoration: InputDecoration(
-                                    hintText: 'Title',
-                                    hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1), fontSize: 17),
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                  maxLines: 2,
-                                  minLines: 1,
-                                );
-                              },
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(_note.pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined, color: _note.pinned ? const Color(0xFF8B5CF6) : muted, size: 20),
-                            onPressed: () => setState(() => _note.pinned = !_note.pinned),
-                          ),
-                          _headerBtn(
-                            icon: Icons.visibility_rounded,
-                            label: 'View',
-                            fg: fg,
-                            onTap: () async {
-                              await _persist();
-                              if (!mounted) return;
-                              setState(() => _previewMode = true);
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.more_horiz_rounded, color: muted),
-                            onPressed: _showActions,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (!_previewMode)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: dark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(10)),
-                            child: Text(_note.folder, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: muted)),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                  if (!_previewMode)
-                  Container(
-                    margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: dark ? Colors.black.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.72),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Listener(
-                      onPointerDown: (_) => _captureEditorSelection(),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                          _tool(Icons.format_bold_rounded, 'Bold', () => _wrapSelection('**', '**'), fg),
-                          _tool(Icons.format_italic_rounded, 'Italic', () => _wrapSelection('_', '_'), fg),
-                          _tool(Icons.format_underlined_rounded, 'Underline', () => _wrapSelection('<u>', '</u>'), fg),
-                          _tool(Icons.format_color_text_rounded, 'Text color', _showTextColorPicker, fg),
-                          _tool(Icons.format_list_bulleted_rounded, 'List', () => _insertLine('• '), fg),
-                          _tool(Icons.format_list_numbered_rounded, 'Number', () => _insertLine('1. '), fg),
-                          _tool(Icons.check_box_outlined, 'Check', _toggleCheckbox, fg),
-                          _tool(Icons.title_rounded, 'Heading', _toggleHeadingOnCurrentLine, fg),
-                          _tool(Icons.format_quote_rounded, 'Quote', () => _insertLine('> '), fg),
-                          _tool(Icons.horizontal_rule_rounded, 'Line', () => _insertAtCursor('\n---\n'), fg),
-                          _sizeSliderChip(
-                            label: 'Title',
-                            value: _note.titleFontSize,
-                            min: 18,
-                            max: 40,
-                            fg: fg,
-                            onChanged: (v) => setState(() {
-                              _note.titleFontSize = v;
-                              _markDirty();
-                            }),
-                          ),
-                          _sizeSliderChip(
-                            label: 'Lead',
-                            value: _note.leadFontSize,
-                            min: 12,
-                            max: 32,
-                            fg: fg,
-                            onChanged: (v) {
-                              setState(() {
-                                _note.leadFontSize = v;
-                                _applyLeadSizeToFirstParagraph(v);
-                              });
-                            },
-                          ),
-                          _tool(Icons.animation_rounded, 'Animate', _showTextAnimationPicker, fg),
-                          _tool(Icons.image_outlined, 'Photo', () => unawaited(_attachPhoto()), fg),
-                          _tool(Icons.emoji_emotions_outlined, 'Emoji', _showBodyEmojiPicker, fg),
-                          _tool(Icons.dashboard_customize_outlined, 'Template', _showInsertTemplate, fg),
-                          _tool(Icons.wallpaper_rounded, 'Background', _showBackgroundPicker, fg),
-                          _tool(Icons.palette_rounded, 'Any color', _showCustomColorPicker, fg),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _previewMode
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-                                child: Text(_formatDate(_note.updatedAt), style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                              ),
-                              _notePhotosSection(dark: dark, editable: false),
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                                  child: SelectableText(
-                                    viewPlain.trim().isEmpty ? 'Start writing…' : viewPlain,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      height: 1.55,
-                                      color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155),
-                                      fontStyle: viewPlain.trim().isEmpty ? FontStyle.italic : FontStyle.normal,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _notePhotosSection(dark: dark, editable: true),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                                  child: TextField(
-                                    controller: _body,
-                                    focusNode: _bodyFocus,
-                                    style: TextStyle(fontSize: 16, height: 1.55, color: dark ? Colors.white.withValues(alpha: 0.92) : const Color(0xFF334155)),
-                                    decoration: InputDecoration(
-                                      hintText: 'Start writing…',
-                                      hintStyle: TextStyle(color: dark ? Colors.white30 : const Color(0xFFCBD5E1)),
-                                      border: InputBorder.none,
-                                    ),
-                                    maxLines: null,
-                                    expands: true,
-                                    textAlignVertical: TextAlignVertical.top,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                  if (_dirty && !_previewMode)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: muted)),
-                          const SizedBox(width: 8),
-                          Text('Saving…', style: TextStyle(fontSize: 11, color: muted, fontWeight: FontWeight.w600)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+              child: Column(children: [
+                topBar,
+                Expanded(child: _previewMode ? readView : editView),
+                if (!_previewMode) toolbar,
+              ]),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _toolSep(Color fg) => Container(width: 1, height: 22, margin: const EdgeInsets.symmetric(horizontal: 4), color: fg.withValues(alpha: 0.15));
 
   Widget _headerBtn({required IconData icon, required String label, required Color fg, required VoidCallback onTap}) {
     return Material(

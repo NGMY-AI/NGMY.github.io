@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ngmy/ngmy_block_builder.dart';
+import 'package:ngmy/ngmy_body_explorer.dart';
 import 'package:ngmy/ngmy_play_data.dart';
 import 'package:ngmy/ngmy_play_hub.dart';
 import 'package:ngmy/ngmy_play_studios_a.dart';
 import 'package:ngmy/ngmy_play_studios_b.dart';
-import 'package:ngmy/ngmy_play_tools.dart';
+import 'package:ngmy/ngmy_play_toolbox.dart';
 import 'package:ngmy/ngmy_studio_kit.dart';
 
 void main() {
@@ -45,7 +46,7 @@ void main() {
   });
 
   testWidgets('every discovery studio opens and runs', (t) async {
-    for (final w in const <Widget>[NgmyPeriodicStudio(), NgmySkyStudio(), NgmyQuakeStudio(), NgmyDinoStudio(), NgmyAnimalStudio(), NgmyBodyStudio(), NgmyConverterStudio(), NgmyWorldClockStudio(), NgmyMathStudio(), NgmyTypingStudio()]) {
+    for (final w in const <Widget>[NgmyPeriodicStudio(), NgmySkyStudio(), NgmyQuakeStudio(), NgmyDinoStudio(), NgmyAnimalStudio(), NgmyBodyExplorer(), NgmyWheelStudio(), NgmyFocusTimerStudio(), NgmyBreatheStudio(), NgmyDrawPadStudio(), NgmyMemoryStudio(), NgmySimonStudio(), NgmyTipStudio(), NgmyLuckyStudio()]) {
       await open(t, w);
       await t.pump(const Duration(milliseconds: 800));
       expect(t.takeException(), isNull, reason: '$w');
@@ -64,7 +65,7 @@ void main() {
     expect(find.textContaining('Water'), findsOneWidget);
   });
 
-  testWidgets('block builder runs a starter and can be edited', (t) async {
+  testWidgets('block builder runs a starter and blocks can be dragged in', (t) async {
     await open(t, const NgmyBlockBuilder());
     expect(find.text('BLOCK BUILDER'), findsWidgets);
     await t.tap(find.text('Play'));
@@ -74,12 +75,17 @@ void main() {
     expect(find.text('Stop'), findsOneWidget);
     await t.tap(find.text('Stop'));
     await t.pump();
-    // Add a block from the Sound tab.
     await t.tap(find.text('Sound'));
     await t.pump();
-    await t.tap(find.text('play note …'));
-    await t.pump();
-    expect(find.textContaining('play note'), findsWidgets);
+    final note = find.textContaining('play note', findRichText: true);
+    expect(note, findsOneWidget);
+    final g = await t.startGesture(t.getCenter(note));
+    await t.pump(const Duration(milliseconds: 300));
+    await g.moveTo(t.getCenter(find.textContaining('Drop here for a new script')));
+    await t.pump(const Duration(milliseconds: 100));
+    await g.up();
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('play note', findRichText: true), findsNWidgets(2));
     expect(t.takeException(), isNull);
   });
 
@@ -88,6 +94,6 @@ void main() {
     expect(find.text('PERIODIC TABLE'), findsOneWidget);
     expect(find.text('BODY EXPLORER'), findsOneWidget);
     await open(t, const NgmyToolboxHub());
-    expect(find.text('TYPING TUTOR'), findsOneWidget);
+    expect(find.text('Spin the Wheel'), findsOneWidget);
   });
 }
