@@ -192,6 +192,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
           ? const Color(0xFF121212)
           : const Color(0xFFF1F5F9),
       body: SafeArea(
+        top: false,
         bottom: false,
         child: NgmyHudMotion(
           builder: (context, pulse, scan, orbit) {
@@ -199,7 +200,7 @@ class NgmyCreatorHubTab extends StatelessWidget {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 10, 20, bottomScrollPadding),
+                    padding: EdgeInsets.fromLTRB(20, 10 + MediaQuery.paddingOf(context).top, 20, bottomScrollPadding),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
