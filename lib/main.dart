@@ -10169,6 +10169,11 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
 
   Future<List<AppTransaction>> _fetchCloudApprovedContributions() => ngmyFetchApprovedContributionsFromCloud();
 
+  int _ngmyTxnUiSignature() => Object.hashAll([
+        for (final t in _allTransactions) Object.hash(t.id, t.status.index, t.amount),
+        _currentUser == null ? 0 : jsonEncode(_currentUser!.toJson()).hashCode,
+      ]);
+
   Future<void> _refreshUserTransactionsFromCloud({bool force = false}) async {
     if (!NgmyCloudPolicy.persistTransactionsToCloud) return;
     if (_currentUser == null || !await ngmyCanReachCloud()) return;
@@ -10201,7 +10206,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         debugPrint('[user] civic contributions local merge: $e');
       }
       if (!mounted) return;
-      setState(() {
+      final sigBefore = _ngmyTxnUiSignature();
+      {
         if (!_ngmySessionIsAdmin(_currentUser)) {
           _allTransactions = ngmyReplaceUserTransactionsFromCloud(
             _allTransactions,
@@ -10227,8 +10233,13 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         _applyWalletDecisionLedgerToTransactions();
         _seedWithdrawalHoldTxnIds();
         _reconcileAllUserBalances(ledgerSettled: true);
-      });
-      unawaited(_persistLocalOnly());
+      }
+      // Only repaint and re-save when something really changed; a poll that finds
+      // the same data must not rebuild the whole app (that looked like refreshing).
+      if (_ngmyTxnUiSignature() != sigBefore) {
+        setState(() {});
+        unawaited(_persistLocalOnly());
+      }
       // Own rows from the last 2 days that the server still doesn't have
       // (an upload that failed or was cut off by a refresh) go up again, so
       // every phone on this account ends up with the same history.
@@ -10749,7 +10760,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ..._currentUser!.toJson(),
         ...rows.first,
       });
-      setState(() {
+      final walletBefore = jsonEncode(_currentUser!.toJson());
+      void applyWallet() {
         _currentUser!.accountBalance = remote.accountBalance;
         _currentUser!.totalProfit = remote.totalProfit;
         _currentUser!.activeInvestment = remote.activeInvestment;
@@ -10768,7 +10780,10 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         if (idx >= 0) {
           _allUsers[idx] = _currentUser!;
         }
-      });
+      }
+      applyWallet();
+      // Repaint the whole app only when the figures really changed.
+      if (jsonEncode(_currentUser!.toJson()) != walletBefore) setState(() {});
       // Show the saved money now — don't wait for the whole history to download.
       ngmyLastServerBalance[ngmyNormalizeEmail(email)] = remote.accountBalance;
       ngmySeedLiveBalance(email, _currentUser!.accountBalance, allowIncrease: true);

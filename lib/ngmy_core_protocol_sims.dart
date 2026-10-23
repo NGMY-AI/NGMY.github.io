@@ -12,6 +12,7 @@ import 'ngmy_core_studios_b.dart';
 import 'ngmy_core_studios_c.dart';
 import 'ngmy_core_studios_e.dart';
 import 'ngmy_studio_kit.dart';
+import 'ngmy_play_hub.dart';
 import 'ngmy_universe_hub.dart';
 
 /// Core Protocol: four auto-playing "unfold" sequences. Each one builds three glass slabs in a
@@ -253,6 +254,9 @@ class _StudioDef {
 
 final List<_StudioDef> _kStudios = [
   _StudioDef('UNIVERSE', 'Earth, space and gravity', Icons.travel_explore_rounded, const Color(0xFF38BDF8), () => const NgmyUniverseHub()),
+  _StudioDef('BLOCK BUILDER', 'Snap blocks, make games', Icons.extension_rounded, const Color(0xFFFACC15), ngmyBlockBuilderScreen),
+  _StudioDef('DISCOVERY LAB', 'Elements, sky, dinosaurs', Icons.biotech_rounded, const Color(0xFF4ADE80), () => const NgmyDiscoveryHub()),
+  _StudioDef('TOOLBOX', 'Converter, clock, games', Icons.build_circle_rounded, const Color(0xFFFB923C), () => const NgmyToolboxHub()),
   _StudioDef('REACTION LAB', 'Wire parts together', Icons.hub_rounded, const Color(0xFF34D399), () => const NgmyReactionLabScreen()),
   _StudioDef('SPARK PAINTER', 'Paint with light', Icons.brush_rounded, const Color(0xFFF472B6), () => const NgmySparkPainterStudio()),
   _StudioDef('MANDALA MAKER', 'Draw once, it repeats', Icons.filter_vintage_rounded, const Color(0xFFA78BFA), () => const NgmyMandalaStudio()),
