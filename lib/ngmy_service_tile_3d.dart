@@ -129,7 +129,8 @@ class _NgmyTile3DState extends State<NgmyTile3D> {
                     ),
                   ),
                 ),
-                widget.child,
+                // Fill the whole tile, so the content is centred in the box and not pushed to one side.
+                Positioned.fill(child: Center(child: widget.child)),
               ]),
             ),
           ),

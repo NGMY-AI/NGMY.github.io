@@ -5,6 +5,7 @@ import 'package:ngmy/ngmy_service_tile_3d.dart';
 
 void main() {
   _tileTests();
+  _centerTest();
   testWidgets('every service look draws its textured card around the content', (tester) async {
     for (final look in NgmyServiceLook.values) {
       await tester.pumpWidget(MaterialApp(home: Scaffold(body: Center(child: SizedBox(width: 360, child: NgmyServiceTexture(look: look, child: Text('inside ${look.name}')))))));
@@ -59,5 +60,54 @@ class _HostState extends State<_Host> with SingleTickerProviderStateMixin {
               NgmyTile3D(colors: NgmyTileColors.of(NgmyServiceLook.values[i]), float: _c, phase: i * 0.2, selected: i == 1, onTap: widget.onTap, child: Center(child: Text('tile $i'))),
           ],
         ),
+      );
+}
+
+void _centerTest() {
+  testWidgets('tile content is centred in the box whatever the width of its text', (tester) async {
+    tester.view.physicalSize = const Size(430, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 190,
+            height: 200,
+            child: _Host2(),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 300));
+    final tile = tester.getRect(find.byType(NgmyTile3D));
+    final text = tester.getRect(find.text('Hi'));
+    expect((text.center.dx - tile.center.dx).abs() < 2, isTrue);
+    expect((text.center.dy - tile.center.dy).abs() < 2, isTrue);
+  });
+}
+
+class _Host2 extends StatefulWidget {
+  @override
+  State<_Host2> createState() => _Host2State();
+}
+
+class _Host2State extends State<_Host2> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(seconds: 2));
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => NgmyTile3D(
+        colors: NgmyTileColors.of(null),
+        float: _c,
+        phase: 0,
+        selected: false,
+        onTap: () {},
+        child: const Column(mainAxisSize: MainAxisSize.min, children: [Text('Hi')]),
       );
 }
