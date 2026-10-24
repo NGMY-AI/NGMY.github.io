@@ -74,19 +74,49 @@ async function geminiVirtualOutfit(
   throw new Error(lastErr);
 }
 
+// The chat models this key can use right now. Google retires and renames models, so ask it
+// which ones exist instead of trusting a fixed list (a stale list is what made every advisor
+// reply fail).
+let geminiModelCache: { at: number; list: string[] } | null = null;
+async function geminiChatModels(apiKey: string): Promise<string[]> {
+  const fallback = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"];
+  if (geminiModelCache && Date.now() - geminiModelCache.at < 30 * 60 * 1000 && geminiModelCache.list.length) {
+    return geminiModelCache.list;
+  }
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=${encodeURIComponent(apiKey)}`,
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const found: { name: string; v: number }[] = [];
+      for (const m of (data?.models ?? []) as any[]) {
+        const methods: string[] = m?.supportedGenerationMethods ?? [];
+        const name = String(m?.name ?? "").replace(/^models\//, "");
+        if (!methods.includes("generateContent")) continue;
+        if (!/flash/.test(name)) continue;
+        if (/image|tts|live|audio|embedding|thinking|exp|preview|vision|robotics|computer|native|8b|lite/.test(name)) continue;
+        const v = parseFloat((name.match(/gemini-(\d+(?:\.\d+)?)/) ?? [])[1] ?? "0");
+        found.push({ name, v });
+      }
+      found.sort((a, b) => b.v - a.v);
+      const list = ["gemini-flash-latest", ...found.slice(0, 3).map((f) => f.name), ...fallback].filter((n, i, a) => a.indexOf(n) === i);
+      geminiModelCache = { at: Date.now(), list };
+      return list;
+    }
+  } catch (_) {
+    // fall through to the built-in list
+  }
+  return fallback;
+}
+
 async function geminiChat(
   apiKey: string,
   prompt: string,
   images: GeminiImagePart[] = [],
   appBuilder = false,
 ): Promise<string> {
-  const models = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
-  ];
+  const models = await geminiChatModels(apiKey);
   const geminiParts: unknown[] = [];
   for (const img of images) {
     const data = String(img?.data ?? "").trim();
@@ -100,7 +130,7 @@ async function geminiChat(
   }
   geminiParts.push({ text: prompt });
 
-  let lastErr = "Gemini request failed";
+  const errors: string[] = [];
   for (const model of models) {
     const url =
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -121,10 +151,13 @@ async function geminiChat(
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text && String(text).trim()) return String(text).trim();
     } else {
-      lastErr = await res.text();
+      const body = (await res.text()).replace(/\s+/g, " ").slice(0, 160);
+      errors.push(`${model}: HTTP ${res.status} ${body}`);
+      // A model that no longer exists is dropped from the list for next time.
+      if (res.status === 404 && geminiModelCache) geminiModelCache.list = geminiModelCache.list.filter((m) => m !== model);
     }
   }
-  throw new Error(lastErr);
+  throw new Error(errors.length ? errors.join(" | ") : "Gemini request failed");
 }
 
 // ── Advisor Browser ─────────────────────────────────────────────────────────
