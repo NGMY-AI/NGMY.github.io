@@ -10760,6 +10760,8 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
         ..._currentUser!.toJson(),
         ...rows.first,
       });
+      final pend = _pendingGameNet(ngmyNormalizeEmail(email));
+      if (pend.abs() > 0.004) remote.accountBalance = (remote.accountBalance + pend) < 0 ? 0.0 : remote.accountBalance + pend;
       final walletBefore = jsonEncode(_currentUser!.toJson());
       void applyWallet() {
         _currentUser!.accountBalance = remote.accountBalance;
@@ -11063,18 +11065,58 @@ class _NGMYAppState extends State<NGMYApp> with WidgetsBindingObserver {
     final run = _legacyGameSettleChain.then((_) async {
       ngmyUnsettledGameTxns.remove(t.id);
       if (t.type == TransactionType.adminRemove) ngmyNoteLocalDebit(email, t.amount);
+      // Has the server seen this receipt already? Then its balance already includes it.
+      var alreadyThere = false;
+      try {
+        final seen = await ngmyDbRelaySelect('transactions', cols: 'id', eq: {'id': t.id}, single: true, timeout: kNgmyCloudLoadTimeout);
+        alreadyThere = seen.isNotEmpty;
+      } catch (_) {}
       final rowOk = await _pushTransactionToCloudReliable(t);
       final idx = _allUsers.indexWhere((u) => ngmyNormalizeEmail(u.email) == email);
       final user = idx != -1
           ? _allUsers[idx]
           : (_currentUser != null && ngmyNormalizeEmail(_currentUser!.email) == email ? _currentUser : null);
-      var balanceOk = false;
-      if (user != null) balanceOk = await _pushUserBalanceToCloud(user, allowDecrease: true);
+      var balanceOk = alreadyThere;
+      if (user != null && !alreadyThere) balanceOk = await _applyGameDeltaOnServer(user, t);
       if (rowOk && balanceOk) _txnOutboxDone(t.id);
       if (mounted) setState(() {});
     });
     _legacyGameSettleChain = run.catchError((Object _) {});
     return run;
+  }
+
+  /// Adds this game's win or loss to the balance the server holds right now, so every phone ends
+  /// up with the same figure and a phone that did not play can never bring old money back.
+  Future<bool> _applyGameDeltaOnServer(UserData u, AppTransaction t) async {
+    try {
+      final email = u.email.trim();
+      final key = ngmyNormalizeEmail(email);
+      final rows = await ngmyDbRelaySelect('users', cols: 'accountBalance', eq: {'email': email}, single: true, timeout: kNgmyCloudLoadTimeout);
+      if (rows.isEmpty || rows.first['accountBalance'] is! num) return false;
+      final cloud = (rows.first['accountBalance'] as num).toDouble();
+      final delta = _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
+      final target = (cloud + delta) < 0 ? 0.0 : cloud + delta;
+      await _safeUpsertUserRow({'email': email, 'accountBalance': target});
+      ngmyLastServerBalance[key] = target;
+      u.accountBalance = target;
+      ngmySeedLiveBalance(email, target, allowIncrease: true, authoritative: true);
+      ngmyNotifyBalanceChanged(email: email, balance: target, authoritative: true);
+      return true;
+    } catch (e) {
+      debugPrint('[wallet] game delta: $e');
+      return false;
+    }
+  }
+
+  /// The net of game bets and wins on this phone that the server has not confirmed yet.
+  double _pendingGameNet(String key) {
+    var sum = ngmyUnsettledGameNetFor(key);
+    for (final t in _allTransactions) {
+      if (!_txnOutbox.contains(t.id) || !ngmyIsGameLedgerTransaction(t)) continue;
+      if (ngmyNormalizeEmail(t.userEmail) != key || ngmyUnsettledGameTxns.containsKey(t.id)) continue;
+      sum += _ngmyTxnIncreasesBalance(t) ? t.amount : -t.amount;
+    }
+    return sum;
   }
 
   Future<void> _settleGameTxnOnServerInner(AppTransaction t) async {
