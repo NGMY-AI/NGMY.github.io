@@ -1430,6 +1430,33 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
     }
   }
 
+  /// Starts the text a little before the first match, so a hit deep in a long note is visible.
+  String _snippet(String text, String q) {
+    final k = q.trim().toLowerCase();
+    if (k.isEmpty) return text;
+    final i = text.toLowerCase().indexOf(k);
+    if (i < 30) return text;
+    return '…' + text.substring(i - 20);
+  }
+
+  /// Paints every match of the search words with a yellow marker.
+  TextSpan _hl(String text, String q) {
+    final k = q.trim().toLowerCase();
+    if (k.isEmpty) return TextSpan(text: text);
+    final low = text.toLowerCase();
+    final spans = <TextSpan>[];
+    var at = 0;
+    while (true) {
+      final i = low.indexOf(k, at);
+      if (i < 0) break;
+      if (i > at) spans.add(TextSpan(text: text.substring(at, i)));
+      spans.add(TextSpan(text: text.substring(i, i + k.length), style: const TextStyle(backgroundColor: Color(0xFFFDE047), color: Color(0xFF111827))));
+      at = i + k.length;
+    }
+    if (at < text.length) spans.add(TextSpan(text: text.substring(at)));
+    return TextSpan(children: spans);
+  }
+
   Widget _card(NgmyBusinessNote n, NgmyHubTheme hub) {
     final dark = n.darkTheme;
     final fg = dark ? Colors.white : const Color(0xFF111827);
@@ -1469,10 +1496,10 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                 GestureDetector(onTap: () => _noteMenu(n), child: Padding(padding: const EdgeInsets.only(right: 22), child: Icon(Icons.more_horiz_rounded, size: 20, color: dark ? Colors.white70 : const Color(0xFF475569)))),
               ]),
               const SizedBox(height: 9),
-              Text(n.preview, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.2, letterSpacing: -0.2)),
+              Text.rich(_hl(n.preview, _query), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 15.5, height: 1.2, letterSpacing: -0.2)),
               if (body.isNotEmpty) ...[
                 const SizedBox(height: 5),
-                Expanded(child: Text(body.replaceAll(RegExp(r'\n{2,}'), '\n'), overflow: TextOverflow.fade, style: TextStyle(color: sub, fontSize: 12.2, height: 1.45))),
+                Expanded(child: Text.rich(_hl(_snippet(body.replaceAll(RegExp(r'\n{2,}'), '\n'), _query), _query), overflow: TextOverflow.fade, style: TextStyle(color: sub, fontSize: 12.2, height: 1.45))),
               ] else
                 const Spacer(),
               const SizedBox(height: 6),
@@ -2015,7 +2042,18 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                     Navigator.pop(context);
                   }
                 }, hub),
-                const Spacer(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(hintText: inBook ? 'Search ' + book.name : 'Search notes', hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500), prefixIcon: Icon(Icons.search_rounded, color: hub.muted, size: 20), filled: true, fillColor: hub.inputFill, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none), contentPadding: EdgeInsets.zero),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 if (!inBook || true) ...[
                   _round(Icons.checklist_rounded, () => setState(() {
                         _selecting = !_selecting;
@@ -2032,46 +2070,24 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                 ],
               ]),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 6, 22, 0),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Expanded(child: Text(inBook ? book.name : 'Notes', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: hub.title, fontWeight: FontWeight.w900, fontSize: 36, letterSpacing: -1.1, height: 1.1))),
-                const SizedBox(width: 8),
-                Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(inBook ? '${entries.length} in this book' : '$total ${total == 1 ? 'note' : 'notes'}  ·  ${sortLabels[_sort]}', style: TextStyle(color: hub.subtitle, fontWeight: FontWeight.w700, fontSize: 11.5))),
-              ]),
-            ),
-            if (!_selecting)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: Row(children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _quick,
-                      onSubmitted: (_) => _quickAdd(),
-                      textInputAction: TextInputAction.send,
-                      style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
-                      decoration: InputDecoration(hintText: inBook ? 'Jot a new note into this book' : 'Jot something down…', hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500), filled: true, fillColor: hub.inputFill, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(onTap: _quickAdd, child: Container(width: 46, height: 46, decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)])), child: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 22))),
-                ]),
-              ),
-            if (!inBook)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                child: TextField(
-                  onChanged: (v) => setState(() => _query = v),
-                  style: TextStyle(color: hub.title, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(hintText: 'Search your notes', hintStyle: TextStyle(color: hub.muted, fontWeight: FontWeight.w500), prefixIcon: Icon(Icons.search_rounded, color: hub.muted), filled: true, fillColor: hub.inputFill, isDense: true, border: OutlineInputBorder(borderRadius: BorderRadius.circular(26), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(vertical: 13)),
-                ),
-              ),
             if (!inBook)
               SizedBox(
                 height: 52,
                 child: ListView(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
+                  children: [
+                    for (final f in _noteFolders) ...[chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)), const SizedBox(width: 8)],
+                    chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
+                  ],
+                ),
+              ),
+            if (!inBook)
+              SizedBox(
+                height: 46,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
                   children: [
                     for (final f in _noteFolders) ...[chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)), const SizedBox(width: 8)],
                     chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
@@ -2090,8 +2106,6 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                   child: Text('Drop here to take it out of the book', style: TextStyle(color: hub.title, fontWeight: FontWeight.w800, fontSize: 12.5)),
                 ),
               ),
-            if (!_selecting && !_loading && entries.length > 1 && !inBook && _folder != _kTrashFolder)
-              Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 2), child: Text('Hold a note, then drag it: onto another note to make a book, or to a note\'s left edge to move it.', style: TextStyle(color: hub.muted, fontSize: 10.5, height: 1.3))),
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator(color: _accent))
