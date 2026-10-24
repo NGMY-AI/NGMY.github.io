@@ -2082,18 +2082,6 @@ class _BusinessNotesScreenState extends State<_BusinessNotesScreen> {
                   ],
                 ),
               ),
-            if (!inBook)
-              SizedBox(
-                height: 46,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-                  children: [
-                    for (final f in _noteFolders) ...[chip(f, _folder == f, () => setState(() => _folder = f), count: countFor(f)), const SizedBox(width: 8)],
-                    chip('Trash', _folder == _kTrashFolder, () => setState(() => _folder = _kTrashFolder), count: trashCount, color: const Color(0xFFEF4444)),
-                  ],
-                ),
-              ),
             if (_dragging != null && inBook)
               DragTarget<_NoteDrag>(
                 onWillAcceptWithDetails: (d) => !d.data.isBook,
